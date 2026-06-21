@@ -1,0 +1,156 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 823022c594b81634bb35040f69abbd59, type: 3}
+  m_Name: TOD_Clearing
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Lighting.TimeOfDayProfile
+  segmentBlend:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  checkpoints:
+  - label: Deep Night
+    hour: 0
+    sunColor: {r: 0.49019608, g: 0.5372549, b: 0.65882355, a: 1}
+    sunIntensity: 0
+    ambientColor: {r: 0.043137256, g: 0.05490196, b: 0.07450981, a: 1}
+    ambientIntensity: 0.08
+    skyTint: {r: 0.03137255, g: 0.039215688, b: 0.08235294, a: 1}
+    skyGroundColor: {r: 0.007843138, g: 0.007843138, b: 0.011764706, a: 1}
+    skyAtmosphereThickness: 0.15
+    skyExposure: 0.08
+    reflectionIntensity: 0.05
+    fogColor: {r: 0.06666667, g: 0.078431375, b: 0.12941177, a: 1}
+    fogDensity: 0
+  - label: Late Night
+    hour: 3
+    sunColor: {r: 0.49019608, g: 0.5372549, b: 0.65882355, a: 1}
+    sunIntensity: 0
+    ambientColor: {r: 0.05490196, g: 0.0627451, b: 0.09411765, a: 1}
+    ambientIntensity: 0.09
+    skyTint: {r: 0.0627451, g: 0.05490196, b: 0.1254902, a: 1}
+    skyGroundColor: {r: 0.011764706, g: 0.007843138, b: 0.015686275, a: 1}
+    skyAtmosphereThickness: 0.2
+    skyExposure: 0.1
+    reflectionIntensity: 0.06
+    fogColor: {r: 0.09019608, g: 0.078431375, b: 0.14509805, a: 1}
+    fogDensity: 0
+  - label: Pre-Dawn
+    hour: 5.25
+    sunColor: {r: 0.7882353, g: 0.47058824, b: 0.4745098, a: 1}
+    sunIntensity: 0
+    ambientColor: {r: 0.09019608, g: 0.07450981, b: 0.14901961, a: 1}
+    ambientIntensity: 0.12
+    skyTint: {r: 0.17254902, g: 0.105882354, b: 0.20784314, a: 1}
+    skyGroundColor: {r: 0.03137255, g: 0.023529412, b: 0.03529412, a: 1}
+    skyAtmosphereThickness: 0.45
+    skyExposure: 0.22
+    reflectionIntensity: 0.08
+    fogColor: {r: 0.17254902, g: 0.14117648, b: 0.2, a: 1}
+    fogDensity: 0
+  - label: Sunrise
+    hour: 6.5
+    sunColor: {r: 1, g: 0.5294118, b: 0.36078432, a: 1}
+    sunIntensity: 0.45
+    ambientColor: {r: 0.20784314, g: 0.14509805, b: 0.22745098, a: 1}
+    ambientIntensity: 0.25
+    skyTint: {r: 0.41568628, g: 0.30588236, b: 0.47058824, a: 1}
+    skyGroundColor: {r: 0.1254902, g: 0.07058824, b: 0.05490196, a: 1}
+    skyAtmosphereThickness: 1.2
+    skyExposure: 0.55
+    reflectionIntensity: 0.2
+    fogColor: {r: 0.5019608, g: 0.3882353, b: 0.43137255, a: 1}
+    fogDensity: 0
+  - label: Morning
+    hour: 9
+    sunColor: {r: 1, g: 0.8392157, b: 0.627451, a: 1}
+    sunIntensity: 0.9
+    ambientColor: {r: 0.57254905, g: 0.6, b: 0.6392157, a: 1}
+    ambientIntensity: 0.45
+    skyTint: {r: 0.47058824, g: 0.6431373, b: 0.72156864, a: 1}
+    skyGroundColor: {r: 0.35686275, g: 0.28627452, b: 0.23529412, a: 1}
+    skyAtmosphereThickness: 0.75
+    skyExposure: 0.9
+    reflectionIntensity: 0.35
+    fogColor: {r: 0.654902, g: 0.6901961, b: 0.7058824, a: 1}
+    fogDensity: 0
+  - label: Midday
+    hour: 12.5
+    sunColor: {r: 0.91764706, g: 0.9647059, b: 0.9098039, a: 1}
+    sunIntensity: 1.15
+    ambientColor: {r: 0.72156864, g: 0.7607843, b: 0.7529412, a: 1}
+    ambientIntensity: 0.55
+    skyTint: {r: 0.44705883, g: 0.6627451, b: 0.7372549, a: 1}
+    skyGroundColor: {r: 0.40784314, g: 0.4392157, b: 0.41568628, a: 1}
+    skyAtmosphereThickness: 0.65
+    skyExposure: 1
+    reflectionIntensity: 0.45
+    fogColor: {r: 0.70980394, g: 0.75686276, b: 0.7607843, a: 1}
+    fogDensity: 0
+  - label: Afternoon
+    hour: 16
+    sunColor: {r: 1, g: 0.827451, b: 0.627451, a: 1}
+    sunIntensity: 1
+    ambientColor: {r: 0.60784316, g: 0.57254905, b: 0.5411765, a: 1}
+    ambientIntensity: 0.45
+    skyTint: {r: 0.4745098, g: 0.6039216, b: 0.65882355, a: 1}
+    skyGroundColor: {r: 0.4, g: 0.3254902, b: 0.26666668, a: 1}
+    skyAtmosphereThickness: 0.75
+    skyExposure: 0.85
+    reflectionIntensity: 0.35
+    fogColor: {r: 0.6784314, g: 0.6431373, b: 0.627451, a: 1}
+    fogDensity: 0
+  - label: Sunset
+    hour: 19
+    sunColor: {r: 1, g: 0.3764706, b: 0.2784314, a: 1}
+    sunIntensity: 0.6
+    ambientColor: {r: 0.2901961, g: 0.18039216, b: 0.27450982, a: 1}
+    ambientIntensity: 0.25
+    skyTint: {r: 0.47843137, g: 0.20784314, b: 0.36078432, a: 1}
+    skyGroundColor: {r: 0.15294118, g: 0.07058824, b: 0.08627451, a: 1}
+    skyAtmosphereThickness: 1.3
+    skyExposure: 0.55
+    reflectionIntensity: 0.2
+    fogColor: {r: 0.47843137, g: 0.3254902, b: 0.39215687, a: 1}
+    fogDensity: 0
+  - label: Twilight
+    hour: 21.5
+    sunColor: {r: 0.7058824, g: 0.36078432, b: 0.49411765, a: 1}
+    sunIntensity: 0
+    ambientColor: {r: 0.09411765, g: 0.08235294, b: 0.16862746, a: 1}
+    ambientIntensity: 0.12
+    skyTint: {r: 0.15686275, g: 0.105882354, b: 0.27450982, a: 1}
+    skyGroundColor: {r: 0.03137255, g: 0.023529412, b: 0.043137256, a: 1}
+    skyAtmosphereThickness: 0.55
+    skyExposure: 0.2
+    reflectionIntensity: 0.08
+    fogColor: {r: 0.15686275, g: 0.13725491, b: 0.22745098, a: 1}
+    fogDensity: 0
