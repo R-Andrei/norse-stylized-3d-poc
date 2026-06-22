@@ -256,6 +256,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
     [RequireComponent(typeof(MeshCollider))]
     public sealed class GeneratedMass : MonoBehaviour
     {
+        private const string LegacyRiverFoamProxyObjectName =
+            "RiverFoamProxy";
+
         [SerializeField]
         private MassRecipe recipe = new MassRecipe();
 
@@ -284,6 +287,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private void OnValidate()
         {
             EnsureRecipeState();
+            RemoveLegacyRiverFoamProxy();
 
             if (!regenerateOnValidate)
             {
@@ -341,6 +345,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             meshCollider.sharedMesh = null;
             meshCollider.sharedMesh = generatedMesh;
             meshCollider.convex = false;
+
+            RemoveLegacyRiverFoamProxy();
         }
 
         [ContextMenu("New Shape")]
@@ -438,6 +444,31 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 meshCollider.sharedMesh == generatedMesh)
             {
                 meshCollider.sharedMesh = null;
+            }
+
+            RemoveLegacyRiverFoamProxy();
+        }
+
+        private void RemoveLegacyRiverFoamProxy()
+        {
+            Transform existing =
+                transform.Find(
+                    LegacyRiverFoamProxyObjectName);
+
+            if (existing == null)
+            {
+                return;
+            }
+
+            GameObject proxy = existing.gameObject;
+
+            if (Application.isPlaying)
+            {
+                Destroy(proxy);
+            }
+            else
+            {
+                DestroyImmediate(proxy);
             }
         }
 

@@ -1,0 +1,262 @@
+#pragma kernel InitializeFoam
+#pragma kernel StepFoam
+#pragma target 4.5
+
+// One persistent field only.
+// R = reaction chemical U
+// G = reaction chemical V / visible foam density
+// B = age
+// A = current source strength
+Texture2D<float4> _StateRead;
+RWTexture2D<float4> _StateWrite;
+
+int2 _TextureSize;
+float _DeltaTime;
+float _TimeValue;
+float _FlowSpeed;
+float _FlowDirection;
+float _RiverLength;
+float _RiverWidth;
+float _PatternScale;
+float _Breakup;
+float _Lifetime;
+float _Cohesion;
+float _BankSource;
+float _AmbientSource;
+float _Feed;
+float _Kill;
+float _Seed;
+
+float Hash21(float2 p)
+{
+    p = frac(p * float2(123.34, 345.45));
+    p += dot(p, p + 34.345 + _Seed * 0.0017);
+    return frac(p.x * p.y);
+}
+
+float ValueNoise(float2 p)
+{
+    float2 cell = floor(p);
+    float2 local = frac(p);
+    local = local * local * (3.0 - 2.0 * local);
+
+    float a = Hash21(cell);
+    float b = Hash21(cell + float2(1.0, 0.0));
+    float c = Hash21(cell + float2(0.0, 1.0));
+    float d = Hash21(cell + float2(1.0, 1.0));
+    return lerp(lerp(a, b, local.x), lerp(c, d, local.x), local.y);
+}
+
+float2 PixelToUV(uint2 pixel)
+{
+    return (float2(pixel) + 0.5) / max(float2(_TextureSize), 1.0);
+}
+
+float2 RiverMetres(float2 uv)
+{
+    return float2(
+        (uv.x - 0.5) * _RiverWidth,
+        uv.y * _RiverLength);
+}
+
+float4 LoadClamped(int2 pixel)
+{
+    int2 maximum = max(_TextureSize - int2(1, 1), int2(0, 0));
+    pixel = clamp(pixel, int2(0, 0), maximum);
+    return _StateRead.Load(int3(pixel, 0));
+}
+
+float4 SampleStateLinear(float2 uv)
+{
+    // Clamp instead of wrapping. Repeated texture boundaries were the source
+    // of the old travelling seam/front artefacts.
+    uv = saturate(uv);
+    float2 maximum = max(float2(_TextureSize - int2(1, 1)), float2(0.0, 0.0));
+    float2 pixelPosition = uv * maximum;
+    int2 p00 = int2(floor(pixelPosition));
+    int2 p10 = p00 + int2(1, 0);
+    int2 p01 = p00 + int2(0, 1);
+    int2 p11 = p00 + int2(1, 1);
+    float2 blend = frac(pixelPosition);
+
+    float4 row0 = lerp(LoadClamped(p00), LoadClamped(p10), blend.x);
+    float4 row1 = lerp(LoadClamped(p01), LoadClamped(p11), blend.x);
+    return lerp(row0, row1, blend.y);
+}
+
+float2 EvaluateVelocity(float2 uv)
+{
+    float scale = max(0.25, _PatternScale);
+    float2 metres = RiverMetres(uv) / scale;
+
+    // Smooth advection only. No threshold mask or second scrolling pattern is
+    // multiplied over the result, so there is no travelling wipe line.
+    float phaseA = metres.y * 0.41 + sin(metres.x * 0.53) + _TimeValue * 0.17;
+    float phaseB = metres.y * 0.19 - metres.x * 0.67 - _TimeValue * 0.13;
+
+    float lateralMetresPerSecond =
+        (sin(phaseA) * 0.58 + sin(phaseB) * 0.31) *
+        _Breakup *
+        scale *
+        0.20;
+
+    float alongVariation =
+        cos(phaseA * 0.61 + phaseB * 0.27) *
+        _Breakup *
+        scale *
+        0.08;
+
+    return float2(
+        lateralMetresPerSecond / max(0.01, _RiverWidth),
+        (_FlowSpeed * _FlowDirection + alongVariation) /
+            max(0.01, _RiverLength));
+}
+
+float EvaluateBankSource(float2 uv, float2 metres)
+{
+    float normalizedWidth =
+        saturate((_PatternScale * 0.32) / max(0.01, _RiverWidth));
+    float bankDistance = min(uv.x, 1.0 - uv.x);
+    float bankMask =
+        1.0 - smoothstep(0.0, max(0.004, normalizedWidth), bankDistance);
+
+    float variation =
+        0.5 +
+        0.30 * sin(metres.y / max(0.25, _PatternScale) * 0.91 + _Seed * 0.011) +
+        0.20 * sin(metres.y / max(0.25, _PatternScale) * 0.37 + 2.17);
+
+    return bankMask * smoothstep(0.34, 0.76, variation) * _BankSource;
+}
+
+float EvaluateAmbientSource(float2 metres)
+{
+    // Stable sparse source locations. Their output does not sweep across the
+    // river; the persistent state itself is what moves and changes.
+    float scale = max(0.25, _PatternScale);
+    float2 cells = metres / scale;
+    float broad = ValueNoise(cells * 0.47 + float2(13.7, 29.1));
+    float detail = ValueNoise(cells * 1.29 + float2(41.2, 7.6));
+    return
+        smoothstep(0.76, 0.94, broad) *
+        smoothstep(0.38, 0.74, detail) *
+        _AmbientSource;
+}
+
+float EvaluateSource(float2 uv)
+{
+    float2 metres = RiverMetres(uv);
+    return saturate(
+        EvaluateBankSource(uv, metres) +
+        EvaluateAmbientSource(metres));
+}
+
+[numthreads(8, 8, 1)]
+void InitializeFoam(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_TextureSize.x ||
+        dispatchId.y >= (uint)_TextureSize.y)
+    {
+        return;
+    }
+
+    uint2 pixel = dispatchId.xy;
+    float2 uv = PixelToUV(pixel);
+    float2 metres = RiverMetres(uv);
+    float scale = max(0.25, _PatternScale);
+
+    float broad = ValueNoise(metres / scale * 0.61 + float2(17.3, 5.9));
+    float detail = ValueNoise(metres / scale * 1.53 + float2(3.7, 31.4));
+    float seedMask =
+        smoothstep(0.67, 0.84, broad) *
+        smoothstep(0.28, 0.68, detail);
+    float source = EvaluateSource(uv);
+
+    float chemicalV = saturate(max(seedMask * 0.92, source * 1.8));
+    float chemicalU = saturate(1.0 - chemicalV * 0.90);
+
+    _StateWrite[pixel] = float4(chemicalU, chemicalV, 0.0, source);
+}
+
+[numthreads(8, 8, 1)]
+void StepFoam(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_TextureSize.x ||
+        dispatchId.y >= (uint)_TextureSize.y)
+    {
+        return;
+    }
+
+    uint2 pixel = dispatchId.xy;
+    float2 uv = PixelToUV(pixel);
+    float2 texel = 1.0 / max(float2(_TextureSize), 1.0);
+    float2 backtracedUV = uv - EvaluateVelocity(uv) * _DeltaTime;
+
+    float4 centre = SampleStateLinear(backtracedUV);
+    float4 north = SampleStateLinear(backtracedUV + float2(0.0, texel.y));
+    float4 south = SampleStateLinear(backtracedUV - float2(0.0, texel.y));
+    float4 east = SampleStateLinear(backtracedUV + float2(texel.x, 0.0));
+    float4 west = SampleStateLinear(backtracedUV - float2(texel.x, 0.0));
+    float4 northEast = SampleStateLinear(backtracedUV + texel);
+    float4 northWest = SampleStateLinear(backtracedUV + float2(-texel.x, texel.y));
+    float4 southEast = SampleStateLinear(backtracedUV + float2(texel.x, -texel.y));
+    float4 southWest = SampleStateLinear(backtracedUV - texel);
+
+    float4 laplacian =
+        -centre +
+        (north + south + east + west) * 0.20 +
+        (northEast + northWest + southEast + southWest) * 0.05;
+
+    float chemicalU = centre.r;
+    float chemicalV = centre.g;
+    float reaction = chemicalU * chemicalV * chemicalV;
+
+    float scaleFactor = clamp(_PatternScale / 1.35, 0.55, 1.8);
+    float diffusionU = 0.160 * scaleFactor;
+    float diffusionV = 0.080 * scaleFactor;
+    float reactionStep = min(1.0, _DeltaTime * 30.0);
+
+    // Stable local parameter variation creates organic differences without a
+    // time-driven wipe/front travelling through the rendered foam.
+    float stableVariation =
+        ValueNoise(RiverMetres(uv) / max(0.25, _PatternScale) * 0.39 + 23.1) -
+        0.5;
+    float localFeed = _Feed * (1.0 + stableVariation * _Breakup * 0.16);
+    float localKill = _Kill + stableVariation * _Breakup * 0.004;
+
+    chemicalU +=
+        (diffusionU * laplacian.r - reaction + localFeed * (1.0 - chemicalU)) *
+        reactionStep;
+    chemicalV +=
+        (diffusionV * laplacian.g + reaction - (localFeed + localKill) * chemicalV) *
+        reactionStep;
+
+    float neighbourV = (north.g + south.g + east.g + west.g) * 0.25;
+    float cohesionAmount =
+        saturate(_Cohesion * (1.0 - _Breakup * 0.45) * reactionStep * 0.08);
+    chemicalV = lerp(
+        chemicalV,
+        max(chemicalV, neighbourV * 0.985),
+        cohesionAmount);
+
+    float source = EvaluateSource(uv);
+    chemicalV += source * reactionStep * 0.12;
+    chemicalU -= source * reactionStep * 0.04;
+
+    // Very slow age loss prevents permanent saturation while preserving
+    // continuity from one frame to the next.
+    chemicalV *= exp(-_DeltaTime / max(1.0, _Lifetime) * 0.025);
+
+    // Let the state leave the downstream end instead of accumulating against
+    // the clamped texture edge.
+    float outletDistance = _FlowDirection >= 0.0 ? 1.0 - uv.y : uv.y;
+    float outletFade = smoothstep(0.0, 0.025, outletDistance);
+    chemicalV *= outletFade;
+
+    chemicalU = saturate(chemicalU);
+    chemicalV = saturate(chemicalV);
+
+    float age = saturate(centre.b + _DeltaTime / max(1.0, _Lifetime));
+    age = lerp(age, 0.0, saturate(source * reactionStep * 0.35));
+
+    _StateWrite[pixel] = float4(chemicalU, chemicalV, age, source);
+}

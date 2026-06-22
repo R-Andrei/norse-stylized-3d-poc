@@ -1,487 +1,201 @@
-Shader "PS3D/Clean Stylized River"
+Shader "PS3D/Stylized River Water"
 {
     Properties
     {
-        [Header(Palette)]
-        [HDR] _ShallowColor("Shallow Color", Color) = (0.42, 0.73, 0.73, 1)
-        [HDR] _DeepColor("Deep Color", Color) = (0.12, 0.42, 0.48, 1)
-        [HDR] _FlowTint("Flow Tint", Color) = (0.72, 0.92, 0.88, 1)
-        _Opacity("Opacity", Range(0.15, 1)) = 0.72
+        [Header(Water Body)]
+        _ShallowColor("Shallow Colour", Color) = (0.458, 0.802, 0.798, 1)
+        _DeepColor("Deep Colour", Color) = (0.0, 0.310, 0.594, 1)
+        _Clarity("Clarity", Range(0, 1)) = 0.62
+        _BodyDepthRange("Depth Range", Range(0.1, 8)) = 1.4
+        _BodyDepthContrast("Depth Contrast", Range(0, 1)) = 0.5
+        _WaterTintStrength("Water Tint Strength", Range(0, 1)) = 0.72
+        _SurfacePresence("Surface Presence", Range(0, 1)) = 0.46
 
-        [Header(Flow)]
-        _FlowTex("Flow Texture", 2D) = "gray" {}
-        _DetailTex("Detail Texture", 2D) = "gray" {}
-        _FlowScale("Flow Scale", Float) = 4.5
-        _FlowStrength("Flow Strength", Range(0, 1)) = 0.32
-        _DetailScale("Detail Scale", Float) = 0.85
-        _DetailStrength("Detail Strength", Range(0, 1)) = 0.38
-        _WaveHeight("Wave Height", Range(0, 0.16)) = 0.035
-        _BankLight("Bank Light", Range(0, 1)) = 0.35
-        _LightingSteps("Lighting Steps", Range(1, 6)) = 3
+        [HideInInspector]
+        _DomainFallbackDepth("Domain Fallback Depth", Float) = 1.1
 
-        [HideInInspector] _FlowDistance("Flow Distance", Float) = 0
-        [HideInInspector] _RiverTime("River Time", Float) = 0
-        [HideInInspector] _VisualSeed("Visual Seed", Float) = 1731
+        [Header(Body Validation)]
+        _BodyDebugView("Body Debug View", Range(0, 7)) = 0
     }
 
     SubShader
     {
         Tags
         {
-            "RenderType" = "Transparent"
-            "Queue" = "Transparent"
             "RenderPipeline" = "UniversalPipeline"
+            "RenderType" = "Opaque"
+            "Queue" = "Transparent-10"
         }
 
         Pass
         {
-            Name "ForwardRiver"
+            Name "ForwardWaterBody"
+            Tags { "LightMode" = "UniversalForward" }
 
-            Tags
-            {
-                "LightMode" = "UniversalForward"
-            }
-
-            Blend SrcAlpha OneMinusSrcAlpha
-            ZWrite Off
             Cull Off
+            ZWrite On
+            ZTest LEqual
+            Blend One Zero
 
             HLSLPROGRAM
-
             #pragma target 3.5
             #pragma vertex Vert
             #pragma fragment Frag
             #pragma multi_compile_fog
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
-            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-
-            TEXTURE2D(_FlowTex);
-            SAMPLER(sampler_FlowTex);
-
-            TEXTURE2D(_DetailTex);
-            SAMPLER(sampler_DetailTex);
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
+            #include "Includes/RiverWaterCommon.hlsl"
+            #include "Includes/RiverWaterDepth.hlsl"
+            #include "Includes/RiverWaterBody.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _ShallowColor;
                 half4 _DeepColor;
-                half4 _FlowTint;
-                float _Opacity;
-
-                float _FlowScale;
-                float _FlowStrength;
-                float _DetailScale;
-                float _DetailStrength;
-                float _WaveHeight;
-                float _BankLight;
-                float _LightingSteps;
-
-                float _FlowDistance;
-                float _RiverTime;
-                float _VisualSeed;
+                float _Clarity;
+                float _BodyDepthRange;
+                float _BodyDepthContrast;
+                float _WaterTintStrength;
+                float _SurfacePresence;
+                float _DomainFallbackDepth;
+                float _BodyDebugView;
             CBUFFER_END
 
             struct Attributes
             {
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
-                float4 tangentOS : TANGENT;
-                float2 uv : TEXCOORD0;
-                float4 color : COLOR;
+                float2 uv0 : TEXCOORD0;
+                float4 uv1 : TEXCOORD1;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct Varyings
             {
-                float4 positionHCS : SV_POSITION;
+                float4 positionCS : SV_POSITION;
                 float3 positionWS : TEXCOORD0;
-                float3 normalWS : TEXCOORD1;
-                float3 tangentWS : TEXCOORD2;
-                float3 bitangentWS : TEXCOORD3;
-                float2 uv : TEXCOORD4;
-                float4 color : TEXCOORD5;
-                half fogFactor : TEXCOORD6;
+                half3 baseNormalWS : TEXCOORD1;
+                float localDistance : TEXCOORD2;
+                float globalDistance : TEXCOORD3;
+                float lateralMetres : TEXCOORD4;
+                half fogFactor : TEXCOORD5;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+                UNITY_VERTEX_OUTPUT_STEREO
             };
 
-            float SampleDetailHeight(
-                float2 riverUv)
+            Varyings Vert(Attributes input)
             {
-                float safeScale =
-                    max(
-                        0.05,
-                        _DetailScale);
+                Varyings output = (Varyings)0;
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
-                float2 uv =
-                    float2(
-                        riverUv.x * 2.25 +
-                            _VisualSeed * 0.00031,
-                        (riverUv.y -
-                         _FlowDistance * 0.52) /
-                            safeScale +
-                            _VisualSeed * 0.00017);
-
-                float first =
-                    SAMPLE_TEXTURE2D_LOD(
-                        _DetailTex,
-                        sampler_DetailTex,
-                        uv,
-                        0).r;
-
-                float second =
-                    SAMPLE_TEXTURE2D_LOD(
-                        _DetailTex,
-                        sampler_DetailTex,
-                        uv *
-                            float2(
-                                1.83,
-                                1.29) +
-                            float2(
-                                0.37,
-                                0.19),
-                        0).r;
-
-                return
-                    first * 0.66 +
-                    second * 0.34;
-            }
-
-            Varyings Vert(
-                Attributes input)
-            {
-                Varyings output;
-
-                float3 positionOS =
-                    input.positionOS.xyz;
-
-                float bankFade =
-                    saturate(
-                        1.0 -
-                        abs(
-                            input.uv.x *
-                                2.0 -
-                            1.0));
-
-                bankFade =
-                    smoothstep(
-                        0.0,
-                        0.35,
-                        bankFade);
-
-                float detailHeight =
-                    SampleDetailHeight(
-                        input.uv);
-
-                float slowUndulation =
-                    sin(
-                        input.uv.y * 0.62 -
-                        _RiverTime * 0.75 +
-                        input.uv.x * 2.7 +
-                        _VisualSeed * 0.011) *
-                    0.5 +
-                    0.5;
-
-                float displacement =
-                    ((detailHeight - 0.5) * 0.72 +
-                     (slowUndulation - 0.5) * 0.28) *
-                    _WaveHeight *
-                    bankFade;
-
-                positionOS.y += displacement;
-
-                VertexPositionInputs positionInputs =
-                    GetVertexPositionInputs(
-                        positionOS);
-
-                VertexNormalInputs normalInputs =
-                    GetVertexNormalInputs(
-                        input.normalOS,
-                        input.tangentOS);
-
-                output.positionHCS =
-                    positionInputs.positionCS;
-
-                output.positionWS =
-                    positionInputs.positionWS;
-
-                output.normalWS =
-                    normalInputs.normalWS;
-
-                output.tangentWS =
-                    normalInputs.tangentWS;
-
-                output.bitangentWS =
-                    normalInputs.bitangentWS;
-
-                output.uv = input.uv;
-                output.color = input.color;
-
-                output.fogFactor =
-                    ComputeFogFactor(
-                        positionInputs.positionCS.z);
-
+                output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                output.positionCS = TransformWorldToHClip(output.positionWS);
+                output.baseNormalWS = normalize(
+                    TransformObjectToWorldNormal(input.normalOS));
+                output.localDistance = input.uv0.y;
+                output.globalDistance = input.uv1.x;
+                output.lateralMetres = input.uv1.y;
+                output.fogFactor = ComputeFogFactor(output.positionCS.z);
                 return output;
             }
 
-            half4 Frag(
-                Varyings input) : SV_Target
+            half4 Frag(Varyings input) : SV_Target
             {
-                float safeFlowScale =
-                    max(
-                        0.05,
-                        _FlowScale);
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
-                float safeDetailScale =
-                    max(
-                        0.05,
-                        _DetailScale);
+                float2 screenUV = GetNormalizedScreenSpaceUV(
+                    input.positionCS);
 
-                float acrossSigned =
-                    input.uv.x * 2.0 - 1.0;
+                RiverWaterSurfaceInputs surfaceInputs;
+                surfaceInputs.positionWS = input.positionWS;
+                surfaceInputs.baseNormalWS = normalize(input.baseNormalWS);
+                surfaceInputs.localDistance = input.localDistance;
+                surfaceInputs.globalDistance = input.globalDistance;
+                surfaceInputs.lateralMetres = input.lateralMetres;
 
-                float centreAmount =
-                    pow(
-                        saturate(
-                            1.0 -
-                            abs(acrossSigned)),
-                        0.72);
+                // Later stages populate this structure. Stage 2 deliberately
+                // supplies neutral values so the body contract does not need
+                // to be refactored when motion, refraction, foam, and
+                // reflections are introduced.
+                RiverWaterIntegrationInputs integration =
+                    RiverWaterCreateEmptyIntegration(
+                        surfaceInputs.baseNormalWS);
 
-                float bankAmount =
-                    1.0 -
-                    centreAmount;
+                float2 backgroundUV = saturate(
+                    screenUV + integration.refractionOffset);
+                float3 sceneColour = SampleSceneColor(backgroundUV);
 
-                float boundedWarp =
-                    sin(
-                        input.uv.y * 0.19 +
-                        _VisualSeed * 0.013) *
-                    0.055;
+                RiverWaterDepthData depthData = RiverWaterEvaluateDepth(
+                    screenUV,
+                    surfaceInputs.positionWS,
+                    _DomainFallbackDepth,
+                    _BodyDepthRange,
+                    _BodyDepthContrast,
+                    _Clarity);
 
-                // Provisional Body Flow sampling: the current source texture repeats along local cumulative
-                // spline distance, and that repetition is a known visual limitation. The future replacement
-                // must sample a fixed-world-scale procedural field using global connected-river distance.
-                // Do not normalize by total river length, and do not generate one unrelated mask per chunk.
-                float2 flowUvA =
-                    float2(
-                        input.uv.x * 1.55 +
-                            boundedWarp,
-                        (input.uv.y -
-                         _FlowDistance) /
-                            safeFlowScale);
+                float3 viewDirectionWS = GetWorldSpaceNormalizeViewDir(
+                    surfaceInputs.positionWS);
+                float viewFacing = saturate(dot(
+                    surfaceInputs.baseNormalWS,
+                    viewDirectionWS));
 
-                float2 flowUvB =
-                    float2(
-                        input.uv.x * 2.35 -
-                            boundedWarp * 0.7 +
-                            0.31,
-                        (input.uv.y -
-                         _FlowDistance * 0.74) /
-                            (safeFlowScale * 0.63) +
-                            0.17);
+                RiverWaterBodyResult body = RiverWaterComposeBody(
+                    sceneColour,
+                    _ShallowColor.rgb,
+                    _DeepColor.rgb,
+                    depthData,
+                    _WaterTintStrength,
+                    _SurfacePresence,
+                    viewFacing);
 
-                float flowA =
-                    SAMPLE_TEXTURE2D(
-                        _FlowTex,
-                        sampler_FlowTex,
-                        flowUvA).r;
+                float3 finalColour = RiverWaterApplyReservedIntegration(
+                    body.colour,
+                    integration);
+                finalColour = MixFog(finalColour, input.fogFactor);
 
-                float flowB =
-                    SAMPLE_TEXTURE2D(
-                        _FlowTex,
-                        sampler_FlowTex,
-                        flowUvB).r;
+                int debugMode = (int)round(_BodyDebugView);
 
-                float flowPattern =
-                    saturate(
-                        flowA * 0.68 +
-                        flowB * 0.32);
+                if (debugMode == 1)
+                {
+                    return half4(depthData.normalizedDepth.xxx, 1.0);
+                }
 
-                float2 detailUv =
-                    float2(
-                        input.uv.x * 2.4 +
-                            _VisualSeed * 0.00023,
-                        (input.uv.y -
-                         _FlowDistance * 0.52) /
-                            safeDetailScale);
+                if (debugMode == 2)
+                {
+                    return half4(depthData.depthBlend.xxx, 1.0);
+                }
 
-                float detail =
-                    SAMPLE_TEXTURE2D(
-                        _DetailTex,
-                        sampler_DetailTex,
-                        detailUv).r;
+                if (debugMode == 3)
+                {
+                    return half4(depthData.transmission.xxx, 1.0);
+                }
 
-                float2 texel =
-                    float2(
-                        0.008,
-                        0.014);
+                if (debugMode == 4)
+                {
+                    return half4(body.coverage.xxx, 1.0);
+                }
 
-                float detailLeft =
-                    SAMPLE_TEXTURE2D(
-                        _DetailTex,
-                        sampler_DetailTex,
-                        detailUv -
-                            float2(
-                                texel.x,
-                                0)).r;
+                if (debugMode == 5)
+                {
+                    return half4(sceneColour, 1.0);
+                }
 
-                float detailRight =
-                    SAMPLE_TEXTURE2D(
-                        _DetailTex,
-                        sampler_DetailTex,
-                        detailUv +
-                            float2(
-                                texel.x,
-                                0)).r;
+                if (debugMode == 6)
+                {
+                    return half4(depthData.validSceneDepth.xxx, 1.0);
+                }
 
-                float detailDown =
-                    SAMPLE_TEXTURE2D(
-                        _DetailTex,
-                        sampler_DetailTex,
-                        detailUv -
-                            float2(
-                                0,
-                                texel.y)).r;
+                if (debugMode == 7)
+                {
+                    return half4(body.surfaceCoverage.xxx, 1.0);
+                }
 
-                float detailUp =
-                    SAMPLE_TEXTURE2D(
-                        _DetailTex,
-                        sampler_DetailTex,
-                        detailUv +
-                            float2(
-                                0,
-                                texel.y)).r;
-
-                float3 detailNormalTS =
-                    normalize(
-                        float3(
-                            (detailLeft -
-                             detailRight) *
-                                2.8 *
-                                _DetailStrength,
-                            (detailDown -
-                             detailUp) *
-                                2.8 *
-                                _DetailStrength,
-                            1.0));
-
-                half3 normalWS =
-                    normalize(
-                        input.tangentWS *
-                            detailNormalTS.x +
-                        input.bitangentWS *
-                            detailNormalTS.y +
-                        input.normalWS *
-                            detailNormalTS.z);
-
-                half3 baseColor =
-                    lerp(
-                        _ShallowColor.rgb,
-                        _DeepColor.rgb,
-                        centreAmount);
-
-                baseColor =
-                    lerp(
-                        baseColor,
-                        baseColor +
-                            _FlowTint.rgb *
-                            0.34,
-                        bankAmount *
-                        _BankLight);
-
-                float signedFlow =
-                    (flowPattern - 0.5) *
-                    2.0;
-
-                half3 color =
-                    baseColor +
-                    _FlowTint.rgb *
-                    signedFlow *
-                    _FlowStrength *
-                    0.36;
-
-                color +=
-                    _FlowTint.rgb *
-                    (detail - 0.5) *
-                    _DetailStrength *
-                    0.12;
-
-                Light mainLight =
-                    GetMainLight();
-
-                half wrappedLight =
-                    saturate(
-                        (dot(
-                            normalWS,
-                            mainLight.direction) +
-                         0.42) /
-                        1.42);
-
-                float steps =
-                    max(
-                        1.0,
-                        _LightingSteps);
-
-                half quantizedLight =
-                    floor(
-                        wrappedLight *
-                            steps +
-                        0.5) /
-                    steps;
-
-                half3 ambient =
-                    max(
-                        SampleSH(
-                            normalWS),
-                        half3(
-                            0.03,
-                            0.03,
-                            0.03));
-
-                color *=
-                    ambient * 0.62 +
-                    mainLight.color *
-                    quantizedLight *
-                    0.78 +
-                    half3(
-                        0.20,
-                        0.20,
-                        0.20);
-
-                half3 viewDirectionWS =
-                    GetWorldSpaceNormalizeViewDir(
-                        input.positionWS);
-
-                half fresnel =
-                    pow(
-                        saturate(
-                            1.0 -
-                            dot(
-                                normalWS,
-                                viewDirectionWS)),
-                        3.0);
-
-                color +=
-                    _FlowTint.rgb *
-                    fresnel *
-                    0.10;
-
-                color =
-                    MixFog(
-                        color,
-                        input.fogFactor);
-
-                half alpha =
-                    _Opacity *
-                    lerp(
-                        0.86,
-                        1.0,
-                        centreAmount);
-
-                return
-                    half4(
-                        color,
-                        alpha);
+                return half4(saturate(finalColour), 1.0);
             }
-
             ENDHLSL
         }
     }

@@ -514,16 +514,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         if (!river.TryEvaluate(
                                 point,
                                 out float distance,
-                                out float waterHeight) ||
+                                out float waterHeight,
+                                out float halfWidth) ||
                             distance >
-                            river.MaximumInfluenceDistance)
+                            halfWidth + river.BankBlend)
                         {
                             continue;
                         }
 
                         float influence =
                             river.EvaluateInfluence(
-                                distance);
+                                distance,
+                                halfWidth);
 
                         if (influence <= 0f)
                         {
@@ -533,7 +535,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         float targetHeight =
                             river.EvaluateTargetHeight(
                                 distance,
-                                waterHeight);
+                                waterHeight,
+                                halfWidth);
 
                         // River channels only carve downward. A misplaced
                         // spline must never lift existing terrain.

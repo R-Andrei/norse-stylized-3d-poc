@@ -15,18 +15,82 @@ namespace ProgrammaticStylized3D.Rivers
             Vector3 side,
             float distance,
             float normalizedTime)
+            : this(
+                centre,
+                centre,
+                tangent,
+                side,
+                Vector3.up,
+                distance,
+                distance,
+                distance,
+                0.5f,
+                0.5f,
+                normalizedTime,
+                normalizedTime)
+        {
+        }
+
+        public StylizedRiverSplineSample(
+            Vector3 centre,
+            Vector3 surfacePoint,
+            Vector3 tangent,
+            Vector3 side,
+            Vector3 up,
+            float localDistance,
+            float orientedDistance,
+            float globalDistance,
+            float halfWidth,
+            float surfaceHalfWidth,
+            float normalizedDistance,
+            float normalizedTime)
         {
             Centre = centre;
+            SurfacePoint = surfacePoint;
             Tangent = tangent;
             Side = side;
-            Distance = distance;
+            Up = up;
+            Distance = localDistance;
+            OrientedDistance = orientedDistance;
+            GlobalDistance = globalDistance;
+            HalfWidth = halfWidth;
+            SurfaceHalfWidth = surfaceHalfWidth;
+            NormalizedDistance = normalizedDistance;
             NormalizedTime = normalizedTime;
         }
 
+        /// <summary>Authored spline centre before the visual surface offset.</summary>
         public Vector3 Centre { get; }
+
+        /// <summary>Actual centre of the generated water surface.</summary>
+        public Vector3 SurfacePoint { get; }
+
+        /// <summary>Planar tangent in authored spline order.</summary>
         public Vector3 Tangent { get; }
+
+        /// <summary>Planar right vector across the river.</summary>
         public Vector3 Side { get; }
+
+        /// <summary>Supported river-surface up direction. Currently world up.</summary>
+        public Vector3 Up { get; }
+
+        /// <summary>Local geometric distance from the authored spline start, in metres.</summary>
         public float Distance { get; }
+
+        /// <summary>Distance measured downstream after reverse-flow orientation, in metres.</summary>
+        public float OrientedDistance { get; }
+
+        /// <summary>Connected-river offset plus oriented distance, in metres.</summary>
+        public float GlobalDistance { get; }
+
+        /// <summary>Logical channel half-width, excluding hidden bank underlap.</summary>
+        public float HalfWidth { get; }
+
+        /// <summary>Generated surface half-width, including hidden bank underlap.</summary>
+        public float SurfaceHalfWidth { get; }
+
+        public float SurfaceHeight => SurfacePoint.y;
+        public float NormalizedDistance { get; }
         public float NormalizedTime { get; }
     }
 
@@ -38,81 +102,249 @@ namespace ProgrammaticStylized3D.Rivers
             Vector3 side,
             float distanceAlong,
             float acrossDistance)
+            : this(
+                centre,
+                centre,
+                tangent,
+                side,
+                Vector3.up,
+                distanceAlong,
+                distanceAlong,
+                distanceAlong,
+                acrossDistance,
+                0f,
+                0f,
+                0f,
+                false)
+        {
+        }
+
+        public StylizedRiverProjection(
+            Vector3 centre,
+            Vector3 surfacePoint,
+            Vector3 tangent,
+            Vector3 side,
+            Vector3 up,
+            float localDistance,
+            float orientedDistance,
+            float globalDistance,
+            float acrossMetres,
+            float acrossNormalized,
+            float distanceToNearestBank,
+            float halfWidth,
+            bool isInside)
         {
             Centre = centre;
+            SurfacePoint = surfacePoint;
             Tangent = tangent;
             Side = side;
-            DistanceAlong = distanceAlong;
-            AcrossDistance = acrossDistance;
+            Up = up;
+            LocalDistance = localDistance;
+            OrientedDistance = orientedDistance;
+            GlobalDistance = globalDistance;
+            AcrossMetres = acrossMetres;
+            AcrossNormalized = acrossNormalized;
+            DistanceToNearestBank = distanceToNearestBank;
+            HalfWidth = halfWidth;
+            IsInside = isInside;
         }
 
         public Vector3 Centre { get; }
+        public Vector3 SurfacePoint { get; }
         public Vector3 Tangent { get; }
         public Vector3 Side { get; }
-        public float DistanceAlong { get; }
-        public float AcrossDistance { get; }
+        public Vector3 Up { get; }
+        public float LocalDistance { get; }
+        public float OrientedDistance { get; }
+        public float GlobalDistance { get; }
+        public float AcrossMetres { get; }
+        public float AcrossNormalized { get; }
+        public float Across01 => AcrossNormalized * 0.5f + 0.5f;
+        public float DistanceToNearestBank { get; }
+        public float HalfWidth { get; }
+        public bool IsInside { get; }
+
+        // Compatibility aliases for older river consumers.
+        public float DistanceAlong => LocalDistance;
+        public float AcrossDistance => AcrossMetres;
     }
 
     public static class StylizedRiverGeometry
     {
-        public static float BuildSplineSamples(
+        private const int MinimumLookupSamples = 64;
+        private const int MaximumLookupSamples = 65536;
+        private const float MinimumSampleSpacing = 0.05f;
+        private const float MinimumLookupSpacing = 0.015f;
+
+        public static RiverDomainSnapshot BuildDomain(
             SplineContainer container,
             float targetSpacing,
-            List<StylizedRiverSplineSample> samples)
+            float width,
+            float edgeOverlap,
+            float surfaceOffset,
+            float connectedDistanceOffset,
+            bool reverseFlow,
+            int version)
         {
-            if (samples == null)
-            {
-                throw new ArgumentNullException(nameof(samples));
-            }
+            float resolvedSpacing =
+                Mathf.Max(
+                    MinimumSampleSpacing,
+                    targetSpacing);
 
-            samples.Clear();
-
-            if (container == null ||
-                container.Splines.Count == 0)
+            if (container == null || container.Splines.Count == 0)
             {
-                return 0f;
+                return new RiverDomainSnapshot(
+                    Array.Empty<StylizedRiverSplineSample>(),
+                    0f,
+                    resolvedSpacing,
+                    connectedDistanceOffset,
+                    reverseFlow,
+                    version);
             }
 
             float approximateLength =
-                Mathf.Max(0.01f, container.CalculateLength());
-
-            int sampleCount =
                 Mathf.Max(
-                    2,
-                    Mathf.CeilToInt(
-                        approximateLength /
-                        Mathf.Max(0.05f, targetSpacing)) + 1);
+                    0.01f,
+                    container.CalculateLength());
 
-            // This local cumulative spline distance is correct for one authored river slice. Future
-            // procedural assembly should add a global distance offset per connected segment, and reversed
-            // segments should use segmentLength - localDistance. Current-ribbon placement may later adopt
-            // the same coordinate so distribution does not reset at chunk transitions.
+            float lookupSpacing =
+                Mathf.Max(
+                    MinimumLookupSpacing,
+                    Mathf.Min(0.1f, resolvedSpacing * 0.2f));
+
+            int lookupCount =
+                Mathf.Clamp(
+                    Mathf.CeilToInt(approximateLength / lookupSpacing) + 1,
+                    MinimumLookupSamples,
+                    MaximumLookupSamples);
+
+            Vector3[] lookupPositions = new Vector3[lookupCount];
+            float[] lookupParameters = new float[lookupCount];
+            float[] lookupDistances = new float[lookupCount];
+
             float cumulativeDistance = 0f;
-            Vector3 previousCentre = Vector3.zero;
-            Vector3 previousTangent = Vector3.forward;
 
-            for (int index = 0; index < sampleCount; index++)
+            for (int index = 0; index < lookupCount; index++)
             {
-                float t =
-                    index / (float)(sampleCount - 1);
+                float t = index / (float)(lookupCount - 1);
+                float3 positionValue = container.EvaluatePosition(t);
 
-                float3 positionValue =
-                    container.EvaluatePosition(t);
-
-                float3 tangentValue =
-                    container.EvaluateTangent(t);
-
-                Vector3 centre =
+                Vector3 position =
                     new Vector3(
                         positionValue.x,
                         positionValue.y,
                         positionValue.z);
 
-                Vector3 tangent =
-                    new Vector3(
-                        tangentValue.x,
-                        0f,
-                        tangentValue.z);
+                lookupPositions[index] = position;
+                lookupParameters[index] = t;
+
+                if (index > 0)
+                {
+                    cumulativeDistance +=
+                        Vector3.Distance(
+                            lookupPositions[index - 1],
+                            position);
+                }
+
+                lookupDistances[index] = cumulativeDistance;
+            }
+
+            float actualLength = cumulativeDistance;
+
+            if (actualLength <= 0.0001f)
+            {
+                return new RiverDomainSnapshot(
+                    Array.Empty<StylizedRiverSplineSample>(),
+                    0f,
+                    resolvedSpacing,
+                    connectedDistanceOffset,
+                    reverseFlow,
+                    version);
+            }
+
+            int sampleCount =
+                Mathf.Max(
+                    2,
+                    Mathf.CeilToInt(actualLength / resolvedSpacing) + 1);
+
+            float actualSampleSpacing =
+                actualLength /
+                Mathf.Max(1, sampleCount - 1);
+
+            Vector3[] centres = new Vector3[sampleCount];
+            float[] parameters = new float[sampleCount];
+            float[] distances = new float[sampleCount];
+
+            int lookupCursor = 1;
+
+            for (int sampleIndex = 0;
+                 sampleIndex < sampleCount;
+                 sampleIndex++)
+            {
+                float targetDistance =
+                    sampleIndex == sampleCount - 1
+                        ? actualLength
+                        : sampleIndex * actualSampleSpacing;
+
+                while (lookupCursor < lookupCount - 1 &&
+                       lookupDistances[lookupCursor] < targetDistance)
+                {
+                    lookupCursor++;
+                }
+
+                int lowerIndex = Mathf.Max(0, lookupCursor - 1);
+                int upperIndex = Mathf.Min(lookupCount - 1, lookupCursor);
+
+                float distanceT =
+                    Mathf.InverseLerp(
+                        lookupDistances[lowerIndex],
+                        lookupDistances[upperIndex],
+                        targetDistance);
+
+                centres[sampleIndex] =
+                    Vector3.Lerp(
+                        lookupPositions[lowerIndex],
+                        lookupPositions[upperIndex],
+                        distanceT);
+
+                parameters[sampleIndex] =
+                    Mathf.Lerp(
+                        lookupParameters[lowerIndex],
+                        lookupParameters[upperIndex],
+                        distanceT);
+
+                distances[sampleIndex] = targetDistance;
+            }
+
+            float halfWidth = Mathf.Max(0.25f, width * 0.5f);
+            float surfaceHalfWidth =
+                Mathf.Max(
+                    halfWidth,
+                    halfWidth + Mathf.Max(0f, edgeOverlap));
+
+            StylizedRiverSplineSample[] samples =
+                new StylizedRiverSplineSample[sampleCount];
+
+            Vector3 previousTangent = Vector3.forward;
+
+            for (int index = 0; index < sampleCount; index++)
+            {
+                Vector3 previous = centres[Mathf.Max(0, index - 1)];
+                Vector3 next = centres[Mathf.Min(sampleCount - 1, index + 1)];
+                Vector3 tangent = next - previous;
+                tangent.y = 0f;
+
+                if (tangent.sqrMagnitude < 0.000001f)
+                {
+                    float3 tangentValue =
+                        container.EvaluateTangent(parameters[index]);
+
+                    tangent =
+                        new Vector3(
+                            tangentValue.x,
+                            0f,
+                            tangentValue.z);
+                }
 
                 if (tangent.sqrMagnitude < 0.000001f)
                 {
@@ -125,36 +357,86 @@ namespace ProgrammaticStylized3D.Rivers
 
                 previousTangent = tangent;
 
-                Vector3 side =
-                    Vector3.Cross(Vector3.up, tangent).normalized;
+                Vector3 up = Vector3.up;
+                Vector3 side = Vector3.Cross(up, tangent).normalized;
+                float localDistance = distances[index];
+                float orientedDistance =
+                    reverseFlow
+                        ? actualLength - localDistance
+                        : localDistance;
 
-                if (index > 0)
-                {
-                    cumulativeDistance +=
-                        Vector3.Distance(previousCentre, centre);
-                }
+                float normalizedDistance =
+                    actualLength > 0.0001f
+                        ? localDistance / actualLength
+                        : 0f;
 
-                previousCentre = centre;
+                Vector3 centre = centres[index];
+                Vector3 surfacePoint = centre + up * surfaceOffset;
 
-                samples.Add(
+                samples[index] =
                     new StylizedRiverSplineSample(
                         centre,
+                        surfacePoint,
                         tangent,
                         side,
-                        cumulativeDistance,
-                        t));
+                        up,
+                        localDistance,
+                        orientedDistance,
+                        connectedDistanceOffset + orientedDistance,
+                        halfWidth,
+                        surfaceHalfWidth,
+                        normalizedDistance,
+                        parameters[index]);
             }
 
-            return cumulativeDistance;
+            return new RiverDomainSnapshot(
+                samples,
+                actualLength,
+                resolvedSpacing,
+                connectedDistanceOffset,
+                reverseFlow,
+                version);
+        }
+
+        /// <summary>
+        /// Compatibility bridge for older consumers. New systems should consume
+        /// StylizedRiver.Domain so every subsystem shares one authoritative snapshot.
+        /// </summary>
+        public static float BuildSplineSamples(
+            SplineContainer container,
+            float targetSpacing,
+            List<StylizedRiverSplineSample> samples)
+        {
+            if (samples == null)
+            {
+                throw new ArgumentNullException(nameof(samples));
+            }
+
+            RiverDomainSnapshot domain =
+                BuildDomain(
+                    container,
+                    targetSpacing,
+                    1f,
+                    0f,
+                    0f,
+                    0f,
+                    false,
+                    0);
+
+            samples.Clear();
+
+            for (int index = 0; index < domain.SampleCount; index++)
+            {
+                samples.Add(domain.Samples[index]);
+            }
+
+            return domain.LocalLength;
         }
 
         public static void BuildSurfaceMesh(
             Transform owner,
-            IReadOnlyList<StylizedRiverSplineSample> samples,
-            float width,
-            float edgeOverlap,
+            RiverDomainSnapshot domain,
             int crossSegments,
-            float surfaceOffset,
             Mesh mesh)
         {
             if (owner == null)
@@ -169,15 +451,14 @@ namespace ProgrammaticStylized3D.Rivers
 
             mesh.Clear();
 
-            if (samples == null ||
-                samples.Count < 2)
+            if (domain == null || !domain.IsValid)
             {
                 return;
             }
 
-            int acrossVertexCount =
-                Mathf.Max(2, crossSegments + 1);
+            IReadOnlyList<StylizedRiverSplineSample> samples = domain.Samples;
 
+            int acrossVertexCount = Mathf.Max(2, crossSegments + 1);
             int rowCount = samples.Count;
             int vertexCount = rowCount * acrossVertexCount;
             int triangleIndexCount =
@@ -189,35 +470,41 @@ namespace ProgrammaticStylized3D.Rivers
             Vector3[] normals = new Vector3[vertexCount];
             Vector4[] tangents = new Vector4[vertexCount];
             Vector2[] uvs = new Vector2[vertexCount];
+            List<Vector4> domainUvs = new List<Vector4>(vertexCount);
             Color[] colors = new Color[vertexCount];
             int[] triangles = new int[triangleIndexCount];
-
-            float halfWidth =
-                Mathf.Max(0.25f, width * 0.5f + edgeOverlap);
-
-            Vector3 localUp =
-                owner.InverseTransformDirection(Vector3.up).normalized;
 
             for (int row = 0; row < rowCount; row++)
             {
                 StylizedRiverSplineSample sample = samples[row];
 
                 Vector3 localTangent =
-                    owner.InverseTransformDirection(sample.Tangent).normalized;
+                    owner.InverseTransformDirection(
+                        sample.Tangent).normalized;
 
-                for (int acrossIndex = 0; acrossIndex < acrossVertexCount; acrossIndex++)
+                Vector3 localUp =
+                    owner.InverseTransformDirection(
+                        sample.Up).normalized;
+
+                for (int acrossIndex = 0;
+                     acrossIndex < acrossVertexCount;
+                     acrossIndex++)
                 {
                     float across01 =
-                        acrossIndex / (float)(acrossVertexCount - 1);
+                        acrossIndex /
+                        (float)(acrossVertexCount - 1);
 
                     float acrossSigned = across01 * 2f - 1f;
+                    float acrossMetres =
+                        acrossSigned * sample.SurfaceHalfWidth;
 
                     Vector3 worldPosition =
-                        sample.Centre +
-                        sample.Side * (acrossSigned * halfWidth) +
-                        Vector3.up * surfaceOffset;
+                        sample.SurfacePoint +
+                        sample.Side * acrossMetres;
 
-                    int vertexIndex = row * acrossVertexCount + acrossIndex;
+                    int vertexIndex =
+                        row * acrossVertexCount +
+                        acrossIndex;
 
                     vertices[vertexIndex] =
                         owner.InverseTransformPoint(worldPosition);
@@ -231,11 +518,30 @@ namespace ProgrammaticStylized3D.Rivers
                             localTangent.z,
                             1f);
 
+                    // Existing contract: normalized cross-river position and
+                    // local geometric metres along the authored spline.
                     uvs[vertexIndex] =
-                        new Vector2(across01, sample.Distance);
+                        new Vector2(
+                            across01,
+                            sample.Distance);
 
+                    // Reserved domain contract for later systems:
+                    // x global downstream metres, y signed lateral metres,
+                    // z oriented local metres, w generated surface half-width.
+                    domainUvs.Add(
+                        new Vector4(
+                            sample.GlobalDistance,
+                            acrossMetres,
+                            sample.OrientedDistance,
+                            sample.SurfaceHalfWidth));
+
+                    // Vertex colour remains non-authoritative compatibility data.
                     colors[vertexIndex] =
-                        new Color(across01, sample.NormalizedTime, 0f, 1f);
+                        new Color(
+                            across01,
+                            sample.NormalizedDistance,
+                            0f,
+                            1f);
                 }
             }
 
@@ -243,7 +549,9 @@ namespace ProgrammaticStylized3D.Rivers
 
             for (int row = 0; row < rowCount - 1; row++)
             {
-                for (int acrossIndex = 0; acrossIndex < acrossVertexCount - 1; acrossIndex++)
+                for (int acrossIndex = 0;
+                     acrossIndex < acrossVertexCount - 1;
+                     acrossIndex++)
                 {
                     int a = row * acrossVertexCount + acrossIndex;
                     int b = a + 1;
@@ -269,123 +577,10 @@ namespace ProgrammaticStylized3D.Rivers
             mesh.normals = normals;
             mesh.tangents = tangents;
             mesh.uv = uvs;
+            mesh.SetUVs(1, domainUvs);
             mesh.colors = colors;
             mesh.triangles = triangles;
             mesh.RecalculateBounds();
-        }
-
-        public static void BuildCurrentAccentMesh(
-            Transform owner,
-            IReadOnlyList<StylizedRiverSplineSample> samples,
-            float riverLength,
-            float riverWidth,
-            float yOffset,
-            float density,
-            float length,
-            float lineWidth,
-            float curvature,
-            float speed,
-            float animationDistance,
-            int seed,
-            int rowsPerAccent,
-            Mesh mesh)
-        {
-            if (owner == null)
-            {
-                throw new ArgumentNullException(nameof(owner));
-            }
-
-            if (mesh == null)
-            {
-                throw new ArgumentNullException(nameof(mesh));
-            }
-
-            mesh.Clear();
-
-            if (samples == null ||
-                samples.Count < 2 ||
-                riverLength <= 0.01f ||
-                density <= 0.001f ||
-                length <= 0.05f ||
-                lineWidth <= 0.005f)
-            {
-                return;
-            }
-
-            RibbonMeshBuilder builder = new RibbonMeshBuilder();
-
-            float safeDensity = Mathf.Max(0.05f, density);
-            int accentCount = Mathf.Clamp(
-                Mathf.CeilToInt(riverLength * safeDensity),
-                1,
-                512);
-
-            float safeLength = Mathf.Max(0.05f, length);
-            float halfWidth = Mathf.Max(0.1f, riverWidth * 0.5f);
-            float usableHalfWidth = Mathf.Max(0.05f, halfWidth - lineWidth * 1.5f);
-            float loopLength = riverLength + safeLength * 1.35f;
-            int safeRows = Mathf.Max(2, rowsPerAccent);
-
-            for (int accentIndex = 0; accentIndex < accentCount; accentIndex++)
-            {
-                float baseOffset =
-                    Hash01(seed, accentIndex, 11) * loopLength;
-
-                float speedScale =
-                    Mathf.Lerp(0.82f, 1.18f, Hash01(seed, accentIndex, 23));
-
-                float accentLength =
-                    safeLength * Mathf.Lerp(0.72f, 1.28f, Hash01(seed, accentIndex, 31));
-
-                float accentWidth =
-                    lineWidth * Mathf.Lerp(0.8f, 1.2f, Hash01(seed, accentIndex, 47));
-
-                float acrossOffset =
-                    (Hash01(seed, accentIndex, 59) * 2f - 1f) * usableHalfWidth * 0.82f;
-
-                float phase =
-                    Hash01(seed, accentIndex, 71) * Mathf.PI * 2f;
-
-                float curveAmplitude =
-                    curvature * Mathf.Lerp(0.08f, 0.35f, Hash01(seed, accentIndex, 89)) * safeLength;
-
-                float along =
-                    Mathf.Repeat(baseOffset + animationDistance * speed * speedScale, loopLength) - accentLength;
-
-                float startDistance = along;
-                float endDistance = along + accentLength;
-
-                if (endDistance <= 0f || startDistance >= riverLength)
-                {
-                    continue;
-                }
-
-                float visibleStart = Mathf.Clamp(startDistance, 0f, riverLength);
-                float visibleEnd = Mathf.Clamp(endDistance, 0f, riverLength);
-
-                if (visibleEnd - visibleStart <= 0.02f)
-                {
-                    continue;
-                }
-
-                AddCurrentAccent(
-                    owner,
-                    samples,
-                    yOffset,
-                    visibleStart,
-                    visibleEnd,
-                    startDistance,
-                    endDistance,
-                    acrossOffset,
-                    accentWidth,
-                    curveAmplitude,
-                    phase,
-                    safeRows,
-                    Hash01(seed, accentIndex, 97),
-                    builder);
-            }
-
-            builder.Apply(mesh);
         }
 
         public static bool TryProjectPoint(
@@ -415,7 +610,9 @@ namespace ProgrammaticStylized3D.Rivers
 
                 float t =
                     lengthSqr > 0.000001f
-                        ? Mathf.Clamp01(Vector2.Dot(point - a2, segment) / lengthSqr)
+                        ? Mathf.Clamp01(
+                            Vector2.Dot(point - a2, segment) /
+                            lengthSqr)
                         : 0f;
 
                 Vector2 nearest = a2 + segment * t;
@@ -427,19 +624,32 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 bestDistanceSqr = distanceSqr;
+                StylizedRiverSplineSample sample = InterpolateStoredSample(a, b, t);
+                Vector3 delta = worldPoint - sample.SurfacePoint;
+                float acrossMetres = Vector3.Dot(delta, sample.Side);
+                float acrossNormalized =
+                    sample.HalfWidth > 0.0001f
+                        ? acrossMetres / sample.HalfWidth
+                        : 0f;
 
-                Vector3 centre = Vector3.Lerp(a.Centre, b.Centre, t);
-                Vector3 tangent = Vector3.Slerp(a.Tangent, b.Tangent, t).normalized;
-                Vector3 side = Vector3.Cross(Vector3.up, tangent).normalized;
-                Vector3 delta = worldPoint - centre;
+                float bankDistance =
+                    sample.HalfWidth - Mathf.Abs(acrossMetres);
 
                 projection =
                     new StylizedRiverProjection(
-                        centre,
-                        tangent,
-                        side,
-                        Mathf.Lerp(a.Distance, b.Distance, t),
-                        Vector3.Dot(delta, side));
+                        sample.Centre,
+                        sample.SurfacePoint,
+                        sample.Tangent,
+                        sample.Side,
+                        sample.Up,
+                        sample.Distance,
+                        sample.OrientedDistance,
+                        sample.GlobalDistance,
+                        acrossMetres,
+                        acrossNormalized,
+                        bankDistance,
+                        sample.HalfWidth,
+                        bankDistance >= 0f);
             }
 
             return !float.IsPositiveInfinity(bestDistanceSqr);
@@ -476,154 +686,94 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
-                float t = Mathf.InverseLerp(a.Distance, b.Distance, distance);
-                Vector3 centre = Vector3.Lerp(a.Centre, b.Centre, t);
-                Vector3 tangent = Vector3.Slerp(a.Tangent, b.Tangent, t).normalized;
-                Vector3 side = Vector3.Cross(Vector3.up, tangent).normalized;
+                float t =
+                    Mathf.InverseLerp(
+                        a.Distance,
+                        b.Distance,
+                        distance);
 
-                return new StylizedRiverSplineSample(
-                    centre,
-                    tangent,
-                    side,
-                    distance,
-                    Mathf.Lerp(a.NormalizedTime, b.NormalizedTime, t));
+                return InterpolateStoredSample(a, b, t);
             }
 
             return last;
         }
 
-        private static void AddCurrentAccent(
-            Transform owner,
-            IReadOnlyList<StylizedRiverSplineSample> samples,
-            float yOffset,
-            float visibleStart,
-            float visibleEnd,
-            float fullStart,
-            float fullEnd,
-            float baseAcrossOffset,
-            float baseWidth,
-            float curveAmplitude,
-            float phase,
-            int rowCount,
-            float randomSeed,
-            RibbonMeshBuilder builder)
+        internal static StylizedRiverSplineSample InterpolateSample(
+            StylizedRiverSplineSample a,
+            StylizedRiverSplineSample b,
+            float t,
+            float localDistance,
+            float localLength,
+            float connectedDistanceOffset,
+            bool reverseFlow)
         {
-            int firstVertex = builder.VertexCount;
+            Vector3 tangent =
+                Vector3.Slerp(
+                    a.Tangent,
+                    b.Tangent,
+                    t).normalized;
 
-            float fullLength = Mathf.Max(0.001f, fullEnd - fullStart);
+            Vector3 up =
+                Vector3.Slerp(
+                    a.Up,
+                    b.Up,
+                    t).normalized;
 
-            for (int row = 0; row <= rowCount; row++)
-            {
-                float t = row / (float)rowCount;
-                float distance = Mathf.Lerp(visibleStart, visibleEnd, t);
+            Vector3 side = Vector3.Cross(up, tangent).normalized;
+            float orientedDistance =
+                reverseFlow
+                    ? localLength - localDistance
+                    : localDistance;
 
-                StylizedRiverSplineSample sample =
-                    SampleAtDistance(samples, distance);
-
-                float fullT = Mathf.InverseLerp(fullStart, fullEnd, distance);
-
-                float curve =
-                    Mathf.Sin(fullT * Mathf.PI + phase) * curveAmplitude;
-
-                float acrossOffset =
-                    baseAcrossOffset + curve;
-
-                float taper =
-                    Mathf.Sin(fullT * Mathf.PI);
-
-                taper = Mathf.Pow(Mathf.Clamp01(taper), 0.75f);
-
-                float widthHere = Mathf.Max(0.006f, baseWidth * taper);
-
-                Vector3 centre =
-                    sample.Centre +
-                    sample.Side * acrossOffset +
-                    Vector3.up * yOffset;
-
-                Vector3 side = sample.Side;
-
-                Vector3 left = centre - side * widthHere * 0.5f;
-                Vector3 right = centre + side * widthHere * 0.5f;
-
-                Color metadata = new Color(randomSeed, fullT, taper, 1f);
-
-                builder.AddVertex(owner.InverseTransformPoint(left), new Vector2(0f, fullT), metadata);
-                builder.AddVertex(owner.InverseTransformPoint(right), new Vector2(1f, fullT), metadata);
-            }
-
-            for (int row = 0; row < rowCount; row++)
-            {
-                int baseIndex = firstVertex + row * 2;
-                builder.AddQuad(baseIndex, baseIndex + 2, baseIndex + 1, baseIndex + 3);
-            }
+            return new StylizedRiverSplineSample(
+                Vector3.Lerp(a.Centre, b.Centre, t),
+                Vector3.Lerp(a.SurfacePoint, b.SurfacePoint, t),
+                tangent,
+                side,
+                up,
+                localDistance,
+                orientedDistance,
+                connectedDistanceOffset + orientedDistance,
+                Mathf.Lerp(a.HalfWidth, b.HalfWidth, t),
+                Mathf.Lerp(a.SurfaceHalfWidth, b.SurfaceHalfWidth, t),
+                localLength > 0.0001f
+                    ? localDistance / localLength
+                    : 0f,
+                Mathf.Lerp(a.NormalizedTime, b.NormalizedTime, t));
         }
 
-        private static float Hash01(int seed, int index, int salt)
+        private static StylizedRiverSplineSample InterpolateStoredSample(
+            StylizedRiverSplineSample a,
+            StylizedRiverSplineSample b,
+            float t)
         {
-            unchecked
-            {
-                uint hash = (uint)seed;
-                hash ^= (uint)(index * 374761393);
-                hash ^= (uint)(salt * 668265263);
-                hash = (hash ^ (hash >> 13)) * 1274126177u;
-                hash ^= hash >> 16;
-                return (hash & 0x00FFFFFFu) / 16777215f;
-            }
-        }
+            Vector3 tangent =
+                Vector3.Slerp(
+                    a.Tangent,
+                    b.Tangent,
+                    t).normalized;
 
-        private sealed class RibbonMeshBuilder
-        {
-            private readonly List<Vector3> vertices = new List<Vector3>();
-            private readonly List<Vector2> uvs = new List<Vector2>();
-            private readonly List<Color> colors = new List<Color>();
-            private readonly List<int> triangles = new List<int>();
-            private readonly List<Vector3> normals = new List<Vector3>();
-            private readonly List<Vector4> tangents = new List<Vector4>();
+            Vector3 up =
+                Vector3.Slerp(
+                    a.Up,
+                    b.Up,
+                    t).normalized;
 
-            public int VertexCount => vertices.Count;
+            Vector3 side = Vector3.Cross(up, tangent).normalized;
 
-            public void AddVertex(Vector3 position, Vector2 uv, Color color)
-            {
-                vertices.Add(position);
-                uvs.Add(uv);
-                colors.Add(color);
-                normals.Add(Vector3.up);
-                tangents.Add(new Vector4(1f, 0f, 0f, 1f));
-            }
-
-            public void AddQuad(int a, int b, int c, int d)
-            {
-                triangles.Add(a);
-                triangles.Add(b);
-                triangles.Add(c);
-
-                triangles.Add(c);
-                triangles.Add(b);
-                triangles.Add(d);
-            }
-
-            public void Apply(Mesh mesh)
-            {
-                mesh.Clear();
-
-                if (vertices.Count == 0)
-                {
-                    return;
-                }
-
-                mesh.indexFormat =
-                    vertices.Count > 65535
-                        ? IndexFormat.UInt32
-                        : IndexFormat.UInt16;
-
-                mesh.SetVertices(vertices);
-                mesh.SetNormals(normals);
-                mesh.SetTangents(tangents);
-                mesh.SetUVs(0, uvs);
-                mesh.SetColors(colors);
-                mesh.SetTriangles(triangles, 0, true);
-                mesh.RecalculateBounds();
-            }
+            return new StylizedRiverSplineSample(
+                Vector3.Lerp(a.Centre, b.Centre, t),
+                Vector3.Lerp(a.SurfacePoint, b.SurfacePoint, t),
+                tangent,
+                side,
+                up,
+                Mathf.Lerp(a.Distance, b.Distance, t),
+                Mathf.Lerp(a.OrientedDistance, b.OrientedDistance, t),
+                Mathf.Lerp(a.GlobalDistance, b.GlobalDistance, t),
+                Mathf.Lerp(a.HalfWidth, b.HalfWidth, t),
+                Mathf.Lerp(a.SurfaceHalfWidth, b.SurfaceHalfWidth, t),
+                Mathf.Lerp(a.NormalizedDistance, b.NormalizedDistance, t),
+                Mathf.Lerp(a.NormalizedTime, b.NormalizedTime, t));
         }
     }
 }
