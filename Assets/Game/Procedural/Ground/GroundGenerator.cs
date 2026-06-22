@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using ProgrammaticStylized3D.Geometry;
+using ProgrammaticStylized3D.Rivers;
 
 namespace ProgrammaticStylized3D.Geometry.Ground
 {
@@ -9,7 +10,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
     {
         public static MeshData Generate(
             GroundRecipe recipe,
-            IReadOnlyList<GroundModifierSnapshot> modifiers)
+            IReadOnlyList<GroundModifierSnapshot> modifiers,
+            IReadOnlyList<StylizedRiverGroundSnapshot> rivers)
         {
             if (recipe == null)
             {
@@ -88,6 +90,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 spacing,
                 halfSize,
                 modifiers);
+
+            ApplyRivers(
+                heights,
+                resolution,
+                spacing,
+                halfSize,
+                rivers);
 
             return BuildMeshData(
                 recipe,
@@ -404,18 +413,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         Vector2 point =
                             new Vector2(localX, localZ);
 
-                        if (modifier.Mode ==
-                            GroundModifierMode.RiverBed)
-                        {
-                            ApplyRiverModifier(
-                                heights,
-                                index,
-                                point,
-                                modifier);
-
-                            continue;
-                        }
-
                         float weight =
                             modifier.EvaluateWeight(point);
 
@@ -464,55 +461,95 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
         }
 
-        private static void ApplyRiverModifier(
+        private static void ApplyRivers(
             float[] heights,
-            int index,
-            Vector2 point,
-            GroundModifierSnapshot modifier)
+            int resolution,
+            float spacing,
+            float halfSize,
+            IReadOnlyList<StylizedRiverGroundSnapshot> rivers)
         {
-            if (!modifier.TryEvaluateRiver(
-                    point,
-                    out float distance,
-                    out float waterHeight))
+            if (rivers == null ||
+                rivers.Count == 0)
             {
                 return;
             }
 
-            float maximumDistance =
-                modifier.RiverWidth * 0.5f +
-                modifier.RiverBankWidth;
-
-            if (distance > maximumDistance)
+            for (int riverIndex = 0;
+                 riverIndex < rivers.Count;
+                 riverIndex++)
             {
-                return;
+                StylizedRiverGroundSnapshot river =
+                    rivers[riverIndex];
+
+                if (!river.IsValid)
+                {
+                    continue;
+                }
+
+                for (int z = 0;
+                     z < resolution;
+                     z++)
+                {
+                    float localZ =
+                        -halfSize +
+                        z * spacing;
+
+                    for (int x = 0;
+                         x < resolution;
+                         x++)
+                    {
+                        float localX =
+                            -halfSize +
+                            x * spacing;
+
+                        int index =
+                            z * resolution +
+                            x;
+
+                        Vector2 point =
+                            new Vector2(
+                                localX,
+                                localZ);
+
+                        if (!river.TryEvaluate(
+                                point,
+                                out float distance,
+                                out float waterHeight) ||
+                            distance >
+                            river.MaximumInfluenceDistance)
+                        {
+                            continue;
+                        }
+
+                        float influence =
+                            river.EvaluateInfluence(
+                                distance);
+
+                        if (influence <= 0f)
+                        {
+                            continue;
+                        }
+
+                        float targetHeight =
+                            river.EvaluateTargetHeight(
+                                distance,
+                                waterHeight);
+
+                        // River channels only carve downward. A misplaced
+                        // spline must never lift existing terrain.
+                        targetHeight =
+                            Mathf.Min(
+                                targetHeight,
+                                heights[index]);
+
+                        heights[index] =
+                            Mathf.Lerp(
+                                heights[index],
+                                targetHeight,
+                                influence);
+                    }
+                }
             }
-
-            float influence =
-                modifier.EvaluateRiverInfluence(
-                    distance);
-
-            if (influence <= 0f)
-            {
-                return;
-            }
-
-            float targetHeight =
-                modifier.EvaluateRiverTargetHeight(
-                    distance,
-                    waterHeight);
-
-            // A river modifier carves. It must not lift low terrain
-            // upward toward a misplaced spline.
-            targetHeight =
-                Mathf.Min(
-                    targetHeight,
-                    heights[index]);
-
-            heights[index] =
-                Mathf.Lerp(
-                    heights[index],
-                    targetHeight,
-                    influence);
         }
 
         private static MeshData BuildMeshData(

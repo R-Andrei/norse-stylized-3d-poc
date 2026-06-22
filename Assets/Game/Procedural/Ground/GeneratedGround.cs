@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using ProgrammaticStylized3D.Geometry;
+using ProgrammaticStylized3D.Rivers;
 
 namespace ProgrammaticStylized3D.Geometry.Ground
 {
@@ -161,12 +162,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField, HideInInspector]
         private GroundModifier[] modifiers = Array.Empty<GroundModifier>();
 
+        [SerializeField, HideInInspector]
+        private StylizedRiver[] rivers = Array.Empty<StylizedRiver>();
+
         private MeshFilter meshFilter;
         private MeshCollider meshCollider;
         private Mesh generatedMesh;
 
         public GroundRecipe Recipe => recipe;
         public int ModifierCount => modifiers != null ? modifiers.Length : 0;
+        public int RiverCount => rivers != null ? rivers.Length : 0;
 
         private void OnEnable()
         {
@@ -203,9 +208,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             List<GroundModifierSnapshot> snapshots =
                 BuildModifierSnapshots();
 
+            List<StylizedRiverGroundSnapshot> riverSnapshots =
+                BuildRiverSnapshots();
+
             MeshData meshData = GroundGenerator.Generate(
                 recipe,
-                snapshots);
+                snapshots,
+                riverSnapshots);
 
             string meshName =
                 $"GeneratedGround_{recipe.PatchSize}_{recipe.Resolution}_Seed{recipe.ShapeSeed}";
@@ -240,12 +249,27 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 modifiers,
                 (left, right) =>
                     left.PriorityValue.CompareTo(right.PriorityValue));
+
+            rivers = GetComponentsInChildren<StylizedRiver>(true);
         }
 
         public void NotifyModifierChanged(GroundModifier modifier)
         {
             if (modifier == null ||
                 !modifier.transform.IsChildOf(transform))
+            {
+                return;
+            }
+
+            RefreshModifiers();
+            Regenerate();
+        }
+
+        public void NotifyRiverChanged(StylizedRiver river)
+        {
+            if (river == null ||
+                (river.transform != transform &&
+                 !river.transform.IsChildOf(transform)))
             {
                 return;
             }
@@ -326,6 +350,41 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             snapshots.Sort(
                 (left, right) =>
                     left.Priority.CompareTo(right.Priority));
+
+            return snapshots;
+        }
+
+        private List<StylizedRiverGroundSnapshot> BuildRiverSnapshots()
+        {
+            List<StylizedRiverGroundSnapshot> snapshots =
+                new List<StylizedRiverGroundSnapshot>();
+
+            if (!recipe.UseModifiers ||
+                rivers == null)
+            {
+                return snapshots;
+            }
+
+            for (int index = 0;
+                 index < rivers.Length;
+                 index++)
+            {
+                StylizedRiver river = rivers[index];
+
+                if (river == null ||
+                    !river.isActiveAndEnabled)
+                {
+                    continue;
+                }
+
+                StylizedRiverGroundSnapshot snapshot =
+                    river.CreateGroundSnapshot(transform);
+
+                if (snapshot.IsValid)
+                {
+                    snapshots.Add(snapshot);
+                }
+            }
 
             return snapshots;
         }
