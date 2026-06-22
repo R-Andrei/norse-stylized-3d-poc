@@ -1,5 +1,18 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-4288149380100595281
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Editor::UnityEditor.Rendering.Universal.AssetVersion
+  version: 10
 --- !u!21 &2100000
 Material:
   serializedVersion: 8
@@ -7,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: MAT_Thatch_Roof
+  m_Name: M_PixelFrozenDirt
   m_Shader: {fileID: -6465566751694194690, guid: e88dcc2f542a49e429a211631d1271ef, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -88,8 +101,10 @@ Material:
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
+    - _Cell_Size: 0.051
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
+    - _Cluster_Strength: 0.613
     - _Cull: 2
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
@@ -103,42 +118,34 @@ Material:
     - _Metallic: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.005
-    - _PixelCellSize: 0.03
-    - _PixelClusterStrength: 0.583
-    - _PixelEffectStrength: 0.933
-    - _PixelSeed: 0
-    - _PixelToneCount: 2.53
-    - _PixelVariation: 0.049
-    - _PixelVertexVariation: 0.06
+    - _PixelCellSize: 0.058
+    - _PixelClusterStrength: 0.591
+    - _PixelEffectStrength: 1
+    - _PixelSeed: 906
+    - _PixelToneCount: 3.89
+    - _PixelVariation: 0.057
+    - _PixelVertexVariation: 0.09
+    - _Pixel_Seed: 4979
+    - _Pixel_Variation: 0.047
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _Smoothness: 0.03
+    - _Smoothness: 0.2
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
+    - _Tone_Count: 4.96
+    - _Vertex_Variation: 0.08
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.4811321, g: 0.4474244, b: 0.35177112, a: 1}
-    - _Color: {r: 0.4811321, g: 0.44742435, b: 0.3517711, a: 1}
+    - _BaseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+    - _Base_Color: {r: 0.34901956, g: 0.38823527, b: 0.41960776, a: 1}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
---- !u!114 &8926549602408890313
-MonoBehaviour:
-  m_ObjectHideFlags: 11
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Editor::UnityEditor.Rendering.Universal.AssetVersion
-  version: 10

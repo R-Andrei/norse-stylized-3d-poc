@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: MAT_Thatch_Roof
+  m_Name: MAT_Wood_Dark
   m_Shader: {fileID: -6465566751694194690, guid: e88dcc2f542a49e429a211631d1271ef, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -88,8 +88,10 @@ Material:
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
+    - _Cell_Size: 0.18
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
+    - _Cluster_Strength: 0.65
     - _Cull: 2
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
@@ -103,33 +105,38 @@ Material:
     - _Metallic: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.005
-    - _PixelCellSize: 0.03
-    - _PixelClusterStrength: 0.583
-    - _PixelEffectStrength: 0.933
-    - _PixelSeed: 0
-    - _PixelToneCount: 2.53
-    - _PixelVariation: 0.049
-    - _PixelVertexVariation: 0.06
+    - _PixelCellSize: 0.045
+    - _PixelClusterStrength: 0.494
+    - _PixelEffectStrength: 1
+    - _PixelSeed: 2980
+    - _PixelToneCount: 4.2
+    - _PixelVariation: 0.065
+    - _PixelVertexVariation: 0.045
+    - _Pixel_Seed: 17
+    - _Pixel_Variation: 0.14
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _Smoothness: 0.03
+    - _Smoothness: 0.161
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
+    - _Tone_Count: 3
+    - _Vertex_Variation: 0.06
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.4811321, g: 0.4474244, b: 0.35177112, a: 1}
-    - _Color: {r: 0.4811321, g: 0.44742435, b: 0.3517711, a: 1}
+    - _BaseColor: {r: 0.21960784, g: 0.18039216, b: 0.16470589, a: 1}
+    - _Base_Color: {r: 0.34901956, g: 0.38823527, b: 0.41960776, a: 1}
+    - _Color: {r: 0.2196078, g: 0.18039212, b: 0.16470584, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
---- !u!114 &8926549602408890313
+--- !u!114 &4887616478088640131
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
