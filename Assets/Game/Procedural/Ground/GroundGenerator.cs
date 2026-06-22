@@ -404,6 +404,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         Vector2 point =
                             new Vector2(localX, localZ);
 
+                        if (modifier.Mode ==
+                            GroundModifierMode.RiverBed)
+                        {
+                            ApplyRiverModifier(
+                                heights,
+                                index,
+                                point,
+                                modifier);
+
+                            continue;
+                        }
+
                         float weight =
                             modifier.EvaluateWeight(point);
 
@@ -450,6 +462,57 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     }
                 }
             }
+        }
+
+        private static void ApplyRiverModifier(
+            float[] heights,
+            int index,
+            Vector2 point,
+            GroundModifierSnapshot modifier)
+        {
+            if (!modifier.TryEvaluateRiver(
+                    point,
+                    out float distance,
+                    out float waterHeight))
+            {
+                return;
+            }
+
+            float maximumDistance =
+                modifier.RiverWidth * 0.5f +
+                modifier.RiverBankWidth;
+
+            if (distance > maximumDistance)
+            {
+                return;
+            }
+
+            float influence =
+                modifier.EvaluateRiverInfluence(
+                    distance);
+
+            if (influence <= 0f)
+            {
+                return;
+            }
+
+            float targetHeight =
+                modifier.EvaluateRiverTargetHeight(
+                    distance,
+                    waterHeight);
+
+            // A river modifier carves. It must not lift low terrain
+            // upward toward a misplaced spline.
+            targetHeight =
+                Mathf.Min(
+                    targetHeight,
+                    heights[index]);
+
+            heights[index] =
+                Mathf.Lerp(
+                    heights[index],
+                    targetHeight,
+                    influence);
         }
 
         private static MeshData BuildMeshData(

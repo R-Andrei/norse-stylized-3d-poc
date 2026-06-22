@@ -1,5 +1,7 @@
 using System;
+using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Splines;
 
 namespace ProgrammaticStylized3D.Geometry.Ground
 {
@@ -7,13 +9,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
     {
         Flatten,
         Raise,
-        Lower
+        Lower,
+        RiverBed
     }
 
     public enum GroundModifierShape
     {
         Circle,
-        Box
+        Box,
+        Spline
     }
 
     public enum GroundModifierPriority
@@ -22,6 +26,21 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         Normal,
         High,
         Critical
+    }
+
+    public enum RiverSplineResolution
+    {
+        Low,
+        Medium,
+        High,
+        VeryHigh
+    }
+
+    public enum RiverBankStyle
+    {
+        Gentle,
+        Natural,
+        Steep
     }
 
     [ExecuteAlways]
@@ -45,7 +64,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float strength = 1f;
 
-        [Tooltip("Distance, in metres, over which the modifier blends back to untouched terrain.")]
+        [Tooltip("Distance, in metres, over which a circle or box modifier blends back to untouched terrain.")]
         [Range(0f, 20f)]
         [SerializeField]
         private float blendDistance = 3f;
@@ -69,6 +88,40 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float preserveDetail = 0.15f;
 
+        [Header("River Bed")]
+
+        [Tooltip("Spline whose Y position represents the water-surface level.")]
+        [SerializeField]
+        private SplineContainer splineContainer;
+
+        [SerializeField]
+        private RiverSplineResolution riverSplineResolution =
+            RiverSplineResolution.Medium;
+
+        [Tooltip("Full visible channel width, in metres.")]
+        [Range(0.5f, 20f)]
+        [SerializeField]
+        private float riverWidth = 4f;
+
+        [Tooltip("Horizontal bank blend distance on each side of the channel.")]
+        [Range(0.25f, 20f)]
+        [SerializeField]
+        private float riverBankWidth = 3f;
+
+        [Tooltip("Bed depth beneath the spline's water level.")]
+        [Range(0.1f, 8f)]
+        [SerializeField]
+        private float riverDepth = 1.2f;
+
+        [Tooltip("Zero creates a rounded cross-section. One creates a flat bed.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float riverBedFlatness = 0.75f;
+
+        [SerializeField]
+        private RiverBankStyle riverBankStyle =
+            RiverBankStyle.Natural;
+
         [Tooltip("Update the parent GeneratedGround when this modifier changes.")]
         [SerializeField]
         private bool autoRegenerateParent = true;
@@ -83,6 +136,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public float HeightAmount => heightAmount;
         public float PreserveDetail => preserveDetail;
         public bool AutoRegenerateParent => autoRegenerateParent;
+        public SplineContainer SplineContainer => ResolveSplineContainer();
+        public RiverSplineResolution RiverResolution => riverSplineResolution;
+        public float RiverWidth => riverWidth;
+        public float RiverBankWidth => riverBankWidth;
+        public float RiverDepth => riverDepth;
+        public float RiverBedFlatness => riverBedFlatness;
+        public RiverBankStyle RiverBankStyle => riverBankStyle;
+        public bool IsRiverBed => mode == GroundModifierMode.RiverBed;
 
         public int PriorityValue => priority switch
         {
@@ -95,8 +156,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         private void OnEnable()
         {
+            ResolveRiverState();
             transform.hasChanged = false;
-            NotifyParent();
+            NotifyDependants();
         }
 
         private void OnValidate()
@@ -113,9 +175,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             blendDistance =
                 Mathf.Max(0f, blendDistance);
 
+            riverWidth =
+                Mathf.Max(0.5f, riverWidth);
+
+            riverBankWidth =
+                Mathf.Max(0.25f, riverBankWidth);
+
+            riverDepth =
+                Mathf.Max(0.1f, riverDepth);
+
+            ResolveRiverState();
+
             if (autoRegenerateParent)
             {
-                NotifyParent();
+                NotifyDependants();
             }
         }
 
@@ -131,7 +204,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             if (autoRegenerateParent)
             {
-                NotifyParent();
+                NotifyDependants();
             }
         }
 
@@ -166,6 +239,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     localForward3.x,
                     localForward3.z).normalized;
 
+            Vector3[] localSplinePoints =
+                BuildLocalSplinePoints(
+                    groundTransform);
+
             return new GroundModifierSnapshot(
                 mode,
                 shape,
@@ -181,16 +258,149 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 circleRadius,
                 boxSize,
                 heightAmount,
-                preserveDetail);
+                preserveDetail,
+                localSplinePoints,
+                riverWidth,
+                riverBankWidth,
+                riverDepth,
+                riverBedFlatness,
+                riverBankStyle);
+        }
+
+        public bool UsesSpline(Spline spline)
+        {
+            SplineContainer container =
+                ResolveSplineContainer();
+
+            if (container == null ||
+                spline == null)
+            {
+                return false;
+            }
+
+            for (int i = 0;
+                 i < container.Splines.Count;
+                 i++)
+            {
+                if (ReferenceEquals(
+                        container.Splines[i],
+                        spline))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static float ResolveSplineSpacing(
+            RiverSplineResolution resolution)
+        {
+            return resolution switch
+            {
+                RiverSplineResolution.Low => 2f,
+                RiverSplineResolution.Medium => 1f,
+                RiverSplineResolution.High => 0.5f,
+                RiverSplineResolution.VeryHigh => 0.25f,
+                _ => 1f
+            };
         }
 
         [ContextMenu("Regenerate Parent Ground")]
         public void RegenerateParentGround()
         {
-            NotifyParent();
+            NotifyDependants();
         }
 
-        private void NotifyParent()
+        private void ResolveRiverState()
+        {
+            if (mode == GroundModifierMode.RiverBed)
+            {
+                shape = GroundModifierShape.Spline;
+
+                if (splineContainer == null)
+                {
+                    splineContainer =
+                        GetComponent<SplineContainer>();
+                }
+            }
+            else if (shape == GroundModifierShape.Spline)
+            {
+                shape = GroundModifierShape.Circle;
+            }
+        }
+
+        private SplineContainer ResolveSplineContainer()
+        {
+            if (splineContainer != null)
+            {
+                return splineContainer;
+            }
+
+            return GetComponent<SplineContainer>();
+        }
+
+        private Vector3[] BuildLocalSplinePoints(
+            Transform groundTransform)
+        {
+            if (mode != GroundModifierMode.RiverBed)
+            {
+                return Array.Empty<Vector3>();
+            }
+
+            SplineContainer container =
+                ResolveSplineContainer();
+
+            if (container == null ||
+                container.Splines.Count == 0)
+            {
+                return Array.Empty<Vector3>();
+            }
+
+            float length =
+                Mathf.Max(
+                    0.01f,
+                    container.CalculateLength());
+
+            float spacing =
+                ResolveSplineSpacing(
+                    riverSplineResolution);
+
+            int sampleCount =
+                Mathf.Max(
+                    2,
+                    Mathf.CeilToInt(
+                        length / spacing) + 1);
+
+            Vector3[] points =
+                new Vector3[sampleCount];
+
+            for (int i = 0;
+                 i < sampleCount;
+                 i++)
+            {
+                float t =
+                    i /
+                    (float)(sampleCount - 1);
+
+                float3 evaluated =
+                    container.EvaluatePosition(t);
+
+                Vector3 worldPosition =
+                    new Vector3(
+                        evaluated.x,
+                        evaluated.y,
+                        evaluated.z);
+
+                points[i] =
+                    groundTransform.InverseTransformPoint(
+                        worldPosition);
+            }
+
+            return points;
+        }
+
+        private void NotifyDependants()
         {
             GeneratedGround ground =
                 GetComponentInParent<GeneratedGround>();
@@ -199,10 +409,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             {
                 ground.NotifyModifierChanged(this);
             }
+
+            GeneratedRiver river =
+                GetComponent<GeneratedRiver>();
+
+            if (river != null)
+            {
+                river.Regenerate();
+            }
         }
 
         private void OnDrawGizmosSelected()
         {
+            if (mode == GroundModifierMode.RiverBed)
+            {
+                DrawRiverGizmos();
+                return;
+            }
+
             Quaternion yawRotation =
                 Quaternion.Euler(
                     0f,
@@ -222,13 +446,25 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 mode switch
                 {
                     GroundModifierMode.Flatten =>
-                        new Color(0.25f, 0.85f, 1f, 0.9f),
+                        new Color(
+                            0.25f,
+                            0.85f,
+                            1f,
+                            0.9f),
 
                     GroundModifierMode.Raise =>
-                        new Color(0.35f, 1f, 0.35f, 0.9f),
+                        new Color(
+                            0.35f,
+                            1f,
+                            0.35f,
+                            0.9f),
 
                     GroundModifierMode.Lower =>
-                        new Color(1f, 0.45f, 0.25f, 0.9f),
+                        new Color(
+                            1f,
+                            0.45f,
+                            0.25f,
+                            0.9f),
 
                     _ => Color.white
                 };
@@ -251,23 +487,175 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 Gizmos.DrawWireCube(
                     Vector3.zero,
                     new Vector3(
-                        boxSize.x + blendDistance * 2f,
+                        boxSize.x +
+                        blendDistance * 2f,
                         0.05f,
-                        boxSize.y + blendDistance * 2f));
+                        boxSize.y +
+                        blendDistance * 2f));
             }
 
             Gizmos.matrix = oldMatrix;
             Gizmos.color = oldColor;
         }
 
-        private static void DrawWireCircle(float radius)
+        private void DrawRiverGizmos()
+        {
+            SplineContainer container =
+                ResolveSplineContainer();
+
+            if (container == null ||
+                container.Splines.Count == 0)
+            {
+                return;
+            }
+
+            Color oldColor = Gizmos.color;
+
+            float length =
+                Mathf.Max(
+                    0.01f,
+                    container.CalculateLength());
+
+            int sampleCount =
+                Mathf.Max(
+                    2,
+                    Mathf.CeilToInt(length) + 1);
+
+            float waterHalfWidth =
+                riverWidth * 0.5f;
+
+            float outerHalfWidth =
+                waterHalfWidth +
+                riverBankWidth;
+
+            Vector3 previousCentre =
+                Vector3.zero;
+
+            Vector3 previousLeft =
+                Vector3.zero;
+
+            Vector3 previousRight =
+                Vector3.zero;
+
+            Vector3 previousOuterLeft =
+                Vector3.zero;
+
+            Vector3 previousOuterRight =
+                Vector3.zero;
+
+            for (int i = 0;
+                 i < sampleCount;
+                 i++)
+            {
+                float t =
+                    i /
+                    (float)(sampleCount - 1);
+
+                float3 positionValue =
+                    container.EvaluatePosition(t);
+
+                float3 tangentValue =
+                    container.EvaluateTangent(t);
+
+                Vector3 centre =
+                    new Vector3(
+                        positionValue.x,
+                        positionValue.y,
+                        positionValue.z);
+
+                Vector3 tangent =
+                    new Vector3(
+                        tangentValue.x,
+                        tangentValue.y,
+                        tangentValue.z);
+
+                tangent.y = 0f;
+
+                if (tangent.sqrMagnitude < 0.0001f)
+                {
+                    tangent = Vector3.forward;
+                }
+
+                tangent.Normalize();
+
+                Vector3 side =
+                    Vector3.Cross(
+                        Vector3.up,
+                        tangent).normalized;
+
+                Vector3 left =
+                    centre - side * waterHalfWidth;
+
+                Vector3 right =
+                    centre + side * waterHalfWidth;
+
+                Vector3 outerLeft =
+                    centre - side * outerHalfWidth;
+
+                Vector3 outerRight =
+                    centre + side * outerHalfWidth;
+
+                if (i > 0)
+                {
+                    Gizmos.color =
+                        new Color(
+                            0.2f,
+                            0.75f,
+                            1f,
+                            0.95f);
+
+                    Gizmos.DrawLine(
+                        previousCentre,
+                        centre);
+
+                    Gizmos.DrawLine(
+                        previousLeft,
+                        left);
+
+                    Gizmos.DrawLine(
+                        previousRight,
+                        right);
+
+                    Gizmos.color =
+                        new Color(
+                            0.2f,
+                            0.75f,
+                            1f,
+                            0.4f);
+
+                    Gizmos.DrawLine(
+                        previousOuterLeft,
+                        outerLeft);
+
+                    Gizmos.DrawLine(
+                        previousOuterRight,
+                        outerRight);
+                }
+
+                previousCentre = centre;
+                previousLeft = left;
+                previousRight = right;
+                previousOuterLeft = outerLeft;
+                previousOuterRight = outerRight;
+            }
+
+            Gizmos.color = oldColor;
+        }
+
+        private static void DrawWireCircle(
+            float radius)
         {
             const int SegmentCount = 48;
 
             Vector3 previous =
-                new Vector3(radius, 0f, 0f);
+                new Vector3(
+                    radius,
+                    0f,
+                    0f);
 
-            for (int i = 1; i <= SegmentCount; i++)
+            for (int i = 1;
+                 i <= SegmentCount;
+                 i++)
             {
                 float angle =
                     i /
@@ -277,11 +665,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
                 Vector3 current =
                     new Vector3(
-                        Mathf.Cos(angle) * radius,
+                        Mathf.Cos(angle) *
+                        radius,
                         0f,
-                        Mathf.Sin(angle) * radius);
+                        Mathf.Sin(angle) *
+                        radius);
 
-                Gizmos.DrawLine(previous, current);
+                Gizmos.DrawLine(
+                    previous,
+                    current);
+
                 previous = current;
             }
         }
@@ -302,7 +695,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float circleRadius,
             Vector2 boxSize,
             float heightAmount,
-            float preserveDetail)
+            float preserveDetail,
+            Vector3[] splinePoints,
+            float riverWidth,
+            float riverBankWidth,
+            float riverDepth,
+            float riverBedFlatness,
+            RiverBankStyle riverBankStyle)
         {
             Mode = mode;
             Shape = shape;
@@ -317,12 +716,37 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Forward = forward.sqrMagnitude > 0.0001f
                 ? forward.normalized
                 : Vector2.up;
-            CircleRadius = Mathf.Max(0.25f, circleRadius);
+            CircleRadius = Mathf.Max(
+                0.25f,
+                circleRadius);
             BoxSize = new Vector2(
-                Mathf.Max(0.5f, boxSize.x),
-                Mathf.Max(0.5f, boxSize.y));
-            HeightAmount = Mathf.Max(0f, heightAmount);
-            PreserveDetail = Mathf.Clamp01(preserveDetail);
+                Mathf.Max(
+                    0.5f,
+                    boxSize.x),
+                Mathf.Max(
+                    0.5f,
+                    boxSize.y));
+            HeightAmount = Mathf.Max(
+                0f,
+                heightAmount);
+            PreserveDetail = Mathf.Clamp01(
+                preserveDetail);
+            SplinePoints =
+                splinePoints ??
+                Array.Empty<Vector3>();
+            RiverWidth = Mathf.Max(
+                0.5f,
+                riverWidth);
+            RiverBankWidth = Mathf.Max(
+                0.25f,
+                riverBankWidth);
+            RiverDepth = Mathf.Max(
+                0.1f,
+                riverDepth);
+            RiverBedFlatness =
+                Mathf.Clamp01(
+                    riverBedFlatness);
+            RiverBankStyle = riverBankStyle;
         }
 
         public GroundModifierMode Mode { get; }
@@ -338,13 +762,28 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public Vector2 BoxSize { get; }
         public float HeightAmount { get; }
         public float PreserveDetail { get; }
+        public Vector3[] SplinePoints { get; }
+        public float RiverWidth { get; }
+        public float RiverBankWidth { get; }
+        public float RiverDepth { get; }
+        public float RiverBedFlatness { get; }
+        public RiverBankStyle RiverBankStyle { get; }
 
-        public float EvaluateWeight(Vector2 point)
+        public bool HasValidRiver =>
+            Mode == GroundModifierMode.RiverBed &&
+            SplinePoints != null &&
+            SplinePoints.Length >= 2;
+
+        public float EvaluateWeight(
+            Vector2 point)
         {
             float distanceOutside =
-                Shape == GroundModifierShape.Circle
-                    ? EvaluateCircleDistance(point)
-                    : EvaluateBoxDistance(point);
+                Shape ==
+                GroundModifierShape.Circle
+                    ? EvaluateCircleDistance(
+                        point)
+                    : EvaluateBoxDistance(
+                        point);
 
             if (distanceOutside <= 0f)
             {
@@ -352,7 +791,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
 
             if (BlendDistance <= 0f ||
-                distanceOutside >= BlendDistance)
+                distanceOutside >=
+                BlendDistance)
             {
                 return 0f;
             }
@@ -363,48 +803,231 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     BlendDistance);
 
             float smooth =
-                t * t * (3f - 2f * t);
+                t *
+                t *
+                (3f - 2f * t);
 
             return 1f - smooth;
+        }
+
+        public bool TryEvaluateRiver(
+            Vector2 point,
+            out float distance,
+            out float waterHeight)
+        {
+            distance =
+                float.PositiveInfinity;
+
+            waterHeight = 0f;
+
+            if (!HasValidRiver)
+            {
+                return false;
+            }
+
+            for (int i = 0;
+                 i < SplinePoints.Length - 1;
+                 i++)
+            {
+                Vector3 pointA3 =
+                    SplinePoints[i];
+
+                Vector3 pointB3 =
+                    SplinePoints[i + 1];
+
+                Vector2 pointA =
+                    new Vector2(
+                        pointA3.x,
+                        pointA3.z);
+
+                Vector2 pointB =
+                    new Vector2(
+                        pointB3.x,
+                        pointB3.z);
+
+                Vector2 segment =
+                    pointB - pointA;
+
+                float segmentLengthSqr =
+                    segment.sqrMagnitude;
+
+                float segmentT =
+                    segmentLengthSqr > 0.000001f
+                        ? Mathf.Clamp01(
+                            Vector2.Dot(
+                                point - pointA,
+                                segment) /
+                            segmentLengthSqr)
+                        : 0f;
+
+                Vector2 nearest =
+                    pointA +
+                    segment * segmentT;
+
+                float candidateDistance =
+                    Vector2.Distance(
+                        point,
+                        nearest);
+
+                if (candidateDistance >=
+                    distance)
+                {
+                    continue;
+                }
+
+                distance =
+                    candidateDistance;
+
+                waterHeight =
+                    Mathf.Lerp(
+                        pointA3.y,
+                        pointB3.y,
+                        segmentT);
+            }
+
+            return
+                !float.IsPositiveInfinity(
+                    distance);
+        }
+
+        public float EvaluateRiverTargetHeight(
+            float distance,
+            float waterHeight)
+        {
+            float halfWidth =
+                RiverWidth * 0.5f;
+
+            float normalizedDistance =
+                halfWidth > 0.0001f
+                    ? Mathf.Clamp01(
+                        distance /
+                        halfWidth)
+                    : 0f;
+
+            float roundedDepthFactor =
+                Mathf.Lerp(
+                    1f,
+                    0.55f,
+                    normalizedDistance *
+                    normalizedDistance);
+
+            float depthFactor =
+                Mathf.Lerp(
+                    roundedDepthFactor,
+                    1f,
+                    RiverBedFlatness);
+
+            return
+                waterHeight -
+                RiverDepth * depthFactor;
+        }
+
+        public float EvaluateRiverInfluence(
+            float distance)
+        {
+            float halfWidth =
+                RiverWidth * 0.5f;
+
+            if (distance <= halfWidth)
+            {
+                return Strength;
+            }
+
+            float bankDistance =
+                distance - halfWidth;
+
+            if (bankDistance >=
+                RiverBankWidth)
+            {
+                return 0f;
+            }
+
+            float t =
+                Mathf.Clamp01(
+                    bankDistance /
+                    RiverBankWidth);
+
+            float smooth =
+                t *
+                t *
+                (3f - 2f * t);
+
+            float baseWeight =
+                1f - smooth;
+
+            float shapedWeight =
+                RiverBankStyle switch
+                {
+                    RiverBankStyle.Gentle =>
+                        Mathf.Pow(
+                            baseWeight,
+                            1.5f),
+
+                    RiverBankStyle.Natural =>
+                        baseWeight,
+
+                    RiverBankStyle.Steep =>
+                        Mathf.Pow(
+                            baseWeight,
+                            0.55f),
+
+                    _ => baseWeight
+                };
+
+            return
+                shapedWeight *
+                Strength;
         }
 
         private float EvaluateCircleDistance(
             Vector2 point)
         {
             return
-                Vector2.Distance(point, Centre) -
+                Vector2.Distance(
+                    point,
+                    Centre) -
                 CircleRadius;
         }
 
         private float EvaluateBoxDistance(
             Vector2 point)
         {
-            Vector2 delta = point - Centre;
+            Vector2 delta =
+                point - Centre;
 
             float localX =
                 Mathf.Abs(
-                    Vector2.Dot(delta, Right));
+                    Vector2.Dot(
+                        delta,
+                        Right));
 
             float localZ =
                 Mathf.Abs(
-                    Vector2.Dot(delta, Forward));
+                    Vector2.Dot(
+                        delta,
+                        Forward));
 
-            Vector2 halfSize = BoxSize * 0.5f;
+            Vector2 halfSize =
+                BoxSize * 0.5f;
 
             float outsideX =
                 Mathf.Max(
                     0f,
-                    localX - halfSize.x);
+                    localX -
+                    halfSize.x);
 
             float outsideZ =
                 Mathf.Max(
                     0f,
-                    localZ - halfSize.y);
+                    localZ -
+                    halfSize.y);
 
             return
                 Mathf.Sqrt(
-                    outsideX * outsideX +
-                    outsideZ * outsideZ);
+                    outsideX *
+                    outsideX +
+                    outsideZ *
+                    outsideZ);
         }
     }
 }
