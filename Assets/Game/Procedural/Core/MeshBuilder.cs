@@ -36,9 +36,23 @@ namespace ProgrammaticStylized3D.Geometry
             targetMesh.SetVertices(data.Vertices);
             targetMesh.SetTriangles(data.Triangles, 0);
             targetMesh.SetUVs(0, data.UV0);
+
+            if (data.HasUV2)
+            {
+                targetMesh.SetUVs(2, data.UV2);
+            }
+
             targetMesh.SetColors(data.Colors);
 
-            targetMesh.RecalculateNormals();
+            if (data.HasNormals)
+            {
+                targetMesh.SetNormals(data.Normals);
+            }
+            else
+            {
+                targetMesh.RecalculateNormals();
+            }
+
             targetMesh.RecalculateTangents();
             targetMesh.RecalculateBounds();
         }

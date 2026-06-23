@@ -104,13 +104,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 halfSize,
                 modifiers);
 
-            baseSurface =
-                new GroundHeightFieldSnapshot(
-                    heights,
-                    resolution,
-                    spacing,
-                    halfSize,
-                    recipe.ShapeSeed);
+            float[] baseHeights = (float[])heights.Clone();
 
             ApplyRivers(
                 heights,
@@ -119,12 +113,46 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 halfSize,
                 rivers);
 
-            return BuildMeshData(
+            Vector3[] baseNormals =
+                BuildHeightFieldNormals(
+                    baseHeights,
+                    resolution,
+                    spacing,
+                    recipe.ShapeSeed);
+
+            Vector3[] renderNormals =
+                BuildHeightFieldNormals(
+                    heights,
+                    resolution,
+                    spacing,
+                    recipe.ShapeSeed);
+
+            BuildSurfaceMetadata(
                 recipe,
                 heights,
+                out float[] surfaceVariations,
+                out float[] materialClassifications);
+
+            baseSurface =
+                new GroundHeightFieldSnapshot(
+                    baseHeights,
+                    baseNormals,
+                    renderNormals,
+                    surfaceVariations,
+                    materialClassifications,
+                    resolution,
+                    spacing,
+                    halfSize,
+                    recipe.ShapeSeed);
+
+            return BuildMeshData(
+                heights,
+                renderNormals,
+                surfaceVariations,
                 resolution,
                 spacing,
-                halfSize);
+                halfSize,
+                recipe.ShapeSeed);
         }
 
         public static float ResolvePatchSize(
@@ -555,31 +583,168 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
         }
 
-        private static MeshData BuildMeshData(
-            GroundRecipe recipe,
+        private static Vector3[] BuildHeightFieldNormals(
             float[] heights,
             int resolution,
             float spacing,
-            float halfSize)
+            int triangulationSeed)
         {
-            MeshData meshData = new MeshData();
+            Vector3[] normals =
+                new Vector3[heights != null ? heights.Length : 0];
+
+            if (heights == null ||
+                resolution < 2 ||
+                heights.Length != resolution * resolution)
+            {
+                return normals;
+            }
+
+            for (int z = 0; z < resolution - 1; z++)
+            {
+                for (int x = 0; x < resolution - 1; x++)
+                {
+                    int a = z * resolution + x;
+                    int b = a + 1;
+                    int c = a + resolution;
+                    int d = c + 1;
+
+                    Vector3 pa =
+                        new Vector3(
+                            x * spacing,
+                            heights[a],
+                            z * spacing);
+                    Vector3 pb =
+                        new Vector3(
+                            (x + 1) * spacing,
+                            heights[b],
+                            z * spacing);
+                    Vector3 pc =
+                        new Vector3(
+                            x * spacing,
+                            heights[c],
+                            (z + 1) * spacing);
+                    Vector3 pd =
+                        new Vector3(
+                            (x + 1) * spacing,
+                            heights[d],
+                            (z + 1) * spacing);
+
+                    bool alternate =
+                        ((x + z + triangulationSeed) & 1) == 0;
+
+                    if (alternate)
+                    {
+                        AccumulateFaceNormal(normals, a, c, b, pa, pc, pb);
+                        AccumulateFaceNormal(normals, b, c, d, pb, pc, pd);
+                    }
+                    else
+                    {
+                        AccumulateFaceNormal(normals, a, d, b, pa, pd, pb);
+                        AccumulateFaceNormal(normals, a, c, d, pa, pc, pd);
+                    }
+                }
+            }
+
+            for (int index = 0; index < normals.Length; index++)
+            {
+                normals[index] =
+                    normals[index].sqrMagnitude > 0.000001f
+                        ? normals[index].normalized
+                        : Vector3.up;
+            }
+
+            return normals;
+        }
+
+        private static void AccumulateFaceNormal(
+            Vector3[] normals,
+            int a,
+            int b,
+            int c,
+            Vector3 pa,
+            Vector3 pb,
+            Vector3 pc)
+        {
+            Vector3 faceNormal =
+                Vector3.Cross(pb - pa, pc - pa);
+
+            if (faceNormal.sqrMagnitude <= 0.0000001f)
+            {
+                return;
+            }
+
+            normals[a] += faceNormal;
+            normals[b] += faceNormal;
+            normals[c] += faceNormal;
+        }
+
+        private static void BuildSurfaceMetadata(
+            GroundRecipe recipe,
+            float[] finalHeights,
+            out float[] surfaceVariations,
+            out float[] materialClassifications)
+        {
+            surfaceVariations = new float[finalHeights.Length];
+            materialClassifications = new float[finalHeights.Length];
 
             float minimumHeight = float.PositiveInfinity;
             float maximumHeight = float.NegativeInfinity;
 
-            for (int i = 0; i < heights.Length; i++)
+            for (int index = 0; index < finalHeights.Length; index++)
             {
                 minimumHeight =
-                    Mathf.Min(minimumHeight, heights[i]);
+                    Mathf.Min(minimumHeight, finalHeights[index]);
 
                 maximumHeight =
-                    Mathf.Max(maximumHeight, heights[i]);
+                    Mathf.Max(maximumHeight, finalHeights[index]);
             }
 
             float heightRange =
                 Mathf.Max(
                     0.001f,
                     maximumHeight - minimumHeight);
+
+            for (int index = 0; index < finalHeights.Length; index++)
+            {
+                float randomValue =
+                    Hash01(
+                        recipe.ShapeSeed,
+                        index ^ 0x2F61);
+
+                float heightValue =
+                    Mathf.InverseLerp(
+                        minimumHeight,
+                        minimumHeight + heightRange,
+                        finalHeights[index]);
+
+                float combinedVariation =
+                    Mathf.Lerp(
+                        randomValue,
+                        heightValue,
+                        0.28f);
+
+                surfaceVariations[index] =
+                    Mathf.Clamp01(
+                        0.5f +
+                        (combinedVariation - 0.5f) *
+                        recipe.SurfaceVariation);
+
+                // Reserved for future terrain material routing. Keeping the
+                // channel explicit now prevents another snapshot/API refactor.
+                materialClassifications[index] = 0f;
+            }
+        }
+
+        private static MeshData BuildMeshData(
+            float[] heights,
+            Vector3[] normals,
+            float[] surfaceVariations,
+            int resolution,
+            float spacing,
+            float halfSize,
+            int triangulationSeed)
+        {
+            MeshData meshData = new MeshData();
 
             for (int z = 0; z < resolution; z++)
             {
@@ -592,29 +757,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     float localX = -halfSize + x * spacing;
                     int index = z * resolution + x;
 
-                    float randomValue =
-                        Hash01(
-                            recipe.ShapeSeed,
-                            index ^ 0x2F61);
-
-                    float heightValue =
-                        Mathf.InverseLerp(
-                            minimumHeight,
-                            minimumHeight + heightRange,
-                            heights[index]);
-
-                    float combinedVariation =
-                        Mathf.Lerp(
-                            randomValue,
-                            heightValue,
-                            0.28f);
-
-                    float red =
-                        Mathf.Clamp01(
-                            0.5f +
-                            (combinedVariation - 0.5f) *
-                            recipe.SurfaceVariation);
-
                     meshData.AddVertex(
                         new Vector3(
                             localX,
@@ -622,10 +764,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             localZ),
                         new Vector2(u, v),
                         new Color(
-                            red,
+                            surfaceVariations[index],
                             0.5f,
                             0.5f,
                             1f));
+
+                    meshData.Normals.Add(normals[index]);
                 }
             }
 
@@ -639,7 +783,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     int d = c + 1;
 
                     bool alternate =
-                        ((x + z + recipe.ShapeSeed) & 1) == 0;
+                        ((x + z + triangulationSeed) & 1) == 0;
 
                     if (alternate)
                     {

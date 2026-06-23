@@ -103,6 +103,26 @@ namespace ProgrammaticStylized3D.Rivers
             public float LocalDistance { get; }
         }
 
+        private readonly struct OuterBlendContext
+        {
+            public OuterBlendContext(
+                float startGroundHeight,
+                float endGroundHeight,
+                float endGroundSlope,
+                float width)
+            {
+                StartGroundHeight = startGroundHeight;
+                EndGroundHeight = endGroundHeight;
+                EndGroundSlope = endGroundSlope;
+                Width = Mathf.Max(0.0001f, width);
+            }
+
+            public float StartGroundHeight { get; }
+            public float EndGroundHeight { get; }
+            public float EndGroundSlope { get; }
+            public float Width { get; }
+        }
+
         public static float ResolveIntegrationApronWidth(float groundGridSpacing)
         {
             // The apron must extend farther than a coarse ground triangle can
@@ -238,6 +258,10 @@ namespace ProgrammaticStylized3D.Rivers
 
             MeshData renderData = new MeshData();
             MeshData colliderData = new MeshData();
+            List<float> terrainIntegrationWeights =
+                new List<float>();
+            List<Vector3> sampledGroundNormals =
+                new List<Vector3>();
 
             float resolvedDepth = Mathf.Max(0.05f, depth);
             float resolvedBankBlend = Mathf.Max(0.1f, bankBlend);
@@ -281,6 +305,22 @@ namespace ProgrammaticStylized3D.Rivers
                         maximumOuterWidth,
                         renderOuterHalfWidth * 2f);
 
+                OuterBlendContext leftBlendContext =
+                    BuildOuterBlendContext(
+                        ground,
+                        ring,
+                        -1f,
+                        handoffHalfWidth,
+                        ref usedGroundHeightField);
+
+                OuterBlendContext rightBlendContext =
+                    BuildOuterBlendContext(
+                        ground,
+                        ring,
+                        1f,
+                        handoffHalfWidth,
+                        ref usedGroundHeightField);
+
                 for (int acrossIndex = 0;
                      acrossIndex < acrossVertexCount;
                      acrossIndex++)
@@ -313,12 +353,17 @@ namespace ProgrammaticStylized3D.Rivers
                         ring.Centre +
                         ring.Side * (acrossDistance * sign);
 
-                    float baseHeight =
-                        SampleBaseHeight(
+                    GroundSurfaceSample groundSample =
+                        SampleBaseSurface(
                             ground,
                             horizontalPosition,
                             ring.WaterHeight,
                             ref usedGroundHeightField);
+
+                    OuterBlendContext blendContext =
+                        sign < 0f
+                            ? leftBlendContext
+                            : rightBlendContext;
 
                     float height =
                         EvaluateHeight(
@@ -327,13 +372,14 @@ namespace ProgrammaticStylized3D.Rivers
                             flatHalfWidth,
                             ring.VisibleHalfWidth,
                             ring.WaterHeight,
-                            baseHeight,
+                            groundSample.Height,
                             resolvedDepth,
                             bankProfile,
                             resolvedConformity,
                             requiredWetClearance,
                             resolvedBankCover,
-                            burialOffset);
+                            burialOffset,
+                            blendContext);
 
                     Vector3 worldPosition =
                         new Vector3(
@@ -344,9 +390,30 @@ namespace ProgrammaticStylized3D.Rivers
                     Vector2 uv = ResolveGroundUv(ground, worldPosition);
                     Vector3 localPosition =
                         owner.InverseTransformPoint(worldPosition);
-                    Color colour = new Color(0.5f, 0.5f, 0.5f, 1f);
+                    float terrainIntegrationWeight =
+                        ResolveTerrainIntegrationWeight(crossPoint);
+                    Vector3 localGroundNormal =
+                        owner
+                            .InverseTransformDirection(
+                                groundSample.RenderNormal)
+                            .normalized;
+                    Color colour =
+                        new Color(
+                            groundSample.SurfaceVariation,
+                            0.5f,
+                            0.5f,
+                            1f);
 
                     renderData.AddVertex(localPosition, uv, colour);
+                    renderData.UV2.Add(
+                        new Vector4(
+                            terrainIntegrationWeight,
+                            groundSample.MaterialClassification,
+                            0f,
+                            0f));
+                    terrainIntegrationWeights.Add(
+                        terrainIntegrationWeight);
+                    sampledGroundNormals.Add(localGroundNormal);
 
                     if (crossPoint.Region != CrossRegion.BuriedApron)
                     {
@@ -363,6 +430,11 @@ namespace ProgrammaticStylized3D.Rivers
                 colliderData,
                 rings.Count,
                 colliderAcrossVertexCount);
+
+            ApplyTerrainMatchedNormals(
+                renderData,
+                terrainIntegrationWeights,
+                sampledGroundNormals);
 
             MeshBuilder.ApplyToMesh(
                 renderData,
@@ -612,7 +684,8 @@ namespace ProgrammaticStylized3D.Rivers
             float terrainConformity,
             float requiredWetClearance,
             float bankCover,
-            float burialOffset)
+            float burialOffset,
+            OuterBlendContext outerBlendContext)
         {
             float bedHeight = waterHeight - depth;
 
@@ -681,29 +754,41 @@ namespace ProgrammaticStylized3D.Rivers
 
                 case CrossRegion.OuterBlend:
                 {
-                    float blendT = SmoothStep(0f, 1f, point.T);
+                    float t = Mathf.Clamp01(point.T);
                     float innerHeight = waterHeight + bankCover;
-                    float authoredHeight =
-                        Mathf.Lerp(
-                            innerHeight,
-                            baseGroundHeight,
-                            EvaluateBankProfile(bankProfile, blendT));
-                    float safetyHeight =
-                        Mathf.Lerp(
-                            innerHeight,
-                            baseGroundHeight,
-                            blendT);
+
+                    // Preserve the sampled ground shape while applying only the
+                    // offset needed to meet the authored bank at the inner edge.
+                    // The offset decays with zero derivative at the handoff, so
+                    // this path naturally recovers the original ground slope.
                     float preservedHeight =
-                        Mathf.Max(baseGroundHeight, safetyHeight);
+                        baseGroundHeight +
+                        (innerHeight -
+                         outerBlendContext.StartGroundHeight) *
+                        (1f - SmoothStep(0f, 1f, t));
+
+                    // The authored path is a cubic Hermite transition that meets
+                    // both the ground height and its cross-river derivative.
+                    // Terrain Conformity therefore changes the bank character
+                    // without reintroducing a lighting or collision crease.
+                    float authoredHeight =
+                        HermiteScalar(
+                            innerHeight,
+                            outerBlendContext.EndGroundHeight,
+                            0f,
+                            outerBlendContext.EndGroundSlope *
+                            outerBlendContext.Width,
+                            t);
+
                     float result =
                         Mathf.Lerp(
                             preservedHeight,
                             authoredHeight,
                             terrainConformity);
 
-                    if (point.T >= 0.9999f)
+                    if (t >= 0.9999f)
                     {
-                        result = baseGroundHeight;
+                        result = outerBlendContext.EndGroundHeight;
                     }
 
                     return result;
@@ -744,7 +829,50 @@ namespace ProgrammaticStylized3D.Rivers
             };
         }
 
-        private static float SampleBaseHeight(
+        private static OuterBlendContext BuildOuterBlendContext(
+            GeneratedGround ground,
+            CorridorRing ring,
+            float sign,
+            float handoffHalfWidth,
+            ref bool usedGroundHeightField)
+        {
+            Vector3 lateralDirection = ring.Side * Mathf.Sign(sign);
+
+            Vector3 startPosition =
+                ring.Centre +
+                lateralDirection * ring.SurfaceHalfWidth;
+
+            Vector3 handoffPosition =
+                ring.Centre +
+                lateralDirection * handoffHalfWidth;
+
+            GroundSurfaceSample startSample =
+                SampleBaseSurface(
+                    ground,
+                    startPosition,
+                    ring.WaterHeight,
+                    ref usedGroundHeightField);
+
+            GroundSurfaceSample handoffSample =
+                SampleBaseSurface(
+                    ground,
+                    handoffPosition,
+                    ring.WaterHeight,
+                    ref usedGroundHeightField);
+
+            float groundSlope =
+                ResolveGroundSlope(
+                    handoffSample.Normal,
+                    lateralDirection);
+
+            return new OuterBlendContext(
+                startSample.Height,
+                handoffSample.Height,
+                groundSlope,
+                handoffHalfWidth - ring.SurfaceHalfWidth);
+        }
+
+        private static GroundSurfaceSample SampleBaseSurface(
             GeneratedGround ground,
             Vector3 worldPosition,
             float fallbackHeight,
@@ -753,14 +881,138 @@ namespace ProgrammaticStylized3D.Rivers
             if (ground != null &&
                 ground.TrySampleBaseSurface(
                     worldPosition,
-                    out float height,
-                    out _))
+                    out GroundSurfaceSample sample))
             {
                 usedGroundHeightField = true;
-                return height;
+                return sample;
             }
 
-            return fallbackHeight;
+            return new GroundSurfaceSample(
+                fallbackHeight,
+                Vector3.up,
+                0.5f,
+                0f);
+        }
+
+        private static float ResolveGroundSlope(
+            Vector3 groundNormal,
+            Vector3 horizontalDirection)
+        {
+            Vector3 direction =
+                new Vector3(
+                    horizontalDirection.x,
+                    0f,
+                    horizontalDirection.z);
+
+            if (direction.sqrMagnitude <= 0.000001f)
+            {
+                return 0f;
+            }
+
+            direction.Normalize();
+
+            float vertical = Mathf.Max(0.05f, Mathf.Abs(groundNormal.y));
+            float horizontalDot =
+                groundNormal.x * direction.x +
+                groundNormal.z * direction.z;
+
+            return -horizontalDot / vertical;
+        }
+
+        private static float ResolveTerrainIntegrationWeight(
+            CrossPoint point)
+        {
+            return point.Region switch
+            {
+                CrossRegion.OuterBlend =>
+                    SmoothStep(0.15f, 1f, point.T),
+                CrossRegion.BuriedApron => 1f,
+                _ => 0f
+            };
+        }
+
+        private static void ApplyTerrainMatchedNormals(
+            MeshData meshData,
+            IReadOnlyList<float> terrainIntegrationWeights,
+            IReadOnlyList<Vector3> sampledGroundNormals)
+        {
+            if (meshData == null ||
+                terrainIntegrationWeights == null ||
+                sampledGroundNormals == null ||
+                terrainIntegrationWeights.Count != meshData.VertexCount ||
+                sampledGroundNormals.Count != meshData.VertexCount)
+            {
+                return;
+            }
+
+            Vector3[] geometricNormals =
+                CalculateGeometricNormals(
+                    meshData.Vertices,
+                    meshData.Triangles);
+
+            meshData.Normals.Clear();
+
+            for (int index = 0;
+                 index < meshData.VertexCount;
+                 index++)
+            {
+                Vector3 geometricNormal = geometricNormals[index];
+                Vector3 groundNormal = sampledGroundNormals[index];
+                float weight =
+                    Mathf.Clamp01(terrainIntegrationWeights[index]);
+
+                Vector3 blended =
+                    Vector3.Slerp(
+                        geometricNormal,
+                        groundNormal,
+                        weight);
+
+                meshData.Normals.Add(
+                    blended.sqrMagnitude > 0.000001f
+                        ? blended.normalized
+                        : Vector3.up);
+            }
+        }
+
+        private static Vector3[] CalculateGeometricNormals(
+            IReadOnlyList<Vector3> vertices,
+            IReadOnlyList<int> triangles)
+        {
+            Vector3[] normals = new Vector3[vertices.Count];
+
+            for (int index = 0;
+                 index + 2 < triangles.Count;
+                 index += 3)
+            {
+                int a = triangles[index];
+                int b = triangles[index + 1];
+                int c = triangles[index + 2];
+
+                Vector3 edgeAB = vertices[b] - vertices[a];
+                Vector3 edgeAC = vertices[c] - vertices[a];
+                Vector3 faceNormal = Vector3.Cross(edgeAB, edgeAC);
+
+                if (faceNormal.sqrMagnitude <= 0.0000001f)
+                {
+                    continue;
+                }
+
+                normals[a] += faceNormal;
+                normals[b] += faceNormal;
+                normals[c] += faceNormal;
+            }
+
+            for (int index = 0;
+                 index < normals.Length;
+                 index++)
+            {
+                normals[index] =
+                    normals[index].sqrMagnitude > 0.000001f
+                        ? normals[index].normalized
+                        : Vector3.up;
+            }
+
+            return normals;
         }
 
         private static Vector2 ResolveGroundUv(
@@ -781,6 +1033,22 @@ namespace ProgrammaticStylized3D.Rivers
             return new Vector2(
                 worldPosition.x * 0.05f,
                 worldPosition.z * 0.05f);
+        }
+
+        private static float HermiteScalar(
+            float p0,
+            float p1,
+            float m0,
+            float m1,
+            float t)
+        {
+            float t2 = t * t;
+            float t3 = t2 * t;
+            float h00 = 2f * t3 - 3f * t2 + 1f;
+            float h10 = t3 - 2f * t2 + t;
+            float h01 = -2f * t3 + 3f * t2;
+            float h11 = t3 - t2;
+            return h00 * p0 + h10 * m0 + h01 * p1 + h11 * m1;
         }
 
         private static Vector3 Hermite(

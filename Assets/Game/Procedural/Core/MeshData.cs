@@ -7,6 +7,8 @@ namespace ProgrammaticStylized3D.Geometry
     /// <summary>
     /// Mutable, Unity-independent mesh construction data.
     /// Generators write into this object before it is converted to a Unity Mesh.
+    /// Optional vertex channels may remain empty when a generator does not need
+    /// to control them explicitly.
     /// </summary>
     [Serializable]
     public sealed class MeshData
@@ -14,17 +16,23 @@ namespace ProgrammaticStylized3D.Geometry
         public readonly List<Vector3> Vertices = new();
         public readonly List<int> Triangles = new();
         public readonly List<Vector2> UV0 = new();
+        public readonly List<Vector4> UV2 = new();
         public readonly List<Color> Colors = new();
+        public readonly List<Vector3> Normals = new();
 
         public int VertexCount => Vertices.Count;
         public int TriangleCount => Triangles.Count / 3;
+        public bool HasUV2 => UV2.Count == Vertices.Count && Vertices.Count > 0;
+        public bool HasNormals => Normals.Count == Vertices.Count && Vertices.Count > 0;
 
         public void Clear()
         {
             Vertices.Clear();
             Triangles.Clear();
             UV0.Clear();
+            UV2.Clear();
             Colors.Clear();
+            Normals.Clear();
         }
 
         public int AddVertex(
@@ -78,10 +86,22 @@ namespace ProgrammaticStylized3D.Geometry
                     "UV0 count must match the vertex count.");
             }
 
+            if (UV2.Count != 0 && UV2.Count != Vertices.Count)
+            {
+                throw new InvalidOperationException(
+                    "UV2 must either be empty or match the vertex count.");
+            }
+
             if (Colors.Count != Vertices.Count)
             {
                 throw new InvalidOperationException(
                     "Vertex color count must match the vertex count.");
+            }
+
+            if (Normals.Count != 0 && Normals.Count != Vertices.Count)
+            {
+                throw new InvalidOperationException(
+                    "Normals must either be empty or match the vertex count.");
             }
 
             for (int i = 0; i < Triangles.Count; i++)

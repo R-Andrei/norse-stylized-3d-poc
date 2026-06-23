@@ -318,8 +318,26 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             out float height,
             out Vector3 normal)
         {
-            height = 0f;
-            normal = Vector3.up;
+            bool succeeded =
+                TrySampleBaseSurface(
+                    worldPosition,
+                    out GroundSurfaceSample sample);
+
+            height = sample.Height;
+            normal = sample.Normal;
+            return succeeded;
+        }
+
+        public bool TrySampleBaseSurface(
+            Vector3 worldPosition,
+            out GroundSurfaceSample sample)
+        {
+            sample =
+                new GroundSurfaceSample(
+                    0f,
+                    Vector3.up,
+                    0.5f,
+                    0f);
 
             if (baseSurface == null || !baseSurface.IsValid)
             {
@@ -331,8 +349,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             if (!baseSurface.TrySample(
                     new Vector2(localPoint.x, localPoint.z),
-                    out float localHeight,
-                    out Vector3 localNormal))
+                    out GroundSurfaceSample localSample))
             {
                 return false;
             }
@@ -341,12 +358,21 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 transform.TransformPoint(
                     new Vector3(
                         localPoint.x,
-                        localHeight,
+                        localSample.Height,
                         localPoint.z));
 
-            height = worldPoint.y;
-            normal =
-                transform.TransformDirection(localNormal).normalized;
+            sample =
+                new GroundSurfaceSample(
+                    worldPoint.y,
+                    transform
+                        .TransformDirection(localSample.Normal)
+                        .normalized,
+                    transform
+                        .TransformDirection(localSample.RenderNormal)
+                        .normalized,
+                    localSample.SurfaceVariation,
+                    localSample.MaterialClassification);
+
             return true;
         }
 

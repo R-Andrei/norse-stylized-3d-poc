@@ -4,28 +4,87 @@ using UnityEngine;
 namespace ProgrammaticStylized3D.Geometry.Ground
 {
     /// <summary>
+    /// Geometry and rendering metadata sampled from the generated ground. Height
+    /// and Normal describe the immutable pre-river surface used for corridor
+    /// fitting. RenderNormal is sampled from the exact normal field assigned to
+    /// the final broad-ground mesh after river concealment.
+    /// MaterialClassification is reserved for future terrain material routing.
+    /// </summary>
+    public readonly struct GroundSurfaceSample
+    {
+        public GroundSurfaceSample(
+            float height,
+            Vector3 normal,
+            Vector3 renderNormal,
+            float surfaceVariation,
+            float materialClassification)
+        {
+            Height = height;
+            Normal = ResolveNormal(normal);
+            RenderNormal = ResolveNormal(renderNormal);
+            SurfaceVariation = Mathf.Clamp01(surfaceVariation);
+            MaterialClassification = materialClassification;
+        }
+
+        public GroundSurfaceSample(
+            float height,
+            Vector3 normal,
+            float surfaceVariation,
+            float materialClassification)
+            : this(
+                height,
+                normal,
+                normal,
+                surfaceVariation,
+                materialClassification)
+        {
+        }
+
+        public float Height { get; }
+        public Vector3 Normal { get; }
+        public Vector3 RenderNormal { get; }
+        public float SurfaceVariation { get; }
+        public float MaterialClassification { get; }
+
+        private static Vector3 ResolveNormal(Vector3 value)
+        {
+            return value.sqrMagnitude > 0.000001f
+                ? value.normalized
+                : Vector3.up;
+        }
+    }
+
+    /// <summary>
     /// Immutable local-space snapshot of generated ground after ordinary ground
-    /// modifiers, but before river concealment is applied. Sampling mirrors the
-    /// actual checkerboard triangle layout used by the generated ground mesh so
-    /// corridor handoff vertices can meet that mesh instead of a bilinear
-    /// approximation of it.
+    /// modifiers. It retains the pre-river geometry, the final render-normal
+    /// field, and material metadata. Sampling mirrors the checkerboard triangle
+    /// layout used by the generated ground mesh.
     /// </summary>
     public sealed class GroundHeightFieldSnapshot
     {
-        private readonly float[] heights;
+        private readonly float[] baseHeights;
+        private readonly Vector3[] baseNormals;
+        private readonly Vector3[] renderNormals;
+        private readonly float[] surfaceVariations;
+        private readonly float[] materialClassifications;
         private readonly int triangulationSeed;
 
         public GroundHeightFieldSnapshot(
-            float[] heights,
+            float[] baseHeights,
+            Vector3[] baseNormals,
+            Vector3[] renderNormals,
+            float[] surfaceVariations,
+            float[] materialClassifications,
             int resolution,
             float spacing,
             float halfSize,
             int triangulationSeed)
         {
-            this.heights =
-                heights != null
-                    ? (float[])heights.Clone()
-                    : Array.Empty<float>();
+            this.baseHeights = CloneOrEmpty(baseHeights);
+            this.baseNormals = CloneOrEmpty(baseNormals);
+            this.renderNormals = CloneOrEmpty(renderNormals);
+            this.surfaceVariations = CloneOrEmpty(surfaceVariations);
+            this.materialClassifications = CloneOrEmpty(materialClassifications);
 
             Resolution = Mathf.Max(0, resolution);
             Spacing = Mathf.Max(0.0001f, spacing);
@@ -36,6 +95,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public static GroundHeightFieldSnapshot Empty { get; } =
             new GroundHeightFieldSnapshot(
                 Array.Empty<float>(),
+                Array.Empty<Vector3>(),
+                Array.Empty<Vector3>(),
+                Array.Empty<float>(),
+                Array.Empty<float>(),
                 0,
                 1f,
                 0f,
@@ -45,55 +108,126 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public float Spacing { get; }
         public float HalfSize { get; }
 
-        public bool IsValid =>
-            Resolution >= 2 &&
-            heights.Length == Resolution * Resolution;
+        public bool IsValid
+        {
+            get
+            {
+                int expected = Resolution * Resolution;
+                return Resolution >= 2 &&
+                       baseHeights.Length == expected &&
+                       baseNormals.Length == expected &&
+                       renderNormals.Length == expected &&
+                       surfaceVariations.Length == expected &&
+                       materialClassifications.Length == expected;
+            }
+        }
 
         public bool TrySample(
             Vector2 localPoint,
             out float height,
             out Vector3 normal)
         {
-            height = 0f;
-            normal = Vector3.up;
+            bool succeeded = TrySample(localPoint, out GroundSurfaceSample sample);
+            height = sample.Height;
+            normal = sample.Normal;
+            return succeeded;
+        }
+
+        public bool TrySample(
+            Vector2 localPoint,
+            out GroundSurfaceSample sample)
+        {
+            sample = new GroundSurfaceSample(0f, Vector3.up, 0.5f, 0f);
+
+            if (!TryResolveGridPoint(
+                    localPoint,
+                    out float gridX,
+                    out float gridZ))
+            {
+                return false;
+            }
+
+            sample = new GroundSurfaceSample(
+                SampleTriangulated(baseHeights, gridX, gridZ),
+                SampleTriangulated(baseNormals, gridX, gridZ),
+                SampleTriangulated(renderNormals, gridX, gridZ),
+                SampleTriangulated(surfaceVariations, gridX, gridZ),
+                SampleTriangulated(materialClassifications, gridX, gridZ));
+
+            return true;
+        }
+
+        private bool TryResolveGridPoint(
+            Vector2 localPoint,
+            out float gridX,
+            out float gridZ)
+        {
+            gridX = 0f;
+            gridZ = 0f;
 
             if (!IsValid)
             {
                 return false;
             }
 
-            float gridX = (localPoint.x + HalfSize) / Spacing;
-            float gridZ = (localPoint.y + HalfSize) / Spacing;
+            gridX = (localPoint.x + HalfSize) / Spacing;
+            gridZ = (localPoint.y + HalfSize) / Spacing;
             float maximum = Resolution - 1f;
 
-            if (gridX < 0f ||
-                gridZ < 0f ||
-                gridX > maximum ||
-                gridZ > maximum)
-            {
-                return false;
-            }
-
-            height = SampleTriangulated(gridX, gridZ);
-
-            const float derivativeStep = 0.25f;
-            float left = SampleTriangulated(gridX - derivativeStep, gridZ);
-            float right = SampleTriangulated(gridX + derivativeStep, gridZ);
-            float down = SampleTriangulated(gridX, gridZ - derivativeStep);
-            float up = SampleTriangulated(gridX, gridZ + derivativeStep);
-            float derivativeDistance =
-                Mathf.Max(0.0001f, 2f * derivativeStep * Spacing);
-
-            normal =
-                new Vector3(
-                    -(right - left) / derivativeDistance,
-                    1f,
-                    -(up - down) / derivativeDistance).normalized;
-
-            return true;
+            return gridX >= 0f &&
+                   gridZ >= 0f &&
+                   gridX <= maximum &&
+                   gridZ <= maximum;
         }
 
-        private float SampleTriangulated(float gridX, float gridZ)
+        private float SampleTriangulated(
+            float[] values,
+            float gridX,
+            float gridZ)
+        {
+            ResolveTriangle(
+                gridX,
+                gridZ,
+                out int i0,
+                out int i1,
+                out int i2,
+                out Vector3 weights);
+
+            return values[i0] * weights.x +
+                   values[i1] * weights.y +
+                   values[i2] * weights.z;
+        }
+
+        private Vector3 SampleTriangulated(
+            Vector3[] values,
+            float gridX,
+            float gridZ)
+        {
+            ResolveTriangle(
+                gridX,
+                gridZ,
+                out int i0,
+                out int i1,
+                out int i2,
+                out Vector3 weights);
+
+            Vector3 value =
+                values[i0] * weights.x +
+                values[i1] * weights.y +
+                values[i2] * weights.z;
+
+            return value.sqrMagnitude > 0.000001f
+                ? value.normalized
+                : Vector3.up;
+        }
+
+        private void ResolveTriangle(
+            float gridX,
+            float gridZ,
+            out int i0,
+            out int i1,
+            out int i2,
+            out Vector3 weights)
         {
             float maximum = Resolution - 1f;
             float x = Mathf.Clamp(gridX, 0f, maximum);
@@ -107,42 +241,59 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float tx = Mathf.Clamp01(x - x0);
             float tz = Mathf.Clamp01(z - z0);
 
-            float h00 = heights[z0 * Resolution + x0];
-            float h10 = heights[z0 * Resolution + x1];
-            float h01 = heights[z1 * Resolution + x0];
-            float h11 = heights[z1 * Resolution + x1];
+            int a = z0 * Resolution + x0;
+            int b = z0 * Resolution + x1;
+            int c = z1 * Resolution + x0;
+            int d = z1 * Resolution + x1;
 
             bool alternate =
                 ((x0 + z0 + triangulationSeed) & 1) == 0;
 
             if (alternate)
             {
-                // Same diagonal and triangle pair used by GroundGenerator:
-                // (a,c,b) and (b,c,d), diagonal from b to c.
                 if (tx + tz <= 1f)
                 {
-                    return h00 +
-                           tx * (h10 - h00) +
-                           tz * (h01 - h00);
+                    i0 = a;
+                    i1 = b;
+                    i2 = c;
+                    weights = new Vector3(1f - tx - tz, tx, tz);
+                    return;
                 }
 
-                return (1f - tz) * h10 +
-                       (1f - tx) * h01 +
-                       (tx + tz - 1f) * h11;
+                i0 = b;
+                i1 = c;
+                i2 = d;
+                weights = new Vector3(1f - tz, 1f - tx, tx + tz - 1f);
+                return;
             }
 
-            // Same alternate pair used by GroundGenerator:
-            // (a,d,b) and (a,c,d), diagonal from a to d.
             if (tx >= tz)
             {
-                return (1f - tx) * h00 +
-                       (tx - tz) * h10 +
-                       tz * h11;
+                i0 = a;
+                i1 = b;
+                i2 = d;
+                weights = new Vector3(1f - tx, tx - tz, tz);
+                return;
             }
 
-            return (1f - tz) * h00 +
-                   (tz - tx) * h01 +
-                   tx * h11;
+            i0 = a;
+            i1 = c;
+            i2 = d;
+            weights = new Vector3(1f - tz, tz - tx, tx);
+        }
+
+        private static float[] CloneOrEmpty(float[] source)
+        {
+            return source != null
+                ? (float[])source.Clone()
+                : Array.Empty<float>();
+        }
+
+        private static Vector3[] CloneOrEmpty(Vector3[] source)
+        {
+            return source != null
+                ? (Vector3[])source.Clone()
+                : Array.Empty<Vector3>();
         }
     }
 }
