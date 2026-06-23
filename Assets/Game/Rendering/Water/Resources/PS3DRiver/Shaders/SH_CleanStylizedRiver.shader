@@ -45,6 +45,7 @@ Shader "PS3D/Stylized River Water"
         _RefractionNormalInfluence("Refraction Normal Influence", Range(0, 1)) = 0.65
         _ShoreRefraction("Shore Refraction", Range(0, 1)) = 0.22
         _RefractionEdgeProtection("Refraction Edge Protection", Range(0, 1)) = 0.88
+        [Toggle] _PreserveObjectSilhouettes("Preserve Object Silhouettes", Float) = 1
         _IceDistortionStrength("Ice Distortion Strength", Range(0, 0.012)) = 0.0015
         _IceDiffusion("Ice Diffusion", Range(0, 1)) = 0.28
         [HideInInspector] _RefractionQuality("Refraction Quality", Float) = 1
@@ -158,6 +159,7 @@ Shader "PS3D/Stylized River Water"
                 float _RefractionNormalInfluence;
                 float _ShoreRefraction;
                 float _RefractionEdgeProtection;
+                float _PreserveObjectSilhouettes;
                 float _IceDistortionStrength;
                 float _IceDiffusion;
                 float _RefractionQuality;
@@ -336,6 +338,7 @@ Shader "PS3D/Stylized River Water"
                         _RefractionNormalInfluence,
                         _ShoreRefraction,
                         _RefractionEdgeProtection,
+                        _PreserveObjectSilhouettes,
                         _IceDistortionStrength,
                         _IceDiffusion,
                         _RefractionQuality,

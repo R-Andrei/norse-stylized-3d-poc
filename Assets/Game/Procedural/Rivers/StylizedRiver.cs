@@ -426,6 +426,9 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float depthEdgeProtection = 0.88f;
 
+        [Tooltip("Reduces refraction only where an object-to-background depth jump would otherwise contract the object silhouette and expose unavailable background information. Uses no additional texture samples.")]
+        [SerializeField] private bool preserveObjectSilhouettes = true;
+
         [Tooltip("Static screen-space warping through fully frozen ice.")]
         [Range(0f, 0.012f)]
         [SerializeField] private float iceDistortionStrength = 0.0015f;
@@ -605,6 +608,8 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_ShoreRefraction");
         private static readonly int RefractionEdgeProtectionStage4Id =
             Shader.PropertyToID("_RefractionEdgeProtection");
+        private static readonly int PreserveObjectSilhouettesStage4Id =
+            Shader.PropertyToID("_PreserveObjectSilhouettes");
         private static readonly int IceDistortionStrengthStage4Id =
             Shader.PropertyToID("_IceDistortionStrength");
         private static readonly int IceDiffusionStage4Id =
@@ -2313,6 +2318,9 @@ namespace ProgrammaticStylized3D.Rivers
             bodyProperties.SetFloat(
                 RefractionEdgeProtectionStage4Id,
                 depthEdgeProtection);
+            bodyProperties.SetFloat(
+                PreserveObjectSilhouettesStage4Id,
+                preserveObjectSilhouettes ? 1f : 0f);
             bodyProperties.SetFloat(
                 IceDistortionStrengthStage4Id,
                 iceDistortionStrength);

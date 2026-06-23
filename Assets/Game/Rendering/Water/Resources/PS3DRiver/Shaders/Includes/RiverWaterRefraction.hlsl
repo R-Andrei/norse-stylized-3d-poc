@@ -194,6 +194,51 @@ float3 RiverWaterSampleValidatedScene(
         validity);
 }
 
+float RiverWaterResolveSilhouettePreservation(
+    RiverWaterDepthData originalDepth,
+    RiverWaterDepthData candidateDepth,
+    float edgeProtection,
+    float preserveObjectSilhouettes)
+{
+    if (preserveObjectSilhouettes < 0.5)
+    {
+        return 1.0;
+    }
+
+    float original = max(0.0, originalDepth.verticalDepth);
+    float candidate = max(0.0, candidateDepth.verticalDepth);
+
+    // The ghosting case is specifically an original shallow object sample
+    // being replaced by a substantially deeper background sample.
+    float deeperJump = max(0.0, candidate - original);
+
+    // Scale the safe allowance with the object's apparent submerged depth.
+    // Deep riverbed-to-riverbed variation keeps full refraction, while a
+    // shallow object edge transitioning to deep bed is progressively guarded.
+    float nearSurfaceRisk = 1.0 - smoothstep(0.12, 1.25, original);
+    float protection = saturate(edgeProtection);
+
+    float relaxedAllowance = max(1.75, original * 2.0 + 0.75);
+    float protectedAllowance = lerp(
+        max(0.30, original * 0.75 + 0.20),
+        max(0.12, original * 0.40 + 0.08),
+        protection);
+
+    float allowance = lerp(
+        relaxedAllowance,
+        protectedAllowance,
+        nearSurfaceRisk);
+
+    float guard = 1.0 - smoothstep(
+        allowance * 0.55,
+        allowance,
+        deeperJump);
+
+    // Never create a hard frozen outline. Even risky edges retain a small
+    // amount of optical motion so silhouettes can still wobble subtly.
+    return lerp(0.18, 1.0, guard);
+}
+
 RiverWaterRefractionResult RiverWaterEvaluateRefraction(
     TEXTURE2D_PARAM(detailTexture, detailSampler),
     RiverWaterRefractionInputs input,
@@ -203,6 +248,7 @@ RiverWaterRefractionResult RiverWaterEvaluateRefraction(
     float normalInfluence,
     float shoreRefraction,
     float edgeProtection,
+    float preserveObjectSilhouettes,
     float iceDistortionStrength,
     float iceDiffusionAmount,
     float refractionQuality,
@@ -359,11 +405,10 @@ RiverWaterRefractionResult RiverWaterEvaluateRefraction(
     }
 
     float2 candidateUV = input.screenUV + finalOffset;
-    float centreValidity;
 
-    float3 refractedScene = RiverWaterSampleValidatedScene(
+    RiverWaterDepthData centreCandidateDepth;
+    float centreValidity = RiverWaterValidateRefractedSample(
         candidateUV,
-        originalScene,
         input,
         originalDepth,
         fallbackDepth,
@@ -371,6 +416,23 @@ RiverWaterRefractionResult RiverWaterEvaluateRefraction(
         depthContrast,
         clarity,
         edgeProtection,
+        centreCandidateDepth);
+
+    float silhouettePreservation =
+        RiverWaterResolveSilhouettePreservation(
+            originalDepth,
+            centreCandidateDepth,
+            edgeProtection,
+            preserveObjectSilhouettes);
+
+    centreValidity *= silhouettePreservation;
+
+    float3 centreCandidateScene = SampleSceneColor(
+        saturate(candidateUV));
+
+    float3 refractedScene = lerp(
+        originalScene,
+        centreCandidateScene,
         centreValidity);
 
     int quality = (int)round(refractionQuality);

@@ -461,6 +461,17 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent(
                     "Depth-Edge Protection",
                     "Rejects displaced samples that cross rocks, banks, foreground objects, or other strong scene-depth discontinuities."));
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField(
+                "Advanced",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                Find("preserveObjectSilhouettes"),
+                new GUIContent(
+                    "Preserve Object Silhouettes",
+                    "Uses the depth samples already required by refraction to reduce object-edge contraction and pale disocclusion ghosts. It adds shader arithmetic but no extra texture samples."));
+
             EditorGUILayout.PropertyField(
                 Find("iceDistortionStrength"),
                 new GUIContent(

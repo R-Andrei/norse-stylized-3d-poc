@@ -38,6 +38,8 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 **Natural channel variation:** Deterministic river-space controls provide asymmetric shoreline width variation and safety-limited bed roughness with configurable lower-slope reach. The water surface, corridor, collider, ground concealment, and spatial queries consume the same resolved channel shape.
 
+**Directional-light shadow stability:** The main directional light uses a tested Depth Bias of `0.13`, preventing low-angle light leaks and holes in elongated shadows while keeping acceptable contact and self-shadowing.
+
 ## 1. River Domain and Coordinate Contract
 
 **Problem:** Establish one continuous river-space representation for distance along the river, position across it, local direction, width, height, and world-space conversion. Motion must not change speed, reverse, jump, or reveal spline knots.
@@ -66,9 +68,9 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 **Problem:** Distort the riverbed and submerged scene convincingly without doubled silhouettes, invalid screen samples, hard boundaries, or camera-dependent artifacts. Liquid and frozen states need distinct distortion behaviour.
 
-**Implemented:** A configurable depth-aware screen-space layer now uses the completed Stage 3 surface normal, water depth, shoreline masking, screen bounds, and scene-depth continuity to produce restrained liquid distortion with safe fallback. Frozen water uses static warping and quality-scaled diffusion influenced by ice cloudiness.
+**Implemented:** A configurable depth-aware screen-space layer distorts the complete transmitted opaque scene using separate Stage 3 macro-wave and animated-detail optical fields. It supports restrained liquid refraction, depth influence, shoreline protection, foreground-crossing rejection, static ice warping, and quality-scaled ice diffusion. Liquid surface shadows are subdued so the refracted underwater shadow remains dominant. An optional zero-extra-sample silhouette guard reduces object-edge contraction by reusing the original and refracted depth values.
 
-**Validated:** Implementation complete; pending Unity visual and regression testing.
+**Validated:** Complete and accepted. Riverbed detail, submerged objects, and underwater shadows deform continuously with surface motion; liquid and frozen optics, depth protection, shoreline behavior, day/night lighting, and local-light response passed visual testing. A faint gray disocclusion trace can remain around strongly refracted high-contrast silhouettes; it is accepted as a low-priority screen-space limitation.
 
 ## 5. Runtime Disturbance and Interaction
 
