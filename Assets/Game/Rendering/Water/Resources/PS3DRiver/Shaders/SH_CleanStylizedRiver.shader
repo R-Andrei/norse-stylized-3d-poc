@@ -51,6 +51,17 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _RefractionQuality("Refraction Quality", Float) = 1
         _RefractionDebugView("Refraction Debug View", Range(0, 6)) = 0
 
+        [Header(Runtime Disturbance Field)]
+        [HideInInspector] _DisturbanceEnabled("Disturbance Enabled", Float) = 0
+        [HideInInspector] _DisturbanceInterpolation("Disturbance Interpolation", Range(0, 1)) = 1
+        [HideInInspector] _DisturbanceGlobalStart("Disturbance Global Start", Float) = 0
+        [HideInInspector] _DisturbanceFieldLength("Disturbance Field Length", Float) = 1
+        [HideInInspector] _DisturbanceGeometryStrength("Disturbance Geometry Strength", Float) = 1
+        [HideInInspector] _DisturbanceNormalStrength("Disturbance Normal Strength", Float) = 1
+        [HideInInspector] _DisturbanceShoreInteraction("Disturbance Shore Interaction", Float) = 0.5
+        [HideInInspector] _DisturbanceMaximumHeight("Disturbance Maximum Height", Float) = 0.1
+        [HideInInspector] _DisturbanceDebugView("Disturbance Debug View", Float) = 0
+
         [Header(Lighting Response)]
         _LightDependence("Light Dependence", Range(0, 1)) = 1
         _AmbientResponse("Ambient Response", Range(0, 2)) = 1
@@ -108,6 +119,7 @@ Shader "PS3D/Stylized River Water"
             #include "Includes/RiverWaterDepth.hlsl"
             #include "Includes/RiverWaterLighting.hlsl"
             #include "Includes/RiverWaterMotion.hlsl"
+            #include "Includes/RiverWaterDisturbance.hlsl"
             #include "Includes/RiverWaterRefraction.hlsl"
             #include "Includes/RiverWaterBody.hlsl"
 
@@ -165,12 +177,26 @@ Shader "PS3D/Stylized River Water"
                 float _RefractionQuality;
                 float _RefractionDebugView;
 
+                float _DisturbanceEnabled;
+                float _DisturbanceInterpolation;
+                float _DisturbanceGlobalStart;
+                float _DisturbanceFieldLength;
+                float _DisturbanceGeometryStrength;
+                float _DisturbanceNormalStrength;
+                float _DisturbanceShoreInteraction;
+                float _DisturbanceMaximumHeight;
+                float _DisturbanceDebugView;
+
                 float _DomainFallbackDepth;
                 float _BodyDebugView;
             CBUFFER_END
 
             TEXTURE2D(_MotionDetailTexture);
             SAMPLER(sampler_MotionDetailTexture);
+            TEXTURE2D(_DisturbanceFieldPrevious);
+            SAMPLER(sampler_DisturbanceFieldPrevious);
+            TEXTURE2D(_DisturbanceFieldCurrent);
+            SAMPLER(sampler_DisturbanceFieldCurrent);
 
             struct Attributes
             {
@@ -192,6 +218,7 @@ Shader "PS3D/Stylized River Water"
                 half3 tangentWS : TEXCOORD3;
                 half3 sideWS : TEXCOORD4;
                 float4 motionData : TEXCOORD5;
+                float4 disturbanceData : TEXCOORD6;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -233,10 +260,32 @@ Shader "PS3D/Stylized River Water"
                     _ShoreMotionWidth,
                     _MotionSeed);
 
+                RiverWaterDisturbanceResult disturbance =
+                    RiverWaterEvaluateDisturbance(
+                        TEXTURE2D_ARGS(
+                            _DisturbanceFieldPrevious,
+                            sampler_DisturbanceFieldPrevious),
+                        TEXTURE2D_ARGS(
+                            _DisturbanceFieldCurrent,
+                            sampler_DisturbanceFieldCurrent),
+                        _DisturbanceEnabled,
+                        input.uv1.x,
+                        input.uv1.y,
+                        input.uv2.x,
+                        input.uv2.y,
+                        _DisturbanceGlobalStart,
+                        _DisturbanceFieldLength,
+                        _DisturbanceInterpolation,
+                        _DisturbanceGeometryStrength,
+                        _DisturbanceShoreInteraction,
+                        _DisturbanceMaximumHeight,
+                        _FreezeAmount);
+
                 output.positionWS =
                     basePositionWS +
                     motion.displacementWS +
-                    baseNormalWS * motion.disturbanceHeight;
+                    baseNormalWS *
+                    (motion.disturbanceHeight + disturbance.height);
                 output.positionCS = TransformWorldToHClip(output.positionWS);
                 output.baseNormalWS = baseNormalWS;
                 output.tangentWS = tangentWS;
@@ -251,6 +300,11 @@ Shader "PS3D/Stylized River Water"
                     motion.macroHeight,
                     motion.bankMask,
                     ComputeFogFactor(output.positionCS.z));
+                output.disturbanceData = float4(
+                    disturbance.downstreamGradient,
+                    disturbance.lateralGradient,
+                    disturbance.height,
+                    disturbance.velocity);
                 return output;
             }
 
@@ -291,6 +345,20 @@ Shader "PS3D/Stylized River Water"
                     _ShoreMotion,
                     _ShoreMotionWidth,
                     _MotionSeed);
+
+                float3 disturbanceNormalWS =
+                    RiverWaterApplyDisturbanceNormal(
+                        motion.surfaceNormalWS,
+                        normalize(input.tangentWS),
+                        normalize(input.sideWS),
+                        input.disturbanceData.x,
+                        input.disturbanceData.y,
+                        _DisturbanceNormalStrength);
+
+                motion.surfaceNormalWS = disturbanceNormalWS;
+                motion.disturbanceHeight = input.disturbanceData.z;
+                motion.disturbanceNormalWS =
+                    disturbanceNormalWS - motionInputs.baseNormalWS;
 
                 RiverWaterSurfaceInputs surfaceInputs;
                 surfaceInputs.positionWS = input.positionWS;
@@ -424,6 +492,55 @@ Shader "PS3D/Stylized River Water"
                     integration);
                 finalColour *= 1.0 + motion.currentAccent * 0.22;
                 finalColour = MixFog(finalColour, input.motionData.w);
+
+                int disturbanceDebug =
+                    (int)round(_DisturbanceDebugView);
+
+                if (disturbanceDebug == 1)
+                {
+                    float encodedHeight = saturate(
+                        input.disturbanceData.z /
+                        max(0.001, _DisturbanceMaximumHeight) *
+                        0.5 + 0.5);
+                    return half4(encodedHeight.xxx, 1.0);
+                }
+
+                if (disturbanceDebug == 2)
+                {
+                    float encodedVelocity = saturate(
+                        input.disturbanceData.w * 0.25 + 0.5);
+                    return half4(encodedVelocity.xxx, 1.0);
+                }
+
+                if (disturbanceDebug == 3)
+                {
+                    return half4(
+                        motion.surfaceNormalWS * 0.5 + 0.5,
+                        1.0);
+                }
+
+                if (disturbanceDebug == 4)
+                {
+                    float intensity = saturate(
+                        abs(input.disturbanceData.z) /
+                        max(0.001, _DisturbanceMaximumHeight) * 0.55 +
+                        abs(input.disturbanceData.w) * 0.12 +
+                        length(input.disturbanceData.xy) * 0.35);
+                    return half4(intensity.xxx, 1.0);
+                }
+
+                if (disturbanceDebug == 5)
+                {
+                    float2 fieldUV = float2(
+                        saturate(
+                            (input.domainData.x - _DisturbanceGlobalStart) /
+                            max(0.001, _DisturbanceFieldLength)),
+                        saturate(
+                            input.domainData.y /
+                            max(0.001, input.domainData.w) *
+                            0.5 + 0.5));
+                    return half4(fieldUV.x, fieldUV.y, 0.0, 1.0);
+                }
 
                 int refractionDebug =
                     (int)round(_RefractionDebugView);

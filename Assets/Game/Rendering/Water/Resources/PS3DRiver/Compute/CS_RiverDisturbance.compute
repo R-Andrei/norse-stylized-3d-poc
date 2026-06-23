@@ -1,0 +1,473 @@
+#pragma kernel ClearRange
+#pragma kernel Inject
+#pragma kernel Simulate
+
+Texture2D<float4> _StateRead;
+RWTexture2D<float4> _StateWrite;
+
+int2 _FieldSize;
+int _DispatchXOffset;
+int _DispatchWidth;
+int4 _InjectRect;
+float2 _InjectStart;
+float2 _InjectEnd;
+float2 _InjectRadiusPixels;
+float _InjectHeight;
+float _InjectVelocity;
+float _InjectGeometrySlope;
+float _InjectNormalDetail;
+float _InjectMovementBlend;
+float _InjectWakeLengthPixels;
+int _InjectMode;
+
+float _DeltaTime;
+float _PropagationSpeed;
+float _DampingPerSecond;
+float _AdvectionPixels;
+float _CellSizeX;
+float _CellSizeY;
+float _MaximumHeight;
+
+float4 LoadState(int2 pixel)
+{
+    pixel = clamp(pixel, int2(0, 0), _FieldSize - 1);
+    return _StateRead.Load(int3(pixel, 0));
+}
+
+float4 SampleStateLinearX(float x, int y)
+{
+    float floorX = floor(x);
+    int x0 = clamp((int)floorX, 0, _FieldSize.x - 1);
+    int x1 = clamp(x0 + 1, 0, _FieldSize.x - 1);
+    float interpolation = saturate(x - floorX);
+    float4 sampleA = LoadState(int2(x0, y));
+    float4 sampleB = LoadState(int2(x1, y));
+    return lerp(sampleA, sampleB, interpolation);
+}
+
+float Gaussian1D(float value, float centre, float width)
+{
+    float normalized =
+        (value - centre) /
+        max(width, 0.0001);
+    return exp(-normalized * normalized);
+}
+
+float Gaussian2D(
+    float2 value,
+    float2 centre,
+    float2 width)
+{
+    float2 normalized =
+        (value - centre) /
+        max(width, float2(0.0001, 0.0001));
+    return exp(-dot(normalized, normalized));
+}
+
+float2 GaussianGradient2D(
+    float2 value,
+    float2 centre,
+    float2 width,
+    float gaussianValue)
+{
+    float2 safeWidth =
+        max(width, float2(0.0001, 0.0001));
+    return
+        -2.0 *
+        (value - centre) /
+        (safeWidth * safeWidth) *
+        gaussianValue;
+}
+
+float2 SafeNormalize(float2 value, float2 fallback)
+{
+    float magnitudeSquared = dot(value, value);
+    return magnitudeSquared > 0.000001
+        ? value * rsqrt(magnitudeSquared)
+        : fallback;
+}
+
+[numthreads(8, 8, 1)]
+void ClearRange(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_DispatchWidth ||
+        dispatchId.y >= (uint)_FieldSize.y)
+    {
+        return;
+    }
+
+    int2 pixel = int2(
+        (int)dispatchId.x + _DispatchXOffset,
+        (int)dispatchId.y);
+
+    if (pixel.x < 0 || pixel.x >= _FieldSize.x)
+    {
+        return;
+    }
+
+    _StateWrite[pixel] = 0.0;
+}
+
+[numthreads(8, 8, 1)]
+void Inject(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_InjectRect.z ||
+        dispatchId.y >= (uint)_InjectRect.w)
+    {
+        return;
+    }
+
+    int2 pixel = int2(
+        _InjectRect.x + (int)dispatchId.x,
+        _InjectRect.y + (int)dispatchId.y);
+
+    if (pixel.x < 0 || pixel.y < 0 ||
+        pixel.x >= _FieldSize.x || pixel.y >= _FieldSize.y)
+    {
+        return;
+    }
+
+    float2 radius =
+        max(_InjectRadiusPixels, float2(1.0, 1.0));
+    float2 samplePosition =
+        (float2(pixel) + 0.5) / radius;
+    float2 startPosition = _InjectStart / radius;
+    float2 endPosition = _InjectEnd / radius;
+    float2 movementSegment = endPosition - startPosition;
+    float movementLength = length(movementSegment);
+    float2 movementDirection = SafeNormalize(
+        movementSegment,
+        float2(1.0, 0.0));
+    float2 movementPerpendicular = float2(
+        -movementDirection.y,
+        movementDirection.x);
+
+    float heightPattern = 0.0;
+    float velocityPattern = 0.0;
+    float2 geometryGradientPattern = float2(0.0, 0.0);
+    float2 normalPattern = float2(0.0, 0.0);
+
+    float2 sourceRelative = samplePosition - endPosition;
+
+    if (_InjectMode == 0)
+    {
+        float radialDistance = length(sourceRelative);
+        float centreDepression =
+            Gaussian1D(radialDistance, 0.0, 0.28);
+        float pressureRing =
+            Gaussian1D(radialDistance, 0.60, 0.17);
+        float outerTrough =
+            Gaussian1D(radialDistance, 0.91, 0.11);
+        float radialEnvelope =
+            1.0 - smoothstep(0.88, 1.12, radialDistance);
+
+        heightPattern =
+            (0.92 * pressureRing -
+             0.70 * centreDepression -
+             0.16 * outerTrough) *
+            radialEnvelope;
+        velocityPattern =
+            (1.05 * pressureRing -
+             1.35 * centreDepression -
+             0.20 * outerTrough) *
+            radialEnvelope;
+
+        float2 radialDirection = SafeNormalize(
+            sourceRelative,
+            float2(1.0, 0.0));
+        geometryGradientPattern =
+            radialDirection *
+            (1.35 * centreDepression -
+             1.15 * pressureRing +
+             0.30 * outerTrough) *
+            radialEnvelope;
+        normalPattern =
+            radialDirection *
+            (pressureRing * 1.25 -
+             centreDepression * 0.55) *
+            radialEnvelope;
+    }
+    else
+    {
+        float movementAlong =
+            dot(samplePosition - startPosition, movementDirection);
+        float movementAcross =
+            dot(samplePosition - startPosition, movementPerpendicular);
+        float clampedAlong = clamp(
+            movementAlong,
+            0.0,
+            max(movementLength, 0.0001));
+        float2 nearestMovementPosition =
+            startPosition + movementDirection * clampedAlong;
+        float pathDistance =
+            length(samplePosition - nearestMovementPosition);
+        float pathEnvelope =
+            1.0 - smoothstep(0.72, 1.05, pathDistance);
+        float pathStartMask =
+            smoothstep(-0.18, 0.12, movementAlong);
+        float pathEndMask =
+            1.0 - smoothstep(
+                max(0.0, movementLength - 0.08),
+                movementLength + 0.30,
+                movementAlong);
+        float pathLengthMask =
+            movementLength > 0.025
+                ? pathStartMask * pathEndMask
+                : 0.0;
+
+        float sideShoulders =
+            Gaussian1D(abs(movementAcross), 0.56, 0.22);
+        float centreChannel =
+            Gaussian1D(movementAcross, 0.0, 0.31);
+        float signedPath =
+            (0.78 * sideShoulders -
+             0.58 * centreChannel) *
+            pathEnvelope *
+            pathLengthMask;
+
+        float2 endRelative = samplePosition - endPosition;
+        float endAlong = dot(endRelative, movementDirection);
+        float endAcross = dot(endRelative, movementPerpendicular);
+        float leadingCrest = Gaussian2D(
+            float2(endAlong, endAcross),
+            float2(0.28, 0.0),
+            float2(0.36, 0.68));
+        float trailingSeparation = Gaussian2D(
+            float2(endAlong, endAcross),
+            float2(-0.36, 0.0),
+            float2(0.52, 0.50));
+
+        float sweptHeight =
+            0.54 * signedPath +
+            0.72 * leadingCrest -
+            0.34 * trailingSeparation;
+        float sweptVelocity =
+            0.82 * signedPath +
+            0.92 * leadingCrest -
+            0.52 * trailingSeparation;
+        float2 sweptGradient =
+            movementPerpendicular *
+            sign(movementAcross) *
+            (sideShoulders + 0.45 * centreChannel) *
+            pathEnvelope *
+            pathLengthMask +
+            movementDirection *
+            (0.95 * leadingCrest -
+             0.58 * trailingSeparation);
+        float2 sweptNormal =
+            movementPerpendicular *
+            sign(movementAcross) *
+            (1.15 * sideShoulders +
+             0.35 * centreChannel) *
+            pathEnvelope *
+            pathLengthMask +
+            movementDirection *
+            (1.20 * leadingCrest -
+             0.45 * trailingSeparation);
+
+        float flowAlong = sourceRelative.x;
+        float flowAcross = sourceRelative.y;
+        float wakeLength = max(
+            1.0,
+            _InjectWakeLengthPixels / radius.x);
+
+        float upstreamCrest = Gaussian2D(
+            float2(flowAlong, flowAcross),
+            float2(-0.48, 0.0),
+            float2(0.34, 0.72));
+        float downstreamTrough = Gaussian2D(
+            float2(flowAlong, flowAcross),
+            float2(0.38, 0.0),
+            float2(0.52, 0.62));
+        float leftShoulder = Gaussian2D(
+            float2(flowAlong, flowAcross),
+            float2(0.02, 0.63),
+            float2(0.52, 0.24));
+        float rightShoulder = Gaussian2D(
+            float2(flowAlong, flowAcross),
+            float2(0.02, -0.63),
+            float2(0.52, 0.24));
+        float sideSeparation = leftShoulder + rightShoulder;
+
+        float wakeStart = smoothstep(0.16, 0.42, flowAlong);
+        float wakeEnd = 1.0 - smoothstep(
+            max(0.55, wakeLength - 0.48),
+            wakeLength,
+            flowAlong);
+        float wakeAcrossMask =
+            Gaussian1D(flowAcross, 0.0, 0.43);
+        float wakeEnvelope =
+            wakeStart * wakeEnd * wakeAcrossMask;
+        float wakeOscillation =
+            sin((flowAlong - 0.12) * 3.65) *
+            wakeEnvelope;
+
+        float obstructionHeight =
+            1.26 * upstreamCrest -
+            1.05 * downstreamTrough +
+            0.08 * sideSeparation +
+            0.12 * wakeOscillation;
+        float obstructionVelocity =
+            1.00 * upstreamCrest -
+            0.90 * downstreamTrough +
+            0.08 * sideSeparation +
+            0.23 * wakeOscillation;
+
+        float2 upstreamGradient = GaussianGradient2D(
+            float2(flowAlong, flowAcross),
+            float2(-0.48, 0.0),
+            float2(0.34, 0.72),
+            upstreamCrest);
+        float2 downstreamGradient = GaussianGradient2D(
+            float2(flowAlong, flowAcross),
+            float2(0.38, 0.0),
+            float2(0.52, 0.62),
+            downstreamTrough);
+        float2 leftGradient = GaussianGradient2D(
+            float2(flowAlong, flowAcross),
+            float2(0.02, 0.63),
+            float2(0.52, 0.24),
+            leftShoulder);
+        float2 rightGradient = GaussianGradient2D(
+            float2(flowAlong, flowAcross),
+            float2(0.02, -0.63),
+            float2(0.52, 0.24),
+            rightShoulder);
+        float2 obstructionGradient =
+            1.26 * upstreamGradient -
+            1.05 * downstreamGradient +
+            0.08 * (leftGradient + rightGradient);
+        float2 obstructionNormal =
+            obstructionGradient +
+            float2(
+                cos((flowAlong - 0.12) * 3.65),
+                sin(flowAlong * 4.90 + flowAcross * 2.40)) *
+            wakeEnvelope *
+            0.72;
+
+        float movementBlend = saturate(_InjectMovementBlend);
+        heightPattern = lerp(
+            obstructionHeight,
+            sweptHeight,
+            movementBlend);
+        velocityPattern = lerp(
+            obstructionVelocity,
+            sweptVelocity,
+            movementBlend);
+        geometryGradientPattern = lerp(
+            obstructionGradient,
+            sweptGradient,
+            movementBlend);
+        normalPattern = lerp(
+            obstructionNormal,
+            sweptNormal,
+            movementBlend);
+    }
+
+    if (abs(heightPattern) < 0.0001 &&
+        abs(velocityPattern) < 0.0001 &&
+        dot(normalPattern, normalPattern) < 0.000001)
+    {
+        return;
+    }
+
+    float4 state = _StateWrite[pixel];
+    state.r += _InjectHeight * heightPattern;
+    state.g += _InjectVelocity * velocityPattern;
+    state.ba +=
+        _InjectGeometrySlope * geometryGradientPattern +
+        _InjectNormalDetail * normalPattern;
+    state.r = clamp(state.r, -_MaximumHeight, _MaximumHeight);
+    state.g = clamp(
+        state.g,
+        -_MaximumHeight * 16.0,
+        _MaximumHeight * 16.0);
+    state.ba = clamp(state.ba, -4.0, 4.0);
+    _StateWrite[pixel] = state;
+}
+
+[numthreads(8, 8, 1)]
+void Simulate(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_DispatchWidth ||
+        dispatchId.y >= (uint)_FieldSize.y)
+    {
+        return;
+    }
+
+    int x = (int)dispatchId.x + _DispatchXOffset;
+    int y = (int)dispatchId.y;
+
+    if (x < 0 || x >= _FieldSize.x)
+    {
+        return;
+    }
+
+    float sourceX = (float)x - _AdvectionPixels;
+    float4 centre = SampleStateLinearX(sourceX, y);
+    float left = SampleStateLinearX(sourceX - 1.0, y).r;
+    float right = SampleStateLinearX(sourceX + 1.0, y).r;
+    float down = SampleStateLinearX(
+        sourceX,
+        max(0, y - 1)).r;
+    float up = SampleStateLinearX(
+        sourceX,
+        min(_FieldSize.y - 1, y + 1)).r;
+
+    float inverseCellX2 =
+        1.0 /
+        max(0.0001, _CellSizeX * _CellSizeX);
+    float inverseCellY2 =
+        1.0 /
+        max(0.0001, _CellSizeY * _CellSizeY);
+    float laplacian =
+        (left - 2.0 * centre.r + right) * inverseCellX2 +
+        (down - 2.0 * centre.r + up) * inverseCellY2;
+
+    float velocity =
+        centre.g +
+        laplacian *
+        _PropagationSpeed *
+        _PropagationSpeed *
+        _DeltaTime;
+    velocity *= exp(-_DampingPerSecond * _DeltaTime);
+
+    float height = centre.r + velocity * _DeltaTime;
+
+    float lateral01 =
+        y / max(1.0, (float)(_FieldSize.y - 1));
+    float edgeDistance = min(lateral01, 1.0 - lateral01);
+    float edgeMask = smoothstep(0.0, 0.075, edgeDistance);
+
+    height *= edgeMask;
+    velocity *= edgeMask;
+    height = clamp(height, -_MaximumHeight, _MaximumHeight);
+
+    float geometryGradientX =
+        (right - left) /
+        max(0.0001, 2.0 * _CellSizeX);
+    float geometryGradientY =
+        (up - down) /
+        max(0.0001, 2.0 * _CellSizeY);
+    float2 geometryGradient =
+        float2(geometryGradientX, geometryGradientY) *
+        edgeMask;
+
+    float2 normalOnlyDetail =
+        centre.ba - geometryGradient;
+    float normalDetailDamping = exp(
+        -(_DampingPerSecond * 1.35 + 0.90) *
+        _DeltaTime);
+    normalOnlyDetail *= normalDetailDamping * edgeMask;
+
+    float2 finalGradient = clamp(
+        geometryGradient + normalOnlyDetail,
+        -4.0,
+        4.0);
+
+    _StateWrite[int2(x, y)] = float4(
+        height,
+        velocity,
+        finalGradient.x,
+        finalGradient.y);
+}

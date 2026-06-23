@@ -78,6 +78,25 @@ namespace ProgrammaticStylized3D.Rivers
         IceDiffusion = 6
     }
 
+    public enum StylizedRiverDisturbancePreset
+    {
+        None,
+        Subtle,
+        Balanced,
+        Reactive,
+        Custom
+    }
+
+    public enum StylizedRiverDisturbanceDebugView
+    {
+        Final = 0,
+        Height = 1,
+        Velocity = 2,
+        Normal = 3,
+        Intensity = 4,
+        FieldCoordinates = 5
+    }
+
     public enum StylizedRiverIceBodyPreset
     {
         ClearIce,
@@ -441,6 +460,54 @@ namespace ProgrammaticStylized3D.Rivers
         private StylizedRiverRefractionDebugView refractionDebugView =
             StylizedRiverRefractionDebugView.Final;
 
+        [Header("Runtime Disturbance and Interaction")]
+        [Tooltip("Enables the shared persistent river-space disturbance field. When disabled, Stage 4 is reproduced exactly and no disturbance textures are allocated or simulated.")]
+        [SerializeField] private bool runtimeDisturbances;
+
+        [SerializeField]
+        private StylizedRiverDisturbancePreset disturbancePreset =
+            StylizedRiverDisturbancePreset.None;
+
+        [Tooltip("Master strength applied when impacts and continuous sources inject energy into the shared field.")]
+        [Range(0f, 2f)]
+        [SerializeField] private float disturbanceStrength = 1f;
+
+        [Tooltip("How long wakes and ripples retain energy. Higher values decay more slowly.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float disturbancePersistence = 0.65f;
+
+        [Tooltip("How quickly broad ripple energy propagates through the field, in approximate metres per second.")]
+        [Range(0.2f, 2.5f)]
+        [SerializeField] private float disturbancePropagationSpeed = 1.05f;
+
+        [Tooltip("How strongly the river current transports persistent disturbances downstream.")]
+        [Range(0f, 1.5f)]
+        [SerializeField] private float disturbanceAdvection = 0.8f;
+
+        [Tooltip("Master multiplier for geometric disturbance height.")]
+        [Range(0f, 2f)]
+        [SerializeField] private float disturbanceGeometryStrength = 0.75f;
+
+        [Tooltip("Master multiplier for disturbance normals used by lighting and refraction.")]
+        [Range(0f, 2f)]
+        [SerializeField] private float disturbanceNormalStrength = 1f;
+
+        [Tooltip("Amount of disturbance retained where the visible water meets the bank. The field still reaches zero before the buried surface edge.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float disturbanceShoreInteraction = 0.55f;
+
+        [Tooltip("Maximum geometric height contributed by the disturbance field, in metres. This also reserves safe riverbed clearance.")]
+        [Range(0.01f, 0.4f)]
+        [SerializeField] private float disturbanceMaximumHeight = 0.12f;
+
+        [Tooltip("Shortest geometric disturbance wavelength the surface mesh should represent, in metres. Smaller visual detail remains normal-only.")]
+        [Range(0.5f, 5f)]
+        [SerializeField] private float disturbanceMinimumWavelength = 1.4f;
+
+        [SerializeField]
+        private StylizedRiverDisturbanceDebugView disturbanceDebugView =
+            StylizedRiverDisturbanceDebugView.Final;
+
         [Header("Water Body Validation")]
         [SerializeField]
         private StylizedRiverBodyDebugView bodyDebugView =
@@ -619,6 +686,9 @@ namespace ProgrammaticStylized3D.Rivers
         private static readonly int RefractionDebugViewStage4Id =
             Shader.PropertyToID("_RefractionDebugView");
 
+        private static readonly int DisturbanceEnabledStage5Id =
+            Shader.PropertyToID("_DisturbanceEnabled");
+
         private static readonly int DomainFallbackDepthId = Shader.PropertyToID("_DomainFallbackDepth");
         private static readonly int BodyDebugViewId = Shader.PropertyToID("_BodyDebugView");
         private static readonly int HorizonColorId = Shader.PropertyToID("_HorizonColor");
@@ -712,6 +782,7 @@ namespace ProgrammaticStylized3D.Rivers
         private double pendingRegenerationTime;
         private bool pendingRegeneration;
         private bool subscribedToSplineChanges;
+        private StylizedRiverDisturbanceRuntime disturbanceRuntime;
 
         public event Action<RiverDomainSnapshot> DomainChanged;
 
@@ -736,8 +807,31 @@ namespace ProgrammaticStylized3D.Rivers
         public float MotionWaveHeight => motionWaveHeight;
         public float MotionWaveLength => motionWaveLength;
         public float ShoreMotion => shoreMotion;
+        public bool RuntimeDisturbancesEnabled => runtimeDisturbances;
+        public StylizedRiverDisturbancePreset DisturbancePreset =>
+            disturbancePreset;
+        public float DisturbanceStrength => disturbanceStrength;
+        public float DisturbancePersistence => disturbancePersistence;
+        public float DisturbancePropagationSpeed =>
+            disturbancePropagationSpeed;
+        public float DisturbanceAdvection => disturbanceAdvection;
+        public float DisturbanceGeometryStrength =>
+            disturbanceGeometryStrength;
+        public float DisturbanceNormalStrength => disturbanceNormalStrength;
+        public float DisturbanceShoreInteraction =>
+            disturbanceShoreInteraction;
+        public float DisturbanceMaximumHeight => disturbanceMaximumHeight;
+        public float DisturbanceMinimumWavelength =>
+            disturbanceMinimumWavelength;
+        public StylizedRiverDisturbanceDebugView DisturbanceDebugView =>
+            disturbanceDebugView;
+        public float LiquidFactor => ResolveLiquidFactor();
         public float ResolvedMaximumDownwardMotion =>
-            ResolveLiquidFactor() * motionWaveHeight;
+            ResolveLiquidFactor() *
+            (motionWaveHeight +
+             (runtimeDisturbances
+                 ? disturbanceMaximumHeight * disturbanceGeometryStrength
+                 : 0f));
         public float ResolvedSurfaceLongitudinalSpacing =>
             ResolveSurfaceLongitudinalSpacing();
         public float VisibleHalfWidth => width * 0.5f;
@@ -771,7 +865,7 @@ namespace ProgrammaticStylized3D.Rivers
                 depth,
                 shorelineWetClearance + Mathf.Max(
                     reservedDownwardSurfaceDisplacement,
-                    motionWaveHeight * ResolveLiquidFactor()));
+                    ResolvedMaximumDownwardMotion));
         public float ResolvedMinimumVisibleWidth =>
             ResolveDomainVisibleWidthRange(out float minimum, out _)
                 ? minimum
@@ -825,6 +919,7 @@ namespace ProgrammaticStylized3D.Rivers
             RemoveLegacyGeneratedObjects();
             EnsureSurfaceOutput();
             EnsureCorridorOutput();
+            EnsureDisturbanceRuntime();
             SetRendererEnabled(true);
             RegenerateAll();
             lastEditorTime = Time.realtimeSinceStartupAsDouble;
@@ -845,6 +940,7 @@ namespace ProgrammaticStylized3D.Rivers
             RemoveLegacyGeneratedObjects();
             EnsureSurfaceOutput();
             EnsureCorridorOutput();
+            EnsureDisturbanceRuntime();
             ApplyVisualSettings();
 
             if (liveRegeneration)
@@ -1121,6 +1217,92 @@ namespace ProgrammaticStylized3D.Rivers
 
             ValidateSettings();
             RebuildSurfaceOnly();
+        }
+
+        public void ApplyDisturbancePreset()
+        {
+            ApplyDisturbancePreset(disturbancePreset);
+        }
+
+        public void ApplyDisturbancePreset(
+            StylizedRiverDisturbancePreset preset)
+        {
+            disturbancePreset = preset;
+
+            switch (preset)
+            {
+                case StylizedRiverDisturbancePreset.None:
+                    runtimeDisturbances = false;
+                    disturbanceStrength = 0f;
+                    disturbancePersistence = 0.35f;
+                    disturbancePropagationSpeed = 0.75f;
+                    disturbanceAdvection = 0.6f;
+                    disturbanceGeometryStrength = 0f;
+                    disturbanceNormalStrength = 0f;
+                    disturbanceShoreInteraction = 0.25f;
+                    disturbanceMaximumHeight = 0.06f;
+                    disturbanceMinimumWavelength = 1.8f;
+                    break;
+
+                case StylizedRiverDisturbancePreset.Subtle:
+                    runtimeDisturbances = true;
+                    disturbanceStrength = 0.55f;
+                    disturbancePersistence = 0.48f;
+                    disturbancePropagationSpeed = 0.82f;
+                    disturbanceAdvection = 0.68f;
+                    disturbanceGeometryStrength = 0.45f;
+                    disturbanceNormalStrength = 0.78f;
+                    disturbanceShoreInteraction = 0.38f;
+                    disturbanceMaximumHeight = 0.07f;
+                    disturbanceMinimumWavelength = 1.8f;
+                    break;
+
+                case StylizedRiverDisturbancePreset.Balanced:
+                    runtimeDisturbances = true;
+                    disturbanceStrength = 1f;
+                    disturbancePersistence = 0.65f;
+                    disturbancePropagationSpeed = 1.05f;
+                    disturbanceAdvection = 0.8f;
+                    disturbanceGeometryStrength = 0.75f;
+                    disturbanceNormalStrength = 1f;
+                    disturbanceShoreInteraction = 0.55f;
+                    disturbanceMaximumHeight = 0.12f;
+                    disturbanceMinimumWavelength = 1.4f;
+                    break;
+
+                case StylizedRiverDisturbancePreset.Reactive:
+                    runtimeDisturbances = true;
+                    disturbanceStrength = 1.35f;
+                    disturbancePersistence = 0.78f;
+                    disturbancePropagationSpeed = 1.3f;
+                    disturbanceAdvection = 0.95f;
+                    disturbanceGeometryStrength = 1f;
+                    disturbanceNormalStrength = 1.3f;
+                    disturbanceShoreInteraction = 0.72f;
+                    disturbanceMaximumHeight = 0.18f;
+                    disturbanceMinimumWavelength = 1f;
+                    break;
+
+                case StylizedRiverDisturbancePreset.Custom:
+                    break;
+
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(preset),
+                        preset,
+                        "Unsupported disturbance preset.");
+            }
+
+            ValidateSettings();
+            EnsureDisturbanceRuntime();
+            RebuildSurfaceOnly();
+            disturbanceRuntime?.NotifyRiverChanged();
+        }
+
+        public StylizedRiverDisturbanceRuntime GetOrCreateDisturbanceRuntime()
+        {
+            EnsureDisturbanceRuntime();
+            return disturbanceRuntime;
         }
 
         public void ApplyRefractionPreset()
@@ -1711,6 +1893,35 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.Clamp(iceDistortionStrength, 0f, 0.012f);
             iceDiffusion = Mathf.Clamp01(iceDiffusion);
 
+            disturbanceStrength = Mathf.Clamp(disturbanceStrength, 0f, 2f);
+            disturbancePersistence = Mathf.Clamp01(disturbancePersistence);
+            disturbancePropagationSpeed = Mathf.Clamp(
+                disturbancePropagationSpeed,
+                0.2f,
+                2.5f);
+            disturbanceAdvection = Mathf.Clamp(
+                disturbanceAdvection,
+                0f,
+                1.5f);
+            disturbanceGeometryStrength = Mathf.Clamp(
+                disturbanceGeometryStrength,
+                0f,
+                2f);
+            disturbanceNormalStrength = Mathf.Clamp(
+                disturbanceNormalStrength,
+                0f,
+                2f);
+            disturbanceShoreInteraction = Mathf.Clamp01(
+                disturbanceShoreInteraction);
+            disturbanceMaximumHeight = Mathf.Clamp(
+                disturbanceMaximumHeight,
+                0.01f,
+                0.4f);
+            disturbanceMinimumWavelength = Mathf.Clamp(
+                disturbanceMinimumWavelength,
+                0.5f,
+                5f);
+
             opacity = Mathf.Clamp01(opacity);
             shallowOpacity = Mathf.Clamp01(shallowOpacity);
             deepOpacity = Mathf.Clamp01(deepOpacity);
@@ -1794,6 +2005,27 @@ namespace ProgrammaticStylized3D.Rivers
             if (corridorMeshRenderer != null)
             {
                 corridorMeshRenderer.enabled = enabled;
+            }
+        }
+
+        private void EnsureDisturbanceRuntime()
+        {
+            if (disturbanceRuntime == null)
+            {
+                disturbanceRuntime =
+                    GetComponent<StylizedRiverDisturbanceRuntime>();
+            }
+
+            if (runtimeDisturbances && disturbanceRuntime == null)
+            {
+                disturbanceRuntime =
+                    gameObject.AddComponent<StylizedRiverDisturbanceRuntime>();
+            }
+
+            if (disturbanceRuntime != null)
+            {
+                disturbanceRuntime.enabled = runtimeDisturbances;
+                disturbanceRuntime.NotifyRiverChanged();
             }
         }
 
@@ -2157,7 +2389,7 @@ namespace ProgrammaticStylized3D.Rivers
                 Domain,
                 ResolveCrossSegments(),
                 ResolveSurfaceLongitudinalSpacing(),
-                motionWaveHeight * ResolveLiquidFactor(),
+                ResolvedMaximumDownwardMotion,
                 surfaceMesh);
         }
 
@@ -2183,7 +2415,7 @@ namespace ProgrammaticStylized3D.Rivers
                     shorelineBankCover,
                     Mathf.Max(
                         reservedDownwardSurfaceDisplacement,
-                        motionWaveHeight * ResolveLiquidFactor()),
+                        ResolvedMaximumDownwardMotion),
                     ResolveNaturalVariationSettings(),
                     corridorMesh,
                     corridorColliderMesh);
@@ -2339,6 +2571,11 @@ namespace ProgrammaticStylized3D.Rivers
             bodyProperties.SetFloat(
                 RefractionDebugViewStage4Id,
                 (float)refractionDebugView);
+
+            // The runtime component re-enables and binds Stage 5 in LateUpdate.
+            // Keeping the main river path neutral preserves exact Stage 4 output
+            // when disturbances are disabled or unsupported.
+            bodyProperties.SetFloat(DisturbanceEnabledStage5Id, 0f);
 
             bodyProperties.SetFloat(DomainFallbackDepthId, Mathf.Max(0.01f, depth));
             bodyProperties.SetFloat(BodyDebugViewId, (float)bodyDebugView);
@@ -2534,10 +2771,8 @@ namespace ProgrammaticStylized3D.Rivers
 
         private float ResolveSurfaceLongitudinalSpacing()
         {
-            if (motionWaveHeight <= 0.0001f || ResolveLiquidFactor() <= 0.0001f)
-            {
-                return Mathf.Max(0.05f, domainSampleSpacing);
-            }
+            float resolvedSpacing = Mathf.Max(0.05f, domainSampleSpacing);
+            float liquidFactor = ResolveLiquidFactor();
 
             int intervalsPerWave = quality switch
             {
@@ -2547,10 +2782,25 @@ namespace ProgrammaticStylized3D.Rivers
                 _ => 10
             };
 
-            float waveSpacing = motionWaveLength / Mathf.Max(1, intervalsPerWave);
+            if (motionWaveHeight > 0.0001f && liquidFactor > 0.0001f)
+            {
+                float waveSpacing =
+                    motionWaveLength / Mathf.Max(1, intervalsPerWave);
+                resolvedSpacing = Mathf.Min(resolvedSpacing, waveSpacing);
+            }
+
+            if (runtimeDisturbances && liquidFactor > 0.0001f)
+            {
+                float disturbanceSpacing =
+                    disturbanceMinimumWavelength /
+                    Mathf.Max(1, intervalsPerWave);
+                resolvedSpacing = Mathf.Min(
+                    resolvedSpacing,
+                    disturbanceSpacing);
+            }
 
             return Mathf.Clamp(
-                Mathf.Min(domainSampleSpacing, waveSpacing),
+                resolvedSpacing,
                 0.05f,
                 Mathf.Max(0.05f, domainSampleSpacing));
         }

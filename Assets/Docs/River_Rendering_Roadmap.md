@@ -34,6 +34,8 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 ## Cross-Stage Foundation Work
 
+**High-performance compatibility:** Visual features may carry meaningful cost when their importance justifies it, but the framework prefers shared fixed-cost representations, quality tiers, culling, sleeping, staggered updates, and lower-frequency simulation whenever they can provide comparable results. Per-effect/per-pixel scaling is avoided where a shared persistent field is practical.
+
 **Generated channel and terrain integration:** A dedicated spline-following corridor generates the riverbed, slopes, shoreline, hidden overlap, collider handoff, and buried terrain apron. It samples an immutable pre-river ground snapshot and matches ground height, slope, normals, UVs, and surface metadata at the handoff.
 
 **Natural channel variation:** Deterministic river-space controls provide asymmetric shoreline width variation and safety-limited bed roughness with configurable lower-slope reach. The water surface, corridor, collider, ground concealment, and spatial queries consume the same resolved channel shape.
@@ -74,9 +76,11 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 ## 5. Runtime Disturbance and Interaction
 
-**Problem:** Add persistent impact ripples, player and object wakes, downstream disturbance transport, spreading, decay, and interaction emitters without replacing the Stage 3 base motion field.
+**Problem:** Add persistent impact ripples, player and object wakes, stationary obstruction trails, downstream transport, spreading, and decay without replacing the Stage 3 base motion field or scaling water shading cost with active effect count.
 
-**Implemented:** Not started.
+**Implemented:** A river-owned, logically chunked persistent disturbance field now uses two low-resolution ping-pong textures, sparse one-shot and continuous-source injection, fixed-frequency compute simulation, downstream advection, propagation, damping, bank-safe fading, temporal interpolation, active-chunk scheduling, sleeping, and quality-scaled resolution/update rates. Generic emitters support entry impacts, swept moving wakes, and continuous standing-object disturbance. The field contributes shared geometry height and normals to lighting and Stage 4 refraction, while preserving outputs for later foam and secondary effects.
+
+**Validated:** Implementation complete; pending Unity compilation, performance profiling, and visual testing.
 
 ## 6. Foam and Surface Tracing
 
@@ -86,7 +90,7 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 ## 7. Secondary Water Effects
 
-**Problem:** Supplement the height-field river with effects it cannot represent directly: splashes, droplets, spray, breaking-crest accents, bank and obstacle impacts, shallow-water footsteps, transient sheets, mist, configurable underwater caustics, and cascade transition hooks.
+**Problem:** Supplement the height-field river with effects it cannot represent directly: splashes, droplets, spray, breaking-crest accents, bank and obstacle impacts, shallow-water footsteps, transient sheets, mist, configurable underwater caustics, submerged-bed wet darkening, a softened shoreline wetness band covering plausible wave and disturbance reach, and cascade transition hooks.
 
 **Implemented:** Not started.
 

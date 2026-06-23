@@ -23,6 +23,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawSurfaceMesh();
             DrawSurfaceMotion();
             DrawRefraction();
+            DrawRuntimeDisturbances();
             DrawWaterBody();
             DrawAdvancedBody();
 
@@ -495,12 +496,191 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
         }
 
+        private void DrawRuntimeDisturbances()
+        {
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField(
+                "Runtime Disturbance and Interaction",
+                EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Stage 5 stores wakes, impacts, and stationary obstruction trails in one shared low-resolution river-space field. The field updates below render frequency, sleeps when inactive, and has fixed shader sampling cost regardless of overlapping effects.",
+                MessageType.Info);
+
+            SerializedProperty enabledProperty = Find("runtimeDisturbances");
+            EditorGUILayout.PropertyField(
+                enabledProperty,
+                new GUIContent(
+                    "Runtime Disturbances",
+                    "Master allocation and simulation switch. Disabled rivers reproduce Stage 4 exactly and allocate no field textures."));
+
+            SerializedProperty preset = Find("disturbancePreset");
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                preset,
+                new GUIContent(
+                    "Disturbance Character",
+                    "None, Subtle, Balanced, and Reactive configure the shared field rather than changing emitter-specific settings."));
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+
+                foreach (Object selectedTarget in targets)
+                {
+                    if (selectedTarget is not StylizedRiver river)
+                    {
+                        continue;
+                    }
+
+                    Undo.RecordObject(river, "Apply River Disturbance Preset");
+                    river.ApplyDisturbancePreset();
+                    EditorUtility.SetDirty(river);
+                }
+
+                serializedObject.Update();
+                RepaintScene();
+            }
+
+            using (new EditorGUI.DisabledScope(
+                       !enabledProperty.hasMultipleDifferentValues &&
+                       !enabledProperty.boolValue))
+            {
+                EditorGUI.BeginChangeCheck();
+                EditorGUILayout.PropertyField(
+                    Find("disturbanceStrength"),
+                    new GUIContent(
+                        "Disturbance Strength",
+                        "Master energy injected by impacts and continuous sources."));
+                EditorGUILayout.PropertyField(
+                    Find("disturbancePersistence"),
+                    new GUIContent(
+                        "Persistence",
+                        "Higher values retain wake and ripple energy for longer."));
+                EditorGUILayout.PropertyField(
+                    Find("disturbancePropagationSpeed"),
+                    new GUIContent(
+                        "Propagation Speed",
+                        "Approximate speed at which broad ripple energy spreads through the field."));
+                EditorGUILayout.PropertyField(
+                    Find("disturbanceAdvection"),
+                    new GUIContent(
+                        "Advection",
+                        "Strength with which the configured river flow transports the persistent field downstream."));
+                EditorGUILayout.PropertyField(
+                    Find("disturbanceGeometryStrength"),
+                    new GUIContent(
+                        "Geometry Strength",
+                        "Master height contribution sampled by the surface vertex shader."));
+                EditorGUILayout.PropertyField(
+                    Find("disturbanceNormalStrength"),
+                    new GUIContent(
+                        "Normal Strength",
+                        "Master disturbance-normal contribution used by lighting and refraction."));
+                EditorGUILayout.PropertyField(
+                    Find("disturbanceShoreInteraction"),
+                    new GUIContent(
+                        "Shore Interaction",
+                        "Disturbance retained at the visible bank before fading inside the hidden overlap."));
+                EditorGUILayout.PropertyField(
+                    Find("disturbanceMaximumHeight"),
+                    new GUIContent(
+                        "Maximum Height",
+                        "Hard geometric safety limit in metres. The corridor automatically reserves this clearance."));
+                EditorGUILayout.PropertyField(
+                    Find("disturbanceMinimumWavelength"),
+                    new GUIContent(
+                        "Minimum Geometry Wavelength",
+                        "Shortest geometric disturbance represented by mesh refinement. Finer detail remains normal-only."));
+                EditorGUILayout.PropertyField(
+                    Find("disturbanceDebugView"),
+                    new GUIContent(
+                        "Disturbance Debug View",
+                        "Displays field height, velocity, normal, intensity, or river-space coordinates."));
+
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Find("disturbancePreset").enumValueIndex =
+                        (int)StylizedRiverDisturbancePreset.Custom;
+                }
+            }
+
+            if (targets.Length != 1 || target is not StylizedRiver singleRiver)
+            {
+                return;
+            }
+
+            StylizedRiverDisturbanceRuntime runtime =
+                singleRiver.GetComponent<StylizedRiverDisturbanceRuntime>();
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Runtime Diagnostics",
+                EditorStyles.miniBoldLabel);
+
+            if (runtime == null)
+            {
+                EditorGUILayout.LabelField(
+                    "Runtime",
+                    singleRiver.RuntimeDisturbancesEnabled
+                        ? "Will be created automatically"
+                        : "Not allocated");
+
+                if (singleRiver.RuntimeDisturbancesEnabled &&
+                    GUILayout.Button("Create Disturbance Runtime"))
+                {
+                    runtime = singleRiver.GetOrCreateDisturbanceRuntime();
+                    EditorUtility.SetDirty(singleRiver);
+                }
+
+                return;
+            }
+
+            EditorGUILayout.LabelField(
+                "Compute Support",
+                runtime.IsSupported ? "Available" : "Unavailable");
+            EditorGUILayout.LabelField(
+                "Field",
+                runtime.IsAllocated
+                    ? $"{runtime.FieldWidth} × {runtime.FieldHeight}"
+                    : "Sleeping / not allocated");
+            EditorGUILayout.LabelField(
+                "Logical Chunks",
+                $"{runtime.ActiveChunkCount} active / {runtime.ChunkCount} total");
+            EditorGUILayout.LabelField(
+                "Simulation Rate",
+                $"{runtime.SimulationRate:0} Hz");
+            EditorGUILayout.LabelField(
+                "Continuous Sources",
+                runtime.ContinuousSourceCount.ToString());
+            EditorGUILayout.LabelField(
+                "Estimated Field Memory",
+                $"{runtime.EstimatedMemoryBytes / (1024f * 1024f):0.00} MB");
+            EditorGUILayout.LabelField(
+                "State",
+                runtime.IsSleeping ? "Sleeping" : "Active");
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Clear Field"))
+            {
+                runtime.ClearField();
+            }
+
+            using (new EditorGUI.DisabledScope(!Application.isPlaying))
+            {
+                if (GUILayout.Button("Emit Test Impact"))
+                {
+                    runtime.EmitDebugImpactAtCentre();
+                }
+            }
+            EditorGUILayout.EndHorizontal();
+        }
+
         private void DrawWaterBody()
         {
             EditorGUILayout.Space(8f);
             EditorGUILayout.LabelField("Water Body", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 2 provides the accepted liquid or frozen body and its light response. Stage 3 supplies the animated surface normal and geometric position, while Stage 4 now distorts the transmitted scene. Persistent disturbances, foam, secondary effects, caustics, and reflections remain deferred.",
+                "Stage 2 provides the accepted body, Stage 3 supplies coherent motion, Stage 4 distorts the transmitted scene, and Stage 5 now adds persistent shared-field disturbances. Foam, secondary effects, caustics, and reflections remain deferred.",
                 MessageType.Info);
 
             SerializedProperty surfaceState = Find("surfaceState");
