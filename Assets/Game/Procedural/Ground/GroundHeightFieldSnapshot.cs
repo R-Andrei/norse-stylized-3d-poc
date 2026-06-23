@@ -6,9 +6,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
     /// <summary>
     /// Geometry and rendering metadata sampled from the generated ground. Height
     /// and Normal describe the immutable pre-river surface used for corridor
-    /// fitting. RenderNormal is sampled from the exact normal field assigned to
-    /// the final broad-ground mesh after river concealment.
-    /// MaterialClassification is reserved for future terrain material routing.
+    /// fitting. RenderNormal describes the visible broad-ground shading normal.
+    /// Hidden river-concealment geometry may change vertex positions without
+    /// changing this visible normal field. MaterialClassification is reserved
+    /// for future terrain material routing.
     /// </summary>
     public readonly struct GroundSurfaceSample
     {
@@ -56,9 +57,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
     /// <summary>
     /// Immutable local-space snapshot of generated ground after ordinary ground
-    /// modifiers. It retains the pre-river geometry, the final render-normal
-    /// field, and material metadata. Sampling mirrors the checkerboard triangle
-    /// layout used by the generated ground mesh.
+    /// modifiers. It retains the pre-river geometry, the visible broad-ground
+    /// normal field, and material metadata. Sampling mirrors the checkerboard
+    /// triangle layout used by the generated ground mesh.
     /// </summary>
     public sealed class GroundHeightFieldSnapshot
     {

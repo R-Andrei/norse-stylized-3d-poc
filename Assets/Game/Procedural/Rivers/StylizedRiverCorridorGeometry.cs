@@ -392,10 +392,13 @@ namespace ProgrammaticStylized3D.Rivers
                         owner.InverseTransformPoint(worldPosition);
                     float terrainIntegrationWeight =
                         ResolveTerrainIntegrationWeight(crossPoint);
+                    // Match the immutable pre-river terrain normal. The
+                    // post-concealment ground geometry is hidden beneath the
+                    // corridor and must not leak its trench slope into lighting.
                     Vector3 localGroundNormal =
                         owner
                             .InverseTransformDirection(
-                                groundSample.RenderNormal)
+                                groundSample.Normal)
                             .normalized;
                     Color colour =
                         new Color(

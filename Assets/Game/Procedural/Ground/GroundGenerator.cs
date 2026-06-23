@@ -120,16 +120,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     spacing,
                     recipe.ShapeSeed);
 
+            // River concealment changes broad-ground positions only where the
+            // dedicated corridor renders above them. Those hidden slopes must
+            // not affect the visible terrain lighting at the handoff.
             Vector3[] renderNormals =
-                BuildHeightFieldNormals(
-                    heights,
-                    resolution,
-                    spacing,
-                    recipe.ShapeSeed);
+                (Vector3[])baseNormals.Clone();
 
+            // Surface metadata describes the visible pre-river terrain rather
+            // than the hidden concealment trench.
             BuildSurfaceMetadata(
                 recipe,
-                heights,
+                baseHeights,
                 out float[] surfaceVariations,
                 out float[] materialClassifications);
 
