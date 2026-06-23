@@ -23,6 +23,21 @@ namespace ProgrammaticStylized3D.Rivers
         Custom
     }
 
+    public enum StylizedRiverSurfaceState
+    {
+        Liquid,
+        Frozen,
+        Custom
+    }
+
+    public enum StylizedRiverIceBodyPreset
+    {
+        ClearIce,
+        CloudyIce,
+        DeepBlueIce,
+        Custom
+    }
+
     public enum StylizedRiverBodyDebugView
     {
         Final = 0,
@@ -32,7 +47,12 @@ namespace ProgrammaticStylized3D.Rivers
         BodyCoverage = 4,
         SceneColour = 5,
         DepthValidity = 6,
-        SurfaceCoverage = 7
+        SurfaceCoverage = 7,
+        CombinedLighting = 8,
+        AmbientLighting = 9,
+        SunLighting = 10,
+        LocalLighting = 11,
+        FreezeAmount = 12
     }
 
     public enum StylizedRiverDebugView
@@ -170,6 +190,77 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float surfacePresence = 0.46f;
 
+        [Header("Surface State")]
+        [SerializeField]
+        private StylizedRiverSurfaceState surfaceState =
+            StylizedRiverSurfaceState.Liquid;
+
+        [Tooltip("Continuous liquid-to-frozen value used only when Surface State is Custom. Zero is liquid and one is frozen.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float customFreezeAmount;
+
+        [Header("Frozen Body")]
+        [SerializeField]
+        private StylizedRiverIceBodyPreset iceBodyPreset =
+            StylizedRiverIceBodyPreset.CloudyIce;
+
+        [SerializeField]
+        private Color iceColor =
+            new Color(0.56f, 0.78f, 0.90f, 1f);
+
+        [Tooltip("How much of the lit scene beneath the ice remains visible.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float iceTransmission = 0.16f;
+
+        [Tooltip("Optical thickness of the frozen sheet. Higher values make the ice more opaque.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float iceThickness = 0.72f;
+
+        [Tooltip("How cloudy and internally scattered the ice appears.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float iceCloudiness = 0.58f;
+
+        [Tooltip("How strongly the frozen air-ice boundary remains visible.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float iceSurfacePresence = 0.86f;
+
+        [Tooltip("How strongly cloudy ice broadens and brightens its light response.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float iceScattering = 0.68f;
+
+        [Header("Lighting Response")]
+        [Tooltip("Zero keeps authored colours largely fixed. One makes the body fully dependent on actual scene lighting.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float lightDependence = 1f;
+
+        [Tooltip("Strength of environment and ambient illumination.")]
+        [Range(0f, 2f)]
+        [SerializeField] private float ambientResponse = 1f;
+
+        [Tooltip("Strength of the main directional sun or moon light.")]
+        [Range(0f, 2f)]
+        [SerializeField] private float sunResponse = 1f;
+
+        [Tooltip("Strength of point, spot, and additional directional lights.")]
+        [Range(0f, 3f)]
+        [SerializeField] private float localLightResponse = 1f;
+
+        [Tooltip("Zero uses light brightness only. One allows lights to fully tint the river.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float lightColorInfluence = 0.80f;
+
+        [Tooltip("Minimum retained body illumination when no meaningful light reaches the river.")]
+        [Range(0f, 0.5f)]
+        [SerializeField] private float minimumNightVisibility = 0.025f;
+
+        [Tooltip("How strongly real-time shadows suppress direct river lighting.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float shadowResponse = 1f;
+
+        [Tooltip("Advanced diffuse wrap used to keep low-angle sun transitions stable.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float diffuseWrap = 0.22f;
+
         [Header("Water Body Validation")]
         [SerializeField]
         private StylizedRiverBodyDebugView bodyDebugView =
@@ -289,6 +380,24 @@ namespace ProgrammaticStylized3D.Rivers
         private static readonly int BodyDepthContrastId = Shader.PropertyToID("_BodyDepthContrast");
         private static readonly int WaterTintStrengthId = Shader.PropertyToID("_WaterTintStrength");
         private static readonly int SurfacePresenceId = Shader.PropertyToID("_SurfacePresence");
+
+        private static readonly int FreezeAmountId = Shader.PropertyToID("_FreezeAmount");
+        private static readonly int IceColorId = Shader.PropertyToID("_IceColor");
+        private static readonly int IceTransmissionId = Shader.PropertyToID("_IceTransmission");
+        private static readonly int IceThicknessId = Shader.PropertyToID("_IceThickness");
+        private static readonly int IceCloudinessId = Shader.PropertyToID("_IceCloudiness");
+        private static readonly int IceSurfacePresenceId = Shader.PropertyToID("_IceSurfacePresence");
+        private static readonly int IceScatteringId = Shader.PropertyToID("_IceScattering");
+
+        private static readonly int LightDependenceId = Shader.PropertyToID("_LightDependence");
+        private static readonly int AmbientResponseId = Shader.PropertyToID("_AmbientResponse");
+        private static readonly int SunResponseId = Shader.PropertyToID("_SunResponse");
+        private static readonly int LocalLightResponseId = Shader.PropertyToID("_LocalLightResponse");
+        private static readonly int LightColorInfluenceId = Shader.PropertyToID("_LightColorInfluence");
+        private static readonly int MinimumNightVisibilityId = Shader.PropertyToID("_MinimumNightVisibility");
+        private static readonly int ShadowResponseId = Shader.PropertyToID("_ShadowResponse");
+        private static readonly int DiffuseWrapId = Shader.PropertyToID("_DiffuseWrap");
+
         private static readonly int DomainFallbackDepthId = Shader.PropertyToID("_DomainFallbackDepth");
         private static readonly int BodyDebugViewId = Shader.PropertyToID("_BodyDebugView");
         private static readonly int HorizonColorId = Shader.PropertyToID("_HorizonColor");
@@ -397,6 +506,10 @@ namespace ProgrammaticStylized3D.Rivers
         public float BodyDepthContrast => bodyDepthContrast;
         public float WaterTintStrength => waterTintStrength;
         public float SurfacePresence => surfacePresence;
+        public StylizedRiverSurfaceState SurfaceState => surfaceState;
+        public StylizedRiverIceBodyPreset IceBodyPreset => iceBodyPreset;
+        public float FreezeAmount => ResolveFreezeAmount();
+        public float LightDependence => lightDependence;
         public float VisibleHalfWidth => width * 0.5f;
         public float VisibleWidth => width;
         public float AutomaticShorelineOverlap =>
@@ -673,6 +786,113 @@ namespace ProgrammaticStylized3D.Rivers
         public void MarkWaterBodyCustom()
         {
             bodyPreset = StylizedRiverWaterBodyPreset.Custom;
+        }
+
+        public void ApplyIceBodyPreset()
+        {
+            ApplyIceBodyPreset(iceBodyPreset);
+        }
+
+        public void ApplyIceBodyPreset(
+            StylizedRiverIceBodyPreset preset)
+        {
+            iceBodyPreset = preset;
+
+            switch (preset)
+            {
+                case StylizedRiverIceBodyPreset.ClearIce:
+                    iceColor = new Color(0.66f, 0.86f, 0.96f, 1f);
+                    iceTransmission = 0.48f;
+                    iceThickness = 0.28f;
+                    iceCloudiness = 0.12f;
+                    iceSurfacePresence = 0.72f;
+                    iceScattering = 0.32f;
+                    break;
+
+                case StylizedRiverIceBodyPreset.CloudyIce:
+                    iceColor = new Color(0.56f, 0.78f, 0.90f, 1f);
+                    iceTransmission = 0.16f;
+                    iceThickness = 0.72f;
+                    iceCloudiness = 0.58f;
+                    iceSurfacePresence = 0.86f;
+                    iceScattering = 0.68f;
+                    break;
+
+                case StylizedRiverIceBodyPreset.DeepBlueIce:
+                    iceColor = new Color(0.22f, 0.46f, 0.68f, 1f);
+                    iceTransmission = 0.10f;
+                    iceThickness = 0.88f;
+                    iceCloudiness = 0.38f;
+                    iceSurfacePresence = 0.92f;
+                    iceScattering = 0.52f;
+                    break;
+
+                case StylizedRiverIceBodyPreset.Custom:
+                    break;
+
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(preset),
+                        preset,
+                        "Unsupported ice-body preset.");
+            }
+
+            ValidateSettings();
+            ApplyVisualSettings();
+        }
+
+        public void MarkIceBodyCustom()
+        {
+            iceBodyPreset = StylizedRiverIceBodyPreset.Custom;
+        }
+
+        /// <summary>
+        /// Switches the authored river surface between liquid and frozen
+        /// endpoints. This is an instantaneous state change; no visible
+        /// freeze/thaw transition is simulated.
+        /// </summary>
+        public void SetFrozen(bool frozen)
+        {
+            SetSurfaceState(
+                frozen
+                    ? StylizedRiverSurfaceState.Frozen
+                    : StylizedRiverSurfaceState.Liquid);
+        }
+
+        public void SetSurfaceState(
+            StylizedRiverSurfaceState state)
+        {
+            if (surfaceState == state)
+            {
+                return;
+            }
+
+            surfaceState = state;
+            ValidateSettings();
+            ApplyVisualSettings();
+            NotifyReflectionSurfaceChanged();
+            NotifyFoamSimulationChanged();
+        }
+
+        public void SetCustomFreezeAmount(float amount)
+        {
+            customFreezeAmount = Mathf.Clamp01(amount);
+            surfaceState = StylizedRiverSurfaceState.Custom;
+            ApplyVisualSettings();
+            NotifyReflectionSurfaceChanged();
+            NotifyFoamSimulationChanged();
+        }
+
+        private float ResolveFreezeAmount()
+        {
+            return surfaceState switch
+            {
+                StylizedRiverSurfaceState.Liquid => 0f,
+                StylizedRiverSurfaceState.Frozen => 1f,
+                StylizedRiverSurfaceState.Custom =>
+                    Mathf.Clamp01(customFreezeAmount),
+                _ => 0f
+            };
         }
 
         public void ConfigureConnectedDomain(
@@ -956,6 +1176,23 @@ namespace ProgrammaticStylized3D.Rivers
             bodyDepthContrast = Mathf.Clamp01(bodyDepthContrast);
             waterTintStrength = Mathf.Clamp01(waterTintStrength);
             surfacePresence = Mathf.Clamp01(surfacePresence);
+
+            customFreezeAmount = Mathf.Clamp01(customFreezeAmount);
+            iceTransmission = Mathf.Clamp01(iceTransmission);
+            iceThickness = Mathf.Clamp01(iceThickness);
+            iceCloudiness = Mathf.Clamp01(iceCloudiness);
+            iceSurfacePresence = Mathf.Clamp01(iceSurfacePresence);
+            iceScattering = Mathf.Clamp01(iceScattering);
+
+            lightDependence = Mathf.Clamp01(lightDependence);
+            ambientResponse = Mathf.Clamp(ambientResponse, 0f, 2f);
+            sunResponse = Mathf.Clamp(sunResponse, 0f, 2f);
+            localLightResponse = Mathf.Clamp(localLightResponse, 0f, 3f);
+            lightColorInfluence = Mathf.Clamp01(lightColorInfluence);
+            minimumNightVisibility =
+                Mathf.Clamp(minimumNightVisibility, 0f, 0.5f);
+            shadowResponse = Mathf.Clamp01(shadowResponse);
+            diffuseWrap = Mathf.Clamp01(diffuseWrap);
 
             opacity = Mathf.Clamp01(opacity);
             shallowOpacity = Mathf.Clamp01(shallowOpacity);
@@ -1445,6 +1682,32 @@ namespace ProgrammaticStylized3D.Rivers
             bodyProperties.SetFloat(BodyDepthContrastId, bodyDepthContrast);
             bodyProperties.SetFloat(WaterTintStrengthId, waterTintStrength);
             bodyProperties.SetFloat(SurfacePresenceId, surfacePresence);
+
+            bodyProperties.SetFloat(FreezeAmountId, ResolveFreezeAmount());
+            bodyProperties.SetColor(IceColorId, iceColor);
+            bodyProperties.SetFloat(IceTransmissionId, iceTransmission);
+            bodyProperties.SetFloat(IceThicknessId, iceThickness);
+            bodyProperties.SetFloat(IceCloudinessId, iceCloudiness);
+            bodyProperties.SetFloat(
+                IceSurfacePresenceId,
+                iceSurfacePresence);
+            bodyProperties.SetFloat(IceScatteringId, iceScattering);
+
+            bodyProperties.SetFloat(LightDependenceId, lightDependence);
+            bodyProperties.SetFloat(AmbientResponseId, ambientResponse);
+            bodyProperties.SetFloat(SunResponseId, sunResponse);
+            bodyProperties.SetFloat(
+                LocalLightResponseId,
+                localLightResponse);
+            bodyProperties.SetFloat(
+                LightColorInfluenceId,
+                lightColorInfluence);
+            bodyProperties.SetFloat(
+                MinimumNightVisibilityId,
+                minimumNightVisibility);
+            bodyProperties.SetFloat(ShadowResponseId, shadowResponse);
+            bodyProperties.SetFloat(DiffuseWrapId, diffuseWrap);
+
             bodyProperties.SetFloat(DomainFallbackDepthId, Mathf.Max(0.01f, depth));
             bodyProperties.SetFloat(BodyDebugViewId, (float)bodyDebugView);
             bodyProperties.SetColor(HorizonColorId, horizonColor);

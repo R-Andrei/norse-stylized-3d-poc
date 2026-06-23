@@ -241,16 +241,104 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.Space(8f);
             EditorGUILayout.LabelField("Water Body", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 2 evaluates the still body only. Surface motion, refraction distortion, foam, and reflections are intentionally not rendered yet.",
+                "Stage 2 evaluates the static optical body and its response to ambient light, the main sun or moon, shadows, and local lights. Surface motion, refraction distortion, foam, and reflections remain deferred.",
                 MessageType.Info);
+
+            SerializedProperty surfaceState = Find("surfaceState");
+            EditorGUILayout.PropertyField(
+                surfaceState,
+                new GUIContent(
+                    "Surface State",
+                    "Liquid and Frozen are authored endpoints. Custom exposes a continuous freeze value reserved for later systems; no visible freeze/thaw transition is simulated."));
+
+            bool mixedState = surfaceState.hasMultipleDifferentValues;
+            StylizedRiverSurfaceState resolvedState =
+                (StylizedRiverSurfaceState)surfaceState.enumValueIndex;
+
+            if (!mixedState &&
+                resolvedState == StylizedRiverSurfaceState.Custom)
+            {
+                EditorGUILayout.PropertyField(
+                    Find("customFreezeAmount"),
+                    new GUIContent(
+                        "Freeze Amount",
+                        "Zero is fully liquid and one is fully frozen."));
+            }
+
+            bool showLiquid =
+                mixedState ||
+                resolvedState != StylizedRiverSurfaceState.Frozen;
+
+            bool showFrozen =
+                mixedState ||
+                resolvedState != StylizedRiverSurfaceState.Liquid;
+
+            if (showLiquid)
+            {
+                DrawLiquidBodyControls();
+            }
+
+            if (showFrozen)
+            {
+                DrawFrozenBodyControls();
+            }
+
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Lighting Response",
+                EditorStyles.boldLabel);
+
+            EditorGUILayout.PropertyField(
+                Find("lightDependence"),
+                new GUIContent(
+                    "Light Dependence",
+                    "Zero keeps authored colours largely fixed. One makes the water or ice body fully dependent on actual scene lighting."));
+            EditorGUILayout.PropertyField(
+                Find("ambientResponse"),
+                new GUIContent(
+                    "Ambient Response",
+                    "Strength of environment and ambient illumination."));
+            EditorGUILayout.PropertyField(
+                Find("sunResponse"),
+                new GUIContent(
+                    "Sun Response",
+                    "Strength of the main directional sun or moon light."));
+            EditorGUILayout.PropertyField(
+                Find("localLightResponse"),
+                new GUIContent(
+                    "Local Light Response",
+                    "Strength of point, spot, and additional directional lights."));
+            EditorGUILayout.PropertyField(
+                Find("lightColorInfluence"),
+                new GUIContent(
+                    "Light Colour Influence",
+                    "Zero uses light brightness only. One allows sunrise, sunset, spells, hearths, and other lights to fully tint the river."));
+            EditorGUILayout.PropertyField(
+                Find("minimumNightVisibility"),
+                new GUIContent(
+                    "Minimum Night Visibility",
+                    "Minimum retained body illumination when meaningful light is absent. Zero allows the river to become virtually black."));
+            EditorGUILayout.PropertyField(
+                Find("shadowResponse"),
+                new GUIContent(
+                    "Shadow Response",
+                    "How strongly real-time shadows suppress direct river lighting."));
+        }
+
+        private void DrawLiquidBodyControls()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Liquid Body",
+                EditorStyles.boldLabel);
 
             SerializedProperty preset = Find("bodyPreset");
             EditorGUI.BeginChangeCheck();
             EditorGUILayout.PropertyField(
                 preset,
                 new GUIContent(
-                    "Body Preset",
-                    "Applies only the still-water body settings. It will never change later motion, foam, refraction, or reflection controls."));
+                    "Liquid Preset",
+                    "Applies only the liquid optical settings. It never changes motion, foam, refraction, reflection, or frozen-body controls."));
 
             if (EditorGUI.EndChangeCheck())
             {
@@ -263,7 +351,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         continue;
                     }
 
-                    Undo.RecordObject(river, "Apply Water Body Preset");
+                    Undo.RecordObject(river, "Apply Liquid Body Preset");
                     river.ApplyWaterBodyPreset();
                     EditorUtility.SetDirty(river);
                 }
@@ -273,18 +361,22 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             EditorGUI.BeginChangeCheck();
-            EditorGUILayout.PropertyField(Find("shallowColor"), new GUIContent("Shallow Colour"));
-            EditorGUILayout.PropertyField(Find("deepColor"), new GUIContent("Deep Colour"));
+            EditorGUILayout.PropertyField(
+                Find("shallowColor"),
+                new GUIContent("Shallow Colour"));
+            EditorGUILayout.PropertyField(
+                Find("deepColor"),
+                new GUIContent("Deep Colour"));
             EditorGUILayout.PropertyField(
                 Find("clarity"),
                 new GUIContent(
                     "Clarity",
-                    "How strongly the riverbed remains visible through the water."));
+                    "How strongly the riverbed remains visible through liquid water."));
             EditorGUILayout.PropertyField(
                 Find("bodyDepthRange"),
                 new GUIContent(
                     "Depth Range",
-                    "World-space vertical depth at which the water reaches its deep appearance."));
+                    "World-space vertical depth at which liquid water reaches its deep appearance."));
             EditorGUILayout.PropertyField(
                 Find("bodyDepthContrast"),
                 new GUIContent(
@@ -294,7 +386,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("waterTintStrength"),
                 new GUIContent(
                     "Water Tint Strength",
-                    "How strongly the water volume colours the scene beneath it."));
+                    "How strongly liquid water colours the scene beneath it."));
             EditorGUILayout.PropertyField(
                 Find("surfacePresence"),
                 new GUIContent(
@@ -305,6 +397,78 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 Find("bodyPreset").enumValueIndex =
                     (int)StylizedRiverWaterBodyPreset.Custom;
+            }
+        }
+
+        private void DrawFrozenBodyControls()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Frozen Body",
+                EditorStyles.boldLabel);
+
+            SerializedProperty preset = Find("iceBodyPreset");
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                preset,
+                new GUIContent(
+                    "Ice Preset",
+                    "Applies only the frozen optical settings. Motion systems will consume the shared freeze state in later stages."));
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+
+                foreach (Object selectedTarget in targets)
+                {
+                    if (selectedTarget is not StylizedRiver river)
+                    {
+                        continue;
+                    }
+
+                    Undo.RecordObject(river, "Apply Ice Body Preset");
+                    river.ApplyIceBodyPreset();
+                    EditorUtility.SetDirty(river);
+                }
+
+                serializedObject.Update();
+                RepaintScene();
+            }
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                Find("iceColor"),
+                new GUIContent("Ice Colour"));
+            EditorGUILayout.PropertyField(
+                Find("iceTransmission"),
+                new GUIContent(
+                    "Ice Transmission",
+                    "How much of the lit scene beneath the ice remains visible."));
+            EditorGUILayout.PropertyField(
+                Find("iceThickness"),
+                new GUIContent(
+                    "Ice Thickness",
+                    "Optical thickness of the frozen sheet. Higher values make the ice more opaque."));
+            EditorGUILayout.PropertyField(
+                Find("iceCloudiness"),
+                new GUIContent(
+                    "Ice Cloudiness",
+                    "How cloudy and internally scattered the ice appears."));
+            EditorGUILayout.PropertyField(
+                Find("iceSurfacePresence"),
+                new GUIContent(
+                    "Ice Surface Presence",
+                    "How strongly the frozen air-ice boundary remains visible."));
+            EditorGUILayout.PropertyField(
+                Find("iceScattering"),
+                new GUIContent(
+                    "Ice Scattering",
+                    "How strongly cloudy ice broadens and brightens its light response."));
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                Find("iceBodyPreset").enumValueIndex =
+                    (int)StylizedRiverIceBodyPreset.Custom;
             }
         }
 
@@ -326,7 +490,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("bodyDebugView"),
                 new GUIContent(
                     "Debug View",
-                    "Displays the body inputs independently: vertical depth, shaped depth, bed transmission, final body coverage, scene colour, depth validity, or surface coverage."));
+                    "Displays the body inputs independently: depth, transmission, coverage, scene colour, lighting contributions, or freeze state."));
+            EditorGUILayout.PropertyField(
+                Find("diffuseWrap"),
+                new GUIContent(
+                    "Diffuse Wrap",
+                    "Advanced low-angle lighting control. Higher values keep sunrise and sunset response broader instead of collapsing abruptly."));
             EditorGUILayout.PropertyField(
                 Find("bodyMaterial"),
                 new GUIContent(

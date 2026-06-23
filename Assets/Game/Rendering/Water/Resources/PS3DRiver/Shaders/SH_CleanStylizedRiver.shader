@@ -11,11 +11,32 @@ Shader "PS3D/Stylized River Water"
         _WaterTintStrength("Water Tint Strength", Range(0, 1)) = 0.72
         _SurfacePresence("Surface Presence", Range(0, 1)) = 0.46
 
+        [Header(Surface State)]
+        _FreezeAmount("Freeze Amount", Range(0, 1)) = 0
+
+        [Header(Frozen Body)]
+        _IceColor("Ice Colour", Color) = (0.56, 0.78, 0.90, 1)
+        _IceTransmission("Ice Transmission", Range(0, 1)) = 0.16
+        _IceThickness("Ice Thickness", Range(0, 1)) = 0.72
+        _IceCloudiness("Ice Cloudiness", Range(0, 1)) = 0.58
+        _IceSurfacePresence("Ice Surface Presence", Range(0, 1)) = 0.86
+        _IceScattering("Ice Scattering", Range(0, 1)) = 0.68
+
+        [Header(Lighting Response)]
+        _LightDependence("Light Dependence", Range(0, 1)) = 1
+        _AmbientResponse("Ambient Response", Range(0, 2)) = 1
+        _SunResponse("Sun Response", Range(0, 2)) = 1
+        _LocalLightResponse("Local Light Response", Range(0, 3)) = 1
+        _LightColorInfluence("Light Colour Influence", Range(0, 1)) = 0.8
+        _MinimumNightVisibility("Minimum Night Visibility", Range(0, 0.5)) = 0.025
+        _ShadowResponse("Shadow Response", Range(0, 1)) = 1
+        _DiffuseWrap("Diffuse Wrap", Range(0, 1)) = 0.22
+
         [HideInInspector]
         _DomainFallbackDepth("Domain Fallback Depth", Float) = 1.1
 
         [Header(Body Validation)]
-        _BodyDebugView("Body Debug View", Range(0, 7)) = 0
+        _BodyDebugView("Body Debug View", Range(0, 12)) = 0
     }
 
     SubShader
@@ -42,12 +63,19 @@ Shader "PS3D/Stylized River Water"
             #pragma vertex Vert
             #pragma fragment Frag
             #pragma multi_compile_fog
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile _ _FORWARD_PLUS
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
             #include "Includes/RiverWaterCommon.hlsl"
             #include "Includes/RiverWaterDepth.hlsl"
+            #include "Includes/RiverWaterLighting.hlsl"
             #include "Includes/RiverWaterBody.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
@@ -58,6 +86,24 @@ Shader "PS3D/Stylized River Water"
                 float _BodyDepthContrast;
                 float _WaterTintStrength;
                 float _SurfacePresence;
+
+                float _FreezeAmount;
+                half4 _IceColor;
+                float _IceTransmission;
+                float _IceThickness;
+                float _IceCloudiness;
+                float _IceSurfacePresence;
+                float _IceScattering;
+
+                float _LightDependence;
+                float _AmbientResponse;
+                float _SunResponse;
+                float _LocalLightResponse;
+                float _LightColorInfluence;
+                float _MinimumNightVisibility;
+                float _ShadowResponse;
+                float _DiffuseWrap;
+
                 float _DomainFallbackDepth;
                 float _BodyDebugView;
             CBUFFER_END
@@ -143,6 +189,29 @@ Shader "PS3D/Stylized River Water"
                     surfaceInputs.baseNormalWS,
                     viewDirectionWS));
 
+                InputData lightingInput = (InputData)0;
+                lightingInput.positionWS = surfaceInputs.positionWS;
+                lightingInput.normalWS = integration.surfaceNormalWS;
+                lightingInput.viewDirectionWS = viewDirectionWS;
+                lightingInput.shadowCoord = TransformWorldToShadowCoord(
+                    surfaceInputs.positionWS);
+                lightingInput.normalizedScreenSpaceUV = screenUV;
+
+                RiverWaterLightingResult lighting =
+                    RiverWaterEvaluateLighting(
+                        lightingInput,
+                        _AmbientResponse,
+                        _SunResponse,
+                        _LocalLightResponse,
+                        _LightColorInfluence,
+                        _ShadowResponse,
+                        _DiffuseWrap);
+
+                float3 bodyLighting = RiverWaterResolveBodyLighting(
+                    lighting,
+                    _LightDependence,
+                    _MinimumNightVisibility);
+
                 RiverWaterBodyResult body = RiverWaterComposeBody(
                     sceneColour,
                     _ShallowColor.rgb,
@@ -150,7 +219,15 @@ Shader "PS3D/Stylized River Water"
                     depthData,
                     _WaterTintStrength,
                     _SurfacePresence,
-                    viewFacing);
+                    viewFacing,
+                    _FreezeAmount,
+                    _IceColor.rgb,
+                    _IceTransmission,
+                    _IceThickness,
+                    _IceCloudiness,
+                    _IceSurfacePresence,
+                    _IceScattering,
+                    bodyLighting);
 
                 float3 finalColour = RiverWaterApplyReservedIntegration(
                     body.colour,
@@ -194,7 +271,32 @@ Shader "PS3D/Stylized River Water"
                     return half4(body.surfaceCoverage.xxx, 1.0);
                 }
 
-                return half4(saturate(finalColour), 1.0);
+                if (debugMode == 8)
+                {
+                    return half4(lighting.combined, 1.0);
+                }
+
+                if (debugMode == 9)
+                {
+                    return half4(lighting.ambient, 1.0);
+                }
+
+                if (debugMode == 10)
+                {
+                    return half4(lighting.sun, 1.0);
+                }
+
+                if (debugMode == 11)
+                {
+                    return half4(lighting.localLights, 1.0);
+                }
+
+                if (debugMode == 12)
+                {
+                    return half4(body.freezeAmount.xxx, 1.0);
+                }
+
+                return half4(max(finalColour, 0.0), 1.0);
             }
             ENDHLSL
         }
