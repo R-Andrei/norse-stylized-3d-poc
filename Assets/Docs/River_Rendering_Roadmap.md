@@ -66,7 +66,9 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 **Problem:** Distort the riverbed and submerged scene convincingly without doubled silhouettes, invalid screen samples, hard boundaries, or camera-dependent artifacts. Liquid and frozen states need distinct distortion behaviour.
 
-**Implemented:** Not started.
+**Implemented:** A configurable depth-aware screen-space layer now uses the completed Stage 3 surface normal, water depth, shoreline masking, screen bounds, and scene-depth continuity to produce restrained liquid distortion with safe fallback. Frozen water uses static warping and quality-scaled diffusion influenced by ice cloudiness.
+
+**Validated:** Implementation complete; pending Unity visual and regression testing.
 
 ## 5. Runtime Disturbance and Interaction
 
@@ -82,7 +84,7 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 ## 7. Secondary Water Effects
 
-**Problem:** Supplement the height-field river with effects it cannot represent directly: splashes, droplets, spray, breaking-crest accents, bank and obstacle impacts, shallow-water footsteps, transient sheets, mist, and cascade transition hooks.
+**Problem:** Supplement the height-field river with effects it cannot represent directly: splashes, droplets, spray, breaking-crest accents, bank and obstacle impacts, shallow-water footsteps, transient sheets, mist, configurable underwater caustics, and cascade transition hooks.
 
 **Implemented:** Not started.
 

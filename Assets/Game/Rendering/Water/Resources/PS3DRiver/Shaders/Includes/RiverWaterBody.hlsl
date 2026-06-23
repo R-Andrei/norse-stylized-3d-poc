@@ -43,7 +43,8 @@ RiverWaterBodyResult RiverWaterComposeBody(
     float iceCloudiness,
     float iceSurfacePresence,
     float iceScattering,
-    float3 bodyLighting)
+    float3 liquidBodyLighting,
+    float3 frozenBodyLighting)
 {
     RiverWaterBodyResult result;
 
@@ -62,7 +63,7 @@ RiverWaterBodyResult RiverWaterComposeBody(
 
     float3 litWaterTint =
         max(waterTint, 0.0) *
-        max(bodyLighting, 0.0);
+        max(liquidBodyLighting, 0.0);
 
     float3 liquidVolumeColour = lerp(
         sceneColour,
@@ -83,7 +84,7 @@ RiverWaterBodyResult RiverWaterComposeBody(
 
     liquidSurfaceTint =
         max(liquidSurfaceTint * 1.04 + 0.015, 0.0) *
-        max(bodyLighting, 0.0);
+        max(liquidBodyLighting, 0.0);
 
     result.liquidColour = lerp(
         liquidVolumeColour,
@@ -118,7 +119,7 @@ RiverWaterBodyResult RiverWaterComposeBody(
 
     float3 litIceColour =
         max(cloudyIceColour, 0.0) *
-        max(bodyLighting, 0.0) *
+        max(frozenBodyLighting, 0.0) *
         scatterBoost;
 
     float3 frozenVolumeColour = lerp(
@@ -140,7 +141,7 @@ RiverWaterBodyResult RiverWaterComposeBody(
 
     frozenSurfaceTint =
         max(frozenSurfaceTint, 0.0) *
-        max(bodyLighting, 0.0) *
+        max(frozenBodyLighting, 0.0) *
         lerp(
             1.0,
             1.25,

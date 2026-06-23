@@ -58,6 +58,26 @@ namespace ProgrammaticStylized3D.Rivers
         LiquidFactor = 5
     }
 
+    public enum StylizedRiverRefractionPreset
+    {
+        None,
+        Clear,
+        Balanced,
+        Distorted,
+        Custom
+    }
+
+    public enum StylizedRiverRefractionDebugView
+    {
+        Final = 0,
+        RefractedScene = 1,
+        Offset = 2,
+        DepthInfluence = 3,
+        ShoreMask = 4,
+        SampleValidity = 5,
+        IceDiffusion = 6
+    }
+
     public enum StylizedRiverIceBodyPreset
     {
         ClearIce,
@@ -312,9 +332,17 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 0.5f)]
         [SerializeField] private float minimumNightVisibility = 0.025f;
 
-        [Tooltip("How strongly real-time shadows suppress direct river lighting.")]
+        [Tooltip("Master strength for real-time shadowing of the river's intrinsic water or ice contribution.")]
         [Range(0f, 1f)]
         [SerializeField] private float shadowResponse = 1f;
+
+        [Tooltip("How strongly the main-light shadow affects liquid water's intrinsic tint and surface lighting. Low values keep the already-shadowed underwater scene dominant.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float liquidSurfaceShadowResponse = 0.08f;
+
+        [Tooltip("How strongly the main-light shadow affects the frozen ice body and surface.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float iceSurfaceShadowResponse = 0.65f;
 
         [Tooltip("Advanced diffuse wrap used to keep low-angle sun transitions stable.")]
         [Range(0f, 1f)]
@@ -372,6 +400,43 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField]
         private StylizedRiverMotionDebugView motionDebugView =
             StylizedRiverMotionDebugView.Final;
+
+        [Header("Refraction and Optical Distortion")]
+        [SerializeField]
+        private StylizedRiverRefractionPreset refractionPreset =
+            StylizedRiverRefractionPreset.None;
+
+        [Tooltip("Maximum liquid screen-space distortion. Mild values are intentional; excessive refraction easily detaches submerged objects from their real positions.")]
+        [Range(0f, 0.02f)]
+        [SerializeField] private float liquidRefractionStrength;
+
+        [Tooltip("How strongly actual water depth increases liquid refraction. Zero applies equal strength at all depths; one suppresses distortion in very shallow water.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float refractionDepthInfluence = 0.55f;
+
+        [Tooltip("How strongly the final Stage 3 surface normal drives optical distortion.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float refractionNormalInfluence = 0.65f;
+
+        [Tooltip("Amount of liquid refraction retained where water visibly meets the bank. Distortion still fades to zero inside the hidden overlap.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float shoreRefraction = 0.22f;
+
+        [Tooltip("How aggressively displaced samples are rejected when they cross scene-depth discontinuities such as rocks, banks, and foreground objects.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float depthEdgeProtection = 0.88f;
+
+        [Tooltip("Static screen-space warping through fully frozen ice.")]
+        [Range(0f, 0.012f)]
+        [SerializeField] private float iceDistortionStrength = 0.0015f;
+
+        [Tooltip("Additional quality-scaled softening of the transmitted scene beneath ice. Ice Cloudiness also contributes automatically.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float iceDiffusion = 0.28f;
+
+        [SerializeField]
+        private StylizedRiverRefractionDebugView refractionDebugView =
+            StylizedRiverRefractionDebugView.Final;
 
         [Header("Water Body Validation")]
         [SerializeField]
@@ -508,6 +573,10 @@ namespace ProgrammaticStylized3D.Rivers
         private static readonly int LightColorInfluenceId = Shader.PropertyToID("_LightColorInfluence");
         private static readonly int MinimumNightVisibilityId = Shader.PropertyToID("_MinimumNightVisibility");
         private static readonly int ShadowResponseId = Shader.PropertyToID("_ShadowResponse");
+        private static readonly int LiquidSurfaceShadowResponseId =
+            Shader.PropertyToID("_LiquidSurfaceShadowResponse");
+        private static readonly int IceSurfaceShadowResponseId =
+            Shader.PropertyToID("_IceSurfaceShadowResponse");
         private static readonly int DiffuseWrapId = Shader.PropertyToID("_DiffuseWrap");
 
         private static readonly int MotionDetailTextureId = Shader.PropertyToID("_MotionDetailTexture");
@@ -525,6 +594,25 @@ namespace ProgrammaticStylized3D.Rivers
         private static readonly int MotionDebugViewId = Shader.PropertyToID("_MotionDebugView");
         private static readonly int MotionTimeId = Shader.PropertyToID("_MotionTime");
         private static readonly int MotionSeedId = Shader.PropertyToID("_MotionSeed");
+
+        private static readonly int LiquidRefractionStrengthStage4Id =
+            Shader.PropertyToID("_LiquidRefractionStrength");
+        private static readonly int RefractionDepthInfluenceStage4Id =
+            Shader.PropertyToID("_RefractionDepthInfluence");
+        private static readonly int RefractionNormalInfluenceStage4Id =
+            Shader.PropertyToID("_RefractionNormalInfluence");
+        private static readonly int ShoreRefractionStage4Id =
+            Shader.PropertyToID("_ShoreRefraction");
+        private static readonly int RefractionEdgeProtectionStage4Id =
+            Shader.PropertyToID("_RefractionEdgeProtection");
+        private static readonly int IceDistortionStrengthStage4Id =
+            Shader.PropertyToID("_IceDistortionStrength");
+        private static readonly int IceDiffusionStage4Id =
+            Shader.PropertyToID("_IceDiffusion");
+        private static readonly int RefractionQualityStage4Id =
+            Shader.PropertyToID("_RefractionQuality");
+        private static readonly int RefractionDebugViewStage4Id =
+            Shader.PropertyToID("_RefractionDebugView");
 
         private static readonly int DomainFallbackDepthId = Shader.PropertyToID("_DomainFallbackDepth");
         private static readonly int BodyDebugViewId = Shader.PropertyToID("_BodyDebugView");
@@ -1030,6 +1118,72 @@ namespace ProgrammaticStylized3D.Rivers
             RebuildSurfaceOnly();
         }
 
+        public void ApplyRefractionPreset()
+        {
+            ApplyRefractionPreset(refractionPreset);
+        }
+
+        public void ApplyRefractionPreset(
+            StylizedRiverRefractionPreset preset)
+        {
+            refractionPreset = preset;
+
+            switch (preset)
+            {
+                case StylizedRiverRefractionPreset.None:
+                    liquidRefractionStrength = 0f;
+                    refractionDepthInfluence = 0.55f;
+                    refractionNormalInfluence = 0.65f;
+                    shoreRefraction = 0f;
+                    depthEdgeProtection = 0.95f;
+                    iceDistortionStrength = 0f;
+                    iceDiffusion = 0f;
+                    break;
+
+                case StylizedRiverRefractionPreset.Clear:
+                    liquidRefractionStrength = 0.0012f;
+                    refractionDepthInfluence = 0.35f;
+                    refractionNormalInfluence = 0.45f;
+                    shoreRefraction = 0.14f;
+                    depthEdgeProtection = 0.94f;
+                    iceDistortionStrength = 0.0008f;
+                    iceDiffusion = 0.10f;
+                    break;
+
+                case StylizedRiverRefractionPreset.Balanced:
+                    liquidRefractionStrength = 0.0025f;
+                    refractionDepthInfluence = 0.55f;
+                    refractionNormalInfluence = 0.65f;
+                    shoreRefraction = 0.22f;
+                    depthEdgeProtection = 0.88f;
+                    iceDistortionStrength = 0.0015f;
+                    iceDiffusion = 0.28f;
+                    break;
+
+                case StylizedRiverRefractionPreset.Distorted:
+                    liquidRefractionStrength = 0.0045f;
+                    refractionDepthInfluence = 0.72f;
+                    refractionNormalInfluence = 0.85f;
+                    shoreRefraction = 0.30f;
+                    depthEdgeProtection = 0.80f;
+                    iceDistortionStrength = 0.0025f;
+                    iceDiffusion = 0.45f;
+                    break;
+
+                case StylizedRiverRefractionPreset.Custom:
+                    break;
+
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(preset),
+                        preset,
+                        "Unsupported refraction preset.");
+            }
+
+            ValidateSettings();
+            ApplyVisualSettings();
+        }
+
         public void ApplyWaterBodyPreset()
         {
             ApplyWaterBodyPreset(bodyPreset);
@@ -1522,6 +1676,10 @@ namespace ProgrammaticStylized3D.Rivers
             minimumNightVisibility =
                 Mathf.Clamp(minimumNightVisibility, 0f, 0.5f);
             shadowResponse = Mathf.Clamp01(shadowResponse);
+            liquidSurfaceShadowResponse =
+                Mathf.Clamp01(liquidSurfaceShadowResponse);
+            iceSurfaceShadowResponse =
+                Mathf.Clamp01(iceSurfaceShadowResponse);
             diffuseWrap = Mathf.Clamp01(diffuseWrap);
 
             flowSpeed = Mathf.Clamp(flowSpeed, 0f, 12f);
@@ -1535,6 +1693,18 @@ namespace ProgrammaticStylized3D.Rivers
             currentAccentScale = Mathf.Clamp(currentAccentScale, 0.5f, 30f);
             shoreMotion = Mathf.Clamp01(shoreMotion);
             shoreMotionWidth = Mathf.Clamp(shoreMotionWidth, 0.05f, 5f);
+
+            liquidRefractionStrength =
+                Mathf.Clamp(liquidRefractionStrength, 0f, 0.02f);
+            refractionDepthInfluence =
+                Mathf.Clamp01(refractionDepthInfluence);
+            refractionNormalInfluence =
+                Mathf.Clamp01(refractionNormalInfluence);
+            shoreRefraction = Mathf.Clamp01(shoreRefraction);
+            depthEdgeProtection = Mathf.Clamp01(depthEdgeProtection);
+            iceDistortionStrength =
+                Mathf.Clamp(iceDistortionStrength, 0f, 0.012f);
+            iceDiffusion = Mathf.Clamp01(iceDiffusion);
 
             opacity = Mathf.Clamp01(opacity);
             shallowOpacity = Mathf.Clamp01(shallowOpacity);
@@ -2102,6 +2272,12 @@ namespace ProgrammaticStylized3D.Rivers
                 MinimumNightVisibilityId,
                 minimumNightVisibility);
             bodyProperties.SetFloat(ShadowResponseId, shadowResponse);
+            bodyProperties.SetFloat(
+                LiquidSurfaceShadowResponseId,
+                liquidSurfaceShadowResponse);
+            bodyProperties.SetFloat(
+                IceSurfaceShadowResponseId,
+                iceSurfaceShadowResponse);
             bodyProperties.SetFloat(DiffuseWrapId, diffuseWrap);
 
             bodyProperties.SetTexture(
@@ -2121,6 +2297,40 @@ namespace ProgrammaticStylized3D.Rivers
             bodyProperties.SetFloat(MotionDebugViewId, (float)motionDebugView);
             bodyProperties.SetFloat(MotionTimeId, riverTime);
             bodyProperties.SetFloat(MotionSeedId, visualSeed);
+
+            bodyProperties.SetFloat(
+                LiquidRefractionStrengthStage4Id,
+                liquidRefractionStrength);
+            bodyProperties.SetFloat(
+                RefractionDepthInfluenceStage4Id,
+                refractionDepthInfluence);
+            bodyProperties.SetFloat(
+                RefractionNormalInfluenceStage4Id,
+                refractionNormalInfluence);
+            bodyProperties.SetFloat(
+                ShoreRefractionStage4Id,
+                shoreRefraction);
+            bodyProperties.SetFloat(
+                RefractionEdgeProtectionStage4Id,
+                depthEdgeProtection);
+            bodyProperties.SetFloat(
+                IceDistortionStrengthStage4Id,
+                iceDistortionStrength);
+            bodyProperties.SetFloat(
+                IceDiffusionStage4Id,
+                iceDiffusion);
+            bodyProperties.SetFloat(
+                RefractionQualityStage4Id,
+                quality switch
+                {
+                    StylizedRiverQuality.Low => 0f,
+                    StylizedRiverQuality.Medium => 1f,
+                    StylizedRiverQuality.High => 2f,
+                    _ => 1f
+                });
+            bodyProperties.SetFloat(
+                RefractionDebugViewStage4Id,
+                (float)refractionDebugView);
 
             bodyProperties.SetFloat(DomainFallbackDepthId, Mathf.Max(0.01f, depth));
             bodyProperties.SetFloat(BodyDebugViewId, (float)bodyDebugView);

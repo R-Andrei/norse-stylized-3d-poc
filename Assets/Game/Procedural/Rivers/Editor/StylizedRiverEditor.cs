@@ -22,6 +22,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawAdvancedShoreline();
             DrawSurfaceMesh();
             DrawSurfaceMotion();
+            DrawRefraction();
             DrawWaterBody();
             DrawAdvancedBody();
 
@@ -396,12 +397,99 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
         }
 
+        private void DrawRefraction()
+        {
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField(
+                "Refraction and Optical Distortion",
+                EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Stage 4 distorts only the already-lit opaque scene beneath the river. It uses the Stage 3 surface normal, actual water depth, shoreline protection, and depth-discontinuity rejection. Defaults are intentionally restrained.",
+                MessageType.Info);
+
+            SerializedProperty preset = Find("refractionPreset");
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                preset,
+                new GUIContent(
+                    "Refraction Character",
+                    "None reproduces the accepted Stage 3 result. Clear, Balanced, and Distorted remain bounded screen-space styles rather than physically exact refraction."));
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+
+                foreach (Object selectedTarget in targets)
+                {
+                    if (selectedTarget is not StylizedRiver river)
+                    {
+                        continue;
+                    }
+
+                    Undo.RecordObject(river, "Apply River Refraction Preset");
+                    river.ApplyRefractionPreset();
+                    EditorUtility.SetDirty(river);
+                }
+
+                serializedObject.Update();
+                RepaintScene();
+            }
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                Find("liquidRefractionStrength"),
+                new GUIContent(
+                    "Refraction Strength",
+                    "Maximum liquid screen-space distortion. Small values are recommended."));
+            EditorGUILayout.PropertyField(
+                Find("refractionDepthInfluence"),
+                new GUIContent(
+                    "Depth Influence",
+                    "How strongly shallow water suppresses distortion while deeper water reaches the configured strength."));
+            EditorGUILayout.PropertyField(
+                Find("refractionNormalInfluence"),
+                new GUIContent(
+                    "Normal Influence",
+                    "How strongly the completed Stage 3 surface normal drives optical distortion."));
+            EditorGUILayout.PropertyField(
+                Find("shoreRefraction"),
+                new GUIContent(
+                    "Shore Refraction",
+                    "Distortion retained at the visible bank. It still fades to zero before the buried surface edge."));
+            EditorGUILayout.PropertyField(
+                Find("depthEdgeProtection"),
+                new GUIContent(
+                    "Depth-Edge Protection",
+                    "Rejects displaced samples that cross rocks, banks, foreground objects, or other strong scene-depth discontinuities."));
+            EditorGUILayout.PropertyField(
+                Find("iceDistortionStrength"),
+                new GUIContent(
+                    "Ice Distortion",
+                    "Static optical warping through frozen ice. It does not scroll with liquid flow."));
+            EditorGUILayout.PropertyField(
+                Find("iceDiffusion"),
+                new GUIContent(
+                    "Ice Diffusion",
+                    "Quality-scaled softening of the transmitted scene beneath ice. Ice Cloudiness also contributes automatically."));
+            EditorGUILayout.PropertyField(
+                Find("refractionDebugView"),
+                new GUIContent(
+                    "Refraction Debug View",
+                    "Displays the refracted scene, offset, depth influence, shoreline mask, sample validity, or ice diffusion."));
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                Find("refractionPreset").enumValueIndex =
+                    (int)StylizedRiverRefractionPreset.Custom;
+            }
+        }
+
         private void DrawWaterBody()
         {
             EditorGUILayout.Space(8f);
             EditorGUILayout.LabelField("Water Body", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 2 provides the accepted liquid or frozen body and its light response. Stage 3 now supplies its animated surface normal and geometric position; refraction, persistent disturbances, foam, secondary effects, and reflections remain deferred.",
+                "Stage 2 provides the accepted liquid or frozen body and its light response. Stage 3 supplies the animated surface normal and geometric position, while Stage 4 now distorts the transmitted scene. Persistent disturbances, foam, secondary effects, caustics, and reflections remain deferred.",
                 MessageType.Info);
 
             SerializedProperty surfaceState = Find("surfaceState");
@@ -481,8 +569,18 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.PropertyField(
                 Find("shadowResponse"),
                 new GUIContent(
-                    "Shadow Response",
-                    "How strongly real-time shadows suppress direct river lighting."));
+                    "Shadow Response Master",
+                    "Master strength for real-time shadowing of the river's intrinsic water or ice contribution."));
+            EditorGUILayout.PropertyField(
+                Find("liquidSurfaceShadowResponse"),
+                new GUIContent(
+                    "Liquid Surface Shadow",
+                    "How strongly the main-light shadow affects intrinsic liquid tint and surface lighting. Keep this subtle so the refracted underwater shadow remains dominant."));
+            EditorGUILayout.PropertyField(
+                Find("iceSurfaceShadowResponse"),
+                new GUIContent(
+                    "Ice Surface Shadow",
+                    "How strongly the main-light shadow affects the more solid frozen ice body and surface."));
         }
 
         private void DrawLiquidBodyControls()

@@ -5,6 +5,7 @@ struct RiverWaterLightingResult
 {
     float3 ambient;
     float3 sun;
+    float3 sunUnshadowed;
     float3 localLights;
     float3 combined;
     float mainShadowAttenuation;
@@ -95,13 +96,18 @@ RiverWaterLightingResult RiverWaterEvaluateLighting(
     result.mainShadowAttenuation =
         mainLight.shadowAttenuation;
 
-    result.sun = RiverWaterEvaluateDirectLight(
+    result.sunUnshadowed = RiverWaterEvaluateDirectLight(
         normalWS,
         mainLight,
         sunResponse,
         lightColourInfluence,
-        shadowResponse,
+        0.0,
         diffuseWrap);
+
+    result.sun = result.sunUnshadowed * lerp(
+        1.0,
+        mainLight.shadowAttenuation,
+        saturate(shadowResponse));
 
     result.localLights = 0.0;
 
@@ -164,6 +170,33 @@ float3 RiverWaterResolveBodyLighting(
     float3 responsiveLighting =
         max(
             lighting.combined,
+            max(0.0, minimumNightVisibility).xxx);
+
+    return lerp(
+        1.0.xxx,
+        responsiveLighting,
+        saturate(lightDependence));
+}
+
+float3 RiverWaterResolveBodyLightingWithMainShadowPolicy(
+    RiverWaterLightingResult lighting,
+    float lightDependence,
+    float minimumNightVisibility,
+    float mainShadowResponse)
+{
+    float resolvedMainShadow = lerp(
+        1.0,
+        lighting.mainShadowAttenuation,
+        saturate(mainShadowResponse));
+
+    float3 policyLighting =
+        lighting.ambient +
+        lighting.sunUnshadowed * resolvedMainShadow +
+        lighting.localLights;
+
+    float3 responsiveLighting =
+        max(
+            policyLighting,
             max(0.0, minimumNightVisibility).xxx);
 
     return lerp(

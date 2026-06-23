@@ -39,6 +39,17 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _MotionSeed("Motion Seed", Float) = 1731
         _MotionDebugView("Motion Debug View", Range(0, 5)) = 0
 
+        [Header(Refraction and Optical Distortion)]
+        _LiquidRefractionStrength("Liquid Refraction Strength", Range(0, 0.02)) = 0
+        _RefractionDepthInfluence("Refraction Depth Influence", Range(0, 1)) = 0.55
+        _RefractionNormalInfluence("Refraction Normal Influence", Range(0, 1)) = 0.65
+        _ShoreRefraction("Shore Refraction", Range(0, 1)) = 0.22
+        _RefractionEdgeProtection("Refraction Edge Protection", Range(0, 1)) = 0.88
+        _IceDistortionStrength("Ice Distortion Strength", Range(0, 0.012)) = 0.0015
+        _IceDiffusion("Ice Diffusion", Range(0, 1)) = 0.28
+        [HideInInspector] _RefractionQuality("Refraction Quality", Float) = 1
+        _RefractionDebugView("Refraction Debug View", Range(0, 6)) = 0
+
         [Header(Lighting Response)]
         _LightDependence("Light Dependence", Range(0, 1)) = 1
         _AmbientResponse("Ambient Response", Range(0, 2)) = 1
@@ -46,7 +57,9 @@ Shader "PS3D/Stylized River Water"
         _LocalLightResponse("Local Light Response", Range(0, 3)) = 1
         _LightColorInfluence("Light Colour Influence", Range(0, 1)) = 0.8
         _MinimumNightVisibility("Minimum Night Visibility", Range(0, 0.5)) = 0.025
-        _ShadowResponse("Shadow Response", Range(0, 1)) = 1
+        _ShadowResponse("Shadow Response Master", Range(0, 1)) = 1
+        _LiquidSurfaceShadowResponse("Liquid Surface Shadow", Range(0, 1)) = 0.08
+        _IceSurfaceShadowResponse("Ice Surface Shadow", Range(0, 1)) = 0.65
         _DiffuseWrap("Diffuse Wrap", Range(0, 1)) = 0.22
 
         [HideInInspector]
@@ -94,6 +107,7 @@ Shader "PS3D/Stylized River Water"
             #include "Includes/RiverWaterDepth.hlsl"
             #include "Includes/RiverWaterLighting.hlsl"
             #include "Includes/RiverWaterMotion.hlsl"
+            #include "Includes/RiverWaterRefraction.hlsl"
             #include "Includes/RiverWaterBody.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
@@ -120,6 +134,8 @@ Shader "PS3D/Stylized River Water"
                 float _LightColorInfluence;
                 float _MinimumNightVisibility;
                 float _ShadowResponse;
+                float _LiquidSurfaceShadowResponse;
+                float _IceSurfaceShadowResponse;
                 float _DiffuseWrap;
 
                 float _MotionFlowSpeed;
@@ -136,6 +152,16 @@ Shader "PS3D/Stylized River Water"
                 float _MotionTime;
                 float _MotionSeed;
                 float _MotionDebugView;
+
+                float _LiquidRefractionStrength;
+                float _RefractionDepthInfluence;
+                float _RefractionNormalInfluence;
+                float _ShoreRefraction;
+                float _RefractionEdgeProtection;
+                float _IceDistortionStrength;
+                float _IceDiffusion;
+                float _RefractionQuality;
+                float _RefractionDebugView;
 
                 float _DomainFallbackDepth;
                 float _BodyDebugView;
@@ -276,10 +302,6 @@ Shader "PS3D/Stylized River Water"
                 integration.disturbanceHeight = motion.disturbanceHeight;
                 integration.disturbanceNormalWS = motion.disturbanceNormalWS;
 
-                float2 backgroundUV = saturate(
-                    screenUV + integration.refractionOffset);
-                float3 sceneColour = SampleSceneColor(backgroundUV);
-
                 RiverWaterDepthData depthData = RiverWaterEvaluateDepth(
                     screenUV,
                     surfaceInputs.positionWS,
@@ -287,6 +309,54 @@ Shader "PS3D/Stylized River Water"
                     _BodyDepthRange,
                     _BodyDepthContrast,
                     _Clarity);
+
+                RiverWaterRefractionInputs refractionInputs;
+                refractionInputs.screenUV = screenUV;
+                refractionInputs.positionWS = surfaceInputs.positionWS;
+                refractionInputs.baseNormalWS = normalize(input.baseNormalWS);
+                refractionInputs.surfaceNormalWS = motion.surfaceNormalWS;
+                refractionInputs.tangentWS = normalize(input.tangentWS);
+                refractionInputs.sideWS = normalize(input.sideWS);
+                refractionInputs.globalDistance = input.domainData.x;
+                refractionInputs.lateralMetres = input.domainData.y;
+                refractionInputs.visibleHalfWidth = input.domainData.z;
+                refractionInputs.surfaceHalfWidth = input.domainData.w;
+                refractionInputs.freezeAmount = _FreezeAmount;
+                refractionInputs.iceCloudiness = _IceCloudiness;
+
+                RiverWaterRefractionResult refraction =
+                    RiverWaterEvaluateRefraction(
+                        TEXTURE2D_ARGS(
+                            _MotionDetailTexture,
+                            sampler_MotionDetailTexture),
+                        refractionInputs,
+                        depthData,
+                        _LiquidRefractionStrength,
+                        _RefractionDepthInfluence,
+                        _RefractionNormalInfluence,
+                        _ShoreRefraction,
+                        _RefractionEdgeProtection,
+                        _IceDistortionStrength,
+                        _IceDiffusion,
+                        _RefractionQuality,
+                        _DomainFallbackDepth,
+                        _BodyDepthRange,
+                        _BodyDepthContrast,
+                        _Clarity,
+                        _MotionSeed,
+                        _MotionTime,
+                        _MotionFlowSpeed,
+                        _MotionWaveHeight,
+                        _MotionWaveLength,
+                        _MotionWaveSteepness,
+                        _MotionDetailStrength,
+                        _MotionDetailScale,
+                        _MotionTurbulence,
+                        _ShoreMotion,
+                        _ShoreMotionWidth);
+
+                integration.refractionOffset = refraction.offset;
+                float3 sceneColour = refraction.sceneColour;
 
                 float3 viewDirectionWS = GetWorldSpaceNormalizeViewDir(
                     surfaceInputs.positionWS);
@@ -312,10 +382,21 @@ Shader "PS3D/Stylized River Water"
                         _ShadowResponse,
                         _DiffuseWrap);
 
-                float3 bodyLighting = RiverWaterResolveBodyLighting(
-                    lighting,
-                    _LightDependence,
-                    _MinimumNightVisibility);
+                float3 liquidBodyLighting =
+                    RiverWaterResolveBodyLightingWithMainShadowPolicy(
+                        lighting,
+                        _LightDependence,
+                        _MinimumNightVisibility,
+                        _ShadowResponse *
+                        _LiquidSurfaceShadowResponse);
+
+                float3 frozenBodyLighting =
+                    RiverWaterResolveBodyLightingWithMainShadowPolicy(
+                        lighting,
+                        _LightDependence,
+                        _MinimumNightVisibility,
+                        _ShadowResponse *
+                        _IceSurfaceShadowResponse);
 
                 RiverWaterBodyResult body = RiverWaterComposeBody(
                     sceneColour,
@@ -332,13 +413,61 @@ Shader "PS3D/Stylized River Water"
                     _IceCloudiness,
                     _IceSurfacePresence,
                     _IceScattering,
-                    bodyLighting);
+                    liquidBodyLighting,
+                    frozenBodyLighting);
 
                 float3 finalColour = RiverWaterApplyReservedIntegration(
                     body.colour,
                     integration);
                 finalColour *= 1.0 + motion.currentAccent * 0.22;
                 finalColour = MixFog(finalColour, input.motionData.w);
+
+                int refractionDebug =
+                    (int)round(_RefractionDebugView);
+
+                if (refractionDebug == 1)
+                {
+                    return half4(refraction.sceneColour, 1.0);
+                }
+
+                if (refractionDebug == 2)
+                {
+                    float2 encodedOffset =
+                        saturate(refraction.offset * 60.0 + 0.5);
+                    return half4(
+                        encodedOffset.x,
+                        encodedOffset.y,
+                        0.5,
+                        1.0);
+                }
+
+                if (refractionDebug == 3)
+                {
+                    return half4(
+                        refraction.depthInfluence.xxx,
+                        1.0);
+                }
+
+                if (refractionDebug == 4)
+                {
+                    return half4(
+                        refraction.shoreMask.xxx,
+                        1.0);
+                }
+
+                if (refractionDebug == 5)
+                {
+                    return half4(
+                        refraction.sampleValidity.xxx,
+                        1.0);
+                }
+
+                if (refractionDebug == 6)
+                {
+                    return half4(
+                        refraction.iceDiffusion.xxx,
+                        1.0);
+                }
 
                 int motionDebug = (int)round(_MotionDebugView);
 
