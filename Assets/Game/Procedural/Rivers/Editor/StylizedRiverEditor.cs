@@ -21,6 +21,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawNaturalVariation();
             DrawAdvancedShoreline();
             DrawSurfaceMesh();
+            DrawSurfaceMotion();
             DrawWaterBody();
             DrawAdvancedBody();
 
@@ -308,8 +309,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.PropertyField(
                 Find("reservedDownwardSurfaceDisplacement"),
                 new GUIContent(
-                    "Reserved Downward Motion",
-                    "Clearance reserved for a later surface-motion stage. Keep at zero during Stage 2."));
+                    "Additional Downward Motion Reserve",
+                    "Optional clearance beyond the automatically resolved Stage 3 wave height."));
             EditorGUI.indentLevel--;
         }
 
@@ -327,12 +328,80 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent("Water Level Offset"));
         }
 
+        private void DrawSurfaceMotion()
+        {
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField("Surface Motion", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Stage 3 uses one coherent river-space field for macro displacement, animated normals, current accents, and shoreline lapping. Persistent wakes remain reserved for Stage 5.",
+                MessageType.Info);
+
+            SerializedProperty preset = Find("motionPreset");
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                preset,
+                new GUIContent(
+                    "Motion Character",
+                    "Still reproduces the accepted Stage 2 surface. Calm, Flowing, and Furious change only surface motion."));
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+
+                foreach (Object selectedTarget in targets)
+                {
+                    if (selectedTarget is not StylizedRiver river)
+                    {
+                        continue;
+                    }
+
+                    Undo.RecordObject(river, "Apply River Motion Preset");
+                    river.ApplyMotionPreset();
+                    EditorUtility.SetDirty(river);
+                }
+
+                serializedObject.Update();
+                RepaintScene();
+            }
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(Find("flowSpeed"), new GUIContent("Flow Speed", "Downstream travel speed in metres per second."));
+            EditorGUILayout.PropertyField(Find("motionWaveHeight"), new GUIContent("Wave Height", "Maximum vertical macro displacement in metres."));
+            EditorGUILayout.PropertyField(Find("motionWaveLength"), new GUIContent("Wave Length", "Typical physical length of displaced waves in metres."));
+            EditorGUILayout.PropertyField(Find("motionWaveSteepness"), new GUIContent("Wave Steepness", "Broad rounded waves versus sharper crest-like shapes."));
+            EditorGUILayout.PropertyField(Find("motionDetailStrength"), new GUIContent("Surface Detail Strength", "Strength of small flow-aligned normal detail."));
+            EditorGUILayout.PropertyField(Find("motionDetailScale"), new GUIContent("Surface Detail Scale", "Typical physical size of ripple detail in metres."));
+            EditorGUILayout.PropertyField(Find("motionTurbulence"), new GUIContent("Turbulence", "How strongly the pattern evolves instead of only translating."));
+            EditorGUILayout.PropertyField(Find("currentAccentStrength"), new GUIContent("Current Accent Strength", "Broad downstream modulation. This is not foam."));
+            EditorGUILayout.PropertyField(Find("currentAccentScale"), new GUIContent("Current Accent Scale", "Typical longitudinal size of current accents in metres."));
+            EditorGUILayout.PropertyField(Find("shoreMotion"), new GUIContent("Shore Motion", "Displacement retained where water visibly meets the bank. It fades to zero inside the hidden overlap."));
+            EditorGUILayout.PropertyField(Find("shoreMotionWidth"), new GUIContent("Shore Motion Width", "Distance inside the visible shoreline over which centre motion blends toward Shore Motion."));
+            EditorGUILayout.PropertyField(Find("motionDebugView"), new GUIContent("Motion Debug View", "Bank mask, macro height, surface normal, current accents, or liquid factor."));
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                Find("motionPreset").enumValueIndex =
+                    (int)StylizedRiverMotionPreset.Custom;
+            }
+
+            if (targets.Length == 1 && target is StylizedRiver singleRiver)
+            {
+                EditorGUILayout.Space(3f);
+                EditorGUILayout.LabelField(
+                    "Resolved Surface Row Spacing",
+                    $"{singleRiver.ResolvedSurfaceLongitudinalSpacing:0.000} m");
+                EditorGUILayout.LabelField(
+                    "Resolved Downward Clearance",
+                    $"{singleRiver.ResolvedMaximumDownwardMotion:0.000} m");
+            }
+        }
+
         private void DrawWaterBody()
         {
             EditorGUILayout.Space(8f);
             EditorGUILayout.LabelField("Water Body", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 2 evaluates the static optical body and its response to ambient light, the main sun or moon, shadows, and local lights. Surface motion, refraction distortion, foam, and reflections remain deferred.",
+                "Stage 2 provides the accepted liquid or frozen body and its light response. Stage 3 now supplies its animated surface normal and geometric position; refraction, persistent disturbances, foam, secondary effects, and reflections remain deferred.",
                 MessageType.Info);
 
             SerializedProperty surfaceState = Find("surfaceState");

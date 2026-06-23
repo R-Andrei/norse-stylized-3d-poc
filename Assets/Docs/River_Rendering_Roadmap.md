@@ -56,31 +56,39 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 ## 3. Surface Motion and Coherent Flow
 
-**Problem:** Add normals, waves, current accents, and surface displacement that all agree on direction and speed. Motion must remain continuous through bends and knots and must scale cleanly from calm to furious.
+**Problem:** Add one coherent downstream motion field whose geometric waves, animated normals, current accents, and shoreline lapping agree on direction and speed. It must remain continuous through bends, knots, width variation, connected distance offsets, reverse flow, and liquid/frozen states.
+
+**Implemented:** A shared river-space HLSL motion layer provides vertical macro displacement, evolving flow-aligned normal detail, directional current accents, visible-shore motion with hidden-edge safety fading, automatic surface refinement, displacement clearance reporting, and a neutral persistent-disturbance input reserved for Stage 5.
+
+**Validated:** Complete and accepted. Calm through furious motion, lighting response, reverse flow, irregular shores, shoreline lapping, and frozen-state suppression passed visual testing. Presets favour turbulence and shore activity over excessively fast, uniform macro-wave bands; detached splashes remain assigned to Stage 7.
+
+## 4. Refraction and Optical Distortion
+
+**Problem:** Distort the riverbed and submerged scene convincingly without doubled silhouettes, invalid screen samples, hard boundaries, or camera-dependent artifacts. Liquid and frozen states need distinct distortion behaviour.
 
 **Implemented:** Not started.
 
-## 4. Refraction and Scene Integration
+## 5. Runtime Disturbance and Interaction
 
-**Problem:** Distort the riverbed and submerged scene convincingly without doubled silhouettes, invalid screen samples, hard boundaries, or camera-dependent artifacts.
-
-**Implemented:** Not started.
-
-## 5. Interaction and Source Detection
-
-**Problem:** Detect banks, static obstacles, runtime objects, and their movement relative to the river. Produce consistent interaction data that later systems can use without knowing how the river mesh or spline is built.
+**Problem:** Add persistent impact ripples, player and object wakes, downstream disturbance transport, spreading, decay, and interaction emitters without replacing the Stage 3 base motion field.
 
 **Implemented:** Not started.
 
-## 6. Foam Generation, Transport, and Rendering
+## 6. Foam and Surface Tracing
 
-**Problem:** Produce sharp, readable foam from banks, obstacles, turbulent regions, and runtime interactions. Foam must move consistently downstream, remain configurable from sparse to violent, and avoid visible repetition, tearing fronts, knot-dependent speed, blur, and unrelated visual layers.
+**Problem:** Generate and transport readable foam from banks, obstacles, turbulence, wakes, and runtime disturbances without unrelated motion layers, tearing fronts, blur, or knot-dependent speed.
 
 **Implemented:** Not started.
 
-## 7. Reflections and Final Lighting
+## 7. Secondary Water Effects
 
-**Problem:** Add controlled stylized reflections and final lighting integration without invalid reflection patches, excessive cost, or conflict with opacity and refraction. A reliable fallback must exist when high-quality reflection data is unavailable.
+**Problem:** Supplement the height-field river with effects it cannot represent directly: splashes, droplets, spray, breaking-crest accents, bank and obstacle impacts, shallow-water footsteps, transient sheets, mist, and cascade transition hooks.
+
+**Implemented:** Not started.
+
+## 8. Reflections and Final Integration
+
+**Problem:** Add controlled stylized reflections, liquid-versus-ice surface response, final specular behaviour, quality tiers, and completed integration of motion, disturbance, foam, and secondary effects.
 
 **Implemented:** Not started.
 

@@ -22,6 +22,23 @@ Shader "PS3D/Stylized River Water"
         _IceSurfacePresence("Ice Surface Presence", Range(0, 1)) = 0.86
         _IceScattering("Ice Scattering", Range(0, 1)) = 0.68
 
+        [Header(Surface Motion)]
+        [NoScaleOffset] _MotionDetailTexture("Motion Detail Texture", 2D) = "bump" {}
+        _MotionFlowSpeed("Flow Speed", Range(0, 12)) = 0
+        _MotionWaveHeight("Wave Height", Range(0, 1.25)) = 0
+        _MotionWaveLength("Wave Length", Range(0.5, 30)) = 5
+        _MotionWaveSteepness("Wave Steepness", Range(0, 1)) = 0.35
+        _MotionDetailStrength("Detail Strength", Range(0, 2)) = 0
+        _MotionDetailScale("Detail Scale", Range(0.15, 12)) = 1.4
+        _MotionTurbulence("Turbulence", Range(0, 1)) = 0.25
+        _CurrentAccentStrength("Current Accent Strength", Range(0, 1)) = 0
+        _CurrentAccentScale("Current Accent Scale", Range(0.5, 30)) = 5
+        _ShoreMotion("Shore Motion", Range(0, 1)) = 0.35
+        _ShoreMotionWidth("Shore Motion Width", Range(0.05, 5)) = 0.75
+        [HideInInspector] _MotionTime("Motion Time", Float) = 0
+        [HideInInspector] _MotionSeed("Motion Seed", Float) = 1731
+        _MotionDebugView("Motion Debug View", Range(0, 5)) = 0
+
         [Header(Lighting Response)]
         _LightDependence("Light Dependence", Range(0, 1)) = 1
         _AmbientResponse("Ambient Response", Range(0, 2)) = 1
@@ -76,6 +93,7 @@ Shader "PS3D/Stylized River Water"
             #include "Includes/RiverWaterCommon.hlsl"
             #include "Includes/RiverWaterDepth.hlsl"
             #include "Includes/RiverWaterLighting.hlsl"
+            #include "Includes/RiverWaterMotion.hlsl"
             #include "Includes/RiverWaterBody.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
@@ -104,16 +122,36 @@ Shader "PS3D/Stylized River Water"
                 float _ShadowResponse;
                 float _DiffuseWrap;
 
+                float _MotionFlowSpeed;
+                float _MotionWaveHeight;
+                float _MotionWaveLength;
+                float _MotionWaveSteepness;
+                float _MotionDetailStrength;
+                float _MotionDetailScale;
+                float _MotionTurbulence;
+                float _CurrentAccentStrength;
+                float _CurrentAccentScale;
+                float _ShoreMotion;
+                float _ShoreMotionWidth;
+                float _MotionTime;
+                float _MotionSeed;
+                float _MotionDebugView;
+
                 float _DomainFallbackDepth;
                 float _BodyDebugView;
             CBUFFER_END
+
+            TEXTURE2D(_MotionDetailTexture);
+            SAMPLER(sampler_MotionDetailTexture);
 
             struct Attributes
             {
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
+                float4 tangentOS : TANGENT;
                 float2 uv0 : TEXCOORD0;
                 float4 uv1 : TEXCOORD1;
+                float4 uv2 : TEXCOORD2;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -122,10 +160,10 @@ Shader "PS3D/Stylized River Water"
                 float4 positionCS : SV_POSITION;
                 float3 positionWS : TEXCOORD0;
                 half3 baseNormalWS : TEXCOORD1;
-                float localDistance : TEXCOORD2;
-                float globalDistance : TEXCOORD3;
-                float lateralMetres : TEXCOORD4;
-                half fogFactor : TEXCOORD5;
+                float4 domainData : TEXCOORD2;
+                half3 tangentWS : TEXCOORD3;
+                half3 sideWS : TEXCOORD4;
+                float4 motionData : TEXCOORD5;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -137,14 +175,54 @@ Shader "PS3D/Stylized River Water"
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
-                output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
-                output.positionCS = TransformWorldToHClip(output.positionWS);
-                output.baseNormalWS = normalize(
+                float3 basePositionWS = TransformObjectToWorld(input.positionOS.xyz);
+                float3 baseNormalWS = normalize(
                     TransformObjectToWorldNormal(input.normalOS));
-                output.localDistance = input.uv0.y;
-                output.globalDistance = input.uv1.x;
-                output.lateralMetres = input.uv1.y;
-                output.fogFactor = ComputeFogFactor(output.positionCS.z);
+                float3 tangentWS = normalize(
+                    TransformObjectToWorldDir(input.tangentOS.xyz));
+                float3 sideWS = normalize(cross(baseNormalWS, tangentWS));
+
+                RiverWaterMotionInputs motionInputs;
+                motionInputs.positionWS = basePositionWS;
+                motionInputs.baseNormalWS = baseNormalWS;
+                motionInputs.tangentWS = tangentWS;
+                motionInputs.sideWS = sideWS;
+                motionInputs.globalDistance = input.uv1.x;
+                motionInputs.lateralMetres = input.uv1.y;
+                motionInputs.visibleHalfWidth = input.uv2.x;
+                motionInputs.surfaceHalfWidth = input.uv2.y;
+                motionInputs.time = _MotionTime;
+                motionInputs.freezeAmount = _FreezeAmount;
+
+                RiverWaterMotionResult motion = RiverWaterEvaluateMotionVertex(
+                    motionInputs,
+                    _MotionFlowSpeed,
+                    _MotionWaveHeight,
+                    _MotionWaveLength,
+                    _MotionWaveSteepness,
+                    _MotionTurbulence,
+                    _ShoreMotion,
+                    _ShoreMotionWidth,
+                    _MotionSeed);
+
+                output.positionWS =
+                    basePositionWS +
+                    motion.displacementWS +
+                    baseNormalWS * motion.disturbanceHeight;
+                output.positionCS = TransformWorldToHClip(output.positionWS);
+                output.baseNormalWS = baseNormalWS;
+                output.tangentWS = tangentWS;
+                output.sideWS = sideWS;
+                output.domainData = float4(
+                    input.uv1.x,
+                    input.uv1.y,
+                    input.uv2.x,
+                    input.uv2.y);
+                output.motionData = float4(
+                    input.uv0.y,
+                    motion.macroHeight,
+                    motion.bankMask,
+                    ComputeFogFactor(output.positionCS.z));
                 return output;
             }
 
@@ -156,20 +234,47 @@ Shader "PS3D/Stylized River Water"
                 float2 screenUV = GetNormalizedScreenSpaceUV(
                     input.positionCS);
 
+                RiverWaterMotionInputs motionInputs;
+                motionInputs.positionWS = input.positionWS;
+                motionInputs.baseNormalWS = normalize(input.baseNormalWS);
+                motionInputs.tangentWS = normalize(input.tangentWS);
+                motionInputs.sideWS = normalize(input.sideWS);
+                motionInputs.globalDistance = input.domainData.x;
+                motionInputs.lateralMetres = input.domainData.y;
+                motionInputs.visibleHalfWidth = input.domainData.z;
+                motionInputs.surfaceHalfWidth = input.domainData.w;
+                motionInputs.time = _MotionTime;
+                motionInputs.freezeAmount = _FreezeAmount;
+
+                RiverWaterMotionResult motion = RiverWaterEvaluateMotionFragment(
+                    TEXTURE2D_ARGS(
+                        _MotionDetailTexture,
+                        sampler_MotionDetailTexture),
+                    motionInputs,
+                    _MotionFlowSpeed,
+                    _MotionWaveHeight,
+                    _MotionWaveLength,
+                    _MotionWaveSteepness,
+                    _MotionDetailStrength,
+                    _MotionDetailScale,
+                    _MotionTurbulence,
+                    _CurrentAccentStrength,
+                    _CurrentAccentScale,
+                    _ShoreMotion,
+                    _ShoreMotionWidth,
+                    _MotionSeed);
+
                 RiverWaterSurfaceInputs surfaceInputs;
                 surfaceInputs.positionWS = input.positionWS;
-                surfaceInputs.baseNormalWS = normalize(input.baseNormalWS);
-                surfaceInputs.localDistance = input.localDistance;
-                surfaceInputs.globalDistance = input.globalDistance;
-                surfaceInputs.lateralMetres = input.lateralMetres;
+                surfaceInputs.baseNormalWS = motion.surfaceNormalWS;
+                surfaceInputs.localDistance = input.motionData.x;
+                surfaceInputs.globalDistance = input.domainData.x;
+                surfaceInputs.lateralMetres = input.domainData.y;
 
-                // Later stages populate this structure. Stage 2 deliberately
-                // supplies neutral values so the body contract does not need
-                // to be refactored when motion, refraction, foam, and
-                // reflections are introduced.
                 RiverWaterIntegrationInputs integration =
-                    RiverWaterCreateEmptyIntegration(
-                        surfaceInputs.baseNormalWS);
+                    RiverWaterCreateEmptyIntegration(motion.surfaceNormalWS);
+                integration.disturbanceHeight = motion.disturbanceHeight;
+                integration.disturbanceNormalWS = motion.disturbanceNormalWS;
 
                 float2 backgroundUV = saturate(
                     screenUV + integration.refractionOffset);
@@ -186,7 +291,7 @@ Shader "PS3D/Stylized River Water"
                 float3 viewDirectionWS = GetWorldSpaceNormalizeViewDir(
                     surfaceInputs.positionWS);
                 float viewFacing = saturate(dot(
-                    surfaceInputs.baseNormalWS,
+                    motion.surfaceNormalWS,
                     viewDirectionWS));
 
                 InputData lightingInput = (InputData)0;
@@ -232,7 +337,39 @@ Shader "PS3D/Stylized River Water"
                 float3 finalColour = RiverWaterApplyReservedIntegration(
                     body.colour,
                     integration);
-                finalColour = MixFog(finalColour, input.fogFactor);
+                finalColour *= 1.0 + motion.currentAccent * 0.22;
+                finalColour = MixFog(finalColour, input.motionData.w);
+
+                int motionDebug = (int)round(_MotionDebugView);
+
+                if (motionDebug == 1)
+                {
+                    return half4(motion.bankMask.xxx, 1.0);
+                }
+
+                if (motionDebug == 2)
+                {
+                    float heightView = saturate(
+                        motion.macroHeight /
+                        max(0.001, _MotionWaveHeight) *
+                        0.5 + 0.5);
+                    return half4(heightView.xxx, 1.0);
+                }
+
+                if (motionDebug == 3)
+                {
+                    return half4(motion.surfaceNormalWS * 0.5 + 0.5, 1.0);
+                }
+
+                if (motionDebug == 4)
+                {
+                    return half4(motion.currentAccent.xxx, 1.0);
+                }
+
+                if (motionDebug == 5)
+                {
+                    return half4(motion.liquidFactor.xxx, 1.0);
+                }
 
                 int debugMode = (int)round(_BodyDebugView);
 

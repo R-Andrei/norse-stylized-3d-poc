@@ -555,6 +555,8 @@ namespace ProgrammaticStylized3D.Rivers
             Transform owner,
             RiverDomainSnapshot domain,
             int crossSegments,
+            float targetLongitudinalSpacing,
+            float maximumVerticalDisplacement,
             Mesh mesh)
         {
             if (owner == null)
@@ -576,8 +578,11 @@ namespace ProgrammaticStylized3D.Rivers
 
             IReadOnlyList<StylizedRiverSplineSample> samples = domain.Samples;
 
+            float resolvedSpacing = Mathf.Max(0.05f, targetLongitudinalSpacing);
+            int rowCount = Mathf.Max(
+                2,
+                Mathf.CeilToInt(domain.LocalLength / resolvedSpacing) + 1);
             int acrossVertexCount = Mathf.Max(2, crossSegments + 1);
-            int rowCount = samples.Count;
             int vertexCount = rowCount * acrossVertexCount;
             int triangleIndexCount =
                 (rowCount - 1) *
@@ -589,12 +594,19 @@ namespace ProgrammaticStylized3D.Rivers
             Vector4[] tangents = new Vector4[vertexCount];
             Vector2[] uvs = new Vector2[vertexCount];
             List<Vector4> domainUvs = new List<Vector4>(vertexCount);
+            List<Vector4> motionUvs = new List<Vector4>(vertexCount);
             Color[] colors = new Color[vertexCount];
             int[] triangles = new int[triangleIndexCount];
 
             for (int row = 0; row < rowCount; row++)
             {
-                StylizedRiverSplineSample sample = samples[row];
+                float localDistance =
+                    row == rowCount - 1
+                        ? domain.LocalLength
+                        : domain.LocalLength * row / (float)(rowCount - 1);
+
+                StylizedRiverSplineSample sample =
+                    SampleAtDistance(samples, localDistance);
 
                 Vector3 localTangent =
                     owner.InverseTransformDirection(
@@ -655,6 +667,21 @@ namespace ProgrammaticStylized3D.Rivers
                             sample.OrientedDistance,
                             localSurfaceHalfWidth));
 
+                    float localVisibleHalfWidth =
+                        sample.GetVisibleHalfWidth(acrossSigned);
+
+                    // Stage 3 motion contract:
+                    // x visible half-width, y generated surface half-width,
+                    // z normalized visible-bank position, w reserved for Stage 5.
+                    motionUvs.Add(
+                        new Vector4(
+                            localVisibleHalfWidth,
+                            localSurfaceHalfWidth,
+                            localVisibleHalfWidth > 0.0001f
+                                ? acrossMetres / localVisibleHalfWidth
+                                : 0f,
+                            0f));
+
                     // Vertex colour remains non-authoritative compatibility data.
                     colors[vertexIndex] =
                         new Color(
@@ -698,9 +725,21 @@ namespace ProgrammaticStylized3D.Rivers
             mesh.tangents = tangents;
             mesh.uv = uvs;
             mesh.SetUVs(1, domainUvs);
+            mesh.SetUVs(2, motionUvs);
             mesh.colors = colors;
             mesh.triangles = triangles;
             mesh.RecalculateBounds();
+
+            if (maximumVerticalDisplacement > 0.0001f)
+            {
+                Bounds expanded = mesh.bounds;
+                expanded.Expand(
+                    new Vector3(
+                        0f,
+                        maximumVerticalDisplacement * 2f + 0.05f,
+                        0f));
+                mesh.bounds = expanded;
+            }
         }
 
         public static bool TryProjectPoint(

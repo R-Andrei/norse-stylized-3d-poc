@@ -17,6 +17,10 @@ struct RiverWaterIntegrationInputs
     float foamMask;
     float3 reflectionColour;
     float reflectionWeight;
+
+    // Stage 5 owns these values. Stage 3 keeps them neutral.
+    float disturbanceHeight;
+    float3 disturbanceNormalWS;
 };
 
 RiverWaterIntegrationInputs RiverWaterCreateEmptyIntegration(
@@ -28,6 +32,8 @@ RiverWaterIntegrationInputs RiverWaterCreateEmptyIntegration(
     inputs.foamMask = 0.0;
     inputs.reflectionColour = 0.0;
     inputs.reflectionWeight = 0.0;
+    inputs.disturbanceHeight = 0.0;
+    inputs.disturbanceNormalWS = 0.0;
     return inputs;
 }
 

@@ -39,6 +39,25 @@ namespace ProgrammaticStylized3D.Rivers
         Custom
     }
 
+    public enum StylizedRiverMotionPreset
+    {
+        Still,
+        Calm,
+        Flowing,
+        Furious,
+        Custom
+    }
+
+    public enum StylizedRiverMotionDebugView
+    {
+        Final = 0,
+        BankMask = 1,
+        MacroHeight = 2,
+        SurfaceNormal = 3,
+        CurrentAccent = 4,
+        LiquidFactor = 5
+    }
+
     public enum StylizedRiverIceBodyPreset
     {
         ClearIce,
@@ -301,6 +320,59 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float diffuseWrap = 0.22f;
 
+        [Header("Surface Motion")]
+        [SerializeField]
+        private StylizedRiverMotionPreset motionPreset =
+            StylizedRiverMotionPreset.Still;
+
+        [Tooltip("Downstream travel speed in metres per second.")]
+        [Range(0f, 12f)]
+        [SerializeField] private float flowSpeed;
+
+        [Tooltip("Maximum vertical displacement of the liquid surface, in metres.")]
+        [Range(0f, 1.25f)]
+        [SerializeField] private float motionWaveHeight;
+
+        [Tooltip("Typical physical length of the displaced macro waves, in metres.")]
+        [Range(0.5f, 30f)]
+        [SerializeField] private float motionWaveLength = 5f;
+
+        [Tooltip("Controls whether macro waves remain broad or become sharper and more crest-like.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float motionWaveSteepness = 0.35f;
+
+        [Tooltip("Strength of small flow-aligned normal detail.")]
+        [Range(0f, 2f)]
+        [SerializeField] private float motionDetailStrength;
+
+        [Tooltip("Typical physical size of surface-detail features, in metres.")]
+        [Range(0.15f, 12f)]
+        [SerializeField] private float motionDetailScale = 1.4f;
+
+        [Tooltip("How strongly the flow pattern evolves and breaks apart instead of only translating.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float motionTurbulence = 0.25f;
+
+        [Tooltip("Strength of broad downstream surface modulation. This is not foam.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float currentAccentStrength;
+
+        [Tooltip("Typical physical length of current accents, in metres.")]
+        [Range(0.5f, 30f)]
+        [SerializeField] private float currentAccentScale = 5f;
+
+        [Tooltip("Amount of macro displacement retained at the visible shoreline. The hidden overlap still fades safely to zero before the raw mesh edge.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float shoreMotion = 0.35f;
+
+        [Tooltip("Distance inside the visible shoreline over which full centre-channel motion blends toward Shore Motion.")]
+        [Range(0.05f, 5f)]
+        [SerializeField] private float shoreMotionWidth = 0.75f;
+
+        [SerializeField]
+        private StylizedRiverMotionDebugView motionDebugView =
+            StylizedRiverMotionDebugView.Final;
+
         [Header("Water Body Validation")]
         [SerializeField]
         private StylizedRiverBodyDebugView bodyDebugView =
@@ -438,6 +510,22 @@ namespace ProgrammaticStylized3D.Rivers
         private static readonly int ShadowResponseId = Shader.PropertyToID("_ShadowResponse");
         private static readonly int DiffuseWrapId = Shader.PropertyToID("_DiffuseWrap");
 
+        private static readonly int MotionDetailTextureId = Shader.PropertyToID("_MotionDetailTexture");
+        private static readonly int FlowSpeedMotionId = Shader.PropertyToID("_MotionFlowSpeed");
+        private static readonly int MotionWaveHeightId = Shader.PropertyToID("_MotionWaveHeight");
+        private static readonly int MotionWaveLengthId = Shader.PropertyToID("_MotionWaveLength");
+        private static readonly int MotionWaveSteepnessId = Shader.PropertyToID("_MotionWaveSteepness");
+        private static readonly int MotionDetailStrengthId = Shader.PropertyToID("_MotionDetailStrength");
+        private static readonly int MotionDetailScaleId = Shader.PropertyToID("_MotionDetailScale");
+        private static readonly int MotionTurbulenceId = Shader.PropertyToID("_MotionTurbulence");
+        private static readonly int CurrentAccentStrengthMotionId = Shader.PropertyToID("_CurrentAccentStrength");
+        private static readonly int CurrentAccentScaleMotionId = Shader.PropertyToID("_CurrentAccentScale");
+        private static readonly int ShoreMotionId = Shader.PropertyToID("_ShoreMotion");
+        private static readonly int ShoreMotionWidthId = Shader.PropertyToID("_ShoreMotionWidth");
+        private static readonly int MotionDebugViewId = Shader.PropertyToID("_MotionDebugView");
+        private static readonly int MotionTimeId = Shader.PropertyToID("_MotionTime");
+        private static readonly int MotionSeedId = Shader.PropertyToID("_MotionSeed");
+
         private static readonly int DomainFallbackDepthId = Shader.PropertyToID("_DomainFallbackDepth");
         private static readonly int BodyDebugViewId = Shader.PropertyToID("_BodyDebugView");
         private static readonly int HorizonColorId = Shader.PropertyToID("_HorizonColor");
@@ -550,6 +638,15 @@ namespace ProgrammaticStylized3D.Rivers
         public StylizedRiverIceBodyPreset IceBodyPreset => iceBodyPreset;
         public float FreezeAmount => ResolveFreezeAmount();
         public float LightDependence => lightDependence;
+        public StylizedRiverMotionPreset MotionPreset => motionPreset;
+        public float FlowSpeedMetresPerSecond => flowSpeed;
+        public float MotionWaveHeight => motionWaveHeight;
+        public float MotionWaveLength => motionWaveLength;
+        public float ShoreMotion => shoreMotion;
+        public float ResolvedMaximumDownwardMotion =>
+            ResolveLiquidFactor() * motionWaveHeight;
+        public float ResolvedSurfaceLongitudinalSpacing =>
+            ResolveSurfaceLongitudinalSpacing();
         public float VisibleHalfWidth => width * 0.5f;
         public float VisibleWidth => width;
         public float AutomaticShorelineOverlap =>
@@ -579,7 +676,9 @@ namespace ProgrammaticStylized3D.Rivers
         public float ResolvedBedRoughness =>
             ResolveNaturalVariationSettings().ResolveSafeBedRoughness(
                 depth,
-                shorelineWetClearance + reservedDownwardSurfaceDisplacement);
+                shorelineWetClearance + Mathf.Max(
+                    reservedDownwardSurfaceDisplacement,
+                    motionWaveHeight * ResolveLiquidFactor()));
         public float ResolvedMinimumVisibleWidth =>
             ResolveDomainVisibleWidthRange(out float minimum, out _)
                 ? minimum
@@ -856,6 +955,81 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverChannelCharacterPreset.Custom;
         }
 
+        public void ApplyMotionPreset()
+        {
+            ApplyMotionPreset(motionPreset);
+        }
+
+        public void ApplyMotionPreset(StylizedRiverMotionPreset preset)
+        {
+            motionPreset = preset;
+
+            switch (preset)
+            {
+                case StylizedRiverMotionPreset.Still:
+                    flowSpeed = 0f;
+                    motionWaveHeight = 0f;
+                    motionWaveLength = 6f;
+                    motionWaveSteepness = 0f;
+                    motionDetailStrength = 0f;
+                    motionDetailScale = 1.8f;
+                    motionTurbulence = 0f;
+                    currentAccentStrength = 0f;
+                    currentAccentScale = 6f;
+                    shoreMotion = 0f;
+                    shoreMotionWidth = 0.9f;
+                    break;
+
+                case StylizedRiverMotionPreset.Calm:
+                    flowSpeed = 0.35f;
+                    motionWaveHeight = 0.018f;
+                    motionWaveLength = 6.5f;
+                    motionWaveSteepness = 0.18f;
+                    motionDetailStrength = 0.18f;
+                    motionDetailScale = 1.8f;
+                    motionTurbulence = 0.25f;
+                    currentAccentStrength = 0.03f;
+                    currentAccentScale = 7f;
+                    shoreMotion = 0.40f;
+                    shoreMotionWidth = 1.0f;
+                    break;
+
+                case StylizedRiverMotionPreset.Flowing:
+                    flowSpeed = 1.2f;
+                    motionWaveHeight = 0.07f;
+                    motionWaveLength = 4.8f;
+                    motionWaveSteepness = 0.42f;
+                    motionDetailStrength = 0.42f;
+                    motionDetailScale = 1.15f;
+                    motionTurbulence = 0.58f;
+                    currentAccentStrength = 0.16f;
+                    currentAccentScale = 4.8f;
+                    shoreMotion = 0.58f;
+                    shoreMotionWidth = 0.75f;
+                    break;
+
+                case StylizedRiverMotionPreset.Furious:
+                    flowSpeed = 2.1f;
+                    motionWaveHeight = 0.24f;
+                    motionWaveLength = 3.2f;
+                    motionWaveSteepness = 0.72f;
+                    motionDetailStrength = 0.82f;
+                    motionDetailScale = 0.72f;
+                    motionTurbulence = 0.90f;
+                    currentAccentStrength = 0.42f;
+                    currentAccentScale = 2.8f;
+                    shoreMotion = 0.78f;
+                    shoreMotionWidth = 0.45f;
+                    break;
+
+                case StylizedRiverMotionPreset.Custom:
+                    break;
+            }
+
+            ValidateSettings();
+            RebuildSurfaceOnly();
+        }
+
         public void ApplyWaterBodyPreset()
         {
             ApplyWaterBodyPreset(bodyPreset);
@@ -1010,6 +1184,11 @@ namespace ProgrammaticStylized3D.Rivers
             ApplyVisualSettings();
             NotifyReflectionSurfaceChanged();
             NotifyFoamSimulationChanged();
+        }
+
+        private float ResolveLiquidFactor()
+        {
+            return 1f - ResolveFreezeAmount();
         }
 
         private float ResolveFreezeAmount()
@@ -1344,6 +1523,18 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.Clamp(minimumNightVisibility, 0f, 0.5f);
             shadowResponse = Mathf.Clamp01(shadowResponse);
             diffuseWrap = Mathf.Clamp01(diffuseWrap);
+
+            flowSpeed = Mathf.Clamp(flowSpeed, 0f, 12f);
+            motionWaveHeight = Mathf.Clamp(motionWaveHeight, 0f, 1.25f);
+            motionWaveLength = Mathf.Clamp(motionWaveLength, 0.5f, 30f);
+            motionWaveSteepness = Mathf.Clamp01(motionWaveSteepness);
+            motionDetailStrength = Mathf.Clamp(motionDetailStrength, 0f, 2f);
+            motionDetailScale = Mathf.Clamp(motionDetailScale, 0.15f, 12f);
+            motionTurbulence = Mathf.Clamp01(motionTurbulence);
+            currentAccentStrength = Mathf.Clamp01(currentAccentStrength);
+            currentAccentScale = Mathf.Clamp(currentAccentScale, 0.5f, 30f);
+            shoreMotion = Mathf.Clamp01(shoreMotion);
+            shoreMotionWidth = Mathf.Clamp(shoreMotionWidth, 0.05f, 5f);
 
             opacity = Mathf.Clamp01(opacity);
             shallowOpacity = Mathf.Clamp01(shallowOpacity);
@@ -1790,6 +1981,8 @@ namespace ProgrammaticStylized3D.Rivers
                 transform,
                 Domain,
                 ResolveCrossSegments(),
+                ResolveSurfaceLongitudinalSpacing(),
+                motionWaveHeight * ResolveLiquidFactor(),
                 surfaceMesh);
         }
 
@@ -1813,7 +2006,9 @@ namespace ProgrammaticStylized3D.Rivers
                     terrainConformity,
                     shorelineWetClearance,
                     shorelineBankCover,
-                    reservedDownwardSurfaceDisplacement,
+                    Mathf.Max(
+                        reservedDownwardSurfaceDisplacement,
+                        motionWaveHeight * ResolveLiquidFactor()),
                     ResolveNaturalVariationSettings(),
                     corridorMesh,
                     corridorColliderMesh);
@@ -1909,6 +2104,24 @@ namespace ProgrammaticStylized3D.Rivers
             bodyProperties.SetFloat(ShadowResponseId, shadowResponse);
             bodyProperties.SetFloat(DiffuseWrapId, diffuseWrap);
 
+            bodyProperties.SetTexture(
+                MotionDetailTextureId,
+                normalTexture != null ? normalTexture : defaultNormalTexture);
+            bodyProperties.SetFloat(FlowSpeedMotionId, flowSpeed);
+            bodyProperties.SetFloat(MotionWaveHeightId, motionWaveHeight);
+            bodyProperties.SetFloat(MotionWaveLengthId, motionWaveLength);
+            bodyProperties.SetFloat(MotionWaveSteepnessId, motionWaveSteepness);
+            bodyProperties.SetFloat(MotionDetailStrengthId, motionDetailStrength);
+            bodyProperties.SetFloat(MotionDetailScaleId, motionDetailScale);
+            bodyProperties.SetFloat(MotionTurbulenceId, motionTurbulence);
+            bodyProperties.SetFloat(CurrentAccentStrengthMotionId, currentAccentStrength);
+            bodyProperties.SetFloat(CurrentAccentScaleMotionId, currentAccentScale);
+            bodyProperties.SetFloat(ShoreMotionId, shoreMotion);
+            bodyProperties.SetFloat(ShoreMotionWidthId, shoreMotionWidth);
+            bodyProperties.SetFloat(MotionDebugViewId, (float)motionDebugView);
+            bodyProperties.SetFloat(MotionTimeId, riverTime);
+            bodyProperties.SetFloat(MotionSeedId, visualSeed);
+
             bodyProperties.SetFloat(DomainFallbackDepthId, Mathf.Max(0.01f, depth));
             bodyProperties.SetFloat(BodyDebugViewId, (float)bodyDebugView);
             bodyProperties.SetColor(HorizonColorId, horizonColor);
@@ -1995,6 +2208,7 @@ namespace ProgrammaticStylized3D.Rivers
             bodyProperties ??= new MaterialPropertyBlock();
             meshRenderer.GetPropertyBlock(bodyProperties);
             bodyProperties.SetFloat(RiverTimeId, riverTime);
+            bodyProperties.SetFloat(MotionTimeId, riverTime);
             meshRenderer.SetPropertyBlock(bodyProperties);
         }
 
@@ -2098,6 +2312,29 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 DestroyImmediate(child.gameObject);
             }
+        }
+
+        private float ResolveSurfaceLongitudinalSpacing()
+        {
+            if (motionWaveHeight <= 0.0001f || ResolveLiquidFactor() <= 0.0001f)
+            {
+                return Mathf.Max(0.05f, domainSampleSpacing);
+            }
+
+            int intervalsPerWave = quality switch
+            {
+                StylizedRiverQuality.Low => 8,
+                StylizedRiverQuality.Medium => 10,
+                StylizedRiverQuality.High => 12,
+                _ => 10
+            };
+
+            float waveSpacing = motionWaveLength / Mathf.Max(1, intervalsPerWave);
+
+            return Mathf.Clamp(
+                Mathf.Min(domainSampleSpacing, waveSpacing),
+                0.05f,
+                Mathf.Max(0.05f, domainSampleSpacing));
         }
 
         private int ResolveCrossSegments()
