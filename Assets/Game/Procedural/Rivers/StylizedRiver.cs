@@ -171,6 +171,10 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0.5f, 30f)]
         [SerializeField] private float bedRoughnessScale = 6f;
 
+        [Tooltip("How far upward through the submerged bed profile roughness may extend. Zero preserves floor-only roughness. One reaches the maximum safe lower-slope area while keeping the shoreline band smooth.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float bedRoughnessReach = 0.5f;
+
         [Tooltip("Maximum smooth left/right shoreline deviation from the configured width, in metres.")]
         [Range(0f, 4f)]
         [SerializeField] private float shorelineIrregularity;
@@ -568,6 +572,7 @@ namespace ProgrammaticStylized3D.Rivers
         public int NaturalVariationSeed => naturalVariationSeed;
         public float BedRoughness => bedRoughness;
         public float BedRoughnessScale => bedRoughnessScale;
+        public float BedRoughnessReach => bedRoughnessReach;
         public float ShorelineIrregularity => shorelineIrregularity;
         public float ShorelineIrregularityScale => shorelineIrregularityScale;
         public float BankAsymmetry => bankAsymmetry;
@@ -798,6 +803,7 @@ namespace ProgrammaticStylized3D.Rivers
                 case StylizedRiverChannelCharacterPreset.Engineered:
                     bedRoughness = 0f;
                     bedRoughnessScale = 8f;
+                    bedRoughnessReach = 0f;
                     shorelineIrregularity = 0f;
                     shorelineIrregularityScale = 14f;
                     bankAsymmetry = 0.5f;
@@ -806,6 +812,7 @@ namespace ProgrammaticStylized3D.Rivers
                 case StylizedRiverChannelCharacterPreset.SmoothNatural:
                     bedRoughness = 0.10f;
                     bedRoughnessScale = 8f;
+                    bedRoughnessReach = 0.45f;
                     shorelineIrregularity = 0.25f;
                     shorelineIrregularityScale = 14f;
                     bankAsymmetry = 0.40f;
@@ -814,6 +821,7 @@ namespace ProgrammaticStylized3D.Rivers
                 case StylizedRiverChannelCharacterPreset.Irregular:
                     bedRoughness = 0.24f;
                     bedRoughnessScale = 5.5f;
+                    bedRoughnessReach = 0.60f;
                     shorelineIrregularity = 0.50f;
                     shorelineIrregularityScale = 9f;
                     bankAsymmetry = 0.65f;
@@ -822,6 +830,7 @@ namespace ProgrammaticStylized3D.Rivers
                 case StylizedRiverChannelCharacterPreset.Rugged:
                     bedRoughness = 0.48f;
                     bedRoughnessScale = 3.5f;
+                    bedRoughnessReach = 0.70f;
                     shorelineIrregularity = 0.85f;
                     shorelineIrregularityScale = 6f;
                     bankAsymmetry = 0.82f;
@@ -1304,6 +1313,7 @@ namespace ProgrammaticStylized3D.Rivers
             terrainConformity = Mathf.Clamp01(terrainConformity);
             bedRoughness = Mathf.Clamp(bedRoughness, 0f, 2f);
             bedRoughnessScale = Mathf.Clamp(bedRoughnessScale, 0.5f, 30f);
+            bedRoughnessReach = Mathf.Clamp01(bedRoughnessReach);
             shorelineIrregularity =
                 Mathf.Clamp(shorelineIrregularity, 0f, 4f);
             shorelineIrregularityScale =
@@ -1663,6 +1673,7 @@ namespace ProgrammaticStylized3D.Rivers
                 naturalVariationSeed,
                 bedRoughness,
                 bedRoughnessScale,
+                bedRoughnessReach,
                 shorelineIrregularity,
                 shorelineIrregularityScale,
                 bankAsymmetry);

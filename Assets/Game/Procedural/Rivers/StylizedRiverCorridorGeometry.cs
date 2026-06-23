@@ -279,13 +279,32 @@ namespace ProgrammaticStylized3D.Rivers
                 return default;
             }
 
+            int resolvedSlopeSubdivisions = slopeSubdivisions;
+
+            if (naturalVariation.BedRoughness > 0.0001f &&
+                naturalVariation.BedRoughnessReach > 0.0001f)
+            {
+                int minimumRoughSlopeSubdivisions = quality switch
+                {
+                    StylizedRiverQuality.Low => 4,
+                    StylizedRiverQuality.Medium => 6,
+                    StylizedRiverQuality.High => 8,
+                    _ => 6
+                };
+
+                resolvedSlopeSubdivisions =
+                    Mathf.Max(
+                        resolvedSlopeSubdivisions,
+                        minimumRoughSlopeSubdivisions);
+            }
+
             List<CrossPoint> positiveCrossPoints =
                 BuildPositiveCrossPoints(
                     bedFlatness,
                     naturalVariation.BedRoughness > 0.0001f
                         ? bedSubdivisions
                         : 1,
-                    slopeSubdivisions,
+                    resolvedSlopeSubdivisions,
                     coverSubdivisions,
                     blendSubdivisions,
                     apronSubdivisions);
@@ -323,6 +342,7 @@ namespace ProgrammaticStylized3D.Rivers
                     naturalVariation.Seed,
                     naturalVariation.BedRoughness,
                     safeBedScale,
+                    naturalVariation.BedRoughnessReach,
                     naturalVariation.ShorelineIrregularity,
                     naturalVariation.ShorelineIrregularityScale,
                     naturalVariation.BankAsymmetry);
@@ -805,10 +825,26 @@ namespace ProgrammaticStylized3D.Rivers
                 case CrossRegion.Centre:
                 case CrossRegion.FlatBedEdge:
                 {
-                    float bedMask =
+                    float floorOnlyMask =
                         point.Region == CrossRegion.Centre
                             ? 1f
                             : 1f - SmoothStep(0.65f, 1f, point.T);
+
+                    // Reach zero exactly preserves the original floor-only
+                    // result. As reach increases, the floor remains fully
+                    // roughened so it joins the lower-slope roughness without a
+                    // smooth ring between the two regions.
+                    float reachExtension =
+                        SmoothStep(
+                            0f,
+                            0.15f,
+                            naturalVariation.BedRoughnessReach);
+
+                    float bedMask =
+                        Mathf.Lerp(
+                            floorOnlyMask,
+                            1f,
+                            reachExtension);
 
                     float bedOffset =
                         StylizedRiverNaturalVariation.EvaluateBedNoise(
@@ -846,11 +882,24 @@ namespace ProgrammaticStylized3D.Rivers
                             bedHeight,
                             waterHeight,
                             profileT);
+                    float slopeRoughnessMask =
+                        naturalVariation
+                            .EvaluateBedSlopeRoughnessMask(profileT);
+
+                    float bedOffset =
+                        StylizedRiverNaturalVariation.EvaluateBedNoise(
+                            shapeDistance,
+                            signedLateralDistance,
+                            naturalVariation) *
+                        resolvedBedRoughness *
+                        slopeRoughnessMask;
+
                     float shaped =
                         Mathf.Lerp(
                             baseGroundHeight,
                             authoredHeight,
-                            terrainConformity);
+                            terrainConformity) +
+                        bedOffset;
                     float clearanceFade =
                         1f - SmoothStep(0.72f, 1f, t);
                     float maximumHeight =

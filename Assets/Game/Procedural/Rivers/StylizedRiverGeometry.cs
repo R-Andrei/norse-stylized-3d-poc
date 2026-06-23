@@ -415,6 +415,7 @@ namespace ProgrammaticStylized3D.Rivers
                     naturalVariation.Seed,
                     naturalVariation.BedRoughness,
                     naturalVariation.BedRoughnessScale,
+                    naturalVariation.BedRoughnessReach,
                     naturalVariation.ShorelineIrregularity,
                     safeShorelineScale,
                     naturalVariation.BankAsymmetry);

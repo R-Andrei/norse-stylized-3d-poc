@@ -229,12 +229,17 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("bedRoughness"),
                 new GUIContent(
                     "Bed Roughness",
-                    "Maximum vertical bottom variation in metres. It fades to zero before the bed slope."));
+                    "Maximum vertical variation in metres across the floor and the configured lower portion of the submerged bed slope."));
             EditorGUILayout.PropertyField(
                 Find("bedRoughnessScale"),
                 new GUIContent(
                     "Bed Feature Scale",
                     "Typical physical size of bottom depressions and raised areas, in metres."));
+            EditorGUILayout.PropertyField(
+                Find("bedRoughnessReach"),
+                new GUIContent(
+                    "Bed Roughness Reach",
+                    "How far upward through the submerged bed profile roughness may extend. Zero preserves floor-only roughness. One uses the maximum safe reach while retaining a smooth upper shoreline band."));
             EditorGUILayout.PropertyField(
                 Find("shorelineIrregularity"),
                 new GUIContent(

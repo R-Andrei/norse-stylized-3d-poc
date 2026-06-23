@@ -13,6 +13,7 @@ namespace ProgrammaticStylized3D.Rivers
             int seed,
             float bedRoughness,
             float bedRoughnessScale,
+            float bedRoughnessReach,
             float shorelineIrregularity,
             float shorelineIrregularityScale,
             float bankAsymmetry)
@@ -20,6 +21,7 @@ namespace ProgrammaticStylized3D.Rivers
             Seed = seed;
             BedRoughness = Mathf.Max(0f, bedRoughness);
             BedRoughnessScale = Mathf.Max(0.5f, bedRoughnessScale);
+            BedRoughnessReach = Mathf.Clamp01(bedRoughnessReach);
             ShorelineIrregularity = Mathf.Max(0f, shorelineIrregularity);
             ShorelineIrregularityScale =
                 Mathf.Max(1.5f, shorelineIrregularityScale);
@@ -32,12 +34,14 @@ namespace ProgrammaticStylized3D.Rivers
                 0f,
                 6f,
                 0f,
+                0f,
                 10f,
                 0.5f);
 
         public int Seed { get; }
         public float BedRoughness { get; }
         public float BedRoughnessScale { get; }
+        public float BedRoughnessReach { get; }
         public float ShorelineIrregularity { get; }
         public float ShorelineIrregularityScale { get; }
         public float BankAsymmetry { get; }
@@ -58,6 +62,54 @@ namespace ProgrammaticStylized3D.Rivers
             return Mathf.Min(
                 BedRoughness,
                 availableDepth * 0.45f);
+        }
+
+        /// <summary>
+        /// Maps the artist-facing 0–1 reach to a protected portion of the
+        /// authored bed-slope elevation. The upper 18% always remains smooth so
+        /// the shoreline, hidden cover, and future wave-damping band stay safe.
+        /// </summary>
+        public float ResolveSafeBedSlopeReach()
+        {
+            return Mathf.Lerp(0f, 0.82f, BedRoughnessReach);
+        }
+
+        /// <summary>
+        /// Returns roughness influence for a normalized authored bed-profile
+        /// height, where zero is the floor and one is the water-level edge.
+        /// </summary>
+        public float EvaluateBedSlopeRoughnessMask(
+            float normalizedProfileHeight)
+        {
+            float reach = ResolveSafeBedSlopeReach();
+
+            if (reach <= 0.0001f)
+            {
+                return 0f;
+            }
+
+            float profileHeight =
+                Mathf.Clamp01(normalizedProfileHeight);
+            float fadeStart = reach * 0.55f;
+
+            if (profileHeight <= fadeStart)
+            {
+                return 1f;
+            }
+
+            if (profileHeight >= reach)
+            {
+                return 0f;
+            }
+
+            float t =
+                Mathf.InverseLerp(
+                    fadeStart,
+                    reach,
+                    profileHeight);
+
+            t = t * t * (3f - 2f * t);
+            return 1f - t;
         }
     }
 
