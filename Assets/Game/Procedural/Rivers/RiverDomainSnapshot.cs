@@ -94,13 +94,15 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 StylizedRiverSplineSample sample = samples[index];
 
-                if (sample.HalfWidth <= 0f ||
-                    sample.SurfaceHalfWidth < sample.HalfWidth)
+                if (sample.LeftHalfWidth <= 0f ||
+                    sample.RightHalfWidth <= 0f ||
+                    sample.LeftSurfaceHalfWidth < sample.LeftHalfWidth ||
+                    sample.RightSurfaceHalfWidth < sample.RightHalfWidth)
                 {
                     AppendError(
                         builder,
                         ref errorCount,
-                        $"Sample {index} has an invalid width contract.");
+                        $"Sample {index} has an invalid left/right width contract.");
                 }
 
                 if (Mathf.Abs(sample.Tangent.magnitude - 1f) > 0.01f ||
@@ -343,13 +345,15 @@ namespace ProgrammaticStylized3D.Rivers
 
             Vector3 delta = worldPoint - sample.SurfacePoint;
             float acrossMetres = Vector3.Dot(delta, sample.Side);
+            float localHalfWidth =
+                sample.GetVisibleHalfWidth(acrossMetres);
             float acrossNormalized =
-                sample.HalfWidth > 0.0001f
-                    ? acrossMetres / sample.HalfWidth
+                localHalfWidth > 0.0001f
+                    ? acrossMetres / localHalfWidth
                     : 0f;
 
             float distanceToNearestBank =
-                sample.HalfWidth - Mathf.Abs(acrossMetres);
+                localHalfWidth - Mathf.Abs(acrossMetres);
 
             projection =
                 new StylizedRiverProjection(
@@ -364,8 +368,8 @@ namespace ProgrammaticStylized3D.Rivers
                     acrossMetres,
                     acrossNormalized,
                     distanceToNearestBank,
-                    sample.HalfWidth,
-                    Mathf.Abs(acrossMetres) <= sample.HalfWidth);
+                    localHalfWidth,
+                    Mathf.Abs(acrossMetres) <= localHalfWidth);
 
             return true;
         }
@@ -482,10 +486,12 @@ namespace ProgrammaticStylized3D.Rivers
             for (int index = 0; index < source.Count; index++)
             {
                 StylizedRiverSplineSample sample = source[index];
-                Vector3 sideOffset = sample.Side * sample.SurfaceHalfWidth;
-
-                bounds.Encapsulate(sample.SurfacePoint + sideOffset);
-                bounds.Encapsulate(sample.SurfacePoint - sideOffset);
+                bounds.Encapsulate(
+                    sample.SurfacePoint +
+                    sample.Side * sample.RightSurfaceHalfWidth);
+                bounds.Encapsulate(
+                    sample.SurfacePoint -
+                    sample.Side * sample.LeftSurfaceHalfWidth);
             }
 
             return bounds;

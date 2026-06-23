@@ -23,6 +23,15 @@ namespace ProgrammaticStylized3D.Rivers
         Custom
     }
 
+    public enum StylizedRiverChannelCharacterPreset
+    {
+        Engineered,
+        SmoothNatural,
+        Irregular,
+        Rugged,
+        Custom
+    }
+
     public enum StylizedRiverSurfaceState
     {
         Liquid,
@@ -146,6 +155,33 @@ namespace ProgrammaticStylized3D.Rivers
         [FormerlySerializedAs("carvingStrength")]
         [Range(0f, 1f)]
         [SerializeField] private float terrainConformity = 1f;
+
+        [Header("Natural Channel Variation")]
+        [SerializeField]
+        private StylizedRiverChannelCharacterPreset channelCharacterPreset =
+            StylizedRiverChannelCharacterPreset.Engineered;
+
+        [SerializeField] private int naturalVariationSeed = 1701;
+
+        [Tooltip("Maximum vertical variation applied only to the bottom region of the riverbed, in metres.")]
+        [Range(0f, 2f)]
+        [SerializeField] private float bedRoughness;
+
+        [Tooltip("Typical physical size of riverbed height features, in metres.")]
+        [Range(0.5f, 30f)]
+        [SerializeField] private float bedRoughnessScale = 6f;
+
+        [Tooltip("Maximum smooth left/right shoreline deviation from the configured width, in metres.")]
+        [Range(0f, 4f)]
+        [SerializeField] private float shorelineIrregularity;
+
+        [Tooltip("Typical length of shoreline widening and narrowing features, in metres.")]
+        [Range(1.5f, 50f)]
+        [SerializeField] private float shorelineIrregularityScale = 12f;
+
+        [Tooltip("Zero keeps both banks correlated. One allows the left and right banks to vary independently.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float bankAsymmetry = 0.5f;
 
         [Header("Surface Mesh")]
         [SerializeField]
@@ -527,6 +563,26 @@ namespace ProgrammaticStylized3D.Rivers
         public float ReservedDownwardSurfaceDisplacement =>
             reservedDownwardSurfaceDisplacement;
         public float TerrainConformity => terrainConformity;
+        public StylizedRiverChannelCharacterPreset ChannelCharacterPreset =>
+            channelCharacterPreset;
+        public int NaturalVariationSeed => naturalVariationSeed;
+        public float BedRoughness => bedRoughness;
+        public float BedRoughnessScale => bedRoughnessScale;
+        public float ShorelineIrregularity => shorelineIrregularity;
+        public float ShorelineIrregularityScale => shorelineIrregularityScale;
+        public float BankAsymmetry => bankAsymmetry;
+        public float ResolvedBedRoughness =>
+            ResolveNaturalVariationSettings().ResolveSafeBedRoughness(
+                depth,
+                shorelineWetClearance + reservedDownwardSurfaceDisplacement);
+        public float ResolvedMinimumVisibleWidth =>
+            ResolveDomainVisibleWidthRange(out float minimum, out _)
+                ? minimum
+                : width;
+        public float ResolvedMaximumVisibleWidth =>
+            ResolveDomainVisibleWidthRange(out _, out float maximum)
+                ? maximum
+                : width;
         public float CorridorOuterWidth => corridorBuildResult.MaximumOuterWidth;
         public float CorridorHandoffWidth => corridorBuildResult.MaximumHandoffWidth;
         public float CorridorIntegrationApronWidth =>
@@ -726,6 +782,70 @@ namespace ProgrammaticStylized3D.Rivers
             NotifyFoamSimulationChanged();
         }
 
+
+        public void ApplyChannelCharacterPreset()
+        {
+            ApplyChannelCharacterPreset(channelCharacterPreset);
+        }
+
+        public void ApplyChannelCharacterPreset(
+            StylizedRiverChannelCharacterPreset preset)
+        {
+            channelCharacterPreset = preset;
+
+            switch (preset)
+            {
+                case StylizedRiverChannelCharacterPreset.Engineered:
+                    bedRoughness = 0f;
+                    bedRoughnessScale = 8f;
+                    shorelineIrregularity = 0f;
+                    shorelineIrregularityScale = 14f;
+                    bankAsymmetry = 0.5f;
+                    break;
+
+                case StylizedRiverChannelCharacterPreset.SmoothNatural:
+                    bedRoughness = 0.10f;
+                    bedRoughnessScale = 8f;
+                    shorelineIrregularity = 0.25f;
+                    shorelineIrregularityScale = 14f;
+                    bankAsymmetry = 0.40f;
+                    break;
+
+                case StylizedRiverChannelCharacterPreset.Irregular:
+                    bedRoughness = 0.24f;
+                    bedRoughnessScale = 5.5f;
+                    shorelineIrregularity = 0.50f;
+                    shorelineIrregularityScale = 9f;
+                    bankAsymmetry = 0.65f;
+                    break;
+
+                case StylizedRiverChannelCharacterPreset.Rugged:
+                    bedRoughness = 0.48f;
+                    bedRoughnessScale = 3.5f;
+                    shorelineIrregularity = 0.85f;
+                    shorelineIrregularityScale = 6f;
+                    bankAsymmetry = 0.82f;
+                    break;
+
+                case StylizedRiverChannelCharacterPreset.Custom:
+                    break;
+
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(preset),
+                        preset,
+                        "Unsupported channel-character preset.");
+            }
+
+            ValidateSettings();
+            RegenerateAll();
+        }
+
+        public void MarkChannelCharacterCustom()
+        {
+            channelCharacterPreset =
+                StylizedRiverChannelCharacterPreset.Custom;
+        }
 
         public void ApplyWaterBodyPreset()
         {
@@ -1008,8 +1128,11 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             Vector3[] localPoints = new Vector3[Domain.SampleCount];
-            float[] visibleHalfWidths = new float[Domain.SampleCount];
-            float[] surfaceHalfWidths = new float[Domain.SampleCount];
+            Vector3[] localSides = new Vector3[Domain.SampleCount];
+            float[] leftVisibleHalfWidths = new float[Domain.SampleCount];
+            float[] rightVisibleHalfWidths = new float[Domain.SampleCount];
+            float[] leftSurfaceHalfWidths = new float[Domain.SampleCount];
+            float[] rightSurfaceHalfWidths = new float[Domain.SampleCount];
 
             for (int index = 0; index < Domain.SampleCount; index++)
             {
@@ -1018,15 +1141,26 @@ namespace ProgrammaticStylized3D.Rivers
                 localPoints[index] =
                     groundTransform.InverseTransformPoint(
                         sample.SurfacePoint);
+                localSides[index] =
+                    groundTransform
+                        .InverseTransformDirection(sample.Side)
+                        .normalized;
 
-                visibleHalfWidths[index] = sample.HalfWidth;
-                surfaceHalfWidths[index] = sample.SurfaceHalfWidth;
+                leftVisibleHalfWidths[index] = sample.LeftHalfWidth;
+                rightVisibleHalfWidths[index] = sample.RightHalfWidth;
+                leftSurfaceHalfWidths[index] =
+                    sample.LeftSurfaceHalfWidth;
+                rightSurfaceHalfWidths[index] =
+                    sample.RightSurfaceHalfWidth;
             }
 
             return new StylizedRiverGroundSnapshot(
                 localPoints,
-                visibleHalfWidths,
-                surfaceHalfWidths,
+                localSides,
+                leftVisibleHalfWidths,
+                rightVisibleHalfWidths,
+                leftSurfaceHalfWidths,
+                rightSurfaceHalfWidths,
                 bankBlend,
                 depth,
                 bedFlatness,
@@ -1168,6 +1302,13 @@ namespace ProgrammaticStylized3D.Rivers
             reservedDownwardSurfaceDisplacement =
                 Mathf.Clamp(reservedDownwardSurfaceDisplacement, 0f, 1f);
             terrainConformity = Mathf.Clamp01(terrainConformity);
+            bedRoughness = Mathf.Clamp(bedRoughness, 0f, 2f);
+            bedRoughnessScale = Mathf.Clamp(bedRoughnessScale, 0.5f, 30f);
+            shorelineIrregularity =
+                Mathf.Clamp(shorelineIrregularity, 0f, 4f);
+            shorelineIrregularityScale =
+                Mathf.Clamp(shorelineIrregularityScale, 1.5f, 50f);
+            bankAsymmetry = Mathf.Clamp01(bankAsymmetry);
             surfaceOffset = Mathf.Clamp(surfaceOffset, 0f, 0.25f);
             domainSampleSpacing = Mathf.Max(0.05f, domainSampleSpacing);
 
@@ -1515,6 +1656,53 @@ namespace ProgrammaticStylized3D.Rivers
 
         }
 
+        private StylizedRiverNaturalVariationSettings
+            ResolveNaturalVariationSettings()
+        {
+            return new StylizedRiverNaturalVariationSettings(
+                naturalVariationSeed,
+                bedRoughness,
+                bedRoughnessScale,
+                shorelineIrregularity,
+                shorelineIrregularityScale,
+                bankAsymmetry);
+        }
+
+        private bool ResolveDomainVisibleWidthRange(
+            out float minimum,
+            out float maximum)
+        {
+            minimum = float.PositiveInfinity;
+            maximum = 0f;
+
+            RiverDomainSnapshot domain = Domain;
+
+            if (domain == null || !domain.IsValid)
+            {
+                minimum = width;
+                maximum = width;
+                return false;
+            }
+
+            for (int index = 0; index < domain.SampleCount; index++)
+            {
+                StylizedRiverSplineSample sample = domain.Samples[index];
+                float localWidth =
+                    sample.LeftHalfWidth + sample.RightHalfWidth;
+                minimum = Mathf.Min(minimum, localWidth);
+                maximum = Mathf.Max(maximum, localWidth);
+            }
+
+            if (float.IsPositiveInfinity(minimum))
+            {
+                minimum = width;
+                maximum = width;
+                return false;
+            }
+
+            return true;
+        }
+
         private float ResolveGroundGridSpacing()
         {
             GeneratedGround ground =
@@ -1560,7 +1748,8 @@ namespace ProgrammaticStylized3D.Rivers
                     surfaceOffset,
                     connectedRiverDistanceOffset,
                     reverseFlow,
-                    riverDomainVersion);
+                    riverDomainVersion,
+                    ResolveNaturalVariationSettings());
 
             riverLength = Domain.LocalLength;
 
@@ -1614,6 +1803,7 @@ namespace ProgrammaticStylized3D.Rivers
                     shorelineWetClearance,
                     shorelineBankCover,
                     reservedDownwardSurfaceDisplacement,
+                    ResolveNaturalVariationSettings(),
                     corridorMesh,
                     corridorColliderMesh);
 

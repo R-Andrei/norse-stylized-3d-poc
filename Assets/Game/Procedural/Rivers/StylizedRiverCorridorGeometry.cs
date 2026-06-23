@@ -79,18 +79,24 @@ namespace ProgrammaticStylized3D.Rivers
                 Vector3 side,
                 Vector3 up,
                 float waterHeight,
-                float visibleHalfWidth,
-                float surfaceHalfWidth,
-                float localDistance)
+                float leftVisibleHalfWidth,
+                float rightVisibleHalfWidth,
+                float leftSurfaceHalfWidth,
+                float rightSurfaceHalfWidth,
+                float localDistance,
+                float shapeDistance)
             {
                 Centre = centre;
                 Tangent = tangent;
                 Side = side;
                 Up = up;
                 WaterHeight = waterHeight;
-                VisibleHalfWidth = visibleHalfWidth;
-                SurfaceHalfWidth = surfaceHalfWidth;
+                LeftVisibleHalfWidth = leftVisibleHalfWidth;
+                RightVisibleHalfWidth = rightVisibleHalfWidth;
+                LeftSurfaceHalfWidth = leftSurfaceHalfWidth;
+                RightSurfaceHalfWidth = rightSurfaceHalfWidth;
                 LocalDistance = localDistance;
+                ShapeDistance = shapeDistance;
             }
 
             public Vector3 Centre { get; }
@@ -98,9 +104,30 @@ namespace ProgrammaticStylized3D.Rivers
             public Vector3 Side { get; }
             public Vector3 Up { get; }
             public float WaterHeight { get; }
-            public float VisibleHalfWidth { get; }
-            public float SurfaceHalfWidth { get; }
+            public float LeftVisibleHalfWidth { get; }
+            public float RightVisibleHalfWidth { get; }
+            public float LeftSurfaceHalfWidth { get; }
+            public float RightSurfaceHalfWidth { get; }
             public float LocalDistance { get; }
+            public float ShapeDistance { get; }
+
+            public float GetVisibleHalfWidth(float sign)
+            {
+                return sign < 0f
+                    ? LeftVisibleHalfWidth
+                    : sign > 0f
+                        ? RightVisibleHalfWidth
+                        : (LeftVisibleHalfWidth + RightVisibleHalfWidth) * 0.5f;
+            }
+
+            public float GetSurfaceHalfWidth(float sign)
+            {
+                return sign < 0f
+                    ? LeftSurfaceHalfWidth
+                    : sign > 0f
+                        ? RightSurfaceHalfWidth
+                        : (LeftSurfaceHalfWidth + RightSurfaceHalfWidth) * 0.5f;
+            }
         }
 
         private readonly struct OuterBlendContext
@@ -157,6 +184,7 @@ namespace ProgrammaticStylized3D.Rivers
             float wetClearance,
             float bankCover,
             float reservedDownwardDisplacement,
+            StylizedRiverNaturalVariationSettings naturalVariation,
             Mesh renderMesh,
             Mesh colliderMesh)
         {
@@ -197,6 +225,14 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverQuality.Medium => 4f,
                 StylizedRiverQuality.High => 2.5f,
                 _ => 4f
+            };
+
+            int bedSubdivisions = quality switch
+            {
+                StylizedRiverQuality.Low => 2,
+                StylizedRiverQuality.Medium => 4,
+                StylizedRiverQuality.High => 6,
+                _ => 4
             };
 
             int slopeSubdivisions = quality switch
@@ -246,6 +282,9 @@ namespace ProgrammaticStylized3D.Rivers
             List<CrossPoint> positiveCrossPoints =
                 BuildPositiveCrossPoints(
                     bedFlatness,
+                    naturalVariation.BedRoughness > 0.0001f
+                        ? bedSubdivisions
+                        : 1,
                     slopeSubdivisions,
                     coverSubdivisions,
                     blendSubdivisions,
@@ -270,6 +309,23 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.Max(0.005f, wetClearance) +
                 Mathf.Max(0f, reservedDownwardDisplacement);
             float resolvedBankCover = Mathf.Max(0.005f, bankCover);
+            float resolvedBedRoughness =
+                naturalVariation.ResolveSafeBedRoughness(
+                    resolvedDepth,
+                    requiredWetClearance);
+            float safeBedScale =
+                Mathf.Max(
+                    naturalVariation.BedRoughnessScale,
+                    maximumRingSpacing * 3f,
+                    resolvedBedRoughness * 5f);
+            StylizedRiverNaturalVariationSettings resolvedNaturalVariation =
+                new StylizedRiverNaturalVariationSettings(
+                    naturalVariation.Seed,
+                    naturalVariation.BedRoughness,
+                    safeBedScale,
+                    naturalVariation.ShorelineIrregularity,
+                    naturalVariation.ShorelineIrregularityScale,
+                    naturalVariation.BankAsymmetry);
             float groundGridSpacing =
                 ground != null
                     ? Mathf.Max(0.01f, ground.GridSpacing)
@@ -287,30 +343,31 @@ namespace ProgrammaticStylized3D.Rivers
                  ringIndex++)
             {
                 CorridorRing ring = rings[ringIndex];
-                float flatHalfWidth =
-                    ring.VisibleHalfWidth *
-                    Mathf.Clamp01(bedFlatness) *
-                    0.90f;
-                float handoffHalfWidth =
-                    ring.SurfaceHalfWidth + resolvedBankBlend;
-                float renderOuterHalfWidth =
-                    handoffHalfWidth + integrationApronWidth;
+                float leftHandoffHalfWidth =
+                    ring.LeftSurfaceHalfWidth + resolvedBankBlend;
+                float rightHandoffHalfWidth =
+                    ring.RightSurfaceHalfWidth + resolvedBankBlend;
+                float leftRenderOuterHalfWidth =
+                    leftHandoffHalfWidth + integrationApronWidth;
+                float rightRenderOuterHalfWidth =
+                    rightHandoffHalfWidth + integrationApronWidth;
 
                 maximumHandoffWidth =
                     Mathf.Max(
                         maximumHandoffWidth,
-                        handoffHalfWidth * 2f);
+                        leftHandoffHalfWidth + rightHandoffHalfWidth);
                 maximumOuterWidth =
                     Mathf.Max(
                         maximumOuterWidth,
-                        renderOuterHalfWidth * 2f);
+                        leftRenderOuterHalfWidth +
+                        rightRenderOuterHalfWidth);
 
                 OuterBlendContext leftBlendContext =
                     BuildOuterBlendContext(
                         ground,
                         ring,
                         -1f,
-                        handoffHalfWidth,
+                        leftHandoffHalfWidth,
                         ref usedGroundHeightField);
 
                 OuterBlendContext rightBlendContext =
@@ -318,7 +375,7 @@ namespace ProgrammaticStylized3D.Rivers
                         ground,
                         ring,
                         1f,
-                        handoffHalfWidth,
+                        rightHandoffHalfWidth,
                         ref usedGroundHeightField);
 
                 for (int acrossIndex = 0;
@@ -340,12 +397,25 @@ namespace ProgrammaticStylized3D.Rivers
                     CrossPoint crossPoint =
                         positiveCrossPoints[signedPositiveIndex];
 
+                    float visibleHalfWidth =
+                        ring.GetVisibleHalfWidth(sign);
+                    float surfaceHalfWidth =
+                        ring.GetSurfaceHalfWidth(sign);
+                    float flatHalfWidth =
+                        visibleHalfWidth *
+                        Mathf.Clamp01(bedFlatness) *
+                        0.90f;
+                    float handoffHalfWidth =
+                        surfaceHalfWidth + resolvedBankBlend;
+                    float renderOuterHalfWidth =
+                        handoffHalfWidth + integrationApronWidth;
+
                     float acrossDistance =
                         ResolveAcrossDistance(
                             crossPoint,
                             flatHalfWidth,
-                            ring.VisibleHalfWidth,
-                            ring.SurfaceHalfWidth,
+                            visibleHalfWidth,
+                            surfaceHalfWidth,
                             handoffHalfWidth,
                             renderOuterHalfWidth);
 
@@ -370,7 +440,7 @@ namespace ProgrammaticStylized3D.Rivers
                             crossPoint,
                             acrossDistance,
                             flatHalfWidth,
-                            ring.VisibleHalfWidth,
+                            visibleHalfWidth,
                             ring.WaterHeight,
                             groundSample.Height,
                             resolvedDepth,
@@ -379,7 +449,11 @@ namespace ProgrammaticStylized3D.Rivers
                             requiredWetClearance,
                             resolvedBankCover,
                             burialOffset,
-                            blendContext);
+                            blendContext,
+                            resolvedBedRoughness,
+                            ring.ShapeDistance,
+                            acrossDistance * sign,
+                            resolvedNaturalVariation);
 
                     Vector3 worldPosition =
                         new Vector3(
@@ -518,8 +592,10 @@ namespace ProgrammaticStylized3D.Rivers
                     float estimatedRadius = segmentLength / turnRadians;
                     float maximumHalfWidth =
                         Mathf.Max(
-                            a.SurfaceHalfWidth,
-                            b.SurfaceHalfWidth);
+                            a.LeftSurfaceHalfWidth,
+                            a.RightSurfaceHalfWidth,
+                            b.LeftSurfaceHalfWidth,
+                            b.RightSurfaceHalfWidth);
 
                     if (maximumHalfWidth > estimatedRadius * 0.80f)
                     {
@@ -542,9 +618,12 @@ namespace ProgrammaticStylized3D.Rivers
                     last.Side,
                     last.Up,
                     last.SurfaceHeight,
-                    last.HalfWidth,
-                    last.SurfaceHalfWidth,
-                    last.Distance));
+                    last.LeftHalfWidth,
+                    last.RightHalfWidth,
+                    last.LeftSurfaceHalfWidth,
+                    last.RightSurfaceHalfWidth,
+                    last.Distance,
+                    last.Distance + domain.ConnectedDistanceOffset));
 
             return rings;
         }
@@ -582,13 +661,27 @@ namespace ProgrammaticStylized3D.Rivers
                 side,
                 up,
                 Mathf.Lerp(a.SurfaceHeight, b.SurfaceHeight, t),
-                Mathf.Lerp(a.HalfWidth, b.HalfWidth, t),
-                Mathf.Lerp(a.SurfaceHalfWidth, b.SurfaceHalfWidth, t),
-                Mathf.Lerp(a.Distance, b.Distance, t));
+                Mathf.Lerp(a.LeftHalfWidth, b.LeftHalfWidth, t),
+                Mathf.Lerp(a.RightHalfWidth, b.RightHalfWidth, t),
+                Mathf.Lerp(
+                    a.LeftSurfaceHalfWidth,
+                    b.LeftSurfaceHalfWidth,
+                    t),
+                Mathf.Lerp(
+                    a.RightSurfaceHalfWidth,
+                    b.RightSurfaceHalfWidth,
+                    t),
+                Mathf.Lerp(a.Distance, b.Distance, t),
+                Mathf.Lerp(a.Distance, b.Distance, t) +
+                Mathf.Lerp(
+                    a.GlobalDistance - a.OrientedDistance,
+                    b.GlobalDistance - b.OrientedDistance,
+                    t));
         }
 
         private static List<CrossPoint> BuildPositiveCrossPoints(
             float bedFlatness,
+            int bedSubdivisions,
             int slopeSubdivisions,
             int coverSubdivisions,
             int blendSubdivisions,
@@ -601,7 +694,17 @@ namespace ProgrammaticStylized3D.Rivers
 
             if (bedFlatness > 0.001f)
             {
-                points.Add(new CrossPoint(CrossRegion.FlatBedEdge, 1f));
+                int resolvedBedSubdivisions = Mathf.Max(1, bedSubdivisions);
+
+                for (int index = 1;
+                     index <= resolvedBedSubdivisions;
+                     index++)
+                {
+                    points.Add(
+                        new CrossPoint(
+                            CrossRegion.FlatBedEdge,
+                            index / (float)resolvedBedSubdivisions));
+                }
             }
 
             for (int index = 1; index <= slopeSubdivisions; index++)
@@ -650,7 +753,8 @@ namespace ProgrammaticStylized3D.Rivers
             return point.Region switch
             {
                 CrossRegion.Centre => 0f,
-                CrossRegion.FlatBedEdge => flatHalfWidth,
+                CrossRegion.FlatBedEdge =>
+                    Mathf.Lerp(0f, flatHalfWidth, point.T),
                 CrossRegion.BedSlope =>
                     Mathf.Lerp(
                         flatHalfWidth,
@@ -688,7 +792,11 @@ namespace ProgrammaticStylized3D.Rivers
             float requiredWetClearance,
             float bankCover,
             float burialOffset,
-            OuterBlendContext outerBlendContext)
+            OuterBlendContext outerBlendContext,
+            float resolvedBedRoughness,
+            float shapeDistance,
+            float signedLateralDistance,
+            StylizedRiverNaturalVariationSettings naturalVariation)
         {
             float bedHeight = waterHeight - depth;
 
@@ -697,11 +805,25 @@ namespace ProgrammaticStylized3D.Rivers
                 case CrossRegion.Centre:
                 case CrossRegion.FlatBedEdge:
                 {
+                    float bedMask =
+                        point.Region == CrossRegion.Centre
+                            ? 1f
+                            : 1f - SmoothStep(0.65f, 1f, point.T);
+
+                    float bedOffset =
+                        StylizedRiverNaturalVariation.EvaluateBedNoise(
+                            shapeDistance,
+                            signedLateralDistance,
+                            naturalVariation) *
+                        resolvedBedRoughness *
+                        bedMask;
+
                     float shaped =
                         Mathf.Lerp(
                             baseGroundHeight,
                             bedHeight,
-                            terrainConformity);
+                            terrainConformity) +
+                        bedOffset;
 
                     return Mathf.Min(
                         shaped,
@@ -841,9 +963,12 @@ namespace ProgrammaticStylized3D.Rivers
         {
             Vector3 lateralDirection = ring.Side * Mathf.Sign(sign);
 
+            float surfaceHalfWidth =
+                ring.GetSurfaceHalfWidth(sign);
+
             Vector3 startPosition =
                 ring.Centre +
-                lateralDirection * ring.SurfaceHalfWidth;
+                lateralDirection * surfaceHalfWidth;
 
             Vector3 handoffPosition =
                 ring.Centre +
@@ -872,7 +997,7 @@ namespace ProgrammaticStylized3D.Rivers
                 startSample.Height,
                 handoffSample.Height,
                 groundSlope,
-                handoffHalfWidth - ring.SurfaceHalfWidth);
+                handoffHalfWidth - surfaceHalfWidth);
         }
 
         private static GroundSurfaceSample SampleBaseSurface(

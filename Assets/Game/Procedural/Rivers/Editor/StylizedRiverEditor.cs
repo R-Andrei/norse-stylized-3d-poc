@@ -18,6 +18,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawSetup();
             DrawRiverDomain();
             DrawChannel();
+            DrawNaturalVariation();
             DrawAdvancedShoreline();
             DrawSurfaceMesh();
             DrawWaterBody();
@@ -181,6 +182,91 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 river.CorridorOuterWidth > 0f
                     ? $"{river.CorridorOuterWidth:0.000} m"
                     : "Not generated");
+        }
+
+        private void DrawNaturalVariation()
+        {
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField(
+                "Natural Channel Variation",
+                EditorStyles.boldLabel);
+
+            SerializedProperty preset = Find("channelCharacterPreset");
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                preset,
+                new GUIContent(
+                    "Channel Character",
+                    "Controls only static bed and shoreline variation. It does not change water colour, lighting, freezing, motion, foam, refraction, or reflections."));
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+
+                foreach (Object selectedTarget in targets)
+                {
+                    if (selectedTarget is not StylizedRiver river)
+                    {
+                        continue;
+                    }
+
+                    Undo.RecordObject(river, "Apply Channel Character Preset");
+                    river.ApplyChannelCharacterPreset();
+                    EditorUtility.SetDirty(river);
+                }
+
+                serializedObject.Update();
+                RepaintScene();
+            }
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                Find("naturalVariationSeed"),
+                new GUIContent(
+                    "Variation Seed",
+                    "Stable seed shared by bed and shoreline variation."));
+            EditorGUILayout.PropertyField(
+                Find("bedRoughness"),
+                new GUIContent(
+                    "Bed Roughness",
+                    "Maximum vertical bottom variation in metres. It fades to zero before the bed slope."));
+            EditorGUILayout.PropertyField(
+                Find("bedRoughnessScale"),
+                new GUIContent(
+                    "Bed Feature Scale",
+                    "Typical physical size of bottom depressions and raised areas, in metres."));
+            EditorGUILayout.PropertyField(
+                Find("shorelineIrregularity"),
+                new GUIContent(
+                    "Shoreline Irregularity",
+                    "Maximum smooth deviation of each bank from the configured water width, in metres."));
+            EditorGUILayout.PropertyField(
+                Find("shorelineIrregularityScale"),
+                new GUIContent(
+                    "Shoreline Feature Scale",
+                    "Typical longitudinal size of widening and narrowing features, in metres."));
+            EditorGUILayout.PropertyField(
+                Find("bankAsymmetry"),
+                new GUIContent(
+                    "Bank Asymmetry",
+                    "Zero keeps both banks correlated. One lets the left and right banks vary independently."));
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                Find("channelCharacterPreset").enumValueIndex =
+                    (int)StylizedRiverChannelCharacterPreset.Custom;
+            }
+
+            if (targets.Length == 1 && target is StylizedRiver singleRiver)
+            {
+                EditorGUILayout.Space(3f);
+                EditorGUILayout.LabelField(
+                    "Resolved Bed Roughness",
+                    $"{singleRiver.ResolvedBedRoughness:0.000} m");
+                EditorGUILayout.LabelField(
+                    "Resolved Visible Width",
+                    $"{singleRiver.ResolvedMinimumVisibleWidth:0.00}–{singleRiver.ResolvedMaximumVisibleWidth:0.00} m");
+            }
         }
 
         private void DrawAdvancedShoreline()

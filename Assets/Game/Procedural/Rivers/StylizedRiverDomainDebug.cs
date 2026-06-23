@@ -199,18 +199,24 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverSplineSample a = domain.Samples[index];
                 StylizedRiverSplineSample b = domain.Samples[index + 1];
 
-                Vector3 aOffset = a.Side * a.HalfWidth;
-                Vector3 bOffset = b.Side * b.HalfWidth;
                 Vector3 aHeight = a.Up * gizmoHeightOffset;
                 Vector3 bHeight = b.Up * gizmoHeightOffset;
 
                 Gizmos.DrawLine(
-                    a.SurfacePoint - aOffset + aHeight,
-                    b.SurfacePoint - bOffset + bHeight);
+                    a.SurfacePoint -
+                    a.Side * a.LeftHalfWidth +
+                    aHeight,
+                    b.SurfacePoint -
+                    b.Side * b.LeftHalfWidth +
+                    bHeight);
 
                 Gizmos.DrawLine(
-                    a.SurfacePoint + aOffset + aHeight,
-                    b.SurfacePoint + bOffset + bHeight);
+                    a.SurfacePoint +
+                    a.Side * a.RightHalfWidth +
+                    aHeight,
+                    b.SurfacePoint +
+                    b.Side * b.RightHalfWidth +
+                    bHeight);
             }
         }
 

@@ -44,6 +44,39 @@ namespace ProgrammaticStylized3D.Rivers
             float surfaceHalfWidth,
             float normalizedDistance,
             float normalizedTime)
+            : this(
+                centre,
+                surfacePoint,
+                tangent,
+                side,
+                up,
+                localDistance,
+                orientedDistance,
+                globalDistance,
+                halfWidth,
+                halfWidth,
+                surfaceHalfWidth,
+                surfaceHalfWidth,
+                normalizedDistance,
+                normalizedTime)
+        {
+        }
+
+        public StylizedRiverSplineSample(
+            Vector3 centre,
+            Vector3 surfacePoint,
+            Vector3 tangent,
+            Vector3 side,
+            Vector3 up,
+            float localDistance,
+            float orientedDistance,
+            float globalDistance,
+            float leftHalfWidth,
+            float rightHalfWidth,
+            float leftSurfaceHalfWidth,
+            float rightSurfaceHalfWidth,
+            float normalizedDistance,
+            float normalizedTime)
         {
             Centre = centre;
             SurfacePoint = surfacePoint;
@@ -53,8 +86,15 @@ namespace ProgrammaticStylized3D.Rivers
             Distance = localDistance;
             OrientedDistance = orientedDistance;
             GlobalDistance = globalDistance;
-            HalfWidth = halfWidth;
-            SurfaceHalfWidth = surfaceHalfWidth;
+            LeftHalfWidth = Mathf.Max(0.25f, leftHalfWidth);
+            RightHalfWidth = Mathf.Max(0.25f, rightHalfWidth);
+            LeftSurfaceHalfWidth =
+                Mathf.Max(LeftHalfWidth, leftSurfaceHalfWidth);
+            RightSurfaceHalfWidth =
+                Mathf.Max(RightHalfWidth, rightSurfaceHalfWidth);
+            HalfWidth = (LeftHalfWidth + RightHalfWidth) * 0.5f;
+            SurfaceHalfWidth =
+                Mathf.Max(LeftSurfaceHalfWidth, RightSurfaceHalfWidth);
             NormalizedDistance = normalizedDistance;
             NormalizedTime = normalizedTime;
         }
@@ -83,11 +123,34 @@ namespace ProgrammaticStylized3D.Rivers
         /// <summary>Connected-river offset plus oriented distance, in metres.</summary>
         public float GlobalDistance { get; }
 
-        /// <summary>Logical channel half-width, excluding hidden bank underlap.</summary>
+        /// <summary>Average logical channel half-width retained for compatibility.</summary>
         public float HalfWidth { get; }
 
-        /// <summary>Generated surface half-width, including hidden bank underlap.</summary>
+        /// <summary>Maximum generated surface half-width retained for compatibility.</summary>
         public float SurfaceHalfWidth { get; }
+
+        public float LeftHalfWidth { get; }
+        public float RightHalfWidth { get; }
+        public float LeftSurfaceHalfWidth { get; }
+        public float RightSurfaceHalfWidth { get; }
+
+        public float GetVisibleHalfWidth(float signedLateral)
+        {
+            return signedLateral < 0f
+                ? LeftHalfWidth
+                : signedLateral > 0f
+                    ? RightHalfWidth
+                    : HalfWidth;
+        }
+
+        public float GetSurfaceHalfWidth(float signedLateral)
+        {
+            return signedLateral < 0f
+                ? LeftSurfaceHalfWidth
+                : signedLateral > 0f
+                    ? RightSurfaceHalfWidth
+                    : (LeftSurfaceHalfWidth + RightSurfaceHalfWidth) * 0.5f;
+        }
 
         public float SurfaceHeight => SurfacePoint.y;
         public float NormalizedDistance { get; }
@@ -185,6 +248,29 @@ namespace ProgrammaticStylized3D.Rivers
             float connectedDistanceOffset,
             bool reverseFlow,
             int version)
+        {
+            return BuildDomain(
+                container,
+                targetSpacing,
+                width,
+                edgeOverlap,
+                surfaceOffset,
+                connectedDistanceOffset,
+                reverseFlow,
+                version,
+                StylizedRiverNaturalVariationSettings.None);
+        }
+
+        public static RiverDomainSnapshot BuildDomain(
+            SplineContainer container,
+            float targetSpacing,
+            float width,
+            float edgeOverlap,
+            float surfaceOffset,
+            float connectedDistanceOffset,
+            bool reverseFlow,
+            int version,
+            StylizedRiverNaturalVariationSettings naturalVariation)
         {
             float resolvedSpacing =
                 Mathf.Max(
@@ -317,10 +403,21 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             float halfWidth = Mathf.Max(0.25f, width * 0.5f);
-            float surfaceHalfWidth =
+            float resolvedOverlap = Mathf.Max(0f, edgeOverlap);
+            float safeShorelineScale =
                 Mathf.Max(
-                    halfWidth,
-                    halfWidth + Mathf.Max(0f, edgeOverlap));
+                    naturalVariation.ShorelineIrregularityScale,
+                    actualSampleSpacing * 4f,
+                    naturalVariation.ResolveSafeShorelineAmplitude(halfWidth) *
+                    4f);
+            StylizedRiverNaturalVariationSettings domainVariation =
+                new StylizedRiverNaturalVariationSettings(
+                    naturalVariation.Seed,
+                    naturalVariation.BedRoughness,
+                    naturalVariation.BedRoughnessScale,
+                    naturalVariation.ShorelineIrregularity,
+                    safeShorelineScale,
+                    naturalVariation.BankAsymmetry);
 
             StylizedRiverSplineSample[] samples =
                 new StylizedRiverSplineSample[sampleCount];
@@ -372,6 +469,23 @@ namespace ProgrammaticStylized3D.Rivers
 
                 Vector3 centre = centres[index];
                 Vector3 surfacePoint = centre + up * surfaceOffset;
+                float globalDistance =
+                    connectedDistanceOffset + orientedDistance;
+
+                // Shape sampling follows stable authored distance so toggling
+                // reverse flow does not regenerate a different shoreline.
+                float shapeDistance =
+                    connectedDistanceOffset + localDistance;
+
+                StylizedRiverNaturalVariation.ResolveShoreWidths(
+                    halfWidth,
+                    resolvedOverlap,
+                    shapeDistance,
+                    domainVariation,
+                    out float leftHalfWidth,
+                    out float rightHalfWidth,
+                    out float leftSurfaceHalfWidth,
+                    out float rightSurfaceHalfWidth);
 
                 samples[index] =
                     new StylizedRiverSplineSample(
@@ -382,9 +496,11 @@ namespace ProgrammaticStylized3D.Rivers
                         up,
                         localDistance,
                         orientedDistance,
-                        connectedDistanceOffset + orientedDistance,
-                        halfWidth,
-                        surfaceHalfWidth,
+                        globalDistance,
+                        leftHalfWidth,
+                        rightHalfWidth,
+                        leftSurfaceHalfWidth,
+                        rightSurfaceHalfWidth,
                         normalizedDistance,
                         parameters[index]);
             }
@@ -421,7 +537,8 @@ namespace ProgrammaticStylized3D.Rivers
                     0f,
                     0f,
                     false,
-                    0);
+                    0,
+                    StylizedRiverNaturalVariationSettings.None);
 
             samples.Clear();
 
@@ -495,8 +612,10 @@ namespace ProgrammaticStylized3D.Rivers
                         (float)(acrossVertexCount - 1);
 
                     float acrossSigned = across01 * 2f - 1f;
+                    float localSurfaceHalfWidth =
+                        sample.GetSurfaceHalfWidth(acrossSigned);
                     float acrossMetres =
-                        acrossSigned * sample.SurfaceHalfWidth;
+                        acrossSigned * localSurfaceHalfWidth;
 
                     Vector3 worldPosition =
                         sample.SurfacePoint +
@@ -533,7 +652,7 @@ namespace ProgrammaticStylized3D.Rivers
                             sample.GlobalDistance,
                             acrossMetres,
                             sample.OrientedDistance,
-                            sample.SurfaceHalfWidth));
+                            localSurfaceHalfWidth));
 
                     // Vertex colour remains non-authoritative compatibility data.
                     colors[vertexIndex] =
@@ -627,13 +746,15 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverSplineSample sample = InterpolateStoredSample(a, b, t);
                 Vector3 delta = worldPoint - sample.SurfacePoint;
                 float acrossMetres = Vector3.Dot(delta, sample.Side);
+                float localHalfWidth =
+                    sample.GetVisibleHalfWidth(acrossMetres);
                 float acrossNormalized =
-                    sample.HalfWidth > 0.0001f
-                        ? acrossMetres / sample.HalfWidth
+                    localHalfWidth > 0.0001f
+                        ? acrossMetres / localHalfWidth
                         : 0f;
 
                 float bankDistance =
-                    sample.HalfWidth - Mathf.Abs(acrossMetres);
+                    localHalfWidth - Mathf.Abs(acrossMetres);
 
                 projection =
                     new StylizedRiverProjection(
@@ -648,7 +769,7 @@ namespace ProgrammaticStylized3D.Rivers
                         acrossMetres,
                         acrossNormalized,
                         bankDistance,
-                        sample.HalfWidth,
+                        localHalfWidth,
                         bankDistance >= 0f);
             }
 
@@ -734,8 +855,16 @@ namespace ProgrammaticStylized3D.Rivers
                 localDistance,
                 orientedDistance,
                 connectedDistanceOffset + orientedDistance,
-                Mathf.Lerp(a.HalfWidth, b.HalfWidth, t),
-                Mathf.Lerp(a.SurfaceHalfWidth, b.SurfaceHalfWidth, t),
+                Mathf.Lerp(a.LeftHalfWidth, b.LeftHalfWidth, t),
+                Mathf.Lerp(a.RightHalfWidth, b.RightHalfWidth, t),
+                Mathf.Lerp(
+                    a.LeftSurfaceHalfWidth,
+                    b.LeftSurfaceHalfWidth,
+                    t),
+                Mathf.Lerp(
+                    a.RightSurfaceHalfWidth,
+                    b.RightSurfaceHalfWidth,
+                    t),
                 localLength > 0.0001f
                     ? localDistance / localLength
                     : 0f,
@@ -770,8 +899,16 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.Lerp(a.Distance, b.Distance, t),
                 Mathf.Lerp(a.OrientedDistance, b.OrientedDistance, t),
                 Mathf.Lerp(a.GlobalDistance, b.GlobalDistance, t),
-                Mathf.Lerp(a.HalfWidth, b.HalfWidth, t),
-                Mathf.Lerp(a.SurfaceHalfWidth, b.SurfaceHalfWidth, t),
+                Mathf.Lerp(a.LeftHalfWidth, b.LeftHalfWidth, t),
+                Mathf.Lerp(a.RightHalfWidth, b.RightHalfWidth, t),
+                Mathf.Lerp(
+                    a.LeftSurfaceHalfWidth,
+                    b.LeftSurfaceHalfWidth,
+                    t),
+                Mathf.Lerp(
+                    a.RightSurfaceHalfWidth,
+                    b.RightSurfaceHalfWidth,
+                    t),
                 Mathf.Lerp(a.NormalizedDistance, b.NormalizedDistance, t),
                 Mathf.Lerp(a.NormalizedTime, b.NormalizedTime, t));
         }
