@@ -13,6 +13,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             IReadOnlyList<GroundModifierSnapshot> modifiers,
             IReadOnlyList<StylizedRiverGroundSnapshot> rivers)
         {
+            return Generate(
+                recipe,
+                modifiers,
+                rivers,
+                out _);
+        }
+
+        public static MeshData Generate(
+            GroundRecipe recipe,
+            IReadOnlyList<GroundModifierSnapshot> modifiers,
+            IReadOnlyList<StylizedRiverGroundSnapshot> rivers,
+            out GroundHeightFieldSnapshot baseSurface)
+        {
             if (recipe == null)
             {
                 throw new ArgumentNullException(nameof(recipe));
@@ -90,6 +103,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 spacing,
                 halfSize,
                 modifiers);
+
+            baseSurface =
+                new GroundHeightFieldSnapshot(
+                    heights,
+                    resolution,
+                    spacing,
+                    halfSize,
+                    recipe.ShapeSeed);
 
             ApplyRivers(
                 heights,
@@ -515,41 +536,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                                 point,
                                 out float distance,
                                 out float waterHeight,
-                                out float halfWidth) ||
+                                out _,
+                                out float surfaceHalfWidth) ||
                             distance >
-                            halfWidth + river.BankBlend)
+                            river.ResolveHandoffHalfWidth(surfaceHalfWidth))
                         {
                             continue;
                         }
-
-                        float influence =
-                            river.EvaluateInfluence(
-                                distance,
-                                halfWidth);
-
-                        if (influence <= 0f)
-                        {
-                            continue;
-                        }
-
-                        float targetHeight =
-                            river.EvaluateTargetHeight(
-                                distance,
-                                waterHeight,
-                                halfWidth);
-
-                        // River channels only carve downward. A misplaced
-                        // spline must never lift existing terrain.
-                        targetHeight =
-                            Mathf.Min(
-                                targetHeight,
-                                heights[index]);
 
                         heights[index] =
-                            Mathf.Lerp(
+                            river.EvaluateConcealedGroundHeight(
                                 heights[index],
-                                targetHeight,
-                                influence);
+                                distance,
+                                waterHeight,
+                                surfaceHalfWidth);
                     }
                 }
             }

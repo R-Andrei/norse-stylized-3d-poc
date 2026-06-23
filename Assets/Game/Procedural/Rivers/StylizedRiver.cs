@@ -63,6 +63,9 @@ namespace ProgrammaticStylized3D.Rivers
         private const string LegacyStaticFoamObjectName =
             "__PS3D_RiverStaticFoam";
 
+        private const string CorridorObjectName =
+            "__PS3D_RiverCorridor";
+
         private const string BodyShaderResourcePath =
             "PS3DRiver/Shaders/SH_CleanStylizedRiver";
 
@@ -100,11 +103,29 @@ namespace ProgrammaticStylized3D.Rivers
         private StylizedRiverBankProfile bankProfile =
             StylizedRiverBankProfile.Natural;
 
-        [Range(0f, 0.8f)]
-        [SerializeField] private float bankOverlap = 0.22f;
+        [FormerlySerializedAs("bankOverlap")]
+        [SerializeField, HideInInspector]
+        private float legacyManualBankOverlap;
 
+        [Tooltip("Additional hidden shoreline overlap added beyond the corridor generator's safe automatic value. This can only increase the generated overlap.")]
+        [Min(0f)]
+        [SerializeField] private float additionalShorelineOverlap;
+
+        [Tooltip("Minimum vertical separation maintained between the visible wet surface and generated terrain.")]
+        [Range(0.005f, 0.5f)]
+        [SerializeField] private float shorelineWetClearance = 0.05f;
+
+        [Tooltip("Minimum terrain cover above the hidden outer edge of the water mesh.")]
+        [Range(0.005f, 0.5f)]
+        [SerializeField] private float shorelineBankCover = 0.05f;
+
+        [Tooltip("Reserved downward water displacement for later surface-motion stages. Stage 2 should remain at zero.")]
         [Range(0f, 1f)]
-        [SerializeField] private float carvingStrength = 1f;
+        [SerializeField] private float reservedDownwardSurfaceDisplacement;
+
+        [FormerlySerializedAs("carvingStrength")]
+        [Range(0f, 1f)]
+        [SerializeField] private float terrainConformity = 1f;
 
         [Header("Surface Mesh")]
         [SerializeField]
@@ -328,6 +349,16 @@ namespace ProgrammaticStylized3D.Rivers
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
         private Mesh surfaceMesh;
+
+        private GameObject corridorObject;
+        private MeshFilter corridorMeshFilter;
+        private MeshRenderer corridorMeshRenderer;
+        private MeshCollider corridorMeshCollider;
+        private Mesh corridorMesh;
+        private Mesh corridorColliderMesh;
+        private StylizedRiverCorridorBuildResult corridorBuildResult;
+        private bool corridorTightBendWarningReported;
+
         private Material temporaryBodyMaterial;
         private MaterialPropertyBlock bodyProperties;
         private bool incompatibleMaterialWarningReported;
@@ -366,8 +397,37 @@ namespace ProgrammaticStylized3D.Rivers
         public float BodyDepthContrast => bodyDepthContrast;
         public float WaterTintStrength => waterTintStrength;
         public float SurfacePresence => surfacePresence;
-        public float VisibleHalfWidth => width * 0.5f + bankOverlap;
-        public float VisibleWidth => VisibleHalfWidth * 2f;
+        public float VisibleHalfWidth => width * 0.5f;
+        public float VisibleWidth => width;
+        public float AutomaticShorelineOverlap =>
+            ResolveAutomaticShorelineOverlap();
+        public float AdditionalShorelineOverlap =>
+            additionalShorelineOverlap;
+        public float ResolvedShorelineOverlap =>
+            AutomaticShorelineOverlap + additionalShorelineOverlap;
+        public float GeneratedSurfaceHalfWidth =>
+            VisibleHalfWidth + ResolvedShorelineOverlap;
+        public float GeneratedSurfaceWidth =>
+            GeneratedSurfaceHalfWidth * 2f;
+        public float ShorelineWetClearance => shorelineWetClearance;
+        public float ShorelineBankCover => shorelineBankCover;
+        public float ReservedDownwardSurfaceDisplacement =>
+            reservedDownwardSurfaceDisplacement;
+        public float TerrainConformity => terrainConformity;
+        public float CorridorOuterWidth => corridorBuildResult.MaximumOuterWidth;
+        public float CorridorHandoffWidth => corridorBuildResult.MaximumHandoffWidth;
+        public float CorridorIntegrationApronWidth =>
+            corridorBuildResult.IntegrationApronWidth;
+        public int CorridorRingCount => corridorBuildResult.RingCount;
+        public int CorridorAcrossVertexCount =>
+            corridorBuildResult.AcrossVertexCount;
+        public int CorridorTriangleCount => corridorBuildResult.TriangleCount;
+        public int CorridorColliderTriangleCount =>
+            corridorBuildResult.ColliderTriangleCount;
+        public bool CorridorUsesGroundHeightField =>
+            corridorBuildResult.UsedGroundHeightField;
+        public bool CorridorHasTightBendWarning =>
+            corridorBuildResult.TightBendWarning;
         public RiverDomainSnapshot Domain => riverDomain ?? RiverDomainSnapshot.Empty;
         public float DomainSampleSpacing => domainSampleSpacing;
         public float ConnectedRiverDistanceOffset => connectedRiverDistanceOffset;
@@ -398,6 +458,7 @@ namespace ProgrammaticStylized3D.Rivers
             SubscribeToSplineChanges();
             RemoveLegacyGeneratedObjects();
             EnsureSurfaceOutput();
+            EnsureCorridorOutput();
             SetRendererEnabled(true);
             RegenerateAll();
             lastEditorTime = Time.realtimeSinceStartupAsDouble;
@@ -417,6 +478,7 @@ namespace ProgrammaticStylized3D.Rivers
             AssignWaterLayer();
             RemoveLegacyGeneratedObjects();
             EnsureSurfaceOutput();
+            EnsureCorridorOutput();
             ApplyVisualSettings();
 
             if (liveRegeneration)
@@ -460,9 +522,15 @@ namespace ProgrammaticStylized3D.Rivers
             AssignWaterLayer();
             RemoveLegacyGeneratedObjects();
             EnsureSurfaceOutput();
+            EnsureCorridorOutput();
             BuildRiverDomain();
             BuildSurface();
-            NotifyParentGround();
+
+            if (!NotifyParentGround())
+            {
+                BuildCorridor();
+            }
+
             ApplyVisualSettings();
             NotifyReflectionSurfaceChanged();
             NotifyFoamSimulationChanged();
@@ -477,11 +545,32 @@ namespace ProgrammaticStylized3D.Rivers
             AssignWaterLayer();
             RemoveLegacyGeneratedObjects();
             EnsureSurfaceOutput();
+            EnsureCorridorOutput();
             BuildRiverDomain();
             BuildSurface();
+            BuildCorridor();
             ApplyVisualSettings();
             NotifyReflectionSurfaceChanged();
             NotifyFoamSimulationChanged();
+        }
+
+        /// <summary>
+        /// Rebuilds only the dedicated visible river corridor after the parent
+        /// generated ground has refreshed its base-height field and concealed
+        /// broad ground mesh.
+        /// </summary>
+        public void RebuildCorridorFromGround()
+        {
+            if (!isActiveAndEnabled)
+            {
+                return;
+            }
+
+            ValidateSettings();
+            CacheComponents();
+            EnsureRiverDomain();
+            EnsureCorridorOutput();
+            BuildCorridor();
         }
 
         [ContextMenu("Clear Generated River")]
@@ -492,6 +581,22 @@ namespace ProgrammaticStylized3D.Rivers
                 surfaceMesh.Clear();
             }
 
+            if (corridorMesh != null)
+            {
+                corridorMesh.Clear();
+            }
+
+            if (corridorColliderMesh != null)
+            {
+                corridorColliderMesh.Clear();
+            }
+
+            if (corridorMeshCollider != null)
+            {
+                corridorMeshCollider.sharedMesh = null;
+            }
+
+            corridorBuildResult = default;
             riverDomainVersion++;
             riverDomain = new RiverDomainSnapshot(
                 Array.Empty<StylizedRiverSplineSample>(),
@@ -683,7 +788,8 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             Vector3[] localPoints = new Vector3[Domain.SampleCount];
-            float[] halfWidths = new float[Domain.SampleCount];
+            float[] visibleHalfWidths = new float[Domain.SampleCount];
+            float[] surfaceHalfWidths = new float[Domain.SampleCount];
 
             for (int index = 0; index < Domain.SampleCount; index++)
             {
@@ -691,19 +797,25 @@ namespace ProgrammaticStylized3D.Rivers
 
                 localPoints[index] =
                     groundTransform.InverseTransformPoint(
-                        sample.Centre);
+                        sample.SurfacePoint);
 
-                halfWidths[index] = sample.HalfWidth;
+                visibleHalfWidths[index] = sample.HalfWidth;
+                surfaceHalfWidths[index] = sample.SurfaceHalfWidth;
             }
 
             return new StylizedRiverGroundSnapshot(
                 localPoints,
-                halfWidths,
+                visibleHalfWidths,
+                surfaceHalfWidths,
                 bankBlend,
                 depth,
                 bedFlatness,
                 bankProfile,
-                carvingStrength);
+                terrainConformity,
+                ResolveGroundGridSpacing(),
+                shorelineWetClearance,
+                shorelineBankCover,
+                reservedDownwardSurfaceDisplacement);
         }
 
         public bool UsesSpline(Spline spline)
@@ -826,8 +938,16 @@ namespace ProgrammaticStylized3D.Rivers
             bankBlend = Mathf.Max(0.1f, bankBlend);
             depth = Mathf.Max(0.1f, depth);
             bedFlatness = Mathf.Clamp01(bedFlatness);
-            bankOverlap = Mathf.Clamp(bankOverlap, 0f, 0.8f);
-            carvingStrength = Mathf.Clamp01(carvingStrength);
+            legacyManualBankOverlap = Mathf.Max(0f, legacyManualBankOverlap);
+            additionalShorelineOverlap =
+                Mathf.Clamp(additionalShorelineOverlap, 0f, 8f);
+            shorelineWetClearance =
+                Mathf.Clamp(shorelineWetClearance, 0.005f, 0.5f);
+            shorelineBankCover =
+                Mathf.Clamp(shorelineBankCover, 0.005f, 0.5f);
+            reservedDownwardSurfaceDisplacement =
+                Mathf.Clamp(reservedDownwardSurfaceDisplacement, 0f, 1f);
+            terrainConformity = Mathf.Clamp01(terrainConformity);
             surfaceOffset = Mathf.Clamp(surfaceOffset, 0f, 0.25f);
             domainSampleSpacing = Mathf.Max(0.05f, domainSampleSpacing);
 
@@ -916,6 +1036,11 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 meshRenderer.enabled = enabled;
             }
+
+            if (corridorMeshRenderer != null)
+            {
+                corridorMeshRenderer.enabled = enabled;
+            }
         }
 
         private void EnsureSurfaceOutput()
@@ -944,6 +1069,144 @@ namespace ProgrammaticStylized3D.Rivers
                 meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
                 meshRenderer.receiveShadows = true;
                 meshRenderer.sortingOrder = 0;
+            }
+        }
+
+        private void EnsureCorridorOutput()
+        {
+            if (corridorObject == null)
+            {
+                Transform existing = transform.Find(CorridorObjectName);
+
+                if (existing != null)
+                {
+                    corridorObject = existing.gameObject;
+                }
+            }
+
+            if (!HasRequiredCorridorComponents(corridorObject))
+            {
+                ReplaceCorridorOutputObject();
+            }
+
+            // Re-fetch every reference after creation or replacement. This is
+            // intentionally not based on cached component fields: partially
+            // generated scene children can survive script reloads and those
+            // cached Unity object references may no longer be valid.
+            corridorMeshFilter = corridorObject.GetComponent<MeshFilter>();
+            corridorMeshRenderer = corridorObject.GetComponent<MeshRenderer>();
+            corridorMeshCollider = corridorObject.GetComponent<MeshCollider>();
+
+            if (corridorMeshFilter == null ||
+                corridorMeshRenderer == null ||
+                corridorMeshCollider == null)
+            {
+                Debug.LogError(
+                    $"StylizedRiver on '{name}' could not create a valid '{CorridorObjectName}' output with MeshFilter, MeshRenderer, and MeshCollider components.",
+                    this);
+                return;
+            }
+
+            if (corridorMesh == null)
+            {
+                corridorMesh = new Mesh
+                {
+                    name = "PS3D_StylizedRiverCorridor",
+                    hideFlags = HideFlags.DontSave
+                };
+            }
+
+            if (corridorColliderMesh == null)
+            {
+                corridorColliderMesh = new Mesh
+                {
+                    name = "PS3D_StylizedRiverCorridorCollider",
+                    hideFlags = HideFlags.DontSave
+                };
+            }
+
+            corridorMeshFilter.sharedMesh = corridorMesh;
+            corridorMeshCollider.convex = false;
+
+            GeneratedGround ground =
+                GetComponentInParent<GeneratedGround>();
+
+            if (ground != null)
+            {
+                corridorObject.layer = ground.gameObject.layer;
+                corridorMeshRenderer.sharedMaterial = ground.SharedMaterial;
+            }
+            else
+            {
+                corridorObject.layer = 0;
+            }
+
+            corridorMeshRenderer.shadowCastingMode =
+                ShadowCastingMode.On;
+            corridorMeshRenderer.receiveShadows = true;
+        }
+
+        private static bool HasRequiredCorridorComponents(GameObject target)
+        {
+            return target != null &&
+                   target.GetComponent<MeshFilter>() != null &&
+                   target.GetComponent<MeshRenderer>() != null &&
+                   target.GetComponent<MeshCollider>() != null;
+        }
+
+        private void ReplaceCorridorOutputObject()
+        {
+            GameObject previous = corridorObject;
+
+            // Supplying all required types in the constructor avoids exposing a
+            // partially assembled corridor child during editor validation and
+            // hierarchy callbacks.
+            GameObject replacement = new GameObject(
+                CorridorObjectName,
+                typeof(MeshFilter),
+                typeof(MeshRenderer),
+                typeof(MeshCollider));
+
+            replacement.transform.SetParent(transform, false);
+            replacement.transform.localPosition = Vector3.zero;
+            replacement.transform.localRotation = Quaternion.identity;
+            replacement.transform.localScale = Vector3.one;
+
+            corridorObject = replacement;
+            corridorMeshFilter = replacement.GetComponent<MeshFilter>();
+            corridorMeshRenderer = replacement.GetComponent<MeshRenderer>();
+            corridorMeshCollider = replacement.GetComponent<MeshCollider>();
+
+            if (previous == null || previous == replacement)
+            {
+                return;
+            }
+
+            MeshFilter previousFilter = previous.GetComponent<MeshFilter>();
+            if (previousFilter != null && previousFilter.sharedMesh == corridorMesh)
+            {
+                previousFilter.sharedMesh = null;
+            }
+
+            MeshCollider previousCollider = previous.GetComponent<MeshCollider>();
+            if (previousCollider != null &&
+                (previousCollider.sharedMesh == corridorMesh ||
+                 previousCollider.sharedMesh == corridorColliderMesh))
+            {
+                previousCollider.sharedMesh = null;
+            }
+
+            // Rename first so delayed destruction in Play Mode cannot be found
+            // as the active generated corridor on a subsequent lookup.
+            previous.name = $"{CorridorObjectName}_Invalid";
+
+            if (Application.isPlaying)
+            {
+                Destroy(previous);
+            }
+            else
+            {
+                DestroyImmediate(previous);
             }
         }
 
@@ -1015,6 +1278,30 @@ namespace ProgrammaticStylized3D.Rivers
 
         }
 
+        private float ResolveGroundGridSpacing()
+        {
+            GeneratedGround ground =
+                GetComponentInParent<GeneratedGround>();
+
+            if (ground != null)
+            {
+                return Mathf.Max(0.01f, ground.GridSpacing);
+            }
+
+            // Rivers are normally children of GeneratedGround. This fallback
+            // keeps standalone test rivers valid without inventing a second
+            // shoreline system.
+            return Mathf.Max(0.25f, domainSampleSpacing);
+        }
+
+        private float ResolveAutomaticShorelineOverlap()
+        {
+            // The dedicated corridor owns the shoreline topology, so overlap no
+            // longer scales with the coarse generated-ground grid. It only needs
+            // enough hidden bank width to cover the flat water surface safely.
+            return Mathf.Clamp(width * 0.08f, 0.20f, 0.75f);
+        }
+
         private void EnsureRiverDomain()
         {
             if (riverDomain == null || !riverDomain.IsValid)
@@ -1032,7 +1319,7 @@ namespace ProgrammaticStylized3D.Rivers
                     ResolveSplineContainer(),
                     domainSampleSpacing,
                     width,
-                    bankOverlap,
+                    ResolvedShorelineOverlap,
                     surfaceOffset,
                     connectedRiverDistanceOffset,
                     reverseFlow,
@@ -1067,6 +1354,70 @@ namespace ProgrammaticStylized3D.Rivers
                 Domain,
                 ResolveCrossSegments(),
                 surfaceMesh);
+        }
+
+        private void BuildCorridor()
+        {
+            EnsureCorridorOutput();
+
+            GeneratedGround ground =
+                GetComponentInParent<GeneratedGround>();
+
+            corridorBuildResult =
+                StylizedRiverCorridorGeometry.BuildMeshes(
+                    transform,
+                    Domain,
+                    ground,
+                    quality,
+                    depth,
+                    bedFlatness,
+                    bankBlend,
+                    bankProfile,
+                    terrainConformity,
+                    shorelineWetClearance,
+                    shorelineBankCover,
+                    reservedDownwardSurfaceDisplacement,
+                    corridorMesh,
+                    corridorColliderMesh);
+
+            if (corridorMeshCollider != null)
+            {
+                corridorMeshCollider.sharedMesh = null;
+
+                if (corridorBuildResult.IsValid)
+                {
+                    corridorMeshCollider.sharedMesh = corridorColliderMesh;
+                }
+            }
+
+            if (corridorMeshRenderer != null)
+            {
+                corridorMeshRenderer.enabled =
+                    enabled &&
+                    corridorBuildResult.IsValid;
+
+                if (ground != null)
+                {
+                    corridorMeshRenderer.sharedMaterial =
+                        ground.SharedMaterial;
+                }
+            }
+
+            if (corridorBuildResult.TightBendWarning)
+            {
+                if (!corridorTightBendWarningReported)
+                {
+                    Debug.LogWarning(
+                        $"StylizedRiver on '{name}' contains a bend whose radius is small relative to the generated river width. Inspect the corridor for inside-bank pinching.",
+                        this);
+
+                    corridorTightBendWarningReported = true;
+                }
+            }
+            else
+            {
+                corridorTightBendWarningReported = false;
+            }
         }
 
         private void ApplyVisualSettings()
@@ -1236,14 +1587,17 @@ namespace ProgrammaticStylized3D.Rivers
             RequestRegeneration();
         }
 
-        private void NotifyParentGround()
+        private bool NotifyParentGround()
         {
             GeneratedGround ground = GetComponentInParent<GeneratedGround>();
 
-            if (ground != null)
+            if (ground == null)
             {
-                ground.NotifyRiverChanged(this);
+                return false;
             }
+
+            ground.NotifyRiverChanged(this);
+            return true;
         }
 
         private void NotifyReflectionSurfaceChanged()
@@ -1333,6 +1687,61 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 surfaceMesh = null;
+            }
+
+            if (corridorMeshCollider != null &&
+                (corridorMeshCollider.sharedMesh == corridorMesh ||
+                 corridorMeshCollider.sharedMesh == corridorColliderMesh))
+            {
+                corridorMeshCollider.sharedMesh = null;
+            }
+
+            if (corridorMeshFilter != null &&
+                corridorMeshFilter.sharedMesh == corridorMesh)
+            {
+                corridorMeshFilter.sharedMesh = null;
+            }
+
+            if (corridorMesh != null)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(corridorMesh);
+                }
+                else
+                {
+                    DestroyImmediate(corridorMesh);
+                }
+
+                corridorMesh = null;
+            }
+
+            if (corridorColliderMesh != null)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(corridorColliderMesh);
+                }
+                else
+                {
+                    DestroyImmediate(corridorColliderMesh);
+                }
+
+                corridorColliderMesh = null;
+            }
+
+            if (corridorObject != null)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(corridorObject);
+                }
+                else
+                {
+                    DestroyImmediate(corridorObject);
+                }
+
+                corridorObject = null;
             }
 
             DestroyTemporaryMaterial(ref temporaryBodyMaterial);

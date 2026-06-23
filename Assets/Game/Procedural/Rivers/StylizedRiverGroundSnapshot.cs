@@ -11,11 +11,53 @@ namespace ProgrammaticStylized3D.Rivers
         Square
     }
 
+    /// <summary>
+    /// Immutable ground-space river data used only to conceal the broad generated
+    /// ground beneath the dedicated river corridor. Visible bed and shoreline
+    /// geometry are owned by the corridor mesh, not by the ground grid.
+    /// </summary>
     public readonly struct StylizedRiverGroundSnapshot
     {
         private readonly Vector3[] points;
-        private readonly float[] halfWidths;
-        private readonly float maximumHalfWidth;
+        private readonly float[] visibleHalfWidths;
+        private readonly float[] surfaceHalfWidths;
+        private readonly float maximumSurfaceHalfWidth;
+
+        public StylizedRiverGroundSnapshot(
+            Vector3[] points,
+            float[] visibleHalfWidths,
+            float[] surfaceHalfWidths,
+            float bankBlend,
+            float depth,
+            float bedFlatness,
+            StylizedRiverBankProfile bankProfile,
+            float terrainConformity,
+            float groundGridSpacing,
+            float wetClearance,
+            float bankCover,
+            float reservedDownwardDisplacement)
+        {
+            this.points = points ?? Array.Empty<Vector3>();
+            this.visibleHalfWidths =
+                ResolveHalfWidths(this.points, visibleHalfWidths);
+            this.surfaceHalfWidths =
+                ResolveSurfaceHalfWidths(
+                    this.points,
+                    surfaceHalfWidths,
+                    this.visibleHalfWidths);
+
+            maximumSurfaceHalfWidth = FindMaximum(this.surfaceHalfWidths);
+            BankBlend = Mathf.Max(0.1f, bankBlend);
+            Depth = Mathf.Max(0.05f, depth);
+            BedFlatness = Mathf.Clamp01(bedFlatness);
+            BankProfile = bankProfile;
+            TerrainConformity = Mathf.Clamp01(terrainConformity);
+            GroundGridSpacing = Mathf.Max(0.01f, groundGridSpacing);
+            WetClearance = Mathf.Max(0.005f, wetClearance);
+            BankCover = Mathf.Max(0.005f, bankCover);
+            ReservedDownwardDisplacement =
+                Mathf.Max(0f, reservedDownwardDisplacement);
+        }
 
         public StylizedRiverGroundSnapshot(
             Vector3[] points,
@@ -25,15 +67,20 @@ namespace ProgrammaticStylized3D.Rivers
             float bedFlatness,
             StylizedRiverBankProfile bankProfile,
             float strength)
+            : this(
+                points,
+                halfWidths,
+                halfWidths,
+                bankBlend,
+                depth,
+                bedFlatness,
+                bankProfile,
+                strength,
+                0.5f,
+                0.04f,
+                0.04f,
+                0f)
         {
-            this.points = points ?? Array.Empty<Vector3>();
-            this.halfWidths = ResolveHalfWidths(this.points, halfWidths);
-            maximumHalfWidth = FindMaximum(this.halfWidths);
-            BankBlend = Mathf.Max(0.05f, bankBlend);
-            Depth = Mathf.Max(0.05f, depth);
-            BedFlatness = Mathf.Clamp01(bedFlatness);
-            BankProfile = bankProfile;
-            Strength = Mathf.Clamp01(strength);
         }
 
         public StylizedRiverGroundSnapshot(
@@ -46,7 +93,9 @@ namespace ProgrammaticStylized3D.Rivers
             float strength)
             : this(
                 points,
-                BuildUniformHalfWidths(points, Mathf.Max(0.5f, width) * 0.5f),
+                BuildUniformHalfWidths(
+                    points,
+                    Mathf.Max(0.5f, width) * 0.5f),
                 bankBlend,
                 depth,
                 bedFlatness,
@@ -55,32 +104,41 @@ namespace ProgrammaticStylized3D.Rivers
         {
         }
 
-        public float Width => maximumHalfWidth * 2f;
         public float BankBlend { get; }
         public float Depth { get; }
         public float BedFlatness { get; }
         public StylizedRiverBankProfile BankProfile { get; }
-        public float Strength { get; }
+        public float TerrainConformity { get; }
+        public float Strength => TerrainConformity;
+        public float GroundGridSpacing { get; }
+        public float WetClearance { get; }
+        public float BankCover { get; }
+        public float ReservedDownwardDisplacement { get; }
+        public float RequiredWetClearance =>
+            WetClearance + ReservedDownwardDisplacement;
 
         public bool IsValid =>
             points != null &&
-            halfWidths != null &&
+            visibleHalfWidths != null &&
+            surfaceHalfWidths != null &&
             points.Length >= 2 &&
-            halfWidths.Length == points.Length &&
-            Strength > 0f;
+            visibleHalfWidths.Length == points.Length &&
+            surfaceHalfWidths.Length == points.Length;
 
         public float MaximumInfluenceDistance =>
-            maximumHalfWidth + BankBlend;
+            maximumSurfaceHalfWidth + BankBlend;
 
         public bool TryEvaluate(
             Vector2 point,
             out float distance,
             out float waterHeight,
-            out float halfWidth)
+            out float visibleHalfWidth,
+            out float surfaceHalfWidth)
         {
             distance = float.PositiveInfinity;
             waterHeight = 0f;
-            halfWidth = 0f;
+            visibleHalfWidth = 0f;
+            surfaceHalfWidth = 0f;
 
             if (!IsValid)
             {
@@ -116,10 +174,15 @@ namespace ProgrammaticStylized3D.Rivers
 
                 bestDistanceSqr = candidateDistanceSqr;
                 waterHeight = Mathf.Lerp(a.y, b.y, t);
-                halfWidth =
+                visibleHalfWidth =
                     Mathf.Lerp(
-                        halfWidths[index],
-                        halfWidths[index + 1],
+                        visibleHalfWidths[index],
+                        visibleHalfWidths[index + 1],
+                        t);
+                surfaceHalfWidth =
+                    Mathf.Lerp(
+                        surfaceHalfWidths[index],
+                        surfaceHalfWidths[index + 1],
                         t);
             }
 
@@ -132,147 +195,90 @@ namespace ProgrammaticStylized3D.Rivers
             return true;
         }
 
-        public bool TryEvaluate(
-            Vector2 point,
-            out float distance,
-            out float waterHeight)
+        /// <summary>
+        /// Distance at which the visible corridor reaches the untouched base
+        /// ground. The render mesh continues beyond this handoff as a buried
+        /// integration apron; the broad ground is never modified past it.
+        /// </summary>
+        public float ResolveHandoffHalfWidth(float surfaceHalfWidth)
         {
-            return TryEvaluate(
-                point,
-                out distance,
-                out waterHeight,
-                out _);
+            return Mathf.Max(0f, surfaceHalfWidth) + BankBlend;
         }
 
-        public float EvaluateInfluence(
-            float distance,
-            float halfWidth)
+        // Compatibility name retained for older callers.
+        public float ResolveOuterHalfWidth(float surfaceHalfWidth)
         {
-            float resolvedHalfWidth = Mathf.Max(0.25f, halfWidth);
-
-            if (distance <= resolvedHalfWidth)
-            {
-                return Strength;
-            }
-
-            float outside = distance - resolvedHalfWidth;
-
-            if (outside >= BankBlend)
-            {
-                return 0f;
-            }
-
-            float t = Mathf.Clamp01(outside / BankBlend);
-
-            float falloff =
-                BankProfile switch
-                {
-                    StylizedRiverBankProfile.Gentle =>
-                        1f - Smooth01(t),
-
-                    StylizedRiverBankProfile.Natural =>
-                        Mathf.Pow(1f - t, 1.35f),
-
-                    StylizedRiverBankProfile.Steep =>
-                        Mathf.Pow(1f - t, 0.55f),
-
-                    StylizedRiverBankProfile.Square =>
-                        t < 0.82f
-                            ? 1f
-                            : 1f - Smooth01(
-                                Mathf.InverseLerp(
-                                    0.82f,
-                                    1f,
-                                    t)),
-
-                    _ =>
-                        1f - Smooth01(t)
-                };
-
-            return Mathf.Clamp01(falloff) * Strength;
+            return ResolveHandoffHalfWidth(surfaceHalfWidth);
         }
 
-        public float EvaluateInfluence(float distance)
-        {
-            return EvaluateInfluence(distance, maximumHalfWidth);
-        }
-
-        public float EvaluateTargetHeight(
+        public float EvaluateConcealedGroundHeight(
+            float originalHeight,
             float distance,
             float waterHeight,
-            float halfWidth)
+            float surfaceHalfWidth)
         {
-            float resolvedHalfWidth = Mathf.Max(0.25f, halfWidth);
+            float handoffHalfWidth =
+                ResolveHandoffHalfWidth(surfaceHalfWidth);
 
-            if (distance >= resolvedHalfWidth)
+            if (distance >= handoffHalfWidth)
             {
-                float outsideT =
-                    Mathf.Clamp01(
-                        (distance - resolvedHalfWidth) /
-                        BankBlend);
-
-                float edgeDepth =
-                    Mathf.Lerp(
-                        0.06f,
-                        0f,
-                        Smooth01(outsideT));
-
-                return waterHeight - edgeDepth;
+                return originalHeight;
             }
 
-            float flatRadius =
-                resolvedHalfWidth *
-                Mathf.Lerp(
-                    0.05f,
-                    0.72f,
-                    BedFlatness);
+            // The broad ground is lowered decisively beneath the bed and inner
+            // banks, then returns to its untouched height before the corridor
+            // collider handoff. The separate buried render apron extends beyond
+            // this point far enough to hide the coarse heightfield transition.
+            float taperWidth =
+                Mathf.Clamp(
+                    Mathf.Max(
+                        GroundGridSpacing * 1.75f,
+                        BankBlend * 0.55f),
+                    0.35f,
+                    Mathf.Max(0.35f, BankBlend));
 
-            float depthFactor;
+            float taperStart =
+                Mathf.Max(
+                    surfaceHalfWidth,
+                    handoffHalfWidth - taperWidth);
 
-            if (distance <= flatRadius)
-            {
-                depthFactor = 1f;
-            }
-            else
-            {
-                float slopeT =
-                    Mathf.InverseLerp(
-                        flatRadius,
-                        resolvedHalfWidth,
-                        distance);
+            float concealWeight =
+                1f - SmoothStep(
+                    taperStart,
+                    handoffHalfWidth,
+                    distance);
 
-                depthFactor = 1f - Smooth01(slopeT);
-            }
+            float concealDepth =
+                Mathf.Max(
+                    Depth + RequiredWetClearance + 0.15f,
+                    0.25f);
 
-            return waterHeight - Depth * depthFactor;
-        }
+            float concealedHeight =
+                Mathf.Min(
+                    originalHeight,
+                    waterHeight - concealDepth);
 
-        public float EvaluateTargetHeight(
-            float distance,
-            float waterHeight)
-        {
-            return EvaluateTargetHeight(
-                distance,
-                waterHeight,
-                maximumHalfWidth);
+            return Mathf.Lerp(
+                originalHeight,
+                concealedHeight,
+                concealWeight);
         }
 
         private static float[] ResolveHalfWidths(
             Vector3[] sourcePoints,
             float[] sourceHalfWidths)
         {
-            int count = sourcePoints != null ? sourcePoints.Length : 0;
-
-            if (count == 0)
+            if (sourcePoints == null || sourcePoints.Length == 0)
             {
                 return Array.Empty<float>();
             }
 
-            if (sourceHalfWidths != null && sourceHalfWidths.Length == count)
+            if (sourceHalfWidths != null &&
+                sourceHalfWidths.Length == sourcePoints.Length)
             {
-                float[] copy = new float[count];
+                float[] copy = new float[sourceHalfWidths.Length];
 
-                for (int index = 0; index < count; index++)
+                for (int index = 0; index < copy.Length; index++)
                 {
                     copy[index] = Mathf.Max(0.25f, sourceHalfWidths[index]);
                 }
@@ -280,7 +286,39 @@ namespace ProgrammaticStylized3D.Rivers
                 return copy;
             }
 
-            return BuildUniformHalfWidths(sourcePoints, 0.25f);
+            return BuildUniformHalfWidths(sourcePoints, 0.5f);
+        }
+
+        private static float[] ResolveSurfaceHalfWidths(
+            Vector3[] sourcePoints,
+            float[] sourceSurfaceHalfWidths,
+            float[] fallbackVisibleHalfWidths)
+        {
+            if (sourcePoints == null || sourcePoints.Length == 0)
+            {
+                return Array.Empty<float>();
+            }
+
+            float[] result = new float[sourcePoints.Length];
+
+            for (int index = 0; index < result.Length; index++)
+            {
+                float visible =
+                    fallbackVisibleHalfWidths != null &&
+                    index < fallbackVisibleHalfWidths.Length
+                        ? fallbackVisibleHalfWidths[index]
+                        : 0.5f;
+
+                float surface =
+                    sourceSurfaceHalfWidths != null &&
+                    index < sourceSurfaceHalfWidths.Length
+                        ? sourceSurfaceHalfWidths[index]
+                        : visible;
+
+                result[index] = Mathf.Max(visible, surface);
+            }
+
+            return result;
         }
 
         private static float[] BuildUniformHalfWidths(
@@ -301,7 +339,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private static float FindMaximum(float[] values)
         {
-            float maximum = 0.25f;
+            float maximum = 0f;
 
             if (values == null)
             {
@@ -316,14 +354,13 @@ namespace ProgrammaticStylized3D.Rivers
             return maximum;
         }
 
-        private static float Smooth01(float value)
+        private static float SmoothStep(
+            float edge0,
+            float edge1,
+            float value)
         {
-            value = Mathf.Clamp01(value);
-
-            return
-                value *
-                value *
-                (3f - 2f * value);
+            float t = Mathf.InverseLerp(edge0, edge1, value);
+            return t * t * (3f - 2f * t);
         }
     }
 }

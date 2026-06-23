@@ -166,12 +166,44 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private StylizedRiver[] rivers = Array.Empty<StylizedRiver>();
 
         private MeshFilter meshFilter;
+        private MeshRenderer meshRenderer;
         private MeshCollider meshCollider;
         private Mesh generatedMesh;
+        private GroundHeightFieldSnapshot baseSurface =
+            GroundHeightFieldSnapshot.Empty;
 
         public GroundRecipe Recipe => recipe;
         public int ModifierCount => modifiers != null ? modifiers.Length : 0;
         public int RiverCount => rivers != null ? rivers.Length : 0;
+        public Material SharedMaterial =>
+            meshRenderer != null
+                ? meshRenderer.sharedMaterial
+                : null;
+        public float PatchSize =>
+            recipe != null
+                ? GroundGenerator.ResolvePatchSize(recipe.PatchSize)
+                : 40f;
+
+        public float GridSpacing
+        {
+            get
+            {
+                if (recipe == null)
+                {
+                    return 0.5f;
+                }
+
+                float patchSize =
+                    GroundGenerator.ResolvePatchSize(recipe.PatchSize);
+
+                int resolution =
+                    GroundGenerator.ResolveResolution(recipe.Resolution);
+
+                return patchSize / Mathf.Max(1, resolution - 1);
+            }
+        }
+
+        public float GridCellDiagonal => GridSpacing * 1.41421356237f;
 
         private void OnEnable()
         {
@@ -214,7 +246,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             MeshData meshData = GroundGenerator.Generate(
                 recipe,
                 snapshots,
-                riverSnapshots);
+                riverSnapshots,
+                out baseSurface);
 
             string meshName =
                 $"GeneratedGround_{recipe.PatchSize}_{recipe.Resolution}_Seed{recipe.ShapeSeed}";
@@ -229,6 +262,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             meshCollider.sharedMesh = null;
             meshCollider.sharedMesh = generatedMesh;
             meshCollider.convex = false;
+
+            NotifyRiverCorridorsChanged();
         }
 
         [ContextMenu("New Ground Shape")]
@@ -276,6 +311,43 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             RefreshModifiers();
             Regenerate();
+        }
+
+        public bool TrySampleBaseSurface(
+            Vector3 worldPosition,
+            out float height,
+            out Vector3 normal)
+        {
+            height = 0f;
+            normal = Vector3.up;
+
+            if (baseSurface == null || !baseSurface.IsValid)
+            {
+                return false;
+            }
+
+            Vector3 localPoint =
+                transform.InverseTransformPoint(worldPosition);
+
+            if (!baseSurface.TrySample(
+                    new Vector2(localPoint.x, localPoint.z),
+                    out float localHeight,
+                    out Vector3 localNormal))
+            {
+                return false;
+            }
+
+            Vector3 worldPoint =
+                transform.TransformPoint(
+                    new Vector3(
+                        localPoint.x,
+                        localHeight,
+                        localPoint.z));
+
+            height = worldPoint.y;
+            normal =
+                transform.TransformDirection(localNormal).normalized;
+            return true;
         }
 
         public bool TrySampleSurface(
@@ -359,8 +431,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             List<StylizedRiverGroundSnapshot> snapshots =
                 new List<StylizedRiverGroundSnapshot>();
 
-            if (!recipe.UseModifiers ||
-                rivers == null)
+            if (rivers == null)
             {
                 return snapshots;
             }
@@ -389,6 +460,27 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return snapshots;
         }
 
+        private void NotifyRiverCorridorsChanged()
+        {
+            if (rivers == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < rivers.Length; index++)
+            {
+                StylizedRiver river = rivers[index];
+
+                if (river == null ||
+                    !river.isActiveAndEnabled)
+                {
+                    continue;
+                }
+
+                river.RebuildCorridorFromGround();
+            }
+        }
+
         private static int GenerateDifferentSeed(int current)
         {
             int candidate =
@@ -413,6 +505,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 meshFilter = GetComponent<MeshFilter>();
             }
 
+            if (meshRenderer == null)
+            {
+                meshRenderer = GetComponent<MeshRenderer>();
+            }
+
             if (meshCollider == null)
             {
                 meshCollider = GetComponent<MeshCollider>();
@@ -435,6 +532,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         private void ClearGeneratedAssignments()
         {
+            baseSurface = GroundHeightFieldSnapshot.Empty;
+
             if (meshFilter != null &&
                 meshFilter.sharedMesh == generatedMesh)
             {

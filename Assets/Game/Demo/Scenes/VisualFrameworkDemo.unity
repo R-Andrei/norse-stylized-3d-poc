@@ -15,15 +15,15 @@ RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
   m_Fog: 0
-  m_FogColor: {r: 0.70003474, g: 0.7214494, b: 0.71926516, a: 1}
+  m_FogColor: {r: 0.6961295, g: 0.70729303, b: 0.7026681, a: 1}
   m_FogMode: 3
   m_FogDensity: 0
   m_LinearFogStart: 30
   m_LinearFogEnd: 125
-  m_AmbientSkyColor: {r: 0.68615526, g: 0.70216906, b: 0.686999, a: 1}
+  m_AmbientSkyColor: {r: 0.6719989, g: 0.6787379, b: 0.6606389, a: 1}
   m_AmbientEquatorColor: {r: 0.4, g: 0.45490196, b: 0.49019608, a: 1}
   m_AmbientGroundColor: {r: 0.20392157, g: 0.23921569, b: 0.2627451, a: 1}
-  m_AmbientIntensity: 0.51886064
+  m_AmbientIntensity: 0.5064128
   m_AmbientMode: 3
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
   m_SkyboxMaterial: {fileID: 2100000, guid: ccd231bc029a57146a49620e30c9f207, type: 2}
@@ -35,7 +35,7 @@ RenderSettings:
   m_DefaultReflectionMode: 0
   m_DefaultReflectionResolution: 128
   m_ReflectionBounces: 1
-  m_ReflectionIntensity: 0.4188606
+  m_ReflectionIntensity: 0.4064128
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 410087040}
   m_UseRadianceAmbientProbe: 0
@@ -1450,7 +1450,7 @@ Camera:
     height: 1
   near clip plane: 0.1
   far clip plane: 1000
-  field of view: 40
+  field of view: 35
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
@@ -1476,8 +1476,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.4159908, y: 0.00000003832703, z: -0.0000000175327, w: 0.9093688}
-  m_LocalPosition: {x: -1.76, y: 22.25, z: -27.48}
+  m_LocalRotation: {x: 0.4115802, y: -1.1981777e-15, z: 5.4110217e-16, w: 0.91137356}
+  m_LocalPosition: {x: 4.63, y: 22.25, z: -27.619999}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1587,8 +1587,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 1
-  m_Color: {r: 0.94329125, g: 0.9219656, b: 0.821881, a: 1}
-  m_Intensity: 1.1032909
+  m_Color: {r: 0.9535424, g: 0.90488034, b: 0.7867342, a: 1}
+  m_Intensity: 1.0846192
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -1633,7 +1633,7 @@ Light:
   m_BounceIntensity: 1
   m_ColorTemperature: 5000
   m_UseColorTemperature: 0
-  m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_BoundingSphereOverride: {x: 4.7e-43, y: 8.0393805e-29, z: 4.5916e-41, w: 8.038735e-29}
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ForceVisible: 0
@@ -1943,6 +1943,37 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 441717164}
   m_Mesh: {fileID: 0}
+--- !u!1 &589866829
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 589866830}
+  m_Layer: 0
+  m_Name: __PS3D_RiverCorridor_Invalid
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &589866830
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 589866829}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1626776151}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &593135559
 GameObject:
   m_ObjectHideFlags: 0
@@ -1993,7 +2024,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Ground.GeneratedGround
   recipe:
-    shapeSeed: 8232
+    shapeSeed: 7122
     patchSize: 1
     resolution: 1
     patchCoordinate: {x: 0, y: 0}
@@ -4694,6 +4725,119 @@ MonoBehaviour:
   blendDistance: 0
   weight: 1
   sharedProfile: {fileID: 11400000, guid: f517b4a773fa1e24eadade10706eea15, type: 2}
+--- !u!1 &1275283774
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1275283775}
+  - component: {fileID: 1275283778}
+  - component: {fileID: 1275283777}
+  - component: {fileID: 1275283776}
+  m_Layer: 0
+  m_Name: __PS3D_RiverCorridor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1275283775
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1275283774}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1626776151}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!64 &1275283776
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1275283774}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 0}
+--- !u!23 &1275283777
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1275283774}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: bb2b87a064468744cafa7cc37153c430, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1275283778
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1275283774}
+  m_Mesh: {fileID: 0}
 --- !u!1 &1279057033
 GameObject:
   m_ObjectHideFlags: 0
@@ -5856,7 +6000,7 @@ MonoBehaviour:
     LookAtTarget: {fileID: 0}
     CustomLookAtTarget: 0
   Lens:
-    FieldOfView: 40
+    FieldOfView: 35
     OrthographicSize: 5
     NearClipPlane: 0.1
     FarClipPlane: 1000
@@ -5883,8 +6027,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1533091818}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.41599077, y: 0.00000003832703, z: -0.000000017532699, w: 0.9093689}
-  m_LocalPosition: {x: -1.76, y: 22.25, z: -27.48}
+  m_LocalRotation: {x: 0.4115802, y: -1.748707e-15, z: 1.7601546e-15, w: 0.91137356}
+  m_LocalPosition: {x: 4.63, y: 22.25, z: -27.619999}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -6285,7 +6429,7 @@ Transform:
   m_GameObject: {fileID: 1611485499}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -1.76, y: 1, z: -7.48}
+  m_LocalPosition: {x: 4.63, y: 1, z: -7.62}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -6532,7 +6676,10 @@ GameObject:
   - component: {fileID: 1626776155}
   - component: {fileID: 1626776154}
   - component: {fileID: 1626776157}
-  m_Layer: 0
+  - component: {fileID: 1626776158}
+  - component: {fileID: 1626776159}
+  - component: {fileID: 1626776160}
+  m_Layer: 4
   m_Name: River_Strip
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -6551,7 +6698,9 @@ Transform:
   m_LocalPosition: {x: 9.83, y: 0, z: -20.627174}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 589866830}
+  - {fileID: 1275283775}
   m_Father: {fileID: 593135560}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1626776152
@@ -6765,7 +6914,7 @@ MeshRenderer:
   m_GameObject: {fileID: 1626776150}
   m_Enabled: 1
   m_CastShadows: 0
-  m_ReceiveShadows: 0
+  m_ReceiveShadows: 1
   m_DynamicOccludee: 1
   m_StaticShadowCaster: 0
   m_MotionVectors: 1
@@ -6827,57 +6976,141 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Rivers.StylizedRiver
   splineContainer: {fileID: 1626776152}
   liveRegeneration: 1
-  width: 4
-  bankBlend: 2.5
-  depth: 1.1
-  bedFlatness: 0.62
-  bankProfile: 1
-  bankOverlap: 0.22
-  carvingStrength: 1
+  reverseFlow: 1
+  domainSampleSpacing: 0.5
+  connectedRiverDistanceOffset: 0
+  width: 4.4
+  bankBlend: 5.9
+  depth: 3.9
+  bedFlatness: 0.917
+  bankProfile: 2
+  legacyManualBankOverlap: 0.041
+  additionalShorelineOverlap: 0
+  shorelineWetClearance: 0.05
+  shorelineBankCover: 0.05
+  reservedDownwardSurfaceDisplacement: 0
+  terrainConformity: 0.397
   quality: 1
-  surfaceOffset: 0.035
-  shallowColor: {r: 0.16990031, g: 0.36085206, b: 0.4339623, a: 1}
-  deepColor: {r: 0.10034712, g: 0.33957615, b: 0.38679248, a: 1}
-  flowTint: {r: 0.620194, g: 0.72018087, b: 0.7264151, a: 1}
-  opacity: 0.999
-  flowSpeed: 0.75
-  flowScale: 4.5
-  flowStrength: 0.32
-  detailScale: 0.85
-  detailStrength: 0.38
-  waveHeight: 0.035
-  bankLight: 0.35
-  lightingSteps: 3
-  enableInteractionFoam: 1
-  foamDetection: 0
-  ignoredFoamLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  staticObstacleLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  dynamicActorLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  foamIntensity: 1.62
-  contactFoam: 0.715
-  wakeFoam: 0.755
-  foamScale: 1.12
-  wakeLength: 1.1
-  foamBreakup: 0.601
-  foamMotion: 1.8
-  standingActorFoam: 0.186
-  actorMotionResponse: 0.801
+  surfaceOffset: 0.001
+  bodyPreset: 3
+  shallowColor: {r: 0.28, g: 0.62, b: 0.68, a: 1}
+  deepColor: {r: 0.015, g: 0.12, b: 0.25, a: 1}
+  clarity: 0.28
+  bodyDepthRange: 2.4
+  bodyDepthContrast: 0.68
+  waterTintStrength: 0.9
+  surfacePresence: 0.651
+  bodyDebugView: 0
+  horizonColor: {r: 0.58, g: 0.91, b: 0.94, a: 0.35}
+  specularColor: {r: 0.58, g: 0.91, b: 0.94, a: 1}
+  opacity: 0.899
+  shallowOpacity: 0.42
+  deepOpacity: 0.82
+  depthFadeDistance: 0.4
+  depthBands: 0
+  useHsvColorBlend: 1
+  horizonPower: 5.1
+  refractionScale: 0.01
+  refractionSpeed: 0.053
+  refractionStrength: 0.0065
+  normalTexture: {fileID: 0}
+  normalScale: 0.012
+  normalSpeed: 0.073
+  normalStrength: 0.277
+  waveScale: 1.7
+  waveSpeed: 0.65
+  waveHeight: 0.06
+  waveDirections: {x: 0, y: 0.5, z: 1, w: 0.2}
+  waveEdgeDampingStart: 0.65
+  waveHeightColorStrength: 0.12
+  lightingSmoothness: 0.587
+  lightingHardness: 1
+  specularStrength: 0.65
+  lightingSteps: 3.7
   bodyMaterial: {fileID: 0}
-  foamMaterial: {fileID: 0}
-  foamTexture: {fileID: 2800000, guid: 7219d0237afa7e3489be21c1d0cbb9b1, type: 3}
-  triggerInteraction: 1
-  dynamicScanInterval: 0.15
-  surfaceTolerance: 0.14
-  foamSurfaceLift: 0.055
-  maximumActorSpeed: 6
-  includeFullySubmerged: 0
   visualSeed: 1731
+  debugView: 0
+--- !u!114 &1626776158
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1626776150}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 56752f4b830d4885bba44b2c28dc7cf2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Rivers.StylizedRiverPlanarReflection
+  reflectionsEnabled: 1
+  sourceCameraOverride: {fileID: 0}
+  resolutionScale: 0.5
+  reflectionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  renderSkybox: 1
+  renderShadows: 1
+  includeSceneView: 1
+  clipPlaneOffset: 0.07
+  maxRenderDistance: 150
+  reflectionStrength: 0.45
+  reflectionDistortion: 0.015
+  updateMode: 1
+  updateEveryNFrames: 2
+--- !u!114 &1626776159
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1626776150}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6bf66122cbfe4b24874914eb1596aa86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Rivers.StylizedRiverFoamSimulation
+  style: 0
+  foamAmount: 0.22
+  patternScale: 1.35
+  flowSpeed: 0.58
+  breakup: 0.24
+  foamColor: {r: 0.94, g: 0.985, b: 1, a: 0.72}
+  quality: 1
+  updatesPerSecond: 30
+  warmupSteps: 240
+  simulateInSceneView: 0
+  resetWhenEnabled: 1
+  customFeed: 0.0367
+  customKill: 0.0649
+  customCohesion: 0.42
+  customBankSource: 0.22
+  customAmbientSource: 0.035
+  customLifetime: 7
+  customContactStrength: 0.24
+  customContactDepth: 0.22
+  customThreshold: 0.34
+  customSoftness: 0.075
+--- !u!114 &1626776160
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1626776150}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8894c03a74cc4235b693e8522e4d9918, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Rivers.StylizedRiverDomainDebug
+  drawCentreline: 1
+  drawLogicalBanks: 1
+  drawSampleFrames: 1
+  frameIntervalMetres: 2
+  gizmoHeightOffset: 0.06
+  animateTransportMarker: 1
+  transportSpeedMetresPerSecond: 1
+  markerRadius: 0.16
+  optionalMarkerTransform: {fileID: 0}
 --- !u!1 &1630774461
 GameObject:
   m_ObjectHideFlags: 0
@@ -8376,7 +8609,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1937438535}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.7857125, y: -0.04963326, z: 0.31924364, w: 0.52751875}
+  m_LocalRotation: {x: 0.7766846, y: 0.008584942, z: 0.37046245, w: 0.5093574}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -8842,15 +9075,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Game.Lighting.TimeOfDayController
   profile: {fileID: 11400000, guid: a4668add035e46343af10c84cf3f502f, type: 2}
   secondsPerFullDay: 180
-  currentHour: 13.8
+  currentHour: 14.1
   paused: 1
   timeScale: 1
   useUnscaledTime: 1
   previewInEditMode: 1
   celestialRig: {fileID: 1937438536}
   sunLight: {fileID: 410087040}
-  sunPathYawDegrees: -35
-  sunPathTiltDegrees: 15
+  sunPathYawDegrees: -38
+  sunPathTiltDegrees: 23
   proceduralSkyboxTemplate: {fileID: 2100000, guid: ccd231bc029a57146a49620e30c9f207, type: 2}
   regionModifier:
     profile: {fileID: 0}

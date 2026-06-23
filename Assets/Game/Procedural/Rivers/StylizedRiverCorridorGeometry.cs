@@ -1,0 +1,823 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+using ProgrammaticStylized3D.Geometry;
+using ProgrammaticStylized3D.Geometry.Ground;
+
+namespace ProgrammaticStylized3D.Rivers
+{
+    public readonly struct StylizedRiverCorridorBuildResult
+    {
+        public StylizedRiverCorridorBuildResult(
+            int ringCount,
+            int acrossVertexCount,
+            int triangleCount,
+            int colliderTriangleCount,
+            float maximumOuterWidth,
+            float maximumHandoffWidth,
+            float integrationApronWidth,
+            bool usedGroundHeightField,
+            bool tightBendWarning)
+        {
+            RingCount = ringCount;
+            AcrossVertexCount = acrossVertexCount;
+            TriangleCount = triangleCount;
+            ColliderTriangleCount = colliderTriangleCount;
+            MaximumOuterWidth = maximumOuterWidth;
+            MaximumHandoffWidth = maximumHandoffWidth;
+            IntegrationApronWidth = integrationApronWidth;
+            UsedGroundHeightField = usedGroundHeightField;
+            TightBendWarning = tightBendWarning;
+        }
+
+        public int RingCount { get; }
+        public int AcrossVertexCount { get; }
+        public int TriangleCount { get; }
+        public int ColliderTriangleCount { get; }
+        public float MaximumOuterWidth { get; }
+        public float MaximumHandoffWidth { get; }
+        public float IntegrationApronWidth { get; }
+        public bool UsedGroundHeightField { get; }
+        public bool TightBendWarning { get; }
+        public bool IsValid => RingCount >= 2 && AcrossVertexCount >= 3;
+    }
+
+    /// <summary>
+    /// Builds the visible riverbed and banks independently from the broad ground
+    /// grid. The authoritative Stage 1 domain owns distance and flow; this class
+    /// only refines that domain for smooth visual geometry.
+    /// </summary>
+    public static class StylizedRiverCorridorGeometry
+    {
+        private enum CrossRegion
+        {
+            Centre,
+            FlatBedEdge,
+            BedSlope,
+            HiddenCover,
+            OuterBlend,
+            BuriedApron
+        }
+
+        private readonly struct CrossPoint
+        {
+            public CrossPoint(CrossRegion region, float t)
+            {
+                Region = region;
+                T = Mathf.Clamp01(t);
+            }
+
+            public CrossRegion Region { get; }
+            public float T { get; }
+        }
+
+        private readonly struct CorridorRing
+        {
+            public CorridorRing(
+                Vector3 centre,
+                Vector3 tangent,
+                Vector3 side,
+                Vector3 up,
+                float waterHeight,
+                float visibleHalfWidth,
+                float surfaceHalfWidth,
+                float localDistance)
+            {
+                Centre = centre;
+                Tangent = tangent;
+                Side = side;
+                Up = up;
+                WaterHeight = waterHeight;
+                VisibleHalfWidth = visibleHalfWidth;
+                SurfaceHalfWidth = surfaceHalfWidth;
+                LocalDistance = localDistance;
+            }
+
+            public Vector3 Centre { get; }
+            public Vector3 Tangent { get; }
+            public Vector3 Side { get; }
+            public Vector3 Up { get; }
+            public float WaterHeight { get; }
+            public float VisibleHalfWidth { get; }
+            public float SurfaceHalfWidth { get; }
+            public float LocalDistance { get; }
+        }
+
+        public static float ResolveIntegrationApronWidth(float groundGridSpacing)
+        {
+            // The apron must extend farther than a coarse ground triangle can
+            // bridge so the heightfield's concealed-to-untouched transition is
+            // always hidden beneath the corridor render mesh.
+            float spacing = Mathf.Max(0.01f, groundGridSpacing);
+            float cellDiagonal = spacing * 1.41421356237f;
+            return Mathf.Clamp(
+                Mathf.Max(0.35f, cellDiagonal * 1.10f),
+                0.35f,
+                3.0f);
+        }
+
+        public static float ResolveBurialOffset(float groundGridSpacing)
+        {
+            return Mathf.Clamp(
+                Mathf.Max(0.01f, groundGridSpacing * 0.02f),
+                0.01f,
+                0.04f);
+        }
+
+        public static StylizedRiverCorridorBuildResult BuildMeshes(
+            Transform owner,
+            RiverDomainSnapshot domain,
+            GeneratedGround ground,
+            StylizedRiverQuality quality,
+            float depth,
+            float bedFlatness,
+            float bankBlend,
+            StylizedRiverBankProfile bankProfile,
+            float terrainConformity,
+            float wetClearance,
+            float bankCover,
+            float reservedDownwardDisplacement,
+            Mesh renderMesh,
+            Mesh colliderMesh)
+        {
+            if (owner == null)
+            {
+                throw new ArgumentNullException(nameof(owner));
+            }
+
+            if (renderMesh == null)
+            {
+                throw new ArgumentNullException(nameof(renderMesh));
+            }
+
+            if (colliderMesh == null)
+            {
+                throw new ArgumentNullException(nameof(colliderMesh));
+            }
+
+            renderMesh.Clear();
+            colliderMesh.Clear();
+
+            if (domain == null || !domain.IsValid)
+            {
+                return default;
+            }
+
+            float maximumRingSpacing = quality switch
+            {
+                StylizedRiverQuality.Low => 0.65f,
+                StylizedRiverQuality.Medium => 0.35f,
+                StylizedRiverQuality.High => 0.20f,
+                _ => 0.35f
+            };
+
+            float maximumTurnDegrees = quality switch
+            {
+                StylizedRiverQuality.Low => 7f,
+                StylizedRiverQuality.Medium => 4f,
+                StylizedRiverQuality.High => 2.5f,
+                _ => 4f
+            };
+
+            int slopeSubdivisions = quality switch
+            {
+                StylizedRiverQuality.Low => 2,
+                StylizedRiverQuality.Medium => 4,
+                StylizedRiverQuality.High => 6,
+                _ => 4
+            };
+
+            int coverSubdivisions = quality switch
+            {
+                StylizedRiverQuality.Low => 2,
+                StylizedRiverQuality.Medium => 3,
+                StylizedRiverQuality.High => 4,
+                _ => 3
+            };
+
+            int blendSubdivisions = quality switch
+            {
+                StylizedRiverQuality.Low => 3,
+                StylizedRiverQuality.Medium => 5,
+                StylizedRiverQuality.High => 8,
+                _ => 5
+            };
+
+            int apronSubdivisions = quality switch
+            {
+                StylizedRiverQuality.Low => 2,
+                StylizedRiverQuality.Medium => 3,
+                StylizedRiverQuality.High => 5,
+                _ => 3
+            };
+
+            List<CorridorRing> rings =
+                BuildRefinedRings(
+                    domain,
+                    maximumRingSpacing,
+                    maximumTurnDegrees,
+                    out bool tightBendWarning);
+
+            if (rings.Count < 2)
+            {
+                return default;
+            }
+
+            List<CrossPoint> positiveCrossPoints =
+                BuildPositiveCrossPoints(
+                    bedFlatness,
+                    slopeSubdivisions,
+                    coverSubdivisions,
+                    blendSubdivisions,
+                    apronSubdivisions);
+
+            int positiveCount = positiveCrossPoints.Count;
+            int acrossVertexCount = positiveCount * 2 - 1;
+            int colliderPositiveCount = positiveCount - apronSubdivisions;
+            int colliderAcrossVertexCount = colliderPositiveCount * 2 - 1;
+
+            MeshData renderData = new MeshData();
+            MeshData colliderData = new MeshData();
+
+            float resolvedDepth = Mathf.Max(0.05f, depth);
+            float resolvedBankBlend = Mathf.Max(0.1f, bankBlend);
+            float resolvedConformity = Mathf.Clamp01(terrainConformity);
+            float requiredWetClearance =
+                Mathf.Max(0.005f, wetClearance) +
+                Mathf.Max(0f, reservedDownwardDisplacement);
+            float resolvedBankCover = Mathf.Max(0.005f, bankCover);
+            float groundGridSpacing =
+                ground != null
+                    ? Mathf.Max(0.01f, ground.GridSpacing)
+                    : Mathf.Max(0.05f, domain.RequestedSampleSpacing);
+            float integrationApronWidth =
+                ResolveIntegrationApronWidth(groundGridSpacing);
+            float burialOffset =
+                ResolveBurialOffset(groundGridSpacing);
+            float maximumOuterWidth = 0f;
+            float maximumHandoffWidth = 0f;
+            bool usedGroundHeightField = false;
+
+            for (int ringIndex = 0;
+                 ringIndex < rings.Count;
+                 ringIndex++)
+            {
+                CorridorRing ring = rings[ringIndex];
+                float flatHalfWidth =
+                    ring.VisibleHalfWidth *
+                    Mathf.Clamp01(bedFlatness) *
+                    0.90f;
+                float handoffHalfWidth =
+                    ring.SurfaceHalfWidth + resolvedBankBlend;
+                float renderOuterHalfWidth =
+                    handoffHalfWidth + integrationApronWidth;
+
+                maximumHandoffWidth =
+                    Mathf.Max(
+                        maximumHandoffWidth,
+                        handoffHalfWidth * 2f);
+                maximumOuterWidth =
+                    Mathf.Max(
+                        maximumOuterWidth,
+                        renderOuterHalfWidth * 2f);
+
+                for (int acrossIndex = 0;
+                     acrossIndex < acrossVertexCount;
+                     acrossIndex++)
+                {
+                    int signedPositiveIndex =
+                        acrossIndex < positiveCount - 1
+                            ? positiveCount - 1 - acrossIndex
+                            : acrossIndex - (positiveCount - 1);
+
+                    float sign =
+                        acrossIndex < positiveCount - 1
+                            ? -1f
+                            : acrossIndex == positiveCount - 1
+                                ? 0f
+                                : 1f;
+
+                    CrossPoint crossPoint =
+                        positiveCrossPoints[signedPositiveIndex];
+
+                    float acrossDistance =
+                        ResolveAcrossDistance(
+                            crossPoint,
+                            flatHalfWidth,
+                            ring.VisibleHalfWidth,
+                            ring.SurfaceHalfWidth,
+                            handoffHalfWidth,
+                            renderOuterHalfWidth);
+
+                    Vector3 horizontalPosition =
+                        ring.Centre +
+                        ring.Side * (acrossDistance * sign);
+
+                    float baseHeight =
+                        SampleBaseHeight(
+                            ground,
+                            horizontalPosition,
+                            ring.WaterHeight,
+                            ref usedGroundHeightField);
+
+                    float height =
+                        EvaluateHeight(
+                            crossPoint,
+                            acrossDistance,
+                            flatHalfWidth,
+                            ring.VisibleHalfWidth,
+                            ring.WaterHeight,
+                            baseHeight,
+                            resolvedDepth,
+                            bankProfile,
+                            resolvedConformity,
+                            requiredWetClearance,
+                            resolvedBankCover,
+                            burialOffset);
+
+                    Vector3 worldPosition =
+                        new Vector3(
+                            horizontalPosition.x,
+                            height,
+                            horizontalPosition.z);
+
+                    Vector2 uv = ResolveGroundUv(ground, worldPosition);
+                    Vector3 localPosition =
+                        owner.InverseTransformPoint(worldPosition);
+                    Color colour = new Color(0.5f, 0.5f, 0.5f, 1f);
+
+                    renderData.AddVertex(localPosition, uv, colour);
+
+                    if (crossPoint.Region != CrossRegion.BuriedApron)
+                    {
+                        colliderData.AddVertex(localPosition, uv, colour);
+                    }
+                }
+            }
+
+            AddStripTriangles(
+                renderData,
+                rings.Count,
+                acrossVertexCount);
+            AddStripTriangles(
+                colliderData,
+                rings.Count,
+                colliderAcrossVertexCount);
+
+            MeshBuilder.ApplyToMesh(
+                renderData,
+                renderMesh,
+                "PS3D_StylizedRiverCorridor");
+            MeshBuilder.ApplyToMesh(
+                colliderData,
+                colliderMesh,
+                "PS3D_StylizedRiverCorridorCollider");
+
+            return new StylizedRiverCorridorBuildResult(
+                rings.Count,
+                acrossVertexCount,
+                renderData.TriangleCount,
+                colliderData.TriangleCount,
+                maximumOuterWidth,
+                maximumHandoffWidth,
+                integrationApronWidth,
+                usedGroundHeightField,
+                tightBendWarning);
+        }
+
+        private static void AddStripTriangles(
+            MeshData meshData,
+            int ringCount,
+            int acrossVertexCount)
+        {
+            for (int ringIndex = 0;
+                 ringIndex < ringCount - 1;
+                 ringIndex++)
+            {
+                int rowStart = ringIndex * acrossVertexCount;
+                int nextRowStart = rowStart + acrossVertexCount;
+
+                for (int acrossIndex = 0;
+                     acrossIndex < acrossVertexCount - 1;
+                     acrossIndex++)
+                {
+                    int a = rowStart + acrossIndex;
+                    int b = a + 1;
+                    int c = nextRowStart + acrossIndex;
+                    int d = c + 1;
+
+                    meshData.AddTriangle(a, c, b);
+                    meshData.AddTriangle(b, c, d);
+                }
+            }
+        }
+
+        private static List<CorridorRing> BuildRefinedRings(
+            RiverDomainSnapshot domain,
+            float maximumSpacing,
+            float maximumTurnDegrees,
+            out bool tightBendWarning)
+        {
+            List<CorridorRing> rings = new List<CorridorRing>();
+            IReadOnlyList<StylizedRiverSplineSample> samples = domain.Samples;
+            tightBendWarning = false;
+
+            for (int index = 0; index < samples.Count - 1; index++)
+            {
+                StylizedRiverSplineSample a = samples[index];
+                StylizedRiverSplineSample b = samples[index + 1];
+                float segmentLength =
+                    Mathf.Max(0.0001f, b.Distance - a.Distance);
+                float turnDegrees = Vector3.Angle(a.Tangent, b.Tangent);
+
+                int subdivisions = Mathf.Max(
+                    1,
+                    Mathf.CeilToInt(segmentLength / maximumSpacing),
+                    Mathf.CeilToInt(
+                        turnDegrees /
+                        Mathf.Max(0.1f, maximumTurnDegrees)));
+
+                float turnRadians = turnDegrees * Mathf.Deg2Rad;
+                if (turnRadians > 0.001f)
+                {
+                    float estimatedRadius = segmentLength / turnRadians;
+                    float maximumHalfWidth =
+                        Mathf.Max(
+                            a.SurfaceHalfWidth,
+                            b.SurfaceHalfWidth);
+
+                    if (maximumHalfWidth > estimatedRadius * 0.80f)
+                    {
+                        tightBendWarning = true;
+                    }
+                }
+
+                for (int step = 0; step < subdivisions; step++)
+                {
+                    float t = step / (float)subdivisions;
+                    rings.Add(InterpolateRing(a, b, t, segmentLength));
+                }
+            }
+
+            StylizedRiverSplineSample last = samples[samples.Count - 1];
+            rings.Add(
+                new CorridorRing(
+                    last.Centre,
+                    last.Tangent,
+                    last.Side,
+                    last.Up,
+                    last.SurfaceHeight,
+                    last.HalfWidth,
+                    last.SurfaceHalfWidth,
+                    last.Distance));
+
+            return rings;
+        }
+
+        private static CorridorRing InterpolateRing(
+            StylizedRiverSplineSample a,
+            StylizedRiverSplineSample b,
+            float t,
+            float segmentLength)
+        {
+            Vector3 tangentA = a.Tangent * segmentLength;
+            Vector3 tangentB = b.Tangent * segmentLength;
+            Vector3 centre = Hermite(a.Centre, b.Centre, tangentA, tangentB, t);
+            Vector3 tangent =
+                HermiteDerivative(
+                    a.Centre,
+                    b.Centre,
+                    tangentA,
+                    tangentB,
+                    t);
+
+            tangent.y = 0f;
+            if (tangent.sqrMagnitude <= 0.000001f)
+            {
+                tangent = Vector3.Slerp(a.Tangent, b.Tangent, t);
+            }
+            tangent.Normalize();
+
+            Vector3 up = Vector3.Slerp(a.Up, b.Up, t).normalized;
+            Vector3 side = Vector3.Cross(up, tangent).normalized;
+
+            return new CorridorRing(
+                centre,
+                tangent,
+                side,
+                up,
+                Mathf.Lerp(a.SurfaceHeight, b.SurfaceHeight, t),
+                Mathf.Lerp(a.HalfWidth, b.HalfWidth, t),
+                Mathf.Lerp(a.SurfaceHalfWidth, b.SurfaceHalfWidth, t),
+                Mathf.Lerp(a.Distance, b.Distance, t));
+        }
+
+        private static List<CrossPoint> BuildPositiveCrossPoints(
+            float bedFlatness,
+            int slopeSubdivisions,
+            int coverSubdivisions,
+            int blendSubdivisions,
+            int apronSubdivisions)
+        {
+            List<CrossPoint> points = new List<CrossPoint>
+            {
+                new CrossPoint(CrossRegion.Centre, 0f)
+            };
+
+            if (bedFlatness > 0.001f)
+            {
+                points.Add(new CrossPoint(CrossRegion.FlatBedEdge, 1f));
+            }
+
+            for (int index = 1; index <= slopeSubdivisions; index++)
+            {
+                points.Add(
+                    new CrossPoint(
+                        CrossRegion.BedSlope,
+                        index / (float)slopeSubdivisions));
+            }
+
+            for (int index = 1; index <= coverSubdivisions; index++)
+            {
+                points.Add(
+                    new CrossPoint(
+                        CrossRegion.HiddenCover,
+                        index / (float)coverSubdivisions));
+            }
+
+            for (int index = 1; index <= blendSubdivisions; index++)
+            {
+                points.Add(
+                    new CrossPoint(
+                        CrossRegion.OuterBlend,
+                        index / (float)blendSubdivisions));
+            }
+
+            for (int index = 1; index <= apronSubdivisions; index++)
+            {
+                points.Add(
+                    new CrossPoint(
+                        CrossRegion.BuriedApron,
+                        index / (float)apronSubdivisions));
+            }
+
+            return points;
+        }
+
+        private static float ResolveAcrossDistance(
+            CrossPoint point,
+            float flatHalfWidth,
+            float visibleHalfWidth,
+            float surfaceHalfWidth,
+            float handoffHalfWidth,
+            float renderOuterHalfWidth)
+        {
+            return point.Region switch
+            {
+                CrossRegion.Centre => 0f,
+                CrossRegion.FlatBedEdge => flatHalfWidth,
+                CrossRegion.BedSlope =>
+                    Mathf.Lerp(
+                        flatHalfWidth,
+                        visibleHalfWidth,
+                        point.T),
+                CrossRegion.HiddenCover =>
+                    Mathf.Lerp(
+                        visibleHalfWidth,
+                        surfaceHalfWidth,
+                        point.T),
+                CrossRegion.OuterBlend =>
+                    Mathf.Lerp(
+                        surfaceHalfWidth,
+                        handoffHalfWidth,
+                        point.T),
+                CrossRegion.BuriedApron =>
+                    Mathf.Lerp(
+                        handoffHalfWidth,
+                        renderOuterHalfWidth,
+                        point.T),
+                _ => 0f
+            };
+        }
+
+        private static float EvaluateHeight(
+            CrossPoint point,
+            float acrossDistance,
+            float flatHalfWidth,
+            float visibleHalfWidth,
+            float waterHeight,
+            float baseGroundHeight,
+            float depth,
+            StylizedRiverBankProfile bankProfile,
+            float terrainConformity,
+            float requiredWetClearance,
+            float bankCover,
+            float burialOffset)
+        {
+            float bedHeight = waterHeight - depth;
+
+            switch (point.Region)
+            {
+                case CrossRegion.Centre:
+                case CrossRegion.FlatBedEdge:
+                {
+                    float shaped =
+                        Mathf.Lerp(
+                            baseGroundHeight,
+                            bedHeight,
+                            terrainConformity);
+
+                    return Mathf.Min(
+                        shaped,
+                        waterHeight - requiredWetClearance);
+                }
+
+                case CrossRegion.BedSlope:
+                {
+                    float denominator =
+                        Mathf.Max(
+                            0.0001f,
+                            visibleHalfWidth - flatHalfWidth);
+                    float t =
+                        Mathf.Clamp01(
+                            (acrossDistance - flatHalfWidth) /
+                            denominator);
+                    float profileT = EvaluateBankProfile(bankProfile, t);
+                    float authoredHeight =
+                        Mathf.Lerp(
+                            bedHeight,
+                            waterHeight,
+                            profileT);
+                    float shaped =
+                        Mathf.Lerp(
+                            baseGroundHeight,
+                            authoredHeight,
+                            terrainConformity);
+                    float clearanceFade =
+                        1f - SmoothStep(0.72f, 1f, t);
+                    float maximumHeight =
+                        waterHeight -
+                        requiredWetClearance * clearanceFade;
+
+                    return Mathf.Min(shaped, maximumHeight);
+                }
+
+                case CrossRegion.HiddenCover:
+                {
+                    float coverT = SmoothStep(0f, 1f, point.T);
+                    float mandatoryHeight =
+                        Mathf.Lerp(
+                            waterHeight,
+                            waterHeight + bankCover,
+                            coverT);
+                    float preservedHeight =
+                        Mathf.Max(baseGroundHeight, mandatoryHeight);
+
+                    return Mathf.Lerp(
+                        preservedHeight,
+                        mandatoryHeight,
+                        terrainConformity);
+                }
+
+                case CrossRegion.OuterBlend:
+                {
+                    float blendT = SmoothStep(0f, 1f, point.T);
+                    float innerHeight = waterHeight + bankCover;
+                    float authoredHeight =
+                        Mathf.Lerp(
+                            innerHeight,
+                            baseGroundHeight,
+                            EvaluateBankProfile(bankProfile, blendT));
+                    float safetyHeight =
+                        Mathf.Lerp(
+                            innerHeight,
+                            baseGroundHeight,
+                            blendT);
+                    float preservedHeight =
+                        Mathf.Max(baseGroundHeight, safetyHeight);
+                    float result =
+                        Mathf.Lerp(
+                            preservedHeight,
+                            authoredHeight,
+                            terrainConformity);
+
+                    if (point.T >= 0.9999f)
+                    {
+                        result = baseGroundHeight;
+                    }
+
+                    return result;
+                }
+
+                case CrossRegion.BuriedApron:
+                {
+                    // The collider has already ended at the exact terrain
+                    // handoff. The render-only apron follows the untouched base
+                    // ground and sinks gently below it, hiding both its own raw
+                    // edge and the coarse ground's concealment transition.
+                    float buryT = SmoothStep(0f, 1f, point.T);
+                    return baseGroundHeight - burialOffset * buryT;
+                }
+
+                default:
+                    return baseGroundHeight;
+            }
+        }
+
+        private static float EvaluateBankProfile(
+            StylizedRiverBankProfile profile,
+            float t)
+        {
+            t = Mathf.Clamp01(t);
+
+            return profile switch
+            {
+                StylizedRiverBankProfile.Gentle =>
+                    1f - (1f - t) * (1f - t),
+                StylizedRiverBankProfile.Natural =>
+                    SmoothStep(0f, 1f, t),
+                StylizedRiverBankProfile.Steep =>
+                    t * t * t,
+                StylizedRiverBankProfile.Square =>
+                    Mathf.Pow(t, 8f),
+                _ => SmoothStep(0f, 1f, t)
+            };
+        }
+
+        private static float SampleBaseHeight(
+            GeneratedGround ground,
+            Vector3 worldPosition,
+            float fallbackHeight,
+            ref bool usedGroundHeightField)
+        {
+            if (ground != null &&
+                ground.TrySampleBaseSurface(
+                    worldPosition,
+                    out float height,
+                    out _))
+            {
+                usedGroundHeightField = true;
+                return height;
+            }
+
+            return fallbackHeight;
+        }
+
+        private static Vector2 ResolveGroundUv(
+            GeneratedGround ground,
+            Vector3 worldPosition)
+        {
+            if (ground != null)
+            {
+                Vector3 local =
+                    ground.transform.InverseTransformPoint(worldPosition);
+                float patchSize = Mathf.Max(0.01f, ground.PatchSize);
+
+                return new Vector2(
+                    local.x / patchSize + 0.5f,
+                    local.z / patchSize + 0.5f);
+            }
+
+            return new Vector2(
+                worldPosition.x * 0.05f,
+                worldPosition.z * 0.05f);
+        }
+
+        private static Vector3 Hermite(
+            Vector3 p0,
+            Vector3 p1,
+            Vector3 m0,
+            Vector3 m1,
+            float t)
+        {
+            float t2 = t * t;
+            float t3 = t2 * t;
+            float h00 = 2f * t3 - 3f * t2 + 1f;
+            float h10 = t3 - 2f * t2 + t;
+            float h01 = -2f * t3 + 3f * t2;
+            float h11 = t3 - t2;
+            return h00 * p0 + h10 * m0 + h01 * p1 + h11 * m1;
+        }
+
+        private static Vector3 HermiteDerivative(
+            Vector3 p0,
+            Vector3 p1,
+            Vector3 m0,
+            Vector3 m1,
+            float t)
+        {
+            float t2 = t * t;
+            float h00 = 6f * t2 - 6f * t;
+            float h10 = 3f * t2 - 4f * t + 1f;
+            float h01 = -6f * t2 + 6f * t;
+            float h11 = 3f * t2 - 2f * t;
+            return h00 * p0 + h10 * m0 + h01 * p1 + h11 * m1;
+        }
+
+        private static float SmoothStep(float edge0, float edge1, float value)
+        {
+            float t = Mathf.InverseLerp(edge0, edge1, value);
+            return t * t * (3f - 2f * t);
+        }
+    }
+}

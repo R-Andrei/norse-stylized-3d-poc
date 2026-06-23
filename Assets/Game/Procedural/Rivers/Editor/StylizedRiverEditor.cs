@@ -9,6 +9,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
     internal sealed class StylizedRiverEditor : UnityEditor.Editor
     {
         private bool showAdvancedBody;
+        private bool showAdvancedShoreline;
 
         public override void OnInspectorGUI()
         {
@@ -17,6 +18,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawSetup();
             DrawRiverDomain();
             DrawChannel();
+            DrawAdvancedShoreline();
             DrawSurfaceMesh();
             DrawWaterBody();
             DrawAdvancedBody();
@@ -126,13 +128,98 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             EditorGUILayout.Space(8f);
             EditorGUILayout.LabelField("Channel", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(Find("width"), new GUIContent("Water Width"));
+            EditorGUILayout.PropertyField(
+                Find("width"),
+                new GUIContent(
+                    "Water Width",
+                    "Approximate visible open-water width. The corridor adds a small hidden shoreline cover automatically."));
             EditorGUILayout.PropertyField(Find("depth"), new GUIContent("Bed Depth"));
-            EditorGUILayout.PropertyField(Find("bedFlatness"));
-            EditorGUILayout.PropertyField(Find("bankBlend"));
+            EditorGUILayout.PropertyField(
+                Find("bedFlatness"),
+                new GUIContent(
+                    "Bed Flatness",
+                    "Controls how much of the river centre remains flat before the bed rises toward the shoreline."));
+            EditorGUILayout.PropertyField(
+                Find("bankBlend"),
+                new GUIContent(
+                    "Bank Blend",
+                    "Actual horizontal distance, in metres, used by the visible corridor bank before it reaches the untouched ground handoff."));
             EditorGUILayout.PropertyField(Find("bankProfile"));
-            EditorGUILayout.PropertyField(Find("bankOverlap"), new GUIContent("Water Underlap"));
-            EditorGUILayout.PropertyField(Find("carvingStrength"));
+            EditorGUILayout.PropertyField(
+                Find("terrainConformity"),
+                new GUIContent(
+                    "Terrain Conformity",
+                    "Zero preserves the sampled ground shape as much as geometry safety permits. One strongly imposes the authored bed and bank cross-section."));
+
+            if (targets.Length != 1 || target is not StylizedRiver river)
+            {
+                return;
+            }
+
+            EditorGUILayout.Space(3f);
+            EditorGUILayout.LabelField(
+                "Visible Shoreline",
+                "Dedicated spline corridor");
+            EditorGUILayout.LabelField(
+                "Resolved Hidden Overlap",
+                $"{river.ResolvedShorelineOverlap:0.000} m / side");
+            EditorGUILayout.LabelField(
+                "Generated Water Width",
+                $"{river.GeneratedSurfaceWidth:0.000} m");
+            EditorGUILayout.LabelField(
+                "Collider Handoff Width",
+                river.CorridorHandoffWidth > 0f
+                    ? $"{river.CorridorHandoffWidth:0.000} m"
+                    : "Not generated");
+            EditorGUILayout.LabelField(
+                "Hidden Integration Apron",
+                river.CorridorIntegrationApronWidth > 0f
+                    ? $"{river.CorridorIntegrationApronWidth:0.000} m / side"
+                    : "Not generated");
+            EditorGUILayout.LabelField(
+                "Corridor Render Width",
+                river.CorridorOuterWidth > 0f
+                    ? $"{river.CorridorOuterWidth:0.000} m"
+                    : "Not generated");
+        }
+
+        private void DrawAdvancedShoreline()
+        {
+            showAdvancedShoreline = EditorGUILayout.Foldout(
+                showAdvancedShoreline,
+                "Advanced Corridor Safety",
+                true);
+
+            if (!showAdvancedShoreline)
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+            EditorGUILayout.HelpBox(
+                "The dedicated corridor guarantees wet clearance and hides the flat water-mesh edge beneath its banks. Its collider ends where the corridor meets the untouched ground; a render-only apron continues beneath the ground to hide the coarse heightfield transition.",
+                MessageType.Info);
+            EditorGUILayout.PropertyField(
+                Find("additionalShorelineOverlap"),
+                new GUIContent(
+                    "Additional Overlap",
+                    "Optional extra hidden overlap beyond the calculated safe minimum."));
+            EditorGUILayout.PropertyField(
+                Find("shorelineWetClearance"),
+                new GUIContent(
+                    "Wet Clearance",
+                    "Minimum separation between generated terrain and the visible wet surface."));
+            EditorGUILayout.PropertyField(
+                Find("shorelineBankCover"),
+                new GUIContent(
+                    "Bank Cover",
+                    "Minimum corridor-bank height above the hidden water-mesh edge."));
+            EditorGUILayout.PropertyField(
+                Find("reservedDownwardSurfaceDisplacement"),
+                new GUIContent(
+                    "Reserved Downward Motion",
+                    "Clearance reserved for a later surface-motion stage. Keep at zero during Stage 2."));
+            EditorGUI.indentLevel--;
         }
 
         private void DrawSurfaceMesh()
@@ -142,8 +229,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.PropertyField(
                 Find("quality"),
                 new GUIContent(
-                    "Across-River Quality",
-                    "Controls cross-channel tessellation only. Along-river density is owned by the River Domain sample spacing."));
+                    "Geometry Quality",
+                    "Controls water cross-channel tessellation plus corridor cross-section detail and smooth longitudinal refinement. The Stage 1 domain remains the authoritative coordinate source."));
             EditorGUILayout.PropertyField(
                 Find("surfaceOffset"),
                 new GUIContent("Water Level Offset"));
@@ -305,6 +392,26 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Surface Triangles",
                 river.SurfaceTriangleCount.ToString("N0"));
             EditorGUILayout.LabelField(
+                "Corridor Rings",
+                river.CorridorRingCount.ToString("N0"));
+            EditorGUILayout.LabelField(
+                "Corridor Triangles",
+                river.CorridorTriangleCount.ToString("N0"));
+            EditorGUILayout.LabelField(
+                "Corridor Collider Triangles",
+                river.CorridorColliderTriangleCount.ToString("N0"));
+            EditorGUILayout.LabelField(
+                "Ground Height Source",
+                river.CorridorUsesGroundHeightField
+                    ? "Generated base terrain"
+                    : "Fallback");
+            if (river.CorridorHasTightBendWarning)
+            {
+                EditorGUILayout.HelpBox(
+                    "The river is very wide relative to at least one bend radius. Inspect the inner bank for pinching.",
+                    MessageType.Warning);
+            }
+            EditorGUILayout.LabelField(
                 "GameObject Layer",
                 LayerMask.LayerToName(river.gameObject.layer));
         }
@@ -320,10 +427,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     river => river.RegenerateAll());
             }
 
-            if (GUILayout.Button("Rebuild Surface Only"))
+            if (GUILayout.Button("Rebuild Surface and Corridor"))
             {
                 ApplyToTargets(
-                    "Rebuild Stylized River Surface",
+                    "Rebuild Stylized River Surface and Corridor",
                     river => river.RebuildSurfaceOnly());
             }
 
