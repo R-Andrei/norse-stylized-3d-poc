@@ -118,7 +118,8 @@ namespace ProgrammaticStylized3D.Rivers
             : this(
                 acrossHalfWidth,
                 samples != null ? samples.Length : 0,
-                samples)
+                samples,
+                System.Array.Empty<float>())
         {
         }
 
@@ -126,10 +127,25 @@ namespace ProgrammaticStylized3D.Rivers
             float acrossHalfWidth,
             int lateralSampleCount,
             Vector4[] samples)
+            : this(
+                acrossHalfWidth,
+                lateralSampleCount,
+                samples,
+                System.Array.Empty<float>())
+        {
+        }
+
+        public RiverDisturbancePressureBakeProfile(
+            float acrossHalfWidth,
+            int lateralSampleCount,
+            Vector4[] samples,
+            float[] downstreamBoundaries)
         {
             AcrossHalfWidth = acrossHalfWidth;
             LateralSampleCount = lateralSampleCount;
             Samples = samples ?? System.Array.Empty<Vector4>();
+            DownstreamBoundaries = downstreamBoundaries ??
+                System.Array.Empty<float>();
         }
 
         public float AcrossHalfWidth { get; }
@@ -142,6 +158,17 @@ namespace ProgrammaticStylized3D.Rivers
         /// supported modulation ceiling. A non-positive W marks an invalid row.
         /// </summary>
         public Vector4[] Samples { get; }
+
+        /// <summary>
+        /// Waterline downstream boundary for each compact lateral row, in
+        /// metres relative to the source. This remains separate from Samples so
+        /// the accepted height/contact profile contract is unchanged.
+        /// </summary>
+        public float[] DownstreamBoundaries { get; }
+
+        public bool HasGeometryBounds =>
+            DownstreamBoundaries != null &&
+            DownstreamBoundaries.Length == LateralSampleCount;
 
         public bool IsValid =>
             Samples != null &&
@@ -707,6 +734,8 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.Max(1, lateralSampleCount - 1);
             Vector4[] compactSamples =
                 new Vector4[lateralSampleCount];
+            float[] downstreamBoundaries =
+                new float[lateralSampleCount];
             int validSampleCount = 0;
 
             for (int row = 0; row < lateralSampleCount; row++)
@@ -715,8 +744,11 @@ namespace ProgrammaticStylized3D.Rivers
                 if (baseSample.z <= 0.5f)
                 {
                     compactSamples[row] = Vector4.zero;
+                    downstreamBoundaries[row] = 0f;
                     continue;
                 }
+
+                downstreamBoundaries[row] = baseSample.y;
 
                 float localMaximumHeight = 0f;
                 for (int slice = 0; slice < PressureSupportHeightSlices; slice++)
@@ -831,7 +863,8 @@ namespace ProgrammaticStylized3D.Rivers
             profile = new RiverDisturbancePressureBakeProfile(
                 support.AcrossHalfWidth,
                 lateralSampleCount,
-                compactSamples);
+                compactSamples,
+                downstreamBoundaries);
             return profile.IsValid;
         }
 

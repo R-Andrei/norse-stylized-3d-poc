@@ -446,6 +446,27 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             EditorGUILayout.IntField(
                 "Rows Reaching Target Height",
                 debugData.TargetHeightRowCount);
+            EditorGUILayout.Vector2Field(
+                "Row Thickness Range",
+                debugData.RowThicknessRange);
+            EditorGUILayout.FloatField(
+                "Median Row Thickness",
+                debugData.MedianRowThickness);
+            EditorGUILayout.FloatField(
+                "Protected Rear Starts At (%)",
+                debugData.ProtectedDownstreamStartPercent);
+            EditorGUILayout.FloatField(
+                "Max Resolved Crest Depth (%)",
+                debugData.MaximumResolvedCrestDepthPercent);
+            EditorGUILayout.FloatField(
+                "Max Pressure-End Depth (%)",
+                debugData.MaximumResolvedPressureEndDepthPercent);
+            EditorGUILayout.IntField(
+                "Rows Clamped by Rear Protection",
+                debugData.GeometryClampedRowCount);
+            EditorGUILayout.IntField(
+                "Rows Entering Protected Rear Region",
+                debugData.ProtectedDownstreamRegionViolationRowCount);
             EditorGUILayout.FloatField(
                 "Max Adjacent Base Height Delta",
                 debugData.MaximumAdjacentBaseHeightDifference);
@@ -505,15 +526,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 sceneView.position.width - 32f,
                 520f,
                 760f);
-            Rect panelRect = new Rect(16f, 48f, panelWidth, 430f);
+            Rect panelRect = new Rect(16f, 48f, panelWidth, 466f);
             Rect heightGraph = new Rect(
                 panelRect.x + 12f,
-                panelRect.y + 80f,
+                panelRect.y + 98f,
                 panelRect.width - 24f,
                 178f);
             Rect contactGraph = new Rect(
                 panelRect.x + 12f,
-                panelRect.y + 294f,
+                panelRect.y + 312f,
                 panelRect.width - 24f,
                 110f);
 
@@ -548,6 +569,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 $"{debugData.SupportLimitedBelowTargetRowCount} | " +
                 $"Endpoint taper {debugData.EndpointTaperRowCount} | " +
                 $"At target {debugData.TargetHeightRowCount}",
+                EditorStyles.miniLabel);
+            GUI.Label(
+                new Rect(
+                    panelRect.x + 10f,
+                    panelRect.y + 65f,
+                    panelRect.width - 20f,
+                    18f),
+                $"Thickness {debugData.RowThicknessRange.x:F3}–" +
+                $"{debugData.RowThicknessRange.y:F3} m | " +
+                $"Geometry-clamped {debugData.GeometryClampedRowCount} | " +
+                $"Rear-region violations " +
+                $"{debugData.ProtectedDownstreamRegionViolationRowCount}",
                 EditorStyles.miniLabel);
 
             DrawHeightProfileGraph(heightGraph, debugData);
@@ -685,14 +718,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     currentSample.y * currentSample.z;
                 float ceilingContact =
                     baseSample.x + baseSample.y * baseSample.w;
+                float downstreamBoundary =
+                    debugData.DownstreamBoundaries[row];
+                float protectedDownstreamStart = Mathf.Lerp(
+                    waterline,
+                    downstreamBoundary,
+                    debugData.ProtectedDownstreamStartPercent * 0.01f);
                 minimum = Mathf.Min(minimum, waterline);
                 minimum = Mathf.Min(minimum, cachedContact);
                 minimum = Mathf.Min(minimum, currentContact);
                 minimum = Mathf.Min(minimum, ceilingContact);
+                minimum = Mathf.Min(minimum, protectedDownstreamStart);
+                minimum = Mathf.Min(minimum, downstreamBoundary);
                 maximum = Mathf.Max(maximum, waterline);
                 maximum = Mathf.Max(maximum, cachedContact);
                 maximum = Mathf.Max(maximum, currentContact);
                 maximum = Mathf.Max(maximum, ceilingContact);
+                maximum = Mathf.Max(maximum, protectedDownstreamStart);
+                maximum = Mathf.Max(maximum, downstreamBoundary);
             }
 
             if (float.IsInfinity(minimum))
@@ -731,6 +774,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 minimum,
                 maximum,
                 new Color(1f, 0.20f, 0.85f, 1f));
+            DrawContactSeries(
+                graphRect,
+                debugData,
+                4,
+                minimum,
+                maximum,
+                new Color(1f, 0.55f, 0.15f, 1f));
+            DrawContactSeries(
+                graphRect,
+                debugData,
+                5,
+                minimum,
+                maximum,
+                new Color(0.55f, 0.35f, 1f, 1f));
 
             GUI.Label(
                 new Rect(
@@ -738,7 +795,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     graphRect.y + 3f,
                     graphRect.width - 10f,
                     18f),
-                "Upstream contact position (metres relative to source)",
+                "Contact and row boundaries (metres relative to source)",
                 EditorStyles.miniBoldLabel);
             GUI.Label(
                 new Rect(
@@ -776,6 +833,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 graphRect.yMax + 4f,
                 new Color(1f, 0.20f, 0.85f, 1f),
                 "ceiling contact");
+            DrawLegendItem(
+                graphRect.x + 6f,
+                graphRect.yMax + 20f,
+                new Color(1f, 0.55f, 0.15f, 1f),
+                "rear protection");
+            DrawLegendItem(
+                graphRect.x + 132f,
+                graphRect.yMax + 20f,
+                new Color(0.55f, 0.35f, 1f, 1f),
+                "downstream edge");
         }
 
         private static void DrawGraphGrid(Rect rect, int rowCount)
@@ -894,6 +961,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     2 => currentSample.x +
                          currentSample.y * currentSample.z,
                     3 => baseSample.x + baseSample.y * baseSample.w,
+                    4 => Mathf.Lerp(
+                        baseSample.x,
+                        debugData.DownstreamBoundaries[row],
+                        debugData.ProtectedDownstreamStartPercent * 0.01f),
+                    5 => debugData.DownstreamBoundaries[row],
                     _ => 0f
                 };
                 Vector3 point = new Vector3(

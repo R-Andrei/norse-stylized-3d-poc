@@ -170,9 +170,17 @@ namespace ProgrammaticStylized3D.Rivers
             float maximumAdjacentCurrentHeightDifference,
             float maximumAdjacentBaseContactShift,
             float maximumAdjacentCurrentContactShift,
+            Vector2 rowThicknessRange,
+            float medianRowThickness,
+            float maximumResolvedCrestDepthPercent,
+            float maximumResolvedPressureEndDepthPercent,
+            int geometryClampedRowCount,
+            int protectedDownstreamRegionViolationRowCount,
+            float protectedDownstreamStartPercent,
             Vector2 appliedMultiplierBounds,
             Vector4[] baseSamples,
-            Vector4[] currentSamples)
+            Vector4[] currentSamples,
+            float[] downstreamBoundaries)
         {
             River = river;
             WorldPosition = worldPosition;
@@ -202,9 +210,22 @@ namespace ProgrammaticStylized3D.Rivers
                 maximumAdjacentBaseContactShift;
             MaximumAdjacentCurrentContactShift =
                 maximumAdjacentCurrentContactShift;
+            RowThicknessRange = rowThicknessRange;
+            MedianRowThickness = medianRowThickness;
+            MaximumResolvedCrestDepthPercent =
+                maximumResolvedCrestDepthPercent;
+            MaximumResolvedPressureEndDepthPercent =
+                maximumResolvedPressureEndDepthPercent;
+            GeometryClampedRowCount = geometryClampedRowCount;
+            ProtectedDownstreamRegionViolationRowCount =
+                protectedDownstreamRegionViolationRowCount;
+            ProtectedDownstreamStartPercent =
+                protectedDownstreamStartPercent;
             AppliedMultiplierBounds = appliedMultiplierBounds;
             BaseSamples = baseSamples ?? Array.Empty<Vector4>();
             CurrentSamples = currentSamples ?? Array.Empty<Vector4>();
+            DownstreamBoundaries = downstreamBoundaries ??
+                Array.Empty<float>();
         }
 
         public StylizedRiver River { get; }
@@ -230,17 +251,27 @@ namespace ProgrammaticStylized3D.Rivers
         public float MaximumAdjacentCurrentHeightDifference { get; }
         public float MaximumAdjacentBaseContactShift { get; }
         public float MaximumAdjacentCurrentContactShift { get; }
+        public Vector2 RowThicknessRange { get; }
+        public float MedianRowThickness { get; }
+        public float MaximumResolvedCrestDepthPercent { get; }
+        public float MaximumResolvedPressureEndDepthPercent { get; }
+        public int GeometryClampedRowCount { get; }
+        public int ProtectedDownstreamRegionViolationRowCount { get; }
+        public float ProtectedDownstreamStartPercent { get; }
         public Vector2 AppliedMultiplierBounds { get; }
         public Vector4[] BaseSamples { get; }
         public Vector4[] CurrentSamples { get; }
+        public float[] DownstreamBoundaries { get; }
 
         public bool IsValid =>
             River != null &&
             LateralSampleCount > 0 &&
             BaseSamples != null &&
             CurrentSamples != null &&
+            DownstreamBoundaries != null &&
             BaseSamples.Length == LateralSampleCount &&
-            CurrentSamples.Length == LateralSampleCount;
+            CurrentSamples.Length == LateralSampleCount &&
+            DownstreamBoundaries.Length == LateralSampleCount;
     }
 #endif
 
@@ -331,6 +362,10 @@ namespace ProgrammaticStylized3D.Rivers
         private readonly Vector4[] staticContourUpload =
             new Vector4[MaximumStaticContourPoints];
         private readonly Vector4[] staticPressureProfileUpload =
+            new Vector4[
+                RiverDisturbanceFootprintResolver.
+                    MaximumPressureSupportLateralSamples];
+        private readonly Vector4[] staticPressureGeometryUpload =
             new Vector4[
                 RiverDisturbanceFootprintResolver.
                     MaximumPressureSupportLateralSamples];
@@ -552,6 +587,37 @@ namespace ProgrammaticStylized3D.Rivers
                             StaticPressureMinimumProfileMultiplier,
                             MaximumStaticPressureModulation);
                 float targetHeight = diagnostics.EffectiveAmplitude;
+                if (!baseProfile.HasGeometryBounds ||
+                    !currentProfile.HasGeometryBounds)
+                {
+                    return false;
+                }
+
+                const float protectedDownstreamStartFraction = 0.50f;
+                const float insideGateDownstreamTailPixels = 0.45f;
+                float cellSizeX = runtime.fieldLength /
+                    Mathf.Max(1, runtime.fieldWidth);
+                float pressureInsideOverlapMetres = Mathf.Clamp(
+                    Mathf.Max(0.08f, cellSizeX * 0.35f),
+                    0.08f,
+                    0.16f);
+                float pressureInsideOverlapPixels =
+                    pressureInsideOverlapMetres /
+                    Mathf.Max(0.001f, cellSizeX);
+                float crestInsetPixels = sampleCount >= 64
+                    ? 1.50f
+                    : sampleCount >= 32
+                        ? 1.00f
+                        : 0.75f;
+                float minimumInsideOverlapPixels = sampleCount >= 64
+                    ? 3.5f
+                    : sampleCount >= 32
+                        ? 2.5f
+                        : 1.5f;
+                float requestedInsideOverlapPixels = Mathf.Max(
+                    minimumInsideOverlapPixels,
+                    pressureInsideOverlapPixels);
+                List<float> validRowThicknesses = new();
 
                 float baseMinimum = float.PositiveInfinity;
                 float baseMaximum = float.NegativeInfinity;
@@ -578,6 +644,12 @@ namespace ProgrammaticStylized3D.Rivers
                 int supportLimitedBelowTargetRowCount = 0;
                 int endpointTaperRowCount = 0;
                 int targetHeightRowCount = 0;
+                float rowThicknessMinimum = float.PositiveInfinity;
+                float rowThicknessMaximum = float.NegativeInfinity;
+                float maximumResolvedCrestDepthPercent = 0f;
+                float maximumResolvedPressureEndDepthPercent = 0f;
+                int geometryClampedRowCount = 0;
+                int protectedDownstreamRegionViolationRowCount = 0;
 
                 for (int row = 0; row < sampleCount; row++)
                 {
@@ -682,6 +754,66 @@ namespace ProgrammaticStylized3D.Rivers
                     float currentContact =
                         currentSample.x +
                         currentSample.y * currentSample.z;
+
+                    float downstreamBoundary =
+                        baseProfile.DownstreamBoundaries[row];
+                    float rowThickness =
+                        downstreamBoundary - baseSample.x;
+                    if (rowThickness > 0.005f)
+                    {
+                        validRowThicknesses.Add(rowThickness);
+                        rowThicknessMinimum = Mathf.Min(
+                            rowThicknessMinimum,
+                            rowThickness);
+                        rowThicknessMaximum = Mathf.Max(
+                            rowThicknessMaximum,
+                            rowThickness);
+
+                        float protectedDownstreamStart = Mathf.Lerp(
+                            baseSample.x,
+                            downstreamBoundary,
+                            protectedDownstreamStartFraction);
+                        float requestedCrest = baseSample.x +
+                            Mathf.Max(
+                                0f,
+                                currentSample.y * currentSample.z) +
+                            crestInsetPixels * cellSizeX;
+                        float resolvedCrest = Mathf.Min(
+                            requestedCrest,
+                            protectedDownstreamStart);
+                        float requestedPressureEnd = resolvedCrest +
+                            (requestedInsideOverlapPixels +
+                             insideGateDownstreamTailPixels) * cellSizeX;
+                        float resolvedPressureEnd = Mathf.Min(
+                            requestedPressureEnd,
+                            protectedDownstreamStart);
+
+                        if (requestedCrest >
+                                protectedDownstreamStart + 0.0001f ||
+                            requestedPressureEnd >
+                                protectedDownstreamStart + 0.0001f)
+                        {
+                            geometryClampedRowCount++;
+                        }
+
+                        if (resolvedPressureEnd >
+                            protectedDownstreamStart + 0.0001f)
+                        {
+                            protectedDownstreamRegionViolationRowCount++;
+                        }
+
+                        maximumResolvedCrestDepthPercent = Mathf.Max(
+                            maximumResolvedCrestDepthPercent,
+                            Mathf.Clamp01(
+                                (resolvedCrest - baseSample.x) /
+                                rowThickness) * 100f);
+                        maximumResolvedPressureEndDepthPercent = Mathf.Max(
+                            maximumResolvedPressureEndDepthPercent,
+                            Mathf.Clamp01(
+                                (resolvedPressureEnd - baseSample.x) /
+                                rowThickness) * 100f);
+                    }
+
                     if (hasPreviousValidRow)
                     {
                         maximumAdjacentBaseHeightDifference = Mathf.Max(
@@ -741,6 +873,19 @@ namespace ProgrammaticStylized3D.Rivers
                     Mathf.Max(0.10f, diagnostics.LocalRiverWidth) *
                     lateralFieldResolution;
 
+                if (validRowThicknesses.Count == 0)
+                {
+                    return false;
+                }
+
+                validRowThicknesses.Sort();
+                int middleIndex = validRowThicknesses.Count / 2;
+                float medianRowThickness =
+                    validRowThicknesses.Count % 2 == 0
+                        ? (validRowThicknesses[middleIndex - 1] +
+                           validRowThicknesses[middleIndex]) * 0.5f
+                        : validRowThicknesses[middleIndex];
+
                 debugData =
                     new GeneratedRiverPressureProfileDebugData(
                         runtime.river,
@@ -774,9 +919,19 @@ namespace ProgrammaticStylized3D.Rivers
                         maximumAdjacentCurrentHeightDifference,
                         maximumAdjacentBaseContactShift,
                         maximumAdjacentCurrentContactShift,
+                        new Vector2(
+                            rowThicknessMinimum,
+                            rowThicknessMaximum),
+                        medianRowThickness,
+                        maximumResolvedCrestDepthPercent,
+                        maximumResolvedPressureEndDepthPercent,
+                        geometryClampedRowCount,
+                        protectedDownstreamRegionViolationRowCount,
+                        protectedDownstreamStartFraction * 100f,
                         appliedMultiplierBounds,
                         baseProfile.Samples,
-                        currentProfile.Samples);
+                        currentProfile.Samples,
+                        baseProfile.DownstreamBoundaries);
                 return debugData.IsValid;
             }
 
@@ -2900,6 +3055,10 @@ namespace ProgrammaticStylized3D.Rivers
                 }
             }
 
+            bool pressureGeometryValid =
+                pressurePass &&
+                pressureProfile.IsValid &&
+                pressureProfile.HasGeometryBounds;
             for (int index = 0;
                  index < staticPressureProfileUpload.Length;
                  index++)
@@ -2914,10 +3073,21 @@ namespace ProgrammaticStylized3D.Rivers
                         sample.y / Mathf.Max(0.001f, cellSizeX),
                         sample.z,
                         sample.w);
+                    staticPressureGeometryUpload[index] =
+                        pressureGeometryValid &&
+                        index < pressureProfile.DownstreamBoundaries.Length
+                            ? new Vector4(
+                                pressureProfile.DownstreamBoundaries[index] /
+                                Mathf.Max(0.001f, cellSizeX),
+                                0f,
+                                0f,
+                                0f)
+                            : Vector4.zero;
                 }
                 else
                 {
                     staticPressureProfileUpload[index] = Vector4.zero;
+                    staticPressureGeometryUpload[index] = Vector4.zero;
                 }
             }
 
@@ -2948,6 +3118,12 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetVectorArray(
                 "_StaticPressureProfile",
                 staticPressureProfileUpload);
+            computeShader.SetVectorArray(
+                "_StaticPressureGeometry",
+                staticPressureGeometryUpload);
+            computeShader.SetInt(
+                "_StaticPressureGeometryValid",
+                pressureGeometryValid ? 1 : 0);
             computeShader.SetInt(
                 "_StaticPressureProfileCount",
                 pressurePass && pressureProfile.IsValid
@@ -3559,10 +3735,22 @@ namespace ProgrammaticStylized3D.Rivers
 
             Vector4[] samples = new Vector4[source.Samples.Length];
             Array.Copy(source.Samples, samples, source.Samples.Length);
+            float[] downstreamBoundaries = source.HasGeometryBounds
+                ? new float[source.DownstreamBoundaries.Length]
+                : Array.Empty<float>();
+            if (downstreamBoundaries.Length > 0)
+            {
+                Array.Copy(
+                    source.DownstreamBoundaries,
+                    downstreamBoundaries,
+                    source.DownstreamBoundaries.Length);
+            }
+
             return new RiverDisturbancePressureBakeProfile(
                 source.AcrossHalfWidth,
                 source.LateralSampleCount,
-                samples);
+                samples,
+                downstreamBoundaries);
         }
 
         private static float[] CreateUnitPressureProfileMultipliers(

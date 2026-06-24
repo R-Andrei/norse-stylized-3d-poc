@@ -1,5 +1,4 @@
 using UnityEditor;
-using UnityEngine;
 
 namespace ProgrammaticStylized3D.Rivers.Editor
 {
@@ -12,9 +11,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private SerializedProperty autoDetectRiver;
         private SerializedProperty verticalContactTolerance;
         private SerializedProperty sourceMobility;
-        private SerializedProperty footprintMode;
-        private SerializedProperty automaticMeshFilter;
-        private SerializedProperty automaticFootprintPadding;
         private SerializedProperty useSeparateFootprintDimensions;
         private SerializedProperty linkedFootprintRadius;
         private SerializedProperty acrossFlowHalfWidth;
@@ -34,11 +30,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             verticalContactTolerance = serializedObject.FindProperty(
                 "verticalContactTolerance");
             sourceMobility = serializedObject.FindProperty("sourceMobility");
-            footprintMode = serializedObject.FindProperty("footprintMode");
-            automaticMeshFilter = serializedObject.FindProperty(
-                "automaticMeshFilter");
-            automaticFootprintPadding = serializedObject.FindProperty(
-                "automaticFootprintPadding");
             useSeparateFootprintDimensions = serializedObject.FindProperty(
                 "useSeparateFootprintDimensions");
             linkedFootprintRadius = serializedObject.FindProperty(
@@ -66,6 +57,22 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             serializedObject.Update();
 
+            bool legacyStaticEmitter =
+                sourceMobility != null &&
+                !sourceMobility.hasMultipleDifferentValues &&
+                sourceMobility.enumValueIndex == 0;
+
+            if (legacyStaticEmitter)
+            {
+                EditorGUILayout.HelpBox(
+                    "This is a legacy Static River Disturbance Emitter. It is " +
+                    "inert because stationary geometry is now handled through " +
+                    "the generated-geometry registry. Remove this component.",
+                    MessageType.Warning);
+                serializedObject.ApplyModifiedProperties();
+                return;
+            }
+
             EditorGUILayout.LabelField("River Contact", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(explicitRiver);
             EditorGUILayout.PropertyField(autoDetectRiver);
@@ -73,76 +80,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUILayout.Space(8f);
             EditorGUILayout.LabelField("Source Footprint", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(sourceMobility);
-            EditorGUILayout.PropertyField(footprintMode);
-
-            bool registryManaged = false;
-            if (!serializedObject.isEditingMultipleObjects)
-            {
-                StylizedRiverDisturbanceEmitter emitter =
-                    (StylizedRiverDisturbanceEmitter)target;
-                registryManaged =
-                    emitter.IsAutomaticallyManagedGeneratedSource;
-
-                if (registryManaged)
-                {
-                    EditorGUILayout.HelpBox(
-                        "This static generated object is discovered directly by the river through the generated-geometry registry. This emitter does not register a duplicate static obstruction. Remove it unless the object also needs dynamic movement or explicit impact behaviour.",
-                        MessageType.Info);
-                }
-            }
-
-            if (registryManaged)
-            {
-                serializedObject.ApplyModifiedProperties();
-                return;
-            }
-
-            bool automatic =
-                footprintMode.enumValueIndex ==
-                (int)StylizedRiverDisturbanceFootprintMode.Automatic;
-            bool isStatic =
-                sourceMobility.enumValueIndex ==
-                (int)StylizedRiverDisturbanceSourceMobility.Static;
-
-            if (automatic)
-            {
-                EditorGUILayout.PropertyField(automaticMeshFilter);
-                EditorGUILayout.PropertyField(automaticFootprintPadding);
-
-                if (!isStatic)
-                {
-                    EditorGUILayout.HelpBox(
-                        "Automatic waterline footprints are currently used by Static sources. Dynamic sources retain their manual footprint dimensions.",
-                        MessageType.Info);
-                    DrawManualFootprint();
-                }
-                else if (!serializedObject.isEditingMultipleObjects)
-                {
-                    StylizedRiverDisturbanceEmitter emitter =
-                        (StylizedRiverDisturbanceEmitter)target;
-                    EditorGUILayout.HelpBox(
-                        emitter.AutomaticFootprintStatus,
-                        emitter.HasResolvedAutomaticFootprint
-                            ? MessageType.Info
-                            : MessageType.None);
-
-                    using (new EditorGUI.DisabledScope(true))
-                    {
-                        EditorGUILayout.FloatField(
-                            "Resolved Across Half Width",
-                            emitter.ResolvedAutomaticAcrossHalfWidth);
-                        EditorGUILayout.FloatField(
-                            "Resolved Along Half Length",
-                            emitter.ResolvedAutomaticAlongHalfLength);
-                    }
-                }
-            }
-            else
-            {
-                DrawManualFootprint();
-            }
-            
+            DrawManualFootprint();
 
             EditorGUILayout.Space(8f);
             EditorGUILayout.LabelField("Influence", EditorStyles.boldLabel);

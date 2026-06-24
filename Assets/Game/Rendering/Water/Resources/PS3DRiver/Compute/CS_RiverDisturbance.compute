@@ -31,9 +31,11 @@ float2 _StaticCellSize;
 int _StaticContourCount;
 float4 _StaticContour[PS3D_MAX_STATIC_CONTOUR];
 float4 _StaticPressureProfile[PS3D_MAX_PRESSURE_PROFILE_SAMPLES];
+float4 _StaticPressureGeometry[PS3D_MAX_PRESSURE_PROFILE_SAMPLES];
 int _StaticPressureProfileCount;
 float _StaticPressureProfileHalfWidthPixels;
 int _StaticPressureProfileValid;
+int _StaticPressureGeometryValid;
 float _StaticTargetHeight;
 float _StaticPressureDepthPixels;
 float _StaticPressureInsideOverlapPixels;
@@ -374,9 +376,12 @@ float EvaluateLegacyStaticPressureShape(float2 relativePosition, float2 halfSize
     return resultShape;
 }
 
-float4 SamplePressureProfile(float lateralPosition)
+float4 SamplePressureProfile(
+    float lateralPosition,
+    out float downstreamBoundaryX)
 {
     float4 invalidSample = float4(0.0, 0.0, 0.0, 0.0);
+    downstreamBoundaryX = 0.0;
 
     if (_StaticPressureProfileValid == 0)
     {
@@ -419,6 +424,14 @@ float4 SamplePressureProfile(float lateralPosition)
 
     float4 sample =
         (sample0 * weight0 + sample1 * weight1) / totalWeight;
+    if (_StaticPressureGeometryValid != 0)
+    {
+        downstreamBoundaryX =
+            (_StaticPressureGeometry[row0].x * weight0 +
+             _StaticPressureGeometry[row1].x * weight1) /
+            totalWeight;
+    }
+
     sample.z = max(0.0, sample.z);
     sample.w = max(sample.z, sample.w);
     return sample.z > 0.0001 ? sample : invalidSample;
@@ -440,7 +453,10 @@ float EvaluateHeightAwareStaticPressure(
     else
     {
         float4 profileSample = float4(0.0, 0.0, 0.0, 0.0);
-        profileSample = SamplePressureProfile(relativePosition.y);
+        float downstreamBoundaryX = 0.0;
+        profileSample = SamplePressureProfile(
+            relativePosition.y,
+            downstreamBoundaryX);
 
         if (profileSample.z > 0.0001)
         {
@@ -448,21 +464,21 @@ float EvaluateHeightAwareStaticPressure(
             float contactSlope = profileSample.y;
             float cachedHeight = profileSample.z;
             float modulationCeiling = profileSample.w;
-            float crestInsetPixels = 0.75;
+            float crestInsetPixels = 0.50;
             float crestShoulderPixels = 0.05;
             float pressureDepthScale = 1.0;
             float minimumInsideOverlapPixels = 1.5;
 
             if (_StaticPressureProfileCount >= 64)
             {
-                crestInsetPixels = 1.50;
+                crestInsetPixels = 0.75;
                 crestShoulderPixels = 0.15;
                 pressureDepthScale = 0.55;
                 minimumInsideOverlapPixels = 3.5;
             }
             else if (_StaticPressureProfileCount >= 32)
             {
-                crestInsetPixels = 1.00;
+                crestInsetPixels = 0.65;
                 crestShoulderPixels = 0.10;
                 pressureDepthScale = 0.65;
                 minimumInsideOverlapPixels = 2.5;
@@ -475,6 +491,13 @@ float EvaluateHeightAwareStaticPressure(
                 minimumInsideOverlapPixels,
                 _StaticPressureInsideOverlapPixels);
             float height = min(_StaticTargetHeight, cachedHeight);
+            bool hasGeometryBounds =
+                _StaticPressureGeometryValid != 0 &&
+                downstreamBoundaryX > baseUpstreamX + 0.001;
+            float protectedDownstreamStartX = lerp(
+                baseUpstreamX,
+                downstreamBoundaryX,
+                0.50);
 
             // Two fixed correction steps approximate the height-aware contact
             // line. The CPU has already reduced the mesh slices to a base
@@ -482,13 +505,51 @@ float EvaluateHeightAwareStaticPressure(
             [unroll]
             for (int iteration = 0; iteration < 2; iteration++)
             {
-                float contactX =
+                float requestedContactX =
                     baseUpstreamX + contactSlope * height + crestInsetPixels;
+                float contactX = hasGeometryBounds
+                    ? min(requestedContactX, protectedDownstreamStartX)
+                    : requestedContactX;
                 float contactDistance = contactX - relativePosition.x;
-                float insideGate = smoothstep(
-                    -insideOverlap - 0.45,
-                    -insideOverlap + 0.10,
-                    contactDistance);
+                float insideGate;
+
+                if (hasGeometryBounds)
+                {
+                    float requestedPressureEndX =
+                        contactX + insideOverlap + 0.45;
+                    float pressureEndX = min(
+                        requestedPressureEndX,
+                        protectedDownstreamStartX);
+
+                    if (pressureEndX <= contactX + 0.001)
+                    {
+                        insideGate =
+                            1.0 - step(
+                                pressureEndX + 0.0001,
+                                relativePosition.x);
+                    }
+                    else
+                    {
+                        float requestedFadeStartX =
+                            contactX + insideOverlap - 0.10;
+                        float fadeStartX = clamp(
+                            requestedFadeStartX,
+                            contactX,
+                            pressureEndX - 0.001);
+                        insideGate = 1.0 - smoothstep(
+                            fadeStartX,
+                            pressureEndX,
+                            relativePosition.x);
+                    }
+                }
+                else
+                {
+                    insideGate = smoothstep(
+                        -insideOverlap - 0.45,
+                        -insideOverlap + 0.10,
+                        contactDistance);
+                }
+
                 float openWaterDistance = max(
                     0.0,
                     contactDistance - crestShoulderPixels);
