@@ -42,10 +42,30 @@ namespace ProgrammaticStylized3D.Rivers
             float[] sliceHeights,
             Vector4[] samples,
             bool usedBoundsFallback)
+            : this(
+                acrossHalfWidth,
+                representativeHeight,
+                maximumHeight,
+                ResolveLateralSampleCount(samples),
+                sliceHeights,
+                samples,
+                usedBoundsFallback)
+        {
+        }
+
+        public RiverDisturbancePressureSupportProfile(
+            float acrossHalfWidth,
+            float representativeHeight,
+            float maximumHeight,
+            int lateralSampleCount,
+            float[] sliceHeights,
+            Vector4[] samples,
+            bool usedBoundsFallback)
         {
             AcrossHalfWidth = acrossHalfWidth;
             RepresentativeHeight = representativeHeight;
             MaximumHeight = maximumHeight;
+            LateralSampleCount = lateralSampleCount;
             SliceHeights = sliceHeights ?? System.Array.Empty<float>();
             Samples = samples ?? System.Array.Empty<Vector4>();
             UsedBoundsFallback = usedBoundsFallback;
@@ -54,6 +74,7 @@ namespace ProgrammaticStylized3D.Rivers
         public float AcrossHalfWidth { get; }
         public float RepresentativeHeight { get; }
         public float MaximumHeight { get; }
+        public int LateralSampleCount { get; }
         public float[] SliceHeights { get; }
 
         /// <summary>
@@ -69,9 +90,22 @@ namespace ProgrammaticStylized3D.Rivers
             Samples != null &&
             SliceHeights.Length ==
                 RiverDisturbanceFootprintResolver.PressureSupportHeightSlices &&
+            RiverDisturbanceFootprintResolver.IsSupportedPressureSampleCount(
+                LateralSampleCount) &&
             Samples.Length ==
-                RiverDisturbanceFootprintResolver.PressureSupportSampleCount &&
+                LateralSampleCount *
+                RiverDisturbanceFootprintResolver.PressureSupportHeightSlices &&
             RepresentativeHeight > 0.001f;
+
+        private static int ResolveLateralSampleCount(Vector4[] samples)
+        {
+            int sampleLength = samples != null ? samples.Length : 0;
+            int heightSlices =
+                RiverDisturbanceFootprintResolver.PressureSupportHeightSlices;
+            return heightSlices > 0 && sampleLength % heightSlices == 0
+                ? sampleLength / heightSlices
+                : 0;
+        }
     }
 
 
@@ -81,12 +115,25 @@ namespace ProgrammaticStylized3D.Rivers
         public RiverDisturbancePressureBakeProfile(
             float acrossHalfWidth,
             Vector4[] samples)
+            : this(
+                acrossHalfWidth,
+                samples != null ? samples.Length : 0,
+                samples)
+        {
+        }
+
+        public RiverDisturbancePressureBakeProfile(
+            float acrossHalfWidth,
+            int lateralSampleCount,
+            Vector4[] samples)
         {
             AcrossHalfWidth = acrossHalfWidth;
+            LateralSampleCount = lateralSampleCount;
             Samples = samples ?? System.Array.Empty<Vector4>();
         }
 
         public float AcrossHalfWidth { get; }
+        public int LateralSampleCount { get; }
 
         /// <summary>
         /// One compact sample per lateral row. X is the waterline upstream
@@ -98,8 +145,9 @@ namespace ProgrammaticStylized3D.Rivers
 
         public bool IsValid =>
             Samples != null &&
-            Samples.Length ==
-                RiverDisturbanceFootprintResolver.PressureSupportLateralSamples &&
+            RiverDisturbanceFootprintResolver.IsSupportedPressureSampleCount(
+                LateralSampleCount) &&
+            Samples.Length == LateralSampleCount &&
             AcrossHalfWidth > 0.001f;
     }
 
@@ -111,7 +159,13 @@ namespace ProgrammaticStylized3D.Rivers
     public static class RiverDisturbanceFootprintResolver
     {
         public const int MaximumContourPoints = 16;
-        public const int PressureSupportLateralSamples = 16;
+        public const int MinimumPressureSupportLateralSamples = 16;
+        public const int MediumPressureSupportLateralSamples = 32;
+        public const int MaximumPressureSupportLateralSamples = 64;
+
+        // Compatibility aliases retain the former fixed-size public contract.
+        public const int PressureSupportLateralSamples =
+            MinimumPressureSupportLateralSamples;
         public const int PressureSupportHeightSlices = 8;
         public const int PressureSupportSampleCount =
             PressureSupportLateralSamples * PressureSupportHeightSlices;
@@ -129,6 +183,28 @@ namespace ProgrammaticStylized3D.Rivers
             { 2, 6 }, { 3, 7 }, { 4, 5 },
             { 4, 6 }, { 5, 7 }, { 6, 7 }
         };
+
+        public static bool IsSupportedPressureSampleCount(int sampleCount)
+        {
+            return sampleCount == MinimumPressureSupportLateralSamples ||
+                   sampleCount == MediumPressureSupportLateralSamples ||
+                   sampleCount == MaximumPressureSupportLateralSamples;
+        }
+
+        public static int ResolvePressureSupportLateralSampleCount(
+            int requestedSampleCount)
+        {
+            if (requestedSampleCount <=
+                MinimumPressureSupportLateralSamples)
+            {
+                return MinimumPressureSupportLateralSamples;
+            }
+
+            return requestedSampleCount <=
+                MediumPressureSupportLateralSamples
+                    ? MediumPressureSupportLateralSamples
+                    : MaximumPressureSupportLateralSamples;
+        }
 
         public static bool TryResolve(
             StylizedRiver river,
@@ -335,6 +411,25 @@ namespace ProgrammaticStylized3D.Rivers
             out RiverDisturbancePressureSupportProfile profile,
             out string status)
         {
+            return TryResolvePressureSupport(
+                river,
+                meshFilter,
+                baseFootprint,
+                maximumHeightToInspect,
+                PressureSupportLateralSamples,
+                out profile,
+                out status);
+        }
+
+        public static bool TryResolvePressureSupport(
+            StylizedRiver river,
+            MeshFilter meshFilter,
+            RiverDisturbanceFootprint baseFootprint,
+            float maximumHeightToInspect,
+            int requestedLateralSampleCount,
+            out RiverDisturbancePressureSupportProfile profile,
+            out string status)
+        {
             profile = default;
 
             if (river == null || meshFilter == null ||
@@ -345,6 +440,10 @@ namespace ProgrammaticStylized3D.Rivers
                 status = "A valid river, generated mesh, and raw waterline footprint are required.";
                 return false;
             }
+
+            int lateralSampleCount =
+                ResolvePressureSupportLateralSampleCount(
+                    requestedLateralSampleCount);
 
             if (!river.TryProjectWorldPoint(
                     baseFootprint.WorldPosition,
@@ -435,7 +534,8 @@ namespace ProgrammaticStylized3D.Rivers
             float[] sliceHeights =
                 new float[PressureSupportHeightSlices];
             Vector4[] samples =
-                new Vector4[PressureSupportSampleCount];
+                new Vector4[
+                    lateralSampleCount * PressureSupportHeightSlices];
             float acrossHalfWidth = Mathf.Max(
                 MinimumHalfExtent,
                 baseFootprint.AcrossHalfWidth);
@@ -494,17 +594,17 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 for (int row = 0;
-                     row < PressureSupportLateralSamples;
+                     row < lateralSampleCount;
                      row++)
                 {
                     float row01 = row /
-                        (float)(PressureSupportLateralSamples - 1);
+                        (float)(lateralSampleCount - 1);
                     float lateral = Mathf.Lerp(
                         -acrossHalfWidth,
                         acrossHalfWidth,
                         row01);
                     int sampleIndex =
-                        slice * PressureSupportLateralSamples + row;
+                        slice * lateralSampleCount + row;
 
                     if (TryResolveContourRow(
                             contour,
@@ -528,11 +628,11 @@ namespace ProgrammaticStylized3D.Rivers
             List<float> centralSupportHeights = new();
             float resolvedMaximumHeight = 0f;
             for (int row = 0;
-                 row < PressureSupportLateralSamples;
+                 row < lateralSampleCount;
                  row++)
             {
                 float row01 = row /
-                    (float)(PressureSupportLateralSamples - 1);
+                    (float)(lateralSampleCount - 1);
                 float lateral01 = Mathf.Abs(row01 * 2f - 1f);
                 float rowHeight = 0f;
                 for (int slice = 0;
@@ -540,7 +640,7 @@ namespace ProgrammaticStylized3D.Rivers
                      slice++)
                 {
                     Vector4 sample = samples[
-                        slice * PressureSupportLateralSamples + row];
+                        slice * lateralSampleCount + row];
                     if (sample.z > 0.5f)
                     {
                         rowHeight = sliceHeights[slice];
@@ -575,6 +675,7 @@ namespace ProgrammaticStylized3D.Rivers
                 acrossHalfWidth,
                 representativeHeight,
                 resolvedMaximumHeight,
+                lateralSampleCount,
                 sliceHeights,
                 samples,
                 usedBoundsFallback);
@@ -598,11 +699,18 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             float safeModulation = Mathf.Max(1f, maximumModulation);
+            const float endpointTaperStart = 0.82f;
+            int lateralSampleCount = support.LateralSampleCount;
+            float minimumBaseHeightRatio = lateralSampleCount >= 64
+                ? 0.96f
+                : lateralSampleCount >= 32
+                    ? 0.92f
+                    : 0f;
             Vector4[] compactSamples =
-                new Vector4[PressureSupportLateralSamples];
+                new Vector4[lateralSampleCount];
             int validSampleCount = 0;
 
-            for (int row = 0; row < PressureSupportLateralSamples; row++)
+            for (int row = 0; row < lateralSampleCount; row++)
             {
                 Vector4 baseSample = support.Samples[row];
                 if (baseSample.z <= 0.5f)
@@ -615,7 +723,7 @@ namespace ProgrammaticStylized3D.Rivers
                 for (int slice = 0; slice < PressureSupportHeightSlices; slice++)
                 {
                     Vector4 sample = support.Samples[
-                        slice * PressureSupportLateralSamples + row];
+                        slice * lateralSampleCount + row];
                     if (sample.z > 0.5f)
                     {
                         localMaximumHeight = support.SliceHeights[slice];
@@ -628,6 +736,15 @@ namespace ProgrammaticStylized3D.Rivers
                 float modulationCeiling = Mathf.Min(
                     targetHeight * safeModulation,
                     localMaximumHeight);
+                if (minimumBaseHeightRatio > 0f)
+                {
+                    float supportSafeFloor = Mathf.Min(
+                        targetHeight * minimumBaseHeightRatio,
+                        modulationCeiling);
+                    cachedHeight = Mathf.Max(
+                        cachedHeight,
+                        supportSafeFloor);
+                }
 
                 if (cachedHeight <= 0.001f || modulationCeiling <= 0.001f)
                 {
@@ -649,12 +766,15 @@ namespace ProgrammaticStylized3D.Rivers
                 contactSlope = Mathf.Clamp(contactSlope, -4f, 4f);
 
                 float row01 = row /
-                    (float)(PressureSupportLateralSamples - 1);
+                    (float)(lateralSampleCount - 1);
                 float lateral01 = Mathf.Abs(row01 * 2f - 1f);
                 float endpointTaper = 1f - Mathf.SmoothStep(
                     0f,
                     1f,
-                    Mathf.InverseLerp(0.82f, 1f, lateral01));
+                    Mathf.InverseLerp(
+                        endpointTaperStart,
+                        1f,
+                        lateral01));
                 cachedHeight *= endpointTaper;
                 modulationCeiling *= endpointTaper;
 
@@ -673,6 +793,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             profile = new RiverDisturbancePressureBakeProfile(
                 support.AcrossHalfWidth,
+                lateralSampleCount,
                 compactSamples);
             return profile.IsValid;
         }
@@ -690,7 +811,7 @@ namespace ProgrammaticStylized3D.Rivers
             for (int slice = 0; slice < PressureSupportHeightSlices; slice++)
             {
                 Vector4 sample = support.Samples[
-                    slice * PressureSupportLateralSamples + row];
+                    slice * support.LateralSampleCount + row];
                 if (sample.z <= 0.5f)
                 {
                     break;

@@ -9,7 +9,7 @@
 
 #define PS3D_TWO_PI 6.28318530718
 #define PS3D_MAX_STATIC_CONTOUR 16
-#define PS3D_PRESSURE_PROFILE_SAMPLES 16
+#define PS3D_MAX_PRESSURE_PROFILE_SAMPLES 64
 
 Texture2D<float4> _StateRead;
 RWTexture2D<float4> _StateWrite;
@@ -30,7 +30,8 @@ float2 _StaticHalfSizePixels;
 float2 _StaticCellSize;
 int _StaticContourCount;
 float4 _StaticContour[PS3D_MAX_STATIC_CONTOUR];
-float4 _StaticPressureProfile[PS3D_PRESSURE_PROFILE_SAMPLES];
+float4 _StaticPressureProfile[PS3D_MAX_PRESSURE_PROFILE_SAMPLES];
+int _StaticPressureProfileCount;
 float _StaticPressureProfileHalfWidthPixels;
 int _StaticPressureProfileValid;
 float _StaticTargetHeight;
@@ -341,20 +342,25 @@ float EvaluateLegacyStaticPressureShape(float2 relativePosition, float2 halfSize
 
         // Positive distance is open water upstream of the contact boundary.
         // Negative distance is inside the object footprint.
-        float contactDistance = upstreamX - relativePosition.x;
+        const float crestInsetPixels = 0.75;
+        const float crestShoulderPixels = 0.05;
+        float contactDistance =
+            upstreamX + crestInsetPixels - relativePosition.x;
         float pressureDepth = max(0.75, _StaticPressureDepthPixels);
         float insideOverlap = max(
-            0.35,
+            1.5,
             _StaticPressureInsideOverlapPixels);
 
-        // The hidden object-facing side is intentionally steep. The ridge
-        // extends slightly into the object so filtering and mesh interpolation
-        // cannot reveal an air gap. Only the open-water side receives falloff.
+        // The crest anchor sits inside the obstruction. Only a sub-cell
+        // shoulder remains exposed, while the hidden object-facing overlap
+        // prevents filtering and mesh interpolation from revealing a gap.
         float insideGate = smoothstep(
             -insideOverlap - 0.45,
             -insideOverlap + 0.10,
             contactDistance);
-        float openWaterDistance = max(0.0, contactDistance);
+        float openWaterDistance = max(
+            0.0,
+            contactDistance - crestShoulderPixels);
         float openWater01 = saturate(
             1.0 - openWaterDistance / pressureDepth);
         float openWaterFalloff = pow(
@@ -385,16 +391,20 @@ float4 SamplePressureProfile(float lateralPosition)
         return invalidSample;
     }
 
+    int profileSampleCount = clamp(
+        _StaticPressureProfileCount,
+        2,
+        PS3D_MAX_PRESSURE_PROFILE_SAMPLES);
     float rowCoordinate = saturate(
         lateralPosition / (supportHalfWidth * 2.0) + 0.5) *
-        (PS3D_PRESSURE_PROFILE_SAMPLES - 1);
+        (profileSampleCount - 1);
     int row0 = clamp(
         (int)floor(rowCoordinate),
         0,
-        PS3D_PRESSURE_PROFILE_SAMPLES - 1);
+        profileSampleCount - 1);
     int row1 = min(
         row0 + 1,
-        PS3D_PRESSURE_PROFILE_SAMPLES - 1);
+        profileSampleCount - 1);
     float interpolation = saturate(rowCoordinate - row0);
     float4 sample0 = _StaticPressureProfile[row0];
     float4 sample1 = _StaticPressureProfile[row1];
@@ -438,9 +448,31 @@ float EvaluateHeightAwareStaticPressure(
             float contactSlope = profileSample.y;
             float cachedHeight = profileSample.z;
             float modulationCeiling = profileSample.w;
-            float pressureDepth = max(0.75, _StaticPressureDepthPixels);
+            float crestInsetPixels = 0.75;
+            float crestShoulderPixels = 0.05;
+            float pressureDepthScale = 1.0;
+            float minimumInsideOverlapPixels = 1.5;
+
+            if (_StaticPressureProfileCount >= 64)
+            {
+                crestInsetPixels = 1.50;
+                crestShoulderPixels = 0.15;
+                pressureDepthScale = 0.55;
+                minimumInsideOverlapPixels = 3.5;
+            }
+            else if (_StaticPressureProfileCount >= 32)
+            {
+                crestInsetPixels = 1.00;
+                crestShoulderPixels = 0.10;
+                pressureDepthScale = 0.65;
+                minimumInsideOverlapPixels = 2.5;
+            }
+
+            float pressureDepth = max(
+                0.75,
+                _StaticPressureDepthPixels * pressureDepthScale);
             float insideOverlap = max(
-                0.35,
+                minimumInsideOverlapPixels,
                 _StaticPressureInsideOverlapPixels);
             float height = min(_StaticTargetHeight, cachedHeight);
 
@@ -450,13 +482,16 @@ float EvaluateHeightAwareStaticPressure(
             [unroll]
             for (int iteration = 0; iteration < 2; iteration++)
             {
-                float contactX = baseUpstreamX + contactSlope * height;
+                float contactX =
+                    baseUpstreamX + contactSlope * height + crestInsetPixels;
                 float contactDistance = contactX - relativePosition.x;
                 float insideGate = smoothstep(
                     -insideOverlap - 0.45,
                     -insideOverlap + 0.10,
                     contactDistance);
-                float openWaterDistance = max(0.0, contactDistance);
+                float openWaterDistance = max(
+                    0.0,
+                    contactDistance - crestShoulderPixels);
                 float openWater01 = saturate(
                     1.0 - openWaterDistance / pressureDepth);
                 float openWaterFalloff = pow(

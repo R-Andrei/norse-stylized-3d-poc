@@ -32,6 +32,59 @@ namespace ProgrammaticStylized3D.Rivers
             float obstructionWakeReach,
             float obstructionWakeSpread,
             string status)
+            : this(
+                river,
+                active,
+                acrossWidth,
+                alongLength,
+                localRiverWidth,
+                blockageRatio,
+                effectivePadding,
+                effectiveAmplitude,
+                effectiveWakeStrength,
+                maximumAllowedAmplitude,
+                heightClampReached,
+                representativeSupportHeight,
+                pressureMinimumHeight,
+                pressureMaximumHeight,
+                pressureStrength,
+                waveAllowance,
+                0f,
+                staticPressureEnabled,
+                contactSharpness,
+                waveResponse,
+                obstructionWakeEnabled,
+                obstructionWakeReach,
+                obstructionWakeSpread,
+                status)
+        {
+        }
+
+        public GeneratedRiverDisturbanceDiagnostics(
+            StylizedRiver river,
+            bool active,
+            float acrossWidth,
+            float alongLength,
+            float localRiverWidth,
+            float blockageRatio,
+            float effectivePadding,
+            float effectiveAmplitude,
+            float effectiveWakeStrength,
+            float maximumAllowedAmplitude,
+            bool heightClampReached,
+            float representativeSupportHeight,
+            float pressureMinimumHeight,
+            float pressureMaximumHeight,
+            float pressureStrength,
+            float waveAllowance,
+            float supportInspectionHeight,
+            bool staticPressureEnabled,
+            float contactSharpness,
+            float waveResponse,
+            bool obstructionWakeEnabled,
+            float obstructionWakeReach,
+            float obstructionWakeSpread,
+            string status)
         {
             River = river;
             Active = active;
@@ -49,6 +102,7 @@ namespace ProgrammaticStylized3D.Rivers
             PressureMaximumHeight = pressureMaximumHeight;
             PressureStrength = pressureStrength;
             WaveAllowance = waveAllowance;
+            SupportInspectionHeight = supportInspectionHeight;
             StaticPressureEnabled = staticPressureEnabled;
             ContactSharpness = contactSharpness;
             ProfileVariation = waveResponse;
@@ -74,6 +128,7 @@ namespace ProgrammaticStylized3D.Rivers
         public float PressureMaximumHeight { get; }
         public float PressureStrength { get; }
         public float WaveAllowance { get; }
+        public float SupportInspectionHeight { get; }
         public bool StaticPressureEnabled { get; }
         public float ContactSharpness { get; }
         public float ProfileVariation { get; }
@@ -87,6 +142,116 @@ namespace ProgrammaticStylized3D.Rivers
         public float ObstructionWakeSpread { get; }
         public string Status { get; }
     }
+
+#if UNITY_EDITOR
+    public readonly struct GeneratedRiverPressureProfileDebugData
+    {
+        public GeneratedRiverPressureProfileDebugData(
+            StylizedRiver river,
+            Vector3 worldPosition,
+            float acrossHalfWidth,
+            float requestedProfileWidthPixels,
+            int lateralSampleCount,
+            int verticalSupportSlices,
+            float supportInspectionHeight,
+            float targetHeight,
+            float supportModulationReserve,
+            int validRowCount,
+            float nominalFloorHeight,
+            int floorRaisedRowCount,
+            int supportLimitedBelowFloorRowCount,
+            int endpointTaperRowCount,
+            int targetHeightRowCount,
+            Vector2 cachedBaseHeightRange,
+            Vector2 currentHeightRange,
+            Vector2 localCeilingRange,
+            Vector2 currentMultiplierRange,
+            Vector2 interiorBaseHeightRange,
+            Vector2 interiorCeilingRange,
+            float maximumAdjacentBaseHeightDifference,
+            float maximumAdjacentCurrentHeightDifference,
+            float maximumAdjacentBaseContactShift,
+            float maximumAdjacentCurrentContactShift,
+            float appliedBaseFloorRatio,
+            Vector2 appliedMultiplierBounds,
+            Vector4[] baseSamples,
+            Vector4[] currentSamples)
+        {
+            River = river;
+            WorldPosition = worldPosition;
+            AcrossHalfWidth = acrossHalfWidth;
+            RequestedProfileWidthPixels = requestedProfileWidthPixels;
+            LateralSampleCount = lateralSampleCount;
+            VerticalSupportSlices = verticalSupportSlices;
+            SupportInspectionHeight = supportInspectionHeight;
+            TargetHeight = targetHeight;
+            SupportModulationReserve = supportModulationReserve;
+            ValidRowCount = validRowCount;
+            NominalFloorHeight = nominalFloorHeight;
+            FloorRaisedRowCount = floorRaisedRowCount;
+            SupportLimitedBelowFloorRowCount =
+                supportLimitedBelowFloorRowCount;
+            EndpointTaperRowCount = endpointTaperRowCount;
+            TargetHeightRowCount = targetHeightRowCount;
+            CachedBaseHeightRange = cachedBaseHeightRange;
+            CurrentHeightRange = currentHeightRange;
+            LocalCeilingRange = localCeilingRange;
+            CurrentMultiplierRange = currentMultiplierRange;
+            InteriorBaseHeightRange = interiorBaseHeightRange;
+            InteriorCeilingRange = interiorCeilingRange;
+            MaximumAdjacentBaseHeightDifference =
+                maximumAdjacentBaseHeightDifference;
+            MaximumAdjacentCurrentHeightDifference =
+                maximumAdjacentCurrentHeightDifference;
+            MaximumAdjacentBaseContactShift =
+                maximumAdjacentBaseContactShift;
+            MaximumAdjacentCurrentContactShift =
+                maximumAdjacentCurrentContactShift;
+            AppliedBaseFloorRatio = appliedBaseFloorRatio;
+            AppliedMultiplierBounds = appliedMultiplierBounds;
+            BaseSamples = baseSamples ?? Array.Empty<Vector4>();
+            CurrentSamples = currentSamples ?? Array.Empty<Vector4>();
+        }
+
+        public StylizedRiver River { get; }
+        public Vector3 WorldPosition { get; }
+        public float AcrossHalfWidth { get; }
+        public float RequestedProfileWidthPixels { get; }
+        public int LateralSampleCount { get; }
+        public int VerticalSupportSlices { get; }
+        public float SupportInspectionHeight { get; }
+        public float TargetHeight { get; }
+        public float SupportModulationReserve { get; }
+        public int ValidRowCount { get; }
+        public float NominalFloorHeight { get; }
+        public int FloorRaisedRowCount { get; }
+        public int SupportLimitedBelowFloorRowCount { get; }
+        public int EndpointTaperRowCount { get; }
+        public int TargetHeightRowCount { get; }
+        public Vector2 CachedBaseHeightRange { get; }
+        public Vector2 CurrentHeightRange { get; }
+        public Vector2 LocalCeilingRange { get; }
+        public Vector2 CurrentMultiplierRange { get; }
+        public Vector2 InteriorBaseHeightRange { get; }
+        public Vector2 InteriorCeilingRange { get; }
+        public float MaximumAdjacentBaseHeightDifference { get; }
+        public float MaximumAdjacentCurrentHeightDifference { get; }
+        public float MaximumAdjacentBaseContactShift { get; }
+        public float MaximumAdjacentCurrentContactShift { get; }
+        public float AppliedBaseFloorRatio { get; }
+        public Vector2 AppliedMultiplierBounds { get; }
+        public Vector4[] BaseSamples { get; }
+        public Vector4[] CurrentSamples { get; }
+
+        public bool IsValid =>
+            River != null &&
+            LateralSampleCount > 0 &&
+            BaseSamples != null &&
+            CurrentSamples != null &&
+            BaseSamples.Length == LateralSampleCount &&
+            CurrentSamples.Length == LateralSampleCount;
+    }
+#endif
 
     [ExecuteAlways]
     [DisallowMultipleComponent]
@@ -175,7 +340,9 @@ namespace ProgrammaticStylized3D.Rivers
         private readonly Vector4[] staticContourUpload =
             new Vector4[MaximumStaticContourPoints];
         private readonly Vector4[] staticPressureProfileUpload =
-            new Vector4[RiverDisturbanceFootprintResolver.PressureSupportLateralSamples];
+            new Vector4[
+                RiverDisturbanceFootprintResolver.
+                    MaximumPressureSupportLateralSamples];
 
         private StylizedRiver river;
         private MeshRenderer surfaceRenderer;
@@ -331,6 +498,326 @@ namespace ProgrammaticStylized3D.Rivers
                        meshFilter.GetEntityId(),
                        out diagnostics);
         }
+
+#if UNITY_EDITOR
+        public static bool TryGetGeneratedSourcePressureProfileDebugData(
+            IGeneratedGeometrySource source,
+            out GeneratedRiverPressureProfileDebugData debugData)
+        {
+            debugData = default;
+            if (source == null)
+            {
+                return false;
+            }
+
+            MeshFilter meshFilter = source.GeometryMeshFilter;
+            if (meshFilter == null)
+            {
+                return false;
+            }
+
+            EntityId sourceId = meshFilter.GetEntityId();
+            if (!GeneratedSourceDiagnostics.TryGetValue(
+                    sourceId,
+                    out GeneratedRiverDisturbanceDiagnostics diagnostics))
+            {
+                return false;
+            }
+
+            for (int runtimeIndex = 0;
+                 runtimeIndex < ActiveRuntimes.Count;
+                 runtimeIndex++)
+            {
+                StylizedRiverDisturbanceRuntime runtime =
+                    ActiveRuntimes[runtimeIndex];
+                if (runtime == null ||
+                    runtime.river == null ||
+                    runtime.river != diagnostics.River ||
+                    !runtime.continuousSources.TryGetValue(
+                        sourceId,
+                        out ContinuousSource continuousSource))
+                {
+                    continue;
+                }
+
+                RiverDisturbancePressureBakeProfile baseProfile =
+                    continuousSource.StaticPressureBaseProfile;
+                RiverDisturbancePressureBakeProfile currentProfile =
+                    continuousSource.StaticPressureProfile;
+                if (!baseProfile.IsValid ||
+                    !currentProfile.IsValid ||
+                    baseProfile.LateralSampleCount !=
+                        currentProfile.LateralSampleCount)
+                {
+                    return false;
+                }
+
+                int sampleCount = baseProfile.LateralSampleCount;
+                float appliedBaseFloorRatio = sampleCount >= 64
+                    ? 0.96f
+                    : sampleCount >= 32
+                        ? 0.92f
+                        : 0f;
+                Vector2 appliedMultiplierBounds = sampleCount >= 64
+                    ? new Vector2(0.86f, 1.10f)
+                    : sampleCount >= 32
+                        ? new Vector2(0.82f, 1.12f)
+                        : new Vector2(
+                            StaticPressureMinimumProfileMultiplier,
+                            MaximumStaticPressureModulation);
+                float targetHeight = diagnostics.EffectiveAmplitude;
+                float nominalFloorHeight =
+                    targetHeight * appliedBaseFloorRatio;
+
+                float baseMinimum = float.PositiveInfinity;
+                float baseMaximum = float.NegativeInfinity;
+                float currentMinimum = float.PositiveInfinity;
+                float currentMaximum = float.NegativeInfinity;
+                float ceilingMinimum = float.PositiveInfinity;
+                float ceilingMaximum = float.NegativeInfinity;
+                float multiplierMinimum = float.PositiveInfinity;
+                float multiplierMaximum = float.NegativeInfinity;
+                float interiorBaseMinimum = float.PositiveInfinity;
+                float interiorBaseMaximum = float.NegativeInfinity;
+                float interiorCeilingMinimum = float.PositiveInfinity;
+                float interiorCeilingMaximum = float.NegativeInfinity;
+                float maximumAdjacentBaseHeightDifference = 0f;
+                float maximumAdjacentCurrentHeightDifference = 0f;
+                float maximumAdjacentBaseContactShift = 0f;
+                float maximumAdjacentCurrentContactShift = 0f;
+                float previousBaseHeight = 0f;
+                float previousCurrentHeight = 0f;
+                float previousBaseContact = 0f;
+                float previousCurrentContact = 0f;
+                bool hasPreviousValidRow = false;
+                int validRowCount = 0;
+                int floorRaisedRowCount = 0;
+                int supportLimitedBelowFloorRowCount = 0;
+                int endpointTaperRowCount = 0;
+                int targetHeightRowCount = 0;
+
+                for (int row = 0; row < sampleCount; row++)
+                {
+                    Vector4 baseSample = baseProfile.Samples[row];
+                    Vector4 currentSample = currentProfile.Samples[row];
+                    if (baseSample.z <= 0.0001f ||
+                        baseSample.w <= 0.0001f)
+                    {
+                        hasPreviousValidRow = false;
+                        continue;
+                    }
+
+                    validRowCount++;
+                    baseMinimum = Mathf.Min(baseMinimum, baseSample.z);
+                    baseMaximum = Mathf.Max(baseMaximum, baseSample.z);
+                    currentMinimum = Mathf.Min(
+                        currentMinimum,
+                        currentSample.z);
+                    currentMaximum = Mathf.Max(
+                        currentMaximum,
+                        currentSample.z);
+                    ceilingMinimum = Mathf.Min(
+                        ceilingMinimum,
+                        baseSample.w);
+                    ceilingMaximum = Mathf.Max(
+                        ceilingMaximum,
+                        baseSample.w);
+
+                    float row01 = sampleCount > 1
+                        ? row / (float)(sampleCount - 1)
+                        : 0.5f;
+                    float lateral01 = Mathf.Abs(row01 * 2f - 1f);
+                    float endpointTaper = 1f - Mathf.SmoothStep(
+                        0f,
+                        1f,
+                        Mathf.InverseLerp(0.82f, 1f, lateral01));
+                    if (endpointTaper < 0.999f)
+                    {
+                        endpointTaperRowCount++;
+                    }
+
+                    float untaperedBaseHeight = endpointTaper > 0.0001f
+                        ? baseSample.z / endpointTaper
+                        : 0f;
+                    float untaperedCeilingHeight = endpointTaper > 0.0001f
+                        ? baseSample.w / endpointTaper
+                        : 0f;
+
+                    if (lateral01 <= 0.82f)
+                    {
+                        interiorBaseMinimum = Mathf.Min(
+                            interiorBaseMinimum,
+                            baseSample.z);
+                        interiorBaseMaximum = Mathf.Max(
+                            interiorBaseMaximum,
+                            baseSample.z);
+                        interiorCeilingMinimum = Mathf.Min(
+                            interiorCeilingMinimum,
+                            baseSample.w);
+                        interiorCeilingMaximum = Mathf.Max(
+                            interiorCeilingMaximum,
+                            baseSample.w);
+                    }
+
+                    if (appliedBaseFloorRatio > 0f &&
+                        endpointTaper > 0.0001f)
+                    {
+                        float rawCachedHeight = Mathf.Min(
+                            targetHeight,
+                            untaperedCeilingHeight /
+                            MaximumStaticPressureModulation);
+                        float supportSafeFloor = Mathf.Min(
+                            nominalFloorHeight,
+                            untaperedCeilingHeight);
+                        if (supportSafeFloor > rawCachedHeight + 0.0005f)
+                        {
+                            floorRaisedRowCount++;
+                        }
+
+                        if (untaperedCeilingHeight <
+                            nominalFloorHeight - 0.0005f)
+                        {
+                            supportLimitedBelowFloorRowCount++;
+                        }
+                    }
+
+                    if (endpointTaper > 0.0001f &&
+                        untaperedBaseHeight >= targetHeight - 0.0005f)
+                    {
+                        targetHeightRowCount++;
+                    }
+
+                    float multiplier = 1f;
+                    if (continuousSource.
+                            StaticPressureCurrentMultipliers != null &&
+                        continuousSource.
+                            StaticPressureCurrentMultipliers.Length ==
+                            sampleCount)
+                    {
+                        multiplier = continuousSource.
+                            StaticPressureCurrentMultipliers[row];
+                    }
+                    else if (baseSample.z > 0.0001f)
+                    {
+                        multiplier = currentSample.z / baseSample.z;
+                    }
+
+                    multiplierMinimum = Mathf.Min(
+                        multiplierMinimum,
+                        multiplier);
+                    multiplierMaximum = Mathf.Max(
+                        multiplierMaximum,
+                        multiplier);
+
+                    float baseContact =
+                        baseSample.x + baseSample.y * baseSample.z;
+                    float currentContact =
+                        currentSample.x +
+                        currentSample.y * currentSample.z;
+                    if (hasPreviousValidRow)
+                    {
+                        maximumAdjacentBaseHeightDifference = Mathf.Max(
+                            maximumAdjacentBaseHeightDifference,
+                            Mathf.Abs(baseSample.z - previousBaseHeight));
+                        maximumAdjacentCurrentHeightDifference = Mathf.Max(
+                            maximumAdjacentCurrentHeightDifference,
+                            Mathf.Abs(
+                                currentSample.z -
+                                previousCurrentHeight));
+                        maximumAdjacentBaseContactShift = Mathf.Max(
+                            maximumAdjacentBaseContactShift,
+                            Mathf.Abs(baseContact - previousBaseContact));
+                        maximumAdjacentCurrentContactShift = Mathf.Max(
+                            maximumAdjacentCurrentContactShift,
+                            Mathf.Abs(
+                                currentContact -
+                                previousCurrentContact));
+                    }
+
+                    previousBaseHeight = baseSample.z;
+                    previousCurrentHeight = currentSample.z;
+                    previousBaseContact = baseContact;
+                    previousCurrentContact = currentContact;
+                    hasPreviousValidRow = true;
+                }
+
+                if (validRowCount == 0)
+                {
+                    return false;
+                }
+
+                if (float.IsInfinity(interiorBaseMinimum))
+                {
+                    interiorBaseMinimum = baseMinimum;
+                    interiorBaseMaximum = baseMaximum;
+                }
+
+                if (float.IsInfinity(interiorCeilingMinimum))
+                {
+                    interiorCeilingMinimum = ceilingMinimum;
+                    interiorCeilingMaximum = ceilingMaximum;
+                }
+
+                int lateralFieldResolution = runtime.river.Quality switch
+                {
+                    StylizedRiverQuality.Low => 32,
+                    StylizedRiverQuality.Medium => 48,
+                    StylizedRiverQuality.High => 64,
+                    _ => 48
+                };
+                float requestedProfileWidthPixels =
+                    Mathf.Max(
+                        0.10f,
+                        continuousSource.
+                            StaticPressureAcrossHalfWidth * 2f) /
+                    Mathf.Max(0.10f, diagnostics.LocalRiverWidth) *
+                    lateralFieldResolution;
+
+                debugData =
+                    new GeneratedRiverPressureProfileDebugData(
+                        runtime.river,
+                        continuousSource.WorldPosition,
+                        continuousSource.
+                            StaticPressureAcrossHalfWidth,
+                        requestedProfileWidthPixels,
+                        sampleCount,
+                        RiverDisturbanceFootprintResolver.
+                            PressureSupportHeightSlices,
+                        diagnostics.SupportInspectionHeight,
+                        targetHeight,
+                        MaximumStaticPressureModulation,
+                        validRowCount,
+                        nominalFloorHeight,
+                        floorRaisedRowCount,
+                        supportLimitedBelowFloorRowCount,
+                        endpointTaperRowCount,
+                        targetHeightRowCount,
+                        new Vector2(baseMinimum, baseMaximum),
+                        new Vector2(currentMinimum, currentMaximum),
+                        new Vector2(ceilingMinimum, ceilingMaximum),
+                        new Vector2(
+                            multiplierMinimum,
+                            multiplierMaximum),
+                        new Vector2(
+                            interiorBaseMinimum,
+                            interiorBaseMaximum),
+                        new Vector2(
+                            interiorCeilingMinimum,
+                            interiorCeilingMaximum),
+                        maximumAdjacentBaseHeightDifference,
+                        maximumAdjacentCurrentHeightDifference,
+                        maximumAdjacentBaseContactShift,
+                        maximumAdjacentCurrentContactShift,
+                        appliedBaseFloorRatio,
+                        appliedMultiplierBounds,
+                        baseProfile.Samples,
+                        currentProfile.Samples);
+                return debugData.IsValid;
+            }
+
+            return false;
+        }
+#endif
 
         private void OnEnable()
         {
@@ -1211,6 +1698,7 @@ namespace ProgrammaticStylized3D.Rivers
             float maximumAllowedPressureHeight = 0f;
             float targetPressureHeight = 0f;
             float unboundedPressureMaximum = 0f;
+            float supportInspectionHeight = 0f;
             bool heightClampReached = false;
             string pressureStatus = "Static pressure disabled.";
 
@@ -1230,30 +1718,6 @@ namespace ProgrammaticStylized3D.Rivers
                     river.MotionWaveHeight * 1.15f + 0.04f,
                     0.04f,
                     0.45f);
-                float supportInspectionHeight =
-                    MaximumStaticPressureHeightMetres +
-                    waveAllowance + 0.10f;
-
-                if (!RiverDisturbanceFootprintResolver.TryResolvePressureSupport(
-                        river,
-                        meshFilter,
-                        pressureFootprint,
-                        supportInspectionHeight,
-                        out RiverDisturbancePressureSupportProfile pressureSupport,
-                        out pressureStatus))
-                {
-                    return;
-                }
-
-                representativeSupportHeight =
-                    pressureSupport.RepresentativeHeight;
-                float supportBudget = Mathf.Max(
-                    0f,
-                    representativeSupportHeight - waveAllowance);
-                float supportCeiling = Mathf.Min(
-                    supportBudget / MaximumStaticPressureModulation,
-                    MaximumStaticPressureHeightMetres /
-                    MaximumStaticPressureModulation);
                 float absoluteFlowSpeed =
                     Mathf.Abs(river.FlowSpeedMetresPerSecond);
                 float velocityHead =
@@ -1270,6 +1734,43 @@ namespace ProgrammaticStylized3D.Rivers
                 // lower response for ordinary gameplay-speed rivers.
                 unboundedPressureMaximum =
                     velocityHead * blockageCoefficient * 5.00f;
+
+                // Focus the fixed eight support slices on the height range
+                // that this river can actually request. The wave allowance and
+                // safety margin preserve headroom without spending vertical
+                // resolution on irrelevant upper geometry.
+                supportInspectionHeight =
+                    Mathf.Min(
+                        MaximumStaticPressureHeightMetres,
+                        unboundedPressureMaximum *
+                        MaximumStaticPressureModulation) +
+                    waveAllowance + 0.10f;
+                int pressureLateralSampleCount =
+                    ResolveStaticPressureLateralSampleCount(
+                        pressureFootprint.AcrossHalfWidth,
+                        localRiverWidth);
+
+                if (!RiverDisturbanceFootprintResolver.TryResolvePressureSupport(
+                        river,
+                        meshFilter,
+                        pressureFootprint,
+                        supportInspectionHeight,
+                        pressureLateralSampleCount,
+                        out RiverDisturbancePressureSupportProfile pressureSupport,
+                        out pressureStatus))
+                {
+                    return;
+                }
+
+                representativeSupportHeight =
+                    pressureSupport.RepresentativeHeight;
+                float supportBudget = Mathf.Max(
+                    0f,
+                    representativeSupportHeight - waveAllowance);
+                float supportCeiling = Mathf.Min(
+                    supportBudget / MaximumStaticPressureModulation,
+                    MaximumStaticPressureHeightMetres /
+                    MaximumStaticPressureModulation);
                 maximumAllowedPressureHeight = Mathf.Min(
                     supportCeiling,
                     unboundedPressureMaximum);
@@ -1359,6 +1860,7 @@ namespace ProgrammaticStylized3D.Rivers
                     maximumAllowedPressureHeight,
                     interaction.StaticPressureStrength,
                     waveAllowance,
+                    supportInspectionHeight,
                     interaction.StaticPressureEnabled,
                     interaction.StaticPressureContactSharpness,
                     interaction.StaticPressureProfileVariation,
@@ -1369,6 +1871,26 @@ namespace ProgrammaticStylized3D.Rivers
                     $"Contour {footprint.Contour.Length} points; " +
                     $"blockage {blockageRatio:P0}; " +
                     $"pressure strength {interaction.StaticPressureStrength:P0}.");
+        }
+
+        private int ResolveStaticPressureLateralSampleCount(
+            float pressureAcrossHalfWidth,
+            float localRiverWidth)
+        {
+            int localFieldHeight = river.Quality switch
+            {
+                StylizedRiverQuality.Low => 32,
+                StylizedRiverQuality.Medium => 48,
+                StylizedRiverQuality.High => 64,
+                _ => 48
+            };
+            float profilePixelWidth =
+                Mathf.Max(0.10f, pressureAcrossHalfWidth * 2f) /
+                Mathf.Max(0.10f, localRiverWidth) *
+                localFieldHeight;
+            return RiverDisturbanceFootprintResolver.
+                ResolvePressureSupportLateralSampleCount(
+                    Mathf.CeilToInt(profilePixelWidth));
         }
 
         private float ResolveAutomaticFootprintPadding(
@@ -2461,6 +2983,11 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetVectorArray(
                 "_StaticPressureProfile",
                 staticPressureProfileUpload);
+            computeShader.SetInt(
+                "_StaticPressureProfileCount",
+                pressurePass && pressureProfile.IsValid
+                    ? pressureProfile.LateralSampleCount
+                    : 0);
             computeShader.SetFloat(
                 "_StaticPressureProfileHalfWidthPixels",
                 pressurePass && pressureProfile.IsValid
@@ -2758,8 +3285,8 @@ namespace ProgrammaticStylized3D.Rivers
             if (anyProfileChanged)
             {
                 // The cached geometry remains unchanged. Only the compact
-                // sixteen-row height profile is rebaked, once after all
-                // sources have advanced this update.
+                // lateral height profiles are rebaked, once after all sources
+                // have advanced this update.
                 staticTargetDirty = true;
             }
         }
@@ -2863,6 +3390,16 @@ namespace ProgrammaticStylized3D.Rivers
                     : -1f;
             float familyAmplitude = family == 0 ? 0.18f : 0.48f;
             float amplitude = familyAmplitude * response;
+            float minimumProfileMultiplier = sampleCount >= 64
+                ? 0.86f
+                : sampleCount >= 32
+                    ? 0.82f
+                    : StaticPressureMinimumProfileMultiplier;
+            float maximumProfileMultiplier = sampleCount >= 64
+                ? 1.10f
+                : sampleCount >= 32
+                    ? 1.12f
+                    : MaximumStaticPressureModulation;
             float[] raw = source.StaticPressureRawScratch;
             float[] smoothed = source.StaticPressureSmoothedScratch;
             float rawSum = 0f;
@@ -2975,8 +3512,8 @@ namespace ProgrammaticStylized3D.Rivers
                 target[index] = Mathf.Clamp(
                     smoothed[index] /
                     Mathf.Max(0.0001f, smoothedMean),
-                    StaticPressureMinimumProfileMultiplier,
-                    MaximumStaticPressureModulation);
+                    minimumProfileMultiplier,
+                    maximumProfileMultiplier);
             }
         }
 
@@ -3018,10 +3555,18 @@ namespace ProgrammaticStylized3D.Rivers
         private static bool HasValidPressureProfileState(
             ContinuousSource source)
         {
+            if (!source.StaticPressureBaseProfile.IsValid ||
+                !source.StaticPressureProfile.IsValid)
+            {
+                return false;
+            }
+
             int sampleCount =
-                RiverDisturbanceFootprintResolver.
-                    PressureSupportLateralSamples;
-            return source.StaticPressureCurrentMultipliers != null &&
+                source.StaticPressureBaseProfile.Samples.Length;
+            return sampleCount > 0 &&
+                   source.StaticPressureProfile.Samples.Length ==
+                       sampleCount &&
+                   source.StaticPressureCurrentMultipliers != null &&
                    source.StaticPressureTransitionStartMultipliers != null &&
                    source.StaticPressureTargetMultipliers != null &&
                    source.StaticPressureRawScratch != null &&
@@ -3051,6 +3596,7 @@ namespace ProgrammaticStylized3D.Rivers
             Array.Copy(source.Samples, samples, source.Samples.Length);
             return new RiverDisturbancePressureBakeProfile(
                 source.AcrossHalfWidth,
+                source.LateralSampleCount,
                 samples);
         }
 
