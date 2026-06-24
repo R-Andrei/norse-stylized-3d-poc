@@ -9,6 +9,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         Raise,
         Lower
     }
+    
 
     public enum GroundModifierShape
     {

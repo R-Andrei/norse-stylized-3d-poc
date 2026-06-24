@@ -37,6 +37,7 @@ namespace ProgrammaticStylized3D.Rivers
                 0f,
                 10f,
                 0.5f);
+                
 
         public int Seed { get; }
         public float BedRoughness { get; }

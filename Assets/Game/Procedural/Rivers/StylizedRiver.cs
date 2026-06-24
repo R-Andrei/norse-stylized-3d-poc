@@ -94,7 +94,10 @@ namespace ProgrammaticStylized3D.Rivers
         Velocity = 2,
         Normal = 3,
         Intensity = 4,
-        FieldCoordinates = 5
+        FieldCoordinates = 5,
+        StaticPressureTarget = 6,
+        StaticWakeSource = 7,
+        WakeEnergy = 8
     }
 
     public enum StylizedRiverIceBodyPreset
@@ -305,6 +308,7 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField]
         private Color iceColor =
             new Color(0.56f, 0.78f, 0.90f, 1f);
+
 
         [Tooltip("How much of the lit scene beneath the ice remains visible.")]
         [Range(0f, 1f)]
@@ -806,6 +810,10 @@ namespace ProgrammaticStylized3D.Rivers
         public float FlowSpeedMetresPerSecond => flowSpeed;
         public float MotionWaveHeight => motionWaveHeight;
         public float MotionWaveLength => motionWaveLength;
+        public float MotionWaveSteepness => motionWaveSteepness;
+        public float MotionTurbulence => motionTurbulence;
+        public float MotionTime => riverTime;
+        public float MotionSeed => visualSeed;
         public float ShoreMotion => shoreMotion;
         public bool RuntimeDisturbancesEnabled => runtimeDisturbances;
         public StylizedRiverDisturbancePreset DisturbancePreset =>
@@ -2389,7 +2397,12 @@ namespace ProgrammaticStylized3D.Rivers
                 Domain,
                 ResolveCrossSegments(),
                 ResolveSurfaceLongitudinalSpacing(),
-                ResolvedMaximumDownwardMotion,
+                Mathf.Max(
+                    ResolvedMaximumDownwardMotion,
+                    runtimeDisturbances
+                        ? StylizedRiverDisturbanceRuntime
+                            .MaximumStaticPressureHeightMetres
+                        : 0f),
                 surfaceMesh);
         }
 
@@ -2807,13 +2820,43 @@ namespace ProgrammaticStylized3D.Rivers
 
         private int ResolveCrossSegments()
         {
-            return quality switch
+            int baseSegments = quality switch
             {
                 StylizedRiverQuality.Low => 6,
                 StylizedRiverQuality.Medium => 12,
                 StylizedRiverQuality.High => 20,
                 _ => 12
             };
+
+            if (!runtimeDisturbances || ResolveLiquidFactor() <= 0.0001f)
+            {
+                return baseSegments;
+            }
+
+            int intervalsPerDisturbance = quality switch
+            {
+                StylizedRiverQuality.Low => 5,
+                StylizedRiverQuality.Medium => 7,
+                StylizedRiverQuality.High => 9,
+                _ => 7
+            };
+            int maximumSegments = quality switch
+            {
+                StylizedRiverQuality.Low => 24,
+                StylizedRiverQuality.Medium => 40,
+                StylizedRiverQuality.High => 64,
+                _ => 40
+            };
+            float targetSpacing =
+                disturbanceMinimumWavelength /
+                Mathf.Max(1, intervalsPerDisturbance);
+            int requiredSegments = Mathf.CeilToInt(
+                GeneratedSurfaceWidth / Mathf.Max(0.05f, targetSpacing));
+
+            return Mathf.Clamp(
+                Mathf.Max(baseSegments, requiredSegments),
+                baseSegments,
+                maximumSegments);
         }
 
         private static void DestroyTemporaryMaterial(ref Material material)

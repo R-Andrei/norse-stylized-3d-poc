@@ -75,6 +75,7 @@ float RiverWaterResolveMotionBankMask(
     return retainedAtShore * smoothstep(0.0, 1.0, hiddenRemaining);
 }
 
+
 float RiverWaterEvaluateMacroHeight(
     float globalDistance,
     float lateralMetres,

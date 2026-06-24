@@ -69,6 +69,7 @@ float RiverWaterResolveRefractionShoreMask(
         hiddenRemaining);
 }
 
+
 float3 RiverWaterEvaluateStaticIceNormal(
     TEXTURE2D_PARAM(detailTexture, detailSampler),
     RiverWaterRefractionInputs input,

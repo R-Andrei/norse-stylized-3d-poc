@@ -13,6 +13,7 @@ namespace ProgrammaticStylized3D.Geometry
     [Serializable]
     public sealed class MeshData
     {
+        
         public readonly List<Vector3> Vertices = new();
         public readonly List<int> Triangles = new();
         public readonly List<Vector2> UV0 = new();

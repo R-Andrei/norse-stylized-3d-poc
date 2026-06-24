@@ -1896,6 +1896,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 _ => 0
             };
         }
+        
 
         private static int GetBoundarySegments(SurfaceFacetDensity density)
         {

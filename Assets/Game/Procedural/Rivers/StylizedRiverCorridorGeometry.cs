@@ -41,6 +41,7 @@ namespace ProgrammaticStylized3D.Rivers
         public bool TightBendWarning { get; }
         public bool IsValid => RingCount >= 2 && AcrossVertexCount >= 3;
     }
+    
 
     /// <summary>
     /// Builds the visible riverbed and banks independently from the broad ground

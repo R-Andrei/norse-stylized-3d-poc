@@ -24,6 +24,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         XXL,
         Monumental
     }
+    
 
     public enum FormComplexity
     {
@@ -254,7 +255,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
     [RequireComponent(typeof(MeshFilter))]
     [RequireComponent(typeof(MeshRenderer))]
     [RequireComponent(typeof(MeshCollider))]
-    public sealed class GeneratedMass : MonoBehaviour
+    public sealed class GeneratedMass : MonoBehaviour, IGeneratedGeometrySource, IGeneratedRiverInteractionSource
     {
         private const string LegacyRiverFoamProxyObjectName =
             "RiverFoamProxy";
@@ -264,6 +265,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         [SerializeField]
         private bool regenerateOnValidate = true;
+
+        [Header("River Interaction")]
+        [SerializeField]
+        private GeneratedRiverInteractionSettings riverInteraction =
+            new GeneratedRiverInteractionSettings();
 
         [SerializeField, HideInInspector]
         private bool recipeInitialized;
@@ -275,13 +281,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private MeshCollider meshCollider;
         private Mesh generatedMesh;
 
+        public event Action GeometryChanged;
+
         public MassRecipe Recipe => recipe;
+        public GeneratedRiverInteractionSettings RiverInteractionSettings
+        {
+            get
+            {
+                riverInteraction ??= new GeneratedRiverInteractionSettings();
+                return riverInteraction;
+            }
+        }
+        public bool IsSolidGeometry => true;
+        public bool IsStaticGeometry => true;
+        public MeshFilter GeometryMeshFilter
+        {
+            get
+            {
+                CacheComponents();
+                return meshFilter;
+            }
+        }
 
         private void OnEnable()
         {
             EnsureRecipeState();
             CacheComponents();
             Regenerate();
+            GeneratedGeometryRegistry.Register(this);
+        }
+
+        private void OnDisable()
+        {
+            GeneratedGeometryRegistry.Unregister(this);
         }
 
         private void OnValidate()
@@ -291,6 +323,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             if (!regenerateOnValidate)
             {
+                GeneratedGeometryRegistry.NotifyChanged(this);
                 return;
             }
 
@@ -304,6 +337,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 recipe = new MassRecipe();
             }
+
+            riverInteraction ??= new GeneratedRiverInteractionSettings();
+            riverInteraction.Validate();
 
             bool archetypeChanged =
                 recipeInitialized &&
@@ -325,6 +361,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             if (recipe == null)
             {
                 ClearGeneratedAssignments();
+                NotifyGeometryChanged();
                 return;
             }
 
@@ -347,6 +384,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             meshCollider.convex = false;
 
             RemoveLegacyRiverFoamProxy();
+            NotifyGeometryChanged();
         }
 
         [ContextMenu("New Shape")]
@@ -449,6 +487,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             RemoveLegacyRiverFoamProxy();
         }
 
+        private void NotifyGeometryChanged()
+        {
+            GeometryChanged?.Invoke();
+        }
+
         private void RemoveLegacyRiverFoamProxy()
         {
             Transform existing =
@@ -474,6 +517,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private void OnDestroy()
         {
+            GeneratedGeometryRegistry.Unregister(this);
             ClearGeneratedAssignments();
 
             if (generatedMesh == null)

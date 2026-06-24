@@ -29,6 +29,7 @@ namespace ProgrammaticStylized3D.Rivers
                 normalizedTime,
                 normalizedTime)
         {
+            
         }
 
         public StylizedRiverSplineSample(

@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-1048024607495253603
+--- !u!114 &-490381757024427534
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
@@ -20,23 +20,20 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: MAT_RiverWater
-  m_Shader: {fileID: 4800000, guid: 78843eda0e4e8a5448842225917d4089, type: 3}
+  m_Name: M_RiverShaderDiagnostic
+  m_Shader: {fileID: 4800000, guid: a8456e3a6889491ab9a6b6a695376b59, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
   m_InvalidKeywords:
-  - _ALPHAPREMULTIPLY_ON
-  - _SURFACE_TYPE_TRANSPARENT
+  - _PRESERVEOBJECTSILHOUETTES_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 1
+  m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
-  - DepthOnly
-  - SHADOWCASTER
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
@@ -61,6 +58,22 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _DisturbanceStaticTarget:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DisturbanceStaticWakeSource:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DisturbanceWakeCurrent:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DisturbanceWakePrevious:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _EmissionMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -70,6 +83,10 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MotionDetailTexture:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -99,105 +116,104 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _AcrossCells: 25.7
     - _AddPrecomputedVelocity: 0
-    - _AlongCells: 27.7
-    - _Alpha: 0.921
     - _AlphaClip: 0
     - _AlphaToMask: 0
-    - _AmbientStrength: 0.96
-    - _BankSpeed: 0.34
-    - _BankTurbulence: 0.42
+    - _AmbientResponse: 1
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
-    - _BlockVariation: 0.646
-    - _BodyScale: 0.32
+    - _BodyDebugView: 0
+    - _BodyDepthContrast: 0.5
+    - _BodyDepthRange: 1.4
     - _BumpScale: 1
+    - _Clarity: 0.62
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
-    - _CrossDrift: 0.12
-    - _Cull: 0
-    - _CurrentAccents: 0.16
-    - _CurvatureInfluence: 0.85
+    - _Cull: 2
+    - _CurrentAccentScale: 5
+    - _CurrentAccentStrength: 0
     - _Cutoff: 0.5
-    - _DepthDarkening: 0.493
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
-    - _DstBlend: 10
-    - _DstBlendAlpha: 10
-    - _EddySpacing: 6
-    - _EddyStrength: 0.34
-    - _EdgeLight: 0.046
-    - _Emission: 0.89
+    - _DiffuseWrap: 0.22
+    - _DisturbanceDebugView: 0
+    - _DisturbanceEnabled: 0
+    - _DisturbanceFieldLength: 1
+    - _DisturbanceFragmentDetail: 0
+    - _DisturbanceGeometryStrength: 1
+    - _DisturbanceGlobalStart: 0
+    - _DisturbanceInterpolation: 1
+    - _DisturbanceMaximumHeight: 0.1
+    - _DisturbanceNormalStrength: 1
+    - _DisturbanceShoreInteraction: 0.5
+    - _DisturbanceStaticMaximumHeight: 1.25
+    - _DisturbanceWakeInterpolation: 1
+    - _DomainFallbackDepth: 1.1
+    - _DstBlend: 0
+    - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
-    - _FacetHighlight: 0.24
-    - _FlowLineIntensity: 1
-    - _FlowPhase: 0
-    - _FlowSpeed: -0.28
-    - _FlowStyle: 1
-    - _FlowTileLength: 0.35
+    - _FreezeAmount: 0
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _LightBands: 3
-    - _LightPenetration: 0.65
-    - _LightResponse: 0.75
-    - _LightWrap: 0.42
-    - _LineAmount: 0.764
-    - _LineFrequency: 5.36
-    - _LineJitter: 0.724
-    - _LineWidth: 0.304
+    - _IceCloudiness: 0.58
+    - _IceDiffusion: 0.28
+    - _IceDistortionStrength: 0.0015
+    - _IceScattering: 0.68
+    - _IceSurfacePresence: 0.86
+    - _IceSurfaceShadowResponse: 0.65
+    - _IceThickness: 0.72
+    - _IceTransmission: 0.16
+    - _LightColorInfluence: 0.8
+    - _LightDependence: 1
+    - _LiquidRefractionStrength: 0
+    - _LiquidSurfaceShadowResponse: 0.08
+    - _LocalLightResponse: 1
     - _Metallic: 0
-    - _NormalStrength: 2.2
+    - _MinimumNightVisibility: 0.025
+    - _MotionDebugView: 0
+    - _MotionDetailScale: 1.4
+    - _MotionDetailStrength: 0
+    - _MotionFlowSpeed: 0
+    - _MotionSeed: 1731
+    - _MotionTime: 0
+    - _MotionTurbulence: 0.25
+    - _MotionWaveHeight: 0
+    - _MotionWaveLength: 5
+    - _MotionWaveSteepness: 0.35
     - _OcclusionStrength: 1
     - _Parallax: 0.005
+    - _PreserveObjectSilhouettes: 1
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _RiverSeed: 3141
-    - _RiverTime: 0
-    - _Scattering: 0.68
-    - _ShallowScattering: 0.82
-    - _ShoreContact: 0.45
-    - _Smoothness: 0.744
+    - _RefractionDebugView: 0
+    - _RefractionDepthInfluence: 0.55
+    - _RefractionEdgeProtection: 0.88
+    - _RefractionNormalInfluence: 0.65
+    - _RefractionQuality: 1
+    - _ShadowResponse: 1
+    - _ShoreMotion: 0.35
+    - _ShoreMotionWidth: 0.75
+    - _ShoreRefraction: 0.22
+    - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
-    - _StreakAmount: 0.223
-    - _StreakContrast: 0.28
-    - _StreakEmission: 0.08
-    - _StreakFrequency: 1.35
-    - _StreakLanes: 7
-    - _StreakLength: 0.48
-    - _StreakWidth: 0.11
-    - _Surface: 1
-    - _SurfaceMotion: 0.42
-    - _ToneBands: 3.69
-    - _ToneContrast: 0.169
-    - _TrailSize: 0.45
-    - _Turbulence: 0.42
-    - _WaveFaceting: 0.845
-    - _WaveHeight: 0.177
-    - _WaveIrregularity: 1
-    - _WaveScale: 5.24
-    - _WaveSpeed: -2.47
-    - _WaveSteps: 1.41
+    - _SunResponse: 1
+    - _Surface: 0
+    - _SurfacePresence: 0.46
+    - _WaterTintStrength: 0.72
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
-    - _ZWrite: 0
+    - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.23709506, g: 0.37732288, b: 0.4528302, a: 0.7176471}
-    - _Color: {r: 0.237095, g: 0.37732285, b: 0.45283014, a: 0.7176471}
-    - _ContactColor: {r: 0.08, g: 0.28, b: 0.3, a: 1}
-    - _CurrentColor: {r: 0.42, g: 0.74, b: 0.72, a: 1}
-    - _DeepColor: {r: 0.095318615, g: 0.23725982, b: 0.3207547, a: 1}
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _DeepColor: {r: 0, g: 0.30999997, b: 0.594, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _LightColor: {r: 0.12, g: 0.3, b: 0.34, a: 1}
-    - _LineColor: {r: 0.17817728, g: 0.41509432, b: 0.41509432, a: 1}
-    - _MidColor: {r: 0.075, g: 0.2, b: 0.235, a: 1}
-    - _ScatterColor: {r: 0.22, g: 0.58, b: 0.56, a: 1}
-    - _ShallowColor: {r: 0.16, g: 0.38, b: 0.4, a: 1}
+    - _IceColor: {r: 0.56, g: 0.78, b: 0.9, a: 1}
+    - _ShallowColor: {r: 0.458, g: 0.802, b: 0.798, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _StreakColor: {r: 0.42, g: 0.74, b: 0.72, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

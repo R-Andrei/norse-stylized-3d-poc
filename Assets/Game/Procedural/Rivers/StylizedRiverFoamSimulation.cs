@@ -16,6 +16,7 @@ namespace ProgrammaticStylized3D.Rivers
         Medium,
         High
     }
+    
 
     [ExecuteAlways]
     [DisallowMultipleComponent]

@@ -32,6 +32,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             SerializedProperty updateMode = serializedObject.FindProperty("updateMode");
             EditorGUILayout.PropertyField(updateMode);
 
+
             if ((StylizedRiverReflectionUpdateMode)updateMode.enumValueIndex ==
                 StylizedRiverReflectionUpdateMode.EveryNthFrame)
             {

@@ -38,6 +38,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawStatus();
             DrawButtons();
         }
+        
 
         private SerializedProperty Find(string propertyName)
         {

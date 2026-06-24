@@ -43,6 +43,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float reflectionStrength = 0.45f;
 
+
         [Range(0f, 0.1f)]
         [SerializeField] private float reflectionDistortion = 0.015f;
 

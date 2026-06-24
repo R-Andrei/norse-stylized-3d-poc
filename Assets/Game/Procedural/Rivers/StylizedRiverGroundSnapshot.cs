@@ -18,6 +18,7 @@ namespace ProgrammaticStylized3D.Rivers
     /// </summary>
     public readonly struct StylizedRiverGroundSnapshot
     {
+        
         private readonly Vector3[] points;
         private readonly Vector3[] sides;
         private readonly float[] leftVisibleHalfWidths;

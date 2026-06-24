@@ -39,6 +39,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Advanced Simulation",
                 true);
 
+
             if (showAdvanced)
             {
                 EditorGUI.indentLevel++;

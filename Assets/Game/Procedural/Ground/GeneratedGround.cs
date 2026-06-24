@@ -20,6 +20,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [InspectorName("Huge")]
         Huge80
     }
+    
 
     public enum GroundResolution
     {

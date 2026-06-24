@@ -135,6 +135,7 @@ RiverWaterLightingResult RiverWaterEvaluateLighting(
                     diffuseWrap);
             }
         #endif
+        
 
         uint pixelLightCount = GetAdditionalLightsCount();
 

@@ -13,6 +13,7 @@ namespace ProgrammaticStylized3D.Geometry
             Mesh targetMesh,
             string meshName)
         {
+            
             if (data == null)
             {
                 throw new System.ArgumentNullException(nameof(data));

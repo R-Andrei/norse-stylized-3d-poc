@@ -22,6 +22,7 @@ Shader "PS3D/Stylized River Water"
         _IceSurfacePresence("Ice Surface Presence", Range(0, 1)) = 0.86
         _IceScattering("Ice Scattering", Range(0, 1)) = 0.68
 
+
         [Header(Surface Motion)]
         [NoScaleOffset] _MotionDetailTexture("Motion Detail Texture", 2D) = "bump" {}
         _MotionFlowSpeed("Flow Speed", Range(0, 12)) = 0
@@ -51,6 +52,7 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _RefractionQuality("Refraction Quality", Float) = 1
         _RefractionDebugView("Refraction Debug View", Range(0, 6)) = 0
 
+        
         [Header(Runtime Disturbance Field)]
         [HideInInspector] _DisturbanceEnabled("Disturbance Enabled", Float) = 0
         [HideInInspector] _DisturbanceInterpolation("Disturbance Interpolation", Range(0, 1)) = 1
@@ -60,7 +62,14 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _DisturbanceNormalStrength("Disturbance Normal Strength", Float) = 1
         [HideInInspector] _DisturbanceShoreInteraction("Disturbance Shore Interaction", Float) = 0.5
         [HideInInspector] _DisturbanceMaximumHeight("Disturbance Maximum Height", Float) = 0.1
+        [HideInInspector] _DisturbanceStaticMaximumHeight("Static Pressure Maximum Height", Float) = 1.25
         [HideInInspector] _DisturbanceDebugView("Disturbance Debug View", Float) = 0
+        [HideInInspector] _DisturbanceFragmentDetail("Disturbance Fragment Detail", Float) = 0
+        [HideInInspector] _DisturbanceStaticTarget("Disturbance Static Pressure", 2D) = "black" {}
+        [HideInInspector] _DisturbanceStaticWakeSource("Disturbance Static Wake Source", 2D) = "black" {}
+        [HideInInspector] _DisturbanceWakePrevious("Disturbance Wake Previous", 2D) = "black" {}
+        [HideInInspector] _DisturbanceWakeCurrent("Disturbance Wake Current", 2D) = "black" {}
+        [HideInInspector] _DisturbanceWakeInterpolation("Disturbance Wake Interpolation", Range(0, 1)) = 1
 
         [Header(Lighting Response)]
         _LightDependence("Light Dependence", Range(0, 1)) = 1
@@ -179,13 +188,16 @@ Shader "PS3D/Stylized River Water"
 
                 float _DisturbanceEnabled;
                 float _DisturbanceInterpolation;
+                float _DisturbanceWakeInterpolation;
                 float _DisturbanceGlobalStart;
                 float _DisturbanceFieldLength;
                 float _DisturbanceGeometryStrength;
                 float _DisturbanceNormalStrength;
                 float _DisturbanceShoreInteraction;
                 float _DisturbanceMaximumHeight;
+                float _DisturbanceStaticMaximumHeight;
                 float _DisturbanceDebugView;
+                float _DisturbanceFragmentDetail;
 
                 float _DomainFallbackDepth;
                 float _BodyDebugView;
@@ -197,6 +209,14 @@ Shader "PS3D/Stylized River Water"
             SAMPLER(sampler_DisturbanceFieldPrevious);
             TEXTURE2D(_DisturbanceFieldCurrent);
             SAMPLER(sampler_DisturbanceFieldCurrent);
+            TEXTURE2D(_DisturbanceStaticTarget);
+            SAMPLER(sampler_DisturbanceStaticTarget);
+            TEXTURE2D(_DisturbanceStaticWakeSource);
+            SAMPLER(sampler_DisturbanceStaticWakeSource);
+            TEXTURE2D(_DisturbanceWakePrevious);
+            SAMPLER(sampler_DisturbanceWakePrevious);
+            TEXTURE2D(_DisturbanceWakeCurrent);
+            SAMPLER(sampler_DisturbanceWakeCurrent);
 
             struct Attributes
             {
@@ -268,6 +288,9 @@ Shader "PS3D/Stylized River Water"
                         TEXTURE2D_ARGS(
                             _DisturbanceFieldCurrent,
                             sampler_DisturbanceFieldCurrent),
+                        TEXTURE2D_ARGS(
+                            _DisturbanceStaticTarget,
+                            sampler_DisturbanceStaticTarget),
                         _DisturbanceEnabled,
                         input.uv1.x,
                         input.uv1.y,
@@ -279,7 +302,16 @@ Shader "PS3D/Stylized River Water"
                         _DisturbanceGeometryStrength,
                         _DisturbanceShoreInteraction,
                         _DisturbanceMaximumHeight,
-                        _FreezeAmount);
+                        _DisturbanceStaticMaximumHeight,
+                        _FreezeAmount,
+                        _MotionTime,
+                        motion.macroHeight,
+                        _MotionWaveHeight,
+                        _MotionFlowSpeed,
+                        _MotionWaveLength,
+                        _MotionWaveSteepness,
+                        _MotionTurbulence,
+                        _MotionSeed);
 
                 output.positionWS =
                     basePositionWS +
@@ -346,17 +378,90 @@ Shader "PS3D/Stylized River Water"
                     _ShoreMotionWidth,
                     _MotionSeed);
 
+                float4 resolvedDisturbanceData =
+                    input.disturbanceData;
+
+                // Medium and High quality re-sample the low-resolution
+                // pressure/ripple field per fragment for crisp contact normals.
+                // Low quality retains interpolated vertex pressure gradients;
+                // the downstream wake field is still sampled once per fragment.
+                if (_DisturbanceFragmentDetail > 0.5 &&
+                    _DisturbanceEnabled > 0.5)
+                {
+                    RiverWaterDisturbanceResult fragmentDisturbance =
+                        RiverWaterEvaluateDisturbance(
+                            TEXTURE2D_ARGS(
+                                _DisturbanceFieldPrevious,
+                                sampler_DisturbanceFieldPrevious),
+                            TEXTURE2D_ARGS(
+                                _DisturbanceFieldCurrent,
+                                sampler_DisturbanceFieldCurrent),
+                            TEXTURE2D_ARGS(
+                                _DisturbanceStaticTarget,
+                                sampler_DisturbanceStaticTarget),
+                            _DisturbanceEnabled,
+                            input.domainData.x,
+                            input.domainData.y,
+                            input.domainData.z,
+                            input.domainData.w,
+                            _DisturbanceGlobalStart,
+                            _DisturbanceFieldLength,
+                            _DisturbanceInterpolation,
+                            _DisturbanceGeometryStrength,
+                            _DisturbanceShoreInteraction,
+                            _DisturbanceMaximumHeight,
+                            _DisturbanceStaticMaximumHeight,
+                            _FreezeAmount,
+                            _MotionTime,
+                            motion.macroHeight,
+                            _MotionWaveHeight,
+                            _MotionFlowSpeed,
+                            _MotionWaveLength,
+                            _MotionWaveSteepness,
+                            _MotionTurbulence,
+                            _MotionSeed);
+
+                    resolvedDisturbanceData.x =
+                        fragmentDisturbance.downstreamGradient;
+                    resolvedDisturbanceData.y =
+                        fragmentDisturbance.lateralGradient;
+                    resolvedDisturbanceData.w =
+                        fragmentDisturbance.velocity;
+                }
+
+                RiverWaterWakeResult wake = RiverWaterEvaluateWake(
+                    TEXTURE2D_ARGS(
+                        _DisturbanceWakePrevious,
+                        sampler_DisturbanceWakePrevious),
+                    TEXTURE2D_ARGS(
+                        _DisturbanceWakeCurrent,
+                        sampler_DisturbanceWakeCurrent),
+                    _DisturbanceEnabled,
+                    input.domainData.x,
+                    input.domainData.y,
+                    input.domainData.z,
+                    input.domainData.w,
+                    _DisturbanceGlobalStart,
+                    _DisturbanceFieldLength,
+                    _DisturbanceWakeInterpolation,
+                    _DisturbanceShoreInteraction,
+                    _FreezeAmount);
+
+                resolvedDisturbanceData.x += wake.downstreamGradient;
+                resolvedDisturbanceData.y += wake.lateralGradient;
+
                 float3 disturbanceNormalWS =
                     RiverWaterApplyDisturbanceNormal(
                         motion.surfaceNormalWS,
                         normalize(input.tangentWS),
                         normalize(input.sideWS),
-                        input.disturbanceData.x,
-                        input.disturbanceData.y,
+                        resolvedDisturbanceData.x,
+                        resolvedDisturbanceData.y,
                         _DisturbanceNormalStrength);
 
                 motion.surfaceNormalWS = disturbanceNormalWS;
-                motion.disturbanceHeight = input.disturbanceData.z;
+                motion.disturbanceHeight =
+                    resolvedDisturbanceData.z;
                 motion.disturbanceNormalWS =
                     disturbanceNormalWS - motionInputs.baseNormalWS;
 
@@ -499,8 +604,12 @@ Shader "PS3D/Stylized River Water"
                 if (disturbanceDebug == 1)
                 {
                     float encodedHeight = saturate(
-                        input.disturbanceData.z /
-                        max(0.001, _DisturbanceMaximumHeight) *
+                        resolvedDisturbanceData.z /
+                        max(
+                            0.001,
+                            max(
+                                _DisturbanceMaximumHeight,
+                                _DisturbanceStaticMaximumHeight)) *
                         0.5 + 0.5);
                     return half4(encodedHeight.xxx, 1.0);
                 }
@@ -508,7 +617,7 @@ Shader "PS3D/Stylized River Water"
                 if (disturbanceDebug == 2)
                 {
                     float encodedVelocity = saturate(
-                        input.disturbanceData.w * 0.25 + 0.5);
+                        resolvedDisturbanceData.w * 0.25 + 0.5);
                     return half4(encodedVelocity.xxx, 1.0);
                 }
 
@@ -522,10 +631,11 @@ Shader "PS3D/Stylized River Water"
                 if (disturbanceDebug == 4)
                 {
                     float intensity = saturate(
-                        abs(input.disturbanceData.z) /
+                        abs(resolvedDisturbanceData.z) /
                         max(0.001, _DisturbanceMaximumHeight) * 0.55 +
-                        abs(input.disturbanceData.w) * 0.12 +
-                        length(input.disturbanceData.xy) * 0.35);
+                        abs(resolvedDisturbanceData.w) * 0.12 +
+                        length(resolvedDisturbanceData.xy) * 0.30 +
+                        wake.intensity * 0.35);
                     return half4(intensity.xxx, 1.0);
                 }
 
@@ -540,6 +650,63 @@ Shader "PS3D/Stylized River Water"
                             max(0.001, input.domainData.w) *
                             0.5 + 0.5));
                     return half4(fieldUV.x, fieldUV.y, 0.0, 1.0);
+                }
+
+                if (disturbanceDebug == 6 ||
+                    disturbanceDebug == 7 ||
+                    disturbanceDebug == 8)
+                {
+                    float2 fieldUV = float2(
+                        saturate(
+                            (input.domainData.x - _DisturbanceGlobalStart) /
+                            max(0.001, _DisturbanceFieldLength)),
+                        saturate(
+                            input.domainData.y /
+                            max(0.001, input.domainData.w) *
+                            0.5 + 0.5));
+
+                    if (disturbanceDebug == 6)
+                    {
+                        float4 staticPressure = SAMPLE_TEXTURE2D(
+                            _DisturbanceStaticTarget,
+                            sampler_DisturbanceStaticTarget,
+                            fieldUV);
+                        float pressure = saturate(
+                            staticPressure.r /
+                            max(
+                                0.001,
+                                _DisturbanceStaticMaximumHeight));
+                        return half4(pressure.xxx, 1.0);
+                    }
+
+                    if (disturbanceDebug == 7)
+                    {
+                        float4 wakeSource = SAMPLE_TEXTURE2D(
+                            _DisturbanceStaticWakeSource,
+                            sampler_DisturbanceStaticWakeSource,
+                            fieldUV);
+                        return half4(
+                            saturate(wakeSource.r * 0.35),
+                            saturate(wakeSource.b),
+                            0.0,
+                            1.0);
+                    }
+
+                    float4 wakePrevious = SAMPLE_TEXTURE2D(
+                        _DisturbanceWakePrevious,
+                        sampler_DisturbanceWakePrevious,
+                        fieldUV);
+                    float4 wakeCurrent = SAMPLE_TEXTURE2D(
+                        _DisturbanceWakeCurrent,
+                        sampler_DisturbanceWakeCurrent,
+                        fieldUV);
+                    float4 wakeState = lerp(
+                        wakePrevious,
+                        wakeCurrent,
+                        saturate(_DisturbanceWakeInterpolation));
+                    float energy = saturate(wakeState.r * 0.30);
+                    float lateral = saturate(abs(wakeState.a) * 0.35);
+                    return half4(energy, lateral, 0.0, 1.0);
                 }
 
                 int refractionDebug =

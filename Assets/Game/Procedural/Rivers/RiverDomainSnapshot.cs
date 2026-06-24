@@ -44,6 +44,7 @@ namespace ProgrammaticStylized3D.Rivers
             MaximumSampleSpacing = maximumSpacing;
             Bounds = CalculateBounds(this.samples);
         }
+        
 
         public static RiverDomainSnapshot Empty { get; } =
             new RiverDomainSnapshot(

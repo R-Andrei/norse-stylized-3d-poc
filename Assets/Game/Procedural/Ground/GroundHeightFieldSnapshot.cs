@@ -26,6 +26,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             SurfaceVariation = Mathf.Clamp01(surfaceVariation);
             MaterialClassification = materialClassification;
         }
+        
 
         public GroundSurfaceSample(
             float height,
