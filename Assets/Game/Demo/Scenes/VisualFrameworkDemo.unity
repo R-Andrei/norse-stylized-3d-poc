@@ -7653,7 +7653,7 @@ MonoBehaviour:
   iceSurfaceShadowResponse: 0.65
   diffuseWrap: 0.22
   motionPreset: 4
-  flowSpeed: 0.75
+  flowSpeed: 0.7
   motionWaveHeight: 0.11
   motionWaveLength: 7
   motionWaveSteepness: 0.879
@@ -7678,9 +7678,9 @@ MonoBehaviour:
   runtimeDisturbances: 1
   disturbancePreset: 4
   disturbanceDebugView: 0
-  staticPressureStrength: 0.154
-  staticPressureContactSharpness: 1.97
-  staticPressureWaveResponse: 1.66
+  staticPressureStrength: 0.18
+  staticPressureContactSharpness: 1.11
+  staticPressureWaveResponse: 1.74
   staticPressureProfileChangeIntervalMin: 0.63
   staticPressureProfileChangeIntervalMax: 0.99
   obstructionWakeStrength: 1.5

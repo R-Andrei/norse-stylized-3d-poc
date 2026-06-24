@@ -175,3 +175,7 @@ Before doing anything else, this one test must pass:
 * the rest of the river remains unchanged.
 
 I do not need any additional files or information. The current V5 sources, screenshot, and resolved diagnostics are enough to implement this isolated correction.
+
+
+
+- shore wave motion is too static, static shapes travel downstream instead of them fluctuating over time.

@@ -700,7 +700,11 @@ namespace ProgrammaticStylized3D.Rivers
 
             float safeModulation = Mathf.Max(1f, maximumModulation);
             const float endpointTaperStart = 0.82f;
+            const float minimumSideFacingPressure = 0.25f;
             int lateralSampleCount = support.LateralSampleCount;
+            float lateralSampleSpacing =
+                support.AcrossHalfWidth * 2f /
+                Mathf.Max(1, lateralSampleCount - 1);
             float minimumBaseHeightRatio = lateralSampleCount >= 64
                 ? 0.96f
                 : lateralSampleCount >= 32
@@ -744,6 +748,54 @@ namespace ProgrammaticStylized3D.Rivers
                     cachedHeight = Mathf.Max(
                         cachedHeight,
                         supportSafeFloor);
+                }
+
+                // Reduce static-pressure buildup where the local waterline
+                // contour turns downstream around an obstruction's sides. A
+                // nearly constant upstream boundary faces the flow and keeps
+                // full pressure; steeper lateral boundary changes approach the
+                // retained side-facing minimum. This remains cached event-time
+                // work and does not alter the local support ceiling.
+                float previousUpstream = baseSample.x;
+                float nextUpstream = baseSample.x;
+                int previousStepCount = 0;
+                int nextStepCount = 0;
+
+                if (row > 0)
+                {
+                    Vector4 previousBaseSample =
+                        support.Samples[row - 1];
+                    if (previousBaseSample.z > 0.5f)
+                    {
+                        previousUpstream = previousBaseSample.x;
+                        previousStepCount = 1;
+                    }
+                }
+
+                if (row + 1 < lateralSampleCount)
+                {
+                    Vector4 nextBaseSample = support.Samples[row + 1];
+                    if (nextBaseSample.z > 0.5f)
+                    {
+                        nextUpstream = nextBaseSample.x;
+                        nextStepCount = 1;
+                    }
+                }
+
+                int measuredStepCount =
+                    previousStepCount + nextStepCount;
+                if (measuredStepCount > 0)
+                {
+                    float measuredLateralDistance =
+                        lateralSampleSpacing * measuredStepCount;
+                    float boundarySlope = Mathf.Abs(
+                        nextUpstream - previousUpstream) /
+                        Mathf.Max(0.0001f, measuredLateralDistance);
+                    float flowFacingFactor = Mathf.Max(
+                        minimumSideFacingPressure,
+                        1f / Mathf.Sqrt(
+                            1f + boundarySlope * boundarySlope));
+                    cachedHeight *= flowFacingFactor;
                 }
 
                 if (cachedHeight <= 0.001f || modulationCeiling <= 0.001f)
