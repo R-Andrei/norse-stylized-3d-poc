@@ -437,20 +437,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             EditorGUILayout.Vector2Field(
                 "Current Multiplier Range",
                 debugData.CurrentMultiplierRange);
-            EditorGUILayout.LabelField(
-                "Configured Base Floor",
-                debugData.AppliedBaseFloorRatio > 0f
-                    ? debugData.AppliedBaseFloorRatio.ToString("P0")
-                    : "None");
-            EditorGUILayout.FloatField(
-                "Nominal Floor Height",
-                debugData.NominalFloorHeight);
             EditorGUILayout.IntField(
-                "Rows Raised by Floor",
-                debugData.FloorRaisedRowCount);
-            EditorGUILayout.IntField(
-                "Rows Support-Limited Below Floor",
-                debugData.SupportLimitedBelowFloorRowCount);
+                "Rows Support-Limited Below Target",
+                debugData.SupportLimitedBelowTargetRowCount);
             EditorGUILayout.IntField(
                 "Rows Affected by Endpoint Taper",
                 debugData.EndpointTaperRowCount);
@@ -547,8 +536,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 $"Rows {debugData.LateralSampleCount} " +
                 $"({debugData.ValidRowCount} valid) | " +
                 $"Requested {debugData.RequestedProfileWidthPixels:F1} px | " +
-                $"Target {debugData.TargetHeight:F3} m | " +
-                $"Floor {debugData.NominalFloorHeight:F3} m",
+                $"Target {debugData.TargetHeight:F3} m",
                 EditorStyles.miniLabel);
             GUI.Label(
                 new Rect(
@@ -556,8 +544,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     panelRect.y + 47f,
                     panelRect.width - 20f,
                     18f),
-                $"Floor raised {debugData.FloorRaisedRowCount} | " +
-                $"Support-limited {debugData.SupportLimitedBelowFloorRowCount} | " +
+                $"Support-limited below target " +
+                $"{debugData.SupportLimitedBelowTargetRowCount} | " +
                 $"Endpoint taper {debugData.EndpointTaperRowCount} | " +
                 $"At target {debugData.TargetHeightRowCount}",
                 EditorStyles.miniLabel);
@@ -576,14 +564,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             float maximumHeight = Mathf.Max(
                 debugData.TargetHeight,
-                debugData.NominalFloorHeight,
                 debugData.InteriorCeilingRange.y,
                 debugData.LocalCeilingRange.y,
                 0.001f) * 1.08f;
 
             DrawHorizontalGraphValue(
                 graphRect,
-                debugData.NominalFloorHeight,
+                debugData.TargetHeight,
                 0f,
                 maximumHeight,
                 new Color(0.30f, 1f, 0.30f, 0.85f));
@@ -668,7 +655,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 graphRect.x + 508f,
                 graphRect.yMax + 4f,
                 new Color(0.30f, 1f, 0.30f, 0.85f),
-                "nominal floor");
+                "target height");
         }
 
         private static void DrawContactProfileGraph(
@@ -958,35 +945,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     continue;
                 }
 
-                float untaperedBase = baseSample.z / taper;
                 float untaperedCeiling = baseSample.w / taper;
-                float rawCachedHeight = Mathf.Min(
-                    debugData.TargetHeight,
-                    untaperedCeiling /
-                    Mathf.Max(1f, debugData.SupportModulationReserve));
-                float supportSafeFloor = Mathf.Min(
-                    debugData.NominalFloorHeight,
-                    untaperedCeiling);
                 float x = ResolveGraphX(
                     rect,
                     row,
                     debugData.LateralSampleCount);
 
-                if (supportSafeFloor > rawCachedHeight + 0.0005f)
-                {
-                    float y = ResolveGraphY(
-                        rect,
-                        untaperedBase,
-                        0f,
-                        maximumHeight);
-                    EditorGUI.DrawRect(
-                        new Rect(x - 2f, y - 2f, 4f, 4f),
-                        new Color(0.30f, 1f, 0.30f, 1f));
-                }
-
-                if (debugData.AppliedBaseFloorRatio > 0f &&
-                    untaperedCeiling <
-                    debugData.NominalFloorHeight - 0.0005f)
+                if (untaperedCeiling <
+                    debugData.TargetHeight - 0.0005f)
                 {
                     float y = ResolveGraphY(
                         rect,

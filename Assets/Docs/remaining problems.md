@@ -179,3 +179,5 @@ I do not need any additional files or information. The current V5 sources, scree
 
 
 - shore wave motion is too static, static shapes travel downstream instead of them fluctuating over time.
+
+- river current is not stronger/faster in the middle compared to sides, this should change.

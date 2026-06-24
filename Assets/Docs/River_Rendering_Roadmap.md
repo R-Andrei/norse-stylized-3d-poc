@@ -36,7 +36,7 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 **High-performance compatibility:** Visual features may carry meaningful cost when their importance justifies it, but the framework prefers shared fixed-cost representations, quality tiers, culling, sleeping, staggered updates, and lower-frequency simulation whenever they can provide comparable results. Per-effect/per-pixel scaling is avoided where a shared persistent field is practical.
 
-**Generated static-geometry registration and authorship:** Active procedural geometry registers through a neutral event-driven registry. Solid static sources expose their final generated mesh and announce geometry changes; river runtimes perform bounds rejection, cache only geometry that touches the river, and unregister automatically with object or chunk lifetime. Generated static obstacles need no river emitter component. Their optional authorship is feature-specific: participation, Static Pressure mode and values, and Obstruction Wake mode and values. Inherit resolves the detecting river's active defaults, Disabled removes only that feature, and Custom replaces only that feature. Dynamic gameplay sources remain emitter-driven.
+**Generated static-geometry registration and authorship:** Active procedural geometry registers through a neutral event-driven registry. Solid static sources expose their final generated mesh and announce geometry changes; river runtimes perform bounds rejection, cache only geometry that touches the river, and unregister automatically with object or chunk lifetime. Generated static obstacles need no river emitter component. Their optional authorship is feature-specific: participation, Static Pressure mode and values, and Static Wake mode and values. `Obstruction Wake` remains the current serialized/code name for Static Wake until a separately approved compatibility-safe rename. Inherit resolves the detecting river's active defaults, Disabled removes only that feature, and Custom replaces only that feature. Dynamic gameplay sources remain emitter-driven.
 
 **Generated channel and terrain integration:** A dedicated spline-following corridor generates the riverbed, slopes, shoreline, hidden overlap, collider handoff, and buried terrain apron. It samples an immutable pre-river ground snapshot and matches ground height, slope, normals, UVs, and surface metadata at the handoff.
 
@@ -78,23 +78,57 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 ## 5. Runtime Disturbance and Interaction
 
-**Problem:** Add persistent impact ripples, player and object wakes, stationary obstruction pressure, downstream transport, spreading, and decay without replacing the Stage 3 base motion field or scaling water shading cost with active effect count.
+**Problem:** Add attached pressure, stationary and moving wakes, one-shot ripples, downstream transport, spreading, and decay without replacing the Stage 3 base motion field or scaling water-shader cost with active effect count.
 
-**Implemented:** A river-owned, chunked runtime keeps four interaction features independent: height-aware Static Pressure, static Obstruction Wakes, dynamic Moving Trails, and one-shot Impact Ripples. Generated static geometry registers automatically and may inherit, disable, or customize Static Pressure and Obstruction Wake independently.
+### Canonical feature vocabulary
 
-Static Pressure computes its feasible height from flow, blockage, local mesh support, and Stage 3 wave headroom. Strength selects a normalized point inside that range, Contact Sharpness controls the one-sided upstream falloff, Profile Variation controls deterministic lateral redistribution, and an independent randomized cadence changes lateral profiles without depending on Stage 3 wave frequency. Cached support preparation uses an adaptive vertical inspection range and 16/32/64 lateral rows selected from disturbance-field coverage. The final pressure ridge is contact-anchored with a short open-water rise, hidden overlap beneath the obstruction, and flow-facing attenuation that reduces side-face buildup while preserving the upstream face.
+Stage 5 uses one consistent source-based vocabulary:
 
-Static geometry preparation is cached and frame-budgeted. Shared pressure, wake, trail, and ripple representations keep water-shader cost independent of active-source count. Editor diagnostics report resolved profile resolution, support and multiplier ranges, row classifications, and per-row height/contact graphs. Stage 5 controls do not participate in riverbed or corridor generation.
+- **Static Pressure** — attached water buildup caused by registered stationary geometry.
+- **Dynamic Pressure** — the moving-source form of the same attached pressure language, driven by an emitter and relative object/water motion. Planned, not implemented.
+- **Static Wake** — the downstream disturbance continuously produced by stationary geometry. The current code and serialized fields call this `Obstruction Wake`.
+- **Dynamic Wake** — the persistent disturbance deposited by a moving emitter. The current code and serialized fields call this `Moving Trail`.
+- **Impact Ripples** — one-shot event-driven disturbances such as entry, exit, footsteps, landings, projectiles, attacks, and explosions.
 
-**Validated:** Static Pressure is visually resolved and accepted under the tested elevated perspective/isometric views, including 16- and 32-row sources, low and exaggerated strength, changing lateral profiles, contact placement beneath obstructions, and reduced side-face buildup. Final cleanup must remove superseded support-floor tuning and its floor-specific diagnostics, then rerun Static Pressure regression before the feature is marked fully closed. Obstruction Wakes, Moving Trails, and Impact Ripples remain to be evaluated and accepted separately, so Stage 5 as a whole remains in progress. The rejected V4 continuously driven obstacle-wave solver is noncanonical and must not be restored.
+Documentation and design discussion should use the canonical names above. Existing runtime, Inspector, serialized-property, shader-property, and compatibility names are not renamed casually; any code-level terminology migration requires a separate approved plan that preserves existing scenes and serialized data.
 
-**Remaining Stage 5 work:**
-- Remove the superseded 92%/96% support-safe floor and its floor-only Inspector/graph diagnostics, then rerun Static Pressure regression.
-- A/B test the width-aware animated multiplier bounds at minimum and maximum Profile Variation; retain them only if they prevent a visible high-intensity regression.
-- Validate and tune Obstruction Wakes independently of Static Pressure.
-- Validate and tune Moving Trails independently of Static Pressure and Obstruction Wakes.
-- Validate and tune Impact Ripples independently.
-- Profile Low, Medium, and High quality after all four interaction features are individually accepted, then perform combined overlap and sleeping/culling regression.
+### Source ownership
+
+- **Generated stationary geometry:** discovered through the generated-geometry registry; eligible for Static Pressure and Static Wake with per-object Inherit, Disabled, or Custom authorship.
+- **Dynamic gameplay objects:** owned by `StylizedRiverDisturbanceEmitter`; future Dynamic Pressure and existing/provisional Dynamic Wake consume emitter movement samples.
+- **Impact events:** emitted through the river runtime's one-shot event API; emitters may automatically request entry and exit impacts, while gameplay systems may request footsteps, attacks, projectile hits, and scripted impacts directly.
+- One source must not be simultaneously owned by both the registry and an emitter for the same continuous static behavior.
+
+### Implemented foundation
+
+A river-owned, chunked runtime already contains separate representations and provisional code paths for Static Pressure, Static Wake, Dynamic Wake, and Impact Ripples. Static geometry preparation is cached and frame-budgeted. The persistent fields support quality-scaled resolution, chunk activity, sleeping, downstream transport, spreading, decay, and fixed-cost shader sampling. Dynamic emitters already support river detection, manual footprints, swept motion submission, and optional entry/exit impact requests.
+
+Static Pressure computes its feasible height from flow, blockage, local mesh support, and Stage 3 wave headroom. Strength selects a normalized point inside that range, Contact Sharpness controls the one-sided upstream falloff, and Profile Variation controls deterministic lateral redistribution. Profile changes use an independent randomized cadence rather than Stage 3 wave frequency. Cached support preparation uses an adaptive vertical inspection range and 16/32/64 lateral rows selected from disturbance-field coverage. The final pressure ridge is contact-anchored with a short open-water rise, hidden overlap beneath the obstruction, and flow-facing attenuation that reduces side-face buildup while preserving the upstream face.
+
+Editor diagnostics report resolved profile resolution, support and multiplier ranges, row classifications, and per-row height/contact graphs. Stage 5 controls do not participate in riverbed or corridor generation.
+
+### Validated
+
+**Static Pressure is complete and accepted.** It passed the tested elevated perspective/isometric views on small and large generated rocks, 16- and 32-row profiles, low and exaggerated Strength, minimum and high Profile Variation, independent changing profiles, contact placement beneath the obstruction, and reduced side-face buildup. The temporary 92%/96% support-safe floor and floor-only diagnostics were removed. Useful target/support/profile diagnostics were retained. Width-aware multiplier bounds remain part of the accepted implementation. No further Static Pressure work should be introduced unless a concrete regression or a proven shared-field integration defect is demonstrated.
+
+The rejected V4 continuously driven obstacle-wave solver is noncanonical and must not be restored.
+
+### Planned visual contracts
+
+**Static Wake — next:** one continuously sourced stationary-object effect made from a short sheltered lee region, controlled side-release/shear near the rear corners, and a broad low-amplitude disturbance that starts at the object, widens downstream, follows river-space flow, and decays. It must not resemble a second pressure ridge, a uniform tube, or repeated circular pulses. It should later provide a useful turbulence/intensity source for Stage 6 foam without rendering foam during Stage 5.
+
+**Impact Ripples — after Static Wake:** one event system with configurable position, radius, signed impulse, geometry contribution, normal contribution, propagation, and decay. Entry, exit, footsteps, landings, projectiles, attacks, and explosions are event profiles feeding the same solver rather than separate water systems. Detached spray, droplets, and splashes remain Stage 7 consumers.
+
+**Dynamic Pressure and Dynamic Wake — deferred package:** design together around emitter-provided movement relative to local river flow. Dynamic Pressure remains attached to the current object position; Dynamic Wake persists after the object passes. A source drifting with the current should create little attached pressure, while upstream or cross-current movement should create stronger leading-face pressure. These features must reuse the accepted visual language where practical without rebuilding expensive static mesh-support profiles every update.
+
+### Remaining Stage 5 work
+
+1. Inspect and document the current Static Wake implementation before changing it: source bake, wake field, simulation, controls, debug views, and existing serialized names.
+2. Agree on Static Wake acceptance tests and an exact file-level change plan before implementation.
+3. Tune and accept Static Wake without modifying accepted Static Pressure behavior.
+4. Inspect the current Impact Ripple implementation and event API, define signed/event-profile behavior, then tune and accept it independently.
+5. Defer Dynamic Pressure and Dynamic Wake until the static-source and event-driven features are accepted; design both dynamic features together around one emitter movement-state contract.
+6. After all Stage 5 capabilities are accepted, profile Low, Medium, and High quality and run combined overlap, source-removal, sleeping, culling, reverse-flow, and frozen-state regression.
 
 ## 6. Foam and Surface Tracing
 
@@ -118,4 +152,4 @@ Static geometry preparation is cached and frame-budgeted. Shared pressure, wake,
 
 ## Working Rule
 
-Before implementing a stage, define its acceptance tests. After approval, record a conservative summary under **Implemented**. Later stages may consume earlier outputs, but they must not change an approved stage's contract unless that change is discussed and approved first.
+Before implementing a stage or sub-feature, define its acceptance tests. After approval, record a conservative summary under **Implemented** or **Validated**. Later work may consume earlier outputs, but it must not change an approved feature's contract unless that change is discussed and approved first.

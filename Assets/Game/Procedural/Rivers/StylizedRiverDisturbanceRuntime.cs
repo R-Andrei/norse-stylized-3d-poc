@@ -157,9 +157,7 @@ namespace ProgrammaticStylized3D.Rivers
             float targetHeight,
             float supportModulationReserve,
             int validRowCount,
-            float nominalFloorHeight,
-            int floorRaisedRowCount,
-            int supportLimitedBelowFloorRowCount,
+            int supportLimitedBelowTargetRowCount,
             int endpointTaperRowCount,
             int targetHeightRowCount,
             Vector2 cachedBaseHeightRange,
@@ -172,7 +170,6 @@ namespace ProgrammaticStylized3D.Rivers
             float maximumAdjacentCurrentHeightDifference,
             float maximumAdjacentBaseContactShift,
             float maximumAdjacentCurrentContactShift,
-            float appliedBaseFloorRatio,
             Vector2 appliedMultiplierBounds,
             Vector4[] baseSamples,
             Vector4[] currentSamples)
@@ -187,10 +184,8 @@ namespace ProgrammaticStylized3D.Rivers
             TargetHeight = targetHeight;
             SupportModulationReserve = supportModulationReserve;
             ValidRowCount = validRowCount;
-            NominalFloorHeight = nominalFloorHeight;
-            FloorRaisedRowCount = floorRaisedRowCount;
-            SupportLimitedBelowFloorRowCount =
-                supportLimitedBelowFloorRowCount;
+            SupportLimitedBelowTargetRowCount =
+                supportLimitedBelowTargetRowCount;
             EndpointTaperRowCount = endpointTaperRowCount;
             TargetHeightRowCount = targetHeightRowCount;
             CachedBaseHeightRange = cachedBaseHeightRange;
@@ -207,7 +202,6 @@ namespace ProgrammaticStylized3D.Rivers
                 maximumAdjacentBaseContactShift;
             MaximumAdjacentCurrentContactShift =
                 maximumAdjacentCurrentContactShift;
-            AppliedBaseFloorRatio = appliedBaseFloorRatio;
             AppliedMultiplierBounds = appliedMultiplierBounds;
             BaseSamples = baseSamples ?? Array.Empty<Vector4>();
             CurrentSamples = currentSamples ?? Array.Empty<Vector4>();
@@ -223,9 +217,7 @@ namespace ProgrammaticStylized3D.Rivers
         public float TargetHeight { get; }
         public float SupportModulationReserve { get; }
         public int ValidRowCount { get; }
-        public float NominalFloorHeight { get; }
-        public int FloorRaisedRowCount { get; }
-        public int SupportLimitedBelowFloorRowCount { get; }
+        public int SupportLimitedBelowTargetRowCount { get; }
         public int EndpointTaperRowCount { get; }
         public int TargetHeightRowCount { get; }
         public Vector2 CachedBaseHeightRange { get; }
@@ -238,7 +230,6 @@ namespace ProgrammaticStylized3D.Rivers
         public float MaximumAdjacentCurrentHeightDifference { get; }
         public float MaximumAdjacentBaseContactShift { get; }
         public float MaximumAdjacentCurrentContactShift { get; }
-        public float AppliedBaseFloorRatio { get; }
         public Vector2 AppliedMultiplierBounds { get; }
         public Vector4[] BaseSamples { get; }
         public Vector4[] CurrentSamples { get; }
@@ -553,11 +544,6 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 int sampleCount = baseProfile.LateralSampleCount;
-                float appliedBaseFloorRatio = sampleCount >= 64
-                    ? 0.96f
-                    : sampleCount >= 32
-                        ? 0.92f
-                        : 0f;
                 Vector2 appliedMultiplierBounds = sampleCount >= 64
                     ? new Vector2(0.86f, 1.10f)
                     : sampleCount >= 32
@@ -566,8 +552,6 @@ namespace ProgrammaticStylized3D.Rivers
                             StaticPressureMinimumProfileMultiplier,
                             MaximumStaticPressureModulation);
                 float targetHeight = diagnostics.EffectiveAmplitude;
-                float nominalFloorHeight =
-                    targetHeight * appliedBaseFloorRatio;
 
                 float baseMinimum = float.PositiveInfinity;
                 float baseMaximum = float.NegativeInfinity;
@@ -591,8 +575,7 @@ namespace ProgrammaticStylized3D.Rivers
                 float previousCurrentContact = 0f;
                 bool hasPreviousValidRow = false;
                 int validRowCount = 0;
-                int floorRaisedRowCount = 0;
-                int supportLimitedBelowFloorRowCount = 0;
+                int supportLimitedBelowTargetRowCount = 0;
                 int endpointTaperRowCount = 0;
                 int targetHeightRowCount = 0;
 
@@ -659,26 +642,11 @@ namespace ProgrammaticStylized3D.Rivers
                             baseSample.w);
                     }
 
-                    if (appliedBaseFloorRatio > 0f &&
-                        endpointTaper > 0.0001f)
+                    if (endpointTaper > 0.0001f &&
+                        untaperedCeilingHeight <
+                            targetHeight - 0.0005f)
                     {
-                        float rawCachedHeight = Mathf.Min(
-                            targetHeight,
-                            untaperedCeilingHeight /
-                            MaximumStaticPressureModulation);
-                        float supportSafeFloor = Mathf.Min(
-                            nominalFloorHeight,
-                            untaperedCeilingHeight);
-                        if (supportSafeFloor > rawCachedHeight + 0.0005f)
-                        {
-                            floorRaisedRowCount++;
-                        }
-
-                        if (untaperedCeilingHeight <
-                            nominalFloorHeight - 0.0005f)
-                        {
-                            supportLimitedBelowFloorRowCount++;
-                        }
+                        supportLimitedBelowTargetRowCount++;
                     }
 
                     if (endpointTaper > 0.0001f &&
@@ -787,9 +755,7 @@ namespace ProgrammaticStylized3D.Rivers
                         targetHeight,
                         MaximumStaticPressureModulation,
                         validRowCount,
-                        nominalFloorHeight,
-                        floorRaisedRowCount,
-                        supportLimitedBelowFloorRowCount,
+                        supportLimitedBelowTargetRowCount,
                         endpointTaperRowCount,
                         targetHeightRowCount,
                         new Vector2(baseMinimum, baseMaximum),
@@ -808,7 +774,6 @@ namespace ProgrammaticStylized3D.Rivers
                         maximumAdjacentCurrentHeightDifference,
                         maximumAdjacentBaseContactShift,
                         maximumAdjacentCurrentContactShift,
-                        appliedBaseFloorRatio,
                         appliedMultiplierBounds,
                         baseProfile.Samples,
                         currentProfile.Samples);

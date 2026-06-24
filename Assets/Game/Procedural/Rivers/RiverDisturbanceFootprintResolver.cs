@@ -705,11 +705,6 @@ namespace ProgrammaticStylized3D.Rivers
             float lateralSampleSpacing =
                 support.AcrossHalfWidth * 2f /
                 Mathf.Max(1, lateralSampleCount - 1);
-            float minimumBaseHeightRatio = lateralSampleCount >= 64
-                ? 0.96f
-                : lateralSampleCount >= 32
-                    ? 0.92f
-                    : 0f;
             Vector4[] compactSamples =
                 new Vector4[lateralSampleCount];
             int validSampleCount = 0;
@@ -740,16 +735,6 @@ namespace ProgrammaticStylized3D.Rivers
                 float modulationCeiling = Mathf.Min(
                     targetHeight * safeModulation,
                     localMaximumHeight);
-                if (minimumBaseHeightRatio > 0f)
-                {
-                    float supportSafeFloor = Mathf.Min(
-                        targetHeight * minimumBaseHeightRatio,
-                        modulationCeiling);
-                    cachedHeight = Mathf.Max(
-                        cachedHeight,
-                        supportSafeFloor);
-                }
-
                 // Reduce static-pressure buildup where the local waterline
                 // contour turns downstream around an obstruction's sides. A
                 // nearly constant upstream boundary faces the flow and keeps
