@@ -23,7 +23,6 @@ struct RiverWaterWakeResult
     float2 fieldUV;
 };
 
-
 float RiverWaterResolveDisturbanceBankMask(
     float lateralMetres,
     float visibleHalfWidth,
@@ -67,17 +66,14 @@ float2 RiverWaterResolveDisturbanceUV(
 void RiverWaterDecodeStaticDynamics(
     float packedValue,
     out float phase,
-    out float stiffness,
-    out float unsteadiness)
+    out float waveResponse)
 {
     float packed = round(max(0.0, packedValue));
     float phaseCode = fmod(packed, 16.0);
-    float stiffnessCode = fmod(floor(packed / 16.0), 8.0);
-    float unsteadinessCode = floor(packed / 128.0);
+    float waveResponseCode = floor(packed / 16.0);
     phase = ((phaseCode + 0.5) / 16.0) *
             PS3D_DISTURBANCE_TWO_PI;
-    stiffness = stiffnessCode / 7.0 * 2.0;
-    unsteadiness = unsteadinessCode / 15.0 * 2.0;
+    waveResponse = saturate(waveResponseCode / 31.0) * 2.0;
 }
 
 RiverWaterDisturbanceResult RiverWaterEvaluateDisturbance(
@@ -154,13 +150,11 @@ RiverWaterDisturbanceResult RiverWaterEvaluateDisturbance(
         shoreInteraction);
 
     float phase;
-    float stiffness;
-    float unsteadiness;
+    float waveResponse;
     RiverWaterDecodeStaticDynamics(
         staticPressure.a,
         phase,
-        stiffness,
-        unsteadiness);
+        waveResponse);
 
     float staticBaseHeight = clamp(
         staticPressure.r,
@@ -189,10 +183,8 @@ RiverWaterDisturbanceResult RiverWaterEvaluateDisturbance(
         float levelChange = abs(macroHeight - previousMacroHeight) /
             max(0.001, motionWaveHeight);
         float waveActivity = saturate(levelChange * 2.35);
-        float response =
-            saturate(unsteadiness * 0.5) *
-            lerp(1.15, 0.55, saturate(stiffness * 0.5));
-        float modulationAmplitude = 0.22 * response;
+        float modulationAmplitude =
+            0.26 * saturate(waveResponse * 0.5);
         float ridgeScale = max(0.55, motionWaveLength * 0.55);
         float flowRate = max(0.20, abs(motionFlowSpeed));
         float frequencyA = PS3D_DISTURBANCE_TWO_PI / ridgeScale;

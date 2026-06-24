@@ -25,6 +25,12 @@ namespace ProgrammaticStylized3D.Rivers
             float pressureMaximumHeight,
             float pressureStrength,
             float waveAllowance,
+            bool staticPressureEnabled,
+            float contactSharpness,
+            float waveResponse,
+            bool obstructionWakeEnabled,
+            float obstructionWakeReach,
+            float obstructionWakeSpread,
             string status)
         {
             River = river;
@@ -43,6 +49,12 @@ namespace ProgrammaticStylized3D.Rivers
             PressureMaximumHeight = pressureMaximumHeight;
             PressureStrength = pressureStrength;
             WaveAllowance = waveAllowance;
+            StaticPressureEnabled = staticPressureEnabled;
+            ContactSharpness = contactSharpness;
+            WaveResponse = waveResponse;
+            ObstructionWakeEnabled = obstructionWakeEnabled;
+            ObstructionWakeReach = obstructionWakeReach;
+            ObstructionWakeSpread = obstructionWakeSpread;
             Status = status ?? string.Empty;
         }
 
@@ -62,6 +74,12 @@ namespace ProgrammaticStylized3D.Rivers
         public float PressureMaximumHeight { get; }
         public float PressureStrength { get; }
         public float WaveAllowance { get; }
+        public bool StaticPressureEnabled { get; }
+        public float ContactSharpness { get; }
+        public float WaveResponse { get; }
+        public bool ObstructionWakeEnabled { get; }
+        public float ObstructionWakeReach { get; }
+        public float ObstructionWakeSpread { get; }
         public string Status { get; }
     }
 
@@ -85,6 +103,7 @@ namespace ProgrammaticStylized3D.Rivers
         private const int MaximumRippleSubsteps = 32;
         private const float GoldenPhaseStep = 0.61803398875f;
         private const float AutomaticBoundsHorizontalPadding = 0.5f;
+        private const float DefaultGeneratedFootprintPadding = 0.12f;
         private const float AutomaticBoundsVerticalPadding = 1.25f;
         private const int GeneratedSourcesPerFrame = 1;
         private const int MaximumStaticContourPoints =
@@ -241,9 +260,10 @@ namespace ProgrammaticStylized3D.Rivers
             public Vector2[] StaticPressureContour;
             public RiverDisturbancePressureBakeProfile StaticPressureProfile;
             public float StaticWakeAmplitude;
-            public float StaticResponseStiffness;
+            public float StaticContactSharpness;
             public float StaticWakeReachMultiplier;
-            public float StaticUnsteadiness;
+            public float StaticWakeSpreadMultiplier;
+            public float StaticWaveResponse;
             public Vector2[] StaticContour;
             public float MovementSpeed;
             public float Phase;
@@ -556,7 +576,8 @@ namespace ProgrammaticStylized3D.Rivers
             float pressureAlongHalfLength = -1f,
             IReadOnlyList<Vector2> pressureContour = null,
             RiverDisturbancePressureBakeProfile pressureProfile = default,
-            bool deferStaticTargetRebuild = false)
+            bool deferStaticTargetRebuild = false,
+            float wakeSpreadMultiplier = 1f)
         {
             if (river == null ||
                 !river.RuntimeDisturbancesEnabled ||
@@ -581,7 +602,7 @@ namespace ProgrammaticStylized3D.Rivers
                     0f,
                     MaximumStaticPressureHeightMetres)
                 : targetHeightFraction >= 0f
-                    ? river.DisturbanceMaximumHeight *
+                    ? river.ResolvedImpactRippleMaximumHeight *
                       Mathf.Clamp01(targetHeightFraction)
                     : Mathf.Clamp(
                         Mathf.Max(0f, strength) *
@@ -631,15 +652,19 @@ namespace ProgrammaticStylized3D.Rivers
                         pressureContour ?? contour),
                     StaticPressureProfile = pressureProfile,
                     StaticWakeAmplitude = resolvedWakeAmplitude,
-                    StaticResponseStiffness = Mathf.Clamp(
+                    StaticContactSharpness = Mathf.Clamp(
                         responseStiffness,
-                        0f,
-                        2f),
+                        0.5f,
+                        4f),
                     StaticWakeReachMultiplier = Mathf.Clamp(
                         wakeReachMultiplier,
                         0.25f,
                         3f),
-                    StaticUnsteadiness = Mathf.Clamp(
+                    StaticWakeSpreadMultiplier = Mathf.Clamp(
+                        wakeSpreadMultiplier,
+                        0.5f,
+                        2f),
+                    StaticWaveResponse = Mathf.Clamp(
                         unsteadiness,
                         0f,
                         2f),
@@ -753,9 +778,10 @@ namespace ProgrammaticStylized3D.Rivers
                         normalContribution),
                     StaticTargetHeightMetres = 0f,
                     StaticWakeAmplitude = 0f,
-                    StaticResponseStiffness = 1f,
+                    StaticContactSharpness = 1f,
                     StaticWakeReachMultiplier = 1f,
-                    StaticUnsteadiness = 1f,
+                    StaticWakeSpreadMultiplier = 1f,
+                    StaticWaveResponse = 1f,
                     StaticContour = Array.Empty<Vector2>(),
                     MovementSpeed =
                         riverSpaceTravel /
@@ -951,6 +977,59 @@ namespace ProgrammaticStylized3D.Rivers
             lastActivityTime = Time.realtimeSinceStartupAsDouble;
         }
 
+        private ResolvedGeneratedRiverInteraction ResolveGeneratedInteraction(
+            GeneratedRiverInteractionSettings settings)
+        {
+            settings?.Validate();
+
+            GeneratedRiverFeatureMode pressureMode = settings != null
+                ? settings.StaticPressureMode
+                : GeneratedRiverFeatureMode.Inherit;
+            GeneratedRiverFeatureMode wakeMode = settings != null
+                ? settings.ObstructionWakeMode
+                : GeneratedRiverFeatureMode.Inherit;
+
+            bool pressureEnabled =
+                pressureMode != GeneratedRiverFeatureMode.Disabled;
+            bool wakeEnabled =
+                wakeMode != GeneratedRiverFeatureMode.Disabled;
+
+            float pressureStrength =
+                pressureMode == GeneratedRiverFeatureMode.Custom
+                    ? settings.StaticPressureStrength
+                    : river.StaticPressureStrength;
+            float contactSharpness =
+                pressureMode == GeneratedRiverFeatureMode.Custom
+                    ? settings.StaticPressureContactSharpness
+                    : river.StaticPressureContactSharpness;
+            float waveResponse =
+                pressureMode == GeneratedRiverFeatureMode.Custom
+                    ? settings.StaticPressureWaveResponse
+                    : river.StaticPressureWaveResponse;
+            float wakeStrength =
+                wakeMode == GeneratedRiverFeatureMode.Custom
+                    ? settings.ObstructionWakeStrength
+                    : river.ObstructionWakeStrength;
+            float wakeReach =
+                wakeMode == GeneratedRiverFeatureMode.Custom
+                    ? settings.ObstructionWakeReach
+                    : river.ObstructionWakeReach;
+            float wakeSpread =
+                wakeMode == GeneratedRiverFeatureMode.Custom
+                    ? settings.ObstructionWakeSpread
+                    : river.ObstructionWakeSpread;
+
+            return new ResolvedGeneratedRiverInteraction(
+                pressureEnabled,
+                pressureStrength,
+                contactSharpness,
+                waveResponse,
+                wakeEnabled,
+                wakeStrength,
+                wakeReach,
+                wakeSpread);
+        }
+
         private void ProcessGeneratedGeometrySource(
             IGeneratedGeometrySource source)
         {
@@ -976,17 +1055,13 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             ResolvedGeneratedRiverInteraction interaction =
-                authoredSettings != null
-                    ? authoredSettings.Resolve()
-                    : new ResolvedGeneratedRiverInteraction(
-                        0.50f,
-                        1f,
-                        1f,
-                        1f,
-                        1f,
-                        1f,
-                        1f,
-                        0.12f);
+                ResolveGeneratedInteraction(authoredSettings);
+
+            if (!interaction.StaticPressureEnabled &&
+                !interaction.ObstructionWakeEnabled)
+            {
+                return;
+            }
 
             MeshFilter meshFilter = source.GeometryMeshFilter;
             if (meshFilter == null ||
@@ -1010,10 +1085,9 @@ namespace ProgrammaticStylized3D.Rivers
                 0.10f,
                 boundsSample.LeftSurfaceHalfWidth +
                 boundsSample.RightSurfaceHalfWidth);
-            float effectivePadding =
-                ResolveAutomaticFootprintPadding(
-                    preliminaryRiverWidth,
-                    interaction.FootprintPadding);
+            float effectivePadding = ResolveAutomaticFootprintPadding(
+                preliminaryRiverWidth,
+                DefaultGeneratedFootprintPadding);
 
             if (!RiverDisturbanceFootprintResolver.TryResolve(
                     river,
@@ -1027,17 +1101,6 @@ namespace ProgrammaticStylized3D.Rivers
                 !footprintProjection.IsInside)
             {
                 return;
-            }
-
-            RiverDisturbanceFootprint pressureFootprint = footprint;
-            if (RiverDisturbanceFootprintResolver.TryResolve(
-                    river,
-                    meshFilter,
-                    0f,
-                    out RiverDisturbanceFootprint rawFootprint,
-                    out _))
-            {
-                pressureFootprint = rawFootprint;
             }
 
             StylizedRiverSplineSample sample =
@@ -1059,90 +1122,115 @@ namespace ProgrammaticStylized3D.Rivers
                     0.04f,
                     0.55f,
                     blockageRatio));
-            GeneratedRiverResponseProfile resolvedProfile =
-                authoredSettings != null
-                    ? authoredSettings.ResponseProfile
-                    : GeneratedRiverResponseProfile.InheritRiver;
 
-            float waveAllowance = Mathf.Clamp(
-                river.MotionWaveHeight * 1.15f + 0.04f,
-                0.04f,
-                0.45f);
-            float supportInspectionHeight =
-                MaximumStaticPressureHeightMetres +
-                waveAllowance + 0.10f;
+            RiverDisturbanceFootprint pressureFootprint = footprint;
+            RiverDisturbancePressureBakeProfile pressureProfile = default;
+            float waveAllowance = 0f;
+            float representativeSupportHeight = 0f;
+            float minimumAllowedPressureHeight = 0f;
+            float maximumAllowedPressureHeight = 0f;
+            float targetPressureHeight = 0f;
+            float unboundedPressureMaximum = 0f;
+            bool heightClampReached = false;
+            string pressureStatus = "Static pressure disabled.";
 
-            if (!RiverDisturbanceFootprintResolver.TryResolvePressureSupport(
-                    river,
-                    meshFilter,
-                    pressureFootprint,
-                    supportInspectionHeight,
-                    out RiverDisturbancePressureSupportProfile pressureSupport,
-                    out string pressureSupportStatus))
+            if (interaction.StaticPressureEnabled)
             {
-                return;
-            }
+                if (RiverDisturbanceFootprintResolver.TryResolve(
+                        river,
+                        meshFilter,
+                        0f,
+                        out RiverDisturbanceFootprint rawFootprint,
+                        out _))
+                {
+                    pressureFootprint = rawFootprint;
+                }
 
-            float supportBudget = Mathf.Max(
-                0f,
-                pressureSupport.RepresentativeHeight - waveAllowance);
-            float normalizedFlow = Mathf.Clamp01(
-                Mathf.InverseLerp(
-                    0.10f,
-                    2.25f,
-                    Mathf.Abs(river.FlowSpeedMetresPerSecond)));
-            float flowResponse = normalizedFlow * normalizedFlow;
-            float drive = flowResponse * Mathf.Lerp(
-                0.35f,
-                1f,
-                blockageInfluence);
-            float riverPressureStyle = Mathf.Lerp(
-                0.85f,
-                1.15f,
-                Mathf.Clamp01(river.DisturbanceStrength * 0.5f));
-            float unboundedPressureMaximum =
-                supportBudget *
-                Mathf.Lerp(0.04f, 0.92f, Mathf.Sqrt(drive)) *
-                riverPressureStyle;
-            float maximumAllowedPressureHeight = Mathf.Min(
-                supportBudget / MaximumStaticPressureModulation,
-                Mathf.Min(
-                    unboundedPressureMaximum,
+                waveAllowance = Mathf.Clamp(
+                    river.MotionWaveHeight * 1.15f + 0.04f,
+                    0.04f,
+                    0.45f);
+                float supportInspectionHeight =
+                    MaximumStaticPressureHeightMetres +
+                    waveAllowance + 0.10f;
+
+                if (!RiverDisturbanceFootprintResolver.TryResolvePressureSupport(
+                        river,
+                        meshFilter,
+                        pressureFootprint,
+                        supportInspectionHeight,
+                        out RiverDisturbancePressureSupportProfile pressureSupport,
+                        out pressureStatus))
+                {
+                    return;
+                }
+
+                representativeSupportHeight =
+                    pressureSupport.RepresentativeHeight;
+                float supportBudget = Mathf.Max(
+                    0f,
+                    representativeSupportHeight - waveAllowance);
+                float supportCeiling = Mathf.Min(
+                    supportBudget / MaximumStaticPressureModulation,
                     MaximumStaticPressureHeightMetres /
-                    MaximumStaticPressureModulation));
-            float minimumAllowedPressureHeight = Mathf.Min(
-                maximumAllowedPressureHeight,
-                supportBudget * Mathf.Lerp(
-                    0.01f,
-                    0.12f,
-                    drive));
-            float targetPressureHeight = Mathf.Lerp(
-                minimumAllowedPressureHeight,
-                maximumAllowedPressureHeight,
-                interaction.PressureStrength);
+                    MaximumStaticPressureModulation);
+                float absoluteFlowSpeed =
+                    Mathf.Abs(river.FlowSpeedMetresPerSecond);
+                float velocityHead =
+                    absoluteFlowSpeed * absoluteFlowSpeed /
+                    (2f * Mathf.Max(0.001f, Physics.gravity.magnitude));
+                float blockageCoefficient = Mathf.Lerp(
+                    0.90f,
+                    2.60f,
+                    blockageInfluence);
 
-            if (!RiverDisturbanceFootprintResolver.TryBuildPressureBakeProfile(
-                    pressureSupport,
-                    targetPressureHeight,
-                    MaximumStaticPressureModulation,
-                    out RiverDisturbancePressureBakeProfile pressureProfile))
-            {
-                return;
+                // Flow determines demand; local height-aware support remains
+                // the hard ceiling. The stylized coefficient deliberately
+                // makes the former Strong result approximately the new safe
+                // lower response for ordinary gameplay-speed rivers.
+                unboundedPressureMaximum =
+                    velocityHead * blockageCoefficient * 5.00f;
+                maximumAllowedPressureHeight = Mathf.Min(
+                    supportCeiling,
+                    unboundedPressureMaximum);
+                minimumAllowedPressureHeight = Mathf.Min(
+                    maximumAllowedPressureHeight,
+                    maximumAllowedPressureHeight * 0.35f +
+                    Mathf.Min(0.050f, supportCeiling * 0.10f));
+                targetPressureHeight = Mathf.Lerp(
+                    minimumAllowedPressureHeight,
+                    maximumAllowedPressureHeight,
+                    interaction.StaticPressureStrength);
+                heightClampReached =
+                    unboundedPressureMaximum > supportCeiling + 0.0001f;
+
+                if (targetPressureHeight > 0.0001f &&
+                    !RiverDisturbanceFootprintResolver.TryBuildPressureBakeProfile(
+                        pressureSupport,
+                        targetPressureHeight,
+                        MaximumStaticPressureModulation,
+                        out pressureProfile))
+                {
+                    return;
+                }
             }
 
-            float wakeFlowFactor = Mathf.Lerp(
-                0.15f,
-                1.15f,
-                Mathf.InverseLerp(
-                    0.05f,
-                    2.5f,
-                    Mathf.Abs(river.FlowSpeedMetresPerSecond)));
-            float wakeAmplitude = Mathf.Max(
-                0f,
-                (0.35f + blockageInfluence * 0.85f) *
-                wakeFlowFactor *
-                interaction.StrengthMultiplier *
-                interaction.SurfaceDetail);
+            float wakeAmplitude = 0f;
+            if (interaction.ObstructionWakeEnabled)
+            {
+                float wakeFlowFactor = Mathf.Lerp(
+                    0.20f,
+                    1.35f,
+                    Mathf.InverseLerp(
+                        0.05f,
+                        2.5f,
+                        Mathf.Abs(river.FlowSpeedMetresPerSecond)));
+                wakeAmplitude = Mathf.Max(
+                    0f,
+                    (0.55f + blockageInfluence * 1.15f) *
+                    wakeFlowFactor *
+                    interaction.ObstructionWakeStrength);
+            }
 
             EntityId sourceId = meshFilter.GetEntityId();
             if (!RegisterStaticSource(
@@ -1155,16 +1243,17 @@ namespace ProgrammaticStylized3D.Rivers
                     1f,
                     -1f,
                     wakeAmplitude,
-                    interaction.ResponseStiffness,
-                    interaction.WakeLength,
-                    interaction.Unsteadiness,
+                    interaction.StaticPressureContactSharpness,
+                    interaction.ObstructionWakeReach,
+                    interaction.StaticPressureWaveResponse,
                     footprint.Contour,
                     targetPressureHeight,
                     pressureFootprint.AcrossHalfWidth,
                     pressureFootprint.AlongHalfLength,
                     pressureFootprint.Contour,
                     pressureProfile,
-                    true))
+                    true,
+                    interaction.ObstructionWakeSpread))
             {
                 return;
             }
@@ -1182,23 +1271,22 @@ namespace ProgrammaticStylized3D.Rivers
                     targetPressureHeight,
                     wakeAmplitude,
                     maximumAllowedPressureHeight,
-                    unboundedPressureMaximum >
-                    supportBudget /
-                    MaximumStaticPressureModulation + 0.0001f ||
-                    unboundedPressureMaximum >
-                    MaximumStaticPressureHeightMetres /
-                    MaximumStaticPressureModulation + 0.0001f,
-                    pressureSupport.RepresentativeHeight,
+                    heightClampReached,
+                    representativeSupportHeight,
                     minimumAllowedPressureHeight,
                     maximumAllowedPressureHeight,
-                    interaction.PressureStrength,
+                    interaction.StaticPressureStrength,
                     waveAllowance,
-                    footprintStatus +
-                    $" {pressureSupportStatus} " +
+                    interaction.StaticPressureEnabled,
+                    interaction.StaticPressureContactSharpness,
+                    interaction.StaticPressureWaveResponse,
+                    interaction.ObstructionWakeEnabled,
+                    interaction.ObstructionWakeReach,
+                    interaction.ObstructionWakeSpread,
+                    footprintStatus + " " + pressureStatus + " " +
                     $"Contour {footprint.Contour.Length} points; " +
                     $"blockage {blockageRatio:P0}; " +
-                    $"pressure strength {interaction.PressureStrength:P0}; " +
-                    $"response profile {resolvedProfile}.");
+                    $"pressure strength {interaction.StaticPressureStrength:P0}.");
         }
 
         private float ResolveAutomaticFootprintPadding(
@@ -1551,7 +1639,7 @@ namespace ProgrammaticStylized3D.Rivers
                     Mathf.InverseLerp(0f, 3f, source.MovementSpeed));
                 float wakeStrength =
                     source.Strength *
-                    river.DisturbanceStrength *
+                    river.MovingTrailStrength *
                     Mathf.Clamp01(source.NormalContribution) *
                     flowInfluence *
                     Mathf.Lerp(0.65f, movementInfluence, movementBlend);
@@ -1603,7 +1691,7 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.Max(1, fieldHeight - 1);
             float propagationSpeed = Mathf.Max(
                 0.01f,
-                river.DisturbancePropagationSpeed);
+                river.ImpactRipplePropagation);
             float inverseLength = Mathf.Sqrt(
                 1f / Mathf.Max(0.0001f, cellSizeX * cellSizeX) +
                 1f / Mathf.Max(0.0001f, cellSizeY * cellSizeY));
@@ -1615,16 +1703,12 @@ namespace ProgrammaticStylized3D.Rivers
                 1,
                 MaximumRippleSubsteps);
             float substepDelta = deltaTime / substepCount;
-            float dampingPerSecond = Mathf.Lerp(
-                2.8f,
-                0.28f,
-                river.DisturbancePersistence);
+            float dampingPerSecond = river.ImpactRippleDecay;
 
             for (int substep = 0; substep < substepCount; substep++)
             {
                 float advectionPixels =
                     Mathf.Abs(river.FlowSpeedMetresPerSecond) *
-                    river.DisturbanceAdvection *
                     substepDelta /
                     Mathf.Max(0.001f, cellSizeX);
 
@@ -1637,7 +1721,7 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.SetFloat("_CellSizeY", cellSizeY);
                 computeShader.SetFloat(
                     "_MaximumHeight",
-                    river.DisturbanceMaximumHeight);
+                    river.ResolvedImpactRippleMaximumHeight);
                 computeShader.SetTexture(
                     simulateRippleKernel,
                     "_StateRead",
@@ -1699,12 +1783,10 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.Max(1, wakeFieldHeight - 1);
             float advectionPixels =
                 Mathf.Abs(river.FlowSpeedMetresPerSecond) *
-                Mathf.Max(0.15f, river.DisturbanceAdvection) *
                 deltaTime /
                 Mathf.Max(0.001f, cellSizeX);
-            float persistence = river.DisturbancePersistence;
-            float decayPerSecond = Mathf.Lerp(2.4f, 0.42f, persistence);
-            float lateralSpread = Mathf.Lerp(0.35f, 0.95f, persistence);
+            const float decayPerSecond = 1.15f;
+            const float lateralSpread = 0.65f;
             float flowFactor = Mathf.SmoothStep(
                 0f,
                 1f,
@@ -1808,7 +1890,7 @@ namespace ProgrammaticStylized3D.Rivers
                 fieldHeight - 1);
             int width = Mathf.Max(1, maxX - minX + 1);
             int height = Mathf.Max(1, maxY - minY + 1);
-            float strength = impact.Strength * river.DisturbanceStrength;
+            float strength = impact.Strength * river.ImpactRippleStrength;
 
             computeShader.SetInts("_FieldSize", fieldWidth, fieldHeight);
             computeShader.SetInts(
@@ -1838,7 +1920,7 @@ namespace ProgrammaticStylized3D.Rivers
                 strength * Mathf.Clamp01(impact.NormalContribution) * 0.12f);
             computeShader.SetFloat(
                 "_MaximumHeight",
-                river.DisturbanceMaximumHeight);
+                river.ResolvedImpactRippleMaximumHeight);
             computeShader.SetTexture(
                 injectRippleKernel,
                 "_StateWrite",
@@ -1867,7 +1949,8 @@ namespace ProgrammaticStylized3D.Rivers
             float alongPixels =
                 source.AlongHalfLength / Mathf.Max(0.001f, cellSizeX);
             float acrossPixels =
-                source.AcrossHalfWidth / Mathf.Max(0.001f, cellSizeY);
+                source.AcrossHalfWidth * river.MovingTrailWidth /
+                Mathf.Max(0.001f, cellSizeY);
             int minX = Mathf.Clamp(
                 Mathf.FloorToInt(
                     Mathf.Min(startX, endX) - alongPixels * 1.25f - 2f),
@@ -1920,7 +2003,9 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_WakeInjectMovementBlend",
                 Mathf.Clamp01(movementBlend));
-            computeShader.SetFloat("_WakeInjectPersistence", 1f);
+            computeShader.SetFloat(
+                "_WakeInjectPersistence",
+                Mathf.Lerp(0.25f, 3f, river.MovingTrailPersistence));
             computeShader.SetFloat(
                 "_WakeInjectDeltaTime",
                 Mathf.Max(0.0001f, simulationDeltaTime));
@@ -1961,7 +2046,7 @@ namespace ProgrammaticStylized3D.Rivers
                 now + Mathf.Lerp(
                     1.5f,
                     8.0f,
-                    river.DisturbancePersistence);
+                    Mathf.InverseLerp(0.25f, 3f, river.ObstructionWakeReach));
             for (int chunk = 0; chunk < chunkCount; chunk++)
             {
                 if (chunkHasStaticSource[chunk])
@@ -2001,35 +2086,42 @@ namespace ProgrammaticStylized3D.Rivers
                     Mathf.Abs(river.FlowSpeedMetresPerSecond)) *
                     source.StaticWakeReachMultiplier;
 
-                DispatchStaticPressureBake(
-                    projection.GlobalDistance,
-                    acrossNormalized,
-                    surfaceHalfWidth,
-                    source.StaticPressureAcrossHalfWidth,
-                    source.StaticPressureAlongHalfLength,
-                    source.StaticTargetHeightMetres,
-                    source.StaticResponseStiffness,
-                    source.StaticUnsteadiness,
-                    source.Phase,
-                    source.StaticPressureContour,
-                    source.StaticPressureProfile);
-                DispatchStaticWakeSourceBake(
-                    projection.GlobalDistance,
-                    acrossNormalized,
-                    surfaceHalfWidth,
-                    source.AcrossHalfWidth,
-                    source.AlongHalfLength,
-                    source.StaticWakeAmplitude,
-                    source.StaticWakeReachMultiplier,
-                    source.StaticUnsteadiness,
-                    source.Phase,
-                    source.StaticContour);
+                if (source.StaticTargetHeightMetres > 0.0001f)
+                {
+                    DispatchStaticPressureBake(
+                        projection.GlobalDistance,
+                        acrossNormalized,
+                        surfaceHalfWidth,
+                        source.StaticPressureAcrossHalfWidth,
+                        source.StaticPressureAlongHalfLength,
+                        source.StaticTargetHeightMetres,
+                        source.StaticContactSharpness,
+                        source.StaticWaveResponse,
+                        source.Phase,
+                        source.StaticPressureContour,
+                        source.StaticPressureProfile);
+                    validStaticSourceCount++;
+                }
 
-                MarkStaticRange(
-                    projection.GlobalDistance,
-                    source.AlongHalfLength,
-                    wakeLength);
-                validStaticSourceCount++;
+                if (source.StaticWakeAmplitude > 0.0001f)
+                {
+                    DispatchStaticWakeSourceBake(
+                        projection.GlobalDistance,
+                        acrossNormalized,
+                        surfaceHalfWidth,
+                        source.AcrossHalfWidth,
+                        source.AlongHalfLength,
+                        source.StaticWakeAmplitude,
+                        source.StaticWakeReachMultiplier,
+                        source.StaticWakeSpreadMultiplier,
+                        source.Phase,
+                        source.StaticContour);
+
+                    MarkStaticRange(
+                        projection.GlobalDistance,
+                        source.AlongHalfLength,
+                        wakeLength);
+                }
             }
 
             if (validStaticSourceCount > 0)
@@ -2086,6 +2178,7 @@ namespace ProgrammaticStylized3D.Rivers
                 targetHeightMetres,
                 0f,
                 1f,
+                1f,
                 responseStiffness,
                 unsteadiness,
                 phase,
@@ -2102,8 +2195,8 @@ namespace ProgrammaticStylized3D.Rivers
             float acrossHalfWidth,
             float alongHalfLength,
             float wakeAmplitude,
-            float wakePersistence,
-            float unsteadiness,
+            float wakeReach,
+            float wakeSpread,
             float phase,
             Vector2[] contour)
         {
@@ -2118,9 +2211,10 @@ namespace ProgrammaticStylized3D.Rivers
                 wakeFieldHeight,
                 0f,
                 wakeAmplitude,
-                wakePersistence,
+                wakeReach,
+                wakeSpread,
                 1f,
-                unsteadiness,
+                0f,
                 phase,
                 bakeStaticWakeSourceKernel,
                 staticWakeSource,
@@ -2140,6 +2234,7 @@ namespace ProgrammaticStylized3D.Rivers
             float targetHeightMetres,
             float wakeAmplitude,
             float wakePersistence,
+            float wakeSpread,
             float responseStiffness,
             float unsteadiness,
             float phase,
@@ -2184,7 +2279,9 @@ namespace ProgrammaticStylized3D.Rivers
                 ? pressureInsideOverlapMetres / Mathf.Max(0.001f, cellSizeX)
                 : 0f;
             float longitudinalExpansion = pressurePass ? 1f : 1.75f;
-            float lateralExpansion = pressurePass ? 1.20f : 1.55f;
+            float lateralExpansion = pressurePass
+                ? 1.20f
+                : 1.55f * Mathf.Clamp(wakeSpread, 0.5f, 2f);
 
             int minX = Mathf.Clamp(
                 Mathf.FloorToInt(
@@ -2311,17 +2408,20 @@ namespace ProgrammaticStylized3D.Rivers
                 "_StaticWakePersistence",
                 Mathf.Clamp(wakePersistence, 0.25f, 3f));
             computeShader.SetFloat(
+                "_StaticWakeSpread",
+                Mathf.Clamp(wakeSpread, 0.5f, 2f));
+            computeShader.SetFloat(
                 "_StaticPhase",
                 Mathf.Repeat(phase, 1f));
             computeShader.SetFloat(
-                "_StaticResponseStiffness",
-                Mathf.Clamp(responseStiffness, 0f, 2f));
+                "_StaticContactSharpness",
+                Mathf.Clamp(responseStiffness, 0.5f, 4f));
             computeShader.SetFloat(
-                "_StaticUnsteadiness",
+                "_StaticWaveResponse",
                 Mathf.Clamp(unsteadiness, 0f, 2f));
             computeShader.SetFloat(
                 "_MaximumHeight",
-                river.DisturbanceMaximumHeight);
+                river.ResolvedImpactRippleMaximumHeight);
             computeShader.SetTexture(
                 kernel,
                 pressurePass
@@ -2406,7 +2506,7 @@ namespace ProgrammaticStylized3D.Rivers
             double activeDuration = Mathf.Lerp(
                 2.0f,
                 10.0f,
-                river.DisturbancePersistence);
+                river.MovingTrailPersistence);
 
             for (int chunk = centreChunk - radiusChunks;
                  chunk <= centreChunk + radiusChunks;
@@ -2537,9 +2637,9 @@ namespace ProgrammaticStylized3D.Rivers
             int radiusChunks = Mathf.CeilToInt(
                 radius / ChunkLengthMetres) + 1;
             double activeDuration = Mathf.Lerp(
-                1.5f,
                 8.0f,
-                river.DisturbancePersistence);
+                1.5f,
+                Mathf.InverseLerp(0.1f, 3f, river.ImpactRippleDecay));
 
             for (int chunk = centreChunk - radiusChunks;
                  chunk <= centreChunk + radiusChunks;
@@ -2866,7 +2966,7 @@ namespace ProgrammaticStylized3D.Rivers
                 river.DisturbanceShoreInteraction);
             propertyBlock.SetFloat(
                 DisturbanceMaximumHeightId,
-                river.DisturbanceMaximumHeight);
+                river.ResolvedImpactRippleMaximumHeight);
             propertyBlock.SetFloat(
                 DisturbanceStaticMaximumHeightId,
                 MaximumStaticPressureHeightMetres);

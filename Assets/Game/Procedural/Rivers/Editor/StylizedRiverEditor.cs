@@ -504,104 +504,318 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Runtime Disturbance and Interaction",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 5 stores wakes, impacts, and stationary obstruction trails in one shared low-resolution river-space field. The field updates below render frequency, sleeps when inactive, and has fixed shader sampling cost regardless of overlapping effects.",
+                "Stage 5 keeps static pressure, obstruction wakes, moving trails, and impact ripples as separate feature controls. The shared runtime remains fixed-cost and sleeps when inactive.",
                 MessageType.Info);
 
             SerializedProperty enabledProperty = Find("runtimeDisturbances");
-            EditorGUILayout.PropertyField(
-                enabledProperty,
-                new GUIContent(
-                    "Runtime Disturbances",
-                    "Master allocation and simulation switch. Disabled rivers reproduce Stage 4 exactly and allocate no field textures."));
+            SerializedProperty presetProperty = Find("disturbancePreset");
+            SerializedProperty staticPressureStrengthProperty =
+                Find("staticPressureStrength");
+            SerializedProperty staticPressureContactSharpnessProperty =
+                Find("staticPressureContactSharpness");
+            SerializedProperty staticPressureWaveResponseProperty =
+                Find("staticPressureWaveResponse");
+            SerializedProperty obstructionWakeStrengthProperty =
+                Find("obstructionWakeStrength");
+            SerializedProperty obstructionWakeReachProperty =
+                Find("obstructionWakeReach");
+            SerializedProperty obstructionWakeSpreadProperty =
+                Find("obstructionWakeSpread");
+            SerializedProperty movingTrailStrengthProperty =
+                Find("movingTrailStrength");
+            SerializedProperty movingTrailPersistenceProperty =
+                Find("movingTrailPersistence");
+            SerializedProperty movingTrailWidthProperty =
+                Find("movingTrailWidth");
+            SerializedProperty impactRippleStrengthProperty =
+                Find("impactRippleStrength");
+            SerializedProperty impactRipplePropagationProperty =
+                Find("impactRipplePropagation");
+            SerializedProperty impactRippleDecayProperty =
+                Find("impactRippleDecay");
+            SerializedProperty debugViewProperty =
+                Find("disturbanceDebugView");
 
-            SerializedProperty preset = Find("disturbancePreset");
-            EditorGUI.BeginChangeCheck();
-            EditorGUILayout.PropertyField(
-                preset,
-                new GUIContent(
-                    "Disturbance Character",
-                    "None, Subtle, Balanced, and Reactive configure the shared field rather than changing emitter-specific settings."));
-
-            if (EditorGUI.EndChangeCheck())
+            string missingProperties = string.Empty;
+            if (enabledProperty == null)
             {
-                serializedObject.ApplyModifiedProperties();
-
-                foreach (Object selectedTarget in targets)
-                {
-                    if (selectedTarget is not StylizedRiver river)
-                    {
-                        continue;
-                    }
-
-                    Undo.RecordObject(river, "Apply River Disturbance Preset");
-                    river.ApplyDisturbancePreset();
-                    EditorUtility.SetDirty(river);
-                }
-
-                serializedObject.Update();
-                RepaintScene();
+                missingProperties += "runtimeDisturbances";
+            }
+            if (presetProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", disturbancePreset"
+                    : "disturbancePreset";
+            }
+            if (staticPressureStrengthProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", staticPressureStrength"
+                    : "staticPressureStrength";
+            }
+            if (staticPressureContactSharpnessProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", staticPressureContactSharpness"
+                    : "staticPressureContactSharpness";
+            }
+            if (staticPressureWaveResponseProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", staticPressureWaveResponse"
+                    : "staticPressureWaveResponse";
+            }
+            if (obstructionWakeStrengthProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", obstructionWakeStrength"
+                    : "obstructionWakeStrength";
+            }
+            if (obstructionWakeReachProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", obstructionWakeReach"
+                    : "obstructionWakeReach";
+            }
+            if (obstructionWakeSpreadProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", obstructionWakeSpread"
+                    : "obstructionWakeSpread";
+            }
+            if (movingTrailStrengthProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", movingTrailStrength"
+                    : "movingTrailStrength";
+            }
+            if (movingTrailPersistenceProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", movingTrailPersistence"
+                    : "movingTrailPersistence";
+            }
+            if (movingTrailWidthProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", movingTrailWidth"
+                    : "movingTrailWidth";
+            }
+            if (impactRippleStrengthProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", impactRippleStrength"
+                    : "impactRippleStrength";
+            }
+            if (impactRipplePropagationProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", impactRipplePropagation"
+                    : "impactRipplePropagation";
+            }
+            if (impactRippleDecayProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", impactRippleDecay"
+                    : "impactRippleDecay";
+            }
+            if (debugViewProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", disturbanceDebugView"
+                    : "disturbanceDebugView";
             }
 
-            using (new EditorGUI.DisabledScope(
-                       !enabledProperty.hasMultipleDifferentValues &&
-                       !enabledProperty.boolValue))
+            if (missingProperties.Length > 0)
+            {
+                EditorGUILayout.HelpBox(
+                    "The StylizedRiver Inspector and runtime component do not match. Missing serialized properties: " +
+                    missingProperties +
+                    ". No missing property will be drawn.",
+                    MessageType.Error);
+            }
+
+            if (enabledProperty != null)
+            {
+                EditorGUILayout.PropertyField(
+                    enabledProperty,
+                    new GUIContent(
+                        "Runtime Disturbances",
+                        "Master allocation and simulation switch. Disabled rivers reproduce Stage 4 and allocate no disturbance fields."));
+            }
+
+            if (presetProperty != null)
             {
                 EditorGUI.BeginChangeCheck();
                 EditorGUILayout.PropertyField(
-                    Find("disturbanceStrength"),
+                    presetProperty,
                     new GUIContent(
-                        "Disturbance Strength",
-                        "Master energy injected by impacts and continuous sources."));
-                EditorGUILayout.PropertyField(
-                    Find("disturbancePersistence"),
-                    new GUIContent(
-                        "Persistence",
-                        "Higher values retain wake and ripple energy for longer."));
-                EditorGUILayout.PropertyField(
-                    Find("disturbancePropagationSpeed"),
-                    new GUIContent(
-                        "Propagation Speed",
-                        "Approximate speed at which broad ripple energy spreads through the field."));
-                EditorGUILayout.PropertyField(
-                    Find("disturbanceAdvection"),
-                    new GUIContent(
-                        "Advection",
-                        "Strength with which the configured river flow transports the persistent field downstream."));
-                EditorGUILayout.PropertyField(
-                    Find("disturbanceGeometryStrength"),
-                    new GUIContent(
-                        "Geometry Strength",
-                        "Master height contribution sampled by the surface vertex shader."));
-                EditorGUILayout.PropertyField(
-                    Find("disturbanceNormalStrength"),
-                    new GUIContent(
-                        "Normal Strength",
-                        "Master disturbance-normal contribution used by lighting and refraction."));
-                EditorGUILayout.PropertyField(
-                    Find("disturbanceShoreInteraction"),
-                    new GUIContent(
-                        "Shore Interaction",
-                        "Disturbance retained at the visible bank before fading inside the hidden overlap."));
-                EditorGUILayout.PropertyField(
-                    Find("disturbanceMaximumHeight"),
-                    new GUIContent(
-                        "Maximum Height",
-                        "Hard geometric safety limit in metres. The corridor automatically reserves this clearance."));
-                EditorGUILayout.PropertyField(
-                    Find("disturbanceMinimumWavelength"),
-                    new GUIContent(
-                        "Minimum Geometry Wavelength",
-                        "Shortest geometric disturbance represented by mesh refinement. Finer detail remains normal-only."));
-                EditorGUILayout.PropertyField(
-                    Find("disturbanceDebugView"),
-                    new GUIContent(
-                        "Disturbance Debug View",
-                        "Displays field height, velocity, normal, intensity, or river-space coordinates."));
+                        "Disturbance Character",
+                        "Applies coordinated defaults to the four separate Stage 5 features."));
 
                 if (EditorGUI.EndChangeCheck())
                 {
-                    Find("disturbancePreset").enumValueIndex =
+                    serializedObject.ApplyModifiedProperties();
+
+                    foreach (Object selectedTarget in targets)
+                    {
+                        if (selectedTarget is not StylizedRiver river)
+                        {
+                            continue;
+                        }
+
+                        Undo.RecordObject(river, "Apply River Disturbance Preset");
+                        river.ApplyDisturbancePreset();
+                        EditorUtility.SetDirty(river);
+                    }
+
+                    serializedObject.Update();
+                    RepaintScene();
+                }
+            }
+
+            bool controlsDisabled =
+                enabledProperty != null &&
+                !enabledProperty.hasMultipleDifferentValues &&
+                !enabledProperty.boolValue;
+
+            using (new EditorGUI.DisabledScope(controlsDisabled))
+            {
+                EditorGUI.BeginChangeCheck();
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField(
+                    "Static Pressure",
+                    EditorStyles.miniBoldLabel);
+                if (staticPressureStrengthProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        staticPressureStrengthProperty,
+                        new GUIContent(
+                            "Strength",
+                            "Normalized 0–1 position inside the computed flow-and-geometry-safe pressure range."));
+                }
+                if (staticPressureContactSharpnessProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        staticPressureContactSharpnessProperty,
+                        new GUIContent(
+                            "Contact Sharpness",
+                            "Controls how quickly the pressure ridge descends from the object toward open water."));
+                }
+                if (staticPressureWaveResponseProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        staticPressureWaveResponseProperty,
+                        new GUIContent(
+                            "Wave Response",
+                            "Controls Stage 3 wave-triggered variation along the pressure ridge."));
+                }
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField(
+                    "Obstruction Wake",
+                    EditorStyles.miniBoldLabel);
+                if (obstructionWakeStrengthProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        obstructionWakeStrengthProperty,
+                        new GUIContent(
+                            "Strength",
+                            "Energy generated downstream of stationary obstructions."));
+                }
+                if (obstructionWakeReachProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        obstructionWakeReachProperty,
+                        new GUIContent(
+                            "Reach",
+                            "How far the obstruction wake remains visible downstream."));
+                }
+                if (obstructionWakeSpreadProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        obstructionWakeSpreadProperty,
+                        new GUIContent(
+                            "Spread",
+                            "Lateral width of the obstruction wake behind the source."));
+                }
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField(
+                    "Moving Trail",
+                    EditorStyles.miniBoldLabel);
+                if (movingTrailStrengthProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        movingTrailStrengthProperty,
+                        new GUIContent(
+                            "Strength",
+                            "Energy contributed by moving dynamic emitters."));
+                }
+                if (movingTrailPersistenceProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        movingTrailPersistenceProperty,
+                        new GUIContent(
+                            "Persistence",
+                            "How long moving trails remain after the emitter passes."));
+                }
+                if (movingTrailWidthProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        movingTrailWidthProperty,
+                        new GUIContent(
+                            "Width",
+                            "Lateral width of trails produced by moving emitters."));
+                }
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField(
+                    "Impact Ripples",
+                    EditorStyles.miniBoldLabel);
+                if (impactRippleStrengthProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        impactRippleStrengthProperty,
+                        new GUIContent(
+                            "Strength",
+                            "Initial energy injected by impact events."));
+                }
+                if (impactRipplePropagationProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        impactRipplePropagationProperty,
+                        new GUIContent(
+                            "Propagation",
+                            "Approximate speed at which impact ripple energy spreads."));
+                }
+                if (impactRippleDecayProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        impactRippleDecayProperty,
+                        new GUIContent(
+                            "Decay",
+                            "Rate at which impact ripple energy dissipates."));
+                }
+
+                if (EditorGUI.EndChangeCheck() && presetProperty != null)
+                {
+                    presetProperty.enumValueIndex =
                         (int)StylizedRiverDisturbancePreset.Custom;
+                }
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField(
+                    "Debug",
+                    EditorStyles.miniBoldLabel);
+                if (debugViewProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        debugViewProperty,
+                        new GUIContent(
+                            "Disturbance Debug View",
+                            "Displays the existing Stage 5 disturbance debug modes without changing simulation settings."));
                 }
             }
 

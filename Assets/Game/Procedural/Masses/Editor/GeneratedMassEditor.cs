@@ -11,16 +11,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
     {
         private SerializedProperty riverInteraction;
         private SerializedProperty participation;
-        private SerializedProperty responseProfile;
-        private SerializedProperty pressureStrength;
-        private SerializedProperty strengthMultiplier;
-        private SerializedProperty geometryAmplitude;
-        private SerializedProperty surfaceDetail;
-        private SerializedProperty responseStiffness;
-        private SerializedProperty wakeLength;
-        private SerializedProperty unsteadiness;
-        private SerializedProperty footprintPadding;
-
+        private SerializedProperty staticPressureMode;
+        private SerializedProperty staticPressureStrength;
+        private SerializedProperty staticPressureContactSharpness;
+        private SerializedProperty staticPressureWaveResponse;
+        private SerializedProperty obstructionWakeMode;
+        private SerializedProperty obstructionWakeStrength;
+        private SerializedProperty obstructionWakeReach;
+        private SerializedProperty obstructionWakeSpread;
 
         private void OnEnable()
         {
@@ -28,24 +26,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "riverInteraction");
             participation = riverInteraction?.FindPropertyRelative(
                 "participation");
-            responseProfile = riverInteraction?.FindPropertyRelative(
-                "responseProfile");
-            pressureStrength = riverInteraction?.FindPropertyRelative(
-                "pressureStrength");
-            strengthMultiplier = riverInteraction?.FindPropertyRelative(
-                "strengthMultiplier");
-            geometryAmplitude = riverInteraction?.FindPropertyRelative(
-                "geometryAmplitude");
-            surfaceDetail = riverInteraction?.FindPropertyRelative(
-                "surfaceDetail");
-            responseStiffness = riverInteraction?.FindPropertyRelative(
-                "responseStiffness");
-            wakeLength = riverInteraction?.FindPropertyRelative(
-                "wakeLength");
-            unsteadiness = riverInteraction?.FindPropertyRelative(
-                "unsteadiness");
-            footprintPadding = riverInteraction?.FindPropertyRelative(
-                "footprintPadding");
+            staticPressureMode = riverInteraction?.FindPropertyRelative(
+                "staticPressureMode");
+            staticPressureStrength = riverInteraction?.FindPropertyRelative(
+                "staticPressureStrength");
+            staticPressureContactSharpness =
+                riverInteraction?.FindPropertyRelative(
+                    "staticPressureContactSharpness");
+            staticPressureWaveResponse =
+                riverInteraction?.FindPropertyRelative(
+                    "staticPressureWaveResponse");
+            obstructionWakeMode = riverInteraction?.FindPropertyRelative(
+                "obstructionWakeMode");
+            obstructionWakeStrength = riverInteraction?.FindPropertyRelative(
+                "obstructionWakeStrength");
+            obstructionWakeReach = riverInteraction?.FindPropertyRelative(
+                "obstructionWakeReach");
+            obstructionWakeSpread = riverInteraction?.FindPropertyRelative(
+                "obstructionWakeSpread");
         }
 
         public override void OnInspectorGUI()
@@ -142,68 +140,90 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 return;
             }
 
-            EditorGUILayout.PropertyField(responseProfile);
-            EditorGUILayout.PropertyField(footprintPadding);
-
-            bool custom =
-                responseProfile.enumValueIndex ==
-                (int)GeneratedRiverResponseProfile.Custom;
-
-            if (custom)
-            {
-                EditorGUILayout.PropertyField(
-                    pressureStrength,
-                    new GUIContent("Pressure Strength"));
-                EditorGUILayout.PropertyField(
-                    strengthMultiplier,
-                    new GUIContent("Wake / General Strength"));
-                EditorGUILayout.PropertyField(
-                    geometryAmplitude,
-                    new GUIContent("Non-Pressure Geometry"));
-                EditorGUILayout.PropertyField(surfaceDetail);
-                EditorGUILayout.PropertyField(responseStiffness);
-                EditorGUILayout.PropertyField(wakeLength);
-                EditorGUILayout.PropertyField(unsteadiness);
-            }
-            else if (!serializedObject.isEditingMultipleObjects)
-            {
-                GeneratedMass mass = (GeneratedMass)target;
-                ResolvedGeneratedRiverInteraction resolved =
-                    mass.RiverInteractionSettings.Resolve();
-
-                using (new EditorGUI.DisabledScope(true))
-                {
-                    EditorGUILayout.Slider(
-                        "Resolved Pressure Strength",
-                        resolved.PressureStrength,
-                        0f,
-                        1f);
-                    EditorGUILayout.FloatField(
-                        "Resolved Strength Multiplier",
-                        resolved.StrengthMultiplier);
-                    EditorGUILayout.FloatField(
-                        "Resolved Geometry Amplitude",
-                        resolved.GeometryAmplitude);
-                    EditorGUILayout.FloatField(
-                        "Resolved Surface Detail",
-                        resolved.SurfaceDetail);
-                    EditorGUILayout.FloatField(
-                        "Resolved Response Stiffness",
-                        resolved.ResponseStiffness);
-                    EditorGUILayout.FloatField(
-                        "Resolved Wake Length",
-                        resolved.WakeLength);
-                    EditorGUILayout.FloatField(
-                        "Resolved Unsteadiness",
-                        resolved.Unsteadiness);
-                }
-            }
+            DrawStaticPressureControls();
+            DrawObstructionWakeControls();
 
             EditorGUILayout.HelpBox(
-                "No disturbance-emitter component is required for static generated geometry. Pressure Strength selects a normalized position inside the computed support/flow range; the remaining controls retain wake and non-pressure interaction authorship.",
+                "Inherit uses the defaults of the river that detects this object. Custom replaces only the selected feature's values; it does not multiply unrelated interaction systems.",
                 MessageType.None);
 
             DrawRuntimeDiagnostics();
+        }
+
+        private void DrawStaticPressureControls()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Static Pressure",
+                EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(
+                staticPressureMode,
+                new GUIContent("Mode"));
+
+            if (staticPressureMode == null)
+            {
+                return;
+            }
+
+            GeneratedRiverFeatureMode mode =
+                (GeneratedRiverFeatureMode)staticPressureMode.enumValueIndex;
+
+            if (mode == GeneratedRiverFeatureMode.Custom)
+            {
+                EditorGUILayout.PropertyField(
+                    staticPressureStrength,
+                    new GUIContent("Strength"));
+                EditorGUILayout.PropertyField(
+                    staticPressureContactSharpness,
+                    new GUIContent("Contact Sharpness"));
+                EditorGUILayout.PropertyField(
+                    staticPressureWaveResponse,
+                    new GUIContent("Wave Response"));
+            }
+            else if (mode == GeneratedRiverFeatureMode.Inherit)
+            {
+                EditorGUILayout.HelpBox(
+                    "Uses the detected river's Static Pressure defaults.",
+                    MessageType.None);
+            }
+        }
+
+        private void DrawObstructionWakeControls()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Obstruction Wake",
+                EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(
+                obstructionWakeMode,
+                new GUIContent("Mode"));
+
+            if (obstructionWakeMode == null)
+            {
+                return;
+            }
+
+            GeneratedRiverFeatureMode mode =
+                (GeneratedRiverFeatureMode)obstructionWakeMode.enumValueIndex;
+
+            if (mode == GeneratedRiverFeatureMode.Custom)
+            {
+                EditorGUILayout.PropertyField(
+                    obstructionWakeStrength,
+                    new GUIContent("Strength"));
+                EditorGUILayout.PropertyField(
+                    obstructionWakeReach,
+                    new GUIContent("Reach"));
+                EditorGUILayout.PropertyField(
+                    obstructionWakeSpread,
+                    new GUIContent("Spread"));
+            }
+            else if (mode == GeneratedRiverFeatureMode.Inherit)
+            {
+                EditorGUILayout.HelpBox(
+                    "Uses the detected river's Obstruction Wake defaults.",
+                    MessageType.None);
+            }
         }
 
         private void DrawRuntimeDiagnostics()
@@ -261,28 +281,50 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 EditorGUILayout.FloatField(
                     "Wave Allowance",
                     diagnostics.WaveAllowance);
-                EditorGUILayout.Slider(
-                    "Pressure Strength",
-                    diagnostics.PressureStrength,
-                    0f,
-                    1f);
-                EditorGUILayout.Vector2Field(
-                    "Feasible Pressure Range",
-                    new Vector2(
-                        diagnostics.PressureMinimumHeight,
-                        diagnostics.PressureMaximumHeight));
-                EditorGUILayout.FloatField(
-                    "Effective Amplitude",
-                    diagnostics.EffectiveAmplitude);
-                EditorGUILayout.FloatField(
-                    "Effective Wake Strength",
-                    diagnostics.EffectiveWakeStrength);
-                EditorGUILayout.FloatField(
-                    "Maximum Allowed",
-                    diagnostics.MaximumAllowedAmplitude);
                 EditorGUILayout.Toggle(
-                    "Height Clamp Reached",
-                    diagnostics.HeightClampReached);
+                    "Static Pressure Enabled",
+                    diagnostics.StaticPressureEnabled);
+                if (diagnostics.StaticPressureEnabled)
+                {
+                    EditorGUILayout.Slider(
+                        "Pressure Strength",
+                        diagnostics.PressureStrength,
+                        0f,
+                        1f);
+                    EditorGUILayout.FloatField(
+                        "Contact Sharpness",
+                        diagnostics.ContactSharpness);
+                    EditorGUILayout.FloatField(
+                        "Wave Response",
+                        diagnostics.WaveResponse);
+                    EditorGUILayout.Vector2Field(
+                        "Feasible Pressure Range",
+                        new Vector2(
+                            diagnostics.PressureMinimumHeight,
+                            diagnostics.PressureMaximumHeight));
+                    EditorGUILayout.FloatField(
+                        "Resolved Pressure Height",
+                        diagnostics.EffectiveAmplitude);
+                    EditorGUILayout.Toggle(
+                        "Support Clamp Reached",
+                        diagnostics.HeightClampReached);
+                }
+
+                EditorGUILayout.Toggle(
+                    "Obstruction Wake Enabled",
+                    diagnostics.ObstructionWakeEnabled);
+                if (diagnostics.ObstructionWakeEnabled)
+                {
+                    EditorGUILayout.FloatField(
+                        "Resolved Wake Strength",
+                        diagnostics.EffectiveWakeStrength);
+                    EditorGUILayout.FloatField(
+                        "Wake Reach",
+                        diagnostics.ObstructionWakeReach);
+                    EditorGUILayout.FloatField(
+                        "Wake Spread",
+                        diagnostics.ObstructionWakeSpread);
+                }
             }
 
             EditorGUILayout.HelpBox(

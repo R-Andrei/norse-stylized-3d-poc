@@ -39,9 +39,10 @@ float _StaticPressureInsideOverlapPixels;
 float _StaticMaximumHeight;
 float _StaticWakeSourceStrength;
 float _StaticWakePersistence;
+float _StaticWakeSpread;
 float _StaticPhase;
-float _StaticResponseStiffness;
-float _StaticUnsteadiness;
+float _StaticContactSharpness;
+float _StaticWaveResponse;
 float _MaximumHeight;
 
 int4 _RippleInjectRect;
@@ -274,23 +275,24 @@ ContourRowResult ResolveContourRow(float lateralPosition)
 
 float EvaluateLegacyStaticPressureShape(float2 relativePosition, float2 halfSize)
 {
-    ContourRowResult contourRow = ResolveContourRow(relativePosition.y);
+    float resultShape = 0.0;
+    ContourRowResult contourRow = (ContourRowResult)0;
+    contourRow = ResolveContourRow(relativePosition.y);
+
     float upstreamX = contourRow.upstreamX;
     float downstreamX = contourRow.downstreamX;
+    float rowIsUsable = 1.0;
 
     if (contourRow.valid < 0.5)
     {
-        float normalizedLateral =
+        float normalizedFallbackLateral =
             relativePosition.y / max(1.0, halfSize.y);
-
-        if (abs(normalizedLateral) > 1.0)
-        {
-            return 0.0;
-        }
+        rowIsUsable = step(abs(normalizedFallbackLateral), 1.0);
 
         float rowHalfLength =
             halfSize.x * sqrt(saturate(
-                1.0 - normalizedLateral * normalizedLateral));
+                1.0 -
+                normalizedFallbackLateral * normalizedFallbackLateral));
         upstreamX = -rowHalfLength;
         downstreamX = rowHalfLength;
     }
@@ -306,20 +308,21 @@ float EvaluateLegacyStaticPressureShape(float2 relativePosition, float2 halfSize
         [unroll]
         for (int offsetIndex = -2; offsetIndex <= 2; offsetIndex++)
         {
-            if (offsetIndex == 0)
+            if (offsetIndex != 0)
             {
-                continue;
-            }
+                ContourRowResult sampleRow = (ContourRowResult)0;
+                sampleRow = ResolveContourRow(
+                    relativePosition.y + offsetIndex * rowOffset);
 
-            ContourRowResult sampleRow = ResolveContourRow(
-                relativePosition.y + offsetIndex * rowOffset);
-            if (sampleRow.valid >= 0.5)
-            {
-                float weight = offsetIndex == -1 || offsetIndex == 1
-                    ? 2.0
-                    : 1.0;
-                weightedUpstream += sampleRow.upstreamX * weight;
-                totalWeight += weight;
+                if (sampleRow.valid >= 0.5)
+                {
+                    float weight =
+                        offsetIndex == -1 || offsetIndex == 1
+                            ? 2.0
+                            : 1.0;
+                    weightedUpstream += sampleRow.upstreamX * weight;
+                    totalWeight += weight;
+                }
             }
         }
 
@@ -327,34 +330,42 @@ float EvaluateLegacyStaticPressureShape(float2 relativePosition, float2 halfSize
         upstreamX = max(upstreamX, smoothedUpstream);
     }
 
-    float rowSpan = max(0.0, downstreamX - upstreamX);
-    float rowSupport = smoothstep(0.20, 0.85, rowSpan);
-    float normalizedLateral =
-        abs(relativePosition.y) / max(1.0, halfSize.y);
-    float endTaper = 1.0 - smoothstep(0.82, 1.02, normalizedLateral);
+    if (rowIsUsable >= 0.5)
+    {
+        float rowSpan = max(0.0, downstreamX - upstreamX);
+        float rowSupport = smoothstep(0.20, 0.85, rowSpan);
+        float normalizedLateral =
+            abs(relativePosition.y) / max(1.0, halfSize.y);
+        float endTaper =
+            1.0 - smoothstep(0.82, 1.02, normalizedLateral);
 
-    // Positive distance is open water upstream of the contact boundary.
-    // Negative distance is inside the object footprint.
-    float contactDistance = upstreamX - relativePosition.x;
-    float pressureDepth = max(0.75, _StaticPressureDepthPixels);
-    float insideOverlap = max(
-        0.35,
-        _StaticPressureInsideOverlapPixels);
+        // Positive distance is open water upstream of the contact boundary.
+        // Negative distance is inside the object footprint.
+        float contactDistance = upstreamX - relativePosition.x;
+        float pressureDepth = max(0.75, _StaticPressureDepthPixels);
+        float insideOverlap = max(
+            0.35,
+            _StaticPressureInsideOverlapPixels);
 
-    // The hidden object-facing side is intentionally steep. The ridge extends
-    // slightly into the object so filtering and mesh interpolation cannot
-    // reveal an air gap. Only the open-water side receives a smooth falloff.
-    float insideGate = smoothstep(
-        -insideOverlap - 0.45,
-        -insideOverlap + 0.10,
-        contactDistance);
-    float openWaterDistance = max(0.0, contactDistance);
-    float openWaterFalloff = 1.0 - smoothstep(
-        0.0,
-        pressureDepth,
-        openWaterDistance);
+        // The hidden object-facing side is intentionally steep. The ridge
+        // extends slightly into the object so filtering and mesh interpolation
+        // cannot reveal an air gap. Only the open-water side receives falloff.
+        float insideGate = smoothstep(
+            -insideOverlap - 0.45,
+            -insideOverlap + 0.10,
+            contactDistance);
+        float openWaterDistance = max(0.0, contactDistance);
+        float openWater01 = saturate(
+            1.0 - openWaterDistance / pressureDepth);
+        float openWaterFalloff = pow(
+            openWater01,
+            max(0.5, _StaticContactSharpness));
 
-    return insideGate * openWaterFalloff * rowSupport * endTaper;
+        resultShape =
+            insideGate * openWaterFalloff * rowSupport * endTaper;
+    }
+
+    return resultShape;
 }
 
 float4 SamplePressureProfile(float lateralPosition)
@@ -407,64 +418,77 @@ float EvaluateHeightAwareStaticPressure(
     float2 relativePosition,
     float2 halfSize)
 {
+    float resultHeight = 0.0;
+
     if (_StaticPressureProfileValid == 0)
     {
         float legacyShape = EvaluateLegacyStaticPressureShape(
             relativePosition,
             halfSize);
-        return _StaticTargetHeight * legacyShape;
+        resultHeight = _StaticTargetHeight * legacyShape;
     }
-
-    float4 profileSample = SamplePressureProfile(relativePosition.y);
-    if (profileSample.z <= 0.0001)
+    else
     {
-        return 0.0;
+        float4 profileSample = float4(0.0, 0.0, 0.0, 0.0);
+        profileSample = SamplePressureProfile(relativePosition.y);
+
+        if (profileSample.z > 0.0001)
+        {
+            float baseUpstreamX = profileSample.x;
+            float contactSlope = profileSample.y;
+            float cachedHeight = profileSample.z;
+            float modulationCeiling = profileSample.w;
+            float pressureDepth = max(0.75, _StaticPressureDepthPixels);
+            float insideOverlap = max(
+                0.35,
+                _StaticPressureInsideOverlapPixels);
+            float height = min(_StaticTargetHeight, cachedHeight);
+
+            // Two fixed correction steps approximate the height-aware contact
+            // line. The CPU has already reduced the mesh slices to a base
+            // boundary, a shift per metre, and local safe height ceilings.
+            [unroll]
+            for (int iteration = 0; iteration < 2; iteration++)
+            {
+                float contactX = baseUpstreamX + contactSlope * height;
+                float contactDistance = contactX - relativePosition.x;
+                float insideGate = smoothstep(
+                    -insideOverlap - 0.45,
+                    -insideOverlap + 0.10,
+                    contactDistance);
+                float openWaterDistance = max(0.0, contactDistance);
+                float openWater01 = saturate(
+                    1.0 - openWaterDistance / pressureDepth);
+                float openWaterFalloff = pow(
+                    openWater01,
+                    max(0.5, _StaticContactSharpness));
+                height = min(
+                    cachedHeight,
+                    cachedHeight * insideGate * openWaterFalloff);
+            }
+
+            resultHeight = clamp(
+                height,
+                0.0,
+                min(cachedHeight, modulationCeiling));
+        }
     }
 
-    float baseUpstreamX = profileSample.x;
-    float contactSlope = profileSample.y;
-    float cachedHeight = profileSample.z;
-    float modulationCeiling = profileSample.w;
-    float pressureDepth = max(0.75, _StaticPressureDepthPixels);
-    float insideOverlap = max(
-        0.35,
-        _StaticPressureInsideOverlapPixels);
-    float height = min(_StaticTargetHeight, cachedHeight);
-
-    // Two fixed correction steps approximate the height-aware contact line.
-    // The CPU has already reduced the eight mesh slices to a base boundary,
-    // a boundary shift per metre, and local safe height ceilings.
-    [unroll]
-    for (int iteration = 0; iteration < 2; iteration++)
-    {
-        float contactX = baseUpstreamX + contactSlope * height;
-        float contactDistance = contactX - relativePosition.x;
-        float insideGate = smoothstep(
-            -insideOverlap - 0.45,
-            -insideOverlap + 0.10,
-            contactDistance);
-        float openWaterDistance = max(0.0, contactDistance);
-        float openWaterFalloff = 1.0 - smoothstep(
-            0.0,
-            pressureDepth,
-            openWaterDistance);
-        height = min(
-            cachedHeight,
-            cachedHeight * insideGate * openWaterFalloff);
-    }
-
-    return clamp(height, 0.0, min(cachedHeight, modulationCeiling));
+    return resultHeight;
 }
 
 float EvaluateStaticWakeSource(float2 relativePosition, float2 halfSize)
 {
     BoundaryInfo boundary = EvaluateStaticBoundary(relativePosition, halfSize);
+    float spread = clamp(_StaticWakeSpread, 0.5, 2.0);
     float minimumHalf = min(halfSize.x, halfSize.y);
-    float bandWidth = max(0.70, minimumHalf * 0.10);
+    float bandWidth = max(0.70, minimumHalf * 0.10) *
+                      lerp(0.80, 1.35, saturate((spread - 0.5) / 1.5));
     float outsideMask = step(0.0, boundary.signedDistance);
     float downstreamFacing = saturate(boundary.outwardNormal.x * 1.60);
-    float side01 = abs(relativePosition.y) / max(1.0, halfSize.y);
-    float sideOutlet = smoothstep(0.38, 0.82, side01);
+    float side01 = abs(relativePosition.y) /
+                   max(1.0, halfSize.y * spread);
+    float sideOutlet = smoothstep(0.30, 0.78, side01);
     float outletBand = Gaussian1D(
         boundary.signedDistance,
         bandWidth * 0.62,
@@ -563,14 +587,11 @@ void BakeStaticPressure(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     float phaseCode = floor(frac(_StaticPhase) * 16.0);
-    float stiffnessCode = round(
-        saturate(_StaticResponseStiffness * 0.5) * 7.0);
-    float unsteadinessCode = round(
-        saturate(_StaticUnsteadiness * 0.5) * 15.0);
+    float waveResponseCode = round(
+        saturate(_StaticWaveResponse * 0.5) * 31.0);
     float packedDynamics =
         phaseCode +
-        stiffnessCode * 16.0 +
-        unsteadinessCode * 128.0;
+        waveResponseCode * 16.0;
 
     float4 existing = _StaticPressureWrite[pixel];
     float existingInfluence = abs(existing.r);
@@ -655,7 +676,7 @@ void BakeStaticWakeSource(uint3 dispatchId : SV_DispatchThreadID)
     if (source >= existing.r)
     {
         existing.g = frac(_StaticPhase);
-        existing.b = saturate(_StaticUnsteadiness * 0.5);
+        existing.b = saturate((_StaticWakeSpread - 0.5) / 1.5);
         existing.a = saturate(_StaticWakePersistence / 3.0);
     }
 
@@ -928,17 +949,12 @@ void SimulateWake(uint3 dispatchId : SV_DispatchThreadID)
         clamp(int2(x, y), int2(0, 0), _WakeFieldSize - 1),
         0));
     float sourcePhase = source.g * PS3D_TWO_PI;
-    float sourceUnsteadiness = source.b * 2.0;
-    float pulseFrequency = lerp(0.78, 1.02, saturate(sourceUnsteadiness * 0.5));
-    float pulse =
-        0.72 +
-        lerp(0.12, 0.24, saturate(sourceUnsteadiness * 0.5)) *
-        sin(_WakeTime * pulseFrequency * PS3D_TWO_PI + sourcePhase) +
-        lerp(0.04, 0.10, saturate(sourceUnsteadiness * 0.5)) *
-        sin(
-            _WakeTime * pulseFrequency * 1.73 * PS3D_TWO_PI +
-            sourcePhase * 1.73);
-    pulse = saturate(pulse);
+    float pulse = saturate(
+        0.84 +
+        0.10 * sin(_WakeTime * 0.88 * PS3D_TWO_PI + sourcePhase) +
+        0.04 * sin(
+            _WakeTime * 1.47 * PS3D_TWO_PI +
+            sourcePhase * 1.73));
     energy +=
         source.r *
         pulse *
@@ -976,11 +992,11 @@ void SimulateWake(uint3 dispatchId : SV_DispatchThreadID)
     float gradientY =
         (up.r - down.r) /
         max(0.0001, 2.0 * _WakeCellSizeY);
-    float turbulence = lerp(0.86, 1.18, saturate(sourceUnsteadiness * 0.5));
+    float sourceSpread = lerp(0.85, 1.20, saturate(source.b));
     float2 gradients = clamp(
         float2(gradientX, gradientY) *
         _WakeGradientStrength *
-        turbulence *
+        sourceSpread *
         edgeMask,
         -4.0,
         4.0);
