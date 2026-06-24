@@ -30,6 +30,10 @@ namespace ProgrammaticStylized3D.Geometry
     [Serializable]
     public sealed class GeneratedRiverInteractionSettings
     {
+        private const float MinimumProfileChangeInterval = 0.5f;
+        private const float MaximumProfileChangeInterval = 3f;
+        private const float DefaultProfileChangeIntervalMin = 0.75f;
+        private const float DefaultProfileChangeIntervalMax = 1.75f;
         [Tooltip("Controls whether this generated solid may be discovered automatically as a static river obstruction.")]
         [SerializeField]
         private GeneratedRiverInteractionParticipation participation =
@@ -51,10 +55,22 @@ namespace ProgrammaticStylized3D.Geometry
         [SerializeField]
         private float staticPressureContactSharpness = 2.8f;
 
-        [Tooltip("For Custom, controls Stage 3 wave-triggered variation along the pressure ridge. Zero keeps the cached shape stable; higher values increase local height fluctuation only while waves pass.")]
+        [Tooltip("For Custom, controls how strongly the pressure ridge redistributes its supported height laterally. Zero keeps the cached geometry-derived profile stable.")]
         [Range(0f, 2f)]
         [SerializeField]
         private float staticPressureWaveResponse = 1f;
+
+        [Tooltip("For Custom, shortest randomized time in seconds between lateral pressure-profile changes.")]
+        [Range(MinimumProfileChangeInterval, MaximumProfileChangeInterval)]
+        [SerializeField]
+        private float staticPressureProfileChangeIntervalMin =
+            DefaultProfileChangeIntervalMin;
+
+        [Tooltip("For Custom, longest randomized time in seconds between lateral pressure-profile changes. The morph duration scales with the selected interval and completes before the next change.")]
+        [Range(MinimumProfileChangeInterval, MaximumProfileChangeInterval)]
+        [SerializeField]
+        private float staticPressureProfileChangeIntervalMax =
+            DefaultProfileChangeIntervalMax;
 
         [Header("Obstruction Wake")]
         [Tooltip("Inherit uses the detected river's Obstruction Wake defaults. Disabled removes only the downstream obstruction wake. Custom uses the values below.")]
@@ -100,8 +116,24 @@ namespace ProgrammaticStylized3D.Geometry
             Mathf.Clamp01(staticPressureStrength);
         public float StaticPressureContactSharpness =>
             Mathf.Clamp(staticPressureContactSharpness, 0.5f, 4f);
-        public float StaticPressureWaveResponse =>
+        public float StaticPressureProfileVariation =>
             Mathf.Clamp(staticPressureWaveResponse, 0f, 2f);
+        public float StaticPressureProfileChangeIntervalMin =>
+            Mathf.Clamp(
+                staticPressureProfileChangeIntervalMin,
+                MinimumProfileChangeInterval,
+                MaximumProfileChangeInterval);
+        public float StaticPressureProfileChangeIntervalMax =>
+            Mathf.Clamp(
+                staticPressureProfileChangeIntervalMax,
+                MinimumProfileChangeInterval,
+                MaximumProfileChangeInterval);
+
+        // Compatibility alias for integrations compiled against the previous
+        // wave-triggered profile implementation.
+        public float StaticPressureWaveResponse =>
+            StaticPressureProfileVariation;
+
         public GeneratedRiverFeatureMode ObstructionWakeMode =>
             obstructionWakeMode;
         public float ObstructionWakeStrength =>
@@ -123,7 +155,9 @@ namespace ProgrammaticStylized3D.Geometry
                 staticPressureMode != GeneratedRiverFeatureMode.Disabled,
                 StaticPressureStrength,
                 StaticPressureContactSharpness,
-                StaticPressureWaveResponse,
+                StaticPressureProfileVariation,
+                StaticPressureProfileChangeIntervalMin,
+                StaticPressureProfileChangeIntervalMax,
                 obstructionWakeMode != GeneratedRiverFeatureMode.Disabled,
                 ObstructionWakeStrength,
                 ObstructionWakeReach,
@@ -142,6 +176,34 @@ namespace ProgrammaticStylized3D.Geometry
                 staticPressureWaveResponse,
                 0f,
                 2f);
+
+            if (staticPressureProfileChangeIntervalMin <= 0f &&
+                staticPressureProfileChangeIntervalMax <= 0f)
+            {
+                staticPressureProfileChangeIntervalMin =
+                    DefaultProfileChangeIntervalMin;
+                staticPressureProfileChangeIntervalMax =
+                    DefaultProfileChangeIntervalMax;
+            }
+
+            staticPressureProfileChangeIntervalMin = Mathf.Clamp(
+                staticPressureProfileChangeIntervalMin,
+                MinimumProfileChangeInterval,
+                MaximumProfileChangeInterval);
+            staticPressureProfileChangeIntervalMax = Mathf.Clamp(
+                staticPressureProfileChangeIntervalMax,
+                MinimumProfileChangeInterval,
+                MaximumProfileChangeInterval);
+
+            if (staticPressureProfileChangeIntervalMin >
+                staticPressureProfileChangeIntervalMax)
+            {
+                (staticPressureProfileChangeIntervalMin,
+                    staticPressureProfileChangeIntervalMax) =
+                    (staticPressureProfileChangeIntervalMax,
+                        staticPressureProfileChangeIntervalMin);
+            }
+
             obstructionWakeStrength = Mathf.Clamp(
                 obstructionWakeStrength,
                 0f,
@@ -236,6 +298,10 @@ namespace ProgrammaticStylized3D.Geometry
             staticPressureStrength = pressure;
             staticPressureContactSharpness = contactSharpness;
             staticPressureWaveResponse = waveResponse;
+            staticPressureProfileChangeIntervalMin =
+                DefaultProfileChangeIntervalMin;
+            staticPressureProfileChangeIntervalMax =
+                DefaultProfileChangeIntervalMax;
             obstructionWakeMode = GeneratedRiverFeatureMode.Custom;
             obstructionWakeStrength = wakeStrength;
             obstructionWakeReach = wakeReach;
@@ -249,7 +315,9 @@ namespace ProgrammaticStylized3D.Geometry
             bool staticPressureEnabled,
             float staticPressureStrength,
             float staticPressureContactSharpness,
-            float staticPressureWaveResponse,
+            float staticPressureProfileVariation,
+            float staticPressureProfileChangeIntervalMin,
+            float staticPressureProfileChangeIntervalMax,
             bool obstructionWakeEnabled,
             float obstructionWakeStrength,
             float obstructionWakeReach,
@@ -261,10 +329,26 @@ namespace ProgrammaticStylized3D.Geometry
                 staticPressureContactSharpness,
                 0.5f,
                 4f);
-            StaticPressureWaveResponse = Mathf.Clamp(
-                staticPressureWaveResponse,
+            StaticPressureProfileVariation = Mathf.Clamp(
+                staticPressureProfileVariation,
                 0f,
                 2f);
+
+            float clampedIntervalMin = Mathf.Clamp(
+                staticPressureProfileChangeIntervalMin,
+                0.5f,
+                3f);
+            float clampedIntervalMax = Mathf.Clamp(
+                staticPressureProfileChangeIntervalMax,
+                0.5f,
+                3f);
+            StaticPressureProfileChangeIntervalMin = Mathf.Min(
+                clampedIntervalMin,
+                clampedIntervalMax);
+            StaticPressureProfileChangeIntervalMax = Mathf.Max(
+                clampedIntervalMin,
+                clampedIntervalMax);
+
             ObstructionWakeEnabled = obstructionWakeEnabled;
             ObstructionWakeStrength = Mathf.Clamp(
                 obstructionWakeStrength,
@@ -279,6 +363,30 @@ namespace ProgrammaticStylized3D.Geometry
                 0.5f,
                 2f);
             compatibilityFootprintPadding = 0.12f;
+        }
+
+        // Former per-feature constructor retained for source compatibility.
+        public ResolvedGeneratedRiverInteraction(
+            bool staticPressureEnabled,
+            float staticPressureStrength,
+            float staticPressureContactSharpness,
+            float staticPressureWaveResponse,
+            bool obstructionWakeEnabled,
+            float obstructionWakeStrength,
+            float obstructionWakeReach,
+            float obstructionWakeSpread)
+            : this(
+                staticPressureEnabled,
+                staticPressureStrength,
+                staticPressureContactSharpness,
+                staticPressureWaveResponse,
+                0.75f,
+                1.75f,
+                obstructionWakeEnabled,
+                obstructionWakeStrength,
+                obstructionWakeReach,
+                obstructionWakeSpread)
+        {
         }
 
         // Former constructor retained so unrelated callers are not broken by
@@ -299,10 +407,12 @@ namespace ProgrammaticStylized3D.Geometry
                 0.5f,
                 4f,
                 Mathf.Clamp01(responseStiffness * 0.5f));
-            StaticPressureWaveResponse = Mathf.Clamp(
+            StaticPressureProfileVariation = Mathf.Clamp(
                 unsteadiness,
                 0f,
                 2f);
+            StaticPressureProfileChangeIntervalMin = 0.75f;
+            StaticPressureProfileChangeIntervalMax = 1.75f;
             ObstructionWakeEnabled = true;
             ObstructionWakeStrength = Mathf.Clamp(
                 strengthMultiplier * surfaceDetail,
@@ -324,7 +434,15 @@ namespace ProgrammaticStylized3D.Geometry
         public bool StaticPressureEnabled { get; }
         public float StaticPressureStrength { get; }
         public float StaticPressureContactSharpness { get; }
-        public float StaticPressureWaveResponse { get; }
+        public float StaticPressureProfileVariation { get; }
+        public float StaticPressureProfileChangeIntervalMin { get; }
+        public float StaticPressureProfileChangeIntervalMax { get; }
+
+        // Compatibility alias for integrations compiled against the previous
+        // wave-triggered profile implementation.
+        public float StaticPressureWaveResponse =>
+            StaticPressureProfileVariation;
+
         public bool ObstructionWakeEnabled { get; }
         public float ObstructionWakeStrength { get; }
         public float ObstructionWakeReach { get; }

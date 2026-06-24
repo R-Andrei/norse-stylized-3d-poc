@@ -515,6 +515,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("staticPressureContactSharpness");
             SerializedProperty staticPressureWaveResponseProperty =
                 Find("staticPressureWaveResponse");
+            SerializedProperty staticPressureProfileChangeIntervalMinProperty =
+                Find("staticPressureProfileChangeIntervalMin");
+            SerializedProperty staticPressureProfileChangeIntervalMaxProperty =
+                Find("staticPressureProfileChangeIntervalMax");
             SerializedProperty obstructionWakeStrengthProperty =
                 Find("obstructionWakeStrength");
             SerializedProperty obstructionWakeReachProperty =
@@ -564,6 +568,18 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 missingProperties += missingProperties.Length > 0
                     ? ", staticPressureWaveResponse"
                     : "staticPressureWaveResponse";
+            }
+            if (staticPressureProfileChangeIntervalMinProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", staticPressureProfileChangeIntervalMin"
+                    : "staticPressureProfileChangeIntervalMin";
+            }
+            if (staticPressureProfileChangeIntervalMaxProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", staticPressureProfileChangeIntervalMax"
+                    : "staticPressureProfileChangeIntervalMax";
             }
             if (obstructionWakeStrengthProperty == null)
             {
@@ -708,8 +724,24 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(
                         staticPressureWaveResponseProperty,
                         new GUIContent(
-                            "Wave Response",
-                            "Controls Stage 3 wave-triggered variation along the pressure ridge."));
+                            "Profile Variation",
+                            "Controls how strongly the supported ridge height is redistributed laterally. Zero keeps the cached geometry-derived profile stable."));
+                }
+                if (staticPressureProfileChangeIntervalMinProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        staticPressureProfileChangeIntervalMinProperty,
+                        new GUIContent(
+                            "Minimum Change Interval",
+                            "Shortest randomized time in seconds between lateral pressure-profile changes."));
+                }
+                if (staticPressureProfileChangeIntervalMaxProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        staticPressureProfileChangeIntervalMaxProperty,
+                        new GUIContent(
+                            "Maximum Change Interval",
+                            "Longest randomized time in seconds between lateral pressure-profile changes. Morph duration scales automatically and completes before the next change."));
                 }
 
                 EditorGUILayout.Space(4f);

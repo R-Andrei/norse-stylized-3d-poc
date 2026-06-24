@@ -15,6 +15,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty staticPressureStrength;
         private SerializedProperty staticPressureContactSharpness;
         private SerializedProperty staticPressureWaveResponse;
+        private SerializedProperty staticPressureProfileChangeIntervalMin;
+        private SerializedProperty staticPressureProfileChangeIntervalMax;
         private SerializedProperty obstructionWakeMode;
         private SerializedProperty obstructionWakeStrength;
         private SerializedProperty obstructionWakeReach;
@@ -36,6 +38,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             staticPressureWaveResponse =
                 riverInteraction?.FindPropertyRelative(
                     "staticPressureWaveResponse");
+            staticPressureProfileChangeIntervalMin =
+                riverInteraction?.FindPropertyRelative(
+                    "staticPressureProfileChangeIntervalMin");
+            staticPressureProfileChangeIntervalMax =
+                riverInteraction?.FindPropertyRelative(
+                    "staticPressureProfileChangeIntervalMax");
             obstructionWakeMode = riverInteraction?.FindPropertyRelative(
                 "obstructionWakeMode");
             obstructionWakeStrength = riverInteraction?.FindPropertyRelative(
@@ -178,7 +186,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     new GUIContent("Contact Sharpness"));
                 EditorGUILayout.PropertyField(
                     staticPressureWaveResponse,
-                    new GUIContent("Wave Response"));
+                    new GUIContent(
+                        "Profile Variation",
+                        "Controls how strongly supported ridge height is redistributed laterally."));
+                EditorGUILayout.PropertyField(
+                    staticPressureProfileChangeIntervalMin,
+                    new GUIContent(
+                        "Minimum Change Interval",
+                        "Shortest randomized time in seconds between lateral pressure-profile changes."));
+                EditorGUILayout.PropertyField(
+                    staticPressureProfileChangeIntervalMax,
+                    new GUIContent(
+                        "Maximum Change Interval",
+                        "Longest randomized time in seconds between lateral pressure-profile changes. Morph duration scales automatically and completes before the next change."));
             }
             else if (mode == GeneratedRiverFeatureMode.Inherit)
             {
@@ -295,8 +315,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         "Contact Sharpness",
                         diagnostics.ContactSharpness);
                     EditorGUILayout.FloatField(
-                        "Wave Response",
-                        diagnostics.WaveResponse);
+                        "Profile Variation",
+                        diagnostics.ProfileVariation);
                     EditorGUILayout.Vector2Field(
                         "Feasible Pressure Range",
                         new Vector2(
