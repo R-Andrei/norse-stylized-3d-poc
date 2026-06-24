@@ -321,6 +321,8 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_DisturbanceStaticTarget");
         private static readonly int DisturbanceStaticWakeSourceId =
             Shader.PropertyToID("_DisturbanceStaticWakeSource");
+        private static readonly int DisturbanceStaticWakeTexelSizeId =
+            Shader.PropertyToID("_DisturbanceStaticWakeTexelSize");
         private static readonly int DisturbanceWakePreviousId =
             Shader.PropertyToID("_DisturbanceWakePrevious");
         private static readonly int DisturbanceWakeCurrentId =
@@ -390,6 +392,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool[] chunkActive = Array.Empty<bool>();
         private bool[] chunkHasStaticSource = Array.Empty<bool>();
         private double[] wakeChunkActiveUntil = Array.Empty<double>();
+        private double[] staticWakeChunkReleaseDuration = Array.Empty<double>();
         private bool[] wakeChunkActive = Array.Empty<bool>();
 
         private int clearKernel = -1;
@@ -418,7 +421,8 @@ namespace ProgrammaticStylized3D.Rivers
         private double lastActivityTime;
         private bool supportWarningReported;
         private bool resourcesDirty = true;
-        private bool staticTargetDirty = true;
+        private bool staticPressureTargetDirty = true;
+        private bool staticWakeSourceDirty = true;
         private int validStaticSourceCount;
         private bool generatedGeometryRegistryDirty = true;
         private bool generatedGeometryRefreshInProgress;
@@ -1121,7 +1125,8 @@ namespace ProgrammaticStylized3D.Rivers
         public void NotifyRiverChanged()
         {
             resourcesDirty = true;
-            staticTargetDirty = true;
+            staticPressureTargetDirty = true;
+            staticWakeSourceDirty = true;
             generatedGeometryRegistryDirty = true;
         }
 
@@ -1139,6 +1144,12 @@ namespace ProgrammaticStylized3D.Rivers
             Array.Clear(chunkActiveUntil, 0, chunkActiveUntil.Length);
             Array.Clear(wakeChunkActive, 0, wakeChunkActive.Length);
             Array.Clear(wakeChunkActiveUntil, 0, wakeChunkActiveUntil.Length);
+            Array.Clear(chunkHasStaticSource, 0, chunkHasStaticSource.Length);
+            Array.Clear(
+                staticWakeChunkReleaseDuration,
+                0,
+                staticWakeChunkReleaseDuration.Length);
+            staticWakeSourceDirty = true;
             pendingImpacts.Clear();
             simulationAccumulator = 0f;
             simulationInterpolation = 1f;
@@ -1355,7 +1366,8 @@ namespace ProgrammaticStylized3D.Rivers
 
             if (!deferStaticTargetRebuild)
             {
-                staticTargetDirty = true;
+                staticPressureTargetDirty = true;
+                staticWakeSourceDirty = true;
             }
 
             lastActivityTime = Time.realtimeSinceStartupAsDouble;
@@ -1423,7 +1435,8 @@ namespace ProgrammaticStylized3D.Rivers
                     out ContinuousSource previousSource) &&
                 previousSource.IsStatic)
             {
-                staticTargetDirty = true;
+                staticPressureTargetDirty = true;
+                staticWakeSourceDirty = true;
             }
 
             continuousSources[sourceId] =
@@ -1485,7 +1498,8 @@ namespace ProgrammaticStylized3D.Rivers
                     out ContinuousSource source) &&
                 source.IsStatic)
             {
-                staticTargetDirty = true;
+                staticPressureTargetDirty = true;
+                staticWakeSourceDirty = true;
             }
 
             continuousSources.Remove(sourceId);
@@ -1563,7 +1577,8 @@ namespace ProgrammaticStylized3D.Rivers
         private void HandleDomainChanged(RiverDomainSnapshot snapshot)
         {
             resourcesDirty = true;
-            staticTargetDirty = true;
+            staticPressureTargetDirty = true;
+            staticWakeSourceDirty = true;
             generatedGeometryRegistryDirty = true;
         }
 
@@ -1650,7 +1665,8 @@ namespace ProgrammaticStylized3D.Rivers
                 refreshedAutomaticGeneratedSourceIds);
             generatedGeometryRefreshInProgress = false;
             generatedGeometryRefreshIndex = 0;
-            staticTargetDirty = true;
+            staticPressureTargetDirty = true;
+            staticWakeSourceDirty = true;
             lastActivityTime = Time.realtimeSinceStartupAsDouble;
         }
 
@@ -2198,6 +2214,7 @@ namespace ProgrammaticStylized3D.Rivers
             chunkActive = new bool[chunkCount];
             chunkHasStaticSource = new bool[chunkCount];
             wakeChunkActiveUntil = new double[chunkCount];
+            staticWakeChunkReleaseDuration = new double[chunkCount];
             wakeChunkActive = new bool[chunkCount];
 
             DispatchClear(stateA, fieldWidth, fieldHeight, 0, fieldWidth);
@@ -2216,7 +2233,8 @@ namespace ProgrammaticStylized3D.Rivers
             simulationInterpolation = 1f;
             wakeInterpolation = 1f;
             validStaticSourceCount = 0;
-            staticTargetDirty = true;
+            staticPressureTargetDirty = true;
+            staticWakeSourceDirty = true;
             resourcesDirty = false;
             return true;
         }
@@ -2282,9 +2300,11 @@ namespace ProgrammaticStylized3D.Rivers
             chunkActive = Array.Empty<bool>();
             chunkHasStaticSource = Array.Empty<bool>();
             wakeChunkActiveUntil = Array.Empty<double>();
+            staticWakeChunkReleaseDuration = Array.Empty<double>();
             wakeChunkActive = Array.Empty<bool>();
             validStaticSourceCount = 0;
-            staticTargetDirty = true;
+            staticPressureTargetDirty = true;
+            staticWakeSourceDirty = true;
             resourcesDirty = true;
         }
 
@@ -2314,9 +2334,14 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void SimulateStep(float deltaTime, double now)
         {
-            if (staticTargetDirty)
+            if (staticPressureTargetDirty)
             {
-                RebuildStaticTarget(now);
+                RebuildStaticPressureTarget(now);
+            }
+
+            if (staticWakeSourceDirty)
+            {
+                RebuildStaticWakeSource(now);
             }
 
             ExpireChunks(now);
@@ -2744,11 +2769,9 @@ namespace ProgrammaticStylized3D.Rivers
                 1);
         }
 
-        private void RebuildStaticTarget(double now)
+        private void RebuildStaticPressureTarget(double now)
         {
-            if (staticTarget == null ||
-                staticWakeSource == null ||
-                computeShader == null)
+            if (staticTarget == null || computeShader == null)
             {
                 return;
             }
@@ -2759,34 +2782,15 @@ namespace ProgrammaticStylized3D.Rivers
                 fieldHeight,
                 0,
                 fieldWidth);
-            DispatchClear(
-                staticWakeSource,
-                wakeFieldWidth,
-                wakeFieldHeight,
-                0,
-                wakeFieldWidth);
-
-            double releasedWakeUntil =
-                now + Mathf.Lerp(
-                    1.5f,
-                    8.0f,
-                    Mathf.InverseLerp(0.25f, 3f, river.ObstructionWakeReach));
-            for (int chunk = 0; chunk < chunkCount; chunk++)
-            {
-                if (chunkHasStaticSource[chunk])
-                {
-                    chunkHasStaticSource[chunk] = false;
-                    wakeChunkActive[chunk] = true;
-                    wakeChunkActiveUntil[chunk] = releasedWakeUntil;
-                }
-            }
 
             validStaticSourceCount = 0;
 
-            foreach (KeyValuePair<EntityId, ContinuousSource> pair in continuousSources)
+            foreach (KeyValuePair<EntityId, ContinuousSource> pair in
+                     continuousSources)
             {
                 ContinuousSource source = pair.Value;
                 if (!source.IsStatic ||
+                    source.StaticTargetHeightMetres <= 0.0001f ||
                     !river.TryProjectWorldPoint(
                         source.WorldPosition,
                         out StylizedRiverProjection projection) ||
@@ -2804,50 +2808,22 @@ namespace ProgrammaticStylized3D.Rivers
                     projection.AcrossMetres / surfaceHalfWidth,
                     -1f,
                     1f);
-                float wakeLength = ResolveObstructionWakeLength(
-                    source.AcrossHalfWidth,
-                    source.AlongHalfLength,
-                    Mathf.Abs(river.FlowSpeedMetresPerSecond)) *
-                    source.StaticWakeReachMultiplier;
 
-                if (source.StaticTargetHeightMetres > 0.0001f)
-                {
-                    DispatchStaticPressureBake(
-                        projection.GlobalDistance,
-                        acrossNormalized,
-                        surfaceHalfWidth,
-                        source.StaticPressureAcrossHalfWidth,
-                        source.StaticPressureAlongHalfLength,
-                        source.StaticTargetHeightMetres,
-                        source.StaticContactSharpness,
-                        source.StaticPressureProfile.IsValid
-                            ? 0f
-                            : source.StaticProfileVariation,
-                        source.Phase,
-                        source.StaticPressureContour,
-                        source.StaticPressureProfile);
-                    validStaticSourceCount++;
-                }
-
-                if (source.StaticWakeAmplitude > 0.0001f)
-                {
-                    DispatchStaticWakeSourceBake(
-                        projection.GlobalDistance,
-                        acrossNormalized,
-                        surfaceHalfWidth,
-                        source.AcrossHalfWidth,
-                        source.AlongHalfLength,
-                        source.StaticWakeAmplitude,
-                        source.StaticWakeReachMultiplier,
-                        source.StaticWakeSpreadMultiplier,
-                        source.Phase,
-                        source.StaticContour);
-
-                    MarkStaticRange(
-                        projection.GlobalDistance,
-                        source.AlongHalfLength,
-                        wakeLength);
-                }
+                DispatchStaticPressureBake(
+                    projection.GlobalDistance,
+                    acrossNormalized,
+                    surfaceHalfWidth,
+                    source.StaticPressureAcrossHalfWidth,
+                    source.StaticPressureAlongHalfLength,
+                    source.StaticTargetHeightMetres,
+                    source.StaticContactSharpness,
+                    source.StaticPressureProfile.IsValid
+                        ? 0f
+                        : source.StaticProfileVariation,
+                    source.Phase,
+                    source.StaticPressureContour,
+                    source.StaticPressureProfile);
+                validStaticSourceCount++;
             }
 
             if (validStaticSourceCount > 0)
@@ -2875,7 +2851,82 @@ namespace ProgrammaticStylized3D.Rivers
                     1);
             }
 
-            staticTargetDirty = false;
+            staticPressureTargetDirty = false;
+            lastActivityTime = now;
+        }
+
+        private void RebuildStaticWakeSource(double now)
+        {
+            if (staticWakeSource == null || computeShader == null)
+            {
+                return;
+            }
+
+            DispatchClear(
+                staticWakeSource,
+                wakeFieldWidth,
+                wakeFieldHeight,
+                0,
+                wakeFieldWidth);
+            ReleaseStaticWakeChunkReservations(now);
+
+            float absoluteFlowSpeed =
+                Mathf.Abs(river.FlowSpeedMetresPerSecond);
+
+            foreach (KeyValuePair<EntityId, ContinuousSource> pair in
+                     continuousSources)
+            {
+                ContinuousSource source = pair.Value;
+                if (!source.IsStatic ||
+                    source.StaticWakeAmplitude <= 0.0001f ||
+                    !river.TryProjectWorldPoint(
+                        source.WorldPosition,
+                        out StylizedRiverProjection projection) ||
+                    !projection.IsInside)
+                {
+                    continue;
+                }
+
+                StylizedRiverSplineSample sample =
+                    river.SampleAtLocalDistance(projection.LocalDistance);
+                float surfaceHalfWidth = Mathf.Max(
+                    0.05f,
+                    sample.GetSurfaceHalfWidth(projection.AcrossMetres));
+                float acrossNormalized = Mathf.Clamp(
+                    projection.AcrossMetres / surfaceHalfWidth,
+                    -1f,
+                    1f);
+                float wakeLength = ResolveObstructionWakeLength(
+                    source.AcrossHalfWidth,
+                    source.AlongHalfLength,
+                    absoluteFlowSpeed) *
+                    source.StaticWakeReachMultiplier;
+                double releaseDurationSeconds =
+                    ResolveStaticWakeReleaseDuration(
+                        wakeLength,
+                        source.StaticWakeReachMultiplier,
+                        absoluteFlowSpeed);
+
+                DispatchStaticWakeSourceBake(
+                    projection.GlobalDistance,
+                    acrossNormalized,
+                    surfaceHalfWidth,
+                    source.AcrossHalfWidth,
+                    source.AlongHalfLength,
+                    source.StaticWakeAmplitude,
+                    source.StaticWakeReachMultiplier,
+                    source.StaticWakeSpreadMultiplier,
+                    source.Phase,
+                    source.StaticContour);
+
+                MarkStaticWakeRange(
+                    projection.GlobalDistance,
+                    source.AlongHalfLength,
+                    wakeLength,
+                    releaseDurationSeconds);
+            }
+
+            staticWakeSourceDirty = false;
             lastActivityTime = now;
         }
 
@@ -3187,17 +3238,22 @@ namespace ProgrammaticStylized3D.Rivers
                 1);
         }
 
-        private void MarkStaticRange(
+        private void MarkStaticWakeRange(
             float globalDistance,
             float alongHalfLength,
-            float wakeLength)
+            float wakeLength,
+            double releaseDurationSeconds)
         {
             float sourceLocal =
                 globalDistance - river.Domain.GlobalDistanceMinimum;
             float upstreamReach = alongHalfLength * 0.80f;
+            // Keep one full downstream chunk active beyond the authored
+            // reach so advection and lateral diffusion cannot terminate at
+            // the source-range boundary.
             float downstreamReach = Mathf.Max(
                 wakeLength,
-                alongHalfLength * 1.20f);
+                alongHalfLength * 1.20f) +
+                ChunkLengthMetres;
             float minimumLocal = Mathf.Clamp(
                 sourceLocal - upstreamReach,
                 0f,
@@ -3236,7 +3292,30 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 chunkHasStaticSource[chunk] = true;
-                wakeChunkActiveUntil[chunk] = double.PositiveInfinity;
+                staticWakeChunkReleaseDuration[chunk] = Math.Max(
+                    staticWakeChunkReleaseDuration[chunk],
+                    releaseDurationSeconds);
+            }
+        }
+
+        private void ReleaseStaticWakeChunkReservations(double now)
+        {
+            for (int chunk = 0; chunk < chunkCount; chunk++)
+            {
+                if (!chunkHasStaticSource[chunk])
+                {
+                    staticWakeChunkReleaseDuration[chunk] = 0.0;
+                    continue;
+                }
+
+                chunkHasStaticSource[chunk] = false;
+                wakeChunkActive[chunk] = true;
+                wakeChunkActiveUntil[chunk] = Math.Max(
+                    wakeChunkActiveUntil[chunk],
+                    now + Math.Max(
+                        1.5,
+                        staticWakeChunkReleaseDuration[chunk]));
+                staticWakeChunkReleaseDuration[chunk] = 0.0;
             }
         }
 
@@ -3305,6 +3384,34 @@ namespace ProgrammaticStylized3D.Rivers
                 alongHalfLength * 1.40f);
             return footprintScale *
                    (1f + Mathf.Min(3f, absoluteFlowSpeed) * 0.12f);
+        }
+
+        private static double ResolveStaticWakeReleaseDuration(
+            float wakeLength,
+            float wakeReachMultiplier,
+            float absoluteFlowSpeed)
+        {
+            // Mirror the current persistent-wake decay envelope while
+            // also retaining enough time to transport the resolved source
+            // reach at the current flow speed.
+            float persistence = Mathf.Clamp(
+                wakeReachMultiplier,
+                0.25f,
+                3f) / 3f;
+            float persistenceScale = Mathf.Lerp(
+                0.72f,
+                1.65f,
+                Mathf.Clamp01(persistence));
+            float decayTailSeconds =
+                Mathf.Log(100f) * persistenceScale / 1.15f;
+            float transportSeconds =
+                Mathf.Max(0f, wakeLength) /
+                Mathf.Max(0.25f, absoluteFlowSpeed);
+
+            return Mathf.Clamp(
+                Mathf.Max(decayTailSeconds, transportSeconds),
+                1.5f,
+                12f);
         }
 
         private static Vector2[] CopyStaticContour(
@@ -3428,7 +3535,7 @@ namespace ProgrammaticStylized3D.Rivers
                 // The cached geometry remains unchanged. Only the compact
                 // lateral height profiles are rebaked, once after all sources
                 // have advanced this update.
-                staticTargetDirty = true;
+                staticPressureTargetDirty = true;
             }
         }
 
@@ -4154,6 +4261,13 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(
                 DisturbanceStaticWakeSourceId,
                 staticWakeSource);
+            propertyBlock.SetVector(
+                DisturbanceStaticWakeTexelSizeId,
+                new Vector4(
+                    1f / Mathf.Max(1, staticWakeSource.width),
+                    1f / Mathf.Max(1, staticWakeSource.height),
+                    staticWakeSource.width,
+                    staticWakeSource.height));
             propertyBlock.SetTexture(
                 DisturbanceWakePreviousId,
                 previousWake);

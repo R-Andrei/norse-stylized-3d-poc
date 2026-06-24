@@ -486,16 +486,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
         private void OnSceneGUI()
         {
-            if (!showPressureProfile ||
-                !Application.isPlaying ||
-                targets == null ||
-                targets.Length != 1)
+            if (!showPressureProfile || !Application.isPlaying)
             {
                 return;
             }
 
             GeneratedMass mass = target as GeneratedMass;
             if (mass == null ||
+                Selection.activeGameObject != mass.gameObject ||
                 !StylizedRiverDisturbanceRuntime.
                     TryGetGeneratedSourcePressureProfileDebugData(
                         mass,

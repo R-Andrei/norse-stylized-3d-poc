@@ -198,6 +198,7 @@ Shader "PS3D/Stylized River Water"
                 float _DisturbanceStaticMaximumHeight;
                 float _DisturbanceDebugView;
                 float _DisturbanceFragmentDetail;
+                float4 _DisturbanceStaticWakeTexelSize;
 
                 float _DomainFallbackDepth;
                 float _BodyDebugView;
@@ -313,11 +314,30 @@ Shader "PS3D/Stylized River Water"
                         _MotionTurbulence,
                         _MotionSeed);
 
+                RiverWaterStaticWakeLeeResult staticWakeLee =
+                    RiverWaterEvaluateStaticWakeLee(
+                        TEXTURE2D_ARGS(
+                            _DisturbanceStaticWakeSource,
+                            sampler_DisturbanceStaticWakeSource),
+                        _DisturbanceEnabled,
+                        input.uv1.x,
+                        input.uv1.y,
+                        input.uv2.x,
+                        input.uv2.y,
+                        _DisturbanceGlobalStart,
+                        _DisturbanceFieldLength,
+                        _DisturbanceShoreInteraction,
+                        _FreezeAmount,
+                        _DisturbanceStaticWakeTexelSize.xy,
+                        0.0);
+                float staticGeometryHeight =
+                    disturbance.height - staticWakeLee.depth;
+
                 output.positionWS =
                     basePositionWS +
                     motion.displacementWS +
                     baseNormalWS *
-                    (motion.disturbanceHeight + disturbance.height);
+                    (motion.disturbanceHeight + staticGeometryHeight);
                 output.positionCS = TransformWorldToHClip(output.positionWS);
                 output.baseNormalWS = baseNormalWS;
                 output.tangentWS = tangentWS;
@@ -335,7 +355,7 @@ Shader "PS3D/Stylized River Water"
                 output.disturbanceData = float4(
                     disturbance.downstreamGradient,
                     disturbance.lateralGradient,
-                    disturbance.height,
+                    staticGeometryHeight,
                     disturbance.velocity);
                 return output;
             }
@@ -427,6 +447,27 @@ Shader "PS3D/Stylized River Water"
                         fragmentDisturbance.lateralGradient;
                     resolvedDisturbanceData.w =
                         fragmentDisturbance.velocity;
+
+                    RiverWaterStaticWakeLeeResult fragmentStaticWakeLee =
+                        RiverWaterEvaluateStaticWakeLee(
+                            TEXTURE2D_ARGS(
+                                _DisturbanceStaticWakeSource,
+                                sampler_DisturbanceStaticWakeSource),
+                            _DisturbanceEnabled,
+                            input.domainData.x,
+                            input.domainData.y,
+                            input.domainData.z,
+                            input.domainData.w,
+                            _DisturbanceGlobalStart,
+                            _DisturbanceFieldLength,
+                            _DisturbanceShoreInteraction,
+                            _FreezeAmount,
+                            _DisturbanceStaticWakeTexelSize.xy,
+                            1.0);
+                    resolvedDisturbanceData.x +=
+                        fragmentStaticWakeLee.downstreamGradient;
+                    resolvedDisturbanceData.y +=
+                        fragmentStaticWakeLee.lateralGradient;
                 }
 
                 RiverWaterWakeResult wake = RiverWaterEvaluateWake(
@@ -652,9 +693,7 @@ Shader "PS3D/Stylized River Water"
                     return half4(fieldUV.x, fieldUV.y, 0.0, 1.0);
                 }
 
-                if (disturbanceDebug == 6 ||
-                    disturbanceDebug == 7 ||
-                    disturbanceDebug == 8)
+                if (disturbanceDebug >= 6 && disturbanceDebug <= 12)
                 {
                     float2 fieldUV = float2(
                         saturate(
@@ -679,34 +718,77 @@ Shader "PS3D/Stylized River Water"
                         return half4(pressure.xxx, 1.0);
                     }
 
-                    if (disturbanceDebug == 7)
+                    if (disturbanceDebug == 8)
                     {
-                        float4 wakeSource = SAMPLE_TEXTURE2D(
-                            _DisturbanceStaticWakeSource,
-                            sampler_DisturbanceStaticWakeSource,
+                        float4 wakePrevious = SAMPLE_TEXTURE2D(
+                            _DisturbanceWakePrevious,
+                            sampler_DisturbanceWakePrevious,
                             fieldUV);
-                        return half4(
-                            saturate(wakeSource.r * 0.35),
-                            saturate(wakeSource.b),
-                            0.0,
-                            1.0);
+                        float4 wakeCurrent = SAMPLE_TEXTURE2D(
+                            _DisturbanceWakeCurrent,
+                            sampler_DisturbanceWakeCurrent,
+                            fieldUV);
+                        float4 wakeState = lerp(
+                            wakePrevious,
+                            wakeCurrent,
+                            saturate(_DisturbanceWakeInterpolation));
+                        float energy = saturate(wakeState.r * 0.30);
+                        float lateral =
+                            saturate(abs(wakeState.a) * 0.35);
+                        return half4(energy, lateral, 0.0, 1.0);
                     }
 
-                    float4 wakePrevious = SAMPLE_TEXTURE2D(
-                        _DisturbanceWakePrevious,
-                        sampler_DisturbanceWakePrevious,
+                    float4 wakeSource = SAMPLE_TEXTURE2D(
+                        _DisturbanceStaticWakeSource,
+                        sampler_DisturbanceStaticWakeSource,
                         fieldUV);
-                    float4 wakeCurrent = SAMPLE_TEXTURE2D(
-                        _DisturbanceWakeCurrent,
-                        sampler_DisturbanceWakeCurrent,
-                        fieldUV);
-                    float4 wakeState = lerp(
-                        wakePrevious,
-                        wakeCurrent,
-                        saturate(_DisturbanceWakeInterpolation));
-                    float energy = saturate(wakeState.r * 0.30);
-                    float lateral = saturate(abs(wakeState.a) * 0.35);
-                    return half4(energy, lateral, 0.0, 1.0);
+                    float release = saturate(wakeSource.r * 0.35);
+                    float leeDepth =
+                        RiverWaterResolveStaticWakeLeeDepth(wakeSource.g);
+                    float lee = saturate(leeDepth / 0.200);
+                    float reach = saturate(wakeSource.a);
+
+                    if (disturbanceDebug == 7)
+                    {
+                        // Static Wake Source channel contract:
+                        // R = rear-corner release energy,
+                        // G = attached lee magnitude,
+                        // B = initial spread metadata,
+                        // A = reach/persistence metadata.
+                        return half4(release, lee, reach, 1.0);
+                    }
+
+                    if (disturbanceDebug == 9)
+                    {
+                        return half4(release, 0.0, 0.0, 1.0);
+                    }
+
+                    if (disturbanceDebug == 10)
+                    {
+                        return half4(0.0, lee, 0.0, 1.0);
+                    }
+
+                    if (disturbanceDebug == 11)
+                    {
+                        return half4(0.0, 0.0, reach, 1.0);
+                    }
+
+                    if (disturbanceDebug == 12)
+                    {
+                        float4 staticPressure = SAMPLE_TEXTURE2D(
+                            _DisturbanceStaticTarget,
+                            sampler_DisturbanceStaticTarget,
+                            fieldUV);
+                        float composedStaticHeight =
+                            staticPressure.r - leeDepth;
+                        float staticHeightScale = max(
+                            0.200,
+                            _DisturbanceStaticMaximumHeight);
+                        float encodedStaticHeight = saturate(
+                            composedStaticHeight /
+                            (2.0 * staticHeightScale) + 0.5);
+                        return half4(encodedStaticHeight.xxx, 1.0);
+                    }
                 }
 
                 int refractionDebug =

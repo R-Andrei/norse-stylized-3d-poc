@@ -7678,14 +7678,14 @@ MonoBehaviour:
   runtimeDisturbances: 1
   disturbancePreset: 4
   disturbanceDebugView: 0
-  staticPressureStrength: 0.18
+  staticPressureStrength: 0.282
   staticPressureContactSharpness: 1.11
   staticPressureWaveResponse: 1.74
   staticPressureProfileChangeIntervalMin: 0.63
   staticPressureProfileChangeIntervalMax: 0.99
   obstructionWakeStrength: 1.5
-  obstructionWakeReach: 1
-  obstructionWakeSpread: 1
+  obstructionWakeReach: 0.74
+  obstructionWakeSpread: 0.904
   movingTrailStrength: 1.35
   movingTrailPersistence: 0.65
   movingTrailWidth: 1

@@ -23,6 +23,15 @@ struct RiverWaterWakeResult
     float2 fieldUV;
 };
 
+struct RiverWaterStaticWakeLeeResult
+{
+    float depth;
+    float downstreamGradient;
+    float lateralGradient;
+    float source;
+    float2 fieldUV;
+};
+
 float RiverWaterResolveDisturbanceBankMask(
     float lateralMetres,
     float visibleHalfWidth,
@@ -61,6 +70,108 @@ float2 RiverWaterResolveDisturbanceUV(
     return float2(
         saturate((globalDistance - globalStart) / fieldLength),
         saturate(signedAcross * 0.5 + 0.5));
+}
+
+float RiverWaterResolveStaticWakeLeeDepth(float leeSource)
+{
+    // Strength is already normalized into the source channel. Keep the
+    // production response linear and hard-bounded so ordinary values remain
+    // tunable while Strength 3 produces a clearly visible validation depth.
+    const float maximumLeeDepth = 0.200;
+    return maximumLeeDepth * saturate(leeSource);
+}
+
+RiverWaterStaticWakeLeeResult RiverWaterEvaluateStaticWakeLee(
+    TEXTURE2D_PARAM(staticWakeSource, staticWakeSourceSampler),
+    float enabled,
+    float globalDistance,
+    float lateralMetres,
+    float visibleHalfWidth,
+    float surfaceHalfWidth,
+    float globalStart,
+    float fieldLength,
+    float shoreInteraction,
+    float freezeAmount,
+    float2 sourceTexelSize,
+    float evaluateGradients)
+{
+    RiverWaterStaticWakeLeeResult result;
+    result.depth = 0.0;
+    result.downstreamGradient = 0.0;
+    result.lateralGradient = 0.0;
+    result.source = 0.0;
+    result.fieldUV = 0.0;
+
+    if (enabled < 0.5 || fieldLength <= 0.0001)
+    {
+        return result;
+    }
+
+    float2 uv = RiverWaterResolveDisturbanceUV(
+        globalDistance,
+        lateralMetres,
+        surfaceHalfWidth,
+        globalStart,
+        fieldLength);
+    float bankMask = RiverWaterResolveDisturbanceBankMask(
+        lateralMetres,
+        visibleHalfWidth,
+        surfaceHalfWidth,
+        shoreInteraction);
+    float mask = bankMask * (1.0 - saturate(freezeAmount));
+    float leeSource = SAMPLE_TEXTURE2D_LOD(
+        staticWakeSource,
+        staticWakeSourceSampler,
+        uv,
+        0.0).g;
+
+    result.source = saturate(leeSource);
+    result.depth =
+        RiverWaterResolveStaticWakeLeeDepth(leeSource) * mask;
+    result.fieldUV = uv;
+
+    [branch]
+    if (evaluateGradients > 0.5)
+    {
+        float2 texelSize = max(
+            sourceTexelSize,
+            float2(0.000001, 0.000001));
+        float2 downstreamUV = saturate(
+            uv + float2(texelSize.x, 0.0));
+        float2 lateralUV = saturate(
+            uv + float2(0.0, texelSize.y));
+        float downstreamSource = SAMPLE_TEXTURE2D_LOD(
+            staticWakeSource,
+            staticWakeSourceSampler,
+            downstreamUV,
+            0.0).g;
+        float lateralSource = SAMPLE_TEXTURE2D_LOD(
+            staticWakeSource,
+            staticWakeSourceSampler,
+            lateralUV,
+            0.0).g;
+        float downstreamDepth =
+            RiverWaterResolveStaticWakeLeeDepth(downstreamSource) * mask;
+        float lateralDepth =
+            RiverWaterResolveStaticWakeLeeDepth(lateralSource) * mask;
+        float downstreamCellMetres = max(
+            0.001,
+            fieldLength * texelSize.x);
+        float lateralCellMetres = max(
+            0.001,
+            2.0 * surfaceHalfWidth * texelSize.y);
+
+        // Lee depth is subtracted from surface height, so its physical
+        // height gradients have the opposite sign of the stored depth.
+        result.downstreamGradient = -
+            (downstreamDepth - result.depth) /
+            downstreamCellMetres;
+        result.lateralGradient = -
+            (lateralDepth - result.depth) /
+            lateralCellMetres;
+    }
+
+    return result;
 }
 
 void RiverWaterDecodeStaticDynamics(

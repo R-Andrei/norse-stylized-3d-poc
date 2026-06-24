@@ -97,7 +97,11 @@ namespace ProgrammaticStylized3D.Rivers
         FieldCoordinates = 5,
         StaticPressureTarget = 6,
         StaticWakeSource = 7,
-        WakeEnergy = 8
+        WakeEnergy = 8,
+        StaticWakeRelease = 9,
+        StaticWakeLee = 10,
+        StaticWakeReach = 11,
+        StaticPressureAndLee = 12
     }
 
     public enum StylizedRiverIceBodyPreset

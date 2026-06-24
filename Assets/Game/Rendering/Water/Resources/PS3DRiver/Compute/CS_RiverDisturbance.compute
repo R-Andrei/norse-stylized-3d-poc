@@ -573,28 +573,151 @@ float EvaluateHeightAwareStaticPressure(
     return resultHeight;
 }
 
-float EvaluateStaticWakeSource(float2 relativePosition, float2 halfSize)
+struct StaticWakeSourceSample
 {
-    BoundaryInfo boundary = EvaluateStaticBoundary(relativePosition, halfSize);
+    float release;
+    float lee;
+};
+
+StaticWakeSourceSample EvaluateStaticWakeSource(
+    float2 relativePosition,
+    float2 halfSize)
+{
+    StaticWakeSourceSample result;
+    result.release = 0.0;
+    result.lee = 0.0;
+
+    ContourRowResult row = ResolveContourRow(relativePosition.y);
+    if (row.valid < 0.5)
+    {
+        if (_StaticContourCount >= 3 ||
+            abs(relativePosition.y) > halfSize.y)
+        {
+            return result;
+        }
+
+        row.upstreamX = -halfSize.x;
+        row.downstreamX = halfSize.x;
+        row.valid = 1.0;
+    }
+
+    float downstreamDistance =
+        relativePosition.x - row.downstreamX;
+    float outsideDownstream = step(0.0, downstreamDistance);
     float spread = clamp(_StaticWakeSpread, 0.5, 2.0);
-    float minimumHalf = min(halfSize.x, halfSize.y);
-    float bandWidth = max(0.70, minimumHalf * 0.10) *
-                      lerp(0.80, 1.35, saturate((spread - 0.5) / 1.5));
-    float outsideMask = step(0.0, boundary.signedDistance);
-    float downstreamFacing = saturate(boundary.outwardNormal.x * 1.60);
-    float side01 = abs(relativePosition.y) /
-                   max(1.0, halfSize.y * spread);
-    float sideOutlet = smoothstep(0.30, 0.78, side01);
-    float outletBand = Gaussian1D(
-        boundary.signedDistance,
-        bandWidth * 0.62,
-        bandWidth * 0.46);
-    float downstreamGate = smoothstep(
-        halfSize.x * 0.45,
-        halfSize.x * 1.05,
+    float spread01 = saturate((spread - 0.5) / 1.5);
+    float lateral01 = abs(relativePosition.y) /
+                      max(1.0, halfSize.y);
+
+    // Extrude the sheltered lee from the actual rear silhouette one row at
+    // a time. Neighbour rows smooth only slightly into the object, so the
+    // source remains attached without flattening angled or irregular rears
+    // into a flow-perpendicular rectangle.
+    const float rearRowOffset = 0.75;
+    ContourRowResult lowerRear = ResolveContourRow(
+        relativePosition.y - rearRowOffset);
+    ContourRowResult upperRear = ResolveContourRow(
+        relativePosition.y + rearRowOffset);
+
+    float weightedRear = row.downstreamX * 4.0;
+    float rearWeight = 4.0;
+    if (lowerRear.valid >= 0.5)
+    {
+        weightedRear += lowerRear.downstreamX;
+        rearWeight += 1.0;
+    }
+    if (upperRear.valid >= 0.5)
+    {
+        weightedRear += upperRear.downstreamX;
+        rearWeight += 1.0;
+    }
+
+    float averagedRear = weightedRear / rearWeight;
+    float smoothedRear = max(
+        row.downstreamX - 0.35,
+        min(row.downstreamX, averagedRear));
+    const float hiddenRearOverlap = 0.45;
+    float leeAttachmentStart = smoothedRear - hiddenRearOverlap;
+    float leeAttachment = smoothstep(
+        leeAttachmentStart,
+        row.downstreamX + 0.15,
         relativePosition.x);
-    return outletBand * downstreamFacing * sideOutlet *
-           outsideMask * downstreamGate;
+
+    float rearSlope = 0.0;
+    if (lowerRear.valid >= 0.5 && upperRear.valid >= 0.5)
+    {
+        rearSlope =
+            (upperRear.downstreamX - lowerRear.downstreamX) /
+            (rearRowOffset * 2.0);
+    }
+    else if (upperRear.valid >= 0.5)
+    {
+        rearSlope =
+            (upperRear.downstreamX - row.downstreamX) /
+            rearRowOffset;
+    }
+    else if (lowerRear.valid >= 0.5)
+    {
+        rearSlope =
+            (row.downstreamX - lowerRear.downstreamX) /
+            rearRowOffset;
+    }
+
+    float rearFacing = rsqrt(1.0 + rearSlope * rearSlope);
+    float rearFacingMask = smoothstep(0.30, 0.80, rearFacing);
+    float rowThickness = max(
+        0.0,
+        row.downstreamX - row.upstreamX);
+    float thicknessSupport = smoothstep(0.50, 1.25, rowThickness);
+    float leeLength = clamp(
+        rowThickness * lerp(0.22, 0.38, spread01),
+        1.25,
+        4.50);
+    float leeHalfWidth = max(
+        1.0,
+        halfSize.y * lerp(0.50, 0.72, spread01));
+    float leeLateral = 1.0 - smoothstep(
+        leeHalfWidth * 0.68,
+        leeHalfWidth,
+        abs(relativePosition.y));
+    float leeLongitudinal = 1.0 - smoothstep(
+        0.0,
+        leeLength,
+        max(0.0, downstreamDistance));
+    result.lee = leeAttachment *
+                 saturate(leeLateral) *
+                 saturate(leeLongitudinal) *
+                 rearFacingMask *
+                 thicknessSupport;
+
+    // Positive wake energy is released near the two rear corners rather
+    // than around the complete contour. Narrow sources naturally merge
+    // the two smooth lobes at field resolution.
+    BoundaryInfo boundary = EvaluateStaticBoundary(
+        relativePosition,
+        halfSize);
+    float downstreamFacing = smoothstep(
+        0.05,
+        0.70,
+        boundary.outwardNormal.x);
+    float releaseCentre = lerp(0.58, 0.72, spread01);
+    float releaseWidth = lerp(0.18, 0.28, spread01);
+    float sideRelease = Gaussian1D(
+        lateral01,
+        releaseCentre,
+        releaseWidth);
+    float minimumHalf = min(halfSize.x, halfSize.y);
+    float releaseBandWidth = max(0.75, minimumHalf * 0.10) *
+                             lerp(0.85, 1.25, spread01);
+    float releaseBand = Gaussian1D(
+        downstreamDistance,
+        releaseBandWidth * 0.48,
+        releaseBandWidth * 0.42);
+    result.release = outsideDownstream *
+                     downstreamFacing *
+                     sideRelease *
+                     releaseBand;
+    return result;
 }
 
 float4 LoadState(int2 pixel)
@@ -760,23 +883,29 @@ void BakeStaticWakeSource(uint3 dispatchId : SV_DispatchThreadID)
 
     float2 relativePosition = float2(pixel) + 0.5 - _StaticCentre;
     float2 halfSize = max(_StaticHalfSizePixels, float2(1.0, 1.0));
-    float source = EvaluateStaticWakeSource(relativePosition, halfSize) *
-                   _StaticWakeSourceStrength;
+    StaticWakeSourceSample sourceSample = EvaluateStaticWakeSource(
+        relativePosition,
+        halfSize);
+    float release = sourceSample.release * _StaticWakeSourceStrength;
+    float lee = sourceSample.lee *
+                saturate(_StaticWakeSourceStrength / 3.0);
 
-    if (source < 0.0001)
+    if (release < 0.0001 && lee < 0.0001)
     {
         return;
     }
 
     float4 existing = _StaticWakeSourceWrite[pixel];
-    if (source >= existing.r)
+    // Spread and persistence belong to transported release energy only.
+    // Lee-only pixels must not seed persistence into the wake solver.
+    if (release >= existing.r && release >= 0.0001)
     {
-        existing.g = frac(_StaticPhase);
         existing.b = saturate((_StaticWakeSpread - 0.5) / 1.5);
         existing.a = saturate(_StaticWakePersistence / 3.0);
     }
 
-    existing.r = clamp(existing.r + source, 0.0, 4.0);
+    existing.r = clamp(existing.r + release, 0.0, 4.0);
+    existing.g = max(existing.g, saturate(lee));
     _StaticWakeSourceWrite[pixel] = existing;
 }
 
@@ -1044,16 +1173,8 @@ void SimulateWake(uint3 dispatchId : SV_DispatchThreadID)
     float4 source = _StaticWakeSourceRead.Load(int3(
         clamp(int2(x, y), int2(0, 0), _WakeFieldSize - 1),
         0));
-    float sourcePhase = source.g * PS3D_TWO_PI;
-    float pulse = saturate(
-        0.84 +
-        0.10 * sin(_WakeTime * 0.88 * PS3D_TWO_PI + sourcePhase) +
-        0.04 * sin(
-            _WakeTime * 1.47 * PS3D_TWO_PI +
-            sourcePhase * 1.73));
     energy +=
         source.r *
-        pulse *
         _WakeSourceRate *
         _WakeFlowFactor *
         _WakeDeltaTime;

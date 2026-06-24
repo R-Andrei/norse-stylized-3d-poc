@@ -847,7 +847,14 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         debugViewProperty,
                         new GUIContent(
                             "Disturbance Debug View",
-                            "Displays the existing Stage 5 disturbance debug modes without changing simulation settings."));
+                            "Displays Stage 5 disturbance fields and composed geometry without changing simulation settings."));
+
+                    if (!debugViewProperty.hasMultipleDifferentValues)
+                    {
+                        DrawDisturbanceDebugLegend(
+                            (StylizedRiverDisturbanceDebugView)
+                            debugViewProperty.enumValueIndex);
+                    }
                 }
             }
 
@@ -920,6 +927,32 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 }
             }
             EditorGUILayout.EndHorizontal();
+        }
+
+        private static void DrawDisturbanceDebugLegend(
+            StylizedRiverDisturbanceDebugView debugView)
+        {
+            string description = debugView switch
+            {
+                StylizedRiverDisturbanceDebugView.StaticWakeSource =>
+                    "Static Wake composite: red is rear-release energy, green is the attached lee mask, and blue is reach/persistence metadata.",
+                StylizedRiverDisturbanceDebugView.StaticWakeRelease =>
+                    "Static Wake release only: red identifies the positive rear-corner energy injected into the persistent wake field.",
+                StylizedRiverDisturbanceDebugView.StaticWakeLee =>
+                    "Static Wake lee only: green identifies the attached sheltered region. Its intensity uses the same bounded mapping as the visible depression.",
+                StylizedRiverDisturbanceDebugView.StaticWakeReach =>
+                    "Static Wake reach only: blue identifies source pixels carrying reach/persistence metadata into the persistent wake field.",
+                StylizedRiverDisturbanceDebugView.StaticPressureAndLee =>
+                    "Composed static geometry height: mid-gray is zero, white is positive Static Pressure, and black is the negative attached lee.",
+                StylizedRiverDisturbanceDebugView.WakeEnergy =>
+                    "Persistent Wake Energy: red is transported energy and green is lateral-gradient magnitude.",
+                _ => string.Empty
+            };
+
+            if (!string.IsNullOrEmpty(description))
+            {
+                EditorGUILayout.HelpBox(description, MessageType.None);
+            }
         }
 
         private void DrawWaterBody()
