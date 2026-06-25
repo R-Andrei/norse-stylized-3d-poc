@@ -27,6 +27,10 @@ namespace ProgrammaticStylized3D.Geometry
         Custom
     }
 
+    // These settings author one stationary source. The detecting river owns
+    // the canonical Pressure and Wake response rules shared with dynamic
+    // emitters; this object may inherit, disable, or override only its source
+    // contribution. Legacy field/property names remain for serialization.
     [Serializable]
     public sealed class GeneratedRiverInteractionSettings
     {
@@ -39,8 +43,8 @@ namespace ProgrammaticStylized3D.Geometry
         private GeneratedRiverInteractionParticipation participation =
             GeneratedRiverInteractionParticipation.Automatic;
 
-        [Header("Static Pressure")]
-        [Tooltip("Inherit uses the detected river's Static Pressure defaults. Disabled removes only the pressure ridge. Custom uses the values below.")]
+        [Header("Pressure")]
+        [Tooltip("Inherit uses the detected river's shared Pressure defaults. Disabled removes only this stationary source's pressure ridge. Custom uses the values below.")]
         [SerializeField]
         private GeneratedRiverFeatureMode staticPressureMode =
             GeneratedRiverFeatureMode.Inherit;
@@ -72,23 +76,23 @@ namespace ProgrammaticStylized3D.Geometry
         private float staticPressureProfileChangeIntervalMax =
             DefaultProfileChangeIntervalMax;
 
-        [Header("Obstruction Wake")]
-        [Tooltip("Inherit uses the detected river's Obstruction Wake defaults. Disabled removes only the downstream obstruction wake. Custom uses the values below.")]
+        [Header("Wake")]
+        [Tooltip("Inherit uses the detected river's shared Wake defaults. Disabled removes only this stationary source's lee and wake releases. Custom uses the values below.")]
         [SerializeField]
         private GeneratedRiverFeatureMode obstructionWakeMode =
             GeneratedRiverFeatureMode.Inherit;
 
-        [Tooltip("For Custom, controls obstruction-wake energy injected downstream.")]
+        [Tooltip("For Custom, controls wake energy injected by this stationary source.")]
         [Range(0f, 3f)]
         [SerializeField]
         private float obstructionWakeStrength = 1.50f;
 
-        [Tooltip("For Custom, controls how far the obstruction wake remains active downstream.")]
+        [Tooltip("For Custom, controls how far this source's wake remains active downstream.")]
         [Range(0.25f, 3f)]
         [SerializeField]
         private float obstructionWakeReach = 1f;
 
-        [Tooltip("For Custom, controls the lateral width of the obstruction wake around the object outlets.")]
+        [Tooltip("For Custom, controls the attached lee and rear-release width around this stationary source.")]
         [Range(0.5f, 2f)]
         [SerializeField]
         private float obstructionWakeSpread = 1f;
@@ -115,24 +119,50 @@ namespace ProgrammaticStylized3D.Geometry
 
         public GeneratedRiverInteractionParticipation Participation =>
             participation;
-        public GeneratedRiverFeatureMode StaticPressureMode =>
+
+        public GeneratedRiverFeatureMode PressureMode =>
             staticPressureMode;
-        public float StaticPressureStrength =>
+        public float PressureStrength =>
             Mathf.Clamp01(staticPressureStrength);
-        public float StaticPressureContactSharpness =>
+        public float PressureContactSharpness =>
             Mathf.Clamp(staticPressureContactSharpness, 0.5f, 4f);
-        public float StaticPressureProfileVariation =>
+        public float PressureProfileVariation =>
             Mathf.Clamp(staticPressureWaveResponse, 0f, 2f);
-        public float StaticPressureProfileChangeIntervalMin =>
+        public float PressureProfileChangeIntervalMin =>
             Mathf.Clamp(
                 staticPressureProfileChangeIntervalMin,
                 MinimumProfileChangeInterval,
                 MaximumProfileChangeInterval);
-        public float StaticPressureProfileChangeIntervalMax =>
+        public float PressureProfileChangeIntervalMax =>
             Mathf.Clamp(
                 staticPressureProfileChangeIntervalMax,
                 MinimumProfileChangeInterval,
                 MaximumProfileChangeInterval);
+
+        public GeneratedRiverFeatureMode WakeMode =>
+            obstructionWakeMode;
+        public float WakeStrength =>
+            Mathf.Clamp(obstructionWakeStrength, 0f, 3f);
+        public float WakeReach =>
+            Mathf.Clamp(obstructionWakeReach, 0.25f, 3f);
+        public float WakeSpread =>
+            Mathf.Clamp(obstructionWakeSpread, 0.5f, 2f);
+        public float WakeVariation =>
+            Mathf.Clamp01(obstructionWakeVariation);
+
+        // Compatibility aliases for the existing stationary-source contract.
+        public GeneratedRiverFeatureMode StaticPressureMode =>
+            PressureMode;
+        public float StaticPressureStrength =>
+            PressureStrength;
+        public float StaticPressureContactSharpness =>
+            PressureContactSharpness;
+        public float StaticPressureProfileVariation =>
+            PressureProfileVariation;
+        public float StaticPressureProfileChangeIntervalMin =>
+            PressureProfileChangeIntervalMin;
+        public float StaticPressureProfileChangeIntervalMax =>
+            PressureProfileChangeIntervalMax;
 
         // Compatibility alias for integrations compiled against the previous
         // wave-triggered profile implementation.
@@ -140,15 +170,15 @@ namespace ProgrammaticStylized3D.Geometry
             StaticPressureProfileVariation;
 
         public GeneratedRiverFeatureMode ObstructionWakeMode =>
-            obstructionWakeMode;
+            WakeMode;
         public float ObstructionWakeStrength =>
-            Mathf.Clamp(obstructionWakeStrength, 0f, 3f);
+            WakeStrength;
         public float ObstructionWakeReach =>
-            Mathf.Clamp(obstructionWakeReach, 0.25f, 3f);
+            WakeReach;
         public float ObstructionWakeSpread =>
-            Mathf.Clamp(obstructionWakeSpread, 0.5f, 2f);
+            WakeSpread;
         public float ObstructionWakeVariation =>
-            Mathf.Clamp01(obstructionWakeVariation);
+            WakeVariation;
 
         // Compatibility surface for code compiled against the former profile.
         public GeneratedRiverResponseProfile ResponseProfile =>

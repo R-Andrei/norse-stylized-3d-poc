@@ -197,6 +197,9 @@ namespace ProgrammaticStylized3D.Rivers
                         normalContribution);
                 }
 
+                // The emitter submits only source-local movement, footprint,
+                // and influence. The detecting river applies the canonical
+                // Wake settings shared with stationary geometry.
                 currentRuntime.UpdateContinuousSource(
                     SourceId,
                     previousSamplePosition,

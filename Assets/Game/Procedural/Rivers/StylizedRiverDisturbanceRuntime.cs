@@ -1923,39 +1923,39 @@ namespace ProgrammaticStylized3D.Rivers
             float pressureStrength =
                 pressureMode == GeneratedRiverFeatureMode.Custom
                     ? settings.StaticPressureStrength
-                    : river.StaticPressureStrength;
+                    : river.PressureStrength;
             float contactSharpness =
                 pressureMode == GeneratedRiverFeatureMode.Custom
                     ? settings.StaticPressureContactSharpness
-                    : river.StaticPressureContactSharpness;
+                    : river.PressureContactSharpness;
             float profileVariation =
                 pressureMode == GeneratedRiverFeatureMode.Custom
                     ? settings.StaticPressureProfileVariation
-                    : river.StaticPressureProfileVariation;
+                    : river.PressureProfileVariation;
             float profileChangeIntervalMin =
                 pressureMode == GeneratedRiverFeatureMode.Custom
                     ? settings.StaticPressureProfileChangeIntervalMin
-                    : river.StaticPressureProfileChangeIntervalMin;
+                    : river.PressureProfileChangeIntervalMin;
             float profileChangeIntervalMax =
                 pressureMode == GeneratedRiverFeatureMode.Custom
                     ? settings.StaticPressureProfileChangeIntervalMax
-                    : river.StaticPressureProfileChangeIntervalMax;
+                    : river.PressureProfileChangeIntervalMax;
             float wakeStrength =
                 wakeMode == GeneratedRiverFeatureMode.Custom
                     ? settings.ObstructionWakeStrength
-                    : river.ObstructionWakeStrength;
+                    : river.WakeStrength;
             float wakeReach =
                 wakeMode == GeneratedRiverFeatureMode.Custom
                     ? settings.ObstructionWakeReach
-                    : river.ObstructionWakeReach;
+                    : river.WakeReach;
             float wakeSpread =
                 wakeMode == GeneratedRiverFeatureMode.Custom
                     ? settings.ObstructionWakeSpread
-                    : river.ObstructionWakeSpread;
+                    : river.WakeSpread;
             float wakeVariation =
                 wakeMode == GeneratedRiverFeatureMode.Custom
                     ? settings.ObstructionWakeVariation
-                    : river.ObstructionWakeVariation;
+                    : river.WakeVariation;
 
             return new ResolvedGeneratedRiverInteraction(
                 pressureEnabled,
@@ -2212,8 +2212,8 @@ namespace ProgrammaticStylized3D.Rivers
                     interaction.StaticPressureProfileChangeIntervalMin,
                     interaction.StaticPressureProfileChangeIntervalMax,
                     interaction.ObstructionWakeVariation,
-                    river.ObstructionWakeVariationIntervalMin,
-                    river.ObstructionWakeVariationIntervalMax))
+                    river.WakeVariationIntervalMin,
+                    river.WakeVariationIntervalMax))
             {
                 return;
             }
@@ -2649,9 +2649,12 @@ namespace ProgrammaticStylized3D.Rivers
                     0.45f,
                     1.55f,
                     Mathf.InverseLerp(0f, 3f, source.MovementSpeed));
+                // Source-local strength is multiplied by the river's
+                // canonical Wake Strength; there is no separate dynamic-wake
+                // visual rule or source-specific response afterward.
                 float wakeStrength =
                     source.Strength *
-                    river.MovingTrailStrength *
+                    river.WakeStrength *
                     Mathf.Clamp01(source.NormalContribution) *
                     flowInfluence *
                     Mathf.Lerp(0.65f, movementInfluence, movementBlend);
@@ -2660,10 +2663,13 @@ namespace ProgrammaticStylized3D.Rivers
                     (source.StartDistance + source.EndDistance) * 0.5f;
                 float segmentHalfLength = Mathf.Abs(
                     source.EndDistance - source.StartDistance) * 0.5f;
+                // Dynamic emitters prepare a swept source footprint, while
+                // stationary geometry prepares cached contour releases. Both
+                // then consume the same canonical Wake response settings.
                 float wakeReach = ResolveObstructionWakeLength(
                     source.AcrossHalfWidth,
                     source.AlongHalfLength,
-                    absoluteFlowSpeed);
+                    absoluteFlowSpeed) * river.WakeReach;
                 MarkWakeActive(
                     segmentCentre + wakeReach * 0.5f,
                     segmentHalfLength + wakeReach * 0.5f +
@@ -2798,7 +2804,7 @@ namespace ProgrammaticStylized3D.Rivers
                 deltaTime /
                 Mathf.Max(0.001f, cellSizeX);
             const float decayPerSecond = 1.15f;
-            float lateralSpread = river.ObstructionWakeWidening;
+            float lateralSpread = river.WakeWidening;
             float flowFactor = Mathf.SmoothStep(
                 0f,
                 1f,
@@ -2961,7 +2967,7 @@ namespace ProgrammaticStylized3D.Rivers
             float alongPixels =
                 source.AlongHalfLength / Mathf.Max(0.001f, cellSizeX);
             float acrossPixels =
-                source.AcrossHalfWidth * river.MovingTrailWidth /
+                source.AcrossHalfWidth * river.WakeSpread /
                 Mathf.Max(0.001f, cellSizeY);
             int minX = Mathf.Clamp(
                 Mathf.FloorToInt(
@@ -3017,7 +3023,7 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.Clamp01(movementBlend));
             computeShader.SetFloat(
                 "_WakeInjectPersistence",
-                Mathf.Lerp(0.25f, 3f, river.MovingTrailPersistence));
+                river.WakeReach);
             computeShader.SetFloat(
                 "_WakeInjectDeltaTime",
                 Mathf.Max(0.0001f, simulationDeltaTime));
@@ -3645,7 +3651,7 @@ namespace ProgrammaticStylized3D.Rivers
             double activeDuration = Mathf.Lerp(
                 2.0f,
                 10.0f,
-                river.MovingTrailPersistence);
+                Mathf.InverseLerp(0.25f, 3f, river.WakeReach));
 
             for (int chunk = centreChunk - radiusChunks;
                  chunk <= centreChunk + radiusChunks;
@@ -5434,10 +5440,10 @@ namespace ProgrammaticStylized3D.Rivers
                 MaximumStaticPressureHeightMetres);
             propertyBlock.SetFloat(
                 DisturbanceWakeGeometryHeightId,
-                river.ObstructionWakeSurfaceHeight);
+                river.WakeSurfaceHeight);
             propertyBlock.SetFloat(
                 DisturbanceWakeGeometryCompactnessId,
-                river.ObstructionWakeSurfaceCompactness);
+                river.WakeSurfaceCompactness);
             propertyBlock.SetFloat(
                 DisturbanceDebugViewId,
                 (float)river.DisturbanceDebugView);

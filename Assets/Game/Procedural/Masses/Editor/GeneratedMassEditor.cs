@@ -166,7 +166,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         {
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
-                "Static Pressure",
+                "Pressure",
                 EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(
                 staticPressureMode,
@@ -207,7 +207,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             else if (mode == GeneratedRiverFeatureMode.Inherit)
             {
                 EditorGUILayout.HelpBox(
-                    "Uses the detected river's Static Pressure defaults.",
+                    "Uses the detected river's shared Pressure defaults.",
                     MessageType.None);
             }
         }
@@ -216,7 +216,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         {
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
-                "Obstruction Wake",
+                "Wake",
                 EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(
                 obstructionWakeMode,
@@ -250,7 +250,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             else if (mode == GeneratedRiverFeatureMode.Inherit)
             {
                 EditorGUILayout.HelpBox(
-                    "Uses the detected river's Obstruction Wake defaults.",
+                    "Uses the detected river's shared Wake defaults.",
                     MessageType.None);
             }
         }
@@ -318,7 +318,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "Wave Allowance",
                     diagnostics.WaveAllowance);
                 EditorGUILayout.Toggle(
-                    "Static Pressure Enabled",
+                    "Pressure Enabled",
                     diagnostics.StaticPressureEnabled);
                 if (diagnostics.StaticPressureEnabled)
                 {
@@ -353,7 +353,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 }
 
                 EditorGUILayout.Toggle(
-                    "Obstruction Wake Enabled",
+                    "Wake Enabled",
                     diagnostics.ObstructionWakeEnabled);
                 if (diagnostics.ObstructionWakeEnabled)
                 {
@@ -556,7 +556,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     panelRect.y + 8f,
                     panelRect.width - 20f,
                     20f),
-                "Static Pressure Profile Diagnostics",
+                "Pressure Profile Diagnostics",
                 EditorStyles.boldLabel);
             GUI.Label(
                 new Rect(

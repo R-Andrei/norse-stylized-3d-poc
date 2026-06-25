@@ -38,7 +38,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawStatus();
             DrawButtons();
         }
-        
+
 
         private SerializedProperty Find(string propertyName)
         {
@@ -504,7 +504,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Runtime Disturbance and Interaction",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 5 keeps static pressure, obstruction wakes, moving trails, and impact ripples as separate feature controls. The shared runtime remains fixed-cost and sleeps when inactive.",
+                "Stage 5 exposes one shared Pressure response and one shared Wake response. Stationary geometry and dynamic emitters prepare different source data, but consume the same river-level visual rules. Impact Ripples remain a separate event system.",
                 MessageType.Info);
 
             SerializedProperty enabledProperty = Find("runtimeDisturbances");
@@ -537,12 +537,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("obstructionWakeSurfaceHeight");
             SerializedProperty obstructionWakeSurfaceCompactnessProperty =
                 Find("obstructionWakeSurfaceCompactness");
-            SerializedProperty movingTrailStrengthProperty =
-                Find("movingTrailStrength");
-            SerializedProperty movingTrailPersistenceProperty =
-                Find("movingTrailPersistence");
-            SerializedProperty movingTrailWidthProperty =
-                Find("movingTrailWidth");
             SerializedProperty impactRippleStrengthProperty =
                 Find("impactRippleStrength");
             SerializedProperty impactRipplePropagationProperty =
@@ -647,24 +641,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     ? ", obstructionWakeSurfaceCompactness"
                     : "obstructionWakeSurfaceCompactness";
             }
-            if (movingTrailStrengthProperty == null)
-            {
-                missingProperties += missingProperties.Length > 0
-                    ? ", movingTrailStrength"
-                    : "movingTrailStrength";
-            }
-            if (movingTrailPersistenceProperty == null)
-            {
-                missingProperties += missingProperties.Length > 0
-                    ? ", movingTrailPersistence"
-                    : "movingTrailPersistence";
-            }
-            if (movingTrailWidthProperty == null)
-            {
-                missingProperties += missingProperties.Length > 0
-                    ? ", movingTrailWidth"
-                    : "movingTrailWidth";
-            }
             if (impactRippleStrengthProperty == null)
             {
                 missingProperties += missingProperties.Length > 0
@@ -749,7 +725,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 EditorGUILayout.Space(4f);
                 EditorGUILayout.LabelField(
-                    "Static Pressure",
+                    "Pressure",
                     EditorStyles.miniBoldLabel);
                 if (staticPressureStrengthProperty != null)
                 {
@@ -794,7 +770,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 EditorGUILayout.Space(4f);
                 EditorGUILayout.LabelField(
-                    "Obstruction Wake",
+                    "Wake",
                     EditorStyles.miniBoldLabel);
                 if (obstructionWakeStrengthProperty != null)
                 {
@@ -802,7 +778,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         obstructionWakeStrengthProperty,
                         new GUIContent(
                             "Strength",
-                            "Energy generated downstream of stationary obstructions."));
+                            "Shared wake-energy response. Stationary geometry and dynamic emitters prepare different sources but use the same river-level Strength."));
                 }
                 if (obstructionWakeReachProperty != null)
                 {
@@ -810,7 +786,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         obstructionWakeReachProperty,
                         new GUIContent(
                             "Reach",
-                            "How far the obstruction wake remains visible downstream."));
+                            "Shared downstream persistence and active range for stationary and dynamic wake sources."));
                 }
                 if (obstructionWakeSpreadProperty != null)
                 {
@@ -818,7 +794,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         obstructionWakeSpreadProperty,
                         new GUIContent(
                             "Spread",
-                            "Initial width and spacing of the attached lee and rear-release regions."));
+                            "Shared source-width response. For stationary geometry this shapes the lee and rear releases; dynamic emitters apply it to their swept wake footprint."));
                 }
                 if (obstructionWakeVariationProperty != null)
                 {
@@ -826,7 +802,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         obstructionWakeVariationProperty,
                         new GUIContent(
                             "Variation",
-                            "Amount of spatial lee-profile variation and independent left/right release trajectory variation applied to each stationary obstruction. Zero keeps the source stable."));
+                            "Shared wake-variation envelope. Stationary sources use spatial lee/release profiles; dynamic sources derive most variation from movement and will consume the same envelope when their full source model is implemented."));
                 }
                 if (obstructionWakeVariationIntervalMinProperty != null)
                 {
@@ -850,7 +826,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         obstructionWakeWideningProperty,
                         new GUIContent(
                             "Widening",
-                            "How quickly the shared transported wake field spreads laterally downstream. It is river-level rather than per obstruction and also affects provisional moving trails."));
+                            "How quickly the shared transported wake field spreads laterally downstream for both stationary and dynamic sources."));
                 }
                 if (obstructionWakeSurfaceHeightProperty != null)
                 {
@@ -867,35 +843,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         new GUIContent(
                             "Wake Surface Compactness",
                             "Controls how much of the broad transported energy field becomes visible geometry. Lower values produce a broader and stronger surface response; higher values restrict height to the strongest wake core without changing transport, normals, turbulence, or future foam data."));
-                }
-
-                EditorGUILayout.Space(4f);
-                EditorGUILayout.LabelField(
-                    "Moving Trail",
-                    EditorStyles.miniBoldLabel);
-                if (movingTrailStrengthProperty != null)
-                {
-                    EditorGUILayout.PropertyField(
-                        movingTrailStrengthProperty,
-                        new GUIContent(
-                            "Strength",
-                            "Energy contributed by moving dynamic emitters."));
-                }
-                if (movingTrailPersistenceProperty != null)
-                {
-                    EditorGUILayout.PropertyField(
-                        movingTrailPersistenceProperty,
-                        new GUIContent(
-                            "Persistence",
-                            "How long moving trails remain after the emitter passes."));
-                }
-                if (movingTrailWidthProperty != null)
-                {
-                    EditorGUILayout.PropertyField(
-                        movingTrailWidthProperty,
-                        new GUIContent(
-                            "Width",
-                            "Lateral width of trails produced by moving emitters."));
                 }
 
                 EditorGUILayout.Space(4f);
