@@ -345,6 +345,10 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_DisturbanceMaximumHeight");
         private static readonly int DisturbanceStaticMaximumHeightId =
             Shader.PropertyToID("_DisturbanceStaticMaximumHeight");
+        private static readonly int DisturbanceWakeGeometryHeightId =
+            Shader.PropertyToID("_DisturbanceWakeGeometryHeight");
+        private static readonly int DisturbanceWakeGeometryCompactnessId =
+            Shader.PropertyToID("_DisturbanceWakeGeometryCompactness");
         private static readonly int DisturbanceDebugViewId =
             Shader.PropertyToID("_DisturbanceDebugView");
         private static readonly int DisturbanceFragmentDetailId =
@@ -423,6 +427,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool resourcesDirty = true;
         private bool staticPressureTargetDirty = true;
         private bool staticWakeSourceDirty = true;
+        private int staticWakeSourceRebuildCount;
         private int validStaticSourceCount;
         private bool generatedGeometryRegistryDirty = true;
         private bool generatedGeometryRefreshInProgress;
@@ -443,8 +448,19 @@ namespace ProgrammaticStylized3D.Rivers
         public int FieldHeight => fieldHeight;
         public int ChunkCount => chunkCount;
         public int ActiveChunkCount => CountActiveChunks();
+        public int WakeFieldWidth => wakeFieldWidth;
+        public int WakeFieldHeight => wakeFieldHeight;
+        public int ActiveWakeChunkCount => CountActiveWakeChunks();
+        public int StaticHeldWakeChunkCount => CountStaticHeldWakeChunks();
+        public int TemporarilyRetainedWakeChunkCount =>
+            CountTemporarilyRetainedWakeChunks();
+        public double MaximumRemainingWakeRetentionSeconds =>
+            ResolveMaximumRemainingWakeRetentionSeconds();
+        public int StaticWakeSourceRebuildCount =>
+            staticWakeSourceRebuildCount;
         public int ContinuousSourceCount => continuousSources.Count;
         public float SimulationRate => ResolveSimulationRate();
+        public float WakeSimulationRate => ResolveSimulationRate();
         public long EstimatedMemoryBytes =>
             (long)fieldWidth * fieldHeight * 8L * 3L +
             (long)wakeFieldWidth * wakeFieldHeight * 8L * 3L;
@@ -2535,7 +2551,7 @@ namespace ProgrammaticStylized3D.Rivers
                 deltaTime /
                 Mathf.Max(0.001f, cellSizeX);
             const float decayPerSecond = 1.15f;
-            const float lateralSpread = 0.65f;
+            float lateralSpread = river.ObstructionWakeWidening;
             float flowFactor = Mathf.SmoothStep(
                 0f,
                 1f,
@@ -2927,6 +2943,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             staticWakeSourceDirty = false;
+            staticWakeSourceRebuildCount++;
             lastActivityTime = now;
         }
 
@@ -4232,6 +4249,78 @@ namespace ProgrammaticStylized3D.Rivers
             return count;
         }
 
+        private int CountActiveWakeChunks()
+        {
+            int count = 0;
+            for (int index = 0; index < wakeChunkActive.Length; index++)
+            {
+                if (wakeChunkActive[index])
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private int CountStaticHeldWakeChunks()
+        {
+            int count = 0;
+            int length = Mathf.Min(
+                wakeChunkActive.Length,
+                chunkHasStaticSource.Length);
+            for (int index = 0; index < length; index++)
+            {
+                if (wakeChunkActive[index] && chunkHasStaticSource[index])
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private int CountTemporarilyRetainedWakeChunks()
+        {
+            int count = 0;
+            int length = Mathf.Min(
+                wakeChunkActive.Length,
+                chunkHasStaticSource.Length);
+            for (int index = 0; index < length; index++)
+            {
+                if (wakeChunkActive[index] && !chunkHasStaticSource[index])
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private double ResolveMaximumRemainingWakeRetentionSeconds()
+        {
+            double now = Time.realtimeSinceStartupAsDouble;
+            double maximum = 0.0;
+            int length = Mathf.Min(
+                wakeChunkActiveUntil.Length,
+                chunkHasStaticSource.Length);
+            for (int index = 0; index < length; index++)
+            {
+                if (index >= wakeChunkActive.Length ||
+                    !wakeChunkActive[index] ||
+                    chunkHasStaticSource[index])
+                {
+                    continue;
+                }
+
+                maximum = Math.Max(
+                    maximum,
+                    wakeChunkActiveUntil[index] - now);
+            }
+
+            return Math.Max(0.0, maximum);
+        }
+
         private void BindField()
         {
             if (surfaceRenderer == null ||
@@ -4302,6 +4391,12 @@ namespace ProgrammaticStylized3D.Rivers
                 DisturbanceStaticMaximumHeightId,
                 MaximumStaticPressureHeightMetres);
             propertyBlock.SetFloat(
+                DisturbanceWakeGeometryHeightId,
+                river.ObstructionWakeSurfaceHeight);
+            propertyBlock.SetFloat(
+                DisturbanceWakeGeometryCompactnessId,
+                river.ObstructionWakeSurfaceCompactness);
+            propertyBlock.SetFloat(
                 DisturbanceDebugViewId,
                 (float)river.DisturbanceDebugView);
             propertyBlock.SetFloat(
@@ -4325,6 +4420,10 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock ??= new MaterialPropertyBlock();
             surfaceRenderer.GetPropertyBlock(propertyBlock);
             propertyBlock.SetFloat(DisturbanceEnabledId, 0f);
+            propertyBlock.SetFloat(DisturbanceWakeGeometryHeightId, 0f);
+            propertyBlock.SetFloat(
+                DisturbanceWakeGeometryCompactnessId,
+                1.50f);
             propertyBlock.SetFloat(DisturbanceFragmentDetailId, 0f);
             propertyBlock.SetFloat(DisturbanceWakeInterpolationId, 1f);
             surfaceRenderer.SetPropertyBlock(propertyBlock);

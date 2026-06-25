@@ -101,7 +101,14 @@ namespace ProgrammaticStylized3D.Rivers
         StaticWakeRelease = 9,
         StaticWakeLee = 10,
         StaticWakeReach = 11,
-        StaticPressureAndLee = 12
+        StaticPressureAndLee = 12,
+        WakeDownstreamGradient = 13,
+        WakeLateralGradient = 14,
+        WakeIntensity = 15,
+        FinalWakeContribution = 16,
+        WakeGeometryCore = 17,
+        LeeAndTrailGeometry = 18,
+        FinalWakeGeometryHeight = 19
     }
 
     public enum StylizedRiverIceBodyPreset
@@ -528,9 +535,22 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0.25f, 3f)]
         [SerializeField] private float obstructionWakeReach = 1f;
 
-        [Tooltip("Controls the lateral width of inherited obstruction wakes around object outlets.")]
+        [Tooltip("Controls the initial width and spacing of the attached lee and rear-release regions. Downstream widening is controlled separately by Widening.")]
         [Range(0.5f, 2f)]
         [SerializeField] private float obstructionWakeSpread = 1f;
+
+        [Tooltip("Controls how quickly the shared transported wake field spreads laterally. Static wakes and provisional moving trails use the same persistent field.")]
+        [Range(0.35f, 1.25f)]
+        [SerializeField] private float obstructionWakeWidening = 0.65f;
+
+        [Tooltip("Maximum positive surface height produced by the compact core of the shared transported wake field. Static and dynamic wakes use the same bounded geometry response.")]
+        [Range(0f, 0.20f)]
+        [SerializeField] private float obstructionWakeSurfaceHeight = 0.08f;
+
+        [Tooltip("Controls how tightly transported wake energy is concentrated into visible surface geometry. Lower values retain a broader, stronger response; higher values restrict geometry to the strongest wake core without changing the underlying energy field.")]
+        [Range(0.80f, 3f)]
+        [SerializeField]
+        private float obstructionWakeSurfaceCompactness = 1.50f;
 
         [Header("Moving Trail")]
         [Tooltip("Controls energy injected by moving disturbance emitters.")]
@@ -885,6 +905,11 @@ namespace ProgrammaticStylized3D.Rivers
         public float ObstructionWakeStrength => obstructionWakeStrength;
         public float ObstructionWakeReach => obstructionWakeReach;
         public float ObstructionWakeSpread => obstructionWakeSpread;
+        public float ObstructionWakeWidening => obstructionWakeWidening;
+        public float ObstructionWakeSurfaceHeight =>
+            obstructionWakeSurfaceHeight;
+        public float ObstructionWakeSurfaceCompactness =>
+            obstructionWakeSurfaceCompactness;
         public float MovingTrailStrength => movingTrailStrength;
         public float MovingTrailPersistence => movingTrailPersistence;
         public float MovingTrailWidth => movingTrailWidth;
@@ -1406,6 +1431,7 @@ namespace ProgrammaticStylized3D.Rivers
                     runtimeDisturbances = false;
                     staticPressureStrength = 0f;
                     obstructionWakeStrength = 0f;
+                    obstructionWakeWidening = 0.65f;
                     movingTrailStrength = 0f;
                     impactRippleStrength = 0f;
                     break;
@@ -1422,6 +1448,7 @@ namespace ProgrammaticStylized3D.Rivers
                     obstructionWakeStrength = 0.90f;
                     obstructionWakeReach = 0.75f;
                     obstructionWakeSpread = 0.85f;
+                    obstructionWakeWidening = 0.65f;
                     movingTrailStrength = 0.90f;
                     movingTrailPersistence = 0.48f;
                     movingTrailWidth = 0.85f;
@@ -1442,6 +1469,7 @@ namespace ProgrammaticStylized3D.Rivers
                     obstructionWakeStrength = 1.50f;
                     obstructionWakeReach = 1f;
                     obstructionWakeSpread = 1f;
+                    obstructionWakeWidening = 0.65f;
                     movingTrailStrength = 1.35f;
                     movingTrailPersistence = 0.65f;
                     movingTrailWidth = 1f;
@@ -1462,6 +1490,7 @@ namespace ProgrammaticStylized3D.Rivers
                     obstructionWakeStrength = 2f;
                     obstructionWakeReach = 1.35f;
                     obstructionWakeSpread = 1.25f;
+                    obstructionWakeWidening = 0.65f;
                     movingTrailStrength = 1.8f;
                     movingTrailPersistence = 0.80f;
                     movingTrailWidth = 1.25f;
@@ -2130,6 +2159,18 @@ namespace ProgrammaticStylized3D.Rivers
                 obstructionWakeSpread,
                 0.5f,
                 2f);
+            obstructionWakeWidening = Mathf.Clamp(
+                obstructionWakeWidening,
+                0.35f,
+                1.25f);
+            obstructionWakeSurfaceHeight = Mathf.Clamp(
+                obstructionWakeSurfaceHeight,
+                0f,
+                0.20f);
+            obstructionWakeSurfaceCompactness = Mathf.Clamp(
+                obstructionWakeSurfaceCompactness,
+                0.80f,
+                3f);
             movingTrailStrength = Mathf.Clamp(
                 movingTrailStrength,
                 0f,

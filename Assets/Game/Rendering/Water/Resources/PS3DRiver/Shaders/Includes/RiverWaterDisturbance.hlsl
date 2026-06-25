@@ -20,6 +20,7 @@ struct RiverWaterWakeResult
     float downstreamGradient;
     float lateralGradient;
     float intensity;
+    float geometryCore;
     float2 fieldUV;
 };
 
@@ -70,6 +71,38 @@ float2 RiverWaterResolveDisturbanceUV(
     return float2(
         saturate((globalDistance - globalStart) / fieldLength),
         saturate(signedAcross * 0.5 + 0.5));
+}
+
+
+float RiverWaterResolveWakeGeometryCore(
+    float wakeEnergy,
+    float compactness)
+{
+    // The shared energy field intentionally remains broad for normals,
+    // turbulence, overlap, and future foam. Geometry uses a smooth saturated
+    // response whose exponent controls how tightly visible height is confined
+    // to the strongest transported energy without changing the field itself.
+    float saturatedEnergy =
+        1.0 - exp(-max(0.0, wakeEnergy) * 0.90);
+    float resolvedCompactness = clamp(compactness, 0.80, 3.0);
+    return pow(saturate(saturatedEnergy), resolvedCompactness);
+}
+
+float RiverWaterResolveWakeGeometryHeight(
+    float geometryCore,
+    float maximumHeight,
+    float appliedLeeDepth)
+{
+    // The attached lee is a local obstruction envelope. It suppresses any
+    // positive shared wake geometry spatially, regardless of which source
+    // contributed the transported energy. Rear-corner trails remain free to
+    // rise while the strongest central depression is protected.
+    const float maximumLeeDepth = 0.200;
+    float lee01 = saturate(appliedLeeDepth / maximumLeeDepth);
+    float leeProtection = smoothstep(0.08, 0.55, lee01);
+    return saturate(geometryCore) *
+        max(0.0, maximumHeight) *
+        (1.0 - leeProtection);
 }
 
 float RiverWaterResolveStaticWakeLeeDepth(float leeSource)
@@ -371,13 +404,15 @@ RiverWaterWakeResult RiverWaterEvaluateWake(
     float fieldLength,
     float interpolation,
     float shoreInteraction,
-    float freezeAmount)
+    float freezeAmount,
+    float geometryCompactness)
 {
     RiverWaterWakeResult result;
     result.energy = 0.0;
     result.downstreamGradient = 0.0;
     result.lateralGradient = 0.0;
     result.intensity = 0.0;
+    result.geometryCore = 0.0;
     result.fieldUV = 0.0;
 
     if (enabled < 0.5 || fieldLength <= 0.0001)
@@ -421,6 +456,10 @@ RiverWaterWakeResult RiverWaterEvaluateWake(
         length(float2(
             result.downstreamGradient,
             result.lateralGradient)) * 0.42);
+    result.geometryCore =
+        RiverWaterResolveWakeGeometryCore(
+            result.energy,
+            geometryCompactness);
     result.fieldUV = uv;
     return result;
 }

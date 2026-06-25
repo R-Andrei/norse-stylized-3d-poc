@@ -63,6 +63,8 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _DisturbanceShoreInteraction("Disturbance Shore Interaction", Float) = 0.5
         [HideInInspector] _DisturbanceMaximumHeight("Disturbance Maximum Height", Float) = 0.1
         [HideInInspector] _DisturbanceStaticMaximumHeight("Static Pressure Maximum Height", Float) = 1.25
+        [HideInInspector] _DisturbanceWakeGeometryHeight("Wake Geometry Height", Float) = 0.08
+        [HideInInspector] _DisturbanceWakeGeometryCompactness("Wake Geometry Compactness", Float) = 1.50
         [HideInInspector] _DisturbanceDebugView("Disturbance Debug View", Float) = 0
         [HideInInspector] _DisturbanceFragmentDetail("Disturbance Fragment Detail", Float) = 0
         [HideInInspector] _DisturbanceStaticTarget("Disturbance Static Pressure", 2D) = "black" {}
@@ -196,6 +198,8 @@ Shader "PS3D/Stylized River Water"
                 float _DisturbanceShoreInteraction;
                 float _DisturbanceMaximumHeight;
                 float _DisturbanceStaticMaximumHeight;
+                float _DisturbanceWakeGeometryHeight;
+                float _DisturbanceWakeGeometryCompactness;
                 float _DisturbanceDebugView;
                 float _DisturbanceFragmentDetail;
                 float4 _DisturbanceStaticWakeTexelSize;
@@ -330,14 +334,39 @@ Shader "PS3D/Stylized River Water"
                         _FreezeAmount,
                         _DisturbanceStaticWakeTexelSize.xy,
                         0.0);
-                float staticGeometryHeight =
-                    disturbance.height - staticWakeLee.depth;
+                RiverWaterWakeResult vertexWake = RiverWaterEvaluateWake(
+                    TEXTURE2D_ARGS(
+                        _DisturbanceWakePrevious,
+                        sampler_DisturbanceWakePrevious),
+                    TEXTURE2D_ARGS(
+                        _DisturbanceWakeCurrent,
+                        sampler_DisturbanceWakeCurrent),
+                    _DisturbanceEnabled,
+                    input.uv1.x,
+                    input.uv1.y,
+                    input.uv2.x,
+                    input.uv2.y,
+                    _DisturbanceGlobalStart,
+                    _DisturbanceFieldLength,
+                    _DisturbanceWakeInterpolation,
+                    _DisturbanceShoreInteraction,
+                    _FreezeAmount,
+                    _DisturbanceWakeGeometryCompactness);
+                float transportedWakeHeight =
+                    RiverWaterResolveWakeGeometryHeight(
+                        vertexWake.geometryCore,
+                        _DisturbanceWakeGeometryHeight,
+                        staticWakeLee.depth);
+                float staticWakeHeight =
+                    transportedWakeHeight - staticWakeLee.depth;
+                float resolvedGeometryHeight =
+                    disturbance.height + staticWakeHeight;
 
                 output.positionWS =
                     basePositionWS +
                     motion.displacementWS +
                     baseNormalWS *
-                    (motion.disturbanceHeight + staticGeometryHeight);
+                    (motion.disturbanceHeight + resolvedGeometryHeight);
                 output.positionCS = TransformWorldToHClip(output.positionWS);
                 output.baseNormalWS = baseNormalWS;
                 output.tangentWS = tangentWS;
@@ -355,7 +384,7 @@ Shader "PS3D/Stylized River Water"
                 output.disturbanceData = float4(
                     disturbance.downstreamGradient,
                     disturbance.lateralGradient,
-                    staticGeometryHeight,
+                    resolvedGeometryHeight,
                     disturbance.velocity);
                 return output;
             }
@@ -486,7 +515,8 @@ Shader "PS3D/Stylized River Water"
                     _DisturbanceFieldLength,
                     _DisturbanceWakeInterpolation,
                     _DisturbanceShoreInteraction,
-                    _FreezeAmount);
+                    _FreezeAmount,
+                    _DisturbanceWakeGeometryCompactness);
 
                 resolvedDisturbanceData.x += wake.downstreamGradient;
                 resolvedDisturbanceData.y += wake.lateralGradient;
@@ -720,22 +750,8 @@ Shader "PS3D/Stylized River Water"
 
                     if (disturbanceDebug == 8)
                     {
-                        float4 wakePrevious = SAMPLE_TEXTURE2D(
-                            _DisturbanceWakePrevious,
-                            sampler_DisturbanceWakePrevious,
-                            fieldUV);
-                        float4 wakeCurrent = SAMPLE_TEXTURE2D(
-                            _DisturbanceWakeCurrent,
-                            sampler_DisturbanceWakeCurrent,
-                            fieldUV);
-                        float4 wakeState = lerp(
-                            wakePrevious,
-                            wakeCurrent,
-                            saturate(_DisturbanceWakeInterpolation));
-                        float energy = saturate(wakeState.r * 0.30);
-                        float lateral =
-                            saturate(abs(wakeState.a) * 0.35);
-                        return half4(energy, lateral, 0.0, 1.0);
+                        float energy = saturate(wake.energy * 0.30);
+                        return half4(energy, 0.0, 0.0, 1.0);
                     }
 
                     float4 wakeSource = SAMPLE_TEXTURE2D(
@@ -789,6 +805,109 @@ Shader "PS3D/Stylized River Water"
                             (2.0 * staticHeightScale) + 0.5);
                         return half4(encodedStaticHeight.xxx, 1.0);
                     }
+                }
+
+                if (disturbanceDebug == 13)
+                {
+                    float signedGradient = wake.downstreamGradient;
+                    float magnitude = saturate(abs(signedGradient) * 0.35);
+                    return signedGradient >= 0.0
+                        ? half4(magnitude, 0.0, 0.0, 1.0)
+                        : half4(0.0, 0.0, magnitude, 1.0);
+                }
+
+                if (disturbanceDebug == 14)
+                {
+                    float signedGradient = wake.lateralGradient;
+                    float magnitude = saturate(abs(signedGradient) * 0.35);
+                    return signedGradient >= 0.0
+                        ? half4(magnitude, 0.0, 0.0, 1.0)
+                        : half4(0.0, 0.0, magnitude, 1.0);
+                }
+
+                if (disturbanceDebug == 15)
+                {
+                    return half4(wake.intensity.xxx, 1.0);
+                }
+
+                if (disturbanceDebug == 16)
+                {
+                    float normalStrength = max(
+                        0.0,
+                        _DisturbanceNormalStrength);
+                    float encodedDownstream = saturate(
+                        wake.downstreamGradient *
+                        normalStrength * 0.25 + 0.5);
+                    float encodedLateral = saturate(
+                        wake.lateralGradient *
+                        normalStrength * 0.25 + 0.5);
+                    float encodedIntensity =
+                        wake.intensity * 0.5 + 0.5;
+                    return half4(
+                        encodedDownstream,
+                        encodedLateral,
+                        encodedIntensity,
+                        1.0);
+                }
+
+                if (disturbanceDebug == 17)
+                {
+                    return half4(wake.geometryCore.xxx, 1.0);
+                }
+
+                if (disturbanceDebug == 18 || disturbanceDebug == 19)
+                {
+                    RiverWaterStaticWakeLeeResult debugStaticWakeLee =
+                        RiverWaterEvaluateStaticWakeLee(
+                            TEXTURE2D_ARGS(
+                                _DisturbanceStaticWakeSource,
+                                sampler_DisturbanceStaticWakeSource),
+                            _DisturbanceEnabled,
+                            input.domainData.x,
+                            input.domainData.y,
+                            input.domainData.z,
+                            input.domainData.w,
+                            _DisturbanceGlobalStart,
+                            _DisturbanceFieldLength,
+                            _DisturbanceShoreInteraction,
+                            _FreezeAmount,
+                            _DisturbanceStaticWakeTexelSize.xy,
+                            0.0);
+                    float unprotectedTrailHeight =
+                        wake.geometryCore *
+                        max(0.0, _DisturbanceWakeGeometryHeight);
+                    float protectedTrailHeight =
+                        RiverWaterResolveWakeGeometryHeight(
+                            wake.geometryCore,
+                            _DisturbanceWakeGeometryHeight,
+                            debugStaticWakeLee.depth);
+                    float removedByLee = max(
+                        0.0,
+                        unprotectedTrailHeight - protectedTrailHeight);
+
+                    if (disturbanceDebug == 18)
+                    {
+                        const float physicalHeightScale = 0.200;
+                        return half4(
+                            saturate(
+                                protectedTrailHeight /
+                                physicalHeightScale),
+                            saturate(
+                                removedByLee /
+                                physicalHeightScale),
+                            saturate(
+                                debugStaticWakeLee.depth /
+                                physicalHeightScale),
+                            1.0);
+                    }
+
+                    float finalWakeGeometryHeight =
+                        protectedTrailHeight - debugStaticWakeLee.depth;
+                    const float signedHeightScale = 0.200;
+                    float encodedHeight = saturate(
+                        finalWakeGeometryHeight /
+                        (2.0 * signedHeightScale) + 0.5);
+                    return half4(encodedHeight.xxx, 1.0);
                 }
 
                 int refractionDebug =
