@@ -551,6 +551,7 @@ namespace ProgrammaticStylized3D.Rivers
         private const float RippleInjectionEnvelopeRadius = 1.15f;
         private const int MaximumRippleSubsteps = 32;
         private const double RippleSubstepDiagnosticWindowSeconds = 5.0;
+        private const double PerformanceDiagnosticWindowSeconds = 5.0;
         private const float MinimumImpactReservationLifetime = 0.25f;
         private const float RippleReservationLookAheadSteps = 2f;
         private const float RippleReservationPaddingCells = 2f;
@@ -566,6 +567,18 @@ namespace ProgrammaticStylized3D.Rivers
         private const float StaticPressureMinimumProfileMultiplier = 0.58f;
         private const int MaximumStaticContourPoints =
             RiverDisturbanceFootprintResolver.MaximumContourPoints;
+
+        private enum PerformanceDispatchCategory
+        {
+            RippleSimulation,
+            WakeSimulation,
+            ImpactInjection,
+            WakeInjection,
+            StaticPressureBake,
+            StaticWakeBake,
+            RippleBoundaryBake,
+            Clear
+        }
 
         private static uint sourcePhaseSequence = 1;
 
@@ -711,6 +724,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool staticWakeSourceDirty = true;
         private bool rippleBoundaryDirty = true;
         private int validStaticSourceCount;
+        private int validStaticWakeSourceCount;
         private int rippleCollisionSourceCount;
         private bool generatedGeometryRegistryDirty = true;
         private bool generatedGeometryRefreshInProgress;
@@ -723,6 +737,23 @@ namespace ProgrammaticStylized3D.Rivers
         private float activeRippleMinimumCellSize;
         private bool rippleSubstepLimitReached;
         private double rippleSubstepDiagnosticWindowStart;
+        private int lastUpdateComputeDispatchCount;
+        private int recentPeakComputeDispatchCount;
+        private long lastUpdateThreadGroupCount;
+        private long recentPeakThreadGroupCount;
+        private long lastUpdateCellIterationCount;
+        private long recentPeakCellIterationCount;
+        private int lastUpdateRippleSimulationDispatchCount;
+        private int lastUpdateWakeSimulationDispatchCount;
+        private int lastUpdateImpactInjectionDispatchCount;
+        private int lastUpdateWakeInjectionDispatchCount;
+        private int lastUpdateStaticPressureBakeDispatchCount;
+        private int lastUpdateStaticWakeBakeDispatchCount;
+        private int lastUpdateRippleBoundaryBakeDispatchCount;
+        private int lastUpdateClearDispatchCount;
+        private int lastUpdateFieldRebuildCount;
+        private int recentPeakFieldRebuildCount;
+        private double performanceDiagnosticWindowStart;
 
         public bool IsSupported =>
             SystemInfo.supportsComputeShaders &&
@@ -765,13 +796,64 @@ namespace ProgrammaticStylized3D.Rivers
             activeRippleMinimumCellSize;
         public bool RippleSubstepLimitReached =>
             rippleSubstepLimitReached;
+        public int RegisteredStationarySourceCount =>
+            CountRegisteredStationarySources();
+        public int ValidStaticPressureSourceCount => validStaticSourceCount;
+        public int ValidStaticWakeSourceCount => validStaticWakeSourceCount;
+        public int LastUpdateComputeDispatchCount =>
+            lastUpdateComputeDispatchCount;
+        public int RecentPeakComputeDispatchCount =>
+            recentPeakComputeDispatchCount;
+        public long LastUpdateThreadGroupCount =>
+            lastUpdateThreadGroupCount;
+        public long RecentPeakThreadGroupCount =>
+            recentPeakThreadGroupCount;
+        public long LastUpdateCellIterationCount =>
+            lastUpdateCellIterationCount;
+        public long RecentPeakCellIterationCount =>
+            recentPeakCellIterationCount;
+        public int LastUpdateRippleSimulationDispatchCount =>
+            lastUpdateRippleSimulationDispatchCount;
+        public int LastUpdateWakeSimulationDispatchCount =>
+            lastUpdateWakeSimulationDispatchCount;
+        public int LastUpdateImpactInjectionDispatchCount =>
+            lastUpdateImpactInjectionDispatchCount;
+        public int LastUpdateWakeInjectionDispatchCount =>
+            lastUpdateWakeInjectionDispatchCount;
+        public int LastUpdateStaticPressureBakeDispatchCount =>
+            lastUpdateStaticPressureBakeDispatchCount;
+        public int LastUpdateStaticWakeBakeDispatchCount =>
+            lastUpdateStaticWakeBakeDispatchCount;
+        public int LastUpdateRippleBoundaryBakeDispatchCount =>
+            lastUpdateRippleBoundaryBakeDispatchCount;
+        public int LastUpdateClearDispatchCount =>
+            lastUpdateClearDispatchCount;
+        public int LastUpdateFieldRebuildCount =>
+            lastUpdateFieldRebuildCount;
+        public int RecentPeakFieldRebuildCount =>
+            recentPeakFieldRebuildCount;
+        public long RippleStateMemoryBytes =>
+            IsAllocated ? (long)fieldWidth * fieldHeight * 8L * 2L : 0L;
+        public long StaticPressureMemoryBytes =>
+            IsAllocated ? (long)fieldWidth * fieldHeight * 8L : 0L;
+        public long RippleBoundaryMemoryBytes =>
+            rippleBoundary != null
+                ? (long)fieldWidth * fieldHeight * 4L
+                : 0L;
+        public long WakeFieldMemoryBytes =>
+            IsAllocated
+                ? (long)wakeFieldWidth * wakeFieldHeight * 8L * 3L
+                : 0L;
+        public long RippleMetricMemoryBytes =>
+            rippleMetricBuffer != null ? (long)fieldWidth * 32L : 0L;
         public float SimulationRate => ResolveSimulationRate();
         public float WakeSimulationRate => ResolveSimulationRate();
         public long EstimatedMemoryBytes =>
-            (long)fieldWidth * fieldHeight * 8L * 3L +
-            (long)fieldWidth * fieldHeight * 4L +
-            (long)wakeFieldWidth * wakeFieldHeight * 8L * 3L +
-            (rippleMetricBuffer != null ? (long)fieldWidth * 32L : 0L);
+            RippleStateMemoryBytes +
+            StaticPressureMemoryBytes +
+            RippleBoundaryMemoryBytes +
+            WakeFieldMemoryBytes +
+            RippleMetricMemoryBytes;
 
         private struct StaticWakeLeeVariationState
         {
@@ -1432,6 +1514,8 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void LateUpdate()
         {
+            BeginPerformanceDiagnosticsUpdate();
+
             if (river == null)
             {
                 river = GetComponent<StylizedRiver>();
@@ -2786,6 +2870,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             ReleaseResources();
+            RecordFieldRebuild();
 
             computeShader = Resources.Load<ComputeShader>(
                 ComputeResourcePath);
@@ -2935,6 +3020,7 @@ namespace ProgrammaticStylized3D.Rivers
             simulationInterpolation = 1f;
             wakeInterpolation = 1f;
             validStaticSourceCount = 0;
+            validStaticWakeSourceCount = 0;
             staticPressureTargetDirty = true;
             staticWakeSourceDirty = true;
             rippleBoundaryDirty = true;
@@ -3044,6 +3130,7 @@ namespace ProgrammaticStylized3D.Rivers
             staticWakeChunkReleaseDuration = Array.Empty<double>();
             wakeChunkActive = Array.Empty<bool>();
             validStaticSourceCount = 0;
+            validStaticWakeSourceCount = 0;
             rippleCollisionSourceCount = 0;
             staticPressureTargetDirty = true;
             staticWakeSourceDirty = true;
@@ -3304,11 +3391,14 @@ namespace ProgrammaticStylized3D.Rivers
                 int width = groupCount * resolutionPerChunk;
                 computeShader.SetInt("_DispatchXOffset", xOffset);
                 computeShader.SetInt("_DispatchWidth", width);
-                computeShader.Dispatch(
+                DispatchCompute(
                     simulateRippleKernel,
                     Mathf.CeilToInt(width / (float)ThreadGroupSize),
                     Mathf.CeilToInt(fieldHeight / (float)ThreadGroupSize),
-                    1);
+                    1,
+                    PerformanceDispatchCategory.RippleSimulation,
+                    width,
+                    fieldHeight);
                 groupStart = -1;
             }
         }
@@ -3394,11 +3484,14 @@ namespace ProgrammaticStylized3D.Rivers
                 int width = groupCount * wakeResolutionPerChunk;
                 computeShader.SetInt("_WakeDispatchXOffset", xOffset);
                 computeShader.SetInt("_WakeDispatchWidth", width);
-                computeShader.Dispatch(
+                DispatchCompute(
                     simulateWakeKernel,
                     Mathf.CeilToInt(width / (float)ThreadGroupSize),
                     Mathf.CeilToInt(wakeFieldHeight / (float)ThreadGroupSize),
-                    1);
+                    1,
+                    PerformanceDispatchCategory.WakeSimulation,
+                    width,
+                    wakeFieldHeight);
                 groupStart = -1;
             }
         }
@@ -3500,11 +3593,14 @@ namespace ProgrammaticStylized3D.Rivers
                 injectRippleKernel,
                 "_StateWrite",
                 currentState);
-            computeShader.Dispatch(
+            DispatchCompute(
                 injectRippleKernel,
                 Mathf.CeilToInt(width / (float)ThreadGroupSize),
                 Mathf.CeilToInt(height / (float)ThreadGroupSize),
-                1);
+                1,
+                PerformanceDispatchCategory.ImpactInjection,
+                width,
+                height);
         }
 
         private void DispatchWakeInjection(
@@ -3588,11 +3684,14 @@ namespace ProgrammaticStylized3D.Rivers
                 injectWakeKernel,
                 "_WakeWrite",
                 currentWake);
-            computeShader.Dispatch(
+            DispatchCompute(
                 injectWakeKernel,
                 Mathf.CeilToInt(width / (float)ThreadGroupSize),
                 Mathf.CeilToInt(height / (float)ThreadGroupSize),
-                1);
+                1,
+                PerformanceDispatchCategory.WakeInjection,
+                width,
+                height);
         }
 
         private void RebuildRippleBoundary(double now)
@@ -3604,6 +3703,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            RecordFieldRebuild();
             computeShader.SetInts("_FieldSize", fieldWidth, fieldHeight);
             computeShader.SetInt("_RippleMetricCount", fieldWidth);
             computeShader.SetFloat(
@@ -3617,11 +3717,14 @@ namespace ProgrammaticStylized3D.Rivers
                 bakeRippleBoundaryBaseKernel,
                 "_RippleBoundaryWrite",
                 rippleBoundary);
-            computeShader.Dispatch(
+            DispatchCompute(
                 bakeRippleBoundaryBaseKernel,
                 Mathf.CeilToInt(fieldWidth / (float)ThreadGroupSize),
                 Mathf.CeilToInt(fieldHeight / (float)ThreadGroupSize),
-                1);
+                1,
+                PerformanceDispatchCategory.RippleBoundaryBake,
+                fieldWidth,
+                fieldHeight);
 
             rippleCollisionSourceCount = 0;
             foreach (KeyValuePair<EntityId, ContinuousSource> pair in
@@ -3782,11 +3885,14 @@ namespace ProgrammaticStylized3D.Rivers
                 bakeRippleBoundaryObstacleKernel,
                 "_RippleBoundaryWrite",
                 rippleBoundary);
-            computeShader.Dispatch(
+            DispatchCompute(
                 bakeRippleBoundaryObstacleKernel,
                 Mathf.CeilToInt(width / (float)ThreadGroupSize),
                 Mathf.CeilToInt(height / (float)ThreadGroupSize),
-                1);
+                1,
+                PerformanceDispatchCategory.RippleBoundaryBake,
+                width,
+                height);
             return true;
         }
 
@@ -3825,11 +3931,14 @@ namespace ProgrammaticStylized3D.Rivers
                 applyRippleBoundaryKernel,
                 "_StateWrite",
                 state);
-            computeShader.Dispatch(
+            DispatchCompute(
                 applyRippleBoundaryKernel,
                 Mathf.CeilToInt(fieldWidth / (float)ThreadGroupSize),
                 Mathf.CeilToInt(fieldHeight / (float)ThreadGroupSize),
-                1);
+                1,
+                PerformanceDispatchCategory.RippleBoundaryBake,
+                fieldWidth,
+                fieldHeight);
         }
 
         private void RebuildStaticPressureTarget(double now)
@@ -3839,6 +3948,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            RecordFieldRebuild();
             DispatchClear(
                 staticTarget,
                 fieldWidth,
@@ -3907,11 +4017,14 @@ namespace ProgrammaticStylized3D.Rivers
                     finalizeStaticPressureKernel,
                     "_StaticPressureWrite",
                     staticTarget);
-                computeShader.Dispatch(
+                DispatchCompute(
                     finalizeStaticPressureKernel,
                     Mathf.CeilToInt(fieldWidth / (float)ThreadGroupSize),
                     Mathf.CeilToInt(fieldHeight / (float)ThreadGroupSize),
-                    1);
+                    1,
+                    PerformanceDispatchCategory.StaticPressureBake,
+                    fieldWidth,
+                    fieldHeight);
             }
 
             staticPressureTargetDirty = false;
@@ -3925,6 +4038,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            RecordFieldRebuild();
             DispatchClear(
                 staticWakeSource,
                 wakeFieldWidth,
@@ -3935,6 +4049,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             float absoluteFlowSpeed =
                 Mathf.Abs(river.FlowSpeedMetresPerSecond);
+            validStaticWakeSourceCount = 0;
 
             foreach (KeyValuePair<EntityId, ContinuousSource> pair in
                      continuousSources)
@@ -3981,6 +4096,7 @@ namespace ProgrammaticStylized3D.Rivers
                     source.AlongHalfLength,
                     wakeLength,
                     releaseDurationSeconds);
+                validStaticWakeSourceCount++;
             }
 
             staticWakeSourceDirty = false;
@@ -4339,11 +4455,16 @@ namespace ProgrammaticStylized3D.Rivers
                     ? "_StaticPressureWrite"
                     : "_StaticWakeSourceWrite",
                 targetTexture);
-            computeShader.Dispatch(
+            DispatchCompute(
                 kernel,
                 Mathf.CeilToInt(width / (float)ThreadGroupSize),
                 Mathf.CeilToInt(height / (float)ThreadGroupSize),
-                1);
+                1,
+                pressurePass
+                    ? PerformanceDispatchCategory.StaticPressureBake
+                    : PerformanceDispatchCategory.StaticWakeBake,
+                width,
+                height);
         }
 
         private void MarkStaticWakeRange(
@@ -5832,6 +5953,131 @@ namespace ProgrammaticStylized3D.Rivers
             return phase;
         }
 
+        private void BeginPerformanceDiagnosticsUpdate()
+        {
+            double now = Time.realtimeSinceStartupAsDouble;
+            if (performanceDiagnosticWindowStart <= 0.0 ||
+                now - performanceDiagnosticWindowStart >=
+                PerformanceDiagnosticWindowSeconds)
+            {
+                performanceDiagnosticWindowStart = now;
+                recentPeakComputeDispatchCount = 0;
+                recentPeakThreadGroupCount = 0L;
+                recentPeakCellIterationCount = 0L;
+                recentPeakFieldRebuildCount = 0;
+            }
+
+            lastUpdateComputeDispatchCount = 0;
+            lastUpdateThreadGroupCount = 0L;
+            lastUpdateCellIterationCount = 0L;
+            lastUpdateRippleSimulationDispatchCount = 0;
+            lastUpdateWakeSimulationDispatchCount = 0;
+            lastUpdateImpactInjectionDispatchCount = 0;
+            lastUpdateWakeInjectionDispatchCount = 0;
+            lastUpdateStaticPressureBakeDispatchCount = 0;
+            lastUpdateStaticWakeBakeDispatchCount = 0;
+            lastUpdateRippleBoundaryBakeDispatchCount = 0;
+            lastUpdateClearDispatchCount = 0;
+            lastUpdateFieldRebuildCount = 0;
+        }
+
+        public void ResetPerformanceDiagnosticPeaks()
+        {
+            performanceDiagnosticWindowStart =
+                Time.realtimeSinceStartupAsDouble;
+            recentPeakComputeDispatchCount = 0;
+            recentPeakThreadGroupCount = 0L;
+            recentPeakCellIterationCount = 0L;
+            recentPeakFieldRebuildCount = 0;
+        }
+
+        private void RecordFieldRebuild()
+        {
+            lastUpdateFieldRebuildCount++;
+            recentPeakFieldRebuildCount = Mathf.Max(
+                recentPeakFieldRebuildCount,
+                lastUpdateFieldRebuildCount);
+        }
+
+        private void DispatchCompute(
+            int kernel,
+            int groupCountX,
+            int groupCountY,
+            int groupCountZ,
+            PerformanceDispatchCategory category,
+            int processedWidth,
+            int processedHeight)
+        {
+            computeShader.Dispatch(
+                kernel,
+                groupCountX,
+                groupCountY,
+                groupCountZ);
+
+            lastUpdateComputeDispatchCount++;
+            long threadGroups =
+                (long)Mathf.Max(0, groupCountX) *
+                Mathf.Max(0, groupCountY) *
+                Mathf.Max(0, groupCountZ);
+            long cellIterations =
+                (long)Mathf.Max(0, processedWidth) *
+                Mathf.Max(0, processedHeight);
+            lastUpdateThreadGroupCount += threadGroups;
+            lastUpdateCellIterationCount += cellIterations;
+
+            switch (category)
+            {
+                case PerformanceDispatchCategory.RippleSimulation:
+                    lastUpdateRippleSimulationDispatchCount++;
+                    break;
+                case PerformanceDispatchCategory.WakeSimulation:
+                    lastUpdateWakeSimulationDispatchCount++;
+                    break;
+                case PerformanceDispatchCategory.ImpactInjection:
+                    lastUpdateImpactInjectionDispatchCount++;
+                    break;
+                case PerformanceDispatchCategory.WakeInjection:
+                    lastUpdateWakeInjectionDispatchCount++;
+                    break;
+                case PerformanceDispatchCategory.StaticPressureBake:
+                    lastUpdateStaticPressureBakeDispatchCount++;
+                    break;
+                case PerformanceDispatchCategory.StaticWakeBake:
+                    lastUpdateStaticWakeBakeDispatchCount++;
+                    break;
+                case PerformanceDispatchCategory.RippleBoundaryBake:
+                    lastUpdateRippleBoundaryBakeDispatchCount++;
+                    break;
+                case PerformanceDispatchCategory.Clear:
+                    lastUpdateClearDispatchCount++;
+                    break;
+            }
+
+            recentPeakComputeDispatchCount = Mathf.Max(
+                recentPeakComputeDispatchCount,
+                lastUpdateComputeDispatchCount);
+            recentPeakThreadGroupCount = Math.Max(
+                recentPeakThreadGroupCount,
+                lastUpdateThreadGroupCount);
+            recentPeakCellIterationCount = Math.Max(
+                recentPeakCellIterationCount,
+                lastUpdateCellIterationCount);
+        }
+
+        private int CountRegisteredStationarySources()
+        {
+            int count = 0;
+            foreach (ContinuousSource source in continuousSources.Values)
+            {
+                if (source.IsStatic)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
         private void DispatchClear(
             RenderTexture texture,
             int textureWidth,
@@ -5855,11 +6101,14 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetInt("_DispatchXOffset", safeOffset);
             computeShader.SetInt("_DispatchWidth", safeWidth);
             computeShader.SetTexture(clearKernel, "_StateWrite", texture);
-            computeShader.Dispatch(
+            DispatchCompute(
                 clearKernel,
                 Mathf.CeilToInt(safeWidth / (float)ThreadGroupSize),
                 Mathf.CeilToInt(textureHeight / (float)ThreadGroupSize),
-                1);
+                1,
+                PerformanceDispatchCategory.Clear,
+                safeWidth,
+                textureHeight);
         }
 
         private ImpactReservation CreateImpactReservation(

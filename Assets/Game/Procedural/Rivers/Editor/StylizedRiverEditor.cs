@@ -10,6 +10,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
     {
         private bool showAdvancedBody;
         private bool showAdvancedShoreline;
+        private bool showPerformanceDiagnostics;
 
         public override void OnInspectorGUI()
         {
@@ -1166,6 +1167,143 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "State",
                 runtime.IsSleeping ? "Sleeping" : "Active");
 
+            EditorGUILayout.Space(3f);
+            showPerformanceDiagnostics = EditorGUILayout.Foldout(
+                showPerformanceDiagnostics,
+                "Performance Diagnostics",
+                true);
+            if (showPerformanceDiagnostics)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.HelpBox(
+                    "These counters estimate submitted compute workload; they are not CPU or GPU time. 'Last Update' is the latest river LateUpdate, and 'Recent Peak' is the highest value observed during the current five-second window.",
+                    MessageType.Info);
+
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Compute Dispatches",
+                        "Number of compute-kernel submissions made by this river. Several dispatches may occur during one simulation update because active chunks can form separate ranges and Ripple may use internal stability substeps."),
+                    new GUIContent($"{runtime.LastUpdateComputeDispatchCount:N0} last / {runtime.RecentPeakComputeDispatchCount:N0} peak"));
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Thread Groups",
+                        "Total compute thread groups submitted. This is a better rough workload comparison than dispatch count because larger dispatches contain more groups."),
+                    new GUIContent($"{runtime.LastUpdateThreadGroupCount:N0} last / {runtime.RecentPeakThreadGroupCount:N0} peak"));
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Estimated Cell-Iterations",
+                        "Approximate field cells processed across all dispatches. Ripple stability substeps and separated active ranges are counted. This is workload, not measured GPU time."),
+                    new GUIContent($"{runtime.LastUpdateCellIterationCount:N0} last / {runtime.RecentPeakCellIterationCount:N0} peak"));
+
+                EditorGUILayout.Space(2f);
+                EditorGUILayout.LabelField(
+                    "Last Update Dispatch Breakdown",
+                    EditorStyles.miniBoldLabel);
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Ripple Simulation",
+                        "Ripple propagation dispatches. Multiple dispatches may be submitted for separated active chunk ranges and for each internal stability substep."),
+                    new GUIContent(runtime.LastUpdateRippleSimulationDispatchCount.ToString("N0")));
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Wake Simulation",
+                        "Persistent Wake transport and widening dispatches for active Wake chunk ranges."),
+                    new GUIContent(runtime.LastUpdateWakeSimulationDispatchCount.ToString("N0")));
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Impact Injection",
+                        "One-shot Impact Ripple injection dispatches submitted during the latest river update."),
+                    new GUIContent(runtime.LastUpdateImpactInjectionDispatchCount.ToString("N0")));
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Dynamic Wake Injection",
+                        "Continuous dynamic-emitter Wake injection dispatches. The full relative-motion dynamic source model remains deferred."),
+                    new GUIContent(runtime.LastUpdateWakeInjectionDispatchCount.ToString("N0")));
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Pressure Bakes",
+                        "Cached stationary Pressure source and finalization dispatches rebuilt during the latest update. These may recur while Pressure Profile Variation is active; unexpectedly high counts without authored variation can indicate avoidable rebaking."),
+                    new GUIContent(runtime.LastUpdateStaticPressureBakeDispatchCount.ToString("N0")));
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Wake Source Bakes",
+                        "Cached stationary Wake source dispatches rebuilt during the latest update. These may recur while Wake Variation is active; otherwise they should mainly follow geometry, domain, or setting changes."),
+                    new GUIContent(runtime.LastUpdateStaticWakeBakeDispatchCount.ToString("N0")));
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Boundary Bakes",
+                        "Ripple shore/obstacle boundary generation and state-application dispatches. These should occur only when the domain, resources, quality, or registered collision geometry changes."),
+                    new GUIContent(runtime.LastUpdateRippleBoundaryBakeDispatchCount.ToString("N0")));
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Clear Dispatches",
+                        "Texture-region clear operations, including allocation, sleeping cleanup, and source-field rebuild preparation."),
+                    new GUIContent(runtime.LastUpdateClearDispatchCount.ToString("N0")));
+
+                EditorGUILayout.Space(2f);
+                EditorGUILayout.LabelField(
+                    "Source and Rebuild State",
+                    EditorStyles.miniBoldLabel);
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Registered Stationary Sources",
+                        "Stationary generated-geometry sources currently owned by this river runtime, regardless of whether each individual feature is enabled."),
+                    new GUIContent(runtime.RegisteredStationarySourceCount.ToString("N0")));
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Valid Pressure Sources",
+                        "Stationary sources that contributed to the latest cached Pressure target rebuild."),
+                    new GUIContent(runtime.ValidStaticPressureSourceCount.ToString("N0")));
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Valid Wake Sources",
+                        "Stationary sources that contributed to the latest cached Wake source rebuild."),
+                    new GUIContent(runtime.ValidStaticWakeSourceCount.ToString("N0")));
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Field Rebuilds",
+                        "Resource allocation or cached Pressure, Wake, and Ripple Boundary rebuilds during the latest update. The peak uses the same five-second window."),
+                    new GUIContent($"{runtime.LastUpdateFieldRebuildCount:N0} last / {runtime.RecentPeakFieldRebuildCount:N0} peak"));
+
+                EditorGUILayout.Space(2f);
+                EditorGUILayout.LabelField(
+                    "Allocated Memory Estimate",
+                    EditorStyles.miniBoldLabel);
+                DrawMemoryDiagnostic(
+                    "Ripple State",
+                    runtime.RippleStateMemoryBytes,
+                    "Two persistent RGBA-half Ripple height/velocity/detail textures.");
+                DrawMemoryDiagnostic(
+                    "Static Pressure",
+                    runtime.StaticPressureMemoryBytes,
+                    "Cached RGBA-half stationary Pressure target texture.");
+                DrawMemoryDiagnostic(
+                    "Ripple Boundary",
+                    runtime.RippleBoundaryMemoryBytes,
+                    "Cached RG-half shore and stationary-obstacle boundary texture.");
+                DrawMemoryDiagnostic(
+                    "Wake State and Source",
+                    runtime.WakeFieldMemoryBytes,
+                    "Two persistent RGBA-half Wake textures plus the cached stationary Wake source texture.");
+                DrawMemoryDiagnostic(
+                    "Ripple Metrics",
+                    runtime.RippleMetricMemoryBytes,
+                    "Compact structured buffer containing the world-space river frame and widths for each longitudinal Ripple row.");
+                DrawMemoryDiagnostic(
+                    "Total",
+                    runtime.EstimatedMemoryBytes,
+                    "Estimated disturbance-field texture and metric-buffer memory for this river. Driver and allocation overhead are not included.");
+
+                if (GUILayout.Button(new GUIContent(
+                        "Reset Recent Peaks",
+                        "Clears the five-second peak counters. Last Update values continue reporting the current workload.")))
+                {
+                    runtime.ResetPerformanceDiagnosticPeaks();
+                }
+
+                EditorGUI.indentLevel--;
+            }
+
             if (GUILayout.Button(new GUIContent(
                     "Clear Field",
                     "Immediately clears Pressure, Wake, and Impact Ripple runtime textures and pending transient state for this river. Authored settings and registered sources are not removed.")))
@@ -1251,6 +1389,16 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 EditorGUILayout.HelpBox(description, MessageType.None);
             }
+        }
+
+        private static void DrawMemoryDiagnostic(
+            string label,
+            long bytes,
+            string tooltip)
+        {
+            EditorGUILayout.LabelField(
+                new GUIContent(label, tooltip),
+                new GUIContent($"{bytes / (1024f * 1024f):0.00} MB"));
         }
 
         private void DrawWaterBody()
