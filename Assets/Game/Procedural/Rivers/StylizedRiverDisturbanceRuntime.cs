@@ -49,6 +49,59 @@ namespace ProgrammaticStylized3D.Rivers
                 pressureMaximumHeight,
                 pressureStrength,
                 waveAllowance,
+                staticPressureEnabled,
+                contactSharpness,
+                waveResponse,
+                obstructionWakeEnabled,
+                obstructionWakeReach,
+                obstructionWakeSpread,
+                0.35f,
+                status)
+        {
+        }
+
+        public GeneratedRiverDisturbanceDiagnostics(
+            StylizedRiver river,
+            bool active,
+            float acrossWidth,
+            float alongLength,
+            float localRiverWidth,
+            float blockageRatio,
+            float effectivePadding,
+            float effectiveAmplitude,
+            float effectiveWakeStrength,
+            float maximumAllowedAmplitude,
+            bool heightClampReached,
+            float representativeSupportHeight,
+            float pressureMinimumHeight,
+            float pressureMaximumHeight,
+            float pressureStrength,
+            float waveAllowance,
+            bool staticPressureEnabled,
+            float contactSharpness,
+            float waveResponse,
+            bool obstructionWakeEnabled,
+            float obstructionWakeReach,
+            float obstructionWakeSpread,
+            float obstructionWakeVariation,
+            string status)
+            : this(
+                river,
+                active,
+                acrossWidth,
+                alongLength,
+                localRiverWidth,
+                blockageRatio,
+                effectivePadding,
+                effectiveAmplitude,
+                effectiveWakeStrength,
+                maximumAllowedAmplitude,
+                heightClampReached,
+                representativeSupportHeight,
+                pressureMinimumHeight,
+                pressureMaximumHeight,
+                pressureStrength,
+                waveAllowance,
                 0f,
                 staticPressureEnabled,
                 contactSharpness,
@@ -56,6 +109,7 @@ namespace ProgrammaticStylized3D.Rivers
                 obstructionWakeEnabled,
                 obstructionWakeReach,
                 obstructionWakeSpread,
+                obstructionWakeVariation,
                 status)
         {
         }
@@ -85,6 +139,61 @@ namespace ProgrammaticStylized3D.Rivers
             float obstructionWakeReach,
             float obstructionWakeSpread,
             string status)
+            : this(
+                river,
+                active,
+                acrossWidth,
+                alongLength,
+                localRiverWidth,
+                blockageRatio,
+                effectivePadding,
+                effectiveAmplitude,
+                effectiveWakeStrength,
+                maximumAllowedAmplitude,
+                heightClampReached,
+                representativeSupportHeight,
+                pressureMinimumHeight,
+                pressureMaximumHeight,
+                pressureStrength,
+                waveAllowance,
+                supportInspectionHeight,
+                staticPressureEnabled,
+                contactSharpness,
+                waveResponse,
+                obstructionWakeEnabled,
+                obstructionWakeReach,
+                obstructionWakeSpread,
+                0.35f,
+                status)
+        {
+        }
+
+        public GeneratedRiverDisturbanceDiagnostics(
+            StylizedRiver river,
+            bool active,
+            float acrossWidth,
+            float alongLength,
+            float localRiverWidth,
+            float blockageRatio,
+            float effectivePadding,
+            float effectiveAmplitude,
+            float effectiveWakeStrength,
+            float maximumAllowedAmplitude,
+            bool heightClampReached,
+            float representativeSupportHeight,
+            float pressureMinimumHeight,
+            float pressureMaximumHeight,
+            float pressureStrength,
+            float waveAllowance,
+            float supportInspectionHeight,
+            bool staticPressureEnabled,
+            float contactSharpness,
+            float waveResponse,
+            bool obstructionWakeEnabled,
+            float obstructionWakeReach,
+            float obstructionWakeSpread,
+            float obstructionWakeVariation,
+            string status)
         {
             River = river;
             Active = active;
@@ -109,6 +218,7 @@ namespace ProgrammaticStylized3D.Rivers
             ObstructionWakeEnabled = obstructionWakeEnabled;
             ObstructionWakeReach = obstructionWakeReach;
             ObstructionWakeSpread = obstructionWakeSpread;
+            ObstructionWakeVariation = obstructionWakeVariation;
             Status = status ?? string.Empty;
         }
 
@@ -140,6 +250,7 @@ namespace ProgrammaticStylized3D.Rivers
         public bool ObstructionWakeEnabled { get; }
         public float ObstructionWakeReach { get; }
         public float ObstructionWakeSpread { get; }
+        public float ObstructionWakeVariation { get; }
         public string Status { get; }
     }
 
@@ -273,6 +384,7 @@ namespace ProgrammaticStylized3D.Rivers
             CurrentSamples.Length == LateralSampleCount &&
             DownstreamBoundaries.Length == LateralSampleCount;
     }
+
 #endif
 
     [ExecuteAlways]
@@ -300,6 +412,8 @@ namespace ProgrammaticStylized3D.Rivers
         private const int GeneratedSourcesPerFrame = 1;
         private const float StaticPressureProfileUpdateRate = 12f;
         private const float StaticPressureProfileTransitionFraction = 0.85f;
+        private const float StaticWakeVariationUpdateRate = 12f;
+        private const float StaticWakeVariationTransitionFraction = 0.85f;
         private const float StaticPressureMinimumProfileMultiplier = 0.58f;
         private const int MaximumStaticContourPoints =
             RiverDisturbanceFootprintResolver.MaximumContourPoints;
@@ -358,6 +472,7 @@ namespace ProgrammaticStylized3D.Rivers
             new();
         private readonly List<EntityId> staleSourceIds = new();
         private readonly List<EntityId> staticPressureProfileSourceIds = new();
+        private readonly List<EntityId> staticWakeVariationSourceIds = new();
         private readonly List<ImpactCommand> pendingImpacts = new();
         private readonly List<IGeneratedGeometrySource>
             generatedGeometryScratch = new();
@@ -372,6 +487,10 @@ namespace ProgrammaticStylized3D.Rivers
                 RiverDisturbanceFootprintResolver.
                     MaximumPressureSupportLateralSamples];
         private readonly Vector4[] staticPressureGeometryUpload =
+            new Vector4[
+                RiverDisturbanceFootprintResolver.
+                    MaximumPressureSupportLateralSamples];
+        private readonly Vector4[] staticWakeVariationProfileUpload =
             new Vector4[
                 RiverDisturbanceFootprintResolver.
                     MaximumPressureSupportLateralSamples];
@@ -419,6 +538,7 @@ namespace ProgrammaticStylized3D.Rivers
         private float averageSurfaceHalfWidth = 1f;
         private float simulationAccumulator;
         private float staticPressureProfileAccumulator;
+        private float staticWakeVariationAccumulator;
         private float simulationInterpolation = 1f;
         private float wakeInterpolation = 1f;
         private double lastRuntimeTime;
@@ -427,7 +547,6 @@ namespace ProgrammaticStylized3D.Rivers
         private bool resourcesDirty = true;
         private bool staticPressureTargetDirty = true;
         private bool staticWakeSourceDirty = true;
-        private int staticWakeSourceRebuildCount;
         private int validStaticSourceCount;
         private bool generatedGeometryRegistryDirty = true;
         private bool generatedGeometryRefreshInProgress;
@@ -451,19 +570,74 @@ namespace ProgrammaticStylized3D.Rivers
         public int WakeFieldWidth => wakeFieldWidth;
         public int WakeFieldHeight => wakeFieldHeight;
         public int ActiveWakeChunkCount => CountActiveWakeChunks();
-        public int StaticHeldWakeChunkCount => CountStaticHeldWakeChunks();
-        public int TemporarilyRetainedWakeChunkCount =>
-            CountTemporarilyRetainedWakeChunks();
-        public double MaximumRemainingWakeRetentionSeconds =>
-            ResolveMaximumRemainingWakeRetentionSeconds();
-        public int StaticWakeSourceRebuildCount =>
-            staticWakeSourceRebuildCount;
         public int ContinuousSourceCount => continuousSources.Count;
         public float SimulationRate => ResolveSimulationRate();
         public float WakeSimulationRate => ResolveSimulationRate();
         public long EstimatedMemoryBytes =>
             (long)fieldWidth * fieldHeight * 8L * 3L +
             (long)wakeFieldWidth * wakeFieldHeight * 8L * 3L;
+
+        private struct StaticWakeLeeVariationState
+        {
+            public int SampleCount;
+            public float[] CurrentDepthMultipliers;
+            public float[] TransitionStartDepthMultipliers;
+            public float[] TargetDepthMultipliers;
+            public float[] CurrentLengthMultipliers;
+            public float[] TransitionStartLengthMultipliers;
+            public float[] TargetLengthMultipliers;
+            public float[] CurrentTrailingEdgeOffsets;
+            public float[] TransitionStartTrailingEdgeOffsets;
+            public float[] TargetTrailingEdgeOffsets;
+            public float[] RawScratch;
+            public float[] SmoothedScratch;
+            public float Transition;
+            public float TransitionDuration;
+            public float SelectedInterval;
+            public uint EventIndex;
+            public double NextEventTime;
+            public bool ScheduleInitialized;
+            public int ProfileFamily;
+        }
+
+        private struct StaticWakeReleaseVariationState
+        {
+            public float CurrentLateralOffset;
+            public float TransitionStartLateralOffset;
+            public float TargetLateralOffset;
+            public float CurrentEnergyMultiplier;
+            public float TransitionStartEnergyMultiplier;
+            public float TargetEnergyMultiplier;
+            public float CurrentWidthMultiplier;
+            public float TransitionStartWidthMultiplier;
+            public float TargetWidthMultiplier;
+            public float CurrentDownstreamOffset;
+            public float TransitionStartDownstreamOffset;
+            public float TargetDownstreamOffset;
+            public float Transition;
+            public float TransitionDuration;
+            public float SelectedInterval;
+            public uint EventIndex;
+            public double NextEventTime;
+            public bool ScheduleInitialized;
+        }
+
+        private readonly struct StaticWakeBakeVariationParameters
+        {
+            public StaticWakeBakeVariationParameters(
+                StaticWakeLeeVariationState lee,
+                StaticWakeReleaseVariationState left,
+                StaticWakeReleaseVariationState right)
+            {
+                Lee = lee;
+                Left = left;
+                Right = right;
+            }
+
+            public StaticWakeLeeVariationState Lee { get; }
+            public StaticWakeReleaseVariationState Left { get; }
+            public StaticWakeReleaseVariationState Right { get; }
+        }
 
         private struct ContinuousSource
         {
@@ -499,6 +673,14 @@ namespace ProgrammaticStylized3D.Rivers
             public float StaticContactSharpness;
             public float StaticWakeReachMultiplier;
             public float StaticWakeSpreadMultiplier;
+            public float StaticWakeVariation;
+            public StaticWakeLeeVariationState StaticWakeLeeVariation;
+            public StaticWakeReleaseVariationState
+                StaticWakeLeftReleaseVariation;
+            public StaticWakeReleaseVariationState
+                StaticWakeRightReleaseVariation;
+            public float StaticWakeVariationIntervalMin;
+            public float StaticWakeVariationIntervalMax;
             public float StaticProfileVariation;
             public Vector2[] StaticContour;
             public float MovementSpeed;
@@ -957,6 +1139,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             return false;
         }
+
 #endif
 
         private void OnEnable()
@@ -1089,6 +1272,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             CleanupStaleSources(now);
             UpdateStaticPressureProfiles(deltaTime, now);
+            UpdateStaticWakeVariations(deltaTime, now);
 
             bool requiresField =
                 pendingImpacts.Count > 0 ||
@@ -1168,6 +1352,7 @@ namespace ProgrammaticStylized3D.Rivers
             staticWakeSourceDirty = true;
             pendingImpacts.Clear();
             simulationAccumulator = 0f;
+            staticWakeVariationAccumulator = 0f;
             simulationInterpolation = 1f;
             wakeInterpolation = 1f;
         }
@@ -1240,7 +1425,12 @@ namespace ProgrammaticStylized3D.Rivers
             float profileChangeIntervalMin =
                 StylizedRiver.DefaultStaticPressureProfileChangeIntervalMin,
             float profileChangeIntervalMax =
-                StylizedRiver.DefaultStaticPressureProfileChangeIntervalMax)
+                StylizedRiver.DefaultStaticPressureProfileChangeIntervalMax,
+            float wakeVariation = 0.35f,
+            float wakeVariationIntervalMin =
+                StylizedRiver.DefaultStaticWakeVariationIntervalMin,
+            float wakeVariationIntervalMax =
+                StylizedRiver.DefaultStaticWakeVariationIntervalMax)
         {
             if (river == null ||
                 !river.RuntimeDisturbancesEnabled ||
@@ -1292,6 +1482,17 @@ namespace ProgrammaticStylized3D.Rivers
                 CreatePressureProfileScratch(basePressureProfile);
             float[] smoothedProfileScratch =
                 CreatePressureProfileScratch(basePressureProfile);
+            int wakeVariationSampleCount =
+                ResolveStaticWakeVariationLateralSampleCount(
+                    acrossHalfWidth,
+                    surfaceHalfWidth * 2f);
+            StaticWakeLeeVariationState wakeLeeVariation =
+                CreateStaticWakeLeeVariationState(
+                    wakeVariationSampleCount);
+            StaticWakeReleaseVariationState leftWakeVariation =
+                CreateStaticWakeReleaseVariationState();
+            StaticWakeReleaseVariationState rightWakeVariation =
+                CreateStaticWakeReleaseVariationState();
 
             continuousSources[sourceId] =
                 new ContinuousSource
@@ -1368,6 +1569,22 @@ namespace ProgrammaticStylized3D.Rivers
                         wakeSpreadMultiplier,
                         0.5f,
                         2f),
+                    StaticWakeVariation = Mathf.Clamp01(wakeVariation),
+                    StaticWakeLeeVariation = wakeLeeVariation,
+                    StaticWakeLeftReleaseVariation = leftWakeVariation,
+                    StaticWakeRightReleaseVariation = rightWakeVariation,
+                    StaticWakeVariationIntervalMin = Mathf.Clamp(
+                        Mathf.Min(
+                            wakeVariationIntervalMin,
+                            wakeVariationIntervalMax),
+                        StylizedRiver.MinimumStaticWakeVariationInterval,
+                        StylizedRiver.MaximumStaticWakeVariationInterval),
+                    StaticWakeVariationIntervalMax = Mathf.Clamp(
+                        Mathf.Max(
+                            wakeVariationIntervalMin,
+                            wakeVariationIntervalMax),
+                        StylizedRiver.MinimumStaticWakeVariationInterval,
+                        StylizedRiver.MaximumStaticWakeVariationInterval),
                     StaticProfileVariation = Mathf.Clamp(
                         unsteadiness,
                         0f,
@@ -1735,6 +1952,10 @@ namespace ProgrammaticStylized3D.Rivers
                 wakeMode == GeneratedRiverFeatureMode.Custom
                     ? settings.ObstructionWakeSpread
                     : river.ObstructionWakeSpread;
+            float wakeVariation =
+                wakeMode == GeneratedRiverFeatureMode.Custom
+                    ? settings.ObstructionWakeVariation
+                    : river.ObstructionWakeVariation;
 
             return new ResolvedGeneratedRiverInteraction(
                 pressureEnabled,
@@ -1746,7 +1967,8 @@ namespace ProgrammaticStylized3D.Rivers
                 wakeEnabled,
                 wakeStrength,
                 wakeReach,
-                wakeSpread);
+                wakeSpread,
+                wakeVariation);
         }
 
         private void ProcessGeneratedGeometrySource(
@@ -1988,7 +2210,10 @@ namespace ProgrammaticStylized3D.Rivers
                     true,
                     interaction.ObstructionWakeSpread,
                     interaction.StaticPressureProfileChangeIntervalMin,
-                    interaction.StaticPressureProfileChangeIntervalMax))
+                    interaction.StaticPressureProfileChangeIntervalMax,
+                    interaction.ObstructionWakeVariation,
+                    river.ObstructionWakeVariationIntervalMin,
+                    river.ObstructionWakeVariationIntervalMax))
             {
                 return;
             }
@@ -2019,6 +2244,7 @@ namespace ProgrammaticStylized3D.Rivers
                     interaction.ObstructionWakeEnabled,
                     interaction.ObstructionWakeReach,
                     interaction.ObstructionWakeSpread,
+                    interaction.ObstructionWakeVariation,
                     footprintStatus + " " + pressureStatus + " " +
                     $"Contour {footprint.Contour.Length} points; " +
                     $"blockage {blockageRatio:P0}; " +
@@ -2038,6 +2264,28 @@ namespace ProgrammaticStylized3D.Rivers
             };
             float profilePixelWidth =
                 Mathf.Max(0.10f, pressureAcrossHalfWidth * 2f) /
+                Mathf.Max(0.10f, localRiverWidth) *
+                localFieldHeight;
+            return RiverDisturbanceFootprintResolver.
+                ResolvePressureSupportLateralSampleCount(
+                    Mathf.CeilToInt(profilePixelWidth));
+        }
+
+        private int ResolveStaticWakeVariationLateralSampleCount(
+            float wakeAcrossHalfWidth,
+            float localRiverWidth)
+        {
+            int localFieldHeight = wakeFieldHeight > 0
+                ? wakeFieldHeight
+                : river.Quality switch
+                {
+                    StylizedRiverQuality.Low => 32,
+                    StylizedRiverQuality.Medium => 48,
+                    StylizedRiverQuality.High => 64,
+                    _ => 48
+                };
+            float profilePixelWidth =
+                Mathf.Max(0.10f, wakeAcrossHalfWidth * 2f) /
                 Mathf.Max(0.10f, localRiverWidth) *
                 localFieldHeight;
             return RiverDisturbanceFootprintResolver.
@@ -2218,7 +2466,6 @@ namespace ProgrammaticStylized3D.Rivers
                 "PS3D_RiverDisturbance_StaticWakeSource",
                 wakeFieldWidth,
                 wakeFieldHeight);
-
             currentState = stateA;
             previousState = stateA;
             writeState = stateB;
@@ -2244,8 +2491,8 @@ namespace ProgrammaticStylized3D.Rivers
                 wakeFieldHeight,
                 0,
                 wakeFieldWidth);
-
             simulationAccumulator = 0f;
+            staticWakeVariationAccumulator = 0f;
             simulationInterpolation = 1f;
             wakeInterpolation = 1f;
             validStaticSourceCount = 0;
@@ -2927,13 +3174,7 @@ namespace ProgrammaticStylized3D.Rivers
                     projection.GlobalDistance,
                     acrossNormalized,
                     surfaceHalfWidth,
-                    source.AcrossHalfWidth,
-                    source.AlongHalfLength,
-                    source.StaticWakeAmplitude,
-                    source.StaticWakeReachMultiplier,
-                    source.StaticWakeSpreadMultiplier,
-                    source.Phase,
-                    source.StaticContour);
+                    source);
 
                 MarkStaticWakeRange(
                     projection.GlobalDistance,
@@ -2943,7 +3184,6 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             staticWakeSourceDirty = false;
-            staticWakeSourceRebuildCount++;
             lastActivityTime = now;
         }
 
@@ -2975,6 +3215,7 @@ namespace ProgrammaticStylized3D.Rivers
                 1f,
                 responseStiffness,
                 unsteadiness,
+                default,
                 phase,
                 bakeStaticPressureKernel,
                 staticTarget,
@@ -2986,30 +3227,28 @@ namespace ProgrammaticStylized3D.Rivers
             float globalDistance,
             float acrossNormalized,
             float surfaceHalfWidth,
-            float acrossHalfWidth,
-            float alongHalfLength,
-            float wakeAmplitude,
-            float wakeReach,
-            float wakeSpread,
-            float phase,
-            Vector2[] contour)
+            ContinuousSource source)
         {
             DispatchStaticBakeCommon(
                 globalDistance,
                 acrossNormalized,
                 surfaceHalfWidth,
-                acrossHalfWidth,
-                alongHalfLength,
-                contour,
+                source.AcrossHalfWidth,
+                source.AlongHalfLength,
+                source.StaticContour,
                 wakeFieldWidth,
                 wakeFieldHeight,
                 0f,
-                wakeAmplitude,
-                wakeReach,
-                wakeSpread,
+                source.StaticWakeAmplitude,
+                source.StaticWakeReachMultiplier,
+                source.StaticWakeSpreadMultiplier,
                 1f,
                 0f,
-                phase,
+                new StaticWakeBakeVariationParameters(
+                    source.StaticWakeLeeVariation,
+                    source.StaticWakeLeftReleaseVariation,
+                    source.StaticWakeRightReleaseVariation),
+                source.Phase,
                 bakeStaticWakeSourceKernel,
                 staticWakeSource,
                 false,
@@ -3031,6 +3270,7 @@ namespace ProgrammaticStylized3D.Rivers
             float wakeSpread,
             float responseStiffness,
             float unsteadiness,
+            StaticWakeBakeVariationParameters wakeVariation,
             float phase,
             int kernel,
             RenderTexture targetTexture,
@@ -3159,6 +3399,30 @@ namespace ProgrammaticStylized3D.Rivers
                 }
             }
 
+            StaticWakeLeeVariationState wakeLeeVariation =
+                wakeVariation.Lee;
+            int wakeVariationProfileCount =
+                !pressurePass &&
+                HasValidStaticWakeLeeVariationState(wakeLeeVariation)
+                    ? wakeLeeVariation.SampleCount
+                    : 0;
+            for (int index = 0;
+                 index < staticWakeVariationProfileUpload.Length;
+                 index++)
+            {
+                staticWakeVariationProfileUpload[index] =
+                    index < wakeVariationProfileCount
+                        ? new Vector4(
+                            wakeLeeVariation.
+                                CurrentDepthMultipliers[index],
+                            wakeLeeVariation.
+                                CurrentLengthMultipliers[index],
+                            wakeLeeVariation.
+                                CurrentTrailingEdgeOffsets[index],
+                            1f)
+                        : new Vector4(1f, 1f, 0f, 0f);
+            }
+
             computeShader.SetInts("_FieldSize", targetWidth, targetHeight);
             computeShader.SetInts(
                 "_StaticRect",
@@ -3189,6 +3453,15 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetVectorArray(
                 "_StaticPressureGeometry",
                 staticPressureGeometryUpload);
+            computeShader.SetVectorArray(
+                "_StaticWakeVariationProfile",
+                staticWakeVariationProfileUpload);
+            computeShader.SetInt(
+                "_StaticWakeVariationProfileCount",
+                wakeVariationProfileCount);
+            computeShader.SetFloat(
+                "_StaticWakeVariationProfileHalfWidthPixels",
+                acrossPixels);
             computeShader.SetInt(
                 "_StaticPressureGeometryValid",
                 pressureGeometryValid ? 1 : 0);
@@ -3230,6 +3503,24 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_StaticWakeSpread",
                 Mathf.Clamp(wakeSpread, 0.5f, 2f));
+            StaticWakeReleaseVariationState leftRelease =
+                wakeVariation.Left;
+            StaticWakeReleaseVariationState rightRelease =
+                wakeVariation.Right;
+            computeShader.SetVector(
+                "_StaticWakeLeftReleaseVariation",
+                new Vector4(
+                    leftRelease.CurrentLateralOffset,
+                    leftRelease.CurrentEnergyMultiplier,
+                    leftRelease.CurrentWidthMultiplier,
+                    leftRelease.CurrentDownstreamOffset));
+            computeShader.SetVector(
+                "_StaticWakeRightReleaseVariation",
+                new Vector4(
+                    rightRelease.CurrentLateralOffset,
+                    rightRelease.CurrentEnergyMultiplier,
+                    rightRelease.CurrentWidthMultiplier,
+                    rightRelease.CurrentDownstreamOffset));
             computeShader.SetFloat(
                 "_StaticPhase",
                 Mathf.Repeat(phase, 1f));
@@ -3449,6 +3740,697 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             return result;
+        }
+
+        private void UpdateStaticWakeVariations(
+            float deltaTime,
+            double now)
+        {
+            if (river == null || deltaTime <= 0f)
+            {
+                return;
+            }
+
+            staticWakeVariationAccumulator += deltaTime;
+            float updateInterval =
+                1f / Mathf.Max(1f, StaticWakeVariationUpdateRate);
+            if (staticWakeVariationAccumulator < updateInterval)
+            {
+                return;
+            }
+
+            float variationDeltaTime = Mathf.Min(
+                staticWakeVariationAccumulator,
+                0.25f);
+            staticWakeVariationAccumulator = 0f;
+            staticWakeVariationSourceIds.Clear();
+
+            foreach (KeyValuePair<EntityId, ContinuousSource> pair in
+                     continuousSources)
+            {
+                ContinuousSource source = pair.Value;
+                if (source.IsStatic &&
+                    source.StaticWakeAmplitude > 0.0001f)
+                {
+                    staticWakeVariationSourceIds.Add(pair.Key);
+                }
+            }
+
+            bool anyVariationChanged = false;
+            for (int sourceIndex = 0;
+                 sourceIndex < staticWakeVariationSourceIds.Count;
+                 sourceIndex++)
+            {
+                EntityId sourceId =
+                    staticWakeVariationSourceIds[sourceIndex];
+                if (!continuousSources.TryGetValue(
+                        sourceId,
+                        out ContinuousSource source))
+                {
+                    continue;
+                }
+
+                bool sourceChanged;
+                if (source.StaticWakeVariation <= 0.0001f)
+                {
+                    sourceChanged = ResetStaticWakeVariation(ref source);
+                }
+                else
+                {
+                    float sourcePhase = source.Phase;
+                    float variationAmount = source.StaticWakeVariation;
+                    float intervalMin =
+                        source.StaticWakeVariationIntervalMin;
+                    float intervalMax =
+                        source.StaticWakeVariationIntervalMax;
+                    sourceChanged =
+                        UpdateStaticWakeLeeVariation(
+                            ref source.StaticWakeLeeVariation,
+                            sourcePhase,
+                            variationAmount,
+                            intervalMin,
+                            intervalMax,
+                            now,
+                            variationDeltaTime,
+                            updateInterval) |
+                        UpdateStaticWakeReleaseVariation(
+                            ref source.StaticWakeLeftReleaseVariation,
+                            sourcePhase,
+                            variationAmount,
+                            intervalMin,
+                            intervalMax,
+                            now,
+                            variationDeltaTime,
+                            updateInterval,
+                            11.17f) |
+                        UpdateStaticWakeReleaseVariation(
+                            ref source.StaticWakeRightReleaseVariation,
+                            sourcePhase,
+                            variationAmount,
+                            intervalMin,
+                            intervalMax,
+                            now,
+                            variationDeltaTime,
+                            updateInterval,
+                            23.41f);
+                }
+
+                if (sourceChanged)
+                {
+                    anyVariationChanged = true;
+                }
+
+                continuousSources[sourceId] = source;
+            }
+
+            if (anyVariationChanged)
+            {
+                staticWakeSourceDirty = true;
+            }
+        }
+
+        private static bool ResetStaticWakeVariation(
+            ref ContinuousSource source)
+        {
+            bool changed =
+                ResetStaticWakeLeeVariation(
+                    ref source.StaticWakeLeeVariation) |
+                ResetStaticWakeReleaseVariation(
+                    ref source.StaticWakeLeftReleaseVariation) |
+                ResetStaticWakeReleaseVariation(
+                    ref source.StaticWakeRightReleaseVariation);
+            return changed;
+        }
+
+        private static bool UpdateStaticWakeLeeVariation(
+            ref StaticWakeLeeVariationState state,
+            float sourcePhase,
+            float variationAmount,
+            float intervalMin,
+            float intervalMax,
+            double now,
+            float deltaTime,
+            float updateInterval)
+        {
+            if (!HasValidStaticWakeLeeVariationState(state))
+            {
+                return false;
+            }
+
+            if (!state.ScheduleInitialized)
+            {
+                state.SelectedInterval = ResolveStaticWakeVariationInterval(
+                    sourcePhase,
+                    intervalMin,
+                    intervalMax,
+                    state.EventIndex,
+                    3.17f);
+                state.NextEventTime = now + state.SelectedInterval;
+                state.ScheduleInitialized = true;
+            }
+            else if (now >= state.NextEventTime &&
+                     state.Transition >= 1f)
+            {
+                BeginStaticWakeLeeVariationTransition(
+                    ref state,
+                    sourcePhase,
+                    variationAmount,
+                    intervalMin,
+                    intervalMax,
+                    now,
+                    updateInterval);
+            }
+
+            if (state.Transition >= 1f ||
+                state.TransitionDuration <= 0.0001f)
+            {
+                return false;
+            }
+
+            state.Transition = Mathf.Min(
+                1f,
+                state.Transition + deltaTime / state.TransitionDuration);
+            ApplyStaticWakeLeeVariationTransition(ref state);
+            return true;
+        }
+
+        private static bool UpdateStaticWakeReleaseVariation(
+            ref StaticWakeReleaseVariationState state,
+            float sourcePhase,
+            float variationAmount,
+            float intervalMin,
+            float intervalMax,
+            double now,
+            float deltaTime,
+            float updateInterval,
+            float scheduleSalt)
+        {
+            if (!state.ScheduleInitialized)
+            {
+                state.SelectedInterval = ResolveStaticWakeVariationInterval(
+                    sourcePhase,
+                    intervalMin,
+                    intervalMax,
+                    state.EventIndex,
+                    scheduleSalt);
+                state.NextEventTime = now + state.SelectedInterval;
+                state.ScheduleInitialized = true;
+            }
+            else if (now >= state.NextEventTime &&
+                     state.Transition >= 1f)
+            {
+                BeginStaticWakeReleaseVariationTransition(
+                    ref state,
+                    sourcePhase,
+                    variationAmount,
+                    intervalMin,
+                    intervalMax,
+                    now,
+                    updateInterval,
+                    scheduleSalt);
+            }
+
+            if (state.Transition >= 1f ||
+                state.TransitionDuration <= 0.0001f)
+            {
+                return false;
+            }
+
+            state.Transition = Mathf.Min(
+                1f,
+                state.Transition + deltaTime / state.TransitionDuration);
+            ApplyStaticWakeReleaseVariationTransition(ref state);
+            return true;
+        }
+
+        private static void BeginStaticWakeLeeVariationTransition(
+            ref StaticWakeLeeVariationState state,
+            float sourcePhase,
+            float variationAmount,
+            float intervalMin,
+            float intervalMax,
+            double now,
+            float updateInterval)
+        {
+            Array.Copy(
+                state.CurrentDepthMultipliers,
+                state.TransitionStartDepthMultipliers,
+                state.SampleCount);
+            Array.Copy(
+                state.CurrentLengthMultipliers,
+                state.TransitionStartLengthMultipliers,
+                state.SampleCount);
+            Array.Copy(
+                state.CurrentTrailingEdgeOffsets,
+                state.TransitionStartTrailingEdgeOffsets,
+                state.SampleCount);
+
+            state.EventIndex++;
+            GenerateStaticWakeLeeTargetProfile(
+                ref state,
+                sourcePhase,
+                variationAmount);
+            state.Transition = 0f;
+            state.SelectedInterval = ResolveStaticWakeVariationInterval(
+                sourcePhase,
+                intervalMin,
+                intervalMax,
+                state.EventIndex,
+                4.73f);
+            state.TransitionDuration = Mathf.Clamp(
+                state.SelectedInterval *
+                    StaticWakeVariationTransitionFraction,
+                updateInterval,
+                state.SelectedInterval);
+            state.NextEventTime = now + state.SelectedInterval;
+        }
+
+        private static void BeginStaticWakeReleaseVariationTransition(
+            ref StaticWakeReleaseVariationState state,
+            float sourcePhase,
+            float variationAmount,
+            float intervalMin,
+            float intervalMax,
+            double now,
+            float updateInterval,
+            float scheduleSalt)
+        {
+            state.TransitionStartLateralOffset =
+                state.CurrentLateralOffset;
+            state.TransitionStartEnergyMultiplier =
+                state.CurrentEnergyMultiplier;
+            state.TransitionStartWidthMultiplier =
+                state.CurrentWidthMultiplier;
+            state.TransitionStartDownstreamOffset =
+                state.CurrentDownstreamOffset;
+
+            state.EventIndex++;
+            GenerateStaticWakeReleaseTarget(
+                ref state,
+                sourcePhase,
+                state.EventIndex,
+                variationAmount,
+                scheduleSalt);
+            state.Transition = 0f;
+            state.SelectedInterval = ResolveStaticWakeVariationInterval(
+                sourcePhase,
+                intervalMin,
+                intervalMax,
+                state.EventIndex,
+                scheduleSalt + 2.31f);
+            state.TransitionDuration = Mathf.Clamp(
+                state.SelectedInterval *
+                    StaticWakeVariationTransitionFraction,
+                updateInterval,
+                state.SelectedInterval);
+            state.NextEventTime = now + state.SelectedInterval;
+        }
+
+        private static float ResolveStaticWakeVariationInterval(
+            float sourcePhase,
+            float authoredIntervalMin,
+            float authoredIntervalMax,
+            uint eventIndex,
+            float salt)
+        {
+            float intervalMin = Mathf.Clamp(
+                Mathf.Min(authoredIntervalMin, authoredIntervalMax),
+                StylizedRiver.MinimumStaticWakeVariationInterval,
+                StylizedRiver.MaximumStaticWakeVariationInterval);
+            float intervalMax = Mathf.Clamp(
+                Mathf.Max(authoredIntervalMin, authoredIntervalMax),
+                StylizedRiver.MinimumStaticWakeVariationInterval,
+                StylizedRiver.MaximumStaticWakeVariationInterval);
+            return Mathf.Lerp(
+                intervalMin,
+                intervalMax,
+                StaticWakeVariationRandom01(
+                    sourcePhase,
+                    eventIndex,
+                    salt));
+        }
+
+        private static void GenerateStaticWakeLeeTargetProfile(
+            ref StaticWakeLeeVariationState state,
+            float sourcePhase,
+            float variationAmount)
+        {
+            float variation = Mathf.Clamp01(variationAmount);
+            int family = Mathf.Min(
+                5,
+                Mathf.FloorToInt(
+                    StaticWakeVariationRandom01(
+                        sourcePhase,
+                        state.EventIndex,
+                        0.31f) * 6f));
+            state.ProfileFamily = family;
+
+            GenerateStaticWakeVariationPattern(
+                state.RawScratch,
+                state.SmoothedScratch,
+                state.SampleCount,
+                sourcePhase,
+                state.EventIndex,
+                0.67f,
+                family);
+            for (int index = 0; index < state.SampleCount; index++)
+            {
+                state.TargetDepthMultipliers[index] = Mathf.Clamp(
+                    1f + state.SmoothedScratch[index] *
+                    0.20f * variation,
+                    0.80f,
+                    1.20f);
+            }
+
+            GenerateStaticWakeVariationPattern(
+                state.RawScratch,
+                state.SmoothedScratch,
+                state.SampleCount,
+                sourcePhase,
+                state.EventIndex,
+                1.13f,
+                (family + 2) % 6);
+            for (int index = 0; index < state.SampleCount; index++)
+            {
+                state.TargetLengthMultipliers[index] = Mathf.Clamp(
+                    1f + state.SmoothedScratch[index] *
+                    0.15f * variation,
+                    0.85f,
+                    1.15f);
+            }
+
+            GenerateStaticWakeVariationPattern(
+                state.RawScratch,
+                state.SmoothedScratch,
+                state.SampleCount,
+                sourcePhase,
+                state.EventIndex,
+                1.79f,
+                (family + 4) % 6);
+            for (int index = 0; index < state.SampleCount; index++)
+            {
+                state.TargetTrailingEdgeOffsets[index] =
+                    state.SmoothedScratch[index] *
+                    0.75f * variation;
+            }
+        }
+
+        private static void GenerateStaticWakeVariationPattern(
+            float[] raw,
+            float[] smoothed,
+            int sampleCount,
+            float sourcePhase,
+            uint eventIndex,
+            float salt,
+            int family)
+        {
+            float phaseA = StaticWakeVariationRandom01(
+                sourcePhase,
+                eventIndex,
+                salt + 0.17f) * Mathf.PI * 2f;
+            float phaseB = StaticWakeVariationRandom01(
+                sourcePhase,
+                eventIndex,
+                salt + 0.53f) * Mathf.PI * 2f;
+            float direction = StaticWakeVariationRandom01(
+                sourcePhase,
+                eventIndex,
+                salt + 0.91f) >= 0.5f
+                    ? 1f
+                    : -1f;
+
+            for (int index = 0; index < sampleCount; index++)
+            {
+                float across01 = sampleCount > 1
+                    ? index / (float)(sampleCount - 1)
+                    : 0.5f;
+                float signedAcross = across01 * 2f - 1f;
+                float centreShape =
+                    1f - signedAcross * signedAcross;
+                float edgeShape =
+                    Mathf.Abs(signedAcross) * 2f - 1f;
+                float shape = family switch
+                {
+                    0 =>
+                        direction * signedAcross +
+                        Mathf.Sin(
+                            across01 * Mathf.PI * 2f + phaseA) *
+                        0.18f,
+                    1 =>
+                        direction * centreShape +
+                        Mathf.Sin(
+                            across01 * Mathf.PI * 2f + phaseA) *
+                        0.20f,
+                    2 =>
+                        direction * edgeShape +
+                        Mathf.Cos(
+                            across01 * Mathf.PI * 2f + phaseA) *
+                        0.16f,
+                    3 =>
+                        Mathf.Cos(
+                            across01 * Mathf.PI * 2f + phaseA) *
+                        0.82f +
+                        direction * signedAcross * 0.18f,
+                    4 =>
+                        Mathf.Sin(
+                            across01 * Mathf.PI * 2f + phaseA) *
+                        0.70f +
+                        Mathf.Sin(
+                            across01 * Mathf.PI * 4f + phaseB) *
+                        0.22f,
+                    _ =>
+                        Mathf.Cos(
+                            across01 * Mathf.PI * 2f + phaseA) *
+                        0.56f +
+                        Mathf.Sin(
+                            across01 * Mathf.PI * 4f + phaseB) *
+                        0.26f +
+                        direction * signedAcross * 0.14f
+                };
+                float edgeInfluence = Mathf.Lerp(
+                    0.38f,
+                    1f,
+                    Mathf.SmoothStep(
+                        0f,
+                        1f,
+                        1f - Mathf.Abs(signedAcross)));
+                raw[index] = shape * edgeInfluence;
+            }
+
+            SmoothStaticWakeVariationPattern(
+                raw,
+                smoothed,
+                sampleCount);
+            SmoothStaticWakeVariationPattern(
+                smoothed,
+                raw,
+                sampleCount);
+
+            float mean = 0f;
+            for (int index = 0; index < sampleCount; index++)
+            {
+                mean += raw[index];
+            }
+            mean /= Mathf.Max(1, sampleCount);
+
+            float maximumMagnitude = 0f;
+            for (int index = 0; index < sampleCount; index++)
+            {
+                smoothed[index] = raw[index] - mean;
+                maximumMagnitude = Mathf.Max(
+                    maximumMagnitude,
+                    Mathf.Abs(smoothed[index]));
+            }
+
+            float normalization = maximumMagnitude > 0.0001f
+                ? 1f / maximumMagnitude
+                : 0f;
+            for (int index = 0; index < sampleCount; index++)
+            {
+                smoothed[index] *= normalization;
+            }
+        }
+
+        private static void SmoothStaticWakeVariationPattern(
+            float[] source,
+            float[] destination,
+            int sampleCount)
+        {
+            for (int index = 0; index < sampleCount; index++)
+            {
+                float centre = source[index];
+                float left = index > 0
+                    ? source[index - 1]
+                    : centre;
+                float right = index + 1 < sampleCount
+                    ? source[index + 1]
+                    : centre;
+                destination[index] =
+                    (left + centre * 2f + right) * 0.25f;
+            }
+        }
+
+        private static void GenerateStaticWakeReleaseTarget(
+            ref StaticWakeReleaseVariationState state,
+            float sourcePhase,
+            uint eventIndex,
+            float variationAmount,
+            float salt)
+        {
+            float variation = Mathf.Clamp01(variationAmount);
+            state.TargetLateralOffset =
+                StaticWakeVariationRandomSigned(
+                    sourcePhase,
+                    eventIndex,
+                    salt + 0.19f) *
+                0.15f * variation;
+            state.TargetEnergyMultiplier = Mathf.Clamp(
+                1f + StaticWakeVariationRandomSigned(
+                    sourcePhase,
+                    eventIndex,
+                    salt + 0.47f) *
+                0.20f * variation,
+                0.80f,
+                1.20f);
+            state.TargetWidthMultiplier = Mathf.Clamp(
+                1f + StaticWakeVariationRandomSigned(
+                    sourcePhase,
+                    eventIndex,
+                    salt + 0.83f) *
+                0.12f * variation,
+                0.88f,
+                1.12f);
+            state.TargetDownstreamOffset =
+                StaticWakeVariationRandomSigned(
+                    sourcePhase,
+                    eventIndex,
+                    salt + 1.21f) *
+                0.50f * variation;
+        }
+
+        private static void ApplyStaticWakeLeeVariationTransition(
+            ref StaticWakeLeeVariationState state)
+        {
+            float interpolation = Mathf.SmoothStep(
+                0f,
+                1f,
+                state.Transition);
+            for (int index = 0; index < state.SampleCount; index++)
+            {
+                state.CurrentDepthMultipliers[index] = Mathf.Lerp(
+                    state.TransitionStartDepthMultipliers[index],
+                    state.TargetDepthMultipliers[index],
+                    interpolation);
+                state.CurrentLengthMultipliers[index] = Mathf.Lerp(
+                    state.TransitionStartLengthMultipliers[index],
+                    state.TargetLengthMultipliers[index],
+                    interpolation);
+                state.CurrentTrailingEdgeOffsets[index] = Mathf.Lerp(
+                    state.TransitionStartTrailingEdgeOffsets[index],
+                    state.TargetTrailingEdgeOffsets[index],
+                    interpolation);
+            }
+        }
+
+        private static void ApplyStaticWakeReleaseVariationTransition(
+            ref StaticWakeReleaseVariationState state)
+        {
+            float interpolation = Mathf.SmoothStep(
+                0f,
+                1f,
+                state.Transition);
+            state.CurrentLateralOffset = Mathf.Lerp(
+                state.TransitionStartLateralOffset,
+                state.TargetLateralOffset,
+                interpolation);
+            state.CurrentEnergyMultiplier = Mathf.Lerp(
+                state.TransitionStartEnergyMultiplier,
+                state.TargetEnergyMultiplier,
+                interpolation);
+            state.CurrentWidthMultiplier = Mathf.Lerp(
+                state.TransitionStartWidthMultiplier,
+                state.TargetWidthMultiplier,
+                interpolation);
+            state.CurrentDownstreamOffset = Mathf.Lerp(
+                state.TransitionStartDownstreamOffset,
+                state.TargetDownstreamOffset,
+                interpolation);
+        }
+
+        private static bool ResetStaticWakeLeeVariation(
+            ref StaticWakeLeeVariationState state)
+        {
+            if (!HasValidStaticWakeLeeVariationState(state))
+            {
+                return false;
+            }
+
+            bool changed = false;
+            for (int index = 0; index < state.SampleCount; index++)
+            {
+                changed |=
+                    Mathf.Abs(state.CurrentDepthMultipliers[index] - 1f) >
+                        0.0001f ||
+                    Mathf.Abs(state.CurrentLengthMultipliers[index] - 1f) >
+                        0.0001f ||
+                    Mathf.Abs(state.CurrentTrailingEdgeOffsets[index]) >
+                        0.0001f;
+                state.CurrentDepthMultipliers[index] = 1f;
+                state.TransitionStartDepthMultipliers[index] = 1f;
+                state.TargetDepthMultipliers[index] = 1f;
+                state.CurrentLengthMultipliers[index] = 1f;
+                state.TransitionStartLengthMultipliers[index] = 1f;
+                state.TargetLengthMultipliers[index] = 1f;
+                state.CurrentTrailingEdgeOffsets[index] = 0f;
+                state.TransitionStartTrailingEdgeOffsets[index] = 0f;
+                state.TargetTrailingEdgeOffsets[index] = 0f;
+            }
+
+            state.Transition = 1f;
+            state.TransitionDuration = 0f;
+            state.SelectedInterval = 0f;
+            state.EventIndex = 0u;
+            state.NextEventTime = 0.0;
+            state.ScheduleInitialized = false;
+            state.ProfileFamily = 0;
+            return changed;
+        }
+
+        private static bool ResetStaticWakeReleaseVariation(
+            ref StaticWakeReleaseVariationState state)
+        {
+            bool changed =
+                Mathf.Abs(state.CurrentLateralOffset) > 0.0001f ||
+                Mathf.Abs(state.CurrentEnergyMultiplier - 1f) > 0.0001f ||
+                Mathf.Abs(state.CurrentWidthMultiplier - 1f) > 0.0001f ||
+                Mathf.Abs(state.CurrentDownstreamOffset) > 0.0001f;
+            state = CreateStaticWakeReleaseVariationState();
+            return changed;
+        }
+
+        private static float StaticWakeVariationRandom01(
+            float sourcePhase,
+            uint eventIndex,
+            float salt)
+        {
+            float input =
+                sourcePhase * 43.117f +
+                eventIndex * 13.731f +
+                salt * 23.419f;
+            return Mathf.Repeat(
+                Mathf.Sin(input) * 43758.5453f,
+                1f);
+        }
+
+        private static float StaticWakeVariationRandomSigned(
+            float sourcePhase,
+            uint eventIndex,
+            float salt)
+        {
+            return StaticWakeVariationRandom01(
+                sourcePhase,
+                eventIndex,
+                salt) * 2f - 1f;
         }
 
         private void UpdateStaticPressureProfiles(
@@ -3902,6 +4884,124 @@ namespace ProgrammaticStylized3D.Rivers
                 : Array.Empty<float>();
         }
 
+        private static StaticWakeLeeVariationState
+            CreateStaticWakeLeeVariationState(int sampleCount)
+        {
+            int resolvedSampleCount =
+                RiverDisturbanceFootprintResolver.
+                    ResolvePressureSupportLateralSampleCount(sampleCount);
+            return new StaticWakeLeeVariationState
+            {
+                SampleCount = resolvedSampleCount,
+                CurrentDepthMultipliers = CreateFilledFloatArray(
+                    resolvedSampleCount,
+                    1f),
+                TransitionStartDepthMultipliers = CreateFilledFloatArray(
+                    resolvedSampleCount,
+                    1f),
+                TargetDepthMultipliers = CreateFilledFloatArray(
+                    resolvedSampleCount,
+                    1f),
+                CurrentLengthMultipliers = CreateFilledFloatArray(
+                    resolvedSampleCount,
+                    1f),
+                TransitionStartLengthMultipliers = CreateFilledFloatArray(
+                    resolvedSampleCount,
+                    1f),
+                TargetLengthMultipliers = CreateFilledFloatArray(
+                    resolvedSampleCount,
+                    1f),
+                CurrentTrailingEdgeOffsets = new float[
+                    resolvedSampleCount],
+                TransitionStartTrailingEdgeOffsets = new float[
+                    resolvedSampleCount],
+                TargetTrailingEdgeOffsets = new float[
+                    resolvedSampleCount],
+                RawScratch = new float[resolvedSampleCount],
+                SmoothedScratch = new float[resolvedSampleCount],
+                Transition = 1f,
+                TransitionDuration = 0f,
+                SelectedInterval = 0f,
+                EventIndex = 0u,
+                NextEventTime = 0.0,
+                ScheduleInitialized = false,
+                ProfileFamily = 0
+            };
+        }
+
+        private static StaticWakeReleaseVariationState
+            CreateStaticWakeReleaseVariationState()
+        {
+            return new StaticWakeReleaseVariationState
+            {
+                CurrentLateralOffset = 0f,
+                TransitionStartLateralOffset = 0f,
+                TargetLateralOffset = 0f,
+                CurrentEnergyMultiplier = 1f,
+                TransitionStartEnergyMultiplier = 1f,
+                TargetEnergyMultiplier = 1f,
+                CurrentWidthMultiplier = 1f,
+                TransitionStartWidthMultiplier = 1f,
+                TargetWidthMultiplier = 1f,
+                CurrentDownstreamOffset = 0f,
+                TransitionStartDownstreamOffset = 0f,
+                TargetDownstreamOffset = 0f,
+                Transition = 1f,
+                TransitionDuration = 0f,
+                SelectedInterval = 0f,
+                EventIndex = 0u,
+                NextEventTime = 0.0,
+                ScheduleInitialized = false
+            };
+        }
+
+        private static float[] CreateFilledFloatArray(
+            int length,
+            float value)
+        {
+            float[] result = new float[Mathf.Max(0, length)];
+            for (int index = 0; index < result.Length; index++)
+            {
+                result[index] = value;
+            }
+            return result;
+        }
+
+        private static bool HasValidStaticWakeLeeVariationState(
+            StaticWakeLeeVariationState state)
+        {
+            int sampleCount = state.SampleCount;
+            return sampleCount > 0 &&
+                   sampleCount <=
+                       RiverDisturbanceFootprintResolver.
+                           MaximumPressureSupportLateralSamples &&
+                   state.CurrentDepthMultipliers != null &&
+                   state.TransitionStartDepthMultipliers != null &&
+                   state.TargetDepthMultipliers != null &&
+                   state.CurrentLengthMultipliers != null &&
+                   state.TransitionStartLengthMultipliers != null &&
+                   state.TargetLengthMultipliers != null &&
+                   state.CurrentTrailingEdgeOffsets != null &&
+                   state.TransitionStartTrailingEdgeOffsets != null &&
+                   state.TargetTrailingEdgeOffsets != null &&
+                   state.RawScratch != null &&
+                   state.SmoothedScratch != null &&
+                   state.CurrentDepthMultipliers.Length == sampleCount &&
+                   state.TransitionStartDepthMultipliers.Length ==
+                       sampleCount &&
+                   state.TargetDepthMultipliers.Length == sampleCount &&
+                   state.CurrentLengthMultipliers.Length == sampleCount &&
+                   state.TransitionStartLengthMultipliers.Length ==
+                       sampleCount &&
+                   state.TargetLengthMultipliers.Length == sampleCount &&
+                   state.CurrentTrailingEdgeOffsets.Length == sampleCount &&
+                   state.TransitionStartTrailingEdgeOffsets.Length ==
+                       sampleCount &&
+                   state.TargetTrailingEdgeOffsets.Length == sampleCount &&
+                   state.RawScratch.Length == sampleCount &&
+                   state.SmoothedScratch.Length == sampleCount;
+        }
+
         private static float StaticPressureProfileRandom01(
             float sourcePhase,
             uint eventIndex,
@@ -4261,64 +5361,6 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             return count;
-        }
-
-        private int CountStaticHeldWakeChunks()
-        {
-            int count = 0;
-            int length = Mathf.Min(
-                wakeChunkActive.Length,
-                chunkHasStaticSource.Length);
-            for (int index = 0; index < length; index++)
-            {
-                if (wakeChunkActive[index] && chunkHasStaticSource[index])
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
-
-        private int CountTemporarilyRetainedWakeChunks()
-        {
-            int count = 0;
-            int length = Mathf.Min(
-                wakeChunkActive.Length,
-                chunkHasStaticSource.Length);
-            for (int index = 0; index < length; index++)
-            {
-                if (wakeChunkActive[index] && !chunkHasStaticSource[index])
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
-
-        private double ResolveMaximumRemainingWakeRetentionSeconds()
-        {
-            double now = Time.realtimeSinceStartupAsDouble;
-            double maximum = 0.0;
-            int length = Mathf.Min(
-                wakeChunkActiveUntil.Length,
-                chunkHasStaticSource.Length);
-            for (int index = 0; index < length; index++)
-            {
-                if (index >= wakeChunkActive.Length ||
-                    !wakeChunkActive[index] ||
-                    chunkHasStaticSource[index])
-                {
-                    continue;
-                }
-
-                maximum = Math.Max(
-                    maximum,
-                    wakeChunkActiveUntil[index] - now);
-            }
-
-            return Math.Max(0.0, maximum);
         }
 
         private void BindField()

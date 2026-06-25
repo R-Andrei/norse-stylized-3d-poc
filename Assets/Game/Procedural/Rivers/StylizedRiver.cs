@@ -98,16 +98,6 @@ namespace ProgrammaticStylized3D.Rivers
         StaticPressureTarget = 6,
         StaticWakeSource = 7,
         WakeEnergy = 8,
-        StaticWakeRelease = 9,
-        StaticWakeLee = 10,
-        StaticWakeReach = 11,
-        StaticPressureAndLee = 12,
-        WakeDownstreamGradient = 13,
-        WakeLateralGradient = 14,
-        WakeIntensity = 15,
-        FinalWakeContribution = 16,
-        WakeGeometryCore = 17,
-        LeeAndTrailGeometry = 18,
         FinalWakeGeometryHeight = 19
     }
 
@@ -164,6 +154,10 @@ namespace ProgrammaticStylized3D.Rivers
             0.75f;
         public const float DefaultStaticPressureProfileChangeIntervalMax =
             1.75f;
+        public const float MinimumStaticWakeVariationInterval = 0.5f;
+        public const float MaximumStaticWakeVariationInterval = 2f;
+        public const float DefaultStaticWakeVariationIntervalMin = 0.6f;
+        public const float DefaultStaticWakeVariationIntervalMax = 0.9f;
 
         private const string LegacyCurrentObjectName =
             "__PS3D_RiverCurrentAccents";
@@ -539,12 +533,32 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0.5f, 2f)]
         [SerializeField] private float obstructionWakeSpread = 1f;
 
+        [Tooltip("Controls spatial lee-profile changes and independent left/right release trajectory variation for inherited stationary wake sources. Zero keeps the accepted source geometry stable; one uses the full bounded variation range.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float obstructionWakeVariation = 0.35f;
+
+        [Tooltip("Shortest randomized time, in seconds, between stationary wake-source variation targets.")]
+        [Range(
+            MinimumStaticWakeVariationInterval,
+            MaximumStaticWakeVariationInterval)]
+        [SerializeField]
+        private float obstructionWakeVariationIntervalMin =
+            DefaultStaticWakeVariationIntervalMin;
+
+        [Tooltip("Longest randomized time, in seconds, between stationary wake-source variation targets. Transitions occupy approximately 85% of the selected interval.")]
+        [Range(
+            MinimumStaticWakeVariationInterval,
+            MaximumStaticWakeVariationInterval)]
+        [SerializeField]
+        private float obstructionWakeVariationIntervalMax =
+            DefaultStaticWakeVariationIntervalMax;
+
         [Tooltip("Controls how quickly the shared transported wake field spreads laterally. Static wakes and provisional moving trails use the same persistent field.")]
         [Range(0.35f, 1.25f)]
         [SerializeField] private float obstructionWakeWidening = 0.65f;
 
         [Tooltip("Maximum positive surface height produced by the compact core of the shared transported wake field. Static and dynamic wakes use the same bounded geometry response.")]
-        [Range(0f, 0.20f)]
+        [Range(0f, 0.40f)]
         [SerializeField] private float obstructionWakeSurfaceHeight = 0.08f;
 
         [Tooltip("Controls how tightly transported wake energy is concentrated into visible surface geometry. Lower values retain a broader, stronger response; higher values restrict geometry to the strongest wake core without changing the underlying energy field.")]
@@ -885,7 +899,7 @@ namespace ProgrammaticStylized3D.Rivers
         public StylizedRiverDisturbancePreset DisturbancePreset =>
             disturbancePreset;
         public StylizedRiverDisturbanceDebugView DisturbanceDebugView =>
-            disturbanceDebugView;
+            ResolveDisturbanceDebugView(disturbanceDebugView);
 
         public float StaticPressureStrength => staticPressureStrength;
         public float StaticPressureContactSharpness =>
@@ -905,6 +919,11 @@ namespace ProgrammaticStylized3D.Rivers
         public float ObstructionWakeStrength => obstructionWakeStrength;
         public float ObstructionWakeReach => obstructionWakeReach;
         public float ObstructionWakeSpread => obstructionWakeSpread;
+        public float ObstructionWakeVariation => obstructionWakeVariation;
+        public float ObstructionWakeVariationIntervalMin =>
+            obstructionWakeVariationIntervalMin;
+        public float ObstructionWakeVariationIntervalMax =>
+            obstructionWakeVariationIntervalMax;
         public float ObstructionWakeWidening => obstructionWakeWidening;
         public float ObstructionWakeSurfaceHeight =>
             obstructionWakeSurfaceHeight;
@@ -1108,6 +1127,8 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void OnEnable()
         {
+            disturbanceDebugView =
+                ResolveDisturbanceDebugView(disturbanceDebugView);
             CacheComponents();
             ResolveSplineContainer();
             AssignWaterLayer();
@@ -1127,8 +1148,40 @@ namespace ProgrammaticStylized3D.Rivers
             SetRendererEnabled(false);
         }
 
+        private static StylizedRiverDisturbanceDebugView
+            ResolveDisturbanceDebugView(
+                StylizedRiverDisturbanceDebugView value)
+        {
+            int rawValue = (int)value;
+            if ((rawValue >= 0 && rawValue <= 8) || rawValue == 19)
+            {
+                return value;
+            }
+
+            if (rawValue == 9 || rawValue == 10 || rawValue == 11 ||
+                rawValue == 20)
+            {
+                return StylizedRiverDisturbanceDebugView.StaticWakeSource;
+            }
+
+            if (rawValue == 12 || rawValue == 18)
+            {
+                return StylizedRiverDisturbanceDebugView.
+                    FinalWakeGeometryHeight;
+            }
+
+            if (rawValue >= 13 && rawValue <= 17)
+            {
+                return StylizedRiverDisturbanceDebugView.WakeEnergy;
+            }
+
+            return StylizedRiverDisturbanceDebugView.Final;
+        }
+
         private void OnValidate()
         {
+            disturbanceDebugView =
+                ResolveDisturbanceDebugView(disturbanceDebugView);
             ValidateSettings();
             CacheComponents();
             ResolveSplineContainer();
@@ -1431,6 +1484,11 @@ namespace ProgrammaticStylized3D.Rivers
                     runtimeDisturbances = false;
                     staticPressureStrength = 0f;
                     obstructionWakeStrength = 0f;
+                    obstructionWakeVariation = 0f;
+                    obstructionWakeVariationIntervalMin =
+                        DefaultStaticWakeVariationIntervalMin;
+                    obstructionWakeVariationIntervalMax =
+                        DefaultStaticWakeVariationIntervalMax;
                     obstructionWakeWidening = 0.65f;
                     movingTrailStrength = 0f;
                     impactRippleStrength = 0f;
@@ -1448,6 +1506,11 @@ namespace ProgrammaticStylized3D.Rivers
                     obstructionWakeStrength = 0.90f;
                     obstructionWakeReach = 0.75f;
                     obstructionWakeSpread = 0.85f;
+                    obstructionWakeVariation = 0.35f;
+                    obstructionWakeVariationIntervalMin =
+                        DefaultStaticWakeVariationIntervalMin;
+                    obstructionWakeVariationIntervalMax =
+                        DefaultStaticWakeVariationIntervalMax;
                     obstructionWakeWidening = 0.65f;
                     movingTrailStrength = 0.90f;
                     movingTrailPersistence = 0.48f;
@@ -1469,6 +1532,11 @@ namespace ProgrammaticStylized3D.Rivers
                     obstructionWakeStrength = 1.50f;
                     obstructionWakeReach = 1f;
                     obstructionWakeSpread = 1f;
+                    obstructionWakeVariation = 0.35f;
+                    obstructionWakeVariationIntervalMin =
+                        DefaultStaticWakeVariationIntervalMin;
+                    obstructionWakeVariationIntervalMax =
+                        DefaultStaticWakeVariationIntervalMax;
                     obstructionWakeWidening = 0.65f;
                     movingTrailStrength = 1.35f;
                     movingTrailPersistence = 0.65f;
@@ -1490,6 +1558,11 @@ namespace ProgrammaticStylized3D.Rivers
                     obstructionWakeStrength = 2f;
                     obstructionWakeReach = 1.35f;
                     obstructionWakeSpread = 1.25f;
+                    obstructionWakeVariation = 0.35f;
+                    obstructionWakeVariationIntervalMin =
+                        DefaultStaticWakeVariationIntervalMin;
+                    obstructionWakeVariationIntervalMax =
+                        DefaultStaticWakeVariationIntervalMax;
                     obstructionWakeWidening = 0.65f;
                     movingTrailStrength = 1.8f;
                     movingTrailPersistence = 0.80f;
@@ -2159,6 +2232,24 @@ namespace ProgrammaticStylized3D.Rivers
                 obstructionWakeSpread,
                 0.5f,
                 2f);
+            obstructionWakeVariation = Mathf.Clamp01(
+                obstructionWakeVariation);
+            obstructionWakeVariationIntervalMin = Mathf.Clamp(
+                obstructionWakeVariationIntervalMin,
+                MinimumStaticWakeVariationInterval,
+                MaximumStaticWakeVariationInterval);
+            obstructionWakeVariationIntervalMax = Mathf.Clamp(
+                obstructionWakeVariationIntervalMax,
+                MinimumStaticWakeVariationInterval,
+                MaximumStaticWakeVariationInterval);
+            if (obstructionWakeVariationIntervalMin >
+                obstructionWakeVariationIntervalMax)
+            {
+                (obstructionWakeVariationIntervalMin,
+                    obstructionWakeVariationIntervalMax) =
+                    (obstructionWakeVariationIntervalMax,
+                        obstructionWakeVariationIntervalMin);
+            }
             obstructionWakeWidening = Mathf.Clamp(
                 obstructionWakeWidening,
                 0.35f,
@@ -2166,7 +2257,7 @@ namespace ProgrammaticStylized3D.Rivers
             obstructionWakeSurfaceHeight = Mathf.Clamp(
                 obstructionWakeSurfaceHeight,
                 0f,
-                0.20f);
+                0.40f);
             obstructionWakeSurfaceCompactness = Mathf.Clamp(
                 obstructionWakeSurfaceCompactness,
                 0.80f,

@@ -21,6 +21,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty obstructionWakeStrength;
         private SerializedProperty obstructionWakeReach;
         private SerializedProperty obstructionWakeSpread;
+        private SerializedProperty obstructionWakeVariation;
         private bool showPressureProfile;
 
         private void OnEnable()
@@ -53,6 +54,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "obstructionWakeReach");
             obstructionWakeSpread = riverInteraction?.FindPropertyRelative(
                 "obstructionWakeSpread");
+            obstructionWakeVariation = riverInteraction?.FindPropertyRelative(
+                "obstructionWakeVariation");
         }
 
         public override void OnInspectorGUI()
@@ -238,6 +241,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 EditorGUILayout.PropertyField(
                     obstructionWakeSpread,
                     new GUIContent("Spread"));
+                EditorGUILayout.PropertyField(
+                    obstructionWakeVariation,
+                    new GUIContent(
+                        "Variation",
+                        "Amount of spatial lee-profile variation and independent left/right release trajectory variation. Timing uses the detected river's interval settings."));
             }
             else if (mode == GeneratedRiverFeatureMode.Inherit)
             {
@@ -358,6 +366,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     EditorGUILayout.FloatField(
                         "Wake Spread",
                         diagnostics.ObstructionWakeSpread);
+                    EditorGUILayout.FloatField(
+                        "Wake Variation",
+                        diagnostics.ObstructionWakeVariation);
+
                 }
             }
 

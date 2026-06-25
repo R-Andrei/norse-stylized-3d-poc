@@ -723,7 +723,7 @@ Shader "PS3D/Stylized River Water"
                     return half4(fieldUV.x, fieldUV.y, 0.0, 1.0);
                 }
 
-                if (disturbanceDebug >= 6 && disturbanceDebug <= 12)
+                if (disturbanceDebug >= 6 && disturbanceDebug <= 8)
                 {
                     float2 fieldUV = float2(
                         saturate(
@@ -766,96 +766,11 @@ Shader "PS3D/Stylized River Water"
 
                     if (disturbanceDebug == 7)
                     {
-                        // Static Wake Source channel contract:
-                        // R = rear-corner release energy,
-                        // G = attached lee magnitude,
-                        // B = initial spread metadata,
-                        // A = reach/persistence metadata.
                         return half4(release, lee, reach, 1.0);
                     }
-
-                    if (disturbanceDebug == 9)
-                    {
-                        return half4(release, 0.0, 0.0, 1.0);
-                    }
-
-                    if (disturbanceDebug == 10)
-                    {
-                        return half4(0.0, lee, 0.0, 1.0);
-                    }
-
-                    if (disturbanceDebug == 11)
-                    {
-                        return half4(0.0, 0.0, reach, 1.0);
-                    }
-
-                    if (disturbanceDebug == 12)
-                    {
-                        float4 staticPressure = SAMPLE_TEXTURE2D(
-                            _DisturbanceStaticTarget,
-                            sampler_DisturbanceStaticTarget,
-                            fieldUV);
-                        float composedStaticHeight =
-                            staticPressure.r - leeDepth;
-                        float staticHeightScale = max(
-                            0.200,
-                            _DisturbanceStaticMaximumHeight);
-                        float encodedStaticHeight = saturate(
-                            composedStaticHeight /
-                            (2.0 * staticHeightScale) + 0.5);
-                        return half4(encodedStaticHeight.xxx, 1.0);
-                    }
                 }
 
-                if (disturbanceDebug == 13)
-                {
-                    float signedGradient = wake.downstreamGradient;
-                    float magnitude = saturate(abs(signedGradient) * 0.35);
-                    return signedGradient >= 0.0
-                        ? half4(magnitude, 0.0, 0.0, 1.0)
-                        : half4(0.0, 0.0, magnitude, 1.0);
-                }
-
-                if (disturbanceDebug == 14)
-                {
-                    float signedGradient = wake.lateralGradient;
-                    float magnitude = saturate(abs(signedGradient) * 0.35);
-                    return signedGradient >= 0.0
-                        ? half4(magnitude, 0.0, 0.0, 1.0)
-                        : half4(0.0, 0.0, magnitude, 1.0);
-                }
-
-                if (disturbanceDebug == 15)
-                {
-                    return half4(wake.intensity.xxx, 1.0);
-                }
-
-                if (disturbanceDebug == 16)
-                {
-                    float normalStrength = max(
-                        0.0,
-                        _DisturbanceNormalStrength);
-                    float encodedDownstream = saturate(
-                        wake.downstreamGradient *
-                        normalStrength * 0.25 + 0.5);
-                    float encodedLateral = saturate(
-                        wake.lateralGradient *
-                        normalStrength * 0.25 + 0.5);
-                    float encodedIntensity =
-                        wake.intensity * 0.5 + 0.5;
-                    return half4(
-                        encodedDownstream,
-                        encodedLateral,
-                        encodedIntensity,
-                        1.0);
-                }
-
-                if (disturbanceDebug == 17)
-                {
-                    return half4(wake.geometryCore.xxx, 1.0);
-                }
-
-                if (disturbanceDebug == 18 || disturbanceDebug == 19)
+                if (disturbanceDebug == 19)
                 {
                     RiverWaterStaticWakeLeeResult debugStaticWakeLee =
                         RiverWaterEvaluateStaticWakeLee(
@@ -873,37 +788,14 @@ Shader "PS3D/Stylized River Water"
                             _FreezeAmount,
                             _DisturbanceStaticWakeTexelSize.xy,
                             0.0);
-                    float unprotectedTrailHeight =
-                        wake.geometryCore *
-                        max(0.0, _DisturbanceWakeGeometryHeight);
                     float protectedTrailHeight =
                         RiverWaterResolveWakeGeometryHeight(
                             wake.geometryCore,
                             _DisturbanceWakeGeometryHeight,
                             debugStaticWakeLee.depth);
-                    float removedByLee = max(
-                        0.0,
-                        unprotectedTrailHeight - protectedTrailHeight);
-
-                    if (disturbanceDebug == 18)
-                    {
-                        const float physicalHeightScale = 0.200;
-                        return half4(
-                            saturate(
-                                protectedTrailHeight /
-                                physicalHeightScale),
-                            saturate(
-                                removedByLee /
-                                physicalHeightScale),
-                            saturate(
-                                debugStaticWakeLee.depth /
-                                physicalHeightScale),
-                            1.0);
-                    }
-
                     float finalWakeGeometryHeight =
                         protectedTrailHeight - debugStaticWakeLee.depth;
-                    const float signedHeightScale = 0.200;
+                    const float signedHeightScale = 0.400;
                     float encodedHeight = saturate(
                         finalWakeGeometryHeight /
                         (2.0 * signedHeightScale) + 0.5);

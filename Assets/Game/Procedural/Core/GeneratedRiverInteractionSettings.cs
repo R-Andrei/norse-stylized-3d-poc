@@ -93,6 +93,11 @@ namespace ProgrammaticStylized3D.Geometry
         [SerializeField]
         private float obstructionWakeSpread = 1f;
 
+        [Tooltip("For Custom, controls spatial lee-profile variation and independent left/right release trajectory variation. Timing remains authored by the detected river.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float obstructionWakeVariation = 0.35f;
+
         // Hidden legacy data permits existing generated masses to migrate from
         // the former combined profile without exposing the removed controls.
         [HideInInspector, SerializeField]
@@ -142,6 +147,8 @@ namespace ProgrammaticStylized3D.Geometry
             Mathf.Clamp(obstructionWakeReach, 0.25f, 3f);
         public float ObstructionWakeSpread =>
             Mathf.Clamp(obstructionWakeSpread, 0.5f, 2f);
+        public float ObstructionWakeVariation =>
+            Mathf.Clamp01(obstructionWakeVariation);
 
         // Compatibility surface for code compiled against the former profile.
         public GeneratedRiverResponseProfile ResponseProfile =>
@@ -161,7 +168,8 @@ namespace ProgrammaticStylized3D.Geometry
                 obstructionWakeMode != GeneratedRiverFeatureMode.Disabled,
                 ObstructionWakeStrength,
                 ObstructionWakeReach,
-                ObstructionWakeSpread);
+                ObstructionWakeSpread,
+                ObstructionWakeVariation);
         }
 
         public void Validate()
@@ -216,6 +224,8 @@ namespace ProgrammaticStylized3D.Geometry
                 obstructionWakeSpread,
                 0.5f,
                 2f);
+            obstructionWakeVariation = Mathf.Clamp01(
+                obstructionWakeVariation);
             footprintPadding = Mathf.Clamp(footprintPadding, 0f, 2f);
         }
 
@@ -306,6 +316,7 @@ namespace ProgrammaticStylized3D.Geometry
             obstructionWakeStrength = wakeStrength;
             obstructionWakeReach = wakeReach;
             obstructionWakeSpread = wakeSpread;
+            obstructionWakeVariation = 0.35f;
         }
     }
 
@@ -321,7 +332,8 @@ namespace ProgrammaticStylized3D.Geometry
             bool obstructionWakeEnabled,
             float obstructionWakeStrength,
             float obstructionWakeReach,
-            float obstructionWakeSpread)
+            float obstructionWakeSpread,
+            float obstructionWakeVariation)
         {
             StaticPressureEnabled = staticPressureEnabled;
             StaticPressureStrength = Mathf.Clamp01(staticPressureStrength);
@@ -362,7 +374,35 @@ namespace ProgrammaticStylized3D.Geometry
                 obstructionWakeSpread,
                 0.5f,
                 2f);
+            ObstructionWakeVariation = Mathf.Clamp01(
+                obstructionWakeVariation);
             compatibilityFootprintPadding = 0.12f;
+        }
+
+        public ResolvedGeneratedRiverInteraction(
+            bool staticPressureEnabled,
+            float staticPressureStrength,
+            float staticPressureContactSharpness,
+            float staticPressureProfileVariation,
+            float staticPressureProfileChangeIntervalMin,
+            float staticPressureProfileChangeIntervalMax,
+            bool obstructionWakeEnabled,
+            float obstructionWakeStrength,
+            float obstructionWakeReach,
+            float obstructionWakeSpread)
+            : this(
+                staticPressureEnabled,
+                staticPressureStrength,
+                staticPressureContactSharpness,
+                staticPressureProfileVariation,
+                staticPressureProfileChangeIntervalMin,
+                staticPressureProfileChangeIntervalMax,
+                obstructionWakeEnabled,
+                obstructionWakeStrength,
+                obstructionWakeReach,
+                obstructionWakeSpread,
+                0.35f)
+        {
         }
 
         // Former per-feature constructor retained for source compatibility.
@@ -426,6 +466,7 @@ namespace ProgrammaticStylized3D.Geometry
                 0.5f,
                 2f,
                 Mathf.Clamp01(geometryAmplitude * 0.5f));
+            ObstructionWakeVariation = 0.35f;
             compatibilityFootprintPadding = Mathf.Max(
                 0f,
                 footprintPadding);
@@ -447,6 +488,7 @@ namespace ProgrammaticStylized3D.Geometry
         public float ObstructionWakeStrength { get; }
         public float ObstructionWakeReach { get; }
         public float ObstructionWakeSpread { get; }
+        public float ObstructionWakeVariation { get; }
 
         // Former property names retained as non-authoritative aliases.
         public float PressureStrength => StaticPressureStrength;

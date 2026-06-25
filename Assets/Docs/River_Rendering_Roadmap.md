@@ -80,6 +80,8 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 **Problem:** Add attached pressure, stationary and moving wakes, one-shot ripples, downstream transport, spreading, and decay without replacing the Stage 3 base motion field or scaling water-shader cost with active effect count.
 
+**Current status:** Static Pressure and Static Wake are accepted. Impact Ripples are the next Stage 5 target. Dynamic Pressure and full Dynamic Wake source behavior remain deferred.
+
 ### Canonical feature vocabulary
 
 Stage 5 uses one consistent source-based vocabulary:
@@ -107,6 +109,16 @@ Static Pressure computes its feasible height from flow, blockage, local mesh sup
 
 Editor diagnostics report resolved profile resolution, support and multiplier ranges, row classifications, row-thickness range and median, maximum crest and pressure-end depth as a percentage of row thickness, rear-protection clamping, rows entering the protected rear region, and per-row height/contact graphs including downstream and rear-protection boundaries. Stage 5 controls do not participate in riverbed or corridor generation.
 
+Static Wake now uses a separate cached source texture and the shared persistent wake field. Static Pressure and Static Wake have independent dirty/rebuild ownership, so pressure-profile morphing does not rebake the wake source. Static wake chunks reserve each source's resolved reach plus downstream transport headroom; when a source disappears, new injection stops immediately while already-transported energy remains active for a finite source-specific decay period.
+
+The cached Static Wake source separates a geometry-aware attached lee from rear-corner release energy. The lee follows each lateral row's actual downstream object boundary, uses inward-only contour smoothing and a small hidden overlap, scales its length from local obstruction thickness, and attenuates strongly side-facing rows. It remains attached to the obstruction and produces bounded negative geometry up to `0.20 m` at maximum Strength. The side releases inject positive energy into the persistent wake field; synchronized sine pulsing was removed.
+
+The persistent field is shared by Static Wake and Dynamic Wake. It transports, widens, overlaps, decays, and sleeps independently of source count. A river-level Widening control (`0.35–1.25`, default `0.65`) controls lateral diffusion. Transported wake geometry is extracted from a softly saturated compact energy core rather than the complete broad turbulence field. Wake Surface Height supports `0–0.40 m`, and Wake Surface Compactness (`0.80–3.00`, default `1.50`) determines how much of the broad field becomes visible geometry. Spatial lee protection prevents positive trail geometry from erasing the strongest central depression while allowing side trails to broaden and merge after the lee weakens.
+
+Static Wake variation uses adaptive 16/32/64-row lateral profiles rather than whole-source pulsing. Per-row lee depth, length, and trailing-edge offsets evolve through smooth deterministic targets. Left and right releases independently vary lateral origin, energy, width, and downstream offset, so newly injected energy forms changing and slightly meandering trail histories. Variation updates at `12 Hz`, remains independent of Stage 3 motion and other rocks, and uses randomized intervals from `0.50–2.00 s` with defaults of `0.60–0.90 s`. `Variation = 0` restores the accepted stable source shape and stops variation-driven rebaking.
+
+Wake debugging was consolidated after acceptance. The retained wake-specific views are `Static Wake Source`, `Wake Energy`, and `Final Wake Geometry Height`; detailed release, lee, gradient, core, overlap, and variation views were removed together with their dedicated variation-debug texture and selected-source internal variation readouts. High-level runtime diagnostics retain field resolution, simulation rate, active chunks, source count, memory, and sleeping state.
+
 ### Validated
 
 **Static Pressure is complete and accepted.** It passed the tested elevated perspective/isometric views on small and large generated rocks, adaptive profile tiers, low and exaggerated Strength, minimum and high Profile Variation, independent changing profiles, contact placement beneath the obstruction, and reduced side-face buildup.
@@ -120,23 +132,26 @@ The final correction stores each row's downstream boundary and clamps the crest 
 
 The temporary 92%/96% support-safe floor and floor-only diagnostics were removed. Useful target, support, profile, thickness, and rear-protection diagnostics were retained. Width-aware multiplier bounds remain part of the accepted implementation. No further Static Pressure work should be introduced unless a concrete regression or a proven shared-field integration defect is demonstrated.
 
+**Static Wake is complete and visually accepted.** The final result was tested on small, large, wide, thin, angled, and irregular registered rocks. The accepted source topology is a geometry-aware central rear lee plus separate rear-corner releases. The lee visibly depresses the actual surface and remains configurable from subtle to strongly exaggerated settings. The transported side trails visibly raise the surface when Surface Height and Compactness permit it, preserve a protected central depression, widen and decay through the shared field, and respond to Reach, Spread, Widening, Surface Height, and Surface Compactness without returning to periodic pulse trains.
+
+The first scalar W3D experiment, which made the whole source brighten, dim, expand, and contract together, was rejected as a visible breathing effect. It was replaced by adaptive spatial lee profiles and independent left/right release trajectories. The replacement produced the approved perception of changing geometry rather than a static hole, static hill, or synchronized heartbeat.
+
+The accepted architecture intentionally shares transported wake geometry between Static Wake and Dynamic Wake. Source identity affects injection, not downstream transport or rendering. Attached lee remains a separate local stationary envelope. Existing wake energy is not cleared when dynamic objects cross it, and overlapping energy uses bounded nonlinear geometry response. Obstacle-aware transport is deferred unless testing later exposes a visible ghost wake passing through solid geometry.
+
 The rejected V4 continuously driven obstacle-wave solver is noncanonical and must not be restored.
 
 ### Planned visual contracts
 
-**Static Wake — next:** one continuously sourced stationary-object effect made from a short sheltered lee region, controlled side-release/shear near the rear corners, and a broad low-amplitude disturbance that starts at the object, widens downstream, follows river-space flow, and decays. Defaults should lean subtle, while bounded controls must allow useful adjustment up or down without producing comically deep troughs, tall ridges, or mechanical pulse trains. It must not resemble a second pressure ridge, a uniform tube, or repeated circular pulses. It should later provide a useful turbulence/intensity source for Stage 6 foam without rendering foam during Stage 5.
+**Impact Ripples — next:** one event system with configurable position, radius, signed impulse, geometry contribution, normal contribution, propagation, and decay. Entry, exit, footsteps, landings, projectiles, attacks, and explosions are event profiles feeding the same solver rather than separate water systems. Detached spray, droplets, and splashes remain Stage 7 consumers.
 
-**Impact Ripples — after Static Wake:** one event system with configurable position, radius, signed impulse, geometry contribution, normal contribution, propagation, and decay. Entry, exit, footsteps, landings, projectiles, attacks, and explosions are event profiles feeding the same solver rather than separate water systems. Detached spray, droplets, and splashes remain Stage 7 consumers.
-
-**Dynamic Pressure and Dynamic Wake — deferred package:** design together around emitter-provided movement relative to local river flow. Dynamic Pressure remains attached to the current object position; Dynamic Wake persists after the object passes. A source drifting with the current should create little attached pressure, while upstream or cross-current movement should create stronger leading-face pressure. These features must reuse the accepted visual language where practical without rebuilding expensive static mesh-support profiles every update.
+**Dynamic Pressure and Dynamic Wake — deferred package:** design together around emitter-provided movement relative to local river flow. Dynamic Pressure remains attached to the current object position; Dynamic Wake persists after the object passes. A source drifting with the current should create little attached pressure, while upstream or cross-current movement should create stronger leading-face pressure. Dynamic Wake must inject into the already accepted shared persistent wake field and receive the same transport, widening, geometry, normal, turbulence, decay, and overlap language as Static Wake. Expensive static mesh-support preparation must not be rebuilt for moving sources.
 
 ### Remaining Stage 5 work
 
-1. Finalize the Static Wake acceptance tests and exact file-level implementation plan from the completed source audit. The plan must cover independent pressure/wake invalidation, an attached sheltered lee, controlled rear-corner release, broad downstream transport and widening, removal of mechanical periodic pulsing, truthful bounded controls, per-source reach, chunk-boundary safety, sleeping, and debug views.
-2. Implement and tune Static Wake conservatively, with subtle defaults and bounded configurability, without modifying accepted Static Pressure behavior.
-3. Inspect the current Impact Ripple implementation and event API, define signed/event-profile behavior, then tune and accept it independently.
-4. Defer Dynamic Pressure and Dynamic Wake until the static-source and event-driven features are accepted; design both dynamic features together around one emitter movement-state contract.
-5. After all Stage 5 capabilities are accepted, profile Low, Medium, and High quality and run combined overlap, source-removal, sleeping, culling, reverse-flow, and frozen-state regression.
+1. Run the routine Unity compile and regression check for the final Static Wake interval-range and debug-cleanup patch. This cleanup does not intentionally alter the accepted wake geometry or simulation.
+2. Inspect the current Impact Ripple implementation and event API, define signed impulses and reusable event profiles, then tune and accept it independently.
+3. Defer Dynamic Pressure and full Dynamic Wake source design until Impact Ripples are accepted; design both dynamic continuous features around one relative-motion emitter contract while reusing the accepted shared wake field.
+4. After all Stage 5 capabilities are accepted, profile Low, Medium, and High quality and run combined overlap, source-removal, sleeping, culling, reverse-flow, frozen-state, and static/dynamic coexistence regression.
 
 ## 6. Foam and Surface Tracing
 

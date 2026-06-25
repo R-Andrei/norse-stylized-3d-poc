@@ -43,6 +43,11 @@ float _StaticMaximumHeight;
 float _StaticWakeSourceStrength;
 float _StaticWakePersistence;
 float _StaticWakeSpread;
+float4 _StaticWakeVariationProfile[PS3D_MAX_PRESSURE_PROFILE_SAMPLES];
+int _StaticWakeVariationProfileCount;
+float _StaticWakeVariationProfileHalfWidthPixels;
+float4 _StaticWakeLeftReleaseVariation;
+float4 _StaticWakeRightReleaseVariation;
 float _StaticPhase;
 float _StaticContactSharpness;
 float _StaticWaveResponse;
@@ -575,16 +580,48 @@ float EvaluateHeightAwareStaticPressure(
 
 struct StaticWakeSourceSample
 {
-    float release;
+    float releaseLeft;
+    float releaseRight;
     float lee;
 };
+
+float3 SampleStaticWakeVariationProfile(float acrossPosition)
+{
+    if (_StaticWakeVariationProfileCount <= 0)
+    {
+        return float3(1.0, 1.0, 0.0);
+    }
+
+    int sampleCount = clamp(
+        _StaticWakeVariationProfileCount,
+        1,
+        PS3D_MAX_PRESSURE_PROFILE_SAMPLES);
+    float halfWidth = max(
+        1.0,
+        _StaticWakeVariationProfileHalfWidthPixels);
+    float across01 = saturate(
+        acrossPosition / (halfWidth * 2.0) + 0.5);
+    float coordinate = across01 * max(0, sampleCount - 1);
+    int row0 = clamp((int)floor(coordinate), 0, sampleCount - 1);
+    int row1 = min(row0 + 1, sampleCount - 1);
+    float interpolation = saturate(coordinate - row0);
+    float4 sample = lerp(
+        _StaticWakeVariationProfile[row0],
+        _StaticWakeVariationProfile[row1],
+        interpolation);
+    return float3(
+        clamp(sample.x, 0.75, 1.25),
+        clamp(sample.y, 0.80, 1.20),
+        clamp(sample.z, -0.75, 0.75));
+}
 
 StaticWakeSourceSample EvaluateStaticWakeSource(
     float2 relativePosition,
     float2 halfSize)
 {
     StaticWakeSourceSample result;
-    result.release = 0.0;
+    result.releaseLeft = 0.0;
+    result.releaseRight = 0.0;
     result.lee = 0.0;
 
     ContourRowResult row = ResolveContourRow(relativePosition.y);
@@ -606,9 +643,6 @@ StaticWakeSourceSample EvaluateStaticWakeSource(
     float outsideDownstream = step(0.0, downstreamDistance);
     float spread = clamp(_StaticWakeSpread, 0.5, 2.0);
     float spread01 = saturate((spread - 0.5) / 1.5);
-    float lateral01 = abs(relativePosition.y) /
-                      max(1.0, halfSize.y);
-
     // Extrude the sheltered lee from the actual rear silhouette one row at
     // a time. Neighbour rows smooth only slightly into the object, so the
     // source remains attached without flattening angled or irregular rears
@@ -669,10 +703,16 @@ StaticWakeSourceSample EvaluateStaticWakeSource(
         0.0,
         row.downstreamX - row.upstreamX);
     float thicknessSupport = smoothstep(0.50, 1.25, rowThickness);
-    float leeLength = clamp(
+    float3 variationProfile = SampleStaticWakeVariationProfile(
+        relativePosition.y);
+    float baseLeeLength = clamp(
         rowThickness * lerp(0.22, 0.38, spread01),
         1.25,
         4.50);
+    float leeLength = clamp(
+        baseLeeLength * variationProfile.y + variationProfile.z,
+        1.00,
+        5.25);
     float leeHalfWidth = max(
         1.0,
         halfSize.y * lerp(0.50, 0.72, spread01));
@@ -688,7 +728,8 @@ StaticWakeSourceSample EvaluateStaticWakeSource(
                  saturate(leeLateral) *
                  saturate(leeLongitudinal) *
                  rearFacingMask *
-                 thicknessSupport;
+                 thicknessSupport *
+                 variationProfile.x;
 
     // Positive wake energy is released near the two rear corners rather
     // than around the complete contour. Narrow sources naturally merge
@@ -702,21 +743,74 @@ StaticWakeSourceSample EvaluateStaticWakeSource(
         boundary.outwardNormal.x);
     float releaseCentre = lerp(0.58, 0.72, spread01);
     float releaseWidth = lerp(0.18, 0.28, spread01);
-    float sideRelease = Gaussian1D(
-        lateral01,
-        releaseCentre,
-        releaseWidth);
+    float leftOffsetPixels = clamp(
+        _StaticWakeLeftReleaseVariation.x * halfSize.y,
+        -0.75,
+        0.75);
+    float rightOffsetPixels = clamp(
+        _StaticWakeRightReleaseVariation.x * halfSize.y,
+        -0.75,
+        0.75);
+    float leftCentrePixels =
+        -releaseCentre * halfSize.y + leftOffsetPixels;
+    float rightCentrePixels =
+        releaseCentre * halfSize.y + rightOffsetPixels;
+    float leftWidthPixels = max(
+        0.50,
+        releaseWidth * halfSize.y *
+        clamp(_StaticWakeLeftReleaseVariation.z, 0.88, 1.12));
+    float rightWidthPixels = max(
+        0.50,
+        releaseWidth * halfSize.y *
+        clamp(_StaticWakeRightReleaseVariation.z, 0.88, 1.12));
+    float leftSideRelease = Gaussian1D(
+        relativePosition.y,
+        leftCentrePixels,
+        leftWidthPixels) *
+        (1.0 - step(0.0, relativePosition.y));
+    float rightSideRelease = Gaussian1D(
+        relativePosition.y,
+        rightCentrePixels,
+        rightWidthPixels) *
+        step(0.0, relativePosition.y);
+
     float minimumHalf = min(halfSize.x, halfSize.y);
     float releaseBandWidth = max(0.75, minimumHalf * 0.10) *
                              lerp(0.85, 1.25, spread01);
-    float releaseBand = Gaussian1D(
+    float leftReleaseBand = Gaussian1D(
         downstreamDistance,
-        releaseBandWidth * 0.48,
+        releaseBandWidth * 0.48 +
+        clamp(_StaticWakeLeftReleaseVariation.w, -0.50, 0.50),
         releaseBandWidth * 0.42);
-    result.release = outsideDownstream *
-                     downstreamFacing *
-                     sideRelease *
-                     releaseBand;
+    float rightReleaseBand = Gaussian1D(
+        downstreamDistance,
+        releaseBandWidth * 0.48 +
+        clamp(_StaticWakeRightReleaseVariation.w, -0.50, 0.50),
+        releaseBandWidth * 0.42);
+
+    float leftEnergy = clamp(
+        _StaticWakeLeftReleaseVariation.y,
+        0.80,
+        1.20);
+    float rightEnergy = clamp(
+        _StaticWakeRightReleaseVariation.y,
+        0.80,
+        1.20);
+    float totalEnergy = max(0.0001, leftEnergy + rightEnergy);
+    float boundedTotalEnergy = clamp(totalEnergy, 1.84, 2.16);
+    float energyNormalization = boundedTotalEnergy / totalEnergy;
+    leftEnergy *= energyNormalization;
+    rightEnergy *= energyNormalization;
+
+    float commonRelease = outsideDownstream * downstreamFacing;
+    result.releaseLeft = commonRelease *
+                         leftSideRelease *
+                         leftReleaseBand *
+                         leftEnergy;
+    result.releaseRight = commonRelease *
+                          rightSideRelease *
+                          rightReleaseBand *
+                          rightEnergy;
     return result;
 }
 
@@ -886,7 +980,11 @@ void BakeStaticWakeSource(uint3 dispatchId : SV_DispatchThreadID)
     StaticWakeSourceSample sourceSample = EvaluateStaticWakeSource(
         relativePosition,
         halfSize);
-    float release = sourceSample.release * _StaticWakeSourceStrength;
+    float releaseLeft =
+        sourceSample.releaseLeft * _StaticWakeSourceStrength;
+    float releaseRight =
+        sourceSample.releaseRight * _StaticWakeSourceStrength;
+    float release = releaseLeft + releaseRight;
     float lee = sourceSample.lee *
                 saturate(_StaticWakeSourceStrength / 3.0);
 
@@ -907,6 +1005,8 @@ void BakeStaticWakeSource(uint3 dispatchId : SV_DispatchThreadID)
     existing.r = clamp(existing.r + release, 0.0, 4.0);
     existing.g = max(existing.g, saturate(lee));
     _StaticWakeSourceWrite[pixel] = existing;
+
+
 }
 
 [numthreads(8, 8, 1)]

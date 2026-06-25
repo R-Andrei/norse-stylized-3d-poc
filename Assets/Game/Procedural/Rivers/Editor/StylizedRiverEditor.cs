@@ -525,6 +525,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("obstructionWakeReach");
             SerializedProperty obstructionWakeSpreadProperty =
                 Find("obstructionWakeSpread");
+            SerializedProperty obstructionWakeVariationProperty =
+                Find("obstructionWakeVariation");
+            SerializedProperty obstructionWakeVariationIntervalMinProperty =
+                Find("obstructionWakeVariationIntervalMin");
+            SerializedProperty obstructionWakeVariationIntervalMaxProperty =
+                Find("obstructionWakeVariationIntervalMax");
             SerializedProperty obstructionWakeWideningProperty =
                 Find("obstructionWakeWidening");
             SerializedProperty obstructionWakeSurfaceHeightProperty =
@@ -604,6 +610,24 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 missingProperties += missingProperties.Length > 0
                     ? ", obstructionWakeSpread"
                     : "obstructionWakeSpread";
+            }
+            if (obstructionWakeVariationProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", obstructionWakeVariation"
+                    : "obstructionWakeVariation";
+            }
+            if (obstructionWakeVariationIntervalMinProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", obstructionWakeVariationIntervalMin"
+                    : "obstructionWakeVariationIntervalMin";
+            }
+            if (obstructionWakeVariationIntervalMaxProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", obstructionWakeVariationIntervalMax"
+                    : "obstructionWakeVariationIntervalMax";
             }
             if (obstructionWakeWideningProperty == null)
             {
@@ -796,6 +820,30 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                             "Spread",
                             "Initial width and spacing of the attached lee and rear-release regions."));
                 }
+                if (obstructionWakeVariationProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        obstructionWakeVariationProperty,
+                        new GUIContent(
+                            "Variation",
+                            "Amount of spatial lee-profile variation and independent left/right release trajectory variation applied to each stationary obstruction. Zero keeps the source stable."));
+                }
+                if (obstructionWakeVariationIntervalMinProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        obstructionWakeVariationIntervalMinProperty,
+                        new GUIContent(
+                            "Minimum Variation Interval",
+                            "Shortest randomized time in seconds between stationary wake-source targets."));
+                }
+                if (obstructionWakeVariationIntervalMaxProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        obstructionWakeVariationIntervalMaxProperty,
+                        new GUIContent(
+                            "Maximum Variation Interval",
+                            "Longest randomized time in seconds between stationary wake-source targets. Smooth transitions complete before the next target."));
+                }
                 if (obstructionWakeWideningProperty != null)
                 {
                     EditorGUILayout.PropertyField(
@@ -901,7 +949,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     {
                         DrawDisturbanceDebugLegend(
                             (StylizedRiverDisturbanceDebugView)
-                            debugViewProperty.enumValueIndex);
+                            debugViewProperty.intValue);
                     }
                 }
             }
@@ -963,18 +1011,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Wake Chunks",
                 $"{runtime.ActiveWakeChunkCount} active / {runtime.ChunkCount} total");
             EditorGUILayout.LabelField(
-                "Static-Held Wake Chunks",
-                runtime.StaticHeldWakeChunkCount.ToString());
-            EditorGUILayout.LabelField(
-                "Temporarily Retained",
-                runtime.TemporarilyRetainedWakeChunkCount.ToString());
-            EditorGUILayout.LabelField(
-                "Max Retained Lifetime",
-                $"{runtime.MaximumRemainingWakeRetentionSeconds:0.00} s");
-            EditorGUILayout.LabelField(
-                "Static Wake Rebuilds",
-                runtime.StaticWakeSourceRebuildCount.ToString());
-            EditorGUILayout.LabelField(
                 "Continuous Sources",
                 runtime.ContinuousSourceCount.ToString());
             EditorGUILayout.LabelField(
@@ -1006,31 +1042,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             string description = debugView switch
             {
                 StylizedRiverDisturbanceDebugView.StaticWakeSource =>
-                    "Static Wake composite: red is rear-release energy, green is the attached lee mask, and blue is reach/persistence metadata.",
-                StylizedRiverDisturbanceDebugView.StaticWakeRelease =>
-                    "Static Wake release only: red identifies the positive rear-corner energy injected into the persistent wake field.",
-                StylizedRiverDisturbanceDebugView.StaticWakeLee =>
-                    "Static Wake lee only: green identifies the attached sheltered region. Its intensity uses the same bounded mapping as the visible depression.",
-                StylizedRiverDisturbanceDebugView.StaticWakeReach =>
-                    "Static Wake reach only: blue identifies source pixels carrying reach/persistence metadata into the persistent wake field.",
-                StylizedRiverDisturbanceDebugView.StaticPressureAndLee =>
-                    "Composed static geometry height: mid-gray is zero, white is positive Static Pressure, and black is the negative attached lee.",
+                    "Static Wake Source: red is rear-release energy, green is the attached geometry-aware lee, and blue is reach/persistence metadata.",
                 StylizedRiverDisturbanceDebugView.WakeEnergy =>
-                    "Persistent Wake Energy: red shows transported positive wake energy after advection, widening, decay, bank masking, and freeze suppression.",
-                StylizedRiverDisturbanceDebugView.WakeDownstreamGradient =>
-                    "Wake Downstream Gradient: red is a positive downstream slope, blue is a negative downstream slope, and black is neutral.",
-                StylizedRiverDisturbanceDebugView.WakeLateralGradient =>
-                    "Wake Lateral Gradient: red and blue show opposite signed lateral slopes; black is neutral.",
-                StylizedRiverDisturbanceDebugView.WakeIntensity =>
-                    "Wake Intensity: grayscale shows the combined transported energy and gradient magnitude used as the wake intensity signal.",
-                StylizedRiverDisturbanceDebugView.FinalWakeContribution =>
-                    "Final Wake Contribution: mid-gray is neutral; red and green encode signed downstream and lateral normal contributions, while blue rises above 0.5 with combined wake intensity.",
-                StylizedRiverDisturbanceDebugView.WakeGeometryCore =>
-                    "Wake Geometry Core: grayscale shows the compact, softly saturated portion of shared transported wake energy that is eligible to raise the water surface.",
-                StylizedRiverDisturbanceDebugView.LeeAndTrailGeometry =>
-                    "Lee and Trail Geometry: red is positive transported trail height, blue is attached lee depth, and green shows positive geometry removed by local lee protection. All channels use a fixed 0.20 m physical scale, so Surface Height changes remain visible in the diagnostic.",
+                    "Wake Energy: red shows the shared persistent wake field after injection, transport, widening, decay, bank masking, and freeze suppression.",
                 StylizedRiverDisturbanceDebugView.FinalWakeGeometryHeight =>
-                    "Final Wake Geometry Height: mid-gray is zero, darker values are the attached lee depression, and brighter values are the protected positive transported wake height used by the vertex-displacement path. The encoding is fixed to -0.20 m through +0.20 m.",
+                    "Final Wake Geometry Height: mid-gray is zero, darker values are the attached lee depression, and brighter values are positive transported trail height. The fixed encoding spans -0.40 m to +0.40 m.",
                 _ => string.Empty
             };
 
