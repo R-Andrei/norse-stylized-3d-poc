@@ -387,6 +387,149 @@ namespace ProgrammaticStylized3D.Rivers
 
 #endif
 
+
+    [Serializable]
+    public struct ImpactRippleEventSettings
+    {
+        public const float MinimumRadius = 0.05f;
+        public const float MaximumRadius = 12f;
+        public const float MinimumSignedImpulse = -8f;
+        public const float MaximumSignedImpulse = 8f;
+        public const float MinimumInitialElevation = -0.40f;
+        public const float MaximumInitialElevation = 0.40f;
+        public const float MinimumSharpness = 0.25f;
+        public const float MaximumSharpness = 4f;
+        public const float LegacyShape = 0.5f;
+        public const float LegacySharpness = 1f;
+
+        [Tooltip("Initial event radius in world metres.")]
+        [Range(MinimumRadius, MaximumRadius)]
+        [SerializeField] private float radius;
+
+        [Tooltip("Signed initial water impulse. Positive values push into the water; negative values produce withdrawal or suction.")]
+        [Range(MinimumSignedImpulse, MaximumSignedImpulse)]
+        [SerializeField] private float signedImpulse;
+
+        [Tooltip("Immediate signed surface displacement in metres, applied independently from the impulse.")]
+        [Range(MinimumInitialElevation, MaximumInitialElevation)]
+        [SerializeField] private float initialElevation;
+
+        [Tooltip("Balances the initial centre disturbance and surrounding ring. The middle value preserves the provisional Stage 5 shape.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float shape;
+
+        [Tooltip("Controls how concentrated the initial analytic pattern is without changing its radius.")]
+        [Range(MinimumSharpness, MaximumSharpness)]
+        [SerializeField] private float sharpness;
+
+        [Tooltip("Contribution to visible surface geometry.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float geometryContribution;
+
+        [Tooltip("Contribution to lighting and refraction normal detail.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float normalContribution;
+
+        public float Radius => radius;
+        public float SignedImpulse => signedImpulse;
+        public float InitialElevation => initialElevation;
+        public float Shape => shape;
+        public float Sharpness => sharpness;
+        public float GeometryContribution => geometryContribution;
+        public float NormalContribution => normalContribution;
+
+        public ImpactRippleEventSettings(
+            float radius,
+            float signedImpulse,
+            float initialElevation,
+            float shape,
+            float sharpness,
+            float geometryContribution,
+            float normalContribution)
+        {
+            this.radius = radius;
+            this.signedImpulse = signedImpulse;
+            this.initialElevation = initialElevation;
+            this.shape = shape;
+            this.sharpness = sharpness;
+            this.geometryContribution = geometryContribution;
+            this.normalContribution = normalContribution;
+        }
+
+        public ImpactRippleEventSettings WithSignsReversed()
+        {
+            return new ImpactRippleEventSettings(
+                radius,
+                -signedImpulse,
+                -initialElevation,
+                shape,
+                sharpness,
+                geometryContribution,
+                normalContribution);
+        }
+
+        public ImpactRippleEventSettings Sanitized()
+        {
+            return new ImpactRippleEventSettings(
+                Mathf.Clamp(radius, MinimumRadius, MaximumRadius),
+                Mathf.Clamp(
+                    signedImpulse,
+                    MinimumSignedImpulse,
+                    MaximumSignedImpulse),
+                Mathf.Clamp(
+                    initialElevation,
+                    MinimumInitialElevation,
+                    MaximumInitialElevation),
+                Mathf.Clamp01(shape),
+                Mathf.Clamp(
+                    sharpness,
+                    MinimumSharpness,
+                    MaximumSharpness),
+                Mathf.Clamp01(geometryContribution),
+                Mathf.Clamp01(normalContribution));
+        }
+
+        public static ImpactRippleEventSettings CreateEntryDefaults()
+        {
+            return new ImpactRippleEventSettings(
+                0.40f,
+                1f,
+                0f,
+                LegacyShape,
+                LegacySharpness,
+                0.65f,
+                1f);
+        }
+
+        public static ImpactRippleEventSettings CreateExitDefaults()
+        {
+            return new ImpactRippleEventSettings(
+                0.35f,
+                -0.55f,
+                0f,
+                LegacyShape,
+                LegacySharpness,
+                0.65f,
+                1f);
+        }
+
+        public static ImpactRippleEventSettings CreateLegacy(
+            float radius,
+            float strength,
+            float geometryContribution,
+            float normalContribution)
+        {
+            return new ImpactRippleEventSettings(
+                radius,
+                strength,
+                0f,
+                LegacyShape,
+                LegacySharpness,
+                geometryContribution,
+                normalContribution);
+        }
+    }
+
     [ExecuteAlways]
     [DisallowMultipleComponent]
     [RequireComponent(typeof(StylizedRiver))]
@@ -405,6 +548,7 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MaximumStaticPressureModulation = 1.16f;
         private const float RippleStabilitySafety = 0.42f;
         private const int MaximumRippleSubsteps = 32;
+        private const double RippleSubstepDiagnosticWindowSeconds = 5.0;
         private const float GoldenPhaseStep = 0.61803398875f;
         private const float AutomaticBoundsHorizontalPadding = 0.5f;
         private const float DefaultGeneratedFootprintPadding = 0.12f;
@@ -553,6 +697,10 @@ namespace ProgrammaticStylized3D.Rivers
         private int generatedGeometryRefreshIndex;
         private Bounds generatedGeometryRefreshBounds;
         private bool wasFrozen;
+        private int impactsInjectedLastStep;
+        private int currentRippleSubstepCount;
+        private int maximumRecentRippleSubstepCount;
+        private double rippleSubstepDiagnosticWindowStart;
 
         public bool IsSupported =>
             SystemInfo.supportsComputeShaders &&
@@ -571,6 +719,11 @@ namespace ProgrammaticStylized3D.Rivers
         public int WakeFieldHeight => wakeFieldHeight;
         public int ActiveWakeChunkCount => CountActiveWakeChunks();
         public int ContinuousSourceCount => continuousSources.Count;
+        public int PendingImpactCount => pendingImpacts.Count;
+        public int ImpactsInjectedLastStep => impactsInjectedLastStep;
+        public int CurrentRippleSubstepCount => currentRippleSubstepCount;
+        public int MaximumRecentRippleSubstepCount =>
+            maximumRecentRippleSubstepCount;
         public float SimulationRate => ResolveSimulationRate();
         public float WakeSimulationRate => ResolveSimulationRate();
         public long EstimatedMemoryBytes =>
@@ -696,7 +849,10 @@ namespace ProgrammaticStylized3D.Rivers
             public float AcrossNormalized;
             public float SurfaceHalfWidth;
             public float Radius;
-            public float Strength;
+            public float SignedImpulse;
+            public float InitialElevation;
+            public float Shape;
+            public float Sharpness;
             public float GeometryContribution;
             public float NormalContribution;
         }
@@ -1250,6 +1406,15 @@ namespace ProgrammaticStylized3D.Rivers
                     ClearField();
                 }
 
+                // Impact requests can arrive after the freeze-transition clear
+                // but before this runtime updates again. Discard them every
+                // fully frozen frame so no event can survive and replay after
+                // thawing.
+                pendingImpacts.Clear();
+                impactsInjectedLastStep = 0;
+                currentRippleSubstepCount = 0;
+                maximumRecentRippleSubstepCount = 0;
+                rippleSubstepDiagnosticWindowStart = 0.0;
                 wasFrozen = true;
                 BindDisabled();
                 return;
@@ -1351,6 +1516,10 @@ namespace ProgrammaticStylized3D.Rivers
                 staticWakeChunkReleaseDuration.Length);
             staticWakeSourceDirty = true;
             pendingImpacts.Clear();
+            impactsInjectedLastStep = 0;
+            currentRippleSubstepCount = 0;
+            maximumRecentRippleSubstepCount = 0;
+            rippleSubstepDiagnosticWindowStart = 0.0;
             simulationAccumulator = 0f;
             staticWakeVariationAccumulator = 0f;
             simulationInterpolation = 1f;
@@ -1364,8 +1533,22 @@ namespace ProgrammaticStylized3D.Rivers
             float geometryContribution = 1f,
             float normalContribution = 1f)
         {
+            return EmitImpact(
+                worldPosition,
+                ImpactRippleEventSettings.CreateLegacy(
+                    radius,
+                    strength,
+                    geometryContribution,
+                    normalContribution));
+        }
+
+        public bool EmitImpact(
+            Vector3 worldPosition,
+            ImpactRippleEventSettings eventSettings)
+        {
             if (river == null ||
                 !river.RuntimeDisturbancesEnabled ||
+                river.LiquidFactor <= 0.0001f ||
                 !river.TryProjectWorldPoint(
                     worldPosition,
                     out StylizedRiverProjection projection) ||
@@ -1374,6 +1557,8 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
+            ImpactRippleEventSettings sanitized =
+                eventSettings.Sanitized();
             StylizedRiverSplineSample sample =
                 river.SampleAtLocalDistance(projection.LocalDistance);
             float surfaceHalfWidth = Mathf.Max(
@@ -1389,12 +1574,15 @@ namespace ProgrammaticStylized3D.Rivers
                         -1f,
                         1f),
                     SurfaceHalfWidth = surfaceHalfWidth,
-                    Radius = Mathf.Max(0.05f, radius),
-                    Strength = Mathf.Max(0f, strength),
-                    GeometryContribution = Mathf.Clamp01(
-                        geometryContribution),
-                    NormalContribution = Mathf.Clamp01(
-                        normalContribution)
+                    Radius = sanitized.Radius,
+                    SignedImpulse = sanitized.SignedImpulse,
+                    InitialElevation = sanitized.InitialElevation,
+                    Shape = sanitized.Shape,
+                    Sharpness = sanitized.Sharpness,
+                    GeometryContribution =
+                        sanitized.GeometryContribution,
+                    NormalContribution =
+                        sanitized.NormalContribution
                 });
 
             lastActivityTime = Time.realtimeSinceStartupAsDouble;
@@ -1738,23 +1926,127 @@ namespace ProgrammaticStylized3D.Rivers
             continuousSources.Remove(sourceId);
         }
 
-        public void EmitDebugImpactAtCentre()
+        public bool EmitDebugImpact(
+            float distanceNormalized,
+            float acrossNormalized,
+            ImpactRippleEventSettings eventSettings)
+        {
+            if (!TryResolveDebugImpactWorldPosition(
+                    distanceNormalized,
+                    acrossNormalized,
+                    out Vector3 worldPosition))
+            {
+                return false;
+            }
+
+            return EmitImpact(worldPosition, eventSettings);
+        }
+
+        public bool EmitDebugOppositeSignImpact(
+            float distanceNormalized,
+            float acrossNormalized,
+            ImpactRippleEventSettings eventSettings)
+        {
+            return EmitDebugImpact(
+                distanceNormalized,
+                acrossNormalized,
+                eventSettings.WithSignsReversed());
+        }
+
+        public bool EmitDebugOverlappingPair(
+            float distanceNormalized,
+            float acrossNormalized,
+            ImpactRippleEventSettings eventSettings)
         {
             if (river == null || !river.Domain.IsValid)
             {
-                return;
+                return false;
             }
 
+            float localDistance =
+                river.Domain.LocalLength *
+                Mathf.Clamp01(distanceNormalized);
             StylizedRiverSplineSample sample =
-                river.Domain.SampleAtLocalDistance(
-                    river.Domain.LocalLength * 0.5f);
+                river.Domain.SampleAtLocalDistance(localDistance);
+            float baseHalfWidth =
+                acrossNormalized < 0f
+                    ? sample.LeftSurfaceHalfWidth
+                    : sample.RightSurfaceHalfWidth;
+            float baseAcrossMetres =
+                Mathf.Clamp(acrossNormalized, -1f, 1f) *
+                Mathf.Max(0.05f, baseHalfWidth);
+            float availableLeft =
+                Mathf.Max(0f, sample.LeftSurfaceHalfWidth + baseAcrossMetres);
+            float availableRight =
+                Mathf.Max(0f, sample.RightSurfaceHalfWidth - baseAcrossMetres);
+            float maximumOffset =
+                Mathf.Max(0f, Mathf.Min(availableLeft, availableRight) - 0.05f);
+            float offset = Mathf.Min(
+                eventSettings.Sanitized().Radius * 0.45f,
+                maximumOffset * 0.5f);
 
-            EmitImpact(
-                sample.SurfacePoint,
-                0.55f,
-                1f,
-                1f,
-                1f);
+            if (offset <= 0.001f)
+            {
+                return EmitDebugImpact(
+                    distanceNormalized,
+                    acrossNormalized,
+                    eventSettings);
+            }
+
+            Vector3 leftPosition =
+                sample.SurfacePoint +
+                sample.Side * (baseAcrossMetres - offset);
+            Vector3 rightPosition =
+                sample.SurfacePoint +
+                sample.Side * (baseAcrossMetres + offset);
+
+            bool leftEmitted = EmitImpact(leftPosition, eventSettings);
+            bool rightEmitted = EmitImpact(rightPosition, eventSettings);
+            return leftEmitted || rightEmitted;
+        }
+
+        public bool EmitDebugNearShore(
+            float distanceNormalized,
+            float acrossNormalized,
+            ImpactRippleEventSettings eventSettings)
+        {
+            float side = acrossNormalized < 0f ? -0.82f : 0.82f;
+            return EmitDebugImpact(
+                distanceNormalized,
+                side,
+                eventSettings);
+        }
+
+        private bool TryResolveDebugImpactWorldPosition(
+            float distanceNormalized,
+            float acrossNormalized,
+            out Vector3 worldPosition)
+        {
+            worldPosition = default;
+            if (river == null || !river.Domain.IsValid)
+            {
+                return false;
+            }
+
+            float localDistance =
+                river.Domain.LocalLength *
+                Mathf.Clamp01(distanceNormalized);
+            StylizedRiverSplineSample sample =
+                river.Domain.SampleAtLocalDistance(localDistance);
+            float clampedAcross = Mathf.Clamp(
+                acrossNormalized,
+                -0.95f,
+                0.95f);
+            float halfWidth =
+                clampedAcross < 0f
+                    ? sample.LeftSurfaceHalfWidth
+                    : sample.RightSurfaceHalfWidth;
+            float acrossMetres =
+                clampedAcross * Mathf.Max(0.05f, halfWidth);
+            worldPosition =
+                sample.SurfacePoint +
+                sample.Side * acrossMetres;
+            return true;
         }
 
         public static bool TryFindContainingRiver(
@@ -2610,6 +2902,7 @@ namespace ProgrammaticStylized3D.Rivers
             ExpireChunks(now);
             ExpireWakeChunks(now);
 
+            impactsInjectedLastStep = pendingImpacts.Count;
             for (int index = 0; index < pendingImpacts.Count; index++)
             {
                 ImpactCommand impact = pendingImpacts[index];
@@ -2700,6 +2993,7 @@ namespace ProgrammaticStylized3D.Rivers
         {
             if (!HasRippleActiveChunks())
             {
+                RecordRippleSubstepDiagnostics(0);
                 return;
             }
 
@@ -2720,6 +3014,7 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.CeilToInt(deltaTime / maximumStableStep),
                 1,
                 MaximumRippleSubsteps);
+            RecordRippleSubstepDiagnostics(substepCount);
             float substepDelta = deltaTime / substepCount;
             float dampingPerSecond = river.ImpactRippleDecay;
 
@@ -2908,7 +3203,8 @@ namespace ProgrammaticStylized3D.Rivers
                 fieldHeight - 1);
             int width = Mathf.Max(1, maxX - minX + 1);
             int height = Mathf.Max(1, maxY - minY + 1);
-            float strength = impact.Strength * river.ImpactRippleStrength;
+            float signedImpulse =
+                impact.SignedImpulse * river.ImpactRippleStrength;
 
             computeShader.SetInts("_FieldSize", fieldWidth, fieldHeight);
             computeShader.SetInts(
@@ -2929,13 +3225,33 @@ namespace ProgrammaticStylized3D.Rivers
                     0f));
             computeShader.SetFloat(
                 "_RippleInjectHeight",
-                strength * Mathf.Clamp01(impact.GeometryContribution) * 0.028f);
+                signedImpulse *
+                Mathf.Clamp01(impact.GeometryContribution) *
+                0.028f);
+            computeShader.SetFloat(
+                "_RippleInjectElevation",
+                impact.InitialElevation *
+                river.ImpactRippleStrength *
+                Mathf.Clamp01(impact.GeometryContribution));
             computeShader.SetFloat(
                 "_RippleInjectVelocity",
-                strength * Mathf.Clamp01(impact.GeometryContribution) * 0.68f);
+                signedImpulse *
+                Mathf.Clamp01(impact.GeometryContribution) *
+                0.68f);
             computeShader.SetFloat(
                 "_RippleInjectNormalDetail",
-                strength * Mathf.Clamp01(impact.NormalContribution) * 0.12f);
+                signedImpulse *
+                Mathf.Clamp01(impact.NormalContribution) *
+                0.12f);
+            computeShader.SetFloat(
+                "_RippleInjectShape",
+                Mathf.Clamp01(impact.Shape));
+            computeShader.SetFloat(
+                "_RippleInjectSharpness",
+                Mathf.Clamp(
+                    impact.Sharpness,
+                    ImpactRippleEventSettings.MinimumSharpness,
+                    ImpactRippleEventSettings.MaximumSharpness));
             computeShader.SetFloat(
                 "_MaximumHeight",
                 river.ResolvedImpactRippleMaximumHeight);
@@ -5199,6 +5515,26 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
+        private void RecordRippleSubstepDiagnostics(int substepCount)
+        {
+            currentRippleSubstepCount = Mathf.Max(0, substepCount);
+            double now = Time.realtimeSinceStartupAsDouble;
+
+            if (rippleSubstepDiagnosticWindowStart <= 0.0 ||
+                now - rippleSubstepDiagnosticWindowStart >=
+                RippleSubstepDiagnosticWindowSeconds)
+            {
+                rippleSubstepDiagnosticWindowStart = now;
+                maximumRecentRippleSubstepCount =
+                    currentRippleSubstepCount;
+                return;
+            }
+
+            maximumRecentRippleSubstepCount = Mathf.Max(
+                maximumRecentRippleSubstepCount,
+                currentRippleSubstepCount);
+        }
+
         private float ResolveSimulationRate()
         {
             float qualityRate = river != null
@@ -5213,7 +5549,8 @@ namespace ProgrammaticStylized3D.Rivers
 
             return HasStaticSources() &&
                    !HasDynamicSources() &&
-                   pendingImpacts.Count == 0
+                   pendingImpacts.Count == 0 &&
+                   !HasRippleActiveChunks()
                 ? Mathf.Min(qualityRate, StaticOnlySimulationRate)
                 : qualityRate;
         }

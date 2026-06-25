@@ -80,7 +80,7 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 **Problem:** Add attached pressure, stationary and moving wake sources, one-shot ripples, downstream transport, spreading, and decay without replacing the Stage 3 base motion field or scaling water-shader cost with active effect count.
 
-**Current status:** The stationary Pressure source and stationary Wake source are accepted. Their river-level visual controls are now unified and source-agnostic. Impact Ripples are the next Stage 5 target. Full relative-motion preparation for dynamic Pressure and dynamic Wake sources remains deferred.
+**Current status:** The stationary Pressure source and stationary Wake source are accepted. Their river-level visual controls are unified and source-agnostic. Impact Ripples are now being completed through the approved R0–R5 advanced shared-solver passes below. R0 source implementation is prepared for Unity compilation and focused validation. Full relative-motion preparation for dynamic Pressure and dynamic Wake sources remains deferred.
 
 ### Canonical feature vocabulary
 
@@ -155,16 +155,96 @@ The rejected V4 continuously driven obstacle-wave solver is noncanonical and mus
 
 ### Planned visual contracts
 
-**Impact Ripples — next:** one event system with configurable position, radius, signed impulse, geometry contribution, normal contribution, propagation, and decay. Entry, exit, footsteps, landings, projectiles, attacks, and explosions are event profiles feeding the same solver rather than separate water systems. Detached spray, droplets, and splashes remain Stage 7 consumers.
+**Impact Ripples — approved implementation:** one shared event system with configurable position, radius, signed impulse, initial elevation, analytic shape, sharpness, geometry contribution, and normal contribution. Propagation, decay, flow dissipation, and boundary response remain river-level rules for the shared field. Entry, exit, footsteps, landings, projectiles, attacks, and explosions feed the same solver rather than becoming separate water systems. Detached spray, droplets, and splashes remain Stage 7 consumers.
 
 **Dynamic Pressure/Wake source preparation — deferred package:** design both around emitter-provided movement relative to local river flow. Pressure remains attached to the current object position; Wake persists after the object passes. A source drifting with the current should create little attached pressure, while upstream or cross-current movement should create stronger leading-face pressure. The dynamic Wake source must continue injecting into the accepted shared persistent field and use the canonical Wake controls. Expensive stationary mesh-support preparation must not be rebuilt for moving sources.
 
+### Approved Impact Ripple architecture
+
+Impact Ripples remain one coherent persistent field and one simulation. Entry, exit, footsteps, projectiles, attacks, explosions, debris, and scripted events use reusable event settings rather than separate solvers. The final water shader continues to sample a fixed number of shared fields and never loops over active events.
+
+River-level response owns shared propagation, decay, flow dissipation, shoreline reflection, and obstacle reflection. Event-level settings own world position, radius, signed impulse, initial elevation, analytic shape, sharpness, geometry contribution, and normal contribution. Positive impulse represents water being pushed or struck; negative impulse represents withdrawal or suction. Per-event propagation and decay are deliberately excluded because event identity is lost after overlap in the shared field.
+
+The final advanced solver will replace average-width propagation with cached local river metrics, use time-derived progressive chunk reservations, and add one cached two-channel boundary mask:
+
+```text
+R = fluid coverage
+G = boundary reflection response
+```
+
+Shorelines will progressively absorb most incoming amplitude and return only a weak broad reflection. Registered static obstructions will use a stronger but still damped reflection. The mask is rebuilt only when the river domain, disturbance resources, quality, or participating static geometry changes.
+
+### Impact Ripple implementation passes
+
+#### R0 — Safety and event contract
+
+- Reject `EmitImpact` immediately while the river is fully frozen.
+- Defensively discard pending impact commands every fully frozen runtime frame.
+- Clear all ripple state on the liquid-to-fully-frozen transition so no event survives thaw.
+- Introduce a profile-ready event contract with radius, signed impulse, initial elevation, shape, sharpness, geometry contribution, and normal contribution.
+- Preserve the former public `EmitImpact(position, radius, strength, geometry, normal)` overload as a compatibility forwarder.
+- Preserve the provisional crater/ring shape at the profile midpoint so R0 does not silently retune appearance.
+- Separate dynamic-emitter entry and exit Impact settings from continuous Wake strength and contributions.
+- Preserve existing emitter behavior through one-time serialized migration; exit becomes a signed negative event rather than the same positive shape at a hidden multiplier.
+- Keep the static-only `12 Hz` optimization only when there are no pending impacts and no active ripple chunks.
+- Replace the centre-only test action with configurable longitudinal/across position, signed profile settings, opposite-sign, overlap, and near-shore test actions.
+- Report pending commands, impacts injected during the last simulation step, current internal ripple substeps, and the maximum observed during a recent diagnostic window.
+- Lifetime-reservation records and their diagnostics begin in R2; R0 must not invent placeholder reservations.
+
+**R0 status:** source implementation prepared; Unity compilation and focused validation pending.
+
+#### R1 — Local metric propagation
+
+- Cache per-longitudinal-row centreline position, local tangent, left/right surface widths, and bend/spacing data.
+- Reconstruct local world-space neighbour distances in compute without allocating a full two-dimensional position texture.
+- Replace the river-wide average lateral cell size.
+- Derive stability requirements from the smallest relevant cells in active chunks.
+- Validate approximately circular world-space propagation through narrow, broad, asymmetric, transitioning, straight, and tightly bending sections.
+- Preserve correct radial expansion under reverse flow.
+
+#### R2 — Lifetime and progressive chunk reservation
+
+- Add lightweight active-impact lifetime records.
+- Derive bounded lifetime from event magnitude, base decay, flow dissipation, minimum visible energy, and maximum lifetime.
+- Expand the reserved interval progressively from propagation radius and downstream advection rather than reserving the full maximum range immediately.
+- Retire reservations early when the relevant field energy sleeps.
+- Prevent fast flow or slow decay from clipping ripples at chunk boundaries.
+- Expose active reservation diagnostics only once the real records exist.
+
+#### R3 — Shore and static-obstacle boundaries
+
+- Build one cached two-channel ripple boundary mask.
+- Generate fractional shoreline fluid coverage and a narrow absorption band from the river domain.
+- Rasterize participating registered static geometry into the same mask.
+- Use damped reflective finite-difference boundary sampling instead of simple edge fading.
+- Keep shoreline returns weak and broad; allow somewhat stronger but still lossy obstruction reflections.
+- Clear ripple state inside newly solid cells.
+- Add independent generated-geometry Ripple Collision authorship with `Inherit` and `Disabled`.
+- Avoid per-frame collider scanning and avoid per-obstacle loops in the final water shader.
+
+#### R4 — Event-shape visual tuning
+
+- Tune the shared analytic centre/ring/counter-ring model.
+- Establish restrained starting profiles for entry, exit/suction, footstep-sized events, and heavy impacts.
+- Tune geometry-only and normal-only behavior.
+- Tune signed overlap, cancellation, reinforcement, height/velocity bounds, and production-versus-stress ranges.
+- Do not use foam, spray, droplets, or Stage 7 effects to hide ripple defects.
+
+#### R5 — Combined regression and profiling
+
+- Validate Low, Medium, and High quality.
+- Profile actual internal substeps, memory, active chunks, sleeping, and resource release.
+- Test multiple simultaneous signed impacts, reverse flow, freeze/thaw, shore and obstacle interaction, source removal, and chunk boundaries.
+- Confirm accepted Pressure and Wake visuals remain unchanged.
+- Confirm stationary and dynamic Wake coexist with the completed ripple field.
+
 ### Remaining Stage 5 work
 
-1. Run the routine Unity compile and regression check for the Pressure/Wake control-unification patch. The intended rendering changes are limited to dynamic wake injection now using canonical Wake Strength, Reach, and Spread.
-2. Inspect the current Impact Ripple implementation and event API, define signed impulses and reusable event profiles, then tune and accept it independently.
-3. Defer full dynamic Pressure/Wake source preparation until Impact Ripples are accepted; design both around one relative-motion emitter contract while reusing the canonical response controls and shared Wake field.
-4. After all Stage 5 capabilities are accepted, profile Low, Medium, and High quality and run combined overlap, source-removal, sleeping, culling, reverse-flow, frozen-state, and stationary/dynamic coexistence regression.
+1. Compile and validate R0 in Unity before beginning R1.
+2. Implement and accept R1–R4 one pass at a time.
+3. Run R5 combined profiling and regression.
+4. Decide whether full dynamic Pressure/Wake source preparation is required before Stage 6 Foam; if deferred, record that milestone decision explicitly.
+
 
 ## 6. Foam and Surface Tracing
 

@@ -57,8 +57,11 @@ int4 _RippleInjectRect;
 float2 _RippleInjectCentre;
 float2 _RippleInjectRadiusPixels;
 float _RippleInjectHeight;
+float _RippleInjectElevation;
 float _RippleInjectVelocity;
 float _RippleInjectNormalDetail;
+float _RippleInjectShape;
+float _RippleInjectSharpness;
 
 int4 _WakeInjectRect;
 float2 _WakeInjectStart;
@@ -1033,20 +1036,42 @@ void InjectRipple(uint3 dispatchId : SV_DispatchThreadID)
         (samplePosition - _RippleInjectCentre) /
         max(_RippleInjectRadiusPixels, float2(1.0, 1.0));
     float radialDistance = length(sourceRelative);
-    float centreDepression = Gaussian1D(radialDistance, 0.0, 0.28);
-    float pressureRing = Gaussian1D(radialDistance, 0.60, 0.17);
-    float outerTrough = Gaussian1D(radialDistance, 0.91, 0.11);
+    float shapeOffset = saturate(_RippleInjectShape) - 0.5;
+    float inverseSharpness =
+        rcp(max(0.25, _RippleInjectSharpness));
+    float centreWidth = 0.28 * inverseSharpness;
+    float ringCentre = 0.60 + shapeOffset * 0.16;
+    float ringWidth = 0.17 * inverseSharpness;
+    float outerCentre = 0.91 + shapeOffset * 0.08;
+    float outerWidth = 0.11 * inverseSharpness;
+    float centreDepression = Gaussian1D(
+        radialDistance,
+        0.0,
+        centreWidth);
+    float pressureRing = Gaussian1D(
+        radialDistance,
+        ringCentre,
+        ringWidth);
+    float outerTrough = Gaussian1D(
+        radialDistance,
+        outerCentre,
+        outerWidth);
     float radialEnvelope =
         1.0 - smoothstep(0.88, 1.12, radialDistance);
+    float elevationPattern = Gaussian1D(
+        radialDistance,
+        0.0,
+        0.34 * inverseSharpness) *
+        radialEnvelope;
 
     float heightPattern =
-        (0.92 * pressureRing -
-         0.70 * centreDepression -
+        ((0.92 + shapeOffset * 0.30) * pressureRing -
+         (0.70 - shapeOffset * 0.20) * centreDepression -
          0.16 * outerTrough) *
         radialEnvelope;
     float velocityPattern =
-        (1.05 * pressureRing -
-         1.35 * centreDepression -
+        ((1.05 + shapeOffset * 0.35) * pressureRing -
+         (1.35 - shapeOffset * 0.30) * centreDepression -
          0.20 * outerTrough) *
         radialEnvelope;
     float2 radialDirection = SafeNormalize(
@@ -1058,7 +1083,9 @@ void InjectRipple(uint3 dispatchId : SV_DispatchThreadID)
         radialEnvelope;
 
     float4 state = _StateWrite[pixel];
-    state.r += _RippleInjectHeight * heightPattern;
+    state.r +=
+        _RippleInjectHeight * heightPattern +
+        _RippleInjectElevation * elevationPattern;
     state.g += _RippleInjectVelocity * velocityPattern;
     state.ba += _RippleInjectNormalDetail * normalPattern;
     state.r = clamp(state.r, -_MaximumHeight, _MaximumHeight);

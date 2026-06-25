@@ -595,6 +595,16 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0.1f, 3f)]
         [SerializeField] private float impactRippleDecay = 0.85f;
 
+        [HideInInspector, SerializeField, Range(0f, 1f)]
+        private float impactRippleTestDistanceNormalized = 0.5f;
+
+        [HideInInspector, SerializeField, Range(-1f, 1f)]
+        private float impactRippleTestAcrossNormalized;
+
+        [HideInInspector, SerializeField]
+        private ImpactRippleEventSettings impactRippleTestEvent =
+            ImpactRippleEventSettings.CreateEntryDefaults();
+
         [Header("Water Body Validation")]
         [SerializeField]
         private StylizedRiverBodyDebugView bodyDebugView =
@@ -968,6 +978,12 @@ namespace ProgrammaticStylized3D.Rivers
         public float ImpactRippleStrength => impactRippleStrength;
         public float ImpactRipplePropagation => impactRipplePropagation;
         public float ImpactRippleDecay => impactRippleDecay;
+        public float ImpactRippleTestDistanceNormalized =>
+            impactRippleTestDistanceNormalized;
+        public float ImpactRippleTestAcrossNormalized =>
+            impactRippleTestAcrossNormalized;
+        public ImpactRippleEventSettings ImpactRippleTestEvent =>
+            impactRippleTestEvent;
         public float ResolvedImpactRippleMaximumHeight =>
             ResolveImpactRippleMaximumHeight();
         public float ResolvedInteractionMinimumWavelength =>
@@ -2308,6 +2324,23 @@ namespace ProgrammaticStylized3D.Rivers
                 impactRippleDecay,
                 0.1f,
                 3f);
+            impactRippleTestDistanceNormalized = Mathf.Clamp01(
+                impactRippleTestDistanceNormalized);
+            impactRippleTestAcrossNormalized = Mathf.Clamp(
+                impactRippleTestAcrossNormalized,
+                -1f,
+                1f);
+            if (impactRippleTestEvent.Radius <
+                ImpactRippleEventSettings.MinimumRadius)
+            {
+                impactRippleTestEvent =
+                    ImpactRippleEventSettings.CreateEntryDefaults();
+            }
+            else
+            {
+                impactRippleTestEvent =
+                    impactRippleTestEvent.Sanitized();
+            }
 
             opacity = Mathf.Clamp01(opacity);
             shallowOpacity = Mathf.Clamp01(shallowOpacity);

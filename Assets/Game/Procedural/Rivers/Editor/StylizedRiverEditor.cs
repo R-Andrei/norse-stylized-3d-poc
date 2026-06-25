@@ -543,6 +543,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("impactRipplePropagation");
             SerializedProperty impactRippleDecayProperty =
                 Find("impactRippleDecay");
+            SerializedProperty impactRippleTestDistanceProperty =
+                Find("impactRippleTestDistanceNormalized");
+            SerializedProperty impactRippleTestAcrossProperty =
+                Find("impactRippleTestAcrossNormalized");
+            SerializedProperty impactRippleTestEventProperty =
+                Find("impactRippleTestEvent");
             SerializedProperty debugViewProperty =
                 Find("disturbanceDebugView");
 
@@ -659,6 +665,24 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     ? ", impactRippleDecay"
                     : "impactRippleDecay";
             }
+            if (impactRippleTestDistanceProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", impactRippleTestDistanceNormalized"
+                    : "impactRippleTestDistanceNormalized";
+            }
+            if (impactRippleTestAcrossProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", impactRippleTestAcrossNormalized"
+                    : "impactRippleTestAcrossNormalized";
+            }
+            if (impactRippleTestEventProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", impactRippleTestEvent"
+                    : "impactRippleTestEvent";
+            }
             if (debugViewProperty == null)
             {
                 missingProperties += missingProperties.Length > 0
@@ -691,7 +715,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     presetProperty,
                     new GUIContent(
                         "Disturbance Character",
-                        "Applies coordinated defaults to the four separate Stage 5 features."));
+                        "Applies coordinated defaults to Pressure, Wake, and Impact Ripple response controls."));
 
                 if (EditorGUI.EndChangeCheck())
                 {
@@ -899,6 +923,34 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                             debugViewProperty.intValue);
                     }
                 }
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField(
+                    "Impact Ripple Test",
+                    EditorStyles.miniBoldLabel);
+                if (impactRippleTestDistanceProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        impactRippleTestDistanceProperty,
+                        new GUIContent(
+                            "Longitudinal Position",
+                            "Normalized zero-to-one position along the river used by manual impact tests."));
+                }
+                if (impactRippleTestAcrossProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        impactRippleTestAcrossProperty,
+                        new GUIContent(
+                            "Across Position",
+                            "Normalized position across the local water surface. Negative is left and positive is right."));
+                }
+                if (impactRippleTestEventProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        impactRippleTestEventProperty,
+                        new GUIContent("Event"),
+                        true);
+                }
             }
 
             if (targets.Length != 1 || target is not StylizedRiver singleRiver)
@@ -961,13 +1013,24 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Continuous Sources",
                 runtime.ContinuousSourceCount.ToString());
             EditorGUILayout.LabelField(
+                "Pending Impacts",
+                runtime.PendingImpactCount.ToString());
+            EditorGUILayout.LabelField(
+                "Impacts Injected Last Step",
+                runtime.ImpactsInjectedLastStep.ToString());
+            EditorGUILayout.LabelField(
+                "Ripple Internal Substeps",
+                runtime.CurrentRippleSubstepCount.ToString());
+            EditorGUILayout.LabelField(
+                "Maximum Recent Ripple Substeps",
+                runtime.MaximumRecentRippleSubstepCount.ToString());
+            EditorGUILayout.LabelField(
                 "Estimated Field Memory",
                 $"{runtime.EstimatedMemoryBytes / (1024f * 1024f):0.00} MB");
             EditorGUILayout.LabelField(
                 "State",
                 runtime.IsSleeping ? "Sleeping" : "Active");
 
-            EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Clear Field"))
             {
                 runtime.ClearField();
@@ -975,12 +1038,52 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             using (new EditorGUI.DisabledScope(!Application.isPlaying))
             {
+                EditorGUILayout.BeginHorizontal();
                 if (GUILayout.Button("Emit Test Impact"))
                 {
-                    runtime.EmitDebugImpactAtCentre();
+                    ApplyImpactTestProperties();
+                    runtime.EmitDebugImpact(
+                        singleRiver.ImpactRippleTestDistanceNormalized,
+                        singleRiver.ImpactRippleTestAcrossNormalized,
+                        singleRiver.ImpactRippleTestEvent);
                 }
+
+                if (GUILayout.Button("Emit Opposite Sign"))
+                {
+                    ApplyImpactTestProperties();
+                    runtime.EmitDebugOppositeSignImpact(
+                        singleRiver.ImpactRippleTestDistanceNormalized,
+                        singleRiver.ImpactRippleTestAcrossNormalized,
+                        singleRiver.ImpactRippleTestEvent);
+                }
+                EditorGUILayout.EndHorizontal();
+
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Emit Overlapping Pair"))
+                {
+                    ApplyImpactTestProperties();
+                    runtime.EmitDebugOverlappingPair(
+                        singleRiver.ImpactRippleTestDistanceNormalized,
+                        singleRiver.ImpactRippleTestAcrossNormalized,
+                        singleRiver.ImpactRippleTestEvent);
+                }
+
+                if (GUILayout.Button("Emit Near Shore"))
+                {
+                    ApplyImpactTestProperties();
+                    runtime.EmitDebugNearShore(
+                        singleRiver.ImpactRippleTestDistanceNormalized,
+                        singleRiver.ImpactRippleTestAcrossNormalized,
+                        singleRiver.ImpactRippleTestEvent);
+                }
+                EditorGUILayout.EndHorizontal();
             }
-            EditorGUILayout.EndHorizontal();
+        }
+
+        private void ApplyImpactTestProperties()
+        {
+            serializedObject.ApplyModifiedProperties();
+            serializedObject.Update();
         }
 
         private static void DrawDisturbanceDebugLegend(

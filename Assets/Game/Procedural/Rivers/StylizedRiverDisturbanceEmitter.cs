@@ -15,6 +15,7 @@ namespace ProgrammaticStylized3D.Rivers
         }
 
         private const float MinimumFootprintHalfExtent = 0.05f;
+        private const int CurrentImpactSettingsVersion = 1;
 
         [Tooltip("Optional explicit river. Leave empty to locate the active river footprint automatically.")]
         [SerializeField] private StylizedRiver explicitRiver;
@@ -63,12 +64,27 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("When movement is slow, the dynamic source becomes a generic flow obstruction.")]
         [SerializeField] private bool stationaryObstruction = true;
 
+        [Header("Impact Ripples")]
         [Tooltip("Creates one impact after an observed outside-to-inside river transition. Merely enabling a source already in water does not emit an impact.")]
         [SerializeField] private bool emitEntryImpact = true;
 
-        [Tooltip("Creates one smaller impact when the source leaves the river.")]
+        [Tooltip("Independent event settings for water entry. These do not change the continuous Wake source.")]
+        [SerializeField]
+        private ImpactRippleEventSettings entryImpact =
+            ImpactRippleEventSettings.CreateEntryDefaults();
+
+        [Tooltip("Creates one signed exit or suction event when the source leaves the river.")]
         [SerializeField] private bool emitExitImpact;
 
+        [Tooltip("Independent event settings for water exit. These do not change the continuous Wake source.")]
+        [SerializeField]
+        private ImpactRippleEventSettings exitImpact =
+            ImpactRippleEventSettings.CreateExitDefaults();
+
+        [SerializeField, HideInInspector]
+        private int impactSettingsVersion;
+
+        [Header("Runtime Sampling")]
         [Tooltip("CPU source-registration interval. Swept injection bridges movement between samples.")]
         [Range(0.025f, 0.2f)]
         [SerializeField] private float sourceUpdateInterval = 0.05f;
@@ -104,6 +120,8 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void OnEnable()
         {
+            MigrateImpactSettingsIfRequired();
+
             if (Application.isPlaying)
             {
                 WarnIfLegacyStaticEmitter();
@@ -117,6 +135,8 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void OnValidate()
         {
+            MigrateImpactSettingsIfRequired();
+
             verticalContactTolerance = Mathf.Max(
                 0.05f,
                 verticalContactTolerance);
@@ -135,10 +155,38 @@ namespace ProgrammaticStylized3D.Rivers
             strength = Mathf.Clamp(strength, 0f, 8f);
             geometryContribution = Mathf.Clamp01(geometryContribution);
             normalContribution = Mathf.Clamp01(normalContribution);
+            entryImpact = entryImpact.Sanitized();
+            exitImpact = exitImpact.Sanitized();
             sourceUpdateInterval = Mathf.Clamp(
                 sourceUpdateInterval,
                 0.025f,
                 0.2f);
+        }
+
+        private void MigrateImpactSettingsIfRequired()
+        {
+            if (impactSettingsVersion >= CurrentImpactSettingsVersion)
+            {
+                return;
+            }
+
+            entryImpact = new ImpactRippleEventSettings(
+                ResolvedImpactRadius * 1.15f,
+                strength,
+                0f,
+                ImpactRippleEventSettings.LegacyShape,
+                ImpactRippleEventSettings.LegacySharpness,
+                geometryContribution,
+                normalContribution);
+            exitImpact = new ImpactRippleEventSettings(
+                ResolvedImpactRadius,
+                -strength * 0.55f,
+                0f,
+                ImpactRippleEventSettings.LegacyShape,
+                ImpactRippleEventSettings.LegacySharpness,
+                geometryContribution,
+                normalContribution);
+            impactSettingsVersion = CurrentImpactSettingsVersion;
         }
 
         private void Update()
@@ -191,10 +239,7 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     currentRuntime.EmitImpact(
                         currentPosition,
-                        ResolvedImpactRadius * 1.15f,
-                        strength,
-                        geometryContribution,
-                        normalContribution);
+                        entryImpact);
                 }
 
                 // The emitter submits only source-local movement, footprint,
@@ -216,10 +261,7 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 previousRuntime.EmitImpact(
                     previousSamplePosition,
-                    ResolvedImpactRadius,
-                    strength * 0.55f,
-                    geometryContribution,
-                    normalContribution);
+                    exitImpact);
             }
 
             hasObservedContactState = true;
@@ -248,10 +290,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             runtime?.EmitImpact(
                 transform.position,
-                ResolvedImpactRadius,
-                strength,
-                geometryContribution,
-                normalContribution);
+                entryImpact);
         }
 
         private void WarnIfLegacyStaticEmitter()

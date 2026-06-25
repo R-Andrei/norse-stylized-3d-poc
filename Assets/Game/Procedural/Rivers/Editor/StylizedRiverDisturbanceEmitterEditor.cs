@@ -1,4 +1,5 @@
 using UnityEditor;
+using UnityEngine;
 
 namespace ProgrammaticStylized3D.Rivers.Editor
 {
@@ -20,7 +21,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private SerializedProperty normalContribution;
         private SerializedProperty stationaryObstruction;
         private SerializedProperty emitEntryImpact;
+        private SerializedProperty entryImpact;
         private SerializedProperty emitExitImpact;
+        private SerializedProperty exitImpact;
         private SerializedProperty sourceUpdateInterval;
 
         private void OnEnable()
@@ -47,8 +50,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "stationaryObstruction");
             emitEntryImpact = serializedObject.FindProperty(
                 "emitEntryImpact");
+            entryImpact = serializedObject.FindProperty(
+                "entryImpact");
             emitExitImpact = serializedObject.FindProperty(
                 "emitExitImpact");
+            exitImpact = serializedObject.FindProperty(
+                "exitImpact");
             sourceUpdateInterval = serializedObject.FindProperty(
                 "sourceUpdateInterval");
         }
@@ -83,16 +90,74 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawManualFootprint();
 
             EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField("Influence", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                "Continuous Wake",
+                EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(strength);
             EditorGUILayout.PropertyField(geometryContribution);
             EditorGUILayout.PropertyField(normalContribution);
             EditorGUILayout.PropertyField(stationaryObstruction);
-            EditorGUILayout.PropertyField(emitEntryImpact);
-            EditorGUILayout.PropertyField(emitExitImpact);
+
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField(
+                "Impact Ripples",
+                EditorStyles.boldLabel);
+            DrawImpactEvent(
+                emitEntryImpact,
+                entryImpact,
+                "Entry Impact");
+            DrawImpactEvent(
+                emitExitImpact,
+                exitImpact,
+                "Exit / Suction Impact");
+
+            using (new EditorGUI.DisabledScope(
+                !Application.isPlaying ||
+                targets.Length != 1))
+            {
+                if (GUILayout.Button("Emit Entry Impact Now") &&
+                    target is StylizedRiverDisturbanceEmitter emitter)
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    emitter.EmitImpactNow();
+                    serializedObject.Update();
+                }
+            }
+
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField(
+                "Runtime Sampling",
+                EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(sourceUpdateInterval);
 
             serializedObject.ApplyModifiedProperties();
+        }
+
+        private static void DrawImpactEvent(
+            SerializedProperty enabledProperty,
+            SerializedProperty settingsProperty,
+            string label)
+        {
+            EditorGUILayout.PropertyField(
+                enabledProperty,
+                new GUIContent(label));
+
+            bool disabled =
+                enabledProperty != null &&
+                !enabledProperty.hasMultipleDifferentValues &&
+                !enabledProperty.boolValue;
+
+            using (new EditorGUI.DisabledScope(disabled))
+            using (new EditorGUI.IndentLevelScope())
+            {
+                if (settingsProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        settingsProperty,
+                        new GUIContent("Settings"),
+                        true);
+                }
+            }
         }
 
         private void DrawManualFootprint()
