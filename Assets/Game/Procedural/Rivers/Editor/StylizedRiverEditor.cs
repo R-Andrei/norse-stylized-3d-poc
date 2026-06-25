@@ -539,10 +539,22 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("obstructionWakeSurfaceCompactness");
             SerializedProperty impactRippleStrengthProperty =
                 Find("impactRippleStrength");
+            SerializedProperty impactRippleRidgeEmphasisProperty =
+                Find("impactRippleRidgeEmphasis");
             SerializedProperty impactRipplePropagationProperty =
                 Find("impactRipplePropagation");
             SerializedProperty impactRippleDecayProperty =
                 Find("impactRippleDecay");
+            SerializedProperty impactRippleFlowDissipationProperty =
+                Find("impactRippleFlowDissipation");
+            SerializedProperty impactRippleMinimumVisibleEnergyProperty =
+                Find("impactRippleMinimumVisibleEnergy");
+            SerializedProperty impactRippleMaximumLifetimeProperty =
+                Find("impactRippleMaximumLifetime");
+            SerializedProperty impactRippleShoreReflectionProperty =
+                Find("impactRippleShoreReflection");
+            SerializedProperty impactRippleObstacleReflectionProperty =
+                Find("impactRippleObstacleReflection");
             SerializedProperty impactRippleTestDistanceProperty =
                 Find("impactRippleTestDistanceNormalized");
             SerializedProperty impactRippleTestAcrossProperty =
@@ -653,6 +665,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     ? ", impactRippleStrength"
                     : "impactRippleStrength";
             }
+            if (impactRippleRidgeEmphasisProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", impactRippleRidgeEmphasis"
+                    : "impactRippleRidgeEmphasis";
+            }
             if (impactRipplePropagationProperty == null)
             {
                 missingProperties += missingProperties.Length > 0
@@ -664,6 +682,36 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 missingProperties += missingProperties.Length > 0
                     ? ", impactRippleDecay"
                     : "impactRippleDecay";
+            }
+            if (impactRippleFlowDissipationProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", impactRippleFlowDissipation"
+                    : "impactRippleFlowDissipation";
+            }
+            if (impactRippleMinimumVisibleEnergyProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", impactRippleMinimumVisibleEnergy"
+                    : "impactRippleMinimumVisibleEnergy";
+            }
+            if (impactRippleMaximumLifetimeProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", impactRippleMaximumLifetime"
+                    : "impactRippleMaximumLifetime";
+            }
+            if (impactRippleShoreReflectionProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", impactRippleShoreReflection"
+                    : "impactRippleShoreReflection";
+            }
+            if (impactRippleObstacleReflectionProperty == null)
+            {
+                missingProperties += missingProperties.Length > 0
+                    ? ", impactRippleObstacleReflection"
+                    : "impactRippleObstacleReflection";
             }
             if (impactRippleTestDistanceProperty == null)
             {
@@ -705,7 +753,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     enabledProperty,
                     new GUIContent(
                         "Runtime Disturbances",
-                        "Master allocation and simulation switch. Disabled rivers reproduce Stage 4 and allocate no disturbance fields."));
+                        "Master switch for Stage 5 Pressure, Wake, and Impact Ripples. Off releases or avoids disturbance textures and reproduces Stage 4 water; registered geometry remains available but contributes no disturbance."));
             }
 
             if (presetProperty != null)
@@ -715,7 +763,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     presetProperty,
                     new GUIContent(
                         "Disturbance Character",
-                        "Applies coordinated defaults to Pressure, Wake, and Impact Ripple response controls."));
+                        "Applies a coordinated starting preset to Pressure, Wake, and Impact Ripple river-level controls. Editing any individual response control returns this field to Custom; source-specific emitter settings are not changed."));
 
                 if (EditorGUI.EndChangeCheck())
                 {
@@ -757,7 +805,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         staticPressureStrengthProperty,
                         new GUIContent(
                             "Strength",
-                            "Normalized 0–1 position inside the computed flow-and-geometry-safe pressure range."));
+                            "Selects a point inside each source's computed safe Pressure-height range. Zero removes attached buildup; one uses the maximum geometry-, support-, and flow-safe height without bypassing rear protection."));
                 }
                 if (staticPressureContactSharpnessProperty != null)
                 {
@@ -765,7 +813,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         staticPressureContactSharpnessProperty,
                         new GUIContent(
                             "Contact Sharpness",
-                            "Controls how quickly the pressure ridge descends from the object toward open water."));
+                            "Shapes the short open-water falloff from source contact. Lower values make a broader, softer ridge; higher values make it tighter and steeper. This does not raise the crest-height ceiling."));
                 }
                 if (staticPressureWaveResponseProperty != null)
                 {
@@ -773,7 +821,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         staticPressureWaveResponseProperty,
                         new GUIContent(
                             "Profile Variation",
-                            "Controls how strongly the supported ridge height is redistributed laterally. Zero keeps the cached geometry-derived profile stable."));
+                            "Controls deterministic lateral reshaping of the Pressure ridge. Zero keeps the cached geometry-derived profile fixed; one gives the normal variation range; two permits the strongest bounded redistribution. It is independent from Stage 3 waves."));
                 }
                 if (staticPressureProfileChangeIntervalMinProperty != null)
                 {
@@ -781,7 +829,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         staticPressureProfileChangeIntervalMinProperty,
                         new GUIContent(
                             "Minimum Change Interval",
-                            "Shortest randomized time in seconds between lateral pressure-profile changes."));
+                            "Shortest randomized delay, in seconds, before each stationary Pressure source chooses a new lateral profile target. The profile morphs smoothly rather than switching instantly."));
                 }
                 if (staticPressureProfileChangeIntervalMaxProperty != null)
                 {
@@ -789,7 +837,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         staticPressureProfileChangeIntervalMaxProperty,
                         new GUIContent(
                             "Maximum Change Interval",
-                            "Longest randomized time in seconds between lateral pressure-profile changes. Morph duration scales automatically and completes before the next change."));
+                            "Longest randomized delay, in seconds, before each stationary Pressure source chooses a new lateral profile target. Sources are independent, and each smooth morph completes before the next target."));
                 }
 
                 EditorGUILayout.Space(4f);
@@ -802,7 +850,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         obstructionWakeStrengthProperty,
                         new GUIContent(
                             "Strength",
-                            "Shared wake-energy response. Stationary geometry and dynamic emitters prepare different sources but use the same river-level Strength."));
+                            "Shared Wake response after source preparation. Zero removes the authored lee/release response; higher values deepen the attached lee and inject more transported Wake energy. Stationary and dynamic sources use this same river-level value."));
                 }
                 if (obstructionWakeReachProperty != null)
                 {
@@ -810,7 +858,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         obstructionWakeReachProperty,
                         new GUIContent(
                             "Reach",
-                            "Shared downstream persistence and active range for stationary and dynamic wake sources."));
+                            "Controls how far the prepared Wake source and retained energy are allowed to influence downstream water. Higher values extend persistence and active range; this does not change river Flow Speed."));
                 }
                 if (obstructionWakeSpreadProperty != null)
                 {
@@ -818,7 +866,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         obstructionWakeSpreadProperty,
                         new GUIContent(
                             "Spread",
-                            "Shared source-width response. For stationary geometry this shapes the lee and rear releases; dynamic emitters apply it to their swept wake footprint."));
+                            "Initial across-river Wake source width. Stationary geometry uses it for the attached lee and rear releases; dynamic emitters use it for their swept footprint. Downstream diffusion is controlled separately by Widening."));
                 }
                 if (obstructionWakeVariationProperty != null)
                 {
@@ -826,7 +874,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         obstructionWakeVariationProperty,
                         new GUIContent(
                             "Variation",
-                            "Shared wake-variation envelope. Stationary sources use spatial lee/release profiles; dynamic sources derive most variation from movement and will consume the same envelope when their full source model is implemented."));
+                            "Allowed spatial change in Wake source shape. Zero keeps stationary lee/release geometry stable; one permits the full bounded variation range. It does not pulse or globally brighten the persistent field."));
                 }
                 if (obstructionWakeVariationIntervalMinProperty != null)
                 {
@@ -834,7 +882,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         obstructionWakeVariationIntervalMinProperty,
                         new GUIContent(
                             "Minimum Variation Interval",
-                            "Shortest randomized time in seconds between stationary wake-source targets."));
+                            "Shortest randomized delay, in seconds, before a stationary Wake source chooses new lee and independent left/right release targets."));
                 }
                 if (obstructionWakeVariationIntervalMaxProperty != null)
                 {
@@ -842,7 +890,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         obstructionWakeVariationIntervalMaxProperty,
                         new GUIContent(
                             "Maximum Variation Interval",
-                            "Longest randomized time in seconds between stationary wake-source targets. Smooth transitions complete before the next target."));
+                            "Longest randomized delay, in seconds, before a stationary Wake source chooses new lee and independent left/right release targets. Transitions occupy about 85% of the chosen interval."));
                 }
                 if (obstructionWakeWideningProperty != null)
                 {
@@ -850,7 +898,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         obstructionWakeWideningProperty,
                         new GUIContent(
                             "Widening",
-                            "How quickly the shared transported wake field spreads laterally downstream for both stationary and dynamic sources."));
+                            "Lateral diffusion after Wake energy enters the shared persistent field. Lower values keep trails narrow for longer; higher values broaden and merge them sooner. This does not change initial source width."));
                 }
                 if (obstructionWakeSurfaceHeightProperty != null)
                 {
@@ -858,7 +906,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         obstructionWakeSurfaceHeightProperty,
                         new GUIContent(
                             "Wake Surface Height",
-                            "Maximum positive surface height produced by the compact core of the shared transported wake field. Static and dynamic wake energy use the same bounded response; the attached lee remains a separate negative envelope."));
+                            "Maximum positive water-surface displacement, in metres, extracted from the compact core of transported Wake energy. Zero preserves transport, normals, intensity, and the separate negative lee but adds no positive transported Wake height."));
                 }
                 if (obstructionWakeSurfaceCompactnessProperty != null)
                 {
@@ -866,7 +914,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         obstructionWakeSurfaceCompactnessProperty,
                         new GUIContent(
                             "Wake Surface Compactness",
-                            "Controls how much of the broad transported energy field becomes visible geometry. Lower values produce a broader and stronger surface response; higher values restrict height to the strongest wake core without changing transport, normals, turbulence, or future foam data."));
+                            "Controls which part of the broad transported Wake field becomes positive geometry. Lower values create a broader, stronger visible rise; higher values restrict height to the strongest core. Transport, normals, intensity, and future foam data are unchanged."));
                 }
 
                 EditorGUILayout.Space(4f);
@@ -879,7 +927,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         impactRippleStrengthProperty,
                         new GUIContent(
                             "Strength",
-                            "Initial energy injected by impact events."));
+                            "Master multiplier for Impact Ripple height, velocity, initial elevation, and normal detail. The nonlinear mapping makes 1 roughly equivalent to the former 2.6. Values from 0–1.5 are the normal authoring range, 2–3 are exaggerated stress settings, and 4 is an intentional override level for exceptional impacts."));
+                }
+                if (impactRippleRidgeEmphasisProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        impactRippleRidgeEmphasisProperty,
+                        new GUIContent(
+                            "Ridge Emphasis",
+                            "Emphasizes only the raised ripple ridge: its positive height, outward velocity, and normal-detail edge. It does not deepen the centre, change radius, propagation, decay, reflections, or initial elevation. Values above 1 make the ridge slightly sharper and more noticeable."));
                 }
                 if (impactRipplePropagationProperty != null)
                 {
@@ -887,7 +943,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         impactRipplePropagationProperty,
                         new GUIContent(
                             "Propagation",
-                            "Approximate speed at which impact ripple energy spreads."));
+                            "Approximate world-space wavefront expansion speed in metres per second. This controls radial spreading through local river metrics; river Flow Speed separately advects the ripple downstream."));
                 }
                 if (impactRippleDecayProperty != null)
                 {
@@ -895,7 +951,47 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         impactRippleDecayProperty,
                         new GUIContent(
                             "Decay",
-                            "Rate at which impact ripple energy dissipates."));
+                            "Base exponential loss per second. Effective Decay = Decay + abs(Flow Speed) × Flow Dissipation. Higher values shorten visible lifetime and chunk reservations even in still water."));
+                }
+                if (impactRippleFlowDissipationProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        impactRippleFlowDissipationProperty,
+                        new GUIContent(
+                            "Flow Dissipation",
+                            "Adds decay in direct proportion to river speed: abs(Flow Speed in m/s) × this value. Example: Decay 0.85, Flow Speed 2 m/s, and Flow Dissipation 0.15 produce Effective Decay 1.15/s. Set to zero when fast flow should advect without extra suppression."));
+                }
+                if (impactRippleMinimumVisibleEnergyProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        impactRippleMinimumVisibleEnergyProperty,
+                        new GUIContent(
+                            "Minimum Visible Energy",
+                            "CPU reservation threshold, not a direct visual cutoff. Once a predicted event envelope falls below this value, its future chunk reservation may end. Lower values preserve faint tails longer; higher values reduce active simulation sooner."));
+                }
+                if (impactRippleMaximumLifetimeProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        impactRippleMaximumLifetimeProperty,
+                        new GUIContent(
+                            "Maximum Lifetime",
+                            "Hard safety cap, in seconds, on how long one event may reserve future chunks. The reservation ends at this time even if it remains above Minimum Visible Energy, so very low values can clip extreme low-decay ripples."));
+                }
+                if (impactRippleShoreReflectionProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        impactRippleShoreReflectionProperty,
+                        new GUIContent(
+                            "Shore Reflection",
+                            "Controls shoreline boundary hardness after the shallow absorption band. Zero uses the most absorbing outgoing-wave response; higher values approach a harder no-flux reflection and make the broad return wave clearer. This is not a literal returned-energy percentage because the absorption band and normal ripple decay still apply."));
+                }
+                if (impactRippleObstacleReflectionProperty != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        impactRippleObstacleReflectionProperty,
+                        new GUIContent(
+                            "Obstacle Reflection",
+                            "Controls registered-solid boundary hardness. Zero uses the most absorbing outgoing-wave response; higher values approach a hard no-flux reflection. This is not a literal returned-energy percentage because obstacle-edge absorption and normal ripple decay still apply."));
                 }
 
                 if (EditorGUI.EndChangeCheck() && presetProperty != null)
@@ -914,7 +1010,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         debugViewProperty,
                         new GUIContent(
                             "Disturbance Debug View",
-                            "Displays Stage 5 disturbance fields and composed geometry without changing simulation settings."));
+                            "Selects a Stage 5 diagnostic visualization for source fields, persistent fields, or composed disturbance geometry. It changes only the debug display and does not alter simulation state or authored values."));
 
                     if (!debugViewProperty.hasMultipleDifferentValues)
                     {
@@ -934,7 +1030,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         impactRippleTestDistanceProperty,
                         new GUIContent(
                             "Longitudinal Position",
-                            "Normalized zero-to-one position along the river used by manual impact tests."));
+                            "Manual test location along this river: 0 is the domain start and 1 is the domain end. This affects only the Inspector test buttons."));
                 }
                 if (impactRippleTestAcrossProperty != null)
                 {
@@ -942,13 +1038,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         impactRippleTestAcrossProperty,
                         new GUIContent(
                             "Across Position",
-                            "Normalized position across the local water surface. Negative is left and positive is right."));
+                            "Manual test location across the local water surface: -1 is the left edge, 0 is the centreline, and +1 is the right edge. This affects only the Inspector test buttons."));
                 }
                 if (impactRippleTestEventProperty != null)
                 {
                     EditorGUILayout.PropertyField(
                         impactRippleTestEventProperty,
-                        new GUIContent("Event"),
+                        new GUIContent(
+                            "Event",
+                            "Profile used by the manual test buttons: initial radius, signed impulse, immediate elevation, centre/ring shape, sharpness, and separate geometry/normal contributions."),
                         true);
                 }
             }
@@ -975,7 +1073,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         : "Not allocated");
 
                 if (singleRiver.RuntimeDisturbancesEnabled &&
-                    GUILayout.Button("Create Disturbance Runtime"))
+                    GUILayout.Button(new GUIContent(
+                        "Create Disturbance Runtime",
+                        "Creates the hidden river-owned runtime component immediately. Normally it is created automatically when an enabled disturbance source or manual test first needs it.")))
                 {
                     runtime = singleRiver.GetOrCreateDisturbanceRuntime();
                     EditorUtility.SetDirty(singleRiver);
@@ -1016,6 +1116,20 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Pending Impacts",
                 runtime.PendingImpactCount.ToString());
             EditorGUILayout.LabelField(
+                "Active Ripple Reservations",
+                runtime.ActiveImpactReservationCount.ToString());
+            EditorGUILayout.LabelField(
+                "Longest Reservation Remaining",
+                runtime.ActiveImpactReservationCount > 0
+                    ? $"{runtime.LongestImpactReservationRemainingSeconds:0.00} s"
+                    : "Inactive");
+            EditorGUILayout.LabelField(
+                "Resolved Ripple Strength",
+                singleRiver.ResolvedImpactRippleStrength.ToString("0.00"));
+            EditorGUILayout.LabelField(
+                "Effective Ripple Decay",
+                $"{singleRiver.ResolvedImpactRippleDecay:0.00} /s");
+            EditorGUILayout.LabelField(
                 "Impacts Injected Last Step",
                 runtime.ImpactsInjectedLastStep.ToString());
             EditorGUILayout.LabelField(
@@ -1025,13 +1139,36 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Maximum Recent Ripple Substeps",
                 runtime.MaximumRecentRippleSubstepCount.ToString());
             EditorGUILayout.LabelField(
+                "Ripple Metric Rows",
+                runtime.RippleMetricRowCount.ToString());
+            EditorGUILayout.LabelField(
+                "Ripple Boundary Mask",
+                runtime.IsAllocated
+                    ? $"{runtime.RippleBoundaryWidth} × {runtime.RippleBoundaryHeight}"
+                    : "Sleeping / not allocated");
+            EditorGUILayout.LabelField(
+                "Ripple Collision Sources",
+                runtime.RippleCollisionSourceCount.ToString());
+            EditorGUILayout.LabelField(
+                "Active Ripple Minimum Cell",
+                runtime.ActiveRippleMinimumCellSize > 0f
+                    ? $"{runtime.ActiveRippleMinimumCellSize:0.000} m"
+                    : "Inactive");
+            EditorGUILayout.LabelField(
+                "Ripple Substep Limit",
+                runtime.RippleSubstepLimitReached
+                    ? "Reached — reduce Propagation or increase local cell size"
+                    : "Within limit");
+            EditorGUILayout.LabelField(
                 "Estimated Field Memory",
                 $"{runtime.EstimatedMemoryBytes / (1024f * 1024f):0.00} MB");
             EditorGUILayout.LabelField(
                 "State",
                 runtime.IsSleeping ? "Sleeping" : "Active");
 
-            if (GUILayout.Button("Clear Field"))
+            if (GUILayout.Button(new GUIContent(
+                    "Clear Field",
+                    "Immediately clears Pressure, Wake, and Impact Ripple runtime textures and pending transient state for this river. Authored settings and registered sources are not removed.")))
             {
                 runtime.ClearField();
             }
@@ -1039,7 +1176,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             using (new EditorGUI.DisabledScope(!Application.isPlaying))
             {
                 EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("Emit Test Impact"))
+                if (GUILayout.Button(new GUIContent(
+                        "Emit Test Impact",
+                        "In Play Mode, emits the configured Event at the selected longitudinal and across-river position.")))
                 {
                     ApplyImpactTestProperties();
                     runtime.EmitDebugImpact(
@@ -1048,7 +1187,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         singleRiver.ImpactRippleTestEvent);
                 }
 
-                if (GUILayout.Button("Emit Opposite Sign"))
+                if (GUILayout.Button(new GUIContent(
+                        "Emit Opposite Sign",
+                        "In Play Mode, emits the same Event after reversing Signed Impulse and Initial Elevation. Radius, shape, sharpness, and contributions stay unchanged.")))
                 {
                     ApplyImpactTestProperties();
                     runtime.EmitDebugOppositeSignImpact(
@@ -1059,7 +1200,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorGUILayout.EndHorizontal();
 
                 EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("Emit Overlapping Pair"))
+                if (GUILayout.Button(new GUIContent(
+                        "Emit Overlapping Pair",
+                        "In Play Mode, emits two nearby copies of the configured Event to test reinforcement, overlap, stability, and shared-field composition.")))
                 {
                     ApplyImpactTestProperties();
                     runtime.EmitDebugOverlappingPair(
@@ -1068,7 +1211,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         singleRiver.ImpactRippleTestEvent);
                 }
 
-                if (GUILayout.Button("Emit Near Shore"))
+                if (GUILayout.Button(new GUIContent(
+                        "Emit Near Shore",
+                        "In Play Mode, emits the configured Event close to the selected side of the river. Tests the cached shoreline absorption band and its weak reflected return wave.")))
                 {
                     ApplyImpactTestProperties();
                     runtime.EmitDebugNearShore(
@@ -1095,6 +1240,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Static Wake Source: red is rear-release energy, green is the attached geometry-aware lee, and blue is reach/persistence metadata.",
                 StylizedRiverDisturbanceDebugView.WakeEnergy =>
                     "Wake Energy: red shows the shared persistent wake field after injection, transport, widening, decay, bank masking, and freeze suppression.",
+                StylizedRiverDisturbanceDebugView.RippleBoundary =>
+                    "Ripple Boundary: green is open water, black is fully absorbing coverage, and red shows reflection hardness. Shores appear as soft dark-red/green absorption bands; participating registered solids appear as compact brighter-red boundaries with dark interiors.",
                 StylizedRiverDisturbanceDebugView.FinalWakeGeometryHeight =>
                     "Final Wake Geometry Height: mid-gray is zero, darker values are the attached lee depression, and brighter values are positive transported trail height. The fixed encoding spans -0.40 m to +0.40 m.",
                 _ => string.Empty

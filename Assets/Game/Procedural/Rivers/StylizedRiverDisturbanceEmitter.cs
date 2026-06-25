@@ -17,13 +17,13 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFootprintHalfExtent = 0.05f;
         private const int CurrentImpactSettingsVersion = 1;
 
-        [Tooltip("Optional explicit river. Leave empty to locate the active river footprint automatically.")]
+        [Tooltip("Optional fixed river target. When assigned, this emitter submits only to that river and does not choose another river automatically.")]
         [SerializeField] private StylizedRiver explicitRiver;
 
-        [Tooltip("Automatically chooses the enabled river whose footprint contains this object.")]
+        [Tooltip("When no Explicit River is assigned, searches enabled rivers and uses the one whose water footprint contains the emitter position within Vertical Contact Tolerance.")]
         [SerializeField] private bool autoDetectRiver = true;
 
-        [Tooltip("Maximum allowed vertical distance from the mean river surface when automatically detecting contact.")]
+        [Tooltip("Maximum vertical separation, in metres, between the emitter pivot and the detected river surface. Larger values accept objects farther above or below the water; this affects contact detection only.")]
         [Min(0.05f)]
         [SerializeField] private float verticalContactTolerance = 1.25f;
 
@@ -32,51 +32,51 @@ namespace ProgrammaticStylized3D.Rivers
             LegacySourceMobility.Dynamic;
 
         [Header("Source Footprint")]
-        [Tooltip("Uses separate across-flow and along-flow dimensions. Disable this to use one linked radius for compact dynamic sources.")]
+        [Tooltip("Uses independent half-width and half-length values for the continuous dynamic Wake footprint. Disable this to use one linked half-size in both directions. Impact Ripple radius is configured separately in each event.")]
         [SerializeField] private bool useSeparateFootprintDimensions;
 
         [FormerlySerializedAs("radius")]
-        [Tooltip("Linked water-contact half-size in metres. Used for both footprint dimensions when Separate Footprint Dimensions is disabled.")]
+        [Tooltip("Continuous Wake footprint half-size in metres, used both across and along the river when Separate Footprint Dimensions is disabled. This does not set Entry or Exit Impact radius.")]
         [Range(0.05f, 8f)]
         [SerializeField] private float linkedFootprintRadius = 0.35f;
 
-        [Tooltip("Half-width of the water-contact footprint measured across the river, in metres.")]
+        [Tooltip("Continuous Wake footprint half-width measured across the local river, in metres. This controls source preparation only and does not set Impact Ripple radius.")]
         [Range(0.05f, 12f)]
         [SerializeField] private float acrossFlowHalfWidth = 0.35f;
 
-        [Tooltip("Half-length of the water-contact footprint measured along the river, in metres.")]
+        [Tooltip("Continuous Wake footprint half-length measured along the local river, in metres. This controls source preparation only and does not set Impact Ripple radius.")]
         [Range(0.05f, 12f)]
         [SerializeField] private float alongFlowHalfLength = 0.35f;
 
         [Header("Influence")]
-        [Tooltip("Local source strength. Values above the normal production range are available for deliberate visual stress testing.")]
+        [Tooltip("Local continuous-Wake multiplier applied before the river's canonical Wake Strength. Zero disables this emitter's continuous Wake; higher values strengthen only this source. It does not affect Entry or Exit Impact Ripples.")]
         [Range(0f, 8f)]
         [SerializeField] private float strength = 1f;
 
-        [Tooltip("Contribution to broad geometric wake and ripple height.")]
+        [Tooltip("Scales this emitter's continuous Wake geometry contribution. Zero keeps the source from adding Wake height; it does not change the independent Impact Ripple event profiles.")]
         [Range(0f, 1f)]
         [SerializeField] private float geometryContribution = 0.65f;
 
-        [Tooltip("Contribution to fine lighting and refraction disturbance without intentionally adding bulk water height.")]
+        [Tooltip("Scales this emitter's continuous Wake normal/intensity contribution used by lighting and refraction. It does not change the independent Impact Ripple event profiles.")]
         [Range(0f, 1f)]
         [SerializeField] private float normalContribution = 1f;
 
-        [Tooltip("When movement is slow, the dynamic source becomes a generic flow obstruction.")]
+        [Tooltip("When enabled, a slow or stopped emitter blends toward the runtime's stationary-obstruction Wake source instead of behaving as a fully moving trail. Disable it when Wake should depend only on movement.")]
         [SerializeField] private bool stationaryObstruction = true;
 
         [Header("Impact Ripples")]
-        [Tooltip("Creates one impact after an observed outside-to-inside river transition. Merely enabling a source already in water does not emit an impact.")]
+        [Tooltip("Emits the Entry Impact profile once after the runtime observes an outside-to-inside river transition. Starting or enabling the component while already inside water intentionally does not count as an entry.")]
         [SerializeField] private bool emitEntryImpact = true;
 
-        [Tooltip("Independent event settings for water entry. These do not change the continuous Wake source.")]
+        [Tooltip("Independent Entry Impact profile: starting radius, signed impulse, immediate elevation, shape, sharpness, and geometry/normal contributions. These values do not modify the continuous Wake source.")]
         [SerializeField]
         private ImpactRippleEventSettings entryImpact =
             ImpactRippleEventSettings.CreateEntryDefaults();
 
-        [Tooltip("Creates one signed exit or suction event when the source leaves the river.")]
+        [Tooltip("Emits the Exit / Suction profile once after an observed inside-to-outside river transition. Use a negative Signed Impulse for suction-like behavior.")]
         [SerializeField] private bool emitExitImpact;
 
-        [Tooltip("Independent event settings for water exit. These do not change the continuous Wake source.")]
+        [Tooltip("Independent Exit / Suction profile: starting radius, signed impulse, immediate elevation, shape, sharpness, and geometry/normal contributions. These values do not modify the continuous Wake source.")]
         [SerializeField]
         private ImpactRippleEventSettings exitImpact =
             ImpactRippleEventSettings.CreateExitDefaults();
@@ -85,7 +85,7 @@ namespace ProgrammaticStylized3D.Rivers
         private int impactSettingsVersion;
 
         [Header("Runtime Sampling")]
-        [Tooltip("CPU source-registration interval. Swept injection bridges movement between samples.")]
+        [Tooltip("Seconds between CPU contact and movement samples. Lower values react sooner but cost more CPU work; swept Wake submission bridges the path between samples so movement is not reduced to isolated points.")]
         [Range(0.025f, 0.2f)]
         [SerializeField] private float sourceUpdateInterval = 0.05f;
 

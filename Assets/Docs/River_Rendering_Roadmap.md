@@ -80,7 +80,7 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 **Problem:** Add attached pressure, stationary and moving wake sources, one-shot ripples, downstream transport, spreading, and decay without replacing the Stage 3 base motion field or scaling water-shader cost with active effect count.
 
-**Current status:** The stationary Pressure source and stationary Wake source are accepted. Their river-level visual controls are unified and source-agnostic. Impact Ripples are now being completed through the approved R0–R5 advanced shared-solver passes below. R0 source implementation is prepared for Unity compilation and focused validation. Full relative-motion preparation for dynamic Pressure and dynamic Wake sources remains deferred.
+**Current status:** The stationary Pressure source, stationary Wake source, and Impact Ripple system are accepted. Their river-level controls are unified and source-agnostic where appropriate. Impact Ripples completed the approved safety/event-contract, local-metric propagation, nonlinear strength, progressive lifetime reservation, cached shore/static-obstacle boundary, and final ridge/override passes. Full relative-motion preparation for dynamic Pressure and dynamic Wake sources remains deferred.
 
 ### Canonical feature vocabulary
 
@@ -191,59 +191,71 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 - Report pending commands, impacts injected during the last simulation step, current internal ripple substeps, and the maximum observed during a recent diagnostic window.
 - Lifetime-reservation records and their diagnostics begin in R2; R0 must not invent placeholder reservations.
 
-**R0 status:** source implementation prepared; Unity compilation and focused validation pending.
+**R0 status:** compiled and focused validation passed. Fully frozen events no longer replay after thaw, signed and independent entry/exit settings work, the configurable test actions work, and the provisional ripple appearance remains acceptable.
 
 #### R1 — Local metric propagation
 
-- Cache per-longitudinal-row centreline position, local tangent, left/right surface widths, and bend/spacing data.
-- Reconstruct local world-space neighbour distances in compute without allocating a full two-dimensional position texture.
-- Replace the river-wide average lateral cell size.
-- Derive stability requirements from the smallest relevant cells in active chunks.
+- Cache two compact `float4` records per longitudinal ripple row: world-space surface centre plus downstream tangent, and local side plus left/right surface widths. Keep companion CPU arrays for precomputed minimum longitudinal/lateral cell sizes used by bounds and stability.
+- Reconstruct local tangent direction and world-space neighbour distances in compute without allocating a full two-dimensional position texture.
+- Inject event radius in world metres rather than deriving an ellipse from one local half-width.
+- Replace the river-wide average lateral cell size in ripple propagation while leaving the accepted Wake and Pressure paths unchanged.
+- Derive stability requirements from the smallest relevant cells in active chunks instead of the most restrictive point on the complete river.
+- Report metric-row count, the active ripple region's minimum cell size, and whether the bounded substep limit was reached alongside existing substep diagnostics.
 - Validate approximately circular world-space propagation through narrow, broad, asymmetric, transitioning, straight, and tightly bending sections.
 - Preserve correct radial expansion under reverse flow.
+
+**R1 status:** compiled and focused validation passed. World-space ripple propagation remained approximately circular through the tested river shapes, and reverse-flow behaviour remained correct.
+
+#### R1.1 — Strength-response correction
+
+- Keep the authored Strength range at `0–3`, but resolve it through `s × (3 - 0.4s)` so values around `1` are clearly visible and values from `2–3` remain bounded stress-test settings.
+- Apply the same resolved strength to injected height, velocity, normal detail, initial elevation, and the permitted ripple-height envelope.
+- Update new-component defaults and disturbance presets for the shaped response; existing serialized raw Strength values remain intact and may require author retuning after the response change.
+
+**R1.1 status:** implemented together with R2; cumulative Unity compilation and focused validation pending.
 
 #### R2 — Lifetime and progressive chunk reservation
 
 - Add lightweight active-impact lifetime records.
 - Derive bounded lifetime from event magnitude, base decay, flow dissipation, minimum visible energy, and maximum lifetime.
+- Use the same flow-adjusted effective decay for visible simulation and CPU reservation lifetime so resource coverage cannot drift from visual fading.
 - Expand the reserved interval progressively from propagation radius and downstream advection rather than reserving the full maximum range immediately.
-- Retire reservations early when the relevant field energy sleeps.
+- Keep each activated chunk alive until the latest overlapping reservation ends, then allow the existing chunk sleeping path to clear it.
+- Use an analytic visible-energy threshold rather than GPU readback: after impacts overlap in the shared field, individual event energy can no longer be identified reliably without adding another field or reduction pipeline.
 - Prevent fast flow or slow decay from clipping ripples at chunk boundaries.
-- Expose active reservation diagnostics only once the real records exist.
+- Report active reservation count, longest remaining reservation, resolved Strength, and effective decay.
+
+**R2 status:** implemented together with R1.1; cumulative Unity compilation and focused validation pending.
 
 #### R3 — Shore and static-obstacle boundaries
 
-- Build one cached two-channel ripple boundary mask.
-- Generate fractional shoreline fluid coverage and a narrow absorption band from the river domain.
-- Rasterize participating registered static geometry into the same mask.
-- Use damped reflective finite-difference boundary sampling instead of simple edge fading.
-- Keep shoreline returns weak and broad; allow somewhat stronger but still lossy obstruction reflections.
-- Clear ripple state inside newly solid cells.
-- Add independent generated-geometry Ripple Collision authorship with `Inherit` and `Disabled`.
-- Avoid per-frame collider scanning and avoid per-obstacle loops in the final water shader.
+- Build one cached `RGHalf` two-channel ripple boundary mask at ripple-field resolution: red stores fractional fluid coverage and green stores reflection hardness.
+- Generate a metric-aware shoreline absorption band from each row's real left/right surface widths. The band progressively removes amplitude before terminal contact instead of treating a sloped bank as a vertical wall.
+- Rasterize participating registered stationary geometry from its cached waterline contour into the same mask. The rasterization is event-driven and rebuilt only when the river domain, quality/resources, or registered static geometry changes.
+- Use damped reflective finite-difference neighbour sampling instead of the former lateral edge fade. Shore Reflection remains deliberately weak; Obstacle Reflection may be stronger but remains lossy.
+- Suppress injection in solid cells, prevent propagation through registered solids, and clear existing ripple state inside cells that become solid after a mask rebuild.
+- Add independent generated-geometry `Impact Ripple Collision` authorship with `Inherit` and `Disabled`; it does not alter Pressure or Wake participation.
+- Expose river-level Shore Reflection and Obstacle Reflection controls, high-level mask/source diagnostics, and one compact `Ripple Boundary` debug view.
+- Avoid per-frame collider scanning, a second mask, GPU readback, and per-obstacle loops in the final water shader.
 
-#### R4 — Event-shape visual tuning
+**R3 status:** complete and accepted. The combined shore/static-obstacle mask compiled after the D3D11-safe scalar signed-distance hotfix. Focused and extensive Unity testing confirmed damped shore interaction, stronger but lossy obstacle interaction, static-solid blocking, correct reverse-flow behavior, stable reservations/sleeping, and no reported Pressure or Wake regression.
 
-- Tune the shared analytic centre/ring/counter-ring model.
-- Establish restrained starting profiles for entry, exit/suction, footstep-sized events, and heavy impacts.
-- Tune geometry-only and normal-only behavior.
-- Tune signed overlap, cancellation, reinforcement, height/velocity bounds, and production-versus-stress ranges.
-- Do not use foam, spray, droplets, or Stage 7 effects to hide ripple defects.
+#### Final ripple visual and authoring pass
 
-#### R5 — Combined regression and profiling
+- Added river-level `Ridge Emphasis` (`0.75–1.50`, default `1.15`) that affects only the positive ridge height, outward ridge velocity, and normal-detail ridge. It does not deepen the centre, change event radius, propagation, decay, reflection, or initial elevation.
+- Narrowed the analytic ridge width slightly so its edge reads more clearly without turning the result into a rigid ring.
+- Extended Impact Ripple Strength from `0–3` to `0–4` while preserving the accepted nonlinear mapping through `3`.
+- Added an explicit overload segment from `3–4`: Strength `3` still resolves to `5.4`, while Strength `4` resolves to `9.0` for exceptional override-style events.
+- Preserved the existing `0.28 m` maximum-height ceiling through Strength `3`; the overload segment progressively unlocks up to approximately `0.45 m` at Strength `4`.
+- Updated disturbance presets to use Ridge Emphasis values of `1.05` for Subtle, `1.15` for Balanced, and `1.25` for Reactive.
 
-- Validate Low, Medium, and High quality.
-- Profile actual internal substeps, memory, active chunks, sleeping, and resource release.
-- Test multiple simultaneous signed impacts, reverse flow, freeze/thaw, shore and obstacle interaction, source removal, and chunk boundaries.
-- Confirm accepted Pressure and Wake visuals remain unchanged.
-- Confirm stationary and dynamic Wake coexist with the completed ripple field.
+**Impact Ripple status:** complete and accepted at system level after extensive user testing. R4 and R5 were collapsed into this focused finalization because the shared analytic profile, signed overlap, metric propagation, lifetime reservations, frozen-state handling, boundary interaction, quality behavior, and combined Stage 5 coexistence were already tested sufficiently. The final ridge/override adjustment requires only the routine Unity compile and smoke check; it does not reopen the accepted solver architecture. Detached spray, droplets, and splash particles remain Stage 7 work and were not used to conceal ripple defects.
 
 ### Remaining Stage 5 work
 
-1. Compile and validate R0 in Unity before beginning R1.
-2. Implement and accept R1–R4 one pass at a time.
-3. Run R5 combined profiling and regression.
-4. Decide whether full dynamic Pressure/Wake source preparation is required before Stage 6 Foam; if deferred, record that milestone decision explicitly.
+1. Decide whether full relative-motion dynamic Pressure/Wake source preparation is required before Stage 6 Foam.
+2. If dynamic preparation remains deferred, record that milestone decision and begin Stage 6 using the accepted shared Pressure, Wake, and Impact Ripple outputs.
+3. Perform final combined Low/Medium/High profiling when the remaining Stage 5 scope is settled; this is a performance milestone, not a reason to reopen accepted ripple visuals.
 
 
 ## 6. Foam and Surface Tracing

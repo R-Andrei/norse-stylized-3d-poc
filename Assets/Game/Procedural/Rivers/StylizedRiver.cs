@@ -98,6 +98,7 @@ namespace ProgrammaticStylized3D.Rivers
         StaticPressureTarget = 6,
         StaticWakeSource = 7,
         WakeEnergy = 8,
+        RippleBoundary = 21,
         FinalWakeGeometryHeight = 19
     }
 
@@ -476,7 +477,7 @@ namespace ProgrammaticStylized3D.Rivers
             StylizedRiverRefractionDebugView.Final;
 
         [Header("Runtime Disturbance and Interaction")]
-        [Tooltip("Enables Stage 5 runtime interactions. When disabled, no disturbance textures are allocated or simulated.")]
+        [Tooltip("Master switch for Stage 5 Pressure, Wake, and Impact Ripples. When disabled, no disturbance textures are allocated or simulated and the river renders with its Stage 4 behavior.")]
         [SerializeField] private bool runtimeDisturbances;
 
         // Retained for serialized/API compatibility with the earlier combined
@@ -487,24 +488,25 @@ namespace ProgrammaticStylized3D.Rivers
         private StylizedRiverDisturbancePreset disturbancePreset =
             StylizedRiverDisturbancePreset.Custom;
 
+        [Tooltip("Selects a diagnostic visualization for Stage 5 source fields, persistent fields, or final disturbance geometry. This changes only the debug display, not the simulation.")]
         [SerializeField]
         private StylizedRiverDisturbanceDebugView disturbanceDebugView =
             StylizedRiverDisturbanceDebugView.Final;
 
         [Header("Pressure")]
-        [Tooltip("Controls the shared Pressure response. The current stationary implementation selects a point between its computed minimum and maximum feasible heights; future dynamic sources will use the same response setting with relative-motion source preparation.")]
+        [Tooltip("Selects how much of each source's computed safe Pressure-height range is used. Zero removes attached buildup; one uses the source's maximum geometry-, support-, and flow-safe height without bypassing rear protection.")]
         [Range(0f, 1f)]
         [SerializeField] private float staticPressureStrength = 0.65f;
 
-        [Tooltip("Controls how abruptly attached Pressure descends away from its source contact. Higher values produce a steeper contact face without increasing the computed height ceiling.")]
+        [Tooltip("Shapes the short open-water falloff away from the source contact. Lower values make a broader, softer ridge; higher values keep it tighter and steeper. This does not increase the computed crest-height ceiling.")]
         [Range(0.5f, 4f)]
         [SerializeField] private float staticPressureContactSharpness = 2.8f;
 
-        [Tooltip("Controls the shared Pressure profile-variation envelope. Zero keeps the prepared source profile stable.")]
+        [Tooltip("Controls deterministic lateral reshaping of the Pressure ridge. Zero keeps the cached geometry-derived profile fixed; one gives the normal variation range; two permits the strongest bounded redistribution. This is independent from Stage 3 waves.")]
         [Range(0f, 2f)]
         [SerializeField] private float staticPressureWaveResponse = 1f;
 
-        [Tooltip("Shortest randomized time, in seconds, between lateral pressure-profile changes.")]
+        [Tooltip("Shortest randomized delay, in seconds, before a stationary Pressure source chooses a new lateral profile target. The profile morphs smoothly rather than switching instantly.")]
         [Range(
             MinimumStaticPressureProfileChangeInterval,
             MaximumStaticPressureProfileChangeInterval)]
@@ -512,7 +514,7 @@ namespace ProgrammaticStylized3D.Rivers
         private float staticPressureProfileChangeIntervalMin =
             DefaultStaticPressureProfileChangeIntervalMin;
 
-        [Tooltip("Longest randomized time, in seconds, between lateral pressure-profile changes. The morph duration scales with the selected interval and completes before the next change.")]
+        [Tooltip("Longest randomized delay, in seconds, before a stationary Pressure source chooses a new lateral profile target. Each source selects independently, and the smooth morph completes before the next target.")]
         [Range(
             MinimumStaticPressureProfileChangeInterval,
             MaximumStaticPressureProfileChangeInterval)]
@@ -521,23 +523,23 @@ namespace ProgrammaticStylized3D.Rivers
             DefaultStaticPressureProfileChangeIntervalMax;
 
         [Header("Wake")]
-        [Tooltip("Controls shared Wake energy. Stationary geometry and dynamic emitters prepare different source footprints but use this same response strength.")]
+        [Tooltip("Controls the shared Wake response after source preparation. Zero removes the authored lee/release response; higher values deepen the attached lee and inject more transported wake energy. Stationary geometry and dynamic emitters use the same river-level value.")]
         [Range(0f, 3f)]
         [SerializeField] private float obstructionWakeStrength = 1.50f;
 
-        [Tooltip("Controls shared Wake persistence and downstream reach for stationary and dynamic sources.")]
+        [Tooltip("Controls how far the prepared Wake source and its retained energy are allowed to influence downstream water. Higher values extend source persistence and active range; this does not change river flow speed.")]
         [Range(0.25f, 3f)]
         [SerializeField] private float obstructionWakeReach = 1f;
 
-        [Tooltip("Controls shared Wake source width. For stationary geometry this shapes the attached lee and rear releases; for dynamic emitters it scales the swept wake footprint. Downstream widening is controlled separately.")]
+        [Tooltip("Controls the initial across-river width of the Wake source. Stationary geometry uses it for the attached lee and rear releases; dynamic emitters use it for their swept footprint. It does not control downstream diffusion—that is Widening.")]
         [Range(0.5f, 2f)]
         [SerializeField] private float obstructionWakeSpread = 1f;
 
-        [Tooltip("Controls the shared Wake variation envelope. Stationary sources use spatial lee/release profiles; dynamic sources derive most variation from movement and will use the same envelope in the full relative-motion source model.")]
+        [Tooltip("Controls the allowed spatial change in Wake source shape. Zero keeps stationary lee/release geometry stable; one permits the full bounded variation range. It does not pulse or globally brighten the persistent field.")]
         [Range(0f, 1f)]
         [SerializeField] private float obstructionWakeVariation = 0.35f;
 
-        [Tooltip("Shortest randomized time, in seconds, between stationary wake-source variation targets.")]
+        [Tooltip("Shortest randomized delay, in seconds, before a stationary Wake source chooses new lee and left/right release targets.")]
         [Range(
             MinimumStaticWakeVariationInterval,
             MaximumStaticWakeVariationInterval)]
@@ -545,7 +547,7 @@ namespace ProgrammaticStylized3D.Rivers
         private float obstructionWakeVariationIntervalMin =
             DefaultStaticWakeVariationIntervalMin;
 
-        [Tooltip("Longest randomized time, in seconds, between stationary wake-source variation targets. Transitions occupy approximately 85% of the selected interval.")]
+        [Tooltip("Longest randomized delay, in seconds, before a stationary Wake source chooses new lee and left/right release targets. Smooth transitions occupy about 85% of the chosen interval.")]
         [Range(
             MinimumStaticWakeVariationInterval,
             MaximumStaticWakeVariationInterval)]
@@ -553,15 +555,15 @@ namespace ProgrammaticStylized3D.Rivers
         private float obstructionWakeVariationIntervalMax =
             DefaultStaticWakeVariationIntervalMax;
 
-        [Tooltip("Controls how quickly the shared transported wake field spreads laterally. Stationary and dynamic wake sources use the same persistent field and response rules.")]
+        [Tooltip("Controls lateral diffusion after Wake energy enters the shared persistent field. Lower values keep trails narrow for longer; higher values broaden and merge them sooner. This does not change the initial source width.")]
         [Range(0.35f, 1.25f)]
         [SerializeField] private float obstructionWakeWidening = 0.65f;
 
-        [Tooltip("Maximum positive surface height produced by the compact core of the shared transported wake field. Static and dynamic wakes use the same bounded geometry response.")]
+        [Tooltip("Maximum positive water-surface displacement, in metres, extracted from the compact core of transported Wake energy. Zero preserves Wake transport, normals, and intensity but adds no positive transported Wake height.")]
         [Range(0f, 0.40f)]
         [SerializeField] private float obstructionWakeSurfaceHeight = 0.08f;
 
-        [Tooltip("Controls how tightly transported wake energy is concentrated into visible surface geometry. Lower values retain a broader, stronger response; higher values restrict geometry to the strongest wake core without changing the underlying energy field.")]
+        [Tooltip("Controls which part of the broad transported Wake field becomes positive geometry. Lower values turn more of the field into a broad visible rise; higher values restrict height to the strongest core. Transport, normals, intensity, and future foam data are unchanged.")]
         [Range(0.80f, 3f)]
         [SerializeField]
         private float obstructionWakeSurfaceCompactness = 1.50f;
@@ -583,17 +585,41 @@ namespace ProgrammaticStylized3D.Rivers
         private float movingTrailWidth = 1f;
 
         [Header("Impact Ripples")]
-        [Tooltip("Controls height and velocity injected by impact events.")]
-        [Range(0f, 3f)]
-        [SerializeField] private float impactRippleStrength = 1.35f;
+        [Tooltip("Master multiplier for Impact Ripple height, velocity, initial elevation, and normal detail. The nonlinear response maps 0.5 to about the former 1.4, 1 to about 2.6, and 3 to about 5.4. Values from 0–1.5 are the normal authoring range, 2–3 are exaggerated stress settings, and 4 is an intentional override level for exceptional impacts.")]
+        [Range(0f, 4f)]
+        [SerializeField] private float impactRippleStrength = 1f;
 
-        [Tooltip("Controls broad ripple propagation speed in approximate metres per second.")]
+        [Tooltip("Emphasizes only the raised ripple ridge: its positive height, outward velocity, and normal-detail edge. It does not deepen the centre, change radius, propagation speed, decay, reflections, or initial elevation. Values above 1 make the ring slightly sharper and more pronounced.")]
+        [Range(0.75f, 1.50f)]
+        [SerializeField] private float impactRippleRidgeEmphasis = 1.15f;
+
+        [Tooltip("Approximate world-space wavefront expansion speed in metres per second. This controls radial spreading through the local river metrics; river Flow Speed separately advects the ripple downstream.")]
         [Range(0.2f, 2.5f)]
         [SerializeField] private float impactRipplePropagation = 1.05f;
 
-        [Tooltip("Controls impact-ripple energy loss per second. Higher values fade faster.")]
+        [Tooltip("Base exponential Impact Ripple loss per second. Effective Decay = Decay + abs(Flow Speed) × Flow Dissipation. Higher values shorten visible lifetime and chunk reservations even in still water.")]
         [Range(0.1f, 3f)]
         [SerializeField] private float impactRippleDecay = 0.85f;
+
+        [Tooltip("Adds decay in direct proportion to river speed: abs(Flow Speed in m/s) × this value. Example: Decay 0.85, Flow Speed 2 m/s, and Flow Dissipation 0.15 produce Effective Decay 1.15/s. Set to zero when fast flow should only advect, not additionally suppress, ripples.")]
+        [Range(0f, 1.5f)]
+        [SerializeField] private float impactRippleFlowDissipation = 0.15f;
+
+        [Tooltip("CPU-side reservation threshold, not a direct visual clamp. When a predicted event envelope falls below this value, its future chunk reservation may end. Lower values keep simulation coverage longer; higher values save work but can retire very faint tails sooner.")]
+        [Range(0.01f, 0.20f)]
+        [SerializeField] private float impactRippleMinimumVisibleEnergy = 0.04f;
+
+        [Tooltip("Hard safety cap, in seconds, on how long one event may reserve future chunks. After this time the reservation ends even if the analytic envelope remains above Minimum Visible Energy, so values that are too low can clip extreme low-decay ripples.")]
+        [Range(1f, 15f)]
+        [SerializeField] private float impactRippleMaximumLifetime = 8f;
+
+        [Tooltip("Controls shoreline boundary hardness after the shallow absorption band. Zero uses the most absorbing outgoing-wave response; higher values move toward a harder no-flux reflection and make the broad return wave clearer. This is not a literal returned-energy percentage because shoreline absorption and normal ripple decay still apply.")]
+        [Range(0f, 0.60f)]
+        [SerializeField] private float impactRippleShoreReflection = 0.25f;
+
+        [Tooltip("Controls registered-solid boundary hardness. Zero uses the most absorbing outgoing-wave response; higher values move toward a hard no-flux reflection. This is not a literal returned-energy percentage because obstacle-edge absorption and normal ripple decay still apply.")]
+        [Range(0f, 0.85f)]
+        [SerializeField] private float impactRippleObstacleReflection = 0.50f;
 
         [HideInInspector, SerializeField, Range(0f, 1f)]
         private float impactRippleTestDistanceNormalized = 0.5f;
@@ -976,8 +1002,24 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.InverseLerp(0.25f, 3f, WakeReach);
         public float MovingTrailWidth => WakeSpread;
         public float ImpactRippleStrength => impactRippleStrength;
+        public float ResolvedImpactRippleStrength =>
+            ResolveImpactRippleStrength();
+        public float ImpactRippleRidgeEmphasis =>
+            impactRippleRidgeEmphasis;
         public float ImpactRipplePropagation => impactRipplePropagation;
         public float ImpactRippleDecay => impactRippleDecay;
+        public float ImpactRippleFlowDissipation =>
+            impactRippleFlowDissipation;
+        public float ImpactRippleMinimumVisibleEnergy =>
+            impactRippleMinimumVisibleEnergy;
+        public float ImpactRippleMaximumLifetime =>
+            impactRippleMaximumLifetime;
+        public float ImpactRippleShoreReflection =>
+            impactRippleShoreReflection;
+        public float ImpactRippleObstacleReflection =>
+            impactRippleObstacleReflection;
+        public float ResolvedImpactRippleDecay =>
+            ResolveImpactRippleDecay();
         public float ImpactRippleTestDistanceNormalized =>
             impactRippleTestDistanceNormalized;
         public float ImpactRippleTestAcrossNormalized =>
@@ -1202,7 +1244,8 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverDisturbanceDebugView value)
         {
             int rawValue = (int)value;
-            if ((rawValue >= 0 && rawValue <= 8) || rawValue == 19)
+            if ((rawValue >= 0 && rawValue <= 8) ||
+                rawValue == 19 || rawValue == 21)
             {
                 return value;
             }
@@ -1540,6 +1583,12 @@ namespace ProgrammaticStylized3D.Rivers
                         DefaultStaticWakeVariationIntervalMax;
                     obstructionWakeWidening = 0.65f;
                     impactRippleStrength = 0f;
+                    impactRippleRidgeEmphasis = 1.15f;
+                    impactRippleFlowDissipation = 0.15f;
+                    impactRippleMinimumVisibleEnergy = 0.04f;
+                    impactRippleMaximumLifetime = 8f;
+                    impactRippleShoreReflection = 0.25f;
+                    impactRippleObstacleReflection = 0.50f;
                     break;
 
                 case StylizedRiverDisturbancePreset.Subtle:
@@ -1560,9 +1609,15 @@ namespace ProgrammaticStylized3D.Rivers
                     obstructionWakeVariationIntervalMax =
                         DefaultStaticWakeVariationIntervalMax;
                     obstructionWakeWidening = 0.65f;
-                    impactRippleStrength = 0.90f;
+                    impactRippleStrength = 0.50f;
+                    impactRippleRidgeEmphasis = 1.05f;
                     impactRipplePropagation = 0.82f;
                     impactRippleDecay = 1.25f;
+                    impactRippleFlowDissipation = 0.25f;
+                    impactRippleMinimumVisibleEnergy = 0.06f;
+                    impactRippleMaximumLifetime = 5f;
+                    impactRippleShoreReflection = 0.18f;
+                    impactRippleObstacleReflection = 0.42f;
                     break;
 
                 case StylizedRiverDisturbancePreset.Balanced:
@@ -1583,9 +1638,15 @@ namespace ProgrammaticStylized3D.Rivers
                     obstructionWakeVariationIntervalMax =
                         DefaultStaticWakeVariationIntervalMax;
                     obstructionWakeWidening = 0.65f;
-                    impactRippleStrength = 1.35f;
+                    impactRippleStrength = 1f;
+                    impactRippleRidgeEmphasis = 1.15f;
                     impactRipplePropagation = 1.05f;
                     impactRippleDecay = 0.85f;
+                    impactRippleFlowDissipation = 0.15f;
+                    impactRippleMinimumVisibleEnergy = 0.04f;
+                    impactRippleMaximumLifetime = 8f;
+                    impactRippleShoreReflection = 0.25f;
+                    impactRippleObstacleReflection = 0.50f;
                     break;
 
                 case StylizedRiverDisturbancePreset.Reactive:
@@ -1606,9 +1667,15 @@ namespace ProgrammaticStylized3D.Rivers
                     obstructionWakeVariationIntervalMax =
                         DefaultStaticWakeVariationIntervalMax;
                     obstructionWakeWidening = 0.65f;
-                    impactRippleStrength = 1.8f;
+                    impactRippleStrength = 1.50f;
+                    impactRippleRidgeEmphasis = 1.25f;
                     impactRipplePropagation = 1.3f;
                     impactRippleDecay = 0.55f;
+                    impactRippleFlowDissipation = 0.08f;
+                    impactRippleMinimumVisibleEnergy = 0.025f;
+                    impactRippleMaximumLifetime = 10f;
+                    impactRippleShoreReflection = 0.32f;
+                    impactRippleObstacleReflection = 0.58f;
                     break;
 
                 case StylizedRiverDisturbancePreset.Custom:
@@ -2315,7 +2382,11 @@ namespace ProgrammaticStylized3D.Rivers
             impactRippleStrength = Mathf.Clamp(
                 impactRippleStrength,
                 0f,
-                3f);
+                4f);
+            impactRippleRidgeEmphasis = Mathf.Clamp(
+                impactRippleRidgeEmphasis,
+                0.75f,
+                1.50f);
             impactRipplePropagation = Mathf.Clamp(
                 impactRipplePropagation,
                 0.2f,
@@ -2324,6 +2395,26 @@ namespace ProgrammaticStylized3D.Rivers
                 impactRippleDecay,
                 0.1f,
                 3f);
+            impactRippleFlowDissipation = Mathf.Clamp(
+                impactRippleFlowDissipation,
+                0f,
+                1.5f);
+            impactRippleMinimumVisibleEnergy = Mathf.Clamp(
+                impactRippleMinimumVisibleEnergy,
+                0.01f,
+                0.20f);
+            impactRippleMaximumLifetime = Mathf.Clamp(
+                impactRippleMaximumLifetime,
+                1f,
+                15f);
+            impactRippleShoreReflection = Mathf.Clamp(
+                impactRippleShoreReflection,
+                0f,
+                0.60f);
+            impactRippleObstacleReflection = Mathf.Clamp(
+                impactRippleObstacleReflection,
+                0f,
+                0.85f);
             impactRippleTestDistanceNormalized = Mathf.Clamp01(
                 impactRippleTestDistanceNormalized);
             impactRippleTestAcrossNormalized = Mathf.Clamp(
@@ -3194,14 +3285,40 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
+        private float ResolveImpactRippleStrength()
+        {
+            float strength = Mathf.Clamp(impactRippleStrength, 0f, 4f);
+            if (strength <= 3f)
+            {
+                return strength * (3f - 0.4f * strength);
+            }
+
+            return 5.4f + (strength - 3f) * 3.6f;
+        }
+
+        private float ResolveImpactRippleDecay()
+        {
+            return Mathf.Max(
+                0.01f,
+                impactRippleDecay +
+                Mathf.Abs(FlowSpeedMetresPerSecond) *
+                impactRippleFlowDissipation);
+        }
+
         private float ResolveImpactRippleMaximumHeight()
         {
             float waveAllowance = motionWaveHeight * 0.20f;
-            float strengthAllowance = impactRippleStrength * 0.035f;
+            float strengthAllowance =
+                ResolveImpactRippleStrength() * 0.035f;
+            float overload01 = Mathf.InverseLerp(
+                3f,
+                4f,
+                Mathf.Clamp(impactRippleStrength, 3f, 4f));
+            float maximumHeight = Mathf.Lerp(0.28f, 0.45f, overload01);
             return Mathf.Clamp(
                 0.06f + waveAllowance + strengthAllowance,
                 0.06f,
-                0.28f);
+                maximumHeight);
         }
 
         private float ResolveInteractionMinimumWavelength()

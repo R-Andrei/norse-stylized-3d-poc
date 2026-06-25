@@ -27,6 +27,12 @@ namespace ProgrammaticStylized3D.Geometry
         Custom
     }
 
+    public enum GeneratedRiverRippleCollisionMode
+    {
+        Inherit,
+        Disabled
+    }
+
     // These settings author one stationary source. The detecting river owns
     // the canonical Pressure and Wake response rules shared with dynamic
     // emitters; this object may inherit, disable, or override only its source
@@ -102,6 +108,12 @@ namespace ProgrammaticStylized3D.Geometry
         [SerializeField]
         private float obstructionWakeVariation = 0.35f;
 
+        [Header("Impact Ripples")]
+        [Tooltip("Inherit lets this registered stationary solid block and partially reflect Impact Ripples. Disabled excludes only this object from the cached ripple boundary mask; Pressure and Wake participation are unchanged.")]
+        [SerializeField]
+        private GeneratedRiverRippleCollisionMode impactRippleCollisionMode =
+            GeneratedRiverRippleCollisionMode.Inherit;
+
         // Hidden legacy data permits existing generated masses to migrate from
         // the former combined profile without exposing the removed controls.
         [HideInInspector, SerializeField]
@@ -149,6 +161,11 @@ namespace ProgrammaticStylized3D.Geometry
             Mathf.Clamp(obstructionWakeSpread, 0.5f, 2f);
         public float WakeVariation =>
             Mathf.Clamp01(obstructionWakeVariation);
+        public GeneratedRiverRippleCollisionMode ImpactRippleCollisionMode =>
+            impactRippleCollisionMode;
+        public bool BlocksImpactRipples =>
+            impactRippleCollisionMode !=
+            GeneratedRiverRippleCollisionMode.Disabled;
 
         // Compatibility aliases for the existing stationary-source contract.
         public GeneratedRiverFeatureMode StaticPressureMode =>
@@ -199,7 +216,8 @@ namespace ProgrammaticStylized3D.Geometry
                 ObstructionWakeStrength,
                 ObstructionWakeReach,
                 ObstructionWakeSpread,
-                ObstructionWakeVariation);
+                ObstructionWakeVariation,
+                BlocksImpactRipples);
         }
 
         public void Validate()
@@ -363,7 +381,8 @@ namespace ProgrammaticStylized3D.Geometry
             float obstructionWakeStrength,
             float obstructionWakeReach,
             float obstructionWakeSpread,
-            float obstructionWakeVariation)
+            float obstructionWakeVariation,
+            bool impactRippleCollisionEnabled = true)
         {
             StaticPressureEnabled = staticPressureEnabled;
             StaticPressureStrength = Mathf.Clamp01(staticPressureStrength);
@@ -406,6 +425,7 @@ namespace ProgrammaticStylized3D.Geometry
                 2f);
             ObstructionWakeVariation = Mathf.Clamp01(
                 obstructionWakeVariation);
+            ImpactRippleCollisionEnabled = impactRippleCollisionEnabled;
             compatibilityFootprintPadding = 0.12f;
         }
 
@@ -497,6 +517,7 @@ namespace ProgrammaticStylized3D.Geometry
                 2f,
                 Mathf.Clamp01(geometryAmplitude * 0.5f));
             ObstructionWakeVariation = 0.35f;
+            ImpactRippleCollisionEnabled = true;
             compatibilityFootprintPadding = Mathf.Max(
                 0f,
                 footprintPadding);
@@ -519,6 +540,7 @@ namespace ProgrammaticStylized3D.Geometry
         public float ObstructionWakeReach { get; }
         public float ObstructionWakeSpread { get; }
         public float ObstructionWakeVariation { get; }
+        public bool ImpactRippleCollisionEnabled { get; }
 
         // Former property names retained as non-authoritative aliases.
         public float PressureStrength => StaticPressureStrength;

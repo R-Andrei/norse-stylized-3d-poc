@@ -2,6 +2,9 @@
 #pragma kernel BakeStaticPressure
 #pragma kernel FinalizeStaticPressure
 #pragma kernel BakeStaticWakeSource
+#pragma kernel BakeRippleBoundaryBase
+#pragma kernel BakeRippleBoundaryObstacle
+#pragma kernel ApplyRippleBoundary
 #pragma kernel InjectRipple
 #pragma kernel InjectWake
 #pragma kernel SimulateRipple
@@ -13,6 +16,16 @@
 
 Texture2D<float4> _StateRead;
 RWTexture2D<float4> _StateWrite;
+Texture2D<float2> _RippleBoundaryRead;
+RWTexture2D<float2> _RippleBoundaryWrite;
+
+struct RippleMetricRowData
+{
+    float4 centreAndTangent;
+    float4 sideAndWidths;
+};
+
+StructuredBuffer<RippleMetricRowData> _RippleMetricData;
 
 Texture2D<float4> _WakeRead;
 RWTexture2D<float4> _WakeWrite;
@@ -54,14 +67,24 @@ float _StaticWaveResponse;
 float _MaximumHeight;
 
 int4 _RippleInjectRect;
-float2 _RippleInjectCentre;
-float2 _RippleInjectRadiusPixels;
+float2 _RippleInjectWorldPosition;
+float _RippleInjectRadiusMetres;
 float _RippleInjectHeight;
 float _RippleInjectElevation;
 float _RippleInjectVelocity;
 float _RippleInjectNormalDetail;
 float _RippleInjectShape;
 float _RippleInjectSharpness;
+float _RippleInjectRidgeEmphasis;
+
+float _RippleShoreReflection;
+int4 _RippleObstacleRect;
+float2 _RippleObstacleWorldCentre;
+float2 _RippleObstacleDownstream;
+float2 _RippleObstacleAcross;
+float2 _RippleObstacleHalfSizeMetres;
+float _RippleObstacleEdgeWidthMetres;
+float _RippleObstacleReflection;
 
 int4 _WakeInjectRect;
 float2 _WakeInjectStart;
@@ -76,8 +99,7 @@ float _DeltaTime;
 float _PropagationSpeed;
 float _DampingPerSecond;
 float _AdvectionPixels;
-float _CellSizeX;
-float _CellSizeY;
+int _RippleMetricCount;
 
 int2 _WakeFieldSize;
 int _WakeDispatchXOffset;
@@ -118,6 +140,121 @@ float2 SafeNormalize(float2 value, float2 fallback)
     return magnitudeSquared > 0.000001
         ? value * rsqrt(magnitudeSquared)
         : fallback;
+}
+
+struct RippleMetricSample
+{
+    float2 centre;
+    float2 tangent;
+    float2 side;
+    float2 widths;
+};
+
+RippleMetricSample LoadRippleMetric(int row)
+{
+    RippleMetricSample result;
+    int safeCount = max(1, _RippleMetricCount);
+    int safeRow = clamp(row, 0, safeCount - 1);
+    RippleMetricRowData rowData = _RippleMetricData[safeRow];
+    result.centre = rowData.centreAndTangent.xy;
+    result.tangent = SafeNormalize(
+        rowData.centreAndTangent.zw,
+        float2(1.0, 0.0));
+    result.side = SafeNormalize(
+        rowData.sideAndWidths.xy,
+        float2(0.0, 1.0));
+    result.widths = max(
+        rowData.sideAndWidths.zw,
+        float2(0.001, 0.001));
+    return result;
+}
+
+RippleMetricSample SampleRippleMetric(float row)
+{
+    RippleMetricSample result;
+    int safeCount = max(1, _RippleMetricCount);
+    float safeRow = clamp(row, 0.0, (float)(safeCount - 1));
+    int row0 = (int)floor(safeRow);
+    int row1 = min(row0 + 1, safeCount - 1);
+    float interpolation = saturate(safeRow - row0);
+    RippleMetricSample first = LoadRippleMetric(row0);
+    RippleMetricSample second = LoadRippleMetric(row1);
+    result.centre = lerp(first.centre, second.centre, interpolation);
+    result.tangent = SafeNormalize(
+        lerp(first.tangent, second.tangent, interpolation),
+        first.tangent);
+    result.side = SafeNormalize(
+        lerp(first.side, second.side, interpolation),
+        first.side);
+    result.widths = lerp(first.widths, second.widths, interpolation);
+    return result;
+}
+
+float RippleAcrossNormalized(float lateralPixel)
+{
+    return lateralPixel /
+        max(1.0, (float)(_FieldSize.y - 1)) * 2.0 - 1.0;
+}
+
+float2 ResolveRippleWorldPosition(
+    RippleMetricSample metric,
+    float lateralPixel)
+{
+    float across = clamp(
+        RippleAcrossNormalized(lateralPixel),
+        -1.0,
+        1.0);
+    float width = across < 0.0
+        ? metric.widths.x
+        : metric.widths.y;
+    return metric.centre + metric.side * (across * width);
+}
+
+float2 ResolveRippleWorldPosition(float row, float lateralPixel)
+{
+    return ResolveRippleWorldPosition(
+        SampleRippleMetric(row),
+        lateralPixel);
+}
+
+float ResolveRippleMetricDistance(float2 first, float2 second)
+{
+    return max(0.001, length(second - first));
+}
+
+float RippleSecondDerivative(
+    float previousValue,
+    float centreValue,
+    float nextValue,
+    float previousDistance,
+    float nextDistance)
+{
+    float safePrevious = max(0.001, previousDistance);
+    float safeNext = max(0.001, nextDistance);
+    return 2.0 *
+        ((nextValue - centreValue) / safeNext -
+         (centreValue - previousValue) / safePrevious) /
+        max(0.001, safePrevious + safeNext);
+}
+
+float RippleFirstDerivative(
+    float previousValue,
+    float centreValue,
+    float nextValue,
+    float previousDistance,
+    float nextDistance)
+{
+    float safePrevious = max(0.001, previousDistance);
+    float safeNext = max(0.001, nextDistance);
+    float denominator = max(
+        0.001,
+        safePrevious * safeNext * (safePrevious + safeNext));
+    return
+        (-safeNext * safeNext * previousValue +
+         (safeNext * safeNext - safePrevious * safePrevious) *
+             centreValue +
+         safePrevious * safePrevious * nextValue) /
+        denominator;
 }
 
 float Cross2D(float2 first, float2 second)
@@ -204,6 +341,57 @@ BoundaryInfo EvaluateStaticBoundary(float2 position, float2 halfSize)
     result.signedDistance = inside ? -minimumDistance : minimumDistance;
     result.outwardNormal = nearestNormal;
     return result;
+}
+
+float EvaluateRippleObstacleSignedDistance(
+    float2 position,
+    float2 halfSize)
+{
+    if (_StaticContourCount < 3)
+    {
+        float radius = max(0.01, min(halfSize.x, halfSize.y) * 0.48);
+        return RoundedBoxDistance(position, halfSize, radius);
+    }
+
+    // This scalar-only contour path deliberately avoids returning BoundaryInfo.
+    // The legacy D3D11/FXC compiler can report a false potentially-
+    // uninitialized warning for struct-return helpers with branched returns,
+    // even when every struct member is explicitly assigned. This kernel only
+    // needs signed distance, so calculating that value directly is both safer
+    // and avoids unnecessary normal work.
+    float minimumDistance = 1000000.0;
+    bool inside = true;
+
+    [loop]
+    for (int index = 0; index < PS3D_MAX_STATIC_CONTOUR; index++)
+    {
+        if (index >= _StaticContourCount)
+        {
+            break;
+        }
+
+        int nextIndex = index + 1;
+        if (nextIndex >= _StaticContourCount)
+        {
+            nextIndex = 0;
+        }
+
+        float2 start = _StaticContour[index].xy;
+        float2 end = _StaticContour[nextIndex].xy;
+        float2 edge = end - start;
+        float edgeLengthSquared = max(0.000001, dot(edge, edge));
+        float interpolation = saturate(
+            dot(position - start, edge) / edgeLengthSquared);
+        float2 nearest = start + edge * interpolation;
+        minimumDistance = min(minimumDistance, length(position - nearest));
+
+        if (Cross2D(edge, position - start) < 0.0)
+        {
+            inside = false;
+        }
+    }
+
+    return inside ? -minimumDistance : minimumDistance;
 }
 
 struct ContourRowResult
@@ -834,6 +1022,47 @@ float4 SampleStateLinearX(float x, int y)
     return lerp(sampleA, sampleB, interpolation);
 }
 
+float2 LoadRippleBoundary(int2 pixel)
+{
+    pixel = clamp(pixel, int2(0, 0), _FieldSize - 1);
+    return _RippleBoundaryRead.Load(int3(pixel, 0));
+}
+
+float2 SampleRippleBoundaryLinearX(float x, int y)
+{
+    float floorX = floor(x);
+    int x0 = clamp((int)floorX, 0, _FieldSize.x - 1);
+    int x1 = clamp(x0 + 1, 0, _FieldSize.x - 1);
+    float interpolation = saturate(x - floorX);
+    float2 sampleA = LoadRippleBoundary(int2(x0, y));
+    float2 sampleB = LoadRippleBoundary(int2(x1, y));
+    return lerp(sampleA, sampleB, interpolation);
+}
+
+float ResolveRippleBoundaryHeight(
+    float neighbourHeight,
+    float centreHeight,
+    float centreVelocity,
+    float2 neighbourBoundary,
+    float neighbourDistance)
+{
+    float coverage = saturate(neighbourBoundary.x);
+    float reflection = saturate(neighbourBoundary.y);
+    float characteristicOffset = clamp(
+        centreVelocity * neighbourDistance /
+        max(0.01, _PropagationSpeed),
+        -_MaximumHeight * 2.0,
+        _MaximumHeight * 2.0);
+    float absorbingBoundaryHeight =
+        centreHeight - characteristicOffset;
+    float hardBoundaryHeight = centreHeight;
+    float boundaryHeight = lerp(
+        absorbingBoundaryHeight,
+        hardBoundaryHeight,
+        reflection);
+    return lerp(boundaryHeight, neighbourHeight, coverage);
+}
+
 float4 LoadWake(int2 pixel)
 {
     pixel = clamp(pixel, int2(0, 0), _WakeFieldSize - 1);
@@ -1013,6 +1242,104 @@ void BakeStaticWakeSource(uint3 dispatchId : SV_DispatchThreadID)
 }
 
 [numthreads(8, 8, 1)]
+void BakeRippleBoundaryBase(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FieldSize.x ||
+        dispatchId.y >= (uint)_FieldSize.y)
+    {
+        return;
+    }
+
+    int2 pixel = int2(dispatchId.xy);
+    RippleMetricSample metric = LoadRippleMetric(pixel.x);
+    float across = clamp(
+        RippleAcrossNormalized((float)pixel.y),
+        -1.0,
+        1.0);
+    float sideWidth = across < 0.0
+        ? metric.widths.x
+        : metric.widths.y;
+    float shoreDistance = max(
+        0.0,
+        (1.0 - abs(across)) * sideWidth);
+    float lateralCell =
+        sideWidth * 2.0 / max(1.0, (float)(_FieldSize.y - 1));
+    float absorptionBand = clamp(
+        max(lateralCell * 2.5, sideWidth * 0.08),
+        0.15,
+        0.65);
+    float coverage = smoothstep(
+        0.0,
+        absorptionBand,
+        shoreDistance);
+    float reflection =
+        saturate(_RippleShoreReflection) * (1.0 - coverage);
+    _RippleBoundaryWrite[pixel] = float2(coverage, reflection);
+}
+
+[numthreads(8, 8, 1)]
+void BakeRippleBoundaryObstacle(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_RippleObstacleRect.z ||
+        dispatchId.y >= (uint)_RippleObstacleRect.w)
+    {
+        return;
+    }
+
+    int2 pixel = int2(
+        _RippleObstacleRect.x + (int)dispatchId.x,
+        _RippleObstacleRect.y + (int)dispatchId.y);
+    if (pixel.x < 0 || pixel.y < 0 ||
+        pixel.x >= _FieldSize.x || pixel.y >= _FieldSize.y)
+    {
+        return;
+    }
+
+    float2 worldPosition = ResolveRippleWorldPosition(
+        (float)pixel.x,
+        (float)pixel.y);
+    float2 worldOffset = worldPosition - _RippleObstacleWorldCentre;
+    float2 relativePosition = float2(
+        dot(worldOffset, _RippleObstacleDownstream),
+        dot(worldOffset, _RippleObstacleAcross));
+    float obstacleSignedDistance = EvaluateRippleObstacleSignedDistance(
+        relativePosition,
+        max(_RippleObstacleHalfSizeMetres, float2(0.05, 0.05)));
+    float edgeWidth = max(0.01, _RippleObstacleEdgeWidthMetres);
+    float obstacleCoverage = smoothstep(
+        0.0,
+        edgeWidth,
+        obstacleSignedDistance);
+    float reflectionWeight = 1.0 - smoothstep(
+        0.0,
+        edgeWidth * 2.5,
+        max(0.0, obstacleSignedDistance));
+
+    float2 existing = _RippleBoundaryWrite[pixel];
+    existing.x = min(existing.x, obstacleCoverage);
+    existing.y = max(
+        existing.y,
+        saturate(_RippleObstacleReflection) * reflectionWeight);
+    _RippleBoundaryWrite[pixel] = existing;
+}
+
+[numthreads(8, 8, 1)]
+void ApplyRippleBoundary(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FieldSize.x ||
+        dispatchId.y >= (uint)_FieldSize.y)
+    {
+        return;
+    }
+
+    int2 pixel = int2(dispatchId.xy);
+    float coverage = saturate(LoadRippleBoundary(pixel).x);
+    float4 state = _StateWrite[pixel];
+    state *= coverage;
+    _StateWrite[pixel] = state;
+}
+
+[numthreads(8, 8, 1)]
 void InjectRipple(uint3 dispatchId : SV_DispatchThreadID)
 {
     if (dispatchId.x >= (uint)_RippleInjectRect.z ||
@@ -1031,17 +1358,27 @@ void InjectRipple(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float2 samplePosition = float2(pixel) + 0.5;
-    float2 sourceRelative =
-        (samplePosition - _RippleInjectCentre) /
-        max(_RippleInjectRadiusPixels, float2(1.0, 1.0));
-    float radialDistance = length(sourceRelative);
+    float boundaryCoverage =
+        saturate(LoadRippleBoundary(pixel).x);
+    if (boundaryCoverage <= 0.0001)
+    {
+        return;
+    }
+
+    RippleMetricSample localMetric = SampleRippleMetric((float)pixel.x);
+    float2 worldPosition = ResolveRippleWorldPosition(
+        localMetric,
+        (float)pixel.y);
+    float2 worldDelta = worldPosition - _RippleInjectWorldPosition;
+    float radialDistance =
+        length(worldDelta) /
+        max(0.001, _RippleInjectRadiusMetres);
     float shapeOffset = saturate(_RippleInjectShape) - 0.5;
     float inverseSharpness =
         rcp(max(0.25, _RippleInjectSharpness));
     float centreWidth = 0.28 * inverseSharpness;
     float ringCentre = 0.60 + shapeOffset * 0.16;
-    float ringWidth = 0.17 * inverseSharpness;
+    float ringWidth = 0.155 * inverseSharpness;
     float outerCentre = 0.91 + shapeOffset * 0.08;
     float outerWidth = 0.11 * inverseSharpness;
     float centreDepression = Gaussian1D(
@@ -1064,30 +1401,39 @@ void InjectRipple(uint3 dispatchId : SV_DispatchThreadID)
         0.34 * inverseSharpness) *
         radialEnvelope;
 
+    float ridgeEmphasis = clamp(
+        _RippleInjectRidgeEmphasis,
+        0.75,
+        1.50);
     float heightPattern =
-        ((0.92 + shapeOffset * 0.30) * pressureRing -
+        ((0.92 + shapeOffset * 0.30) * pressureRing * ridgeEmphasis -
          (0.70 - shapeOffset * 0.20) * centreDepression -
          0.16 * outerTrough) *
         radialEnvelope;
     float velocityPattern =
-        ((1.05 + shapeOffset * 0.35) * pressureRing -
+        ((1.05 + shapeOffset * 0.35) * pressureRing * ridgeEmphasis -
          (1.35 - shapeOffset * 0.30) * centreDepression -
          0.20 * outerTrough) *
         radialEnvelope;
     float2 radialDirection = SafeNormalize(
-        sourceRelative,
+        float2(
+            dot(worldDelta, localMetric.tangent),
+            dot(worldDelta, localMetric.side)),
         float2(1.0, 0.0));
     float2 normalPattern =
         radialDirection *
-        (pressureRing * 1.25 - centreDepression * 0.55) *
+        (pressureRing * 1.25 * ridgeEmphasis -
+         centreDepression * 0.55) *
         radialEnvelope;
 
     float4 state = _StateWrite[pixel];
-    state.r +=
-        _RippleInjectHeight * heightPattern +
-        _RippleInjectElevation * elevationPattern;
-    state.g += _RippleInjectVelocity * velocityPattern;
-    state.ba += _RippleInjectNormalDetail * normalPattern;
+    state.r += boundaryCoverage *
+        (_RippleInjectHeight * heightPattern +
+         _RippleInjectElevation * elevationPattern);
+    state.g += boundaryCoverage *
+        _RippleInjectVelocity * velocityPattern;
+    state.ba += boundaryCoverage *
+        _RippleInjectNormalDetail * normalPattern;
     state.r = clamp(state.r, -_MaximumHeight, _MaximumHeight);
     state.g = clamp(
         state.g,
@@ -1193,22 +1539,117 @@ void SimulateRipple(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float sourceX = (float)x - _AdvectionPixels;
-    float4 centre = SampleStateLinearX(sourceX, y);
-    float left = SampleStateLinearX(sourceX - 1.0, y).r;
-    float right = SampleStateLinearX(sourceX + 1.0, y).r;
-    float down = SampleStateLinearX(sourceX, max(0, y - 1)).r;
-    float up = SampleStateLinearX(
-        sourceX,
-        min(_FieldSize.y - 1, y + 1)).r;
+    int2 targetPixel = int2(x, y);
+    float2 targetBoundary = LoadRippleBoundary(targetPixel);
+    float targetCoverage = saturate(targetBoundary.x);
+    if (targetCoverage <= 0.0001)
+    {
+        _StateWrite[targetPixel] = 0.0;
+        return;
+    }
 
-    float inverseCellX2 =
-        1.0 / max(0.0001, _CellSizeX * _CellSizeX);
-    float inverseCellY2 =
-        1.0 / max(0.0001, _CellSizeY * _CellSizeY);
+    float sourceX = (float)x - _AdvectionPixels;
+    float2 sourceBoundary = SampleRippleBoundaryLinearX(sourceX, y);
+    float4 centre = SampleStateLinearX(sourceX, y);
+    centre *= saturate(sourceBoundary.x);
+
+    int downY = max(0, y - 1);
+    int upY = min(_FieldSize.y - 1, y + 1);
+    float rawLeft = SampleStateLinearX(sourceX - 1.0, y).r;
+    float rawRight = SampleStateLinearX(sourceX + 1.0, y).r;
+    float rawDown = SampleStateLinearX(sourceX, downY).r;
+    float rawUp = SampleStateLinearX(sourceX, upY).r;
+    float2 leftBoundary = SampleRippleBoundaryLinearX(sourceX - 1.0, y);
+    float2 rightBoundary = SampleRippleBoundaryLinearX(sourceX + 1.0, y);
+    float2 downBoundary = SampleRippleBoundaryLinearX(sourceX, downY);
+    float2 upBoundary = SampleRippleBoundaryLinearX(sourceX, upY);
+    RippleMetricSample centreMetric = SampleRippleMetric(sourceX);
+    RippleMetricSample leftMetric = SampleRippleMetric(sourceX - 1.0);
+    RippleMetricSample rightMetric = SampleRippleMetric(sourceX + 1.0);
+    float2 centreWorldPosition = ResolveRippleWorldPosition(
+        centreMetric,
+        (float)y);
+    float2 leftWorldPosition = ResolveRippleWorldPosition(
+        leftMetric,
+        (float)y);
+    float2 rightWorldPosition = ResolveRippleWorldPosition(
+        rightMetric,
+        (float)y);
+    float2 downWorldPosition = ResolveRippleWorldPosition(
+        centreMetric,
+        (float)downY);
+    float2 upWorldPosition = ResolveRippleWorldPosition(
+        centreMetric,
+        (float)upY);
+
+    float leftDistance = ResolveRippleMetricDistance(
+        leftWorldPosition,
+        centreWorldPosition);
+    float rightDistance = ResolveRippleMetricDistance(
+        centreWorldPosition,
+        rightWorldPosition);
+    float downDistance = ResolveRippleMetricDistance(
+        downWorldPosition,
+        centreWorldPosition);
+    float upDistance = ResolveRippleMetricDistance(
+        centreWorldPosition,
+        upWorldPosition);
+
+    if (sourceX <= 0.0)
+    {
+        leftDistance = rightDistance;
+    }
+    if (sourceX >= (float)(_FieldSize.x - 1))
+    {
+        rightDistance = leftDistance;
+    }
+    if (y <= 0)
+    {
+        downDistance = upDistance;
+    }
+    if (y >= _FieldSize.y - 1)
+    {
+        upDistance = downDistance;
+    }
+
+    float left = ResolveRippleBoundaryHeight(
+        rawLeft,
+        centre.r,
+        centre.g,
+        leftBoundary,
+        leftDistance);
+    float right = ResolveRippleBoundaryHeight(
+        rawRight,
+        centre.r,
+        centre.g,
+        rightBoundary,
+        rightDistance);
+    float down = ResolveRippleBoundaryHeight(
+        rawDown,
+        centre.r,
+        centre.g,
+        downBoundary,
+        downDistance);
+    float up = ResolveRippleBoundaryHeight(
+        rawUp,
+        centre.r,
+        centre.g,
+        upBoundary,
+        upDistance);
+
     float laplacian =
-        (left - 2.0 * centre.r + right) * inverseCellX2 +
-        (down - 2.0 * centre.r + up) * inverseCellY2;
+        RippleSecondDerivative(
+            left,
+            centre.r,
+            right,
+            leftDistance,
+            rightDistance) +
+        RippleSecondDerivative(
+            down,
+            centre.r,
+            up,
+            downDistance,
+            upDistance);
 
     float velocity =
         centre.g +
@@ -1219,11 +1660,12 @@ void SimulateRipple(uint3 dispatchId : SV_DispatchThreadID)
     velocity *= exp(-_DampingPerSecond * _DeltaTime);
     float height = centre.r + velocity * _DeltaTime;
 
-    float lateral01 = y / max(1.0, (float)(_FieldSize.y - 1));
-    float edgeDistance = min(lateral01, 1.0 - lateral01);
-    float edgeMask = smoothstep(0.0, 0.075, edgeDistance);
-    height *= edgeMask;
-    velocity *= edgeMask;
+    // Partial water coverage models the lossy shallow shoreline band.
+    // A fully solid cell was rejected above; open water receives no extra loss.
+    float boundaryDamping = exp(
+        -(1.0 - targetCoverage) * 9.0 * _DeltaTime);
+    height *= boundaryDamping;
+    velocity *= boundaryDamping;
 
     if (height != height || velocity != velocity ||
         abs(height) > _MaximumHeight * 8.0 ||
@@ -1239,24 +1681,31 @@ void SimulateRipple(uint3 dispatchId : SV_DispatchThreadID)
         -_MaximumHeight * 12.0,
         _MaximumHeight * 12.0);
 
-    float gradientX =
-        (right - left) /
-        max(0.0001, 2.0 * _CellSizeX);
-    float gradientY =
-        (up - down) /
-        max(0.0001, 2.0 * _CellSizeY);
+    float gradientX = RippleFirstDerivative(
+        left,
+        centre.r,
+        right,
+        leftDistance,
+        rightDistance);
+    float gradientY = RippleFirstDerivative(
+        down,
+        centre.r,
+        up,
+        downDistance,
+        upDistance);
     float2 normalOnlyDetail =
         centre.ba - float2(gradientX, gradientY);
     normalOnlyDetail *= exp(
         -(_DampingPerSecond * 1.35 + 0.90) * _DeltaTime);
-    normalOnlyDetail *= edgeMask;
+    normalOnlyDetail *= boundaryDamping;
 
     float2 finalGradient = clamp(
-        float2(gradientX, gradientY) * edgeMask + normalOnlyDetail,
+        float2(gradientX, gradientY) * targetCoverage +
+        normalOnlyDetail,
         -4.0,
         4.0);
 
-    _StateWrite[int2(x, y)] = float4(
+    _StateWrite[targetPixel] = float4(
         height,
         velocity,
         finalGradient.x,

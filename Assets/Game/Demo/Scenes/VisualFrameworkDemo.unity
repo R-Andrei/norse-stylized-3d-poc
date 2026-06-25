@@ -195,6 +195,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -397,6 +399,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -788,6 +792,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -955,6 +961,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -1296,6 +1304,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -2097,6 +2107,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -3293,6 +3305,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -3915,6 +3929,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -4322,6 +4338,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -4713,6 +4731,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -4880,6 +4900,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -5090,6 +5112,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -5530,6 +5554,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -5817,6 +5843,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -6081,6 +6109,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -6411,6 +6441,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -7186,6 +7218,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -7683,15 +7717,37 @@ MonoBehaviour:
   staticPressureWaveResponse: 1.74
   staticPressureProfileChangeIntervalMin: 0.63
   staticPressureProfileChangeIntervalMax: 0.99
-  obstructionWakeStrength: 1.5
-  obstructionWakeReach: 0.74
-  obstructionWakeSpread: 0.904
-  movingTrailStrength: 1.35
-  movingTrailPersistence: 0.65
-  movingTrailWidth: 1
-  impactRippleStrength: 1.35
-  impactRipplePropagation: 1.05
-  impactRippleDecay: 0.85
+  obstructionWakeStrength: 1.85
+  obstructionWakeReach: 1.3
+  obstructionWakeSpread: 0.981
+  obstructionWakeVariation: 0.818
+  obstructionWakeVariationIntervalMin: 1
+  obstructionWakeVariationIntervalMax: 1.23
+  obstructionWakeWidening: 0.702
+  obstructionWakeSurfaceHeight: 0.342
+  obstructionWakeSurfaceCompactness: 0.9
+  movingTrailStrength: 1.85
+  movingTrailPersistence: 0.38181818
+  movingTrailWidth: 0.981
+  impactRippleStrength: 2.57
+  impactRippleRidgeEmphasis: 1.314
+  impactRipplePropagation: 2.1
+  impactRippleDecay: 0.27
+  impactRippleFlowDissipation: 0.237
+  impactRippleMinimumVisibleEnergy: 0.082
+  impactRippleMaximumLifetime: 9.97
+  impactRippleShoreReflection: 0.491
+  impactRippleObstacleReflection: 0.75
+  impactRippleTestDistanceNormalized: 0.026
+  impactRippleTestAcrossNormalized: 0
+  impactRippleTestEvent:
+    radius: 0.4
+    signedImpulse: 1
+    initialElevation: 0
+    shape: 0.5
+    sharpness: 1
+    geometryContribution: 0.65
+    normalContribution: 1
   bodyDebugView: 0
   horizonColor: {r: 0.58, g: 0.91, b: 0.94, a: 0.35}
   specularColor: {r: 1, g: 1, b: 1, a: 0.35}
@@ -8433,6 +8489,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -8600,6 +8658,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -9171,6 +9231,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1
@@ -9370,6 +9432,8 @@ MonoBehaviour:
     obstructionWakeStrength: 1.5
     obstructionWakeReach: 1
     obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
     responseProfile: 0
     pressureStrength: 0.55
     strengthMultiplier: 1

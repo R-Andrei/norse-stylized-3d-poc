@@ -22,6 +22,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty obstructionWakeReach;
         private SerializedProperty obstructionWakeSpread;
         private SerializedProperty obstructionWakeVariation;
+        private SerializedProperty impactRippleCollisionMode;
         private bool showPressureProfile;
 
         private void OnEnable()
@@ -56,6 +57,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "obstructionWakeSpread");
             obstructionWakeVariation = riverInteraction?.FindPropertyRelative(
                 "obstructionWakeVariation");
+            impactRippleCollisionMode =
+                riverInteraction?.FindPropertyRelative(
+                    "impactRippleCollisionMode");
         }
 
         public override void OnInspectorGUI()
@@ -154,6 +158,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             DrawStaticPressureControls();
             DrawObstructionWakeControls();
+            DrawImpactRippleCollisionControls();
 
             EditorGUILayout.HelpBox(
                 "Inherit uses the defaults of the river that detects this object. Custom replaces only the selected feature's values; it does not multiply unrelated interaction systems.",
@@ -253,6 +258,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "Uses the detected river's shared Wake defaults.",
                     MessageType.None);
             }
+        }
+
+
+        private void DrawImpactRippleCollisionControls()
+        {
+            if (impactRippleCollisionMode == null)
+            {
+                return;
+            }
+
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Impact Ripples",
+                EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(
+                impactRippleCollisionMode,
+                new GUIContent(
+                    "Collision",
+                    "Inherit includes this registered stationary solid in the cached Impact Ripple boundary mask. Disabled lets ripples pass through this object without changing its Pressure or Wake behavior."));
         }
 
         private void DrawRuntimeDiagnostics()

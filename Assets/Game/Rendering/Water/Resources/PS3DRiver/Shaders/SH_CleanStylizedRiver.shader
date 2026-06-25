@@ -68,6 +68,7 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _DisturbanceDebugView("Disturbance Debug View", Float) = 0
         [HideInInspector] _DisturbanceFragmentDetail("Disturbance Fragment Detail", Float) = 0
         [HideInInspector] _DisturbanceStaticTarget("Disturbance Static Pressure", 2D) = "black" {}
+        [HideInInspector] _DisturbanceRippleBoundary("Disturbance Ripple Boundary", 2D) = "white" {}
         [HideInInspector] _DisturbanceStaticWakeSource("Disturbance Static Wake Source", 2D) = "black" {}
         [HideInInspector] _DisturbanceWakePrevious("Disturbance Wake Previous", 2D) = "black" {}
         [HideInInspector] _DisturbanceWakeCurrent("Disturbance Wake Current", 2D) = "black" {}
@@ -216,6 +217,8 @@ Shader "PS3D/Stylized River Water"
             SAMPLER(sampler_DisturbanceFieldCurrent);
             TEXTURE2D(_DisturbanceStaticTarget);
             SAMPLER(sampler_DisturbanceStaticTarget);
+            TEXTURE2D(_DisturbanceRippleBoundary);
+            SAMPLER(sampler_DisturbanceRippleBoundary);
             TEXTURE2D(_DisturbanceStaticWakeSource);
             SAMPLER(sampler_DisturbanceStaticWakeSource);
             TEXTURE2D(_DisturbanceWakePrevious);
@@ -768,6 +771,27 @@ Shader "PS3D/Stylized River Water"
                     {
                         return half4(release, lee, reach, 1.0);
                     }
+                }
+
+                if (disturbanceDebug == 21)
+                {
+                    float2 fieldUV = float2(
+                        saturate(
+                            (input.domainData.x - _DisturbanceGlobalStart) /
+                            max(0.001, _DisturbanceFieldLength)),
+                        saturate(
+                            input.domainData.y /
+                            max(0.001, input.domainData.w) *
+                            0.5 + 0.5));
+                    float2 boundary = SAMPLE_TEXTURE2D(
+                        _DisturbanceRippleBoundary,
+                        sampler_DisturbanceRippleBoundary,
+                        fieldUV).rg;
+                    return half4(
+                        saturate(boundary.y),
+                        saturate(boundary.x),
+                        0.0,
+                        1.0);
                 }
 
                 if (disturbanceDebug == 19)
