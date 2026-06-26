@@ -212,7 +212,7 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 - Apply the same resolved strength to injected height, velocity, normal detail, initial elevation, and the permitted ripple-height envelope.
 - Update new-component defaults and disturbance presets for the shaped response; existing serialized raw Strength values remain intact and may require author retuning after the response change.
 
-**R1.1 status:** implemented together with R2; cumulative Unity compilation and focused validation pending.
+**R1.1 status:** compiled and focused validation passed together with R2. The nonlinear response made normal values readable while preserving a bounded overload range.
 
 #### R2 — Lifetime and progressive chunk reservation
 
@@ -225,7 +225,7 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 - Prevent fast flow or slow decay from clipping ripples at chunk boundaries.
 - Report active reservation count, longest remaining reservation, resolved Strength, and effective decay.
 
-**R2 status:** implemented together with R1.1; cumulative Unity compilation and focused validation pending.
+**R2 status:** compiled and focused validation passed together with R1.1. Progressive reservations remained bounded, avoided visible chunk clipping, adapted to live flow/decay changes, and returned to sleep after activity ended.
 
 #### R3 — Shore and static-obstacle boundaries
 
@@ -249,20 +249,231 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 - Preserved the existing `0.28 m` maximum-height ceiling through Strength `3`; the overload segment progressively unlocks up to approximately `0.45 m` at Strength `4`.
 - Updated disturbance presets to use Ridge Emphasis values of `1.05` for Subtle, `1.15` for Balanced, and `1.25` for Reactive.
 
-**Impact Ripple status:** complete and accepted at system level after extensive user testing. R4 and R5 were collapsed into this focused finalization because the shared analytic profile, signed overlap, metric propagation, lifetime reservations, frozen-state handling, boundary interaction, quality behavior, and combined Stage 5 coexistence were already tested sufficiently. The final ridge/override adjustment requires only the routine Unity compile and smoke check; it does not reopen the accepted solver architecture. Detached spray, droplets, and splash particles remain Stage 7 work and were not used to conceal ripple defects.
+**Impact Ripple status:** complete and accepted after compilation, focused checks, and extensive user stress testing. R4 and R5 were collapsed into this focused finalization because the shared analytic profile, signed overlap, metric propagation, lifetime reservations, frozen-state handling, boundary interaction, quality behavior, and combined Stage 5 coexistence were tested sufficiently. Detached spray, droplets, and splash particles remain Stage 7 work and were not used to conceal ripple defects.
 
-### Remaining Stage 5 work
+### Stage 5 closure
 
-1. Decide whether full relative-motion dynamic Pressure/Wake source preparation is required before Stage 6 Foam.
-2. If dynamic preparation remains deferred, record that milestone decision and begin Stage 6 using the accepted shared Pressure, Wake, and Impact Ripple outputs.
-3. Perform final combined Low/Medium/High profiling when the remaining Stage 5 scope is settled; this is a performance milestone, not a reason to reopen accepted ripple visuals.
+**Stage 5 is closed for the current gameplay milestone.**
+
+- Stationary Pressure is complete and accepted.
+- Stationary source preparation and the shared persistent Wake response are complete and accepted.
+- Impact Ripples are complete and accepted.
+- Full relative-motion preparation for dynamic Pressure and dynamic Wake is explicitly deferred until an authoritative movement/velocity system and real moving-water gameplay consumers exist. The current dynamic emitter path remains compatibility and foundation work, not a completed production movement model.
+- A lightweight Inspector workload pass was completed. In a representative scene the accepted disturbance fields reported approximately `0.39 MB` allocated memory at the captured state, and deliberate user stress testing remained bounded at roughly `48,000` estimated cell-iterations. These are internal workload estimates rather than measured CPU/GPU milliseconds; a broader hardware profiling pass remains a future whole-project optimization milestone.
+- Stage 6 may consume the accepted Pressure, Wake, Ripple, boundary, river-domain, freeze, chunking, and diagnostics contracts without reopening their visual behaviour.
 
 
 ## 6. Foam and Surface Tracing
 
-**Problem:** Generate and transport readable foam from banks, obstacles, turbulence, wakes, and runtime disturbances without unrelated motion layers, tearing fronts, blur, or knot-dependent speed.
+**Problem:** Create a persistent, evolving, web-like surface-tracer network that remains crisp at gameplay distance, preserves substantial open water, breaks and reconnects chaotically without exposing the simulation grid, never appears to travel upstream, and is strongly but temporarily captured by animated shores, real obstacle contours, stationary Pressure shoulders, and lee depressions.
 
-**Implemented:** Not started.
+**Current status:** The first integrated F1–F4 solver reached the correct broad category but failed its motion-quality review. It produced excessive area coverage, too few pockets, broad sheet-like structures, cardinal row/column fracture patterns, synchronized scalloping, overly smooth edges, occasional apparent upstream connection growth, and weak boundary/lee retention. The first Integrated Dynamics Correction produced the strongest still result so far but failed its motion review through sparse elongated lanes and particle-like threshold breakup. **Stage 6.1 — Cohesive Web and Fragment Correction** is now implemented in code and awaits Unity compilation and focused visual validation. Final material polish, quality profiling, regression, and Stage 6 closure remain pending.
+
+The canonical implementation and acceptance record is maintained in:
+
+```text
+Assets/Docs/River_Foam_Stage6_Architecture.md
+```
+
+### Canonical visual contract
+
+Foam is one persistent material system that continually reorganises into a partial filament network:
+
+- many small and medium dark-water pockets;
+- thin and medium branches with extremely narrow temporary connectors;
+- forks, junctions, occasional broad nodes, ribbons, splinters, and tiny fragments;
+- real merging through material convergence;
+- asynchronous edge cracking, oblique tears, weak-seam reopening, and neck failure;
+- strong but bounded capture at shores, real obstacle contours, Pressure shoulders, and lee depressions;
+- peeling and shredded release from captured regions;
+- fixed-cost Wake and Impact reinforcement of the same material.
+
+The network need not remain globally connected. It must continually move between connected, partly connected, and fragmented states. It must not become a static translated web, broad white sheets with a few holes, a scrolling texture, a procedural deletion mask, or a cardinal/checker cellular pattern.
+
+### Preserved contracts
+
+- authoritative river domain, metric spacing, bends, connected offsets, and reverse flow;
+- river-owned quality, chunk, freeze, sleep, and delayed-release lifecycle;
+- corrected per-vertex projected stationary-obstacle polygons;
+- accepted Stage 5 Pressure, Wake, Ripple, registry, and static-boundary inputs;
+- fixed-cost final shader with no per-source loops;
+- compact authoring: Amount, Fragmentation, Persistence, Agitation, Sharpness, and Foam Colour.
+
+Stage 5 remains visually closed. Stage 6 receives read-only access to accepted Stage 5 textures and does not rewrite their response.
+
+### Persistent material state
+
+Two `RGBAHalf` ping-pong textures store:
+
+```text
+R = Amount
+G = Freshness
+B = Integrity
+A = material phase / provenance
+```
+
+Amount is long-lived material. Freshness decays much sooner, so the source imprint can change quickly while the material travels for many seconds. Integrity accumulates structural damage. Phase carries lightweight transported history for asynchronous damage, compatible merging, and weak seams.
+
+The corrected transport path also uses temporary forward and reverse `RGBAHalf` states for bounded MacCormack/BFECC-style correction. These are transient simulation resources, not separate Foam layers.
+
+### Integrated Dynamics Correction
+
+#### Population morphology
+
+**Status:** implemented; Unity validation pending.
+
+The GPU population reduction now records more than occupied area. Per chunk it measures visible material, perimeter cells, broad interior cells, total Amount, Integrity, and capture occupancy. The controller can therefore distinguish a useful high-perimeter network from a few large white sheets.
+
+Canonical Amount resolves to an initial target visible-area range of approximately `3.5–28%`. Supply is reduced around broad interiors and saturated junctions, favours under-populated guidance lanes, and cannot refill every empty cell merely because it is open water. Excess population is never deleted by a controller; it falls through ordinary transport, damage, tearing, and decay.
+
+#### Multi-scale filament guidance
+
+**Status:** implemented; Unity validation pending.
+
+A low-resolution evolving `RGBAHalf` guidance field combines:
+
+- sparse coarse divisions for the largest river-space organisation;
+- a dominant medium network for ordinary branches and pockets;
+- an incomplete fine network for narrow connectors and secondary subdivisions.
+
+The guidance stores attraction direction, lane strength/distance response, and junction capacity rather than only a normalized gradient. Independent regional phases and different evolution rates prevent one synchronized network pulse. The field is invisible and moves persistent material; it never directly draws or removes Foam.
+
+#### Strict downstream authority
+
+**Status:** implemented; Unity validation pending.
+
+All guidance, boundary, Pressure, lee, Wake, Ripple, and phase-drift contributions are combined before the final longitudinal velocity is clamped to a non-negative magnitude along the authoritative downstream axis. Reverse flow flips the axis but preserves the same rule.
+
+Connections may form only through real advection/convergence and conservative overlap. The former opposing-neighbour bridge insertion has been removed. No coherent feature or merge front is permitted to advance upstream.
+
+#### Corrected transport
+
+**Status:** implemented; Unity validation pending.
+
+The former one-pass bilinear semi-Lagrangian transport is replaced by a bounded forward/reverse correction sequence:
+
+1. forward advection;
+2. reverse estimate;
+3. error correction;
+4. local-neighbourhood clamping.
+
+This is intended to preserve thin branches, sharp cracks, one-to-three-cell fragments, and rough silhouettes instead of diffusing them into broad smooth sheets. All quality tiers retain the corrected model; quality scales resolution and cadence rather than reverting to the rejected transport.
+
+#### Directional topology and aggressive tearing
+
+**Status:** implemented; Unity validation pending.
+
+Cardinal left/right and up/down bridge/fracture rules have been removed. The solver samples a rotated multi-direction stencil whose orientation varies with material phase, river-space position, local flow, and guidance direction.
+
+Integrity damage is driven by directional strain, weak support, exposed tips, curvature, phase disagreement, age, guidance shear, Wake turbulence, and impacts. Structural fracture and continuous micro-shredding operate together:
+
+- oblique edge nicks;
+- jagged crack propagation;
+- asymmetric bites;
+- peeling shelves and tips;
+- weak-seam reopening;
+- nonlinear neck collapse;
+- one-to-three-cell detached fragments with a short survival grace period.
+
+Fragmentation changes damage rate, crack propagation, bridge survival, and reconnection stability. It does not act as a second global Amount lifetime control. No timed fracture strip, dotted perforation row, temporary deletion pocket, or shader-created macro crack remains.
+
+#### Conservative merging
+
+**Status:** implemented; Unity validation pending.
+
+Material merges only after genuine overlap or extremely short-range convergence with donor mass. Phase-compatible groups stabilise more readily; phase disagreement creates weaker seams that may crack open later. Merging redistributes existing Amount and cannot inflate a broad empty gap or construct a bridge upstream.
+
+#### Animated-shore and stationary-source capture
+
+**Status:** implemented; Unity validation pending.
+
+The animated shoreline capture band now provides strong attraction toward the visible edge, major downstream slowdown without reversal, tangential bank-following motion, reduced decay, and temporary Integrity support. Capacity limits prevent a permanent continuous shoreline outline.
+
+Corrected projected obstacle polygons remain authoritative for solid exclusion and shoulder splitting. Registered stationary Pressure provides weaker upstream/shoulder organisation. The accepted lee depression is the strongest static capture region: material nearly stalls, survives longer, gains temporary support, then ages, cracks, and peels away in fragments. Capture is intended to increase residence time substantially without draining the complete open-water network.
+
+#### Wake and Impact reinforcement
+
+**Status:** implemented; Unity validation pending.
+
+Strong Wake stretches branches, increases local shredding and Integrity damage, and reinforces accepted rear/side release paths. Weak Wake remains restrained. Strong Impact Ripple activity displaces existing material, damages weak links, and may provide bounded fresh reinforcement. All longitudinal motion remains downstream-only, and neither system renders a separate Foam overlay.
+
+#### Rendering and debug contract
+
+**Status:** implemented; Unity validation pending.
+
+The water shader receives the actual simulated topology and adds only transported, phase-varied sub-cell silhouette roughness. It cannot invent macro holes, branches, or fracture events.
+
+Debug and diagnostics now include Amount, Freshness, Integrity, Phase, Guidance, Capture, final mask, visible coverage, perimeter ratio, broad-interior ratio, average Integrity, capture occupancy, corrected-advection status, and the downstream-velocity contract. The D3D11 integer-division warning in population measurement has been removed through unsigned chunk indexing.
+
+### Validation gate before final polish
+
+The integrated correction is not accepted until gameplay-camera testing demonstrates all of the following:
+
+- ordinary settings contain substantially more open water than the rejected solver;
+- many small and medium pockets coexist with thin connectors and occasional broader nodes;
+- perimeter complexity rises rather than merely reducing total Amount;
+- no row, column, checker, scallop, or dotted fracture pattern is visible;
+- small fractures and edge tears occur powerfully, continuously, asynchronously, and at varied geometry and tempo;
+- oblique cracks propagate and one-to-three-cell fragments detach and travel;
+- merging occurs through physical convergence without dilation or upstream construction;
+- no coherent feature or merge front appears to move upstream;
+- the initial generated identity changes quickly while material survives for many seconds;
+- the 10-second and 60-second populations remain broadly comparable;
+- animated shores retain intermittent branches without becoming white outlines;
+- real obstacle contours split material correctly;
+- Pressure shoulders and lee depressions capture material strongly and release it through shredded peeling;
+- Wake and Impact activity reinforce the same network without separate overlays;
+- freeze, Amount zero, reverse flow, quality changes, sleeping, release, and Stage 5 coexistence remain correct;
+- the D3D11 integer-division warning does not recur.
+
+### Remaining Stage 6 work
+
+#### Final visual and authoring polish
+
+After the dynamics pass:
+
+- final lit off-white response;
+- Amount/Integrity-driven thickness;
+- restrained Freshness variation;
+- refraction/transmission suppression and subtle normal response;
+- final preset balancing;
+- expose a normal-facing Boundary Attraction control only if internal tuning cannot cover the required range.
+
+#### Quality, performance, regression, and closure
+
+Profile material and temporary-state memory, guidance work, population reduction, active-chunk cost, and worst-case capture/Wake/Impact overlap on the PC-first target. Regress bends, width variation, connected offsets, reverse flow, freeze/thaw, Amount zero, quality switching, obstacle registration/removal, scene reload, sleeping, delayed release, and long-running population stability.
+
+### Failure gate
+
+If this corrected field solver still cannot produce a fine, downstream-only, asynchronously tearing network without exposing the lattice, Stage 6 must move to a GPU graph/ribbon-element representation rasterised into the shared material field. The next response must not be another coefficient patch around cardinal topology or diffusive transport.
+
+
+
+#### Stage 6.1 — Cohesive Web and Fragment Correction
+
+**Status:** implemented; Unity validation pending.
+
+- Rebuild guidance in global-distance/across-metre coordinates so topology scale remains stable through river length, width, and quality changes.
+- Make medium lanes the dominant partial web, with coarse structure and incomplete fine connectors.
+- Measure guidance-lane availability and occupation alongside visible area, perimeter, and broad interior.
+- Prioritize missing lane occupancy before branch thickness.
+- Add a half-resolution persistent `RGHalf` fracture field storing accumulated damage and crack coherence.
+- Replace animated per-cell destruction with connected damage driven by age, weak support, necks, phase seams, guidance shear, Wake, and Impact stress.
+- Remove time-animated shader threshold breakup; rendering may only add stable sub-cell contour roughness.
+- Add donor-causal correction limits, upstream-adjacent supply suppression, existing-material-only reinforcement, and overlap-only merging.
+- Stagger expensive auxiliary work: guidance and population at `4/6/8 Hz`, fracture at `8/10/12 Hz`, material at `12/20/30 Hz`.
+- Retain projected obstacle contours, animated-shore capture, lee retention, corrected advection, fixed-cost rendering, freezing, sleeping, and Stage 5 visual isolation.
+
+**Acceptance:**
+
+- more transverse/diagonal connectors and partial pockets than parallel lanes;
+- no stippled pixel cloud or shader-driven edge phasing;
+- coherent small fragment detachment and survival;
+- no apparent upstream material or merge-front travel;
+- stable ten-to-sixty-second population;
+- no regression in shore, obstacle, lee, Wake, or Impact integration.
+
+**Performance note:** Stage 6.1 adds two half-resolution `RGHalf` fracture textures and one low-rate fracture dispatch, but guidance and full population measurement no longer run at every material step. Full GPU timing remains required before Stage 6 closure.
 
 ## 7. Secondary Water Effects
 

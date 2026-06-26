@@ -7,12 +7,16 @@ namespace ProgrammaticStylized3D.Rivers
     {
         public RiverDisturbanceFootprint(
             Vector3 worldPosition,
+            Vector3 worldDownstream,
+            Vector3 worldAcross,
             float acrossHalfWidth,
             float alongHalfLength,
             Vector2[] contour,
             bool usedBoundsFallback)
         {
             WorldPosition = worldPosition;
+            WorldDownstream = worldDownstream;
+            WorldAcross = worldAcross;
             AcrossHalfWidth = acrossHalfWidth;
             AlongHalfLength = alongHalfLength;
             Contour = contour ?? System.Array.Empty<Vector2>();
@@ -20,12 +24,22 @@ namespace ProgrammaticStylized3D.Rivers
         }
 
         public Vector3 WorldPosition { get; }
+
+        /// <summary>
+        /// Exact world-space basis used when the cached waterline contour was
+        /// resolved. Foam must reconstruct each contour vertex through this
+        /// basis before projecting it into the authoritative river domain.
+        /// </summary>
+        public Vector3 WorldDownstream { get; }
+        public Vector3 WorldAcross { get; }
+
         public float AcrossHalfWidth { get; }
         public float AlongHalfLength { get; }
 
         /// <summary>
-        /// Convex waterline contour in river space, centred on WorldPosition.
-        /// X is downstream and Y is across the river.
+        /// Convex source-local waterline contour centred on WorldPosition.
+        /// X is measured along WorldDownstream and Y along WorldAcross. It is
+        /// not already expressed in global river-distance/across coordinates.
         /// </summary>
         public Vector2[] Contour { get; }
 
@@ -420,6 +434,8 @@ namespace ProgrammaticStylized3D.Rivers
 
             footprint = new RiverDisturbanceFootprint(
                 worldPosition,
+                downstream,
+                across,
                 acrossHalfWidth,
                 alongHalfLength,
                 contour,

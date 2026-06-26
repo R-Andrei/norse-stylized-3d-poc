@@ -87,6 +87,27 @@ namespace ProgrammaticStylized3D.Rivers
         Custom
     }
 
+    public enum StylizedRiverFoamPreset
+    {
+        Subtle,
+        Flowing,
+        Whitewater,
+        Custom
+    }
+
+    public enum StylizedRiverFoamDebugView
+    {
+        Final = 0,
+        Amount = 1,
+        Freshness = 2,
+        FinalMask = 3,
+        Integrity = 4,
+        Phase = 5,
+        Guidance = 6,
+        Capture = 7,
+        Fracture = 8
+    }
+
     public enum StylizedRiverDisturbanceDebugView
     {
         Final = 0,
@@ -165,6 +186,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private const string LegacyStaticFoamObjectName =
             "__PS3D_RiverStaticFoam";
+        private const int CurrentFoamAuthoringVersion = 1;
 
         private const string CorridorObjectName =
             "__PS3D_RiverCorridor";
@@ -631,6 +653,87 @@ namespace ProgrammaticStylized3D.Rivers
         private ImpactRippleEventSettings impactRippleTestEvent =
             ImpactRippleEventSettings.CreateEntryDefaults();
 
+        [Header("Foam and Surface Tracing")]
+        [Tooltip("Master switch for the Stage 6 shared persistent Foam field. When disabled, no Foam textures are allocated or simulated and the water shader receives a neutral Foam input.")]
+        [SerializeField] private bool foamEnabled;
+
+        [Tooltip("Applies a coherent stylized Foam personality using only the canonical high-impact controls below. Custom preserves the current values.")]
+        [SerializeField] private StylizedRiverFoamPreset foamPreset =
+            StylizedRiverFoamPreset.Flowing;
+
+        [Tooltip("Canonical Foam population control. It resolves a measured GPU target for the autonomous network: low values retain sparse branches, high values support a busy web, and even the maximum setting preserves substantial open water. Zero stops new material supply while existing Foam dies naturally.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamAmount = 0.48f;
+
+        [Tooltip("Controls topology failure rather than global lifespan: edge cracking, phase-seam weakness, internal pitting, neck collapse, and how difficult tiny reconnections are to preserve.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFragmentation = 0.68f;
+
+        [Tooltip("Controls persistent material and fragment lifetime. Freshness expires much sooner than Amount, so a source imprint changes quickly while the resulting network can travel, merge, and break for many seconds.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamPersistence = 0.58f;
+
+        [Tooltip("Controls filament-guidance evolution, lateral wandering, differential shear, and network reconfiguration. Authoritative river flow still owns the downstream direction.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamAgitation = 0.56f;
+
+        [Tooltip("Controls only the hardness of the visible graphical Foam edge. Zero allows a softer anti-aliased transition; one produces an extremely crisp stylized silhouette.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamSharpness = 0.88f;
+
+        [Tooltip("Lit, non-emissive Foam tint. The alpha channel controls maximum Foam opacity, so no separate opacity control is required.")]
+        [SerializeField] private Color foamColour =
+            new Color(0.94f, 0.97f, 0.94f, 0.72f);
+
+        [HideInInspector, SerializeField]
+        private int foamAuthoringVersion;
+
+        // Hidden F1/F2A compatibility values. Existing scenes are migrated
+        // once into the canonical Amount / Fragmentation / Persistence /
+        // Agitation / Sharpness language. Runtime response is then derived
+        // only from the canonical controls above.
+        [HideInInspector, SerializeField] private float foamStrength = 1f;
+        [HideInInspector, SerializeField] private float foamCoverage = 0.50f;
+        [HideInInspector, SerializeField] private float foamConnectivity = 0.30f;
+        [HideInInspector, SerializeField] private float foamGlobalPresence = 0.42f;
+        [HideInInspector, SerializeField] private float foamSparsity = 0.64f;
+        [HideInInspector, SerializeField] private float foamSupplyRate = 0.75f;
+        [HideInInspector, SerializeField] private float foamLifetimeVariation = 0.58f;
+        [HideInInspector, SerializeField] private float foamLongLivedFraction = 0.18f;
+        [HideInInspector, SerializeField] private float foamLifetime = 6f;
+        [HideInInspector, SerializeField] private float foamEvolution = 1.12f;
+        [HideInInspector, SerializeField] private float foamBreakup = 0.64f;
+        [HideInInspector, SerializeField] private float foamOpacity = 0.70f;
+        [HideInInspector, SerializeField] private float foamFlowFollow = 1f;
+        [HideInInspector, SerializeField] private float foamLateralSpread = 0.30f;
+        [HideInInspector, SerializeField] private float foamCohesion = 0.32f;
+        [HideInInspector, SerializeField] private float foamFreshnessLifetime = 2f;
+        [HideInInspector, SerializeField] private float foamShoreRetention = 0.20f;
+        [HideInInspector, SerializeField] private float foamDetailScale = 0.65f;
+        [HideInInspector, SerializeField] private float foamDetailStrength = 0.35f;
+
+        [Tooltip("Selects a Stage 6 diagnostic view. Amount shows persistent material, Freshness recent activation, Integrity structural resistance, Phase transported provenance, and Final Mask the exact rendered network silhouette.")]
+        [SerializeField] private StylizedRiverFoamDebugView foamDebugView =
+            StylizedRiverFoamDebugView.Final;
+
+        [HideInInspector, SerializeField, Range(0f, 1f)]
+        private float foamTestDistanceNormalized = 0.5f;
+
+        [HideInInspector, SerializeField, Range(-1f, 1f)]
+        private float foamTestAcrossNormalized;
+
+        [HideInInspector, SerializeField, Range(0.05f, 8f)]
+        private float foamTestRadius = 0.8f;
+
+        [HideInInspector, SerializeField, Range(0f, 1f)]
+        private float foamTestAmount = 0.85f;
+
+        [HideInInspector, SerializeField, Range(0f, 1f)]
+        private float foamTestFreshness = 1f;
+
+        [HideInInspector, SerializeField, Range(0.25f, 8f)]
+        private float foamTestElongation = 1.5f;
+
         [Header("Water Body Validation")]
         [SerializeField]
         private StylizedRiverBodyDebugView bodyDebugView =
@@ -734,15 +837,6 @@ namespace ProgrammaticStylized3D.Rivers
         private StylizedRiverDebugView debugView =
             StylizedRiverDebugView.Final;
 
-        private Texture statefulFoamTexture;
-        private Color statefulFoamColor = new Color(0.94f, 0.985f, 1f, 0.78f);
-        private float statefulFoamStrength;
-        private float statefulFoamThreshold = 0.16f;
-        private float statefulFoamSoftness = 0.025f;
-        private float statefulFoamBandWidth = 0.14f;
-        private float statefulFoamContactStrength = 0.16f;
-        private float statefulFoamContactDepth = 0.20f;
-
         private static readonly int ShallowColorId = Shader.PropertyToID("_ShallowColor");
         private static readonly int DeepColorId = Shader.PropertyToID("_DeepColor");
         private static readonly int ClarityId = Shader.PropertyToID("_Clarity");
@@ -812,6 +906,9 @@ namespace ProgrammaticStylized3D.Rivers
         private static readonly int DisturbanceEnabledStage5Id =
             Shader.PropertyToID("_DisturbanceEnabled");
 
+        private static readonly int FoamEnabledStage6Id =
+            Shader.PropertyToID("_FoamEnabled");
+
         private static readonly int DomainFallbackDepthId = Shader.PropertyToID("_DomainFallbackDepth");
         private static readonly int BodyDebugViewId = Shader.PropertyToID("_BodyDebugView");
         private static readonly int HorizonColorId = Shader.PropertyToID("_HorizonColor");
@@ -833,9 +930,6 @@ namespace ProgrammaticStylized3D.Rivers
         private static readonly int NormalSpeedId = Shader.PropertyToID("_NormalSpeed");
         private static readonly int NormalStrengthId = Shader.PropertyToID("_NormalStrength");
 
-        private static readonly int SurfaceFoamColorId = Shader.PropertyToID("_SurfaceFoamColor");
-        private static readonly int SurfaceFoamColorBlendId = Shader.PropertyToID("_SurfaceFoamColorBlend");
-
         private static readonly int WaveLengthId = Shader.PropertyToID("_WaveLength");
         private static readonly int WaveSpeedId = Shader.PropertyToID("_WaveSpeed");
         private static readonly int WaveSteepnessId = Shader.PropertyToID("_WaveSteepness");
@@ -854,14 +948,6 @@ namespace ProgrammaticStylized3D.Rivers
         private static readonly int RiverTimeId = Shader.PropertyToID("_RiverTime");
         private static readonly int VisualSeedId = Shader.PropertyToID("_VisualSeed");
         private static readonly int DebugViewId = Shader.PropertyToID("_DebugView");
-
-        private static readonly int ExternalFoamFieldId = Shader.PropertyToID("_ExternalFoamField");
-        private static readonly int ExternalFoamStrengthId = Shader.PropertyToID("_ExternalFoamStrength");
-        private static readonly int ExternalFoamThresholdId = Shader.PropertyToID("_ExternalFoamThreshold");
-        private static readonly int ExternalFoamSoftnessId = Shader.PropertyToID("_ExternalFoamSoftness");
-        private static readonly int ExternalFoamBandWidthId = Shader.PropertyToID("_ExternalFoamBandWidth");
-        private static readonly int ExternalFoamContactStrengthId = Shader.PropertyToID("_ExternalFoamContactStrength");
-        private static readonly int ExternalFoamContactDepthId = Shader.PropertyToID("_ExternalFoamContactDepth");
 
         private static readonly int PlanarReflectionTextureId = Shader.PropertyToID("_PlanarReflectionTexture");
         private static readonly int PlanarReflectionVpId = Shader.PropertyToID("_PlanarReflectionVP");
@@ -906,6 +992,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool pendingRegeneration;
         private bool subscribedToSplineChanges;
         private StylizedRiverDisturbanceRuntime disturbanceRuntime;
+        private StylizedRiverFoamRuntime foamRuntime;
 
         public event Action<RiverDomainSnapshot> DomainChanged;
 
@@ -1030,6 +1117,51 @@ namespace ProgrammaticStylized3D.Rivers
             ResolveImpactRippleMaximumHeight();
         public float ResolvedInteractionMinimumWavelength =>
             ResolveInteractionMinimumWavelength();
+
+        public bool FoamEnabled => foamEnabled;
+        public StylizedRiverFoamPreset FoamPreset => foamPreset;
+        public float FoamAmount => foamAmount;
+        public float FoamFragmentation => foamFragmentation;
+        public float FoamPersistence => foamPersistence;
+        public float FoamAgitation => foamAgitation;
+        public float FoamStrength => ResolveFoamStrength();
+        public float FoamCoverage => ResolveFoamCoverage();
+        public float FoamSharpness => foamSharpness;
+        public float FoamConnectivity => ResolveFoamConnectivity();
+        public float FoamGlobalPresence => foamAmount;
+        public float FoamSparsity => ResolveFoamSparsity();
+        public float FoamSupplyRate => ResolveFoamSupplyRate();
+        public float FoamTargetCoverage => ResolveFoamTargetCoverage();
+        public float FoamPopulationVisibleThreshold =>
+            ResolveFoamPopulationVisibleThreshold();
+        public float FoamGuidanceStrength => ResolveFoamGuidanceStrength();
+        public float FoamBoundaryAttraction => ResolveFoamBoundaryAttraction();
+        public float FoamWakeReinforcement => ResolveFoamWakeReinforcement();
+        public float FoamImpactReinforcement => ResolveFoamImpactReinforcement();
+        public float FoamLifetimeVariation => ResolveFoamLifetimeVariation();
+        public float FoamLongLivedFraction => ResolveFoamLongLivedFraction();
+        public float FoamLifetime => ResolveFoamLifetime();
+        public float FoamEvolution => ResolveFoamEvolution();
+        public float FoamBreakup => ResolveFoamBreakup();
+        public Color FoamColour => foamColour;
+        public float FoamOpacity => Mathf.Clamp01(foamColour.a);
+        public float FoamFlowFollow => ResolveFoamFlowFollow();
+        public float FoamLateralSpread => ResolveFoamLateralSpread();
+        public float FoamCohesion => ResolveFoamReconnection();
+        public float FoamFreshnessLifetime => ResolveFoamFreshnessLifetime();
+        public float FoamShoreRetention => 1.35f;
+        public float FoamDetailScale => ResolveFoamDetailScale();
+        public float FoamDetailStrength => ResolveFoamDetailStrength();
+        public float FoamShapeVariety => ResolveFoamShapeVariety();
+        public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
+        public float FoamTestDistanceNormalized =>
+            foamTestDistanceNormalized;
+        public float FoamTestAcrossNormalized =>
+            foamTestAcrossNormalized;
+        public float FoamTestRadius => foamTestRadius;
+        public float FoamTestAmount => foamTestAmount;
+        public float FoamTestFreshness => foamTestFreshness;
+        public float FoamTestElongation => foamTestElongation;
 
         // Compatibility aliases for existing emitter and renderer integrations.
         // They are no longer backed by exposed global Stage 5 controls.
@@ -1212,12 +1344,14 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void Reset()
         {
+            foamAuthoringVersion = CurrentFoamAuthoringVersion;
             splineContainer = GetComponent<SplineContainer>();
             AssignWaterLayer();
         }
 
         private void OnEnable()
         {
+            MigrateFoamAuthoringIfNeeded();
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
             CacheComponents();
@@ -1228,6 +1362,7 @@ namespace ProgrammaticStylized3D.Rivers
             EnsureSurfaceOutput();
             EnsureCorridorOutput();
             EnsureDisturbanceRuntime();
+            EnsureFoamRuntime();
             SetRendererEnabled(true);
             RegenerateAll();
             lastEditorTime = Time.realtimeSinceStartupAsDouble;
@@ -1272,6 +1407,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void OnValidate()
         {
+            MigrateFoamAuthoringIfNeeded();
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
             ValidateSettings();
@@ -1282,6 +1418,7 @@ namespace ProgrammaticStylized3D.Rivers
             EnsureSurfaceOutput();
             EnsureCorridorOutput();
             EnsureDisturbanceRuntime();
+            EnsureFoamRuntime();
             ApplyVisualSettings();
 
             if (liveRegeneration)
@@ -1336,7 +1473,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             ApplyVisualSettings();
             NotifyReflectionSurfaceChanged();
-            NotifyFoamSimulationChanged();
+            NotifyFoamRuntimeChanged();
         }
 
         [ContextMenu("Rebuild Surface Only")]
@@ -1354,7 +1491,7 @@ namespace ProgrammaticStylized3D.Rivers
             BuildCorridor();
             ApplyVisualSettings();
             NotifyReflectionSurfaceChanged();
-            NotifyFoamSimulationChanged();
+            NotifyFoamRuntimeChanged();
         }
 
         /// <summary>
@@ -1413,7 +1550,7 @@ namespace ProgrammaticStylized3D.Rivers
             DomainChanged?.Invoke(Domain);
             ApplyVisualSettings();
             NotifyReflectionSurfaceChanged();
-            NotifyFoamSimulationChanged();
+            NotifyFoamRuntimeChanged();
         }
 
 
@@ -1700,6 +1837,407 @@ namespace ProgrammaticStylized3D.Rivers
             return disturbanceRuntime;
         }
 
+        public StylizedRiverFoamRuntime GetOrCreateFoamRuntime()
+        {
+            foamEnabled = true;
+            EnsureFoamRuntime();
+            return foamRuntime;
+        }
+
+        public void ApplyFoamPreset()
+        {
+            ApplyFoamPreset(foamPreset);
+        }
+
+        public void ApplyFoamPreset(StylizedRiverFoamPreset preset)
+        {
+            foamPreset = preset;
+            foamAuthoringVersion = CurrentFoamAuthoringVersion;
+
+            switch (preset)
+            {
+                case StylizedRiverFoamPreset.Subtle:
+                    foamEnabled = true;
+                    foamAmount = 0.22f;
+                    foamFragmentation = 0.62f;
+                    foamPersistence = 0.42f;
+                    foamAgitation = 0.32f;
+                    foamSharpness = 0.92f;
+                    foamColour = new Color(0.94f, 0.97f, 0.94f, 0.58f);
+                    break;
+
+                case StylizedRiverFoamPreset.Flowing:
+                    foamEnabled = true;
+                    foamAmount = 0.48f;
+                    foamFragmentation = 0.68f;
+                    foamPersistence = 0.58f;
+                    foamAgitation = 0.56f;
+                    foamSharpness = 0.88f;
+                    foamColour = new Color(0.94f, 0.97f, 0.94f, 0.72f);
+                    break;
+
+                case StylizedRiverFoamPreset.Whitewater:
+                    foamEnabled = true;
+                    foamAmount = 0.78f;
+                    foamFragmentation = 0.78f;
+                    foamPersistence = 0.72f;
+                    foamAgitation = 0.82f;
+                    foamSharpness = 0.84f;
+                    foamColour = new Color(0.94f, 0.97f, 0.94f, 0.86f);
+                    break;
+
+                case StylizedRiverFoamPreset.Custom:
+                    break;
+
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(preset),
+                        preset,
+                        "Unsupported Foam preset.");
+            }
+
+            ValidateSettings();
+            EnsureFoamRuntime();
+            ApplyVisualSettings();
+            foamRuntime?.NotifyRiverChanged();
+        }
+
+        private void MigrateFoamAuthoringIfNeeded()
+        {
+            if (foamAuthoringVersion >= CurrentFoamAuthoringVersion)
+            {
+                return;
+            }
+
+            float strength01 = Mathf.Clamp01(foamStrength / 1.5f);
+            float densityFromSparsity = 1f - Mathf.Clamp01(foamSparsity);
+            float fineDetail = 1f - Mathf.InverseLerp(0.10f, 5f, foamDetailScale);
+            float legacyFlowResponse = Mathf.InverseLerp(0.50f, 1.50f, foamFlowFollow);
+
+            // Best-effort one-time migration from the former implementation-level
+            // controls into the compact canonical authoring language. Every
+            // retained compatibility field contributes only where it has a
+            // defensible visual analogue; runtime response no longer reads these
+            // values after migration.
+            foamAmount = Mathf.Clamp01(
+                foamGlobalPresence * 0.35f +
+                foamCoverage * 0.20f +
+                strength01 * 0.25f +
+                densityFromSparsity * 0.15f +
+                Mathf.Clamp01(foamShoreRetention) * 0.05f);
+            foamFragmentation = Mathf.Clamp01(
+                foamBreakup * 0.62f +
+                (1f - foamConnectivity) * 0.22f +
+                (1f - foamCohesion) * 0.10f +
+                fineDetail * 0.06f);
+            foamPersistence = Mathf.Clamp01(
+                Mathf.Clamp01(foamLifetime / 12f) * 0.55f +
+                Mathf.Clamp01(foamFreshnessLifetime / 5f) * 0.15f +
+                foamLongLivedFraction * 0.15f +
+                Mathf.Clamp01(foamLifetimeVariation) * 0.15f);
+            foamAgitation = Mathf.Clamp01(
+                Mathf.Clamp01(foamEvolution / 2f) * 0.45f +
+                foamLateralSpread * 0.20f +
+                foamDetailStrength * 0.15f +
+                Mathf.Clamp01(foamSupplyRate / 2f) * 0.10f +
+                legacyFlowResponse * 0.10f);
+            foamSharpness = Mathf.Clamp01(foamSharpness);
+            foamColour.a = Mathf.Clamp01(foamOpacity);
+            foamPreset = StylizedRiverFoamPreset.Custom;
+            foamAuthoringVersion = CurrentFoamAuthoringVersion;
+        }
+
+        private float ResolveFoamStrength()
+        {
+            // Existing material remains visible while Amount is being lowered,
+            // so population changes happen through supply and decay rather than
+            // an authoring-side disappearance.
+            return Mathf.Lerp(
+                0.98f,
+                1.48f,
+                Mathf.Pow(Mathf.Clamp01(foamAmount), 0.62f));
+        }
+
+        private float ResolveFoamCoverage()
+        {
+            return Mathf.Lerp(0.24f, 0.50f, Mathf.Clamp01(foamAmount));
+        }
+
+        private float ResolveFoamConnectivity()
+        {
+            return Mathf.Lerp(0.58f, 0.08f, Mathf.Clamp01(foamFragmentation));
+        }
+
+        private float ResolveFoamSparsity()
+        {
+            return Mathf.Lerp(0.90f, 0.30f, Mathf.Clamp01(foamAmount));
+        }
+
+        private float ResolveFoamSupplyRate()
+        {
+            // The GPU population controller shuts supply down at the measured
+            // target, so the source may react decisively to a deficit without
+            // returning to uncontrolled river-wide repainting.
+            return Mathf.Lerp(0.58f, 1.48f, Mathf.Clamp01(foamAmount));
+        }
+
+        private float ResolveFoamTargetCoverage()
+        {
+            return Mathf.Lerp(
+                0.045f,
+                0.30f,
+                Mathf.Pow(Mathf.Clamp01(foamAmount), 0.92f));
+        }
+
+        private float ResolveFoamPopulationVisibleThreshold()
+        {
+            return Mathf.Lerp(0.20f, 0.14f, Mathf.Clamp01(foamAmount));
+        }
+
+        private float ResolveFoamGuidanceStrength()
+        {
+            return Mathf.Lerp(0.88f, 1.34f, Mathf.Clamp01(foamAgitation));
+        }
+
+        private float ResolveFoamBoundaryAttraction()
+        {
+            return Mathf.Lerp(1.35f, 2.35f, Mathf.Clamp01(foamAgitation));
+        }
+
+        private float ResolveFoamWakeReinforcement()
+        {
+            return Mathf.Lerp(0.75f, 1.25f, Mathf.Clamp01(foamAmount));
+        }
+
+        private float ResolveFoamImpactReinforcement()
+        {
+            return Mathf.Lerp(0.70f, 1.30f, Mathf.Clamp01(foamAgitation));
+        }
+
+        private float ResolveFoamLifetimeVariation()
+        {
+            return Mathf.Lerp(0.35f, 0.82f, Mathf.Clamp01(foamPersistence));
+        }
+
+        private float ResolveFoamLongLivedFraction()
+        {
+            return Mathf.Lerp(0.04f, 0.38f, Mathf.Clamp01(foamPersistence));
+        }
+
+        private float ResolveFoamLifetime()
+        {
+            // Approximate time for unsupported Amount to reach five percent.
+            // Shore, lee, Wake, and network support can extend local survival.
+            return Mathf.Lerp(14f, 42f, Mathf.Clamp01(foamPersistence));
+        }
+
+        private float ResolveFoamEvolution()
+        {
+            return Mathf.Lerp(0.45f, 1.80f, Mathf.Clamp01(foamAgitation));
+        }
+
+        private float ResolveFoamBreakup()
+        {
+            // Fragmentation is structural susceptibility, not global Amount loss.
+            return Mathf.Clamp01(foamFragmentation);
+        }
+
+        private float ResolveFoamFlowFollow()
+        {
+            return Mathf.Lerp(0.92f, 1.10f, Mathf.Clamp01(foamAgitation));
+        }
+
+        private float ResolveFoamLateralSpread()
+        {
+            return Mathf.Lerp(0.08f, 0.66f, Mathf.Clamp01(foamAgitation));
+        }
+
+        private float ResolveFoamReconnection()
+        {
+            float fragmentation = Mathf.Clamp01(foamFragmentation);
+            float agitation = Mathf.Clamp01(foamAgitation);
+            return Mathf.Lerp(0.16f, 0.025f, fragmentation) *
+                   Mathf.Lerp(1f, 0.78f, agitation);
+        }
+
+        private float ResolveFoamFreshnessLifetime()
+        {
+            return Mathf.Lerp(1.15f, 3.20f, Mathf.Clamp01(foamPersistence));
+        }
+
+        private float ResolveFoamDetailScale()
+        {
+            return Mathf.Lerp(0.82f, 0.42f, Mathf.Clamp01(foamAgitation));
+        }
+
+        private float ResolveFoamDetailStrength()
+        {
+            return Mathf.Lerp(0.30f, 0.78f, Mathf.Clamp01(foamFragmentation));
+        }
+
+        private float ResolveFoamShapeVariety()
+        {
+            return Mathf.Clamp01(
+                0.30f +
+                Mathf.Clamp01(foamFragmentation) * 0.42f +
+                Mathf.Clamp01(foamAgitation) * 0.28f);
+        }
+
+        public bool EmitFoamTestPatch()
+        {
+            return GetOrCreateFoamRuntime()?.EmitNormalized(
+                foamTestDistanceNormalized,
+                foamTestAcrossNormalized,
+                foamTestRadius,
+                foamTestAmount,
+                foamTestFreshness,
+                foamTestElongation) == true;
+        }
+
+        public bool EmitFoamAdjacentPair()
+        {
+            StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
+            if (runtime == null)
+            {
+                return false;
+            }
+
+            float acrossOffset = Mathf.Clamp(
+                0.18f + foamTestRadius /
+                Mathf.Max(0.25f, ResolvedMaximumVisibleWidth),
+                0.12f,
+                0.45f);
+            bool left = runtime.EmitNormalized(
+                foamTestDistanceNormalized,
+                Mathf.Clamp(foamTestAcrossNormalized - acrossOffset, -1f, 1f),
+                foamTestRadius,
+                foamTestAmount,
+                foamTestFreshness,
+                foamTestElongation);
+            bool right = runtime.EmitNormalized(
+                foamTestDistanceNormalized,
+                Mathf.Clamp(foamTestAcrossNormalized + acrossOffset, -1f, 1f),
+                foamTestRadius,
+                foamTestAmount,
+                foamTestFreshness,
+                foamTestElongation);
+            return left || right;
+        }
+
+        public bool EmitFoamThinRibbon()
+        {
+            return GetOrCreateFoamRuntime()?.EmitNormalized(
+                foamTestDistanceNormalized,
+                foamTestAcrossNormalized,
+                Mathf.Max(0.08f, foamTestRadius * 0.35f),
+                foamTestAmount,
+                foamTestFreshness,
+                Mathf.Max(3f, foamTestElongation * 2.5f)) == true;
+        }
+
+        public bool EmitFoamTongueCluster()
+        {
+            StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
+            if (runtime == null)
+            {
+                return false;
+            }
+
+            float width = Mathf.Max(0.25f, ResolvedMaximumVisibleWidth);
+            float acrossStep = Mathf.Clamp(
+                foamTestRadius / width * 0.75f,
+                0.05f,
+                0.22f);
+            float alongStep = Mathf.Clamp(
+                foamTestRadius * foamTestElongation /
+                Mathf.Max(0.25f, Domain.LocalLength),
+                0.015f,
+                0.12f);
+
+            bool emitted = false;
+            emitted |= runtime.EmitNormalized(
+                Mathf.Clamp01(foamTestDistanceNormalized - alongStep * 0.45f),
+                Mathf.Clamp(foamTestAcrossNormalized - acrossStep * 0.65f, -1f, 1f),
+                Mathf.Max(0.08f, foamTestRadius * 0.42f),
+                foamTestAmount,
+                foamTestFreshness,
+                Mathf.Max(2.4f, foamTestElongation * 1.9f));
+            emitted |= runtime.EmitNormalized(
+                foamTestDistanceNormalized,
+                foamTestAcrossNormalized,
+                Mathf.Max(0.08f, foamTestRadius * 0.55f),
+                foamTestAmount,
+                foamTestFreshness,
+                Mathf.Max(2.0f, foamTestElongation * 1.55f));
+            emitted |= runtime.EmitNormalized(
+                Mathf.Clamp01(foamTestDistanceNormalized + alongStep * 0.65f),
+                Mathf.Clamp(foamTestAcrossNormalized + acrossStep, -1f, 1f),
+                Mathf.Max(0.08f, foamTestRadius * 0.34f),
+                foamTestAmount * 0.82f,
+                foamTestFreshness,
+                Mathf.Max(2.8f, foamTestElongation * 2.25f));
+            return emitted;
+        }
+
+        public bool EmitFoamFragmentChain()
+        {
+            StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
+            if (runtime == null)
+            {
+                return false;
+            }
+
+            float width = Mathf.Max(0.25f, ResolvedMaximumVisibleWidth);
+            float acrossStep = Mathf.Clamp(
+                foamTestRadius / width * 0.85f,
+                0.05f,
+                0.20f);
+            float alongStep = Mathf.Clamp(
+                foamTestRadius * Mathf.Max(1f, foamTestElongation) /
+                Mathf.Max(0.25f, Domain.LocalLength) * 1.25f,
+                0.018f,
+                0.11f);
+
+            bool emitted = false;
+            for (int index = -2; index <= 2; index++)
+            {
+                float alternating = (index & 1) == 0 ? -1f : 1f;
+                float amountScale = 1f - Mathf.Abs(index) * 0.10f;
+                emitted |= runtime.EmitNormalized(
+                    Mathf.Clamp01(
+                        foamTestDistanceNormalized + index * alongStep),
+                    Mathf.Clamp(
+                        foamTestAcrossNormalized + alternating * acrossStep,
+                        -1f,
+                        1f),
+                    Mathf.Max(
+                        0.07f,
+                        foamTestRadius * (0.28f + 0.04f * (index + 2))),
+                    foamTestAmount * amountScale,
+                    foamTestFreshness * Mathf.Lerp(0.72f, 1f, amountScale),
+                    Mathf.Max(1.8f, foamTestElongation * 1.35f));
+            }
+
+            return emitted;
+        }
+
+        public bool EmitFoamNearShore()
+        {
+            float shoreAcross = foamTestAcrossNormalized < 0f ? -0.88f : 0.88f;
+            return GetOrCreateFoamRuntime()?.EmitNormalized(
+                foamTestDistanceNormalized,
+                shoreAcross,
+                foamTestRadius,
+                foamTestAmount,
+                foamTestFreshness,
+                foamTestElongation) == true;
+        }
+
+        public void ClearFoam()
+        {
+            foamRuntime?.ClearFoam();
+        }
+
         public void ApplyRefractionPreset()
         {
             ApplyRefractionPreset(refractionPreset);
@@ -1910,7 +2448,7 @@ namespace ProgrammaticStylized3D.Rivers
             ValidateSettings();
             ApplyVisualSettings();
             NotifyReflectionSurfaceChanged();
-            NotifyFoamSimulationChanged();
+            NotifyFoamRuntimeChanged();
         }
 
         public void SetCustomFreezeAmount(float amount)
@@ -1919,7 +2457,7 @@ namespace ProgrammaticStylized3D.Rivers
             surfaceState = StylizedRiverSurfaceState.Custom;
             ApplyVisualSettings();
             NotifyReflectionSurfaceChanged();
-            NotifyFoamSimulationChanged();
+            NotifyFoamRuntimeChanged();
         }
 
         private float ResolveLiquidFactor()
@@ -2128,61 +2666,6 @@ namespace ProgrammaticStylized3D.Rivers
 
             bounds = renderer.bounds;
             return true;
-        }
-
-        public void SetExternalFoamTexture(Texture texture, float strength)
-        {
-            SetStatefulFoamTexture(
-                texture,
-                statefulFoamColor,
-                strength,
-                0.13f,
-                0.025f,
-                0.14f,
-                0.16f,
-                0.20f);
-        }
-
-        public void SetStatefulFoamTexture(
-            Texture texture,
-            Color color,
-            float strength,
-            float threshold,
-            float softness,
-            float bandWidth,
-            float contactStrength,
-            float contactDepth)
-        {
-            statefulFoamTexture = texture;
-            statefulFoamStrength = Mathf.Clamp01(strength);
-            statefulFoamColor = color;
-            statefulFoamThreshold = Mathf.Clamp01(threshold);
-            statefulFoamSoftness = Mathf.Clamp(softness, 0.001f, 0.25f);
-            statefulFoamBandWidth = Mathf.Clamp(bandWidth, 0.01f, 0.5f);
-            statefulFoamContactStrength = Mathf.Clamp01(contactStrength);
-            statefulFoamContactDepth = Mathf.Max(0.001f, contactDepth);
-
-            ApplyVisualSettings();
-        }
-
-        // Compatibility bridge for older callers.
-        [Obsolete("Use SetExternalFoamTexture(Texture, float) instead.")]
-        public void SetDynamicFoamTexture(Texture texture)
-        {
-            SetExternalFoamTexture(texture, texture != null ? 1f : 0f);
-        }
-
-        [Obsolete("Use RegenerateAll or SetExternalFoamTexture instead.")]
-        public void RefreshFoamTextureBinding()
-        {
-            ApplyVisualSettings();
-        }
-
-        public void ClearExternalFoamTexture()
-        {
-            statefulFoamTexture = null;
-            statefulFoamStrength = 0f;
-            ApplyVisualSettings();
         }
 
         public void SetPlanarReflectionData(
@@ -2458,8 +2941,27 @@ namespace ProgrammaticStylized3D.Rivers
             lightingHardness = Mathf.Clamp01(lightingHardness);
             specularStrength = Mathf.Clamp(specularStrength, 0f, 4f);
             lightingSteps = Mathf.Clamp(lightingSteps, 1f, 8f);
+            foamAmount = Mathf.Clamp01(foamAmount);
+            foamFragmentation = Mathf.Clamp01(foamFragmentation);
+            foamPersistence = Mathf.Clamp01(foamPersistence);
+            foamAgitation = Mathf.Clamp01(foamAgitation);
+            foamSharpness = Mathf.Clamp01(foamSharpness);
+            foamColour.a = Mathf.Clamp01(foamColour.a);
+            foamTestDistanceNormalized = Mathf.Clamp01(
+                foamTestDistanceNormalized);
+            foamTestAcrossNormalized = Mathf.Clamp(
+                foamTestAcrossNormalized,
+                -1f,
+                1f);
+            foamTestRadius = Mathf.Clamp(foamTestRadius, 0.05f, 8f);
+            foamTestAmount = Mathf.Clamp01(foamTestAmount);
+            foamTestFreshness = Mathf.Clamp01(foamTestFreshness);
+            foamTestElongation = Mathf.Clamp(
+                foamTestElongation,
+                0.25f,
+                8f);
+
             visualSeed = Mathf.Clamp(visualSeed, 1, 9999);
-            statefulFoamStrength = Mathf.Clamp01(statefulFoamStrength);
         }
 
         private void CacheComponents()
@@ -2537,6 +3039,27 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 disturbanceRuntime.enabled = runtimeDisturbances;
                 disturbanceRuntime.NotifyRiverChanged();
+            }
+        }
+
+        private void EnsureFoamRuntime()
+        {
+            if (foamRuntime == null)
+            {
+                foamRuntime = GetComponent<StylizedRiverFoamRuntime>();
+            }
+
+            if (foamEnabled && foamRuntime == null)
+            {
+                foamRuntime =
+                    gameObject.AddComponent<StylizedRiverFoamRuntime>();
+            }
+
+            if (foamRuntime != null)
+            {
+                foamRuntime.hideFlags = HideFlags.HideInInspector;
+                foamRuntime.enabled = foamEnabled;
+                foamRuntime.NotifyRiverChanged();
             }
         }
 
@@ -3093,6 +3616,11 @@ namespace ProgrammaticStylized3D.Rivers
             // when disturbances are disabled or unsupported.
             bodyProperties.SetFloat(DisturbanceEnabledStage5Id, 0f);
 
+            // The hidden Stage 6 runtime binds the shared Foam field in
+            // LateUpdate. Keeping this neutral here preserves exact Stage 1–5
+            // output while Foam is disabled, sleeping, unsupported, or frozen.
+            bodyProperties.SetFloat(FoamEnabledStage6Id, 0f);
+
             bodyProperties.SetFloat(DomainFallbackDepthId, Mathf.Max(0.01f, depth));
             bodyProperties.SetFloat(BodyDebugViewId, (float)bodyDebugView);
             bodyProperties.SetColor(HorizonColorId, horizonColor);
@@ -3116,9 +3644,6 @@ namespace ProgrammaticStylized3D.Rivers
             bodyProperties.SetFloat(NormalSpeedId, normalSpeed);
             bodyProperties.SetFloat(NormalStrengthId, normalStrength);
 
-            bodyProperties.SetColor(SurfaceFoamColorId, statefulFoamColor);
-            bodyProperties.SetFloat(SurfaceFoamColorBlendId, 1f);
-
             bodyProperties.SetFloat(WaveLengthId, waveScale);
             bodyProperties.SetFloat(WaveSpeedId, waveSpeed);
             bodyProperties.SetFloat(WaveSteepnessId, waveHeight);
@@ -3137,18 +3662,6 @@ namespace ProgrammaticStylized3D.Rivers
             bodyProperties.SetFloat(RiverTimeId, riverTime);
             bodyProperties.SetFloat(VisualSeedId, visualSeed);
             bodyProperties.SetFloat(DebugViewId, (float)debugView);
-
-            bodyProperties.SetTexture(
-                ExternalFoamFieldId,
-                statefulFoamTexture != null
-                    ? statefulFoamTexture
-                    : Texture2D.blackTexture);
-            bodyProperties.SetFloat(ExternalFoamStrengthId, statefulFoamStrength);
-            bodyProperties.SetFloat(ExternalFoamThresholdId, statefulFoamThreshold);
-            bodyProperties.SetFloat(ExternalFoamSoftnessId, statefulFoamSoftness);
-            bodyProperties.SetFloat(ExternalFoamBandWidthId, statefulFoamBandWidth);
-            bodyProperties.SetFloat(ExternalFoamContactStrengthId, statefulFoamContactStrength);
-            bodyProperties.SetFloat(ExternalFoamContactDepthId, statefulFoamContactDepth);
 
             bodyProperties.SetTexture(
                 PlanarReflectionTextureId,
@@ -3183,15 +3696,10 @@ namespace ProgrammaticStylized3D.Rivers
             meshRenderer.SetPropertyBlock(bodyProperties);
         }
 
-        private void NotifyFoamSimulationChanged()
+        private void NotifyFoamRuntimeChanged()
         {
-            StylizedRiverFoamSimulation simulation =
-                GetComponent<StylizedRiverFoamSimulation>();
-
-            if (simulation != null)
-            {
-                simulation.NotifyRiverChanged();
-            }
+            EnsureFoamRuntime();
+            foamRuntime?.NotifyRiverChanged();
         }
 
         private void RequestRegeneration()

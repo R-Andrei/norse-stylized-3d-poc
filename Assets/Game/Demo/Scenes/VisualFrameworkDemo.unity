@@ -7326,6 +7326,7 @@ GameObject:
   - component: {fileID: 1626776154}
   - component: {fileID: 1626776158}
   - component: {fileID: 1626776157}
+  - component: {fileID: 1626776159}
   m_Layer: 4
   m_Name: River_Strip
   m_TagString: Untagged
@@ -7660,7 +7661,7 @@ MonoBehaviour:
   quality: 1
   surfaceOffset: 0.035
   bodyPreset: 3
-  shallowColor: {r: 0.3292097, g: 0.39161032, b: 0.509434, a: 1}
+  shallowColor: {r: 0.21693662, g: 0.26945412, b: 0.3679245, a: 1}
   deepColor: {r: 0.027100397, g: 0.11657065, b: 0.1981132, a: 1}
   clarity: 0.53
   bodyDepthRange: 3.68
@@ -7748,6 +7749,36 @@ MonoBehaviour:
     sharpness: 1
     geometryContribution: 0.65
     normalContribution: 1
+  foamEnabled: 1
+  foamPreset: 2
+  foamStrength: 1.45
+  foamCoverage: 0.68
+  foamSharpness: 0.78
+  foamConnectivity: 0.44
+  foamGlobalPresence: 0.42
+  foamSparsity: 0.64
+  foamSupplyRate: 0.75
+  foamLifetimeVariation: 0.58
+  foamLongLivedFraction: 0.18
+  foamLifetime: 8
+  foamEvolution: 1.5
+  foamBreakup: 0.76
+  foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 1}
+  foamOpacity: 0.84
+  foamFlowFollow: 1.08
+  foamLateralSpread: 0.48
+  foamCohesion: 0.46
+  foamFreshnessLifetime: 2.8
+  foamShoreRetention: 0.32
+  foamDetailScale: 0.48
+  foamDetailStrength: 0.48
+  foamDebugView: 0
+  foamTestDistanceNormalized: 0.5
+  foamTestAcrossNormalized: 0
+  foamTestRadius: 0.8
+  foamTestAmount: 0.85
+  foamTestFreshness: 1
+  foamTestElongation: 1.5
   bodyDebugView: 0
   horizonColor: {r: 0.58, g: 0.91, b: 0.94, a: 0.35}
   specularColor: {r: 1, g: 1, b: 1, a: 0.35}
@@ -7778,6 +7809,18 @@ MonoBehaviour:
   bodyMaterial: {fileID: 0}
   visualSeed: 1731
   debugView: 0
+--- !u!114 &1626776159
+MonoBehaviour:
+  m_ObjectHideFlags: 2
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1626776150}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6858a43826214630b33b415bc03396e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Rivers.StylizedRiverFoamRuntime
 --- !u!1 &1630774461
 GameObject:
   m_ObjectHideFlags: 0

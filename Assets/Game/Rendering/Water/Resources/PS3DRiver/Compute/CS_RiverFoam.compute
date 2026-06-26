@@ -1,0 +1,1663 @@
+#pragma kernel ClearRange
+#pragma kernel InjectFoam
+#pragma kernel BuildGuidance
+#pragma kernel ResetPopulation
+#pragma kernel MeasurePopulation
+#pragma kernel UpdateFracture
+#pragma kernel ClearFractureRange
+#pragma kernel AdvectForward
+#pragma kernel AdvectReverse
+#pragma kernel SimulateFoam
+#pragma kernel ApplyBoundary
+#pragma target 5.0
+
+struct FoamMetricRow
+{
+    // x = left surface half-width, y = right surface half-width,
+    // z = longitudinal cell spacing, w = minimum lateral cell spacing.
+    float4 widthsAndSpacing;
+};
+
+// Shared Stage 6 material state:
+// R = persistent Amount
+// G = Freshness / recent activation
+// B = structural Integrity
+// A = material phase / provenance
+RWTexture2D<float4> _FoamStateWrite;
+Texture2D<float4> _FoamStateRead;
+RWTexture2D<float4> _FoamAdvectionWrite;
+Texture2D<float4> _FoamAdvectedRead;
+Texture2D<float4> _FoamReverseRead;
+Texture2D<float2> _FoamBoundary;
+RWTexture2D<float4> _FoamGuidanceWrite;
+Texture2D<float4> _FoamGuidanceRead;
+Texture2D<float4> _FoamWakeField;
+Texture2D<float4> _FoamRippleField;
+Texture2D<float4> _FoamStaticWakeField;
+Texture2D<float4> _FoamStaticPressureField;
+RWTexture2D<float2> _FoamFractureWrite;
+Texture2D<float2> _FoamFractureRead;
+StructuredBuffer<FoamMetricRow> _FoamMetricRows;
+
+// Per chunk, two uint4 records are stored in one raw buffer:
+// record 0: x = quantised Amount sum, y = visible-cell count,
+//           z = valid fluid-cell count, w = guidance-lane cell count.
+// record 1: x = perimeter-cell count, y = broad-interior count,
+//           z = boundary-capture visible count, w = visible guidance-lane count.
+RWByteAddressBuffer _FoamPopulationMetrics;
+
+int2 _FoamDimensions;
+int2 _FoamGuidanceDimensions;
+int2 _FoamWakeDimensions;
+int2 _FoamRippleDimensions;
+int2 _FoamStaticWakeDimensions;
+int2 _FoamStaticPressureDimensions;
+int2 _FoamFractureDimensions;
+int _FoamRangeStart;
+int _FoamRangeCount;
+int _FoamFractureRangeStart;
+int _FoamFractureRangeCount;
+int _FoamResolutionPerChunk;
+int _FoamChunkCount;
+float _FoamDeltaTime;
+float _FoamGlobalStart;
+float _FoamFieldLength;
+float _FoamFlowSpeed;
+float _FoamEvolution;
+float _FoamBreakup;
+float _FoamSpread;
+float _FoamCohesion;
+float _FoamConnectivity;
+float _FoamAmountDecay;
+float _FoamFreshnessDecay;
+float _FoamIntegrityDamage;
+float _FoamShoreRetention;
+float _FoamTime;
+float _FoamSeed;
+float _FoamTargetCoverage;
+float _FoamSupplyRate;
+float _FoamVisibleThreshold;
+float _FoamGuidanceStrength;
+float _FoamBoundaryAttraction;
+float _FoamWakeReinforcement;
+float _FoamImpactReinforcement;
+float _FoamDisturbanceEnabled;
+float _FoamFractureDeltaTime;
+
+float _FoamInjectionGlobalDistance;
+float _FoamInjectionAcrossNormalized;
+float _FoamInjectionRadius;
+float _FoamInjectionAmount;
+float _FoamInjectionFreshness;
+float _FoamInjectionIntegrity;
+float _FoamInjectionPhase;
+float _FoamInjectionElongation;
+float _FoamInjectionShapeSeed;
+float _FoamInjectionShapeVariety;
+float _FoamInjectionCompound;
+
+int ClampX(int x)
+{
+    return clamp(x, 0, _FoamDimensions.x - 1);
+}
+
+int ClampY(int y)
+{
+    return clamp(y, 0, _FoamDimensions.y - 1);
+}
+
+float4 LoadState(int2 coordinate)
+{
+    return _FoamStateRead.Load(
+        int3(ClampX(coordinate.x), ClampY(coordinate.y), 0));
+}
+
+float2 LoadBoundary(int2 coordinate)
+{
+    return saturate(_FoamBoundary.Load(
+        int3(ClampX(coordinate.x), ClampY(coordinate.y), 0)));
+}
+
+float Across01ToMetres(
+    float across01,
+    float leftHalfWidth,
+    float rightHalfWidth)
+{
+    if (across01 <= 0.5)
+    {
+        return -leftHalfWidth * (1.0 - across01 * 2.0);
+    }
+
+    return rightHalfWidth * (across01 * 2.0 - 1.0);
+}
+
+float4 SampleStateBilinear(float2 pixelCoordinate)
+{
+    float2 clamped = clamp(
+        pixelCoordinate,
+        float2(0.0, 0.0),
+        float2(
+            (float)(_FoamDimensions.x - 1),
+            (float)(_FoamDimensions.y - 1)));
+    int2 baseCoordinate = int2(floor(clamped));
+    int2 nextCoordinate = min(
+        baseCoordinate + int2(1, 1),
+        _FoamDimensions - int2(1, 1));
+    float2 blend = frac(clamped);
+
+    float4 a = LoadState(baseCoordinate);
+    float4 b = LoadState(int2(nextCoordinate.x, baseCoordinate.y));
+    float4 c = LoadState(int2(baseCoordinate.x, nextCoordinate.y));
+    float4 d = LoadState(nextCoordinate);
+    float4 state = lerp(
+        lerp(a, b, blend.x),
+        lerp(c, d, blend.x),
+        blend.y);
+
+    float phaseNumerator = lerp(
+        lerp(a.w * a.x, b.w * b.x, blend.x),
+        lerp(c.w * c.x, d.w * d.x, blend.x),
+        blend.y);
+    state.w = state.x > 0.0001
+        ? saturate(phaseNumerator / state.x)
+        : 0.0;
+    return state;
+}
+
+
+float4 LoadAdvected(int2 coordinate)
+{
+    return _FoamAdvectedRead.Load(
+        int3(ClampX(coordinate.x), ClampY(coordinate.y), 0));
+}
+
+float4 LoadReverse(int2 coordinate)
+{
+    return _FoamReverseRead.Load(
+        int3(ClampX(coordinate.x), ClampY(coordinate.y), 0));
+}
+
+float4 SampleAdvectedBilinear(float2 pixelCoordinate)
+{
+    float2 clamped = clamp(
+        pixelCoordinate,
+        float2(0.0, 0.0),
+        float2(
+            (float)(_FoamDimensions.x - 1),
+            (float)(_FoamDimensions.y - 1)));
+    int2 baseCoordinate = int2(floor(clamped));
+    int2 nextCoordinate = min(
+        baseCoordinate + int2(1, 1),
+        _FoamDimensions - int2(1, 1));
+    float2 blend = frac(clamped);
+
+    float4 a = LoadAdvected(baseCoordinate);
+    float4 b = LoadAdvected(int2(nextCoordinate.x, baseCoordinate.y));
+    float4 c = LoadAdvected(int2(baseCoordinate.x, nextCoordinate.y));
+    float4 d = LoadAdvected(nextCoordinate);
+    float4 state = lerp(
+        lerp(a, b, blend.x),
+        lerp(c, d, blend.x),
+        blend.y);
+
+    float phaseNumerator = lerp(
+        lerp(a.w * a.x, b.w * b.x, blend.x),
+        lerp(c.w * c.x, d.w * d.x, blend.x),
+        blend.y);
+    state.w = state.x > 0.0001
+        ? saturate(phaseNumerator / state.x)
+        : 0.0;
+    return state;
+}
+
+
+float2 SampleBoundaryBilinear(float2 pixelCoordinate)
+{
+    float2 clamped = clamp(
+        pixelCoordinate,
+        float2(0.0, 0.0),
+        float2(
+            (float)(_FoamDimensions.x - 1),
+            (float)(_FoamDimensions.y - 1)));
+    int2 baseCoordinate = int2(floor(clamped));
+    int2 nextCoordinate = min(
+        baseCoordinate + int2(1, 1),
+        _FoamDimensions - int2(1, 1));
+    float2 blend = frac(clamped);
+    float2 a = LoadBoundary(baseCoordinate);
+    float2 b = LoadBoundary(int2(nextCoordinate.x, baseCoordinate.y));
+    float2 c = LoadBoundary(int2(baseCoordinate.x, nextCoordinate.y));
+    float2 d = LoadBoundary(nextCoordinate);
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+float4 SampleGuidanceBilinear(float2 uv)
+{
+    float2 dimensions = max(float2(1.0, 1.0), (float2)_FoamGuidanceDimensions);
+    float2 coordinate = saturate(uv) * max(float2(0.0, 0.0), dimensions - 1.0);
+    int2 baseCoordinate = int2(floor(coordinate));
+    int2 nextCoordinate = min(
+        baseCoordinate + int2(1, 1),
+        _FoamGuidanceDimensions - int2(1, 1));
+    float2 blend = frac(coordinate);
+    float4 a = _FoamGuidanceRead.Load(int3(baseCoordinate, 0));
+    float4 b = _FoamGuidanceRead.Load(
+        int3(nextCoordinate.x, baseCoordinate.y, 0));
+    float4 c = _FoamGuidanceRead.Load(
+        int3(baseCoordinate.x, nextCoordinate.y, 0));
+    float4 d = _FoamGuidanceRead.Load(int3(nextCoordinate, 0));
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+
+float4 SampleStateAtUV(float2 uv)
+{
+    float2 coordinate = saturate(uv) *
+        max(float2(0.0, 0.0), (float2)_FoamDimensions - 1.0);
+    return SampleStateBilinear(coordinate);
+}
+
+
+float2 LoadFracture(int2 coordinate)
+{
+    int2 safeDimensions = max(_FoamFractureDimensions, int2(1, 1));
+    int2 clamped = clamp(coordinate, int2(0, 0), safeDimensions - int2(1, 1));
+    return saturate(_FoamFractureRead.Load(int3(clamped, 0)));
+}
+
+float2 SampleFractureBilinear(float2 uv)
+{
+    int2 safeDimensions = max(_FoamFractureDimensions, int2(1, 1));
+    float2 coordinate = saturate(uv) *
+        (float2)(safeDimensions - int2(1, 1));
+    int2 baseCoordinate = int2(floor(coordinate));
+    int2 nextCoordinate = min(
+        baseCoordinate + int2(1, 1),
+        safeDimensions - int2(1, 1));
+    float2 blend = frac(coordinate);
+    float2 a = LoadFracture(baseCoordinate);
+    float2 b = LoadFracture(int2(nextCoordinate.x, baseCoordinate.y));
+    float2 c = LoadFracture(int2(baseCoordinate.x, nextCoordinate.y));
+    float2 d = LoadFracture(nextCoordinate);
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+void ResolveExternalBilinearCoordinates(
+    int2 dimensions,
+    float2 uv,
+    out int2 baseCoordinate,
+    out int2 nextCoordinate,
+    out float2 blend)
+{
+    int2 safeDimensions = max(dimensions, int2(1, 1));
+    float2 coordinate = saturate(uv) *
+        (float2)(safeDimensions - int2(1, 1));
+    baseCoordinate = int2(floor(coordinate));
+    nextCoordinate = min(
+        baseCoordinate + int2(1, 1),
+        safeDimensions - int2(1, 1));
+    blend = frac(coordinate);
+}
+
+float4 SampleWakeBilinear(float2 uv)
+{
+    int2 baseCoordinate;
+    int2 nextCoordinate;
+    float2 blend;
+    ResolveExternalBilinearCoordinates(
+        _FoamWakeDimensions,
+        uv,
+        baseCoordinate,
+        nextCoordinate,
+        blend);
+    float4 a = _FoamWakeField.Load(int3(baseCoordinate, 0));
+    float4 b = _FoamWakeField.Load(
+        int3(nextCoordinate.x, baseCoordinate.y, 0));
+    float4 c = _FoamWakeField.Load(
+        int3(baseCoordinate.x, nextCoordinate.y, 0));
+    float4 d = _FoamWakeField.Load(int3(nextCoordinate, 0));
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+float4 SampleRippleBilinear(float2 uv)
+{
+    int2 baseCoordinate;
+    int2 nextCoordinate;
+    float2 blend;
+    ResolveExternalBilinearCoordinates(
+        _FoamRippleDimensions,
+        uv,
+        baseCoordinate,
+        nextCoordinate,
+        blend);
+    float4 a = _FoamRippleField.Load(int3(baseCoordinate, 0));
+    float4 b = _FoamRippleField.Load(
+        int3(nextCoordinate.x, baseCoordinate.y, 0));
+    float4 c = _FoamRippleField.Load(
+        int3(baseCoordinate.x, nextCoordinate.y, 0));
+    float4 d = _FoamRippleField.Load(int3(nextCoordinate, 0));
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+float4 SampleStaticWakeBilinear(float2 uv)
+{
+    int2 baseCoordinate;
+    int2 nextCoordinate;
+    float2 blend;
+    ResolveExternalBilinearCoordinates(
+        _FoamStaticWakeDimensions,
+        uv,
+        baseCoordinate,
+        nextCoordinate,
+        blend);
+    float4 a = _FoamStaticWakeField.Load(int3(baseCoordinate, 0));
+    float4 b = _FoamStaticWakeField.Load(
+        int3(nextCoordinate.x, baseCoordinate.y, 0));
+    float4 c = _FoamStaticWakeField.Load(
+        int3(baseCoordinate.x, nextCoordinate.y, 0));
+    float4 d = _FoamStaticWakeField.Load(int3(nextCoordinate, 0));
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+
+float4 SampleStaticPressureBilinear(float2 uv)
+{
+    int2 baseCoordinate;
+    int2 nextCoordinate;
+    float2 blend;
+    ResolveExternalBilinearCoordinates(
+        _FoamStaticPressureDimensions,
+        uv,
+        baseCoordinate,
+        nextCoordinate,
+        blend);
+    float4 a = _FoamStaticPressureField.Load(int3(baseCoordinate, 0));
+    float4 b = _FoamStaticPressureField.Load(
+        int3(nextCoordinate.x, baseCoordinate.y, 0));
+    float4 c = _FoamStaticPressureField.Load(
+        int3(baseCoordinate.x, nextCoordinate.y, 0));
+    float4 d = _FoamStaticPressureField.Load(int3(nextCoordinate, 0));
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+float FoamHash11(float value)
+{
+    return frac(sin(value * 127.1 + 311.7) * 43758.5453123);
+}
+
+float2 FoamHash22(float2 value)
+{
+    float2 result;
+    result.x = frac(sin(dot(value, float2(127.1, 311.7))) * 43758.5453123);
+    result.y = frac(sin(dot(value, float2(269.5, 183.3))) * 43758.5453123);
+    return result;
+}
+
+float PhaseDistance(float a, float b)
+{
+    float difference = abs(frac(a - b + 0.5) - 0.5);
+    return difference * 2.0;
+}
+
+float MixPhaseShortest(float fromPhase, float toPhase, float blend)
+{
+    float delta = frac(toPhase - fromPhase + 0.5) - 0.5;
+    return frac(fromPhase + delta * saturate(blend) + 1.0);
+}
+
+float FoamEllipseMask(float2 samplePosition, float2 centre, float2 radius)
+{
+    float2 safeRadius = max(radius, float2(0.04, 0.04));
+    float distanceValue = length((samplePosition - centre) / safeRadius);
+    return 1.0 - smoothstep(0.78, 1.0, distanceValue);
+}
+
+float EvaluateCompoundInjectionShape(float alongDistance, float acrossDistance)
+{
+    float variety = saturate(_FoamInjectionShapeVariety);
+    float seed = _FoamInjectionShapeSeed * 97.31 + _FoamSeed * 0.017;
+    float2 samplePosition = float2(alongDistance, acrossDistance);
+
+    float bend = (FoamHash11(seed + 1.0) - 0.5) * 0.72 * variety;
+    float skew = (FoamHash11(seed + 2.0) - 0.5) * 0.34 * variety;
+    float taperDirection = FoamHash11(seed + 3.0) < 0.5 ? -1.0 : 1.0;
+    float along01 = saturate(alongDistance * 0.5 * taperDirection + 0.5);
+    float centreLine = bend * (alongDistance * alongDistance - 0.28) +
+        skew * alongDistance;
+    float mainHeadWidth = lerp(0.30, 0.68, FoamHash11(seed + 4.0));
+    float mainTailWidth = mainHeadWidth *
+        lerp(0.22, 0.52, FoamHash11(seed + 4.5));
+    float mainWidth = lerp(mainHeadWidth, mainTailWidth, along01);
+    float mainAlong = 1.0 - smoothstep(0.76, 1.04, abs(alongDistance));
+    float mainAcross = 1.0 - smoothstep(
+        mainWidth * 0.70,
+        mainWidth,
+        abs(acrossDistance - centreLine));
+    float mainTongue = saturate(mainAlong * mainAcross);
+
+    float secondarySide = FoamHash11(seed + 5.0) < 0.5 ? -1.0 : 1.0;
+    float2 secondaryCentre = float2(
+        lerp(-0.30, 0.38, FoamHash11(seed + 6.0)),
+        secondarySide * lerp(0.20, 0.48, FoamHash11(seed + 7.0)) * variety);
+    float2 secondaryRadius = float2(
+        lerp(0.24, 0.62, FoamHash11(seed + 8.0)),
+        lerp(0.10, 0.28, FoamHash11(seed + 9.0)));
+    float secondaryTongue = FoamEllipseMask(
+        samplePosition,
+        secondaryCentre,
+        secondaryRadius) * variety;
+
+    float tailAlong =
+        taperDirection * lerp(0.58, 0.84, FoamHash11(seed + 10.0));
+    float tailCentreLine =
+        bend * (tailAlong * tailAlong - 0.28) + skew * tailAlong;
+    float2 tailCentre = float2(
+        tailAlong,
+        tailCentreLine * 0.45 +
+        (FoamHash11(seed + 11.0) - 0.5) * 0.28 * variety);
+    float tail = FoamEllipseMask(
+        samplePosition,
+        tailCentre,
+        float2(
+            lerp(0.14, 0.32, FoamHash11(seed + 12.0)),
+            lerp(0.07, 0.18, FoamHash11(seed + 13.0)))) *
+        lerp(0.35, 1.0, variety);
+
+    float satelliteEnabled = step(0.48, FoamHash11(seed + 14.0)) * variety;
+    float2 satelliteCentre = float2(
+        lerp(-0.68, 0.68, FoamHash11(seed + 15.0)),
+        lerp(-0.72, 0.72, FoamHash11(seed + 16.0)));
+    float satellite = FoamEllipseMask(
+        samplePosition,
+        satelliteCentre,
+        float2(
+            lerp(0.12, 0.25, FoamHash11(seed + 17.0)),
+            lerp(0.10, 0.22, FoamHash11(seed + 18.0)))) *
+        satelliteEnabled;
+
+    float combined = 1.0 -
+        (1.0 - mainTongue) *
+        (1.0 - secondaryTongue) *
+        (1.0 - tail) *
+        (1.0 - satellite);
+
+    float2 cutCentre = float2(
+        lerp(-0.42, 0.42, FoamHash11(seed + 19.0)),
+        lerp(-0.28, 0.28, FoamHash11(seed + 20.0)));
+    float cut = FoamEllipseMask(
+        samplePosition,
+        cutCentre,
+        float2(
+            lerp(0.14, 0.30, FoamHash11(seed + 21.0)),
+            lerp(0.12, 0.26, FoamHash11(seed + 22.0))));
+    combined = saturate(combined - cut * variety * 0.58);
+    return combined;
+}
+
+
+float FoamValueNoise(float2 position)
+{
+    float2 baseCell = floor(position);
+    float2 local = frac(position);
+    local = local * local * (3.0 - 2.0 * local);
+
+    float a = FoamHash11(dot(baseCell, float2(17.17, 61.73)) + _FoamSeed * 0.011);
+    float b = FoamHash11(dot(baseCell + float2(1.0, 0.0), float2(17.17, 61.73)) + _FoamSeed * 0.011);
+    float c = FoamHash11(dot(baseCell + float2(0.0, 1.0), float2(17.17, 61.73)) + _FoamSeed * 0.011);
+    float d = FoamHash11(dot(baseCell + float2(1.0, 1.0), float2(17.17, 61.73)) + _FoamSeed * 0.011);
+    return lerp(lerp(a, b, local.x), lerp(c, d, local.x), local.y);
+}
+
+float FoamFbm(float2 position)
+{
+    float value = 0.0;
+    float amplitude = 0.55;
+    float2 samplePosition = position;
+
+    [unroll]
+    for (int octave = 0; octave < 4; octave++)
+    {
+        value += FoamValueNoise(samplePosition) * amplitude;
+        samplePosition = mul(
+            float2x2(1.37, -1.11, 1.11, 1.37),
+            samplePosition) + float2(13.7, 29.3);
+        amplitude *= 0.48;
+    }
+
+    return saturate(value);
+}
+
+float VoronoiEdgeDistance(float2 position, float timeValue, float seedValue)
+{
+    float2 baseCell = floor(position);
+    float2 local = frac(position);
+    float nearest = 1000.0;
+    float secondNearest = 1000.0;
+
+    [unroll]
+    for (int offsetY = -1; offsetY <= 1; offsetY++)
+    {
+        [unroll]
+        for (int offsetX = -1; offsetX <= 1; offsetX++)
+        {
+            float2 offset = float2((float)offsetX, (float)offsetY);
+            float2 hashValue = FoamHash22(baseCell + offset + seedValue);
+            float regionalPhase = FoamHash11(
+                dot(baseCell + offset, float2(23.71, 47.13)) +
+                seedValue * 0.91);
+            float2 centre = 0.5 + (hashValue - 0.5) * 0.78;
+            centre += float2(
+                sin(timeValue * lerp(0.19, 0.43, regionalPhase) +
+                    hashValue.x * 6.2831853),
+                cos(timeValue * lerp(0.17, 0.39, 1.0 - regionalPhase) +
+                    hashValue.y * 6.2831853)) *
+                lerp(0.055, 0.14, regionalPhase);
+            float2 delta = offset + centre - local;
+            delta.x *= 0.78;
+            float distanceSquared = dot(delta, delta);
+
+            if (distanceSquared < nearest)
+            {
+                secondNearest = nearest;
+                nearest = distanceSquared;
+            }
+            else if (distanceSquared < secondNearest)
+            {
+                secondNearest = distanceSquared;
+            }
+        }
+    }
+
+    return max(
+        0.0,
+        sqrt(max(0.0, secondNearest)) - sqrt(max(0.0, nearest)));
+}
+
+float4 EvaluateNetworkSample(float2 uv)
+{
+    float agitation = saturate(_FoamEvolution / 1.8);
+    int metricX = clamp(
+        (int)round(saturate(uv.x) * max(1.0, (float)(_FoamDimensions.x - 1))),
+        0,
+        max(0, _FoamDimensions.x - 1));
+    FoamMetricRow metric = _FoamMetricRows[metricX];
+    float globalDistance = _FoamGlobalStart + saturate(uv.x) * _FoamFieldLength;
+    float lateralMetres = Across01ToMetres(
+        saturate(uv.y),
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+
+    // Build the skeleton in metric river space. Previous normalized-UV cells
+    // stretched with river length and produced long parallel lanes. Metric
+    // cells preserve a stable pocket size through width changes and quality
+    // tiers, with only a restrained downstream elongation.
+    float2 world = float2(globalDistance, lateralMetres);
+    float warpClock = _FoamTime * lerp(0.025, 0.090, agitation);
+    float warpA = FoamFbm(
+        world * float2(0.075, 0.12) +
+        float2(warpClock, -warpClock * 0.63) +
+        _FoamSeed * 0.0013);
+    float warpB = FoamFbm(
+        world.yx * float2(0.14, 0.065) +
+        float2(-warpClock * 0.41, warpClock * 0.74) +
+        31.7 + _FoamSeed * 0.0021);
+    float2 warpedWorld = world + float2(
+        (warpA - 0.5) * lerp(0.55, 1.45, agitation),
+        (warpB - 0.5) * lerp(0.65, 1.65, agitation));
+
+    float coarseSize = lerp(13.5, 10.5, agitation);
+    float mediumSize = lerp(7.0, 5.0, agitation);
+    float fineSize = lerp(3.8, 2.7, agitation);
+
+    float coarseDistance = VoronoiEdgeDistance(
+        warpedWorld / float2(coarseSize * 1.16, coarseSize),
+        _FoamTime * lerp(0.055, 0.13, agitation),
+        _FoamSeed * 0.013 + 7.1);
+    float mediumDistance = VoronoiEdgeDistance(
+        (warpedWorld + float2(2.7, -1.9)) /
+            float2(mediumSize * 1.06, mediumSize),
+        _FoamTime * lerp(0.085, 0.20, agitation),
+        _FoamSeed * 0.029 + 19.7);
+    float fineDistance = VoronoiEdgeDistance(
+        (warpedWorld + float2(-1.4, 1.1)) /
+            float2(fineSize * 0.98, fineSize),
+        _FoamTime * lerp(0.12, 0.28, agitation),
+        _FoamSeed * 0.047 + 41.3);
+
+    float coarseLane = 1.0 - smoothstep(0.022, 0.085, coarseDistance);
+    float mediumLane = 1.0 - smoothstep(0.014, 0.060, mediumDistance);
+    float fineLane = 1.0 - smoothstep(0.010, 0.045, fineDistance);
+
+    float fineGateNoise = FoamFbm(
+        warpedWorld * float2(0.19, 0.27) +
+        float2(
+            _FoamTime * lerp(0.018, 0.060, agitation),
+            -_FoamTime * lerp(0.015, 0.052, agitation)) +
+        _FoamSeed * 0.0031);
+    float fineGate = smoothstep(0.37, 0.62, fineGateNoise);
+    fineLane *= fineGate;
+
+    // Medium lanes are the dominant web. Coarse lanes provide only broad
+    // structure and fine lanes provide incomplete connectors rather than a
+    // second set of continuous parallel streaks.
+    float lane = saturate(max(
+        coarseLane * 0.50,
+        max(mediumLane, fineLane * 0.86)));
+    float junction = saturate(
+        coarseLane * mediumLane * 0.62 +
+        mediumLane * fineLane * 1.08 +
+        coarseLane * fineLane * 0.42);
+    float distanceField = min(
+        coarseDistance * 1.45,
+        min(mediumDistance, fineDistance * 0.88 + (1.0 - fineGate) * 0.20));
+
+    return float4(distanceField, lane, junction, fineGate);
+}
+
+float EvaluateNetworkDistance(float2 uv)
+{
+    return EvaluateNetworkSample(uv).x;
+}
+
+struct FoamMotionSample
+{
+    float2 velocity;
+    float capture;
+    float lane;
+    float junction;
+    float wakeEnergy;
+    float leeStrength;
+    float pressureStrength;
+    float rippleIntensity;
+};
+
+FoamMotionSample ResolveMotion(float2 pixelCoordinate, float2 fieldUV)
+{
+    FoamMotionSample result;
+    result.velocity = 0.0.xx;
+    result.capture = 0.0;
+    result.lane = 0.0;
+    result.junction = 0.0;
+    result.wakeEnergy = 0.0;
+    result.leeStrength = 0.0;
+    result.pressureStrength = 0.0;
+    result.rippleIntensity = 0.0;
+
+    float4 guidance = SampleGuidanceBilinear(fieldUV);
+    float2 directionToLane = guidance.xy;
+    float laneStrength = saturate(guidance.z);
+    float junctionStrength = saturate(guidance.w);
+    result.lane = laneStrength;
+    result.junction = junctionStrength;
+
+    float2 boundary = SampleBoundaryBilinear(pixelCoordinate);
+    float2 boundaryLeft = SampleBoundaryBilinear(
+        pixelCoordinate + float2(-1.0, 0.0));
+    float2 boundaryRight = SampleBoundaryBilinear(
+        pixelCoordinate + float2(1.0, 0.0));
+    float2 boundaryDown = SampleBoundaryBilinear(
+        pixelCoordinate + float2(0.0, -1.0));
+    float2 boundaryUp = SampleBoundaryBilinear(
+        pixelCoordinate + float2(0.0, 1.0));
+    float2 boundaryGradient = float2(
+        boundaryRight.y - boundaryLeft.y,
+        boundaryUp.y - boundaryDown.y) * 0.5;
+
+    float4 wakeState = 0.0.xxxx;
+    float4 rippleState = 0.0.xxxx;
+    float4 staticWakeState = 0.0.xxxx;
+    float4 pressureState = 0.0.xxxx;
+    float2 wakeGradient = 0.0.xx;
+    float2 leeGradient = 0.0.xx;
+    float2 pressureGradient = 0.0.xx;
+
+    if (_FoamDisturbanceEnabled > 0.5)
+    {
+        wakeState = SampleWakeBilinear(fieldUV);
+        rippleState = SampleRippleBilinear(fieldUV);
+        staticWakeState = SampleStaticWakeBilinear(fieldUV);
+        pressureState = SampleStaticPressureBilinear(fieldUV);
+
+        float2 wakeTexel = 1.0 /
+            max(float2(2.0, 2.0), (float2)_FoamWakeDimensions);
+        wakeGradient = float2(
+            SampleWakeBilinear(saturate(
+                fieldUV + float2(wakeTexel.x, 0.0))).x -
+            SampleWakeBilinear(saturate(
+                fieldUV - float2(wakeTexel.x, 0.0))).x,
+            SampleWakeBilinear(saturate(
+                fieldUV + float2(0.0, wakeTexel.y))).x -
+            SampleWakeBilinear(saturate(
+                fieldUV - float2(0.0, wakeTexel.y))).x) * 0.5;
+
+        float2 leeTexel = 1.0 /
+            max(float2(2.0, 2.0), (float2)_FoamStaticWakeDimensions);
+        leeGradient = float2(
+            SampleStaticWakeBilinear(saturate(
+                fieldUV + float2(leeTexel.x, 0.0))).g -
+            SampleStaticWakeBilinear(saturate(
+                fieldUV - float2(leeTexel.x, 0.0))).g,
+            SampleStaticWakeBilinear(saturate(
+                fieldUV + float2(0.0, leeTexel.y))).g -
+            SampleStaticWakeBilinear(saturate(
+                fieldUV - float2(0.0, leeTexel.y))).g) * 0.5;
+
+        pressureGradient = pressureState.gb;
+    }
+
+    float agitation = saturate(_FoamEvolution / 1.8);
+    float guideStrength = max(0.0, _FoamGuidanceStrength);
+    float phaseWander = FoamFbm(
+        fieldUV * float2(
+            max(6.0, (float)_FoamChunkCount * 2.3),
+            11.0) +
+        float2(
+            _FoamTime * lerp(0.035, 0.12, agitation),
+            -_FoamTime * lerp(0.028, 0.095, agitation)));
+    float2 guideTangent = float2(-directionToLane.y, directionToLane.x);
+
+    float2 guidanceVelocity =
+        directionToLane *
+            guideStrength *
+            laneStrength *
+            lerp(0.40, 1.15, agitation) +
+        guideTangent *
+            (phaseWander - 0.5) *
+            guideStrength *
+            agitation *
+            0.32;
+
+    float boundaryStrength =
+        max(0.0, _FoamBoundaryAttraction);
+    float2 boundaryVelocity =
+        boundaryGradient *
+        boundaryStrength *
+        lerp(0.85, 2.20, boundary.y);
+
+    float2 wakeVelocity =
+        (wakeGradient * 0.42 + leeGradient * 1.35) *
+        max(0.0, _FoamWakeReinforcement);
+    float2 pressureVelocity =
+        pressureGradient *
+        max(0.0, _FoamBoundaryAttraction) *
+        0.08;
+    float2 rippleVelocity = float2(
+        -rippleState.b,
+        -rippleState.a) *
+        max(0.0, _FoamImpactReinforcement) *
+        0.055;
+
+    float wakeEnergy = max(0.0, wakeState.x);
+    float leeStrength = saturate(staticWakeState.g);
+    float pressureStrength = saturate(abs(pressureState.r) / 0.18);
+    float rippleIntensity = saturate(
+        abs(rippleState.x) * 4.0 +
+        abs(rippleState.y) * 0.12 +
+        length(rippleState.ba) * 0.38);
+
+    float capture = saturate(
+        boundary.y * boundaryStrength * 1.35 +
+        leeStrength * 1.85 +
+        pressureStrength * 0.48);
+
+    float downstreamSign = _FoamFlowSpeed < -0.0001 ? -1.0 : 1.0;
+    float rawAlong = _FoamFlowSpeed +
+        guidanceVelocity.x * 0.33 +
+        boundaryVelocity.x * 0.26 +
+        wakeVelocity.x * 0.24 +
+        pressureVelocity.x * 0.18 +
+        rippleVelocity.x;
+    float downstreamMagnitude = max(0.0, rawAlong * downstreamSign);
+    float captureSlowdown = lerp(
+        1.0,
+        0.045,
+        pow(capture, 1.35));
+    float alongVelocity =
+        downstreamSign *
+        downstreamMagnitude *
+        captureSlowdown;
+
+    float lateralVelocity =
+        (
+            guidanceVelocity.y * 0.96 +
+            boundaryVelocity.y * 1.12 +
+            wakeVelocity.y * 0.78 +
+            pressureVelocity.y * 0.55 +
+            rippleVelocity.y
+        ) *
+        lerp(0.72, 1.28, saturate(_FoamSpread));
+
+    result.velocity = float2(alongVelocity, lateralVelocity);
+    result.capture = capture;
+    result.wakeEnergy = wakeEnergy;
+    result.leeStrength = leeStrength;
+    result.pressureStrength = pressureStrength;
+    result.rippleIntensity = rippleIntensity;
+    return result;
+}
+
+void ResolveOriginalBounds(
+    float2 pixelCoordinate,
+    out float3 minimumValue,
+    out float3 maximumValue)
+{
+    int2 baseCoordinate = int2(floor(clamp(
+        pixelCoordinate,
+        float2(0.0, 0.0),
+        float2(
+            (float)(_FoamDimensions.x - 1),
+            (float)(_FoamDimensions.y - 1)))));
+    int2 nextCoordinate = min(
+        baseCoordinate + int2(1, 1),
+        _FoamDimensions - int2(1, 1));
+
+    float3 a = LoadState(baseCoordinate).xyz;
+    float3 b = LoadState(int2(nextCoordinate.x, baseCoordinate.y)).xyz;
+    float3 c = LoadState(int2(baseCoordinate.x, nextCoordinate.y)).xyz;
+    float3 d = LoadState(nextCoordinate).xyz;
+    minimumValue = min(min(a, b), min(c, d));
+    maximumValue = max(max(a, b), max(c, d));
+}
+
+[numthreads(8, 8, 1)]
+void ClearRange(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    if (x < 0 || x >= _FoamDimensions.x)
+    {
+        return;
+    }
+
+    _FoamStateWrite[int2(x, dispatchId.y)] = 0.0.xxxx;
+}
+
+[numthreads(8, 8, 1)]
+void ApplyBoundary(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    int y = (int)dispatchId.y;
+    if (x < 0 || x >= _FoamDimensions.x)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(x, y);
+    float coverage = LoadBoundary(coordinate).x;
+    float4 state = _FoamStateWrite[coordinate];
+    state.xyz *= coverage;
+
+    if (coverage <= 0.001 || state.x < 0.001)
+    {
+        state = 0.0.xxxx;
+    }
+
+    _FoamStateWrite[coordinate] = saturate(state);
+}
+
+[numthreads(8, 8, 1)]
+void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    int y = (int)dispatchId.y;
+    if (x < 0 || x >= _FoamDimensions.x)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(x, y);
+    float coverage = LoadBoundary(coordinate).x;
+    if (coverage <= 0.001)
+    {
+        _FoamStateWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
+    FoamMetricRow metric = _FoamMetricRows[x];
+    float across01 = y / max(1.0, (float)(_FoamDimensions.y - 1));
+    float lateralMetres = Across01ToMetres(
+        across01,
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+    float centreAcrossMetres = Across01ToMetres(
+        saturate(_FoamInjectionAcrossNormalized * 0.5 + 0.5),
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+    float globalDistance = _FoamGlobalStart +
+        x / max(1.0, (float)(_FoamDimensions.x - 1)) * _FoamFieldLength;
+
+    float alongDistance =
+        (globalDistance - _FoamInjectionGlobalDistance) /
+        max(0.05, _FoamInjectionRadius * _FoamInjectionElongation);
+    float acrossDistance =
+        (lateralMetres - centreAcrossMetres) /
+        max(0.05, _FoamInjectionRadius);
+    float radial = length(float2(alongDistance, acrossDistance));
+    float ellipseShape = saturate(1.0 - radial);
+    ellipseShape = ellipseShape * ellipseShape * (3.0 - 2.0 * ellipseShape);
+    float compoundShape = EvaluateCompoundInjectionShape(
+        alongDistance,
+        acrossDistance);
+    float shape = lerp(
+        ellipseShape,
+        compoundShape,
+        saturate(_FoamInjectionCompound));
+
+    float4 previous = _FoamStateWrite[coordinate];
+    float previousAmount = saturate(previous.x);
+    float injectedAmount = saturate(
+        shape * _FoamInjectionAmount * coverage);
+    float combinedAmount = 1.0 -
+        (1.0 - previousAmount) * (1.0 - injectedAmount);
+    float addedAmount = max(0.0, combinedAmount - previousAmount);
+    float injectedFreshness = saturate(
+        shape * _FoamInjectionFreshness * coverage);
+    float injectedIntegrity = saturate(
+        shape * _FoamInjectionIntegrity * coverage);
+
+    float phase = saturate(_FoamInjectionPhase);
+    if (previousAmount > 0.001 && combinedAmount > 0.001)
+    {
+        phase = MixPhaseShortest(
+            saturate(previous.w),
+            phase,
+            saturate(addedAmount / combinedAmount));
+    }
+
+    previous.x = combinedAmount;
+    previous.y = max(saturate(previous.y), injectedFreshness);
+    previous.z = max(saturate(previous.z), injectedIntegrity);
+    previous.w = combinedAmount > 0.001 ? phase : 0.0;
+    _FoamStateWrite[coordinate] = saturate(previous);
+}
+
+[numthreads(8, 8, 1)]
+void BuildGuidance(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamGuidanceDimensions.x ||
+        dispatchId.y >= (uint)_FoamGuidanceDimensions.y)
+    {
+        return;
+    }
+
+    float2 uv = (float2(dispatchId.xy) + 0.5) /
+        max(float2(1.0, 1.0), (float2)_FoamGuidanceDimensions);
+    float2 epsilon = 1.0 /
+        max(float2(2.0, 2.0), (float2)_FoamGuidanceDimensions);
+
+    float4 centreSample = EvaluateNetworkSample(uv);
+    float left = EvaluateNetworkDistance(saturate(uv - float2(epsilon.x, 0.0)));
+    float right = EvaluateNetworkDistance(saturate(uv + float2(epsilon.x, 0.0)));
+    float down = EvaluateNetworkDistance(saturate(uv - float2(0.0, epsilon.y)));
+    float up = EvaluateNetworkDistance(saturate(uv + float2(0.0, epsilon.y)));
+
+    int metricX = clamp(
+        (int)round(uv.x * max(1.0, (float)(_FoamDimensions.x - 1))),
+        0,
+        max(0, _FoamDimensions.x - 1));
+    FoamMetricRow metric = _FoamMetricRows[metricX];
+    float dxMetres = max(0.01, _FoamFieldLength * epsilon.x * 2.0);
+    float totalWidth = max(
+        0.05,
+        metric.widthsAndSpacing.x + metric.widthsAndSpacing.y);
+    float dyMetres = max(0.01, totalWidth * epsilon.y * 2.0);
+    float2 distanceGradient = float2(
+        (right - left) / dxMetres,
+        (up - down) / dyMetres);
+    float gradientLength = length(distanceGradient);
+    float2 directionToLane = gradientLength > 0.00001
+        ? -distanceGradient / gradientLength
+        : float2(0.0, 0.0);
+
+    _FoamGuidanceWrite[int2(dispatchId.xy)] = float4(
+        directionToLane,
+        saturate(centreSample.y),
+        saturate(centreSample.z));
+}
+
+[numthreads(64, 1, 1)]
+void ResetPopulation(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamChunkCount)
+    {
+        return;
+    }
+
+    uint byteOffset = dispatchId.x * 32u;
+    _FoamPopulationMetrics.Store4(
+        byteOffset,
+        uint4(0, 0, 0, 0));
+    _FoamPopulationMetrics.Store4(
+        byteOffset + 16u,
+        uint4(0, 0, 0, 0));
+}
+
+[numthreads(8, 8, 1)]
+void MeasurePopulation(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamDimensions.x ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(dispatchId.xy);
+    float coverage = LoadBoundary(coordinate).x;
+    if (coverage <= 0.05)
+    {
+        return;
+    }
+
+    float4 state = _FoamStateRead.Load(int3(coordinate, 0));
+    uint safeResolution = max(1u, (uint)_FoamResolutionPerChunk);
+    uint maximumChunk = (uint)max(0, _FoamChunkCount - 1);
+    uint chunk = min(dispatchId.x / safeResolution, maximumChunk);
+    uint byteOffset = chunk * 32u;
+
+    float threshold = max(0.001, _FoamVisibleThreshold);
+    bool visible = state.x >= threshold;
+    bool interior = false;
+    bool perimeter = false;
+
+    if (visible)
+    {
+        float neighbourThreshold = threshold * 0.82;
+        float n0 = LoadState(coordinate + int2(-1, 0)).x;
+        float n1 = LoadState(coordinate + int2(1, 0)).x;
+        float n2 = LoadState(coordinate + int2(0, -1)).x;
+        float n3 = LoadState(coordinate + int2(0, 1)).x;
+        float n4 = LoadState(coordinate + int2(-1, -1)).x;
+        float n5 = LoadState(coordinate + int2(1, -1)).x;
+        float n6 = LoadState(coordinate + int2(-1, 1)).x;
+        float n7 = LoadState(coordinate + int2(1, 1)).x;
+        interior =
+            n0 >= neighbourThreshold && n1 >= neighbourThreshold &&
+            n2 >= neighbourThreshold && n3 >= neighbourThreshold &&
+            n4 >= neighbourThreshold && n5 >= neighbourThreshold &&
+            n6 >= neighbourThreshold && n7 >= neighbourThreshold;
+        perimeter = !interior;
+    }
+
+    float2 fieldUV = (float2(dispatchId.xy) + 0.5) /
+        max(float2(1.0, 1.0), (float2)_FoamDimensions);
+    float4 guidance = SampleGuidanceBilinear(fieldUV);
+    bool laneCell = guidance.z >= 0.32;
+    bool laneVisible = laneCell && visible;
+
+    uint amountValue = (uint)round(saturate(state.x) * 4096.0);
+    uint originalValue;
+    _FoamPopulationMetrics.InterlockedAdd(byteOffset + 0u, amountValue, originalValue);
+    _FoamPopulationMetrics.InterlockedAdd(byteOffset + 4u, visible ? 1u : 0u, originalValue);
+    _FoamPopulationMetrics.InterlockedAdd(byteOffset + 8u, 1u, originalValue);
+    _FoamPopulationMetrics.InterlockedAdd(byteOffset + 12u, laneCell ? 1u : 0u, originalValue);
+    _FoamPopulationMetrics.InterlockedAdd(byteOffset + 16u, perimeter ? 1u : 0u, originalValue);
+    _FoamPopulationMetrics.InterlockedAdd(byteOffset + 20u, interior ? 1u : 0u, originalValue);
+    _FoamPopulationMetrics.InterlockedAdd(
+        byteOffset + 24u,
+        LoadBoundary(coordinate).y > 0.10 && visible ? 1u : 0u,
+        originalValue);
+    _FoamPopulationMetrics.InterlockedAdd(byteOffset + 28u, laneVisible ? 1u : 0u, originalValue);
+}
+
+[numthreads(8, 8, 1)]
+void ClearFractureRange(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamFractureRangeCount ||
+        dispatchId.y >= (uint)_FoamFractureDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamFractureRangeStart + (int)dispatchId.x;
+    if (x < 0 || x >= _FoamFractureDimensions.x)
+    {
+        return;
+    }
+
+    _FoamFractureWrite[int2(x, (int)dispatchId.y)] = 0.0.xx;
+}
+
+[numthreads(8, 8, 1)]
+void UpdateFracture(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamFractureDimensions.x ||
+        dispatchId.y >= (uint)_FoamFractureDimensions.y)
+    {
+        return;
+    }
+
+    float2 uv = (float2(dispatchId.xy) + 0.5) /
+        max(float2(1.0, 1.0), (float2)_FoamFractureDimensions);
+    float2 fullPixel = uv * max(float2(0.0, 0.0), (float2)_FoamDimensions - 1.0);
+    float2 boundary = SampleBoundaryBilinear(fullPixel);
+    if (boundary.x <= 0.001)
+    {
+        _FoamFractureWrite[int2(dispatchId.xy)] = 0.0.xx;
+        return;
+    }
+
+    int metricX = clamp((int)round(fullPixel.x), 0, max(0, _FoamDimensions.x - 1));
+    FoamMetricRow metric = _FoamMetricRows[metricX];
+    float totalWidth = max(0.05, metric.widthsAndSpacing.x + metric.widthsAndSpacing.y);
+    FoamMotionSample motion = ResolveMotion(fullPixel, uv);
+    float2 backUv = uv - float2(
+        motion.velocity.x * _FoamFractureDeltaTime / max(0.05, _FoamFieldLength),
+        motion.velocity.y * _FoamFractureDeltaTime / totalWidth);
+    float2 previous = SampleFractureBilinear(backUv);
+
+    float4 centre = SampleStateAtUV(uv);
+    float phase = centre.w;
+    float angle = phase * 6.2831853 +
+        (FoamFbm(float2(
+            (_FoamGlobalStart + uv.x * _FoamFieldLength) * 0.13,
+            uv.y * 7.1) + _FoamSeed * 0.0019) - 0.5) * 2.4;
+    float2 d0 = float2(cos(angle), sin(angle));
+    float2 d1 = float2(-d0.y, d0.x);
+    float2 fractureTexel = 1.0 /
+        max(float2(2.0, 2.0), (float2)_FoamFractureDimensions);
+
+    float4 a = SampleStateAtUV(saturate(uv + d0 * fractureTexel * 1.5));
+    float4 b = SampleStateAtUV(saturate(uv - d0 * fractureTexel * 1.5));
+    float4 c = SampleStateAtUV(saturate(uv + d1 * fractureTexel * 1.5));
+    float4 d = SampleStateAtUV(saturate(uv - d1 * fractureTexel * 1.5));
+    float support0 = min(a.x, b.x);
+    float support1 = min(c.x, d.x);
+    float averageSupport = (a.x + b.x + c.x + d.x) * 0.25;
+    float edgeExposure = saturate(
+        1.0 - averageSupport / max(0.035, centre.x));
+    float neckStress = smoothstep(0.08, 0.38, max(support0, support1)) *
+        (1.0 - smoothstep(0.06, 0.28, min(support0, support1)));
+    float phaseStress = (
+        PhaseDistance(a.w, phase) * a.x +
+        PhaseDistance(b.w, phase) * b.x +
+        PhaseDistance(c.w, phase) * c.x +
+        PhaseDistance(d.w, phase) * d.x) /
+        max(0.001, a.x + b.x + c.x + d.x);
+
+    float4 guideLeft = SampleGuidanceBilinear(saturate(uv - float2(fractureTexel.x, 0.0)));
+    float4 guideRight = SampleGuidanceBilinear(saturate(uv + float2(fractureTexel.x, 0.0)));
+    float4 guideDown = SampleGuidanceBilinear(saturate(uv - float2(0.0, fractureTexel.y)));
+    float4 guideUp = SampleGuidanceBilinear(saturate(uv + float2(0.0, fractureTexel.y)));
+    float guidanceShear = saturate(
+        length(guideRight.xy - guideLeft.xy) +
+        length(guideUp.xy - guideDown.xy));
+
+    float worldDistance = _FoamGlobalStart + uv.x * _FoamFieldLength;
+    float lateralMetres = Across01ToMetres(
+        uv.y,
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+    float regionalClock = _FoamTime * lerp(0.045, 0.16, saturate(_FoamEvolution / 1.8));
+    float regionalDefect = FoamFbm(
+        float2(worldDistance * 0.21 + regionalClock, lateralMetres * 0.43 - regionalClock * 0.57) +
+        phase * 11.7 + _FoamSeed * 0.0043);
+    float defectGate = smoothstep(0.58, 0.82, regionalDefect);
+
+    float age = 1.0 - centre.y;
+    float structuralWeakness = saturate(1.0 - centre.z);
+    float turbulence = saturate(
+        motion.wakeEnergy * 0.18 +
+        motion.rippleIntensity * 0.46 +
+        guidanceShear * 0.23);
+    float stress = saturate(
+        edgeExposure * 0.42 +
+        neckStress * 0.78 +
+        phaseStress * 0.62 +
+        age * 0.20 +
+        turbulence * 0.45 +
+        defectGate * age * 0.38);
+    stress *= smoothstep(0.025, 0.22, centre.x);
+    stress *= lerp(0.18, 1.0, saturate(_FoamBreakup));
+    stress *= lerp(0.42, 1.0, structuralWeakness);
+
+    float2 pa = SampleFractureBilinear(saturate(uv + d0 * fractureTexel * 1.2));
+    float2 pb = SampleFractureBilinear(saturate(uv - d0 * fractureTexel * 1.2));
+    float2 pc = SampleFractureBilinear(saturate(uv + d1 * fractureTexel * 1.2));
+    float2 pd = SampleFractureBilinear(saturate(uv - d1 * fractureTexel * 1.2));
+    float propagated = max(max(pa.x, pb.x), max(pc.x, pd.x));
+    propagated *= lerp(0.91, 0.985, saturate(_FoamBreakup));
+
+    float damage = previous.x * exp(-_FoamFractureDeltaTime * 0.17);
+    damage = max(damage, propagated * smoothstep(0.20, 0.86, stress + previous.y * 0.28));
+    damage = saturate(damage + stress * _FoamFractureDeltaTime * lerp(0.28, 1.10, saturate(_FoamBreakup)));
+    float coherence = previous.y * exp(-_FoamFractureDeltaTime * 0.10);
+    coherence = max(coherence, smoothstep(0.20, 0.62, damage));
+    coherence = saturate(coherence + stress * _FoamFractureDeltaTime * 0.38);
+
+    if (centre.x < 0.006)
+    {
+        damage *= exp(-_FoamFractureDeltaTime * 1.8);
+        coherence *= exp(-_FoamFractureDeltaTime * 1.2);
+    }
+
+    _FoamFractureWrite[int2(dispatchId.xy)] = saturate(float2(damage, coherence));
+}
+
+[numthreads(8, 8, 1)]
+void AdvectForward(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    int y = (int)dispatchId.y;
+    if (x < 0 || x >= _FoamDimensions.x)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(x, y);
+    float coverage = LoadBoundary(coordinate).x;
+    if (coverage <= 0.001)
+    {
+        _FoamAdvectionWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
+    FoamMetricRow metric = _FoamMetricRows[x];
+    float longitudinalSpacing = max(0.01, metric.widthsAndSpacing.z);
+    float lateralSpacing = max(0.01, metric.widthsAndSpacing.w);
+    float2 fieldUV = float2(
+        x / max(1.0, (float)(_FoamDimensions.x - 1)),
+        y / max(1.0, (float)(_FoamDimensions.y - 1)));
+    FoamMotionSample motion = ResolveMotion(float2(x, y), fieldUV);
+    float2 backPixel = float2(
+        x - motion.velocity.x * _FoamDeltaTime / longitudinalSpacing,
+        y - motion.velocity.y * _FoamDeltaTime / lateralSpacing);
+    float4 state = SampleStateBilinear(backPixel);
+    state.xyz *= coverage;
+    _FoamAdvectionWrite[coordinate] = saturate(state);
+}
+
+[numthreads(8, 8, 1)]
+void AdvectReverse(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    int y = (int)dispatchId.y;
+    if (x < 0 || x >= _FoamDimensions.x)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(x, y);
+    float coverage = LoadBoundary(coordinate).x;
+    if (coverage <= 0.001)
+    {
+        _FoamAdvectionWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
+    FoamMetricRow metric = _FoamMetricRows[x];
+    float longitudinalSpacing = max(0.01, metric.widthsAndSpacing.z);
+    float lateralSpacing = max(0.01, metric.widthsAndSpacing.w);
+    float2 fieldUV = float2(
+        x / max(1.0, (float)(_FoamDimensions.x - 1)),
+        y / max(1.0, (float)(_FoamDimensions.y - 1)));
+    FoamMotionSample motion = ResolveMotion(float2(x, y), fieldUV);
+    float2 forwardPixel = float2(
+        x + motion.velocity.x * _FoamDeltaTime / longitudinalSpacing,
+        y + motion.velocity.y * _FoamDeltaTime / lateralSpacing);
+    float4 state = SampleAdvectedBilinear(forwardPixel);
+    state.xyz *= coverage;
+    _FoamAdvectionWrite[coordinate] = saturate(state);
+}
+
+[numthreads(8, 8, 1)]
+void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    int y = (int)dispatchId.y;
+    if (x < 0 || x >= _FoamDimensions.x)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(x, y);
+    float2 boundary = LoadBoundary(coordinate);
+    float coverage = boundary.x;
+    if (coverage <= 0.001)
+    {
+        _FoamStateWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
+    FoamMetricRow metric = _FoamMetricRows[x];
+    float longitudinalSpacing = max(0.01, metric.widthsAndSpacing.z);
+    float lateralSpacing = max(0.01, metric.widthsAndSpacing.w);
+    float2 fieldUV = float2(
+        x / max(1.0, (float)(_FoamDimensions.x - 1)),
+        y / max(1.0, (float)(_FoamDimensions.y - 1)));
+    float globalDistance = _FoamGlobalStart + fieldUV.x * _FoamFieldLength;
+    float lateralMetres = Across01ToMetres(
+        fieldUV.y,
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+
+    FoamMotionSample motion = ResolveMotion(float2(x, y), fieldUV);
+    float2 backPixel = float2(
+        x - motion.velocity.x * _FoamDeltaTime / longitudinalSpacing,
+        y - motion.velocity.y * _FoamDeltaTime / lateralSpacing);
+
+    float4 original = _FoamStateRead.Load(int3(coordinate, 0));
+    float4 forward = _FoamAdvectedRead.Load(int3(coordinate, 0));
+    float4 reverse = _FoamReverseRead.Load(int3(coordinate, 0));
+    float3 minimumOriginal;
+    float3 maximumOriginal;
+    ResolveOriginalBounds(backPixel, minimumOriginal, maximumOriginal);
+    float3 corrected = forward.xyz + 0.5 * (original.xyz - reverse.xyz);
+    corrected = clamp(corrected, minimumOriginal, maximumOriginal);
+
+    // One-sided causal limiter: anti-diffusion may sharpen material already
+    // carried from an upstream/lateral donor, but it may not advance a front
+    // beyond the physically sampled donor region.
+    float downstreamSign = _FoamFlowSpeed < -0.0001 ? -1.0 : 1.0;
+    // ResolveOriginalBounds already inspected the four bilinear donor texels.
+    // Reuse that bound rather than resampling the same neighbourhood four more
+    // times; it is both causal and materially cheaper in the heaviest kernel.
+    float donorMaximum = max(forward.x, maximumOriginal.x);
+    corrected.x = min(corrected.x, donorMaximum + 0.0005);
+
+    float amount = saturate(corrected.x);
+    float freshness = saturate(corrected.y);
+    float integrity = saturate(corrected.z);
+    float phase = saturate(forward.w);
+
+    float agitation = saturate(_FoamEvolution / 1.8);
+    float fragmentation = saturate(_FoamBreakup);
+    float baseAngle = phase * 6.2831853 +
+        (FoamFbm(float2(globalDistance * 0.19, lateralMetres * 0.41) + _FoamSeed * 0.0017) - 0.5) * 2.6;
+    float radius = lerp(1.15, 1.70, agitation);
+    float2 d0 = float2(cos(baseAngle), sin(baseAngle));
+    float2 d1 = float2(cos(baseAngle + 0.7853982), sin(baseAngle + 0.7853982));
+    float2 d2 = float2(cos(baseAngle + 1.5707963), sin(baseAngle + 1.5707963));
+    float2 d3 = float2(cos(baseAngle + 2.3561945), sin(baseAngle + 2.3561945));
+
+    float4 s0 = SampleAdvectedBilinear(float2(x, y) + d0 * radius);
+    float4 s1 = SampleAdvectedBilinear(float2(x, y) + d1 * radius);
+    float4 s2 = SampleAdvectedBilinear(float2(x, y) + d2 * radius);
+    float4 s3 = SampleAdvectedBilinear(float2(x, y) + d3 * radius);
+    float4 s4 = SampleAdvectedBilinear(float2(x, y) - d0 * radius);
+    float4 s5 = SampleAdvectedBilinear(float2(x, y) - d1 * radius);
+    float4 s6 = SampleAdvectedBilinear(float2(x, y) - d2 * radius);
+    float4 s7 = SampleAdvectedBilinear(float2(x, y) - d3 * radius);
+
+    float directionalAverage =
+        (s0.x + s1.x + s2.x + s3.x + s4.x + s5.x + s6.x + s7.x) * 0.125;
+    float pair0 = min(s0.x, s4.x);
+    float pair1 = min(s1.x, s5.x);
+    float pair2 = min(s2.x, s6.x);
+    float pair3 = min(s3.x, s7.x);
+    float strongestPair = max(max(pair0, pair1), max(pair2, pair3));
+    float weakestPair = min(min(pair0, pair1), min(pair2, pair3));
+    float edgeExposure = saturate(
+        1.0 - directionalAverage / max(0.035, amount) +
+        max(0.0, amount - directionalAverage) * 0.72);
+    float neckness =
+        smoothstep(0.09, 0.38, strongestPair) *
+        (1.0 - smoothstep(0.055, 0.24, weakestPair)) *
+        smoothstep(0.045, 0.40, amount);
+    float tipness =
+        smoothstep(0.035, 0.28, amount) *
+        (1.0 - smoothstep(0.08, 0.34, directionalAverage));
+
+    float directionalWeight =
+        s0.x + s1.x + s2.x + s3.x + s4.x + s5.x + s6.x + s7.x;
+    float neighbourPhase = phase;
+    if (directionalWeight > 0.001)
+    {
+        float weightedSin =
+            sin(s0.w * 6.2831853) * s0.x + sin(s1.w * 6.2831853) * s1.x +
+            sin(s2.w * 6.2831853) * s2.x + sin(s3.w * 6.2831853) * s3.x +
+            sin(s4.w * 6.2831853) * s4.x + sin(s5.w * 6.2831853) * s5.x +
+            sin(s6.w * 6.2831853) * s6.x + sin(s7.w * 6.2831853) * s7.x;
+        float weightedCos =
+            cos(s0.w * 6.2831853) * s0.x + cos(s1.w * 6.2831853) * s1.x +
+            cos(s2.w * 6.2831853) * s2.x + cos(s3.w * 6.2831853) * s3.x +
+            cos(s4.w * 6.2831853) * s4.x + cos(s5.w * 6.2831853) * s5.x +
+            cos(s6.w * 6.2831853) * s6.x + cos(s7.w * 6.2831853) * s7.x;
+        neighbourPhase = frac(atan2(weightedSin, weightedCos) / 6.2831853 + 1.0);
+    }
+
+    float phaseStress =
+        (PhaseDistance(s0.w, phase) * s0.x + PhaseDistance(s1.w, phase) * s1.x +
+         PhaseDistance(s2.w, phase) * s2.x + PhaseDistance(s3.w, phase) * s3.x +
+         PhaseDistance(s4.w, phase) * s4.x + PhaseDistance(s5.w, phase) * s5.x +
+         PhaseDistance(s6.w, phase) * s6.x + PhaseDistance(s7.w, phase) * s7.x) /
+        max(0.001, directionalWeight);
+
+    float broadRadius = lerp(2.5, 3.5, agitation);
+    // Four phase-rotated broad samples are sufficient for source suppression;
+    // the fracture field now owns coherent multi-directional stress. Avoid a
+    // second eight-sample neighbourhood in every full-resolution cell.
+    float broadAmount =
+        (SampleAdvectedBilinear(float2(x, y) + d0 * broadRadius).x +
+         SampleAdvectedBilinear(float2(x, y) - d0 * broadRadius).x +
+         SampleAdvectedBilinear(float2(x, y) + d2 * broadRadius).x +
+         SampleAdvectedBilinear(float2(x, y) - d2 * broadRadius).x) * 0.25;
+
+    float chunkPosition =
+        ((float)x + 0.5) / max(1.0, (float)_FoamResolutionPerChunk) - 0.5;
+    int chunkBase = (int)floor(chunkPosition);
+    int chunkA = clamp(chunkBase, 0, max(0, _FoamChunkCount - 1));
+    int chunkB = clamp(chunkBase + 1, 0, max(0, _FoamChunkCount - 1));
+    float chunkBlend = frac(chunkPosition);
+    uint byteOffsetA = (uint)chunkA * 32u;
+    uint byteOffsetB = (uint)chunkB * 32u;
+    uint4 metricsA0 = _FoamPopulationMetrics.Load4(byteOffsetA);
+    uint4 metricsB0 = _FoamPopulationMetrics.Load4(byteOffsetB);
+    uint4 metricsA1 = _FoamPopulationMetrics.Load4(byteOffsetA + 16u);
+    uint4 metricsB1 = _FoamPopulationMetrics.Load4(byteOffsetB + 16u);
+    float validA = max(1.0, (float)metricsA0.z);
+    float validB = max(1.0, (float)metricsB0.z);
+    float laneValidA = max(1.0, (float)metricsA0.w);
+    float laneValidB = max(1.0, (float)metricsB0.w);
+    float visibleCoverage = lerp((float)metricsA0.y / validA, (float)metricsB0.y / validB, chunkBlend);
+    float perimeterCoverage = lerp((float)metricsA1.x / validA, (float)metricsB1.x / validB, chunkBlend);
+    float interiorCoverage = lerp((float)metricsA1.y / validA, (float)metricsB1.y / validB, chunkBlend);
+    float laneCoverage = lerp((float)metricsA1.w / laneValidA, (float)metricsB1.w / laneValidB, chunkBlend);
+    float perimeterRatio = perimeterCoverage / max(0.001, visibleCoverage);
+
+    float targetCoverage = saturate(_FoamTargetCoverage);
+    float populationDeficit = targetCoverage > 0.0001
+        ? saturate((targetCoverage - visibleCoverage) / max(0.025, targetCoverage))
+        : 0.0;
+    float laneTarget = lerp(0.44, 0.72, saturate(targetCoverage / 0.30));
+    float laneDeficit = saturate((laneTarget - laneCoverage) / max(0.12, laneTarget));
+    float interiorLimit = max(0.014, targetCoverage * 0.28);
+    float interiorPenalty = saturate(1.0 - interiorCoverage / interiorLimit);
+    float complexityNeed = saturate((0.66 - perimeterRatio) / 0.42);
+    float sourceNeed = max(laneDeficit * 0.92, populationDeficit * 0.58);
+    sourceNeed *= lerp(0.68, 1.0, complexityNeed);
+    sourceNeed *= lerp(0.18, 1.0, interiorPenalty);
+
+    float sourceNoise = FoamFbm(
+        float2(
+            globalDistance * 0.33 + _FoamTime * lerp(0.018, 0.062, agitation),
+            lateralMetres * 0.61 - _FoamTime * lerp(0.015, 0.052, agitation)) +
+        _FoamSeed * 0.007);
+    float sourcePulse = smoothstep(0.34, 0.70, sourceNoise);
+    float laneBirth = saturate(
+        smoothstep(0.15, 0.56, motion.lane) * lerp(0.78, 1.0, sourcePulse) +
+        motion.junction * 0.26);
+
+    float enclosedSupport =
+        step(_FoamVisibleThreshold * 0.80, s0.x) + step(_FoamVisibleThreshold * 0.80, s1.x) +
+        step(_FoamVisibleThreshold * 0.80, s2.x) + step(_FoamVisibleThreshold * 0.80, s3.x) +
+        step(_FoamVisibleThreshold * 0.80, s4.x) + step(_FoamVisibleThreshold * 0.80, s5.x) +
+        step(_FoamVisibleThreshold * 0.80, s6.x) + step(_FoamVisibleThreshold * 0.80, s7.x);
+    float enclosedHole =
+        (1.0 - smoothstep(0.02, 0.12, amount)) *
+        smoothstep(4.5, 7.0, enclosedSupport);
+    float localCapacity = saturate(1.0 - broadAmount / lerp(0.13, 0.22, targetCoverage));
+    localCapacity *= 1.0 - enclosedHole * 0.99;
+    localCapacity *= 1.0 - smoothstep(0.24, 0.50, amount);
+
+    // Prevent distributed supply from appearing immediately upstream of an
+    // existing branch and masquerading as reverse-flow merging.
+    float downstreamSupport = SampleAdvectedBilinear(
+        float2(x, y) + float2(downstreamSign * 2.6, 0.0)).x;
+    float upstreamMergeSuppression =
+        (1.0 - smoothstep(0.02, 0.10, amount)) *
+        smoothstep(_FoamVisibleThreshold * 0.70, _FoamVisibleThreshold * 1.25, downstreamSupport);
+    localCapacity *= 1.0 - upstreamMergeSuppression * 0.96;
+
+    float sourceRate =
+        max(0.0, _FoamSupplyRate) * sourceNeed * laneBirth * localCapacity * coverage;
+    float bornAmount = sourceRate * _FoamDeltaTime;
+    if (bornAmount > 0.000001)
+    {
+        float previousAmount = amount;
+        amount = saturate(amount + bornAmount * (1.0 - amount));
+        float added = max(0.0, amount - previousAmount);
+        float sourceFreshness = lerp(0.50, 0.78, sourcePulse);
+        float sourceIntegrity = lerp(0.62, 0.86, sourcePulse);
+        if (amount > 0.0001)
+        {
+            freshness = saturate((freshness * previousAmount + sourceFreshness * added) / amount);
+            integrity = saturate((integrity * previousAmount + sourceIntegrity * added) / amount);
+        }
+        float sourcePhase = frac(
+            sourceNoise * 0.73 +
+            FoamHash11(floor(globalDistance * 0.15) * 31.7 + floor(fieldUV.y * 17.0) * 17.3 + _FoamSeed * 0.019) * 0.61);
+        phase = previousAmount > 0.002
+            ? MixPhaseShortest(phase, sourcePhase, saturate(added / max(0.001, amount)))
+            : sourcePhase;
+    }
+
+    float2 fracture = SampleFractureBilinear(fieldUV);
+    float age = 1.0 - freshness;
+    float turbulenceDamage = saturate(
+        motion.wakeEnergy * 0.12 + motion.rippleIntensity * 0.38);
+    float strainDamage = saturate(
+        neckness * 0.72 + tipness * 0.30 + phaseStress * 0.58 + edgeExposure * 0.34);
+    float integrityLoss = max(0.0, _FoamIntegrityDamage) * (
+        0.008 + age * 0.032 + strainDamage * lerp(0.08, 0.34, fragmentation) +
+        fracture.x * fracture.y * lerp(0.22, 0.82, fragmentation) +
+        turbulenceDamage * lerp(0.05, 0.24, fragmentation));
+    integrity = max(0.0, integrity - integrityLoss * _FoamDeltaTime);
+
+    float captureSupport = saturate(motion.capture * (0.10 + motion.leeStrength * 0.25));
+    integrity += (1.0 - integrity) * captureSupport * _FoamDeltaTime;
+    integrity = max(integrity, freshness * 0.34);
+
+    float structuralWeakness = pow(saturate(1.0 - integrity), lerp(2.2, 1.18, fragmentation));
+    float coherentTear =
+        fracture.x * fracture.y * structuralWeakness *
+        lerp(0.18, 2.25, fragmentation) *
+        lerp(0.72, 1.28, agitation);
+    float edgeBite =
+        coherentTear * edgeExposure * lerp(0.42, 1.45, fracture.y);
+    float tipPeel =
+        coherentTear * tipness * lerp(0.30, 1.05, fragmentation);
+    float neckCollapse =
+        coherentTear * smoothstep(0.18, 0.72, neckness) *
+        smoothstep(0.42, 0.90, structuralWeakness) *
+        lerp(0.55, 3.6, fragmentation);
+    float interiorCrack =
+        coherentTear * smoothstep(0.30, 0.65, amount) *
+        smoothstep(0.20, 0.62, directionalAverage) *
+        (1.0 - edgeExposure) * 0.42;
+
+    float tinyFragment =
+        smoothstep(0.010, 0.13, amount) *
+        (1.0 - smoothstep(0.10, 0.30, directionalAverage));
+    float fragmentGrace = lerp(1.0, 0.42, tinyFragment);
+    amount *= exp(-(
+        edgeBite + tipPeel + neckCollapse + interiorCrack) *
+        fragmentGrace * _FoamDeltaTime);
+
+    // Merging only mixes already overlapping material. No amount is inserted
+    // across a gap, so a connection requires real donor flux.
+    float phaseAgreement = 1.0 - smoothstep(0.16, 0.58, PhaseDistance(phase, neighbourPhase));
+    float physicalOverlap =
+        smoothstep(0.08, 0.34, amount) *
+        smoothstep(0.08, 0.30, directionalAverage);
+    float phaseMix =
+        saturate(_FoamCohesion + _FoamConnectivity * 0.25) *
+        phaseAgreement * physicalOverlap * _FoamDeltaTime;
+    phase = MixPhaseShortest(phase, neighbourPhase, phaseMix);
+
+    float wakeReinforcement = smoothstep(0.15, 0.72, motion.wakeEnergy) * max(0.0, _FoamWakeReinforcement);
+    float leeReinforcement = smoothstep(0.06, 0.70, motion.leeStrength) * max(0.0, _FoamWakeReinforcement);
+    float pressureReinforcement = smoothstep(0.08, 0.72, motion.pressureStrength) * max(0.0, _FoamWakeReinforcement);
+    float impactReinforcement = smoothstep(0.26, 0.86, motion.rippleIntensity) * max(0.0, _FoamImpactReinforcement);
+    float existingSupport = smoothstep(0.020, 0.20, max(amount, broadAmount));
+    float reinforcement =
+        (wakeReinforcement * 0.030 + leeReinforcement * 0.095 +
+         pressureReinforcement * 0.034 + impactReinforcement * 0.060) *
+        existingSupport * coverage;
+    if (reinforcement > 0.0)
+    {
+        float previousAmount = amount;
+        amount = saturate(amount + reinforcement * (1.0 - amount) * _FoamDeltaTime);
+        float added = max(0.0, amount - previousAmount);
+        if (amount > 0.0001)
+        {
+            freshness = saturate((freshness * previousAmount + saturate(0.54 + impactReinforcement * 0.28) * added) / amount);
+            integrity = saturate((integrity * previousAmount + saturate(0.52 + leeReinforcement * 0.32) * added) / amount);
+        }
+    }
+
+    float captureRetention = saturate(
+        motion.capture + boundary.y * max(0.0, _FoamShoreRetention));
+    float amountDecay = max(0.0, _FoamAmountDecay);
+    amountDecay *= lerp(1.0, 0.075, pow(captureRetention, 1.30));
+    amountDecay *= lerp(1.0, 0.46, tinyFragment);
+    amount *= exp(-amountDecay * _FoamDeltaTime);
+    freshness *= exp(-max(0.0, _FoamFreshnessDecay) * _FoamDeltaTime);
+
+    float capturePeel =
+        captureRetention * age * edgeExposure * fragmentation *
+        fracture.x * fracture.y * lerp(0.04, 0.34, agitation);
+    amount *= exp(-capturePeel * _FoamDeltaTime);
+
+    amount *= lerp(0.52, 1.0, coverage);
+    freshness *= lerp(0.68, 1.0, coverage);
+    integrity *= lerp(0.72, 1.0, coverage);
+
+    amount = saturate(amount);
+    freshness = saturate(freshness);
+    integrity = saturate(integrity);
+    if (amount < 0.001)
+    {
+        _FoamStateWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
+    float materialPresence = smoothstep(0.001, 0.035, amount);
+    freshness *= materialPresence;
+    integrity *= materialPresence;
+    _FoamStateWrite[coordinate] = saturate(float4(amount, freshness, integrity, phase));
+}

@@ -11,6 +11,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private bool showAdvancedBody;
         private bool showAdvancedShoreline;
         private bool showPerformanceDiagnostics;
+        private bool showFoamTestTools;
+        private bool showFoamDiagnostics;
 
         public override void OnInspectorGUI()
         {
@@ -25,6 +27,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawSurfaceMotion();
             DrawRefraction();
             DrawRuntimeDisturbances();
+            DrawFoam();
             DrawWaterBody();
             DrawAdvancedBody();
 
@@ -1401,12 +1404,345 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent($"{bytes / (1024f * 1024f):0.00} MB"));
         }
 
+        private void DrawFoam()
+        {
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField(
+                "Foam and Surface Tracing",
+                EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Stage 6 now runs the complete shared Foam network: measured autonomous population, evolving filament guidance, persistent Amount/Freshness/Integrity/phase state, real merging and structural failure, shore and obstacle organisation, and Wake/Impact reinforcement. Manual tools remain diagnostics rather than the normal source of Foam.",
+                MessageType.Info);
+
+            EditorGUILayout.PropertyField(
+                Find("foamEnabled"),
+                new GUIContent(
+                    "Foam Enabled",
+                    "Master switch for the shared persistent Foam field. Disabled Foam allocates no simulation textures and contributes nothing to the water shader."));
+
+            SerializedProperty preset = Find("foamPreset");
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                preset,
+                new GUIContent(
+                    "Foam Preset",
+                    "Applies one coherent stylized Foam personality using the five canonical controls. Custom preserves the current values."));
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+
+                foreach (Object selectedTarget in targets)
+                {
+                    if (selectedTarget is not StylizedRiver selectedRiver)
+                    {
+                        continue;
+                    }
+
+                    Undo.RecordObject(selectedRiver, "Apply Foam Preset");
+                    selectedRiver.ApplyFoamPreset(
+                        (StylizedRiverFoamPreset)preset.enumValueIndex);
+                    EditorUtility.SetDirty(selectedRiver);
+                }
+
+                serializedObject.Update();
+            }
+
+            EditorGUILayout.PropertyField(
+                Find("foamAmount"),
+                new GUIContent(
+                    "Amount",
+                    "Canonical measured population control. It changes the GPU target and supply capacity while maximum Amount still preserves substantial open water."));
+            EditorGUILayout.PropertyField(
+                Find("foamFragmentation"),
+                new GUIContent(
+                    "Fragmentation",
+                    "Controls edge crack growth, phase-seam weakness, internal pitting, neck collapse, and how difficult tiny reconnections are to preserve. It does not multiply global lifetime."));
+            EditorGUILayout.PropertyField(
+                Find("foamPersistence"),
+                new GUIContent(
+                    "Persistence",
+                    "Controls persistent Amount lifetime. Freshness intentionally expires much sooner, so the initial injection shape can lose its youth while the material continues travelling for many seconds."));
+            EditorGUILayout.PropertyField(
+                Find("foamAgitation"),
+                new GUIContent(
+                    "Agitation",
+                    "Controls secondary wandering, shear, spreading, and structural evolution. Downstream direction still comes from the authoritative river flow."));
+            EditorGUILayout.PropertyField(
+                Find("foamSharpness"),
+                new GUIContent(
+                    "Sharpness",
+                    "Controls visible edge hardness only. It does not change supply, lifetime, transport, or simulation topology."));
+            EditorGUILayout.PropertyField(
+                Find("foamColour"),
+                new GUIContent(
+                    "Foam Colour",
+                    "Lit, non-emissive Foam tint. The colour alpha controls maximum Foam opacity."));
+
+            if (targets.Length != 1 || target is not StylizedRiver river)
+            {
+                return;
+            }
+
+            EditorGUILayout.Space(4f);
+            showFoamTestTools = EditorGUILayout.Foldout(
+                showFoamTestTools,
+                "Advanced Manual Foam Test Tools",
+                true);
+            if (showFoamTestTools)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(
+                    Find("foamTestDistanceNormalized"),
+                    new GUIContent(
+                        "Longitudinal Position",
+                        "Normalized position from the logical upstream start (0) to downstream end (1)."));
+                EditorGUILayout.PropertyField(
+                    Find("foamTestAcrossNormalized"),
+                    new GUIContent(
+                        "Across Position",
+                        "Normalized lateral position. Minus one is the left surface edge, zero is centre, and one is the right surface edge."));
+                EditorGUILayout.PropertyField(
+                    Find("foamTestRadius"),
+                    new GUIContent(
+                        "Radius",
+                        "Initial across-river radius in world metres."));
+                EditorGUILayout.PropertyField(
+                    Find("foamTestAmount"),
+                    new GUIContent(
+                        "Amount",
+                        "Persistent Foam coverage injected into the shared field."));
+                EditorGUILayout.PropertyField(
+                    Find("foamTestFreshness"),
+                    new GUIContent(
+                        "Freshness",
+                        "Initial source youth. Freshness decays much faster than Amount, while injected Integrity begins high automatically."));
+                EditorGUILayout.PropertyField(
+                    Find("foamTestElongation"),
+                    new GUIContent(
+                        "Along-Flow Elongation",
+                        "Multiplies the patch radius along the river. One is approximately circular; larger values create ribbons."));
+
+                using (new EditorGUI.DisabledScope(!Application.isPlaying))
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button(
+                            new GUIContent(
+                                "Emit Foam Patch",
+                                "Injects the configured manual patch into the persistent Foam field.")))
+                    {
+                        ApplyFoamTestProperties();
+                        river.EmitFoamTestPatch();
+                    }
+
+                    if (GUILayout.Button(
+                            new GUIContent(
+                                "Emit Adjacent Pair",
+                                "Injects two nearby patches to test cohesion and merging.")))
+                    {
+                        ApplyFoamTestProperties();
+                        river.EmitFoamAdjacentPair();
+                    }
+                    EditorGUILayout.EndHorizontal();
+
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button(
+                            new GUIContent(
+                                "Emit Thin Ribbon",
+                                "Injects a narrow elongated patch to test transport, Freshness loss, Integrity weakening, and crisp state extraction.")))
+                    {
+                        ApplyFoamTestProperties();
+                        river.EmitFoamThinRibbon();
+                    }
+
+                    if (GUILayout.Button(
+                            new GUIContent(
+                                "Emit Tongue Cluster",
+                                "Injects three overlapping elongated sources to test phase carriage, overlap, structural support, and temporal interpolation.")))
+                    {
+                        ApplyFoamTestProperties();
+                        river.EmitFoamTongueCluster();
+                    }
+                    EditorGUILayout.EndHorizontal();
+
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button(
+                            new GUIContent(
+                                "Emit Fragment Chain",
+                                "Injects a staggered chain of small sources to compare independent phase, Amount lifetime, Freshness lifetime, and Integrity evolution.")))
+                    {
+                        ApplyFoamTestProperties();
+                        river.EmitFoamFragmentChain();
+                    }
+
+                    if (GUILayout.Button(
+                            new GUIContent(
+                                "Emit Near Shore",
+                                "Injects the configured patch close to a shore to test animated-edge attraction, retention, release, and exclusion.")))
+                    {
+                        ApplyFoamTestProperties();
+                        river.EmitFoamNearShore();
+                    }
+                    EditorGUILayout.EndHorizontal();
+
+                    if (GUILayout.Button(
+                            new GUIContent(
+                                "Clear Foam",
+                                "Clears the four-channel Foam state and pending diagnostics. When Amount is above zero, the measured autonomous population begins rebuilding on subsequent simulation steps.")))
+                    {
+                        ApplyFoamTestProperties();
+                        river.ClearFoam();
+                    }
+                }
+
+                if (!Application.isPlaying)
+                {
+                    EditorGUILayout.HelpBox(
+                        "Enter Play Mode to observe the autonomous network. Manual shapes may be injected to test how explicit material merges into, breaks within, and is reorganised by the same complete solver.",
+                        MessageType.Info);
+                }
+
+                EditorGUI.indentLevel--;
+            }
+
+            StylizedRiverFoamRuntime runtime =
+                river.GetComponent<StylizedRiverFoamRuntime>();
+
+            showFoamDiagnostics = EditorGUILayout.Foldout(
+                showFoamDiagnostics,
+                "Foam Runtime Diagnostics",
+                true);
+            if (!showFoamDiagnostics)
+            {
+                return;
+            }
+
+            EditorGUILayout.PropertyField(
+                Find("foamDebugView"),
+                new GUIContent(
+                    "Debug View",
+                    "Amount displays persistent material, Freshness displays source youth, Integrity displays structural resistance, Phase displays transported provenance, Guidance displays the invisible metric filament lanes, Capture displays shore/obstacle/lee retention strength, Fracture displays persistent damage in red and crack coherence in green, and Final Mask displays the exact visible silhouette. Empty or sleeping fields intentionally display black."));
+
+            if (runtime == null)
+            {
+                EditorGUILayout.LabelField(
+                    new GUIContent("Runtime"),
+                    new GUIContent(
+                        river.FoamEnabled
+                            ? "Created on Play/validation"
+                            : "Disabled"));
+                return;
+            }
+
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Stage 6 Mode",
+                    "The cohesive-web correction is active: metric multi-scale guidance, lane-aware population control, bounded corrected advection, persistent coherent fracture state, donor-causal merging, downstream-only transport, environmental capture, Wake, and Impact reinforcement."),
+                new GUIContent("Cohesive web + coherent fracture"));
+            EditorGUILayout.LabelField(
+                new GUIContent("Field Resolution"),
+                new GUIContent(
+                    runtime.ResourcesAllocated
+                        ? $"{runtime.FieldWidth} × {runtime.FieldHeight}"
+                        : "Not allocated"));
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Guidance Resolution",
+                    "Low-resolution evolving network field used only to move persistent material toward branches and junctions; it is never rendered directly."),
+                new GUIContent(
+                    runtime.ResourcesAllocated
+                        ? $"{runtime.GuidanceWidth} × {runtime.GuidanceHeight}"
+                        : "Not allocated"));
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Fracture Resolution",
+                    "Half-resolution persistent structural-damage field. Red stores accumulated damage; green stores crack coherence. It advances at a lower rate than material transport and never directly renders or deletes Foam."),
+                new GUIContent(
+                    runtime.ResourcesAllocated
+                        ? $"{runtime.FractureWidth} × {runtime.FractureHeight}"
+                        : "Not allocated"));
+            EditorGUILayout.LabelField(
+                new GUIContent("Subsystem Rates"),
+                new GUIContent(
+                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz"));
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Transport",
+                    "All quality tiers use forward/reverse bounded correction so thin strands, cracks, and tiny fragments survive transport instead of diffusing into broad sheets; quality scales resolution and cadence rather than reverting to the rejected transport. The longitudinal velocity is clamped to the authoritative downstream direction."),
+                new GUIContent(
+                    runtime.CorrectedAdvectionActive
+                        ? "Corrected; downstream-only"
+                        : "Not allocated"));
+            EditorGUILayout.LabelField(
+                new GUIContent("Update Rate"),
+                new GUIContent($"{runtime.UpdateRate:0} Hz"));
+            EditorGUILayout.LabelField(
+                new GUIContent("Active Chunks"),
+                new GUIContent(runtime.ActiveChunkCount.ToString()));
+            EditorGUILayout.LabelField(
+                new GUIContent("Pending Injections"),
+                new GUIContent(runtime.PendingInjectionCount.ToString()));
+            EditorGUILayout.LabelField(
+                new GUIContent("Active Reservations"),
+                new GUIContent(runtime.ActiveReservationCount.ToString()));
+            EditorGUILayout.LabelField(
+                new GUIContent("Injected Last Update"),
+                new GUIContent(runtime.InjectedLastUpdate.ToString()));
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Last Injection Boundary Coverage",
+                    "Fluid coverage sampled at the centre of the most recent manual injection. Values near one mean open water; values near zero mean the requested centre was inside the shore/solid exclusion mask."),
+                new GUIContent(
+                    runtime.LastInjectionBoundaryCoverage >= 0f
+                        ? runtime.LastInjectionBoundaryCoverage.ToString("0.000")
+                        : "No injection yet"));
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Injection Temporal State",
+                    "Fresh manual injections are written into both Foam ping-pong textures so interpolation cannot hide them behind an empty previous state."),
+                new GUIContent(
+                    runtime.LastInjectionStateSynchronized
+                        ? "Synchronized"
+                        : "No injection yet"));
+            EditorGUILayout.LabelField(
+                new GUIContent("State"),
+                new GUIContent(
+                    runtime.IsSleeping
+                        ? "Sleeping"
+                        : "Active"));
+            EditorGUILayout.LabelField(
+                new GUIContent("Compute Dispatches"),
+                new GUIContent(
+                    $"{runtime.LastUpdateDispatches} last / {runtime.RecentPeakDispatches} recent peak"));
+            EditorGUILayout.LabelField(
+                new GUIContent("Estimated Cell-Iterations"),
+                new GUIContent(
+                    $"{runtime.LastUpdateCellIterations:N0} last / {runtime.RecentPeakCellIterations:N0} recent peak"));
+            DrawMemoryDiagnostic(
+                "Allocated Foam Memory",
+                runtime.EstimatedMemoryBytes,
+                "Estimated RGBAHalf ping-pong material state, forward and reverse corrected-advection scratch textures, multi-scale guidance, boundary texture, perimeter-aware population metrics, and local river metric buffer.");
+
+            if (GUILayout.Button(
+                    new GUIContent(
+                        "Reset Foam Peaks",
+                        "Resets the five-second recent dispatch and cell-iteration peaks to the current update.")))
+            {
+                runtime.ResetRecentPeaks();
+            }
+        }
+
+        private void ApplyFoamTestProperties()
+        {
+            serializedObject.ApplyModifiedProperties();
+            serializedObject.Update();
+        }
+
         private void DrawWaterBody()
         {
             EditorGUILayout.Space(8f);
             EditorGUILayout.LabelField("Water Body", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 2 provides the accepted body, Stage 3 supplies coherent motion, Stage 4 distorts the transmitted scene, and Stage 5 now adds persistent shared-field disturbances. Foam, secondary effects, caustics, and reflections remain deferred.",
+                "Stage 2 provides the accepted body, Stage 3 coherent motion, Stage 4 optical distortion, Stage 5 Pressure/Wake/Ripples, and Stage 6 now consumes all of those contracts in one persistent web-capable Foam network. Detached spray, droplets, caustics, reflections, and final performance closure remain later gated work.",
                 MessageType.Info);
 
             SerializedProperty surfaceState = Find("surfaceState");
@@ -1693,18 +2029,31 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 return;
             }
 
-            bool hasFoam = river.GetComponent<StylizedRiverFoamSimulation>() != null;
-            bool hasReflection = river.GetComponent<StylizedRiverPlanarReflection>() != null;
+            bool hasLegacyFoam =
+                river.GetComponent<StylizedRiverFoamSimulation>() != null;
+            bool hasReflection =
+                river.GetComponent<StylizedRiverPlanarReflection>() != null;
 
-            if (!hasFoam && !hasReflection)
+            if (!hasLegacyFoam && !hasReflection)
             {
                 return;
             }
 
             EditorGUILayout.Space(8f);
-            EditorGUILayout.HelpBox(
-                "Deferred-stage components are still present on this river, but the Stage 2 shader intentionally ignores foam and planar-reflection inputs. They may remain disabled until their stages are redesigned.",
-                MessageType.Warning);
+
+            if (hasLegacyFoam)
+            {
+                EditorGUILayout.HelpBox(
+                    "A legacy StylizedRiverFoamSimulation migration stub remains attached. Remove that component; Stage 6 Foam is now owned by the hidden StylizedRiverFoamRuntime and the controls above.",
+                    MessageType.Warning);
+            }
+
+            if (hasReflection)
+            {
+                EditorGUILayout.HelpBox(
+                    "The planar-reflection component remains a deferred Stage 8 system and is still ignored by the accepted production shader path.",
+                    MessageType.Warning);
+            }
         }
 
         private void DrawStatus()

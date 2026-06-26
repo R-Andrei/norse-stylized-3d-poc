@@ -773,6 +773,25 @@ namespace ProgrammaticStylized3D.Rivers
         public int ActiveChunkCount => CountActiveChunks();
         public int WakeFieldWidth => wakeFieldWidth;
         public int WakeFieldHeight => wakeFieldHeight;
+        public RenderTexture CurrentWakeTexture => currentWake;
+        public RenderTexture CurrentRippleTexture => currentState;
+        public RenderTexture StaticWakeSourceTexture => staticWakeSource;
+        // Stage 6 consumes the already accepted stationary Pressure target as
+        // a read-only capture influence. Foam never writes to or reinterprets
+        // the Stage 5 field.
+        public RenderTexture StaticPressureTexture => staticTarget;
+        public Vector2Int WakeTextureDimensions => currentWake != null
+            ? new Vector2Int(currentWake.width, currentWake.height)
+            : Vector2Int.one;
+        public Vector2Int RippleTextureDimensions => currentState != null
+            ? new Vector2Int(currentState.width, currentState.height)
+            : Vector2Int.one;
+        public Vector2Int StaticWakeTextureDimensions => staticWakeSource != null
+            ? new Vector2Int(staticWakeSource.width, staticWakeSource.height)
+            : Vector2Int.one;
+        public Vector2Int StaticPressureTextureDimensions => staticTarget != null
+            ? new Vector2Int(staticTarget.width, staticTarget.height)
+            : Vector2Int.one;
         public int ActiveWakeChunkCount => CountActiveWakeChunks();
         public int ContinuousSourceCount => continuousSources.Count;
         public int PendingImpactCount => pendingImpacts.Count;

@@ -74,6 +74,28 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _DisturbanceWakeCurrent("Disturbance Wake Current", 2D) = "black" {}
         [HideInInspector] _DisturbanceWakeInterpolation("Disturbance Wake Interpolation", Range(0, 1)) = 1
 
+        [Header(Stage 6 Foam Field)]
+        [HideInInspector] _FoamEnabled("Foam Enabled", Float) = 0
+        [HideInInspector] _FoamPrevious("Foam Previous", 2D) = "black" {}
+        [HideInInspector] _FoamCurrent("Foam Current", 2D) = "black" {}
+        [HideInInspector] _FoamGuidance("Foam Guidance", 2D) = "black" {}
+        [HideInInspector] _FoamFracture("Foam Fracture", 2D) = "black" {}
+        [HideInInspector] _FoamBoundary("Foam Boundary", 2D) = "black" {}
+        [HideInInspector] _FoamInterpolation("Foam Interpolation", Range(0, 1)) = 1
+        [HideInInspector] _FoamGlobalStart("Foam Global Start", Float) = 0
+        [HideInInspector] _FoamFieldLength("Foam Field Length", Float) = 1
+        [HideInInspector] _FoamColour("Foam Colour", Color) = (0.94, 0.97, 0.94, 1)
+        [HideInInspector] _FoamStrength("Foam Strength", Float) = 1
+        [HideInInspector] _FoamCoverage("Foam Coverage", Range(0, 1)) = 0.5
+        [HideInInspector] _FoamSharpness("Foam Sharpness", Range(0, 1)) = 0.8
+        [HideInInspector] _FoamConnectivity("Foam Connectivity", Range(0, 1)) = 0.3
+        [HideInInspector] _FoamOpacity("Foam Opacity", Range(0, 1)) = 0.7
+        [HideInInspector] _FoamDetailScale("Foam Detail Scale", Float) = 0.65
+        [HideInInspector] _FoamDetailStrength("Foam Detail Strength", Range(0, 1)) = 0.35
+        [HideInInspector] _FoamDebugView("Foam Debug View", Float) = 0
+        [HideInInspector] _FoamTime("Foam Time", Float) = 0
+        [HideInInspector] _FoamSeed("Foam Seed", Float) = 1731
+
         [Header(Lighting Response)]
         _LightDependence("Light Dependence", Range(0, 1)) = 1
         _AmbientResponse("Ambient Response", Range(0, 2)) = 1
@@ -132,6 +154,7 @@ Shader "PS3D/Stylized River Water"
             #include "Includes/RiverWaterLighting.hlsl"
             #include "Includes/RiverWaterMotion.hlsl"
             #include "Includes/RiverWaterDisturbance.hlsl"
+            #include "Includes/RiverWaterFoam.hlsl"
             #include "Includes/RiverWaterRefraction.hlsl"
             #include "Includes/RiverWaterBody.hlsl"
 
@@ -205,6 +228,19 @@ Shader "PS3D/Stylized River Water"
                 float _DisturbanceFragmentDetail;
                 float4 _DisturbanceStaticWakeTexelSize;
 
+                float _FoamEnabled;
+                float _FoamInterpolation;
+                float _FoamGlobalStart;
+                float _FoamFieldLength;
+                half4 _FoamColour;
+                float _FoamStrength;
+                float _FoamCoverage;
+                float _FoamSharpness;
+                float _FoamDetailScale;
+                float _FoamDetailStrength;
+                float _FoamDebugView;
+                float _FoamSeed;
+
                 float _DomainFallbackDepth;
                 float _BodyDebugView;
             CBUFFER_END
@@ -225,6 +261,16 @@ Shader "PS3D/Stylized River Water"
             SAMPLER(sampler_DisturbanceWakePrevious);
             TEXTURE2D(_DisturbanceWakeCurrent);
             SAMPLER(sampler_DisturbanceWakeCurrent);
+            TEXTURE2D(_FoamPrevious);
+            SAMPLER(sampler_FoamPrevious);
+            TEXTURE2D(_FoamCurrent);
+            SAMPLER(sampler_FoamCurrent);
+            TEXTURE2D(_FoamGuidance);
+            SAMPLER(sampler_FoamGuidance);
+            TEXTURE2D(_FoamFracture);
+            SAMPLER(sampler_FoamFracture);
+            TEXTURE2D(_FoamBoundary);
+            SAMPLER(sampler_FoamBoundary);
 
             struct Attributes
             {
@@ -666,11 +712,138 @@ Shader "PS3D/Stylized River Water"
                     liquidBodyLighting,
                     frozenBodyLighting);
 
+                RiverWaterFoamResult foam = RiverWaterEvaluateFoam(
+                    TEXTURE2D_ARGS(
+                        _FoamPrevious,
+                        sampler_FoamPrevious),
+                    TEXTURE2D_ARGS(
+                        _FoamCurrent,
+                        sampler_FoamCurrent),
+                    _FoamEnabled,
+                    input.domainData.x,
+                    input.domainData.y,
+                    input.domainData.w,
+                    _FoamGlobalStart,
+                    _FoamFieldLength,
+                    _FoamInterpolation,
+                    _FoamStrength,
+                    _FoamCoverage,
+                    _FoamSharpness,
+                    _FoamDetailScale,
+                    _FoamDetailStrength,
+                    _FoamSeed,
+                    _FreezeAmount);
+
+
                 float3 finalColour = RiverWaterApplyReservedIntegration(
                     body.colour,
                     integration);
                 finalColour *= 1.0 + motion.currentAccent * 0.22;
+
+                float3 foamColour = RiverWaterResolveFoamColour(
+                    _FoamColour.rgb,
+                    lighting.combined,
+                    _MinimumNightVisibility,
+                    foam.freshness,
+                    foam.integrity);
+                // Foam Colour alpha is the single canonical opacity control.
+                // The hidden legacy _FoamOpacity property remains only so old
+                // material serialization does not lose a known property.
+                float foamBlend = saturate(
+                    foam.mask *
+                    _FoamColour.a);
+                finalColour = lerp(finalColour, foamColour, foamBlend);
                 finalColour = MixFog(finalColour, input.motionData.w);
+
+                int foamDebug = (int)round(_FoamDebugView);
+                if (foamDebug == 1)
+                {
+                    return half4(foam.amount.xxx, 1.0);
+                }
+
+                if (foamDebug == 2)
+                {
+                    return half4(foam.freshness.xxx, 1.0);
+                }
+
+                if (foamDebug == 3)
+                {
+                    return half4(foam.mask.xxx, 1.0);
+                }
+
+                if (foamDebug == 4)
+                {
+                    return half4(foam.integrity.xxx, 1.0);
+                }
+
+                if (foamDebug == 5)
+                {
+                    float3 phaseColour = RiverWaterFoamPhaseDebugColour(
+                        foam.phase) * saturate(foam.amount * 2.0);
+                    return half4(phaseColour, 1.0);
+                }
+
+                if (foamDebug == 6)
+                {
+                    float4 guidanceDebug = SAMPLE_TEXTURE2D_LOD(
+                        _FoamGuidance,
+                        sampler_FoamGuidance,
+                        foam.fieldUV,
+                        0.0);
+                    float3 directionColour = float3(
+                        guidanceDebug.x * 0.5 + 0.5,
+                        guidanceDebug.y * 0.5 + 0.5,
+                        guidanceDebug.z);
+                    return half4(
+                        lerp(
+                            directionColour * 0.35,
+                            float3(1.0, 1.0, 1.0),
+                            guidanceDebug.z),
+                        1.0);
+                }
+
+                if (foamDebug == 7)
+                {
+                    float2 boundaryDebug = SAMPLE_TEXTURE2D_LOD(
+                        _FoamBoundary,
+                        sampler_FoamBoundary,
+                        foam.fieldUV,
+                        0.0).rg;
+                    float4 staticWakeDebug = SAMPLE_TEXTURE2D_LOD(
+                        _DisturbanceStaticWakeSource,
+                        sampler_DisturbanceStaticWakeSource,
+                        foam.fieldUV,
+                        0.0);
+                    float4 pressureDebug = SAMPLE_TEXTURE2D_LOD(
+                        _DisturbanceStaticTarget,
+                        sampler_DisturbanceStaticTarget,
+                        foam.fieldUV,
+                        0.0);
+                    float captureDebug = saturate(
+                        boundaryDebug.g * 1.35 +
+                        staticWakeDebug.g * 1.85 +
+                        abs(pressureDebug.r) / 0.18 * 0.48);
+                    return half4(
+                        captureDebug,
+                        boundaryDebug.g,
+                        staticWakeDebug.g,
+                        1.0);
+                }
+
+
+                if (foamDebug == 8)
+                {
+                    float2 fractureDebug = SAMPLE_TEXTURE2D_LOD(
+                        _FoamFracture,
+                        sampler_FoamFracture,
+                        foam.fieldUV,
+                        0.0).rg;
+                    return half4(
+                        fractureDebug.r,
+                        fractureDebug.g,
+                        0.0,
+                        1.0);
+                }
 
                 int disturbanceDebug =
                     (int)round(_DisturbanceDebugView);
