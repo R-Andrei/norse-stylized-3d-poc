@@ -28,28 +28,124 @@ struct RiverWaterMotionResult
 };
 
 
-float3 RiverWaterEvaluateMacroNormal(
+float3 RiverWaterEvaluateSurfaceNormal(
     RiverWaterMotionInputs input,
     float flowSpeed,
     float waveHeight,
     float waveLength,
     float steepness,
     float turbulence,
+    float shoreMotion,
+    float shoreMotionWidth,
+    float shoreWaveHeightScale,
+    float shoreWaveLengthScale,
+    float shoreWaveReach,
+    float shoreWaveTransitionLength,
+    float shoreWaveSizeVariation,
+    float shoreWaveSideAsymmetry,
+    float shoreWaveProfileVariation,
     float seed)
 {
     float epsilon = max(0.04, min(0.18, waveLength * 0.035));
-    float hForward = RiverWaterEvaluateMacroHeight(
-        input.globalDistance + epsilon, input.lateralMetres, input.time,
-        flowSpeed, waveHeight, waveLength, steepness, turbulence, seed);
-    float hBack = RiverWaterEvaluateMacroHeight(
-        input.globalDistance - epsilon, input.lateralMetres, input.time,
-        flowSpeed, waveHeight, waveLength, steepness, turbulence, seed);
-    float hRight = RiverWaterEvaluateMacroHeight(
-        input.globalDistance, input.lateralMetres + epsilon, input.time,
-        flowSpeed, waveHeight, waveLength, steepness, turbulence, seed);
-    float hLeft = RiverWaterEvaluateMacroHeight(
-        input.globalDistance, input.lateralMetres - epsilon, input.time,
-        flowSpeed, waveHeight, waveLength, steepness, turbulence, seed);
+    float centreBankMask;
+    RiverWaterEvaluateSurfaceHeight(
+        input.globalDistance,
+        input.lateralMetres,
+        input.visibleHalfWidth,
+        input.surfaceHalfWidth,
+        input.time,
+        flowSpeed,
+        waveHeight,
+        waveLength,
+        steepness,
+        turbulence,
+        shoreMotion,
+        shoreMotionWidth,
+        shoreWaveHeightScale,
+        shoreWaveLengthScale,
+        shoreWaveReach,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
+        1.0 - saturate(input.freezeAmount),
+        seed,
+        centreBankMask);
+
+    float heightScale = centreBankMask *
+        (1.0 - saturate(input.freezeAmount));
+    float hForward = RiverWaterEvaluateBlendedMacroHeight(
+        input.globalDistance + epsilon,
+        input.lateralMetres,
+        input.visibleHalfWidth,
+        input.time,
+        flowSpeed,
+        waveHeight,
+        waveLength,
+        steepness,
+        turbulence,
+        shoreMotionWidth,
+        shoreWaveHeightScale,
+        shoreWaveLengthScale,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
+        seed) * heightScale;
+    float hBack = RiverWaterEvaluateBlendedMacroHeight(
+        input.globalDistance - epsilon,
+        input.lateralMetres,
+        input.visibleHalfWidth,
+        input.time,
+        flowSpeed,
+        waveHeight,
+        waveLength,
+        steepness,
+        turbulence,
+        shoreMotionWidth,
+        shoreWaveHeightScale,
+        shoreWaveLengthScale,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
+        seed) * heightScale;
+    float hRight = RiverWaterEvaluateBlendedMacroHeight(
+        input.globalDistance,
+        input.lateralMetres + epsilon,
+        input.visibleHalfWidth,
+        input.time,
+        flowSpeed,
+        waveHeight,
+        waveLength,
+        steepness,
+        turbulence,
+        shoreMotionWidth,
+        shoreWaveHeightScale,
+        shoreWaveLengthScale,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
+        seed) * heightScale;
+    float hLeft = RiverWaterEvaluateBlendedMacroHeight(
+        input.globalDistance,
+        input.lateralMetres - epsilon,
+        input.visibleHalfWidth,
+        input.time,
+        flowSpeed,
+        waveHeight,
+        waveLength,
+        steepness,
+        turbulence,
+        shoreMotionWidth,
+        shoreWaveHeightScale,
+        shoreWaveLengthScale,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
+        seed) * heightScale;
     float downstreamSlope = (hForward - hBack) / (2.0 * epsilon);
     float lateralSlope = (hRight - hLeft) / (2.0 * epsilon);
     return normalize(
@@ -96,25 +192,58 @@ RiverWaterMotionResult RiverWaterEvaluateMotionVertex(
     float turbulence,
     float shoreMotion,
     float shoreMotionWidth,
+    float shoreWaveHeightScale,
+    float shoreWaveLengthScale,
+    float shoreWaveReach,
+    float shoreWaveTransitionLength,
+    float shoreWaveSizeVariation,
+    float shoreWaveSideAsymmetry,
+    float shoreWaveProfileVariation,
     float seed)
 {
     RiverWaterMotionResult result;
     result.liquidFactor = 1.0 - saturate(input.freezeAmount);
-    result.bankMask = RiverWaterResolveMotionBankMask(
+    result.macroHeight = RiverWaterEvaluateSurfaceHeight(
+        input.globalDistance,
         input.lateralMetres,
         input.visibleHalfWidth,
         input.surfaceHalfWidth,
+        input.time,
+        flowSpeed,
+        waveHeight,
+        waveLength,
+        waveSteepness,
+        turbulence,
         shoreMotion,
-        shoreMotionWidth);
-    float baseHeight = RiverWaterEvaluateMacroHeight(
-        input.globalDistance, input.lateralMetres, input.time,
-        flowSpeed, waveHeight, waveLength, waveSteepness, turbulence, seed);
-    result.macroHeight = baseHeight * result.bankMask * result.liquidFactor;
+        shoreMotionWidth,
+        shoreWaveHeightScale,
+        shoreWaveLengthScale,
+        shoreWaveReach,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
+        result.liquidFactor,
+        seed,
+        result.bankMask);
     result.displacementWS = input.baseNormalWS * result.macroHeight;
-    result.surfaceNormalWS = RiverWaterEvaluateMacroNormal(
-        input, flowSpeed,
-        waveHeight * result.bankMask * result.liquidFactor,
-        waveLength, waveSteepness, turbulence, seed);
+    result.surfaceNormalWS = RiverWaterEvaluateSurfaceNormal(
+        input,
+        flowSpeed,
+        waveHeight,
+        waveLength,
+        waveSteepness,
+        turbulence,
+        shoreMotion,
+        shoreMotionWidth,
+        shoreWaveHeightScale,
+        shoreWaveLengthScale,
+        shoreWaveReach,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
+        seed);
     result.disturbanceHeight = 0.0;
     result.disturbanceNormalWS = 0.0;
     result.currentAccent = 0.0;
@@ -135,11 +264,32 @@ RiverWaterMotionResult RiverWaterEvaluateMotionFragment(
     float currentAccentScale,
     float shoreMotion,
     float shoreMotionWidth,
+    float shoreWaveHeightScale,
+    float shoreWaveLengthScale,
+    float shoreWaveReach,
+    float shoreWaveTransitionLength,
+    float shoreWaveSizeVariation,
+    float shoreWaveSideAsymmetry,
+    float shoreWaveProfileVariation,
     float seed)
 {
     RiverWaterMotionResult result = RiverWaterEvaluateMotionVertex(
-        input, flowSpeed, waveHeight, waveLength, waveSteepness,
-        turbulence, shoreMotion, shoreMotionWidth, seed);
+        input,
+        flowSpeed,
+        waveHeight,
+        waveLength,
+        waveSteepness,
+        turbulence,
+        shoreMotion,
+        shoreMotionWidth,
+        shoreWaveHeightScale,
+        shoreWaveLengthScale,
+        shoreWaveReach,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
+        seed);
     float3 detailNormal = RiverWaterEvaluateDetailNormal(
         TEXTURE2D_ARGS(detailTexture, detailSampler),
         input, detailScale,

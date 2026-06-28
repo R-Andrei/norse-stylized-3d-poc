@@ -63,16 +63,309 @@ float RiverWaterValueNoise(float2 p)
     return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
 }
 
+// Intermediate Stage 3 shore-wave profile.
+//
+// Profile Variation shapes one wave internally through a slope-continuous
+// half-wave knot curve. Size Variation gives successive travelling wave
+// identities stable deterministic overall sizes. Transition Length controls
+// the world-space blend around the boundary between those wave identities.
+// Both controls share the same left/right asymmetry contract and never reseed
+// during runtime.
+float RiverWaterResolveShoreProfileKnot(
+    float knotIndex,
+    float seed,
+    float salt)
+{
+    return RiverWaterHash21(float2(
+        knotIndex + seed * 0.00173,
+        salt + seed * 0.00091));
+}
+
+float RiverWaterResolveShoreSideValue(
+    float sampleIndex,
+    float sideSign,
+    float seed,
+    float sideAsymmetry,
+    float salt)
+{
+    float sharedValue = RiverWaterResolveShoreProfileKnot(
+        sampleIndex,
+        seed,
+        salt);
+    float asymmetry = saturate(sideAsymmetry);
+    if (asymmetry <= 0.0001)
+    {
+        return sharedValue;
+    }
+
+    float sideSalt = sideSign < 0.0 ? salt + 17.0 : salt + 31.0;
+    float sideValue = RiverWaterResolveShoreProfileKnot(
+        sampleIndex,
+        seed,
+        sideSalt);
+    return lerp(sharedValue, sideValue, asymmetry);
+}
+
+float RiverWaterCatmullRomScalar(
+    float p0,
+    float p1,
+    float p2,
+    float p3,
+    float t)
+{
+    float t2 = t * t;
+    float t3 = t2 * t;
+    return 0.5 * (
+        2.0 * p1 +
+        (-p0 + p2) * t +
+        (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 +
+        (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3);
+}
+
+float RiverWaterBSplineScalar(
+    float p0,
+    float p1,
+    float p2,
+    float p3,
+    float t)
+{
+    float t2 = t * t;
+    float t3 = t2 * t;
+    return (
+        p0 * (1.0 - 3.0 * t + 3.0 * t2 - t3) +
+        p1 * (4.0 - 6.0 * t2 + 3.0 * t3) +
+        p2 * (1.0 + 3.0 * t + 3.0 * t2 - 3.0 * t3) +
+        p3 * t3) / 6.0;
+}
+
+float RiverWaterResolveShoreProfileValue(
+    float waveCoordinate,
+    float sideSign,
+    float seed,
+    float sideAsymmetry,
+    float variation,
+    float transitionLength,
+    float wavelength,
+    float salt,
+    float minimumValue,
+    float maximumValue)
+{
+    if (variation <= 0.0001)
+    {
+        return 1.0;
+    }
+
+    // One sample every half wave gives each cycle a distinct start, middle,
+    // and end while cubic interpolation preserves continuous slope.
+    float knotCoordinate = waveCoordinate * 2.0;
+    float knotIndex = floor(knotCoordinate);
+    float knotT = frac(knotCoordinate);
+
+    float p0 = RiverWaterResolveShoreSideValue(
+        (knotIndex - 1.0) * 0.5,
+        sideSign,
+        seed,
+        sideAsymmetry,
+        salt);
+    float p1 = RiverWaterResolveShoreSideValue(
+        knotIndex * 0.5,
+        sideSign,
+        seed,
+        sideAsymmetry,
+        salt);
+    float p2 = RiverWaterResolveShoreSideValue(
+        (knotIndex + 1.0) * 0.5,
+        sideSign,
+        seed,
+        sideAsymmetry,
+        salt);
+    float p3 = RiverWaterResolveShoreSideValue(
+        (knotIndex + 2.0) * 0.5,
+        sideSign,
+        seed,
+        sideAsymmetry,
+        salt);
+
+    float catmullProfile = RiverWaterCatmullRomScalar(
+        p0,
+        p1,
+        p2,
+        p3,
+        knotT);
+    float splineProfile = RiverWaterBSplineScalar(
+        p0,
+        p1,
+        p2,
+        p3,
+        knotT);
+    float smoothing = saturate(
+        max(0.0, transitionLength) /
+        max(0.25, wavelength * 0.5));
+    float rawProfile = saturate(lerp(
+        catmullProfile,
+        splineProfile,
+        smoothing));
+    float shapedProfile = lerp(minimumValue, maximumValue, rawProfile);
+    return lerp(1.0, shapedProfile, saturate(variation));
+}
+
+float RiverWaterResolveShoreWaveSizeValue(
+    float waveCoordinate,
+    float sideSign,
+    float seed,
+    float sideAsymmetry,
+    float sizeVariation,
+    float transitionLength,
+    float wavelength,
+    float salt,
+    float minimumValue,
+    float maximumValue)
+{
+    if (sizeVariation <= 0.0001)
+    {
+        return 1.0;
+    }
+
+    float waveIndex = floor(waveCoordinate);
+    float waveT = frac(waveCoordinate);
+
+    float previousValue = RiverWaterResolveShoreSideValue(
+        waveIndex - 1.0,
+        sideSign,
+        seed,
+        sideAsymmetry,
+        salt);
+    float currentValue = RiverWaterResolveShoreSideValue(
+        waveIndex,
+        sideSign,
+        seed,
+        sideAsymmetry,
+        salt);
+    float nextValue = RiverWaterResolveShoreSideValue(
+        waveIndex + 1.0,
+        sideSign,
+        seed,
+        sideAsymmetry,
+        salt);
+
+    // Transition Length is the complete world-space blend span centred on a
+    // wave boundary. Both adjacent cycles evaluate the same half-transition
+    // at that boundary, so position and slope remain continuous.
+    float transitionHalfT = clamp(
+        max(0.0, transitionLength) /
+            max(0.25, wavelength) * 0.5,
+        0.0005,
+        0.49);
+
+    float rawSize = currentValue;
+    if (waveT < transitionHalfT)
+    {
+        float blend = smoothstep(
+            -transitionHalfT,
+            transitionHalfT,
+            waveT);
+        rawSize = lerp(previousValue, currentValue, blend);
+    }
+    else if (waveT > 1.0 - transitionHalfT)
+    {
+        float blend = smoothstep(
+            -transitionHalfT,
+            transitionHalfT,
+            waveT - 1.0);
+        rawSize = lerp(currentValue, nextValue, blend);
+    }
+
+    float shapedSize = lerp(minimumValue, maximumValue, rawSize);
+    return lerp(1.0, shapedSize, saturate(sizeVariation));
+}
+
+void RiverWaterResolveShoreWaveProfiles(
+    float globalDistance,
+    float time,
+    float flowSpeed,
+    float shoreWaveLength,
+    float sideSign,
+    float transitionLength,
+    float sizeVariation,
+    float sideAsymmetry,
+    float profileVariation,
+    float seed,
+    out float heightProfile,
+    out float reachProfile)
+{
+    float wavelength = max(0.25, shoreWaveLength);
+    float waveCoordinate =
+        globalDistance / wavelength -
+        time * flowSpeed / wavelength +
+        frac(seed * 0.01371);
+
+    float heightShape = RiverWaterResolveShoreProfileValue(
+        waveCoordinate,
+        sideSign,
+        seed,
+        sideAsymmetry,
+        profileVariation,
+        transitionLength,
+        wavelength,
+        11.0,
+        0.45,
+        1.55);
+    float reachShape = RiverWaterResolveShoreProfileValue(
+        waveCoordinate,
+        sideSign,
+        seed,
+        sideAsymmetry,
+        profileVariation,
+        transitionLength,
+        wavelength,
+        53.0,
+        0.35,
+        1.15);
+
+    float waveSize = RiverWaterResolveShoreWaveSizeValue(
+        waveCoordinate,
+        sideSign,
+        seed,
+        sideAsymmetry,
+        sizeVariation,
+        transitionLength,
+        wavelength,
+        101.0,
+        0.60,
+        1.40);
+
+    heightProfile = max(0.0, heightShape * waveSize);
+    reachProfile = max(0.0, reachShape * waveSize);
+}
+
+float RiverWaterResolveShoreBlend(
+    float lateralMetres,
+    float visibleHalfWidth,
+    float shoreMotionWidth)
+{
+    float interiorDistance =
+        max(0.0, visibleHalfWidth - abs(lateralMetres));
+    return 1.0 - smoothstep(
+        0.0,
+        max(0.001, shoreMotionWidth),
+        interiorDistance);
+}
+
 float RiverWaterResolveMotionBankMask(
     float lateralMetres,
     float visibleHalfWidth,
     float surfaceHalfWidth,
     float shoreMotion,
-    float shoreMotionWidth)
+    float shoreMotionWidth,
+    float shoreWaveReach)
 {
     float lateral = abs(lateralMetres);
     float visible = max(0.001, visibleHalfWidth);
-    float surface = max(visible + 0.001, surfaceHalfWidth);
+    float generatedSurface = max(visible + 0.001, surfaceHalfWidth);
+    float effectiveSurface = lerp(
+        visible,
+        generatedSurface,
+        saturate(shoreWaveReach));
     float retainedAtShore = saturate(shoreMotion);
 
     if (lateral <= visible)
@@ -85,8 +378,14 @@ float RiverWaterResolveMotionBankMask(
         return lerp(retainedAtShore, 1.0, interiorBlend);
     }
 
-    float hiddenWidth = max(0.001, surface - visible);
-    float hiddenRemaining = saturate((surface - lateral) / hiddenWidth);
+    if (lateral >= effectiveSurface || effectiveSurface <= visible + 0.0001)
+    {
+        return 0.0;
+    }
+
+    float hiddenWidth = max(0.001, effectiveSurface - visible);
+    float hiddenRemaining = saturate(
+        (effectiveSurface - lateral) / hiddenWidth);
     return retainedAtShore * smoothstep(0.0, 1.0, hiddenRemaining);
 }
 
@@ -135,6 +434,148 @@ float RiverWaterEvaluateMacroHeight(
     return crest * max(0.0, waveHeight);
 }
 
+float RiverWaterEvaluateBlendedMacroHeight(
+    float globalDistance,
+    float lateralMetres,
+    float visibleHalfWidth,
+    float time,
+    float flowSpeed,
+    float waveHeight,
+    float waveLength,
+    float steepness,
+    float turbulence,
+    float shoreMotionWidth,
+    float shoreWaveHeightScale,
+    float shoreWaveLengthScale,
+    float shoreWaveTransitionLength,
+    float shoreWaveSizeVariation,
+    float shoreWaveSideAsymmetry,
+    float shoreWaveProfileVariation,
+    float seed)
+{
+    float baseHeight = RiverWaterEvaluateMacroHeight(
+        globalDistance,
+        lateralMetres,
+        time,
+        flowSpeed,
+        waveHeight,
+        waveLength,
+        steepness,
+        turbulence,
+        seed);
+
+    float shoreLength = max(
+        0.25,
+        waveLength * max(0.25, shoreWaveLengthScale));
+    float sideSign = lateralMetres < 0.0 ? -1.0 : 1.0;
+    float heightProfile;
+    float unusedReachProfile;
+    RiverWaterResolveShoreWaveProfiles(
+        globalDistance,
+        time,
+        flowSpeed,
+        shoreLength,
+        sideSign,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
+        seed,
+        heightProfile,
+        unusedReachProfile);
+
+    float shoreHeight = RiverWaterEvaluateMacroHeight(
+        globalDistance,
+        lateralMetres,
+        time,
+        flowSpeed,
+        waveHeight * max(0.0, shoreWaveHeightScale) * heightProfile,
+        shoreLength,
+        steepness,
+        turbulence,
+        seed);
+    float shoreBlend = RiverWaterResolveShoreBlend(
+        lateralMetres,
+        visibleHalfWidth,
+        shoreMotionWidth);
+    return lerp(baseHeight, shoreHeight, shoreBlend);
+}
+
+float RiverWaterEvaluateSurfaceHeight(
+    float globalDistance,
+    float lateralMetres,
+    float visibleHalfWidth,
+    float surfaceHalfWidth,
+    float time,
+    float flowSpeed,
+    float waveHeight,
+    float waveLength,
+    float steepness,
+    float turbulence,
+    float shoreMotion,
+    float shoreMotionWidth,
+    float shoreWaveHeightScale,
+    float shoreWaveLengthScale,
+    float shoreWaveReach,
+    float shoreWaveTransitionLength,
+    float shoreWaveSizeVariation,
+    float shoreWaveSideAsymmetry,
+    float shoreWaveProfileVariation,
+    float liquidFactor,
+    float seed,
+    out float bankMask)
+{
+    float shoreLength = max(
+        0.25,
+        waveLength * max(0.25, shoreWaveLengthScale));
+    float sideSign = lateralMetres < 0.0 ? -1.0 : 1.0;
+    float unusedHeightProfile;
+    float reachProfile;
+    RiverWaterResolveShoreWaveProfiles(
+        globalDistance,
+        time,
+        flowSpeed,
+        shoreLength,
+        sideSign,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
+        seed,
+        unusedHeightProfile,
+        reachProfile);
+
+    float resolvedReach = saturate(
+        saturate(shoreWaveReach) * reachProfile);
+    bankMask = RiverWaterResolveMotionBankMask(
+        lateralMetres,
+        visibleHalfWidth,
+        surfaceHalfWidth,
+        shoreMotion,
+        shoreMotionWidth,
+        resolvedReach);
+
+    float blendedHeight = RiverWaterEvaluateBlendedMacroHeight(
+        globalDistance,
+        lateralMetres,
+        visibleHalfWidth,
+        time,
+        flowSpeed,
+        waveHeight,
+        waveLength,
+        steepness,
+        turbulence,
+        shoreMotionWidth,
+        shoreWaveHeightScale,
+        shoreWaveLengthScale,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
+        seed);
+    return blendedHeight * bankMask * saturate(liquidFactor);
+}
+
 float RiverWaterResolveHiddenBankCoverOffset(
     float visibleHalfWidth,
     float surfaceHalfWidth,
@@ -160,26 +601,40 @@ float RiverWaterEvaluateShoreSurfaceOffset(
     float turbulence,
     float shoreMotion,
     float shoreMotionWidth,
+    float shoreWaveHeightScale,
+    float shoreWaveLengthScale,
+    float shoreWaveReach,
+    float shoreWaveTransitionLength,
+    float shoreWaveSizeVariation,
+    float shoreWaveSideAsymmetry,
+    float shoreWaveProfileVariation,
     float liquidFactor,
     float seed)
 {
-    float macroHeight = RiverWaterEvaluateMacroHeight(
+    float bankMask;
+    return RiverWaterEvaluateSurfaceHeight(
         globalDistance,
         lateralMetres,
+        visibleHalfWidth,
+        surfaceHalfWidth,
         time,
         flowSpeed,
         waveHeight,
         waveLength,
         steepness,
         turbulence,
-        seed);
-    float bankMask = RiverWaterResolveMotionBankMask(
-        lateralMetres,
-        visibleHalfWidth,
-        surfaceHalfWidth,
         shoreMotion,
-        shoreMotionWidth);
-    return macroHeight * bankMask * saturate(liquidFactor);
+        shoreMotionWidth,
+        shoreWaveHeightScale,
+        shoreWaveLengthScale,
+        shoreWaveReach,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
+        liquidFactor,
+        seed,
+        bankMask);
 }
 
 bool RiverWaterIsHiddenShoreSampleVisible(
@@ -196,6 +651,13 @@ bool RiverWaterIsHiddenShoreSampleVisible(
     float turbulence,
     float shoreMotion,
     float shoreMotionWidth,
+    float shoreWaveHeightScale,
+    float shoreWaveLengthScale,
+    float shoreWaveReach,
+    float shoreWaveTransitionLength,
+    float shoreWaveSizeVariation,
+    float shoreWaveSideAsymmetry,
+    float shoreWaveProfileVariation,
     float bankCover,
     float liquidFactor,
     float seed)
@@ -218,6 +680,13 @@ bool RiverWaterIsHiddenShoreSampleVisible(
         turbulence,
         shoreMotion,
         shoreMotionWidth,
+        shoreWaveHeightScale,
+        shoreWaveLengthScale,
+        shoreWaveReach,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
         liquidFactor,
         seed);
     float coverOffset = RiverWaterResolveHiddenBankCoverOffset(
@@ -246,6 +715,13 @@ float RiverWaterResolveCurrentVisibleShoreHalfWidth(
     float turbulence,
     float shoreMotion,
     float shoreMotionWidth,
+    float shoreWaveHeightScale,
+    float shoreWaveLengthScale,
+    float shoreWaveReach,
+    float shoreWaveTransitionLength,
+    float shoreWaveSizeVariation,
+    float shoreWaveSideAsymmetry,
+    float shoreWaveProfileVariation,
     float bankCover,
     float liquidFactor,
     float seed)
@@ -262,7 +738,10 @@ float RiverWaterResolveCurrentVisibleShoreHalfWidth(
 
     float farthestWetT = 0.0;
 
-    [unroll]
+    // This search calls the complete shared shore-wave evaluator. Forcing all
+    // samples to unroll can exceed D3D11 compiler limits as that evaluator grows.
+    // Shader Model 5 compute supports this bounded runtime loop directly.
+    [loop]
     for (int sampleIndex = 1;
          sampleIndex <= PS3D_RIVER_SHORE_SEARCH_STEPS;
          sampleIndex++)
@@ -283,6 +762,13 @@ float RiverWaterResolveCurrentVisibleShoreHalfWidth(
                 turbulence,
                 shoreMotion,
                 shoreMotionWidth,
+                shoreWaveHeightScale,
+                shoreWaveLengthScale,
+                shoreWaveReach,
+                shoreWaveTransitionLength,
+                shoreWaveSizeVariation,
+                shoreWaveSideAsymmetry,
+                shoreWaveProfileVariation,
                 bankCover,
                 liquidFactor,
                 seed))
@@ -319,6 +805,13 @@ float RiverWaterResolveCurrentVisibleShoreHalfWidth(
                 turbulence,
                 shoreMotion,
                 shoreMotionWidth,
+                shoreWaveHeightScale,
+                shoreWaveLengthScale,
+                shoreWaveReach,
+                shoreWaveTransitionLength,
+                shoreWaveSizeVariation,
+                shoreWaveSideAsymmetry,
+                shoreWaveProfileVariation,
                 bankCover,
                 liquidFactor,
                 seed))

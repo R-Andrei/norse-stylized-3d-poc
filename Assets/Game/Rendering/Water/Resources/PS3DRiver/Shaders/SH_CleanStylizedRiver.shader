@@ -36,6 +36,13 @@ Shader "PS3D/Stylized River Water"
         _CurrentAccentScale("Current Accent Scale", Range(0.5, 30)) = 5
         _ShoreMotion("Shore Motion", Range(0, 1)) = 0.35
         _ShoreMotionWidth("Shore Motion Width", Range(0.05, 5)) = 0.75
+        _ShoreWaveHeightScale("Shore Wave Height Scale", Range(0, 2.5)) = 1
+        _ShoreWaveLengthScale("Shore Wave Length Scale", Range(0.25, 4)) = 1
+        _ShoreWaveReach("Shore Wave Reach", Range(0, 1)) = 1
+        _ShoreWaveTransitionLength("Shore Wave Transition Length", Range(0.25, 3)) = 1
+        _ShoreWaveSizeVariation("Shore Wave Size Variation", Range(0, 1)) = 0
+        _ShoreWaveSideAsymmetry("Shore Side Asymmetry", Range(0, 1)) = 0
+        _ShoreWaveProfileVariation("Shore Wave Profile Variation", Range(0, 1)) = 0
         [HideInInspector] _MotionTime("Motion Time", Float) = 0
         [HideInInspector] _MotionSeed("Motion Seed", Float) = 1731
         _MotionDebugView("Motion Debug View", Range(0, 5)) = 0
@@ -199,6 +206,13 @@ Shader "PS3D/Stylized River Water"
                 float _CurrentAccentScale;
                 float _ShoreMotion;
                 float _ShoreMotionWidth;
+                float _ShoreWaveHeightScale;
+                float _ShoreWaveLengthScale;
+                float _ShoreWaveReach;
+                float _ShoreWaveTransitionLength;
+                float _ShoreWaveSizeVariation;
+                float _ShoreWaveSideAsymmetry;
+                float _ShoreWaveProfileVariation;
                 float _MotionTime;
                 float _MotionSeed;
                 float _MotionDebugView;
@@ -341,6 +355,13 @@ Shader "PS3D/Stylized River Water"
                     _MotionTurbulence,
                     _ShoreMotion,
                     _ShoreMotionWidth,
+                    _ShoreWaveHeightScale,
+                    _ShoreWaveLengthScale,
+                    _ShoreWaveReach,
+                    _ShoreWaveTransitionLength,
+                    _ShoreWaveSizeVariation,
+                    _ShoreWaveSideAsymmetry,
+                    _ShoreWaveProfileVariation,
                     _MotionSeed);
 
                 RiverWaterDisturbanceResult disturbance =
@@ -483,6 +504,13 @@ Shader "PS3D/Stylized River Water"
                     _CurrentAccentScale,
                     _ShoreMotion,
                     _ShoreMotionWidth,
+                    _ShoreWaveHeightScale,
+                    _ShoreWaveLengthScale,
+                    _ShoreWaveReach,
+                    _ShoreWaveTransitionLength,
+                    _ShoreWaveSizeVariation,
+                    _ShoreWaveSideAsymmetry,
+                    _ShoreWaveProfileVariation,
                     _MotionSeed);
 
                 float4 resolvedDisturbanceData =
@@ -658,7 +686,14 @@ Shader "PS3D/Stylized River Water"
                         _MotionDetailScale,
                         _MotionTurbulence,
                         _ShoreMotion,
-                        _ShoreMotionWidth);
+                        _ShoreMotionWidth,
+                        _ShoreWaveHeightScale,
+                        _ShoreWaveLengthScale,
+                        _ShoreWaveReach,
+                        _ShoreWaveTransitionLength,
+                        _ShoreWaveSizeVariation,
+                        _ShoreWaveSideAsymmetry,
+                        _ShoreWaveProfileVariation);
 
                 integration.refractionOffset = refraction.offset;
                 float3 sceneColour = refraction.sceneColour;

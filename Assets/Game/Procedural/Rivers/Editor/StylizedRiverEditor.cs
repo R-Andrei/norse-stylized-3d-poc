@@ -383,6 +383,45 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.PropertyField(Find("currentAccentScale"), new GUIContent("Current Accent Scale", "Typical longitudinal size of current accents in metres."));
             EditorGUILayout.PropertyField(Find("shoreMotion"), new GUIContent("Shore Motion", "Displacement retained where water visibly meets the bank. It fades to zero inside the hidden overlap."));
             EditorGUILayout.PropertyField(Find("shoreMotionWidth"), new GUIContent("Shore Motion Width", "Distance inside the visible shoreline over which centre motion blends toward Shore Motion."));
+
+            EditorGUILayout.Space(3f);
+            EditorGUILayout.LabelField("Shore Wave Profile", EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                Find("shoreWaveHeightScale"),
+                new GUIContent(
+                    "Shore Wave Height Scale",
+                    "Vertical shore-wave amplitude relative to the centre-river macro wave. One preserves the former height."));
+            EditorGUILayout.PropertyField(
+                Find("shoreWaveLengthScale"),
+                new GUIContent(
+                    "Shore Wave Length Scale",
+                    "Longitudinal shore-wave length relative to the centre-river macro wave. One preserves the former wavelength."));
+            EditorGUILayout.PropertyField(
+                Find("shoreWaveReach"),
+                new GUIContent(
+                    "Shore Wave Reach",
+                    "Maximum fraction of the generated hidden shoreline allowance that a shore wave may wet."));
+            EditorGUILayout.PropertyField(
+                Find("shoreWaveTransitionLength"),
+                new GUIContent(
+                    "Shore Wave Transition Length",
+                    "World-space smoothing distance for the shore-wave profile and for transitions between neighbouring wave sizes. Larger values produce broader, rounder shoreline transitions."));
+            EditorGUILayout.PropertyField(
+                Find("shoreWaveSizeVariation"),
+                new GUIContent(
+                    "Shore Wave Size Variation",
+                    "Stable deterministic differences between successive shore waves. This changes overall height and lateral reach without live reseeding."));
+            EditorGUILayout.PropertyField(
+                Find("shoreWaveSideAsymmetry"),
+                new GUIContent(
+                    "Shore Side Asymmetry",
+                    "Makes left and right banks use increasingly independent Size Variation and Profile Variation."));
+            EditorGUILayout.PropertyField(
+                Find("shoreWaveProfileVariation"),
+                new GUIContent(
+                    "Shore Wave Profile Variation",
+                    "Varies each shore wave smoothly between its start, middle, and end, affecting both height and lateral reach. Zero preserves the former uniform repeating wave."));
+
             EditorGUILayout.PropertyField(Find("motionDebugView"), new GUIContent("Motion Debug View", "Bank mask, macro height, surface normal, current accents, or liquid factor."));
 
             if (EditorGUI.EndChangeCheck())
@@ -1704,7 +1743,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Dynamic Shore Rows",
-                    "One shared Stage 3 shoreline record per topology column. Each record stores the current left and right visible water edges after macro-wave displacement and hidden-bank-cover intersection. Shore Capture is a 0.35 m solid band plus a 0.10 m inward fade from those moving edges."),
+                    "One shared Stage 3 shoreline record per topology column. Each record stores the current left and right visible water edges after macro-wave displacement and hidden-bank-cover intersection. Shore Capture is a 0.24 m solid band plus a 0.03 m inward fade from those moving edges."),
                 new GUIContent(
                     runtime.ResourcesAllocated
                         ? runtime.DynamicShoreRowCount.ToString()
@@ -2227,7 +2266,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.CaptureZones:
                     return
-                        "Canonical independent Capture Zones. Red = Pressure. Green = attached Lee. Blue = Shore. Magenta = Obstacle. Shore is a fixed metric band measured inward from the instantaneous Stage 3 visible water edge: 0.35 m solid capture plus a 0.10 m fade. The edge is resolved from the same macro-wave and shore attenuation functions used by the water shader, not from the static shoreline allowance. No capture class or free-water class modifies another. Overlaps mix directly. These same four values are collapsed into the blue Capture class in Positive Zone Classes.";
+                        "Canonical independent Capture Zones. Red = Pressure. Green = attached Lee. Blue = Shore. Magenta = Obstacle. Shore is a fixed metric band measured inward from the instantaneous Stage 3 visible water edge: 0.24 m solid capture plus a 0.03 m fade. The edge is resolved from the same macro-wave and shore attenuation functions used by the water shader, not from the static shoreline allowance. No capture class or free-water class modifies another. Overlaps mix directly. These same four values are collapsed into the blue Capture class in Positive Zone Classes.";
 
                 case StylizedRiverFoamDebugView.PositiveZoneClasses:
                     return

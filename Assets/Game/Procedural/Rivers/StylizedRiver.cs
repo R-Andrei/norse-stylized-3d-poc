@@ -440,6 +440,34 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0.05f, 5f)]
         [SerializeField] private float shoreMotionWidth = 0.75f;
 
+        [Tooltip("Vertical shore-wave amplitude relative to the centre-river macro wave. A value of 1 preserves the existing wave height.")]
+        [Range(0f, 2.5f)]
+        [SerializeField] private float shoreWaveHeightScale = 1f;
+
+        [Tooltip("Longitudinal shore-wave length relative to the centre-river macro wave. A value of 1 preserves the existing wavelength.")]
+        [Range(0.25f, 4f)]
+        [SerializeField] private float shoreWaveLengthScale = 1f;
+
+        [Tooltip("Maximum fraction of the hidden shoreline allowance that shore waves may reach. A value of 1 preserves the complete generated allowance.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float shoreWaveReach = 1f;
+
+        [Tooltip("World-space smoothing distance for the shore-wave profile and for transitions between neighbouring waves with different sizes. Larger values produce broader, rounder shoreline transitions.")]
+        [Range(0.25f, 3f)]
+        [SerializeField] private float shoreWaveTransitionLength = 1f;
+
+        [Tooltip("Stable deterministic size differences between successive shore waves. Zero keeps every wave at the same overall size; higher values make some waves taller and farther-reaching than others without live reseeding.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float shoreWaveSizeVariation;
+
+        [Tooltip("How independently the same shore wave varies on the left and right banks. This affects both Size Variation and Profile Variation.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float shoreWaveSideAsymmetry;
+
+        [Tooltip("Per-wave start, middle, and end variation for shore-wave height and lateral reach. Zero preserves the former uniform repeating wave.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float shoreWaveProfileVariation;
+
         [SerializeField]
         private StylizedRiverMotionDebugView motionDebugView =
             StylizedRiverMotionDebugView.Final;
@@ -872,6 +900,20 @@ namespace ProgrammaticStylized3D.Rivers
         private static readonly int CurrentAccentScaleMotionId = Shader.PropertyToID("_CurrentAccentScale");
         private static readonly int ShoreMotionId = Shader.PropertyToID("_ShoreMotion");
         private static readonly int ShoreMotionWidthId = Shader.PropertyToID("_ShoreMotionWidth");
+        private static readonly int ShoreWaveHeightScaleId =
+            Shader.PropertyToID("_ShoreWaveHeightScale");
+        private static readonly int ShoreWaveLengthScaleId =
+            Shader.PropertyToID("_ShoreWaveLengthScale");
+        private static readonly int ShoreWaveReachId =
+            Shader.PropertyToID("_ShoreWaveReach");
+        private static readonly int ShoreWaveTransitionLengthId =
+            Shader.PropertyToID("_ShoreWaveTransitionLength");
+        private static readonly int ShoreWaveSizeVariationId =
+            Shader.PropertyToID("_ShoreWaveSizeVariation");
+        private static readonly int ShoreWaveSideAsymmetryId =
+            Shader.PropertyToID("_ShoreWaveSideAsymmetry");
+        private static readonly int ShoreWaveProfileVariationId =
+            Shader.PropertyToID("_ShoreWaveProfileVariation");
         private static readonly int MotionDebugViewId = Shader.PropertyToID("_MotionDebugView");
         private static readonly int MotionTimeId = Shader.PropertyToID("_MotionTime");
         private static readonly int MotionSeedId = Shader.PropertyToID("_MotionSeed");
@@ -1015,6 +1057,13 @@ namespace ProgrammaticStylized3D.Rivers
         public float MotionSeed => visualSeed;
         public float ShoreMotion => shoreMotion;
         public float ShoreMotionWidth => shoreMotionWidth;
+        public float ShoreWaveHeightScale => shoreWaveHeightScale;
+        public float ShoreWaveLengthScale => shoreWaveLengthScale;
+        public float ShoreWaveReach => shoreWaveReach;
+        public float ShoreWaveTransitionLength => shoreWaveTransitionLength;
+        public float ShoreWaveSizeVariation => shoreWaveSizeVariation;
+        public float ShoreWaveSideAsymmetry => shoreWaveSideAsymmetry;
+        public float ShoreWaveProfileVariation => shoreWaveProfileVariation;
         public bool RuntimeDisturbancesEnabled => runtimeDisturbances;
         public StylizedRiverDisturbancePreset DisturbancePreset =>
             disturbancePreset;
@@ -1677,6 +1726,7 @@ namespace ProgrammaticStylized3D.Rivers
                     currentAccentScale = 6f;
                     shoreMotion = 0f;
                     shoreMotionWidth = 0.9f;
+                    ResetShoreWaveProfileControls();
                     break;
 
                 case StylizedRiverMotionPreset.Calm:
@@ -1691,6 +1741,7 @@ namespace ProgrammaticStylized3D.Rivers
                     currentAccentScale = 7f;
                     shoreMotion = 0.40f;
                     shoreMotionWidth = 1.0f;
+                    ResetShoreWaveProfileControls();
                     break;
 
                 case StylizedRiverMotionPreset.Flowing:
@@ -1705,6 +1756,7 @@ namespace ProgrammaticStylized3D.Rivers
                     currentAccentScale = 4.8f;
                     shoreMotion = 0.58f;
                     shoreMotionWidth = 0.75f;
+                    ResetShoreWaveProfileControls();
                     break;
 
                 case StylizedRiverMotionPreset.Furious:
@@ -1719,6 +1771,7 @@ namespace ProgrammaticStylized3D.Rivers
                     currentAccentScale = 2.8f;
                     shoreMotion = 0.78f;
                     shoreMotionWidth = 0.45f;
+                    ResetShoreWaveProfileControls();
                     break;
 
                 case StylizedRiverMotionPreset.Custom:
@@ -1727,6 +1780,17 @@ namespace ProgrammaticStylized3D.Rivers
 
             ValidateSettings();
             RebuildSurfaceOnly();
+        }
+
+        private void ResetShoreWaveProfileControls()
+        {
+            shoreWaveHeightScale = 1f;
+            shoreWaveLengthScale = 1f;
+            shoreWaveReach = 1f;
+            shoreWaveTransitionLength = 1f;
+            shoreWaveSizeVariation = 0f;
+            shoreWaveSideAsymmetry = 0f;
+            shoreWaveProfileVariation = 0f;
         }
 
         public void ApplyDisturbancePreset()
@@ -2898,6 +2962,25 @@ namespace ProgrammaticStylized3D.Rivers
             currentAccentScale = Mathf.Clamp(currentAccentScale, 0.5f, 30f);
             shoreMotion = Mathf.Clamp01(shoreMotion);
             shoreMotionWidth = Mathf.Clamp(shoreMotionWidth, 0.05f, 5f);
+            shoreWaveHeightScale = Mathf.Clamp(
+                shoreWaveHeightScale,
+                0f,
+                2.5f);
+            shoreWaveLengthScale = Mathf.Clamp(
+                shoreWaveLengthScale,
+                0.25f,
+                4f);
+            shoreWaveReach = Mathf.Clamp01(shoreWaveReach);
+            shoreWaveTransitionLength = Mathf.Clamp(
+                shoreWaveTransitionLength,
+                0.25f,
+                3f);
+            shoreWaveSizeVariation = Mathf.Clamp01(
+                shoreWaveSizeVariation);
+            shoreWaveSideAsymmetry = Mathf.Clamp01(
+                shoreWaveSideAsymmetry);
+            shoreWaveProfileVariation = Mathf.Clamp01(
+                shoreWaveProfileVariation);
 
             liquidRefractionStrength =
                 Mathf.Clamp(liquidRefractionStrength, 0f, 0.02f);
@@ -3713,6 +3796,25 @@ namespace ProgrammaticStylized3D.Rivers
             bodyProperties.SetFloat(CurrentAccentScaleMotionId, currentAccentScale);
             bodyProperties.SetFloat(ShoreMotionId, shoreMotion);
             bodyProperties.SetFloat(ShoreMotionWidthId, shoreMotionWidth);
+            bodyProperties.SetFloat(
+                ShoreWaveHeightScaleId,
+                shoreWaveHeightScale);
+            bodyProperties.SetFloat(
+                ShoreWaveLengthScaleId,
+                shoreWaveLengthScale);
+            bodyProperties.SetFloat(ShoreWaveReachId, shoreWaveReach);
+            bodyProperties.SetFloat(
+                ShoreWaveTransitionLengthId,
+                shoreWaveTransitionLength);
+            bodyProperties.SetFloat(
+                ShoreWaveSizeVariationId,
+                shoreWaveSizeVariation);
+            bodyProperties.SetFloat(
+                ShoreWaveSideAsymmetryId,
+                shoreWaveSideAsymmetry);
+            bodyProperties.SetFloat(
+                ShoreWaveProfileVariationId,
+                shoreWaveProfileVariation);
             bodyProperties.SetFloat(MotionDebugViewId, (float)motionDebugView);
             bodyProperties.SetFloat(MotionTimeId, riverTime);
             bodyProperties.SetFloat(MotionSeedId, visualSeed);

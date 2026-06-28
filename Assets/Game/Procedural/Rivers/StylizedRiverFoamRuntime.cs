@@ -32,8 +32,8 @@ namespace ProgrammaticStylized3D.Rivers
         // Canonical Stage 6 shore-capture band measured inward from the
         // instantaneous Stage 3 visible water edge. These are deliberately
         // fixed while the capture contract is being validated.
-        private const float ShoreCaptureCoreWidthMetres = 0.35f;
-        private const float ShoreCaptureFadeWidthMetres = 0.10f;
+        private const float ShoreCaptureCoreWidthMetres = 0.24f;
+        private const float ShoreCaptureFadeWidthMetres = 0.03f;
 
         private static readonly int FoamEnabledId =
             Shader.PropertyToID("_FoamEnabled");
@@ -1924,6 +1924,27 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamShoreMotionWidth",
                 river.ShoreMotionWidth);
+            computeShader.SetFloat(
+                "_FoamShoreWaveHeightScale",
+                river.ShoreWaveHeightScale);
+            computeShader.SetFloat(
+                "_FoamShoreWaveLengthScale",
+                river.ShoreWaveLengthScale);
+            computeShader.SetFloat(
+                "_FoamShoreWaveReach",
+                river.ShoreWaveReach);
+            computeShader.SetFloat(
+                "_FoamShoreWaveTransitionLength",
+                river.ShoreWaveTransitionLength);
+            computeShader.SetFloat(
+                "_FoamShoreWaveSizeVariation",
+                river.ShoreWaveSizeVariation);
+            computeShader.SetFloat(
+                "_FoamShoreWaveSideAsymmetry",
+                river.ShoreWaveSideAsymmetry);
+            computeShader.SetFloat(
+                "_FoamShoreWaveProfileVariation",
+                river.ShoreWaveProfileVariation);
             computeShader.SetFloat(
                 "_FoamShoreBankCover",
                 river.ShorelineBankCover);

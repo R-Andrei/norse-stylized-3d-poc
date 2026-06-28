@@ -134,6 +134,13 @@ float _FoamMotionWaveSteepness;
 float _FoamMotionTurbulence;
 float _FoamShoreMotion;
 float _FoamShoreMotionWidth;
+float _FoamShoreWaveHeightScale;
+float _FoamShoreWaveLengthScale;
+float _FoamShoreWaveReach;
+float _FoamShoreWaveTransitionLength;
+float _FoamShoreWaveSizeVariation;
+float _FoamShoreWaveSideAsymmetry;
+float _FoamShoreWaveProfileVariation;
 float _FoamShoreBankCover;
 float _FoamFreezeAmount;
 float _FoamShoreCaptureCoreWidth;
@@ -1448,6 +1455,13 @@ void BuildCurrentShoreEdges(uint3 dispatchId : SV_DispatchThreadID)
         _FoamMotionTurbulence,
         _FoamShoreMotion,
         _FoamShoreMotionWidth,
+        _FoamShoreWaveHeightScale,
+        _FoamShoreWaveLengthScale,
+        _FoamShoreWaveReach,
+        _FoamShoreWaveTransitionLength,
+        _FoamShoreWaveSizeVariation,
+        _FoamShoreWaveSideAsymmetry,
+        _FoamShoreWaveProfileVariation,
         _FoamShoreBankCover,
         liquidFactor,
         _FoamSeed);
@@ -1464,6 +1478,13 @@ void BuildCurrentShoreEdges(uint3 dispatchId : SV_DispatchThreadID)
         _FoamMotionTurbulence,
         _FoamShoreMotion,
         _FoamShoreMotionWidth,
+        _FoamShoreWaveHeightScale,
+        _FoamShoreWaveLengthScale,
+        _FoamShoreWaveReach,
+        _FoamShoreWaveTransitionLength,
+        _FoamShoreWaveSizeVariation,
+        _FoamShoreWaveSideAsymmetry,
+        _FoamShoreWaveProfileVariation,
         _FoamShoreBankCover,
         liquidFactor,
         _FoamSeed);

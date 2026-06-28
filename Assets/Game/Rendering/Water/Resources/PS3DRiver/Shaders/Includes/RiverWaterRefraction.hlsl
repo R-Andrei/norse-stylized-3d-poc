@@ -267,7 +267,14 @@ RiverWaterRefractionResult RiverWaterEvaluateRefraction(
     float detailScale,
     float turbulence,
     float shoreMotion,
-    float shoreMotionWidth)
+    float shoreMotionWidth,
+    float shoreWaveHeightScale,
+    float shoreWaveLengthScale,
+    float shoreWaveReach,
+    float shoreWaveTransitionLength,
+    float shoreWaveSizeVariation,
+    float shoreWaveSideAsymmetry,
+    float shoreWaveProfileVariation)
 {
     RiverWaterRefractionResult result;
 
@@ -303,20 +310,48 @@ RiverWaterRefractionResult RiverWaterEvaluateRefraction(
     opticalMotionInputs.freezeAmount = input.freezeAmount;
 
     float liquidFactor = 1.0 - freeze;
+    float shoreLength = max(
+        0.25,
+        waveLength * max(0.25, shoreWaveLengthScale));
+    float heightProfile;
+    float reachProfile;
+    RiverWaterResolveShoreWaveProfiles(
+        input.globalDistance,
+        motionTime,
+        flowSpeed,
+        shoreLength,
+        input.lateralMetres < 0.0 ? -1.0 : 1.0,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
+        seed,
+        heightProfile,
+        reachProfile);
     float motionBankMask = RiverWaterResolveMotionBankMask(
         input.lateralMetres,
         input.visibleHalfWidth,
         input.surfaceHalfWidth,
         shoreMotion,
-        shoreMotionWidth);
+        shoreMotionWidth,
+        saturate(shoreWaveReach * reachProfile));
 
-    float3 macroNormalWS = RiverWaterEvaluateMacroNormal(
+    float3 macroNormalWS = RiverWaterEvaluateSurfaceNormal(
         opticalMotionInputs,
         flowSpeed,
-        waveHeight * motionBankMask * liquidFactor,
+        waveHeight,
         waveLength,
         waveSteepness,
         turbulence,
+        shoreMotion,
+        shoreMotionWidth,
+        shoreWaveHeightScale,
+        shoreWaveLengthScale,
+        shoreWaveReach,
+        shoreWaveTransitionLength,
+        shoreWaveSizeVariation,
+        shoreWaveSideAsymmetry,
+        shoreWaveProfileVariation,
         seed);
 
     float3 detailNormalWS = RiverWaterEvaluateDetailNormal(

@@ -461,7 +461,7 @@ The normal rendered state and retained diagnostics are:
 | View | Meaning and colour encoding |
 |---|---|
 | `Final Foam (Debug Off)` | Normally lit visible Foam from the current persistent material solver. No Foam diagnostic colour encoding is active. |
-| `Capture Zones` | Canonical independent capture values. Red = Pressure; green = stationary attached Lee; blue = the fixed-width band following the instantaneous Stage 3 visible shoreline; magenta = Obstacle. Shore uses `0.35 m` full capture plus a `0.10 m` inward fade from the current left/right edge. Each class comes only from its own source plus valid domain/solid masking. Overlaps mix directly. |
+| `Capture Zones` | Canonical independent capture values. Red = Pressure; green = stationary attached Lee; blue = the fixed-width band following the instantaneous Stage 3 visible shoreline; magenta = Obstacle. Shore uses `0.24 m` full capture plus a `0.03 m` inward fade from the current left/right edge. Each class comes only from its own source plus valid domain/solid masking. Overlaps mix directly. |
 | `Positive Zone Classes` | Red = independent Major Capacity; green = independent Connector Capacity; blue = the maximum of the exact Pressure, Lee, Shore, and Obstacle values shown separately in Capture Zones. No class weighting is applied. Overlaps mix; black means no positive support. Pocket Exclusion is not shown. |
 | `Positive and Negative Zones` | Green = the unweighted maximum of Major, Connector, and combined Capture support before subtraction; red = Pocket Exclusion; yellow = overlap where exclusion can remove positive support; black = neither. |
 
@@ -475,7 +475,7 @@ The canonical source rules are:
 
 - **Major Capacity:** generated from its own free-water structure rules and river metrics; Obstacle capture does not deform or cut it.
 - **Connector Capacity:** generated from its own connector/branch paths after endpoint validation; it is not weighted against Major, Capture, Pocket, or Obstacle fields.
-- **Shore Capture:** a fixed metric band measured inward from the instantaneous Stage 3 visible shoreline, not from the static normal or maximum shoreline allowance. Stage 3 and Stage 6 share the same macro-wave, river-space noise, and shore attenuation functions. A compact `RGHalf` row texture stores current signed left/right visible edges for every topology column. The current validation band is `0.35 m` of full capture plus a `0.10 m` inward fade. No random longitudinal gating and no Major/Connector context.
+- **Shore Capture:** a fixed metric band measured inward from the instantaneous Stage 3 visible shoreline, not from the static normal or maximum shoreline allowance. Stage 3 and Stage 6 share the same macro-wave, river-space noise, shore-specific profile, lateral-reach, asymmetry, and attenuation functions. A compact `RGHalf` row texture stores current signed left/right visible edges for every topology column. The current validation band is `0.24 m` of full capture plus a `0.03 m` inward fade. No random longitudinal gating and no Major/Connector context.
 - **Obstacle Capture:** the cached projected-obstacle attraction band directly. No Major/Connector context.
 - **Pressure Capture:** the direct magnitude available from the accepted static Pressure texture, with no hidden importance weight or external context multiplier.
 - **Lee Capture:** the direct positive attached-lee value available from the accepted stationary Wake source, with no hidden importance weight or external context multiplier.
@@ -486,13 +486,13 @@ The canonical source rules are:
 Shore Capture does not infer the shoreline from the normal allowance, maximum overlap, a static interpolation factor, or a second procedural wave. Stage 3 exposes the current visible edge through a shared evaluator:
 
 1. use the authoritative global river distance and current motion time;
-2. evaluate the exact Stage 3 macro height and shore attenuation used by the water shader;
-3. test positive displacement against the corridor's mandatory hidden bank-cover profile between normal and maximum surface widths;
+2. evaluate the exact Stage 3 centre carrier plus shore-specific height scale, length scale, lateral reach, stable wave-to-wave size variation, metric transition length, slope-continuous start/middle/end profile, left/right asymmetry, and shore attenuation used by the water shader;
+3. test positive displacement against the corridor's mandatory hidden bank-cover profile between normal and maximum surface widths, while respecting the current per-wave reach limit;
 4. store the outermost visible left and right edges in a compact row texture;
 5. construct Shore Capture inward from those moving edges in world metres;
 6. remove registered solid cells using the boundary texture's dedicated solid-coverage channel.
 
-The free-water topology remains low-rate, but the current edge and capture-source composition refresh at the ordinary Foam update cadence so visible shore motion is not quantised to the `4/6/8 Hz` topology-generation cadence. Future Stage 3 shore-wave changes must preserve this contract by changing the shared evaluator rather than adding a second approximation in Stage 6.
+The free-water topology remains low-rate, but the current edge and capture-source composition refresh at the ordinary Foam update cadence so visible shore motion is not quantised to the `4/6/8 Hz` topology-generation cadence. The current intermediate Stage 3 controls are `Shore Wave Height Scale`, `Shore Wave Length Scale`, `Shore Wave Reach`, `Shore Wave Transition Length`, `Shore Wave Size Variation`, `Shore Side Asymmetry`, and `Shore Wave Profile Variation`. Size Variation produces stable deterministic differences between successive travelling waves; Transition Length smooths both the within-wave profile and wave-to-wave size changes over a physical distance; Profile Variation shapes an individual wave through slope-continuous start/middle/end interpolation. Stage 6 receives only the resolved shoreline result through the shared evaluator and does not reinterpret those controls. Future packet-based shore-wave work must replace or extend this evaluator rather than adding a second approximation in Stage 6.
 
 Composition is deliberately simple:
 

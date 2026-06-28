@@ -66,9 +66,21 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 **Implemented:** A shared river-space HLSL motion layer provides vertical macro displacement, evolving flow-aligned normal detail, directional current accents, visible-shore motion with hidden-edge safety fading, automatic surface refinement, displacement clearance reporting, and a neutral persistent-disturbance input reserved for Stage 5.
 
-**Shared shoreline output — implemented; Stage 6 validation pending:** The macro-wave, river-space noise, and shore attenuation primitives now live in the shared water-motion contract rather than only in the render pass. Stage 6 uses those exact functions to resolve one instantaneous left/right visible shoreline edge per longitudinal topology row by intersecting current positive shore-wave displacement with the corridor's mandatory hidden bank-cover profile. Future changes to shore-wave height, longitudinal length, lateral reach, asymmetry, or runtime evolution must update this shared evaluator; consumers must not recreate an approximate shoreline rhythm independently. This addition does not retune the accepted Stage 3 render result.
+**Shared shoreline output — implemented; Stage 6 validation pending:** The macro-wave, river-space noise, shore-wave profile, and shore attenuation primitives now live in the shared water-motion contract rather than only in the render pass. Stage 6 uses those exact functions to resolve one instantaneous left/right visible shoreline edge per longitudinal topology row by intersecting current positive shore-wave displacement with the corridor's mandatory hidden bank-cover profile. Consumers must not recreate an approximate shoreline rhythm independently.
 
-**Validated:** Complete and accepted. Calm through furious motion, lighting response, reverse flow, irregular shores, shoreline lapping, and frozen-state suppression passed visual testing. Presets favour turbulence and shore activity over excessively fast, uniform macro-wave bands; detached splashes remain assigned to Stage 7.
+**Intermediate shore-wave profile controls — implemented; Unity validation pending:** The accepted repeating Stage 3 carrier remains in place, but the bank-reaching component can now diverge from the centre-river macro wave through seven controls:
+
+- `Shore Wave Height Scale` independently scales vertical bank-wave amplitude;
+- `Shore Wave Length Scale` independently scales longitudinal bank-wave length;
+- `Shore Wave Reach` limits the fraction of generated hidden shoreline allowance that can be wetted;
+- `Shore Wave Transition Length` defines the world-space smoothing span for the within-wave profile and for blends between neighbouring waves with different overall sizes;
+- `Shore Wave Size Variation` gives successive travelling waves stable deterministic differences in overall height and lateral reach;
+- `Shore Side Asymmetry` blends from shared left/right size and profile values to independent bank values;
+- `Shore Wave Profile Variation` creates deterministic variation inside each wave between its start, middle, and end.
+
+Within-wave profile knots use a slope-continuous cubic curve that blends toward a smoother B-spline response as Transition Length increases. Successive wave-size values also blend across that configured metric span, eliminating abrupt corners both inside a wave and where a small wave meets a larger one. Size identities are deterministic and travel with the existing carrier; they do not reseed or fluctuate independently at runtime. Left and right profiles are identical when Side Asymmetry is zero and become increasingly independent as it rises. Neutral values (`1`, `1`, `1`, `1 m`, `0`, `0`, `0`) preserve the prior Stage 3 result because Transition Length and Side Asymmetry have no visible effect while both variation controls are zero. Water displacement, surface normals, liquid refraction motion, instantaneous shoreline resolution, and Stage 6 Shore Capture all consume the same shared evaluator. This is an intermediate extension of the existing carrier, not the later explicit travelling-wave-packet redesign; individual packet speeds, lifetimes, births, and independent length evolution remain deferred.
+
+**Validated:** The original calm-through-furious motion contract remains accepted at neutral shore-profile values. The new shore-specific controls require focused Unity validation across reverse flow, freeze/thaw, asymmetric banks, and hidden-allowance limits. Presets reset the new controls to neutral values so selecting an existing motion preset preserves the accepted appearance. Detached splashes remain assigned to Stage 7.
 
 ## 4. Refraction and Optical Distortion
 
