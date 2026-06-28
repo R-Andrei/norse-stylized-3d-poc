@@ -34,6 +34,7 @@ RWTexture2D<float4> _StaticPressureWrite;
 RWTexture2D<float4> _StaticWakeSourceWrite;
 
 int2 _FieldSize;
+int _ValidFieldWidth;
 int _DispatchXOffset;
 int _DispatchWidth;
 
@@ -102,6 +103,7 @@ float _AdvectionPixels;
 int _RippleMetricCount;
 
 int2 _WakeFieldSize;
+int _ValidWakeWidth;
 int _WakeDispatchXOffset;
 int _WakeDispatchWidth;
 float _WakeDeltaTime;
@@ -1115,7 +1117,7 @@ void BakeStaticPressure(uint3 dispatchId : SV_DispatchThreadID)
         _StaticRect.y + (int)dispatchId.y);
 
     if (pixel.x < 0 || pixel.y < 0 ||
-        pixel.x >= _FieldSize.x || pixel.y >= _FieldSize.y)
+        pixel.x >= _ValidFieldWidth || pixel.y >= _FieldSize.y)
     {
         return;
     }
@@ -1164,8 +1166,16 @@ void FinalizeStaticPressure(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 pixel = int2(dispatchId.xy);
+    if (pixel.x >= _ValidFieldWidth)
+    {
+        _StaticPressureWrite[pixel] = 0.0;
+        return;
+    }
+
     int2 leftPixel = int2(max(0, pixel.x - 1), pixel.y);
-    int2 rightPixel = int2(min(_FieldSize.x - 1, pixel.x + 1), pixel.y);
+    int2 rightPixel = int2(
+        min(max(0, _ValidFieldWidth - 1), pixel.x + 1),
+        pixel.y);
     int2 downPixel = int2(pixel.x, max(0, pixel.y - 1));
     int2 upPixel = int2(pixel.x, min(_FieldSize.y - 1, pixel.y + 1));
 
@@ -1202,7 +1212,7 @@ void BakeStaticWakeSource(uint3 dispatchId : SV_DispatchThreadID)
         _StaticRect.y + (int)dispatchId.y);
 
     if (pixel.x < 0 || pixel.y < 0 ||
-        pixel.x >= _FieldSize.x || pixel.y >= _FieldSize.y)
+        pixel.x >= _ValidWakeWidth || pixel.y >= _FieldSize.y)
     {
         return;
     }
@@ -1251,6 +1261,12 @@ void BakeRippleBoundaryBase(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 pixel = int2(dispatchId.xy);
+    if (pixel.x >= _ValidFieldWidth)
+    {
+        _RippleBoundaryWrite[pixel] = 0.0.xx;
+        return;
+    }
+
     RippleMetricSample metric = LoadRippleMetric(pixel.x);
     float across = clamp(
         RippleAcrossNormalized((float)pixel.y),
@@ -1290,7 +1306,7 @@ void BakeRippleBoundaryObstacle(uint3 dispatchId : SV_DispatchThreadID)
         _RippleObstacleRect.x + (int)dispatchId.x,
         _RippleObstacleRect.y + (int)dispatchId.y);
     if (pixel.x < 0 || pixel.y < 0 ||
-        pixel.x >= _FieldSize.x || pixel.y >= _FieldSize.y)
+        pixel.x >= _ValidFieldWidth || pixel.y >= _FieldSize.y)
     {
         return;
     }
@@ -1333,6 +1349,12 @@ void ApplyRippleBoundary(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 pixel = int2(dispatchId.xy);
+    if (pixel.x >= _ValidFieldWidth)
+    {
+        _StateWrite[pixel] = 0.0;
+        return;
+    }
+
     float coverage = saturate(LoadRippleBoundary(pixel).x);
     float4 state = _StateWrite[pixel];
     state *= coverage;
@@ -1353,7 +1375,7 @@ void InjectRipple(uint3 dispatchId : SV_DispatchThreadID)
         _RippleInjectRect.y + (int)dispatchId.y);
 
     if (pixel.x < 0 || pixel.y < 0 ||
-        pixel.x >= _FieldSize.x || pixel.y >= _FieldSize.y)
+        pixel.x >= _ValidFieldWidth || pixel.y >= _FieldSize.y)
     {
         return;
     }
@@ -1457,7 +1479,7 @@ void InjectWake(uint3 dispatchId : SV_DispatchThreadID)
         _WakeInjectRect.y + (int)dispatchId.y);
 
     if (pixel.x < 0 || pixel.y < 0 ||
-        pixel.x >= _WakeFieldSize.x || pixel.y >= _WakeFieldSize.y)
+        pixel.x >= _ValidWakeWidth || pixel.y >= _WakeFieldSize.y)
     {
         return;
     }
@@ -1540,6 +1562,11 @@ void SimulateRipple(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 targetPixel = int2(x, y);
+    if (x >= _ValidFieldWidth)
+    {
+        _StateWrite[targetPixel] = 0.0;
+        return;
+    }
     float2 targetBoundary = LoadRippleBoundary(targetPixel);
     float targetCoverage = saturate(targetBoundary.x);
     if (targetCoverage <= 0.0001)
@@ -1726,6 +1753,13 @@ void SimulateWake(uint3 dispatchId : SV_DispatchThreadID)
 
     if (x < 0 || x >= _WakeFieldSize.x)
     {
+        return;
+    }
+
+    int2 targetPixel = int2(x, y);
+    if (x >= _ValidWakeWidth)
+    {
+        _WakeWrite[targetPixel] = 0.0;
         return;
     }
 

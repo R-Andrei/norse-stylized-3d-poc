@@ -110,3 +110,8 @@ InitTestScene*.unity*
 .vscode/*
 !.vscode/launch.json
 !.vscode/extensions.json
+
+/[Aa]ssets/References/
+/[Aa]ssets/References.meta
+
+*.7z

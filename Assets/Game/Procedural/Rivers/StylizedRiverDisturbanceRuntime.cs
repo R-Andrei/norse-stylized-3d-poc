@@ -634,6 +634,10 @@ namespace ProgrammaticStylized3D.Rivers
 
         private readonly Dictionary<EntityId, ContinuousSource> continuousSources =
             new();
+        private readonly Dictionary<EntityId, EntityId>
+            continuousSourceIdsByOwner = new();
+        private readonly HashSet<EntityId> ownershipConflictWarningOwnerIds =
+            new();
         private readonly List<EntityId> staleSourceIds = new();
         private readonly List<EntityId> staticPressureProfileSourceIds = new();
         private readonly List<EntityId> staticWakeVariationSourceIds = new();
@@ -710,6 +714,9 @@ namespace ProgrammaticStylized3D.Rivers
         private int wakeFieldHeight;
         private int domainVersion = -1;
         private float fieldLength;
+        private float validFieldLength;
+        private int validFieldWidth;
+        private int validWakeFieldWidth;
         private float averageSurfaceHalfWidth = 1f;
         private float simulationAccumulator;
         private float staticPressureProfileAccumulator;
@@ -719,6 +726,7 @@ namespace ProgrammaticStylized3D.Rivers
         private double lastRuntimeTime;
         private double lastActivityTime;
         private bool supportWarningReported;
+        private bool allocationWarningReported;
         private bool resourcesDirty = true;
         private bool staticPressureTargetDirty = true;
         private bool staticWakeSourceDirty = true;
@@ -986,6 +994,7 @@ namespace ProgrammaticStylized3D.Rivers
             public Vector2[] RippleCollisionContour;
             public float MovementSpeed;
             public float Phase;
+            public EntityId OwnerId;
             public bool IsStatic;
             public bool StationaryObstruction;
             public double LastSeen;
@@ -1516,6 +1525,8 @@ namespace ProgrammaticStylized3D.Rivers
             BindDisabled();
             ReleaseResources();
             continuousSources.Clear();
+            continuousSourceIdsByOwner.Clear();
+            ownershipConflictWarningOwnerIds.Clear();
             automaticGeneratedSourceIds.Clear();
             refreshedAutomaticGeneratedSourceIds.Clear();
             generatedGeometryScratch.Clear();
@@ -1540,7 +1551,9 @@ namespace ProgrammaticStylized3D.Rivers
                 river = GetComponent<StylizedRiver>();
             }
 
-            if (river == null || !river.RuntimeDisturbancesEnabled)
+            if (river == null ||
+                !river.isActiveAndEnabled ||
+                !river.RuntimeDisturbancesEnabled)
             {
                 BindDisabled();
                 ReleaseResources();
@@ -1638,6 +1651,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            SetValidDomainComputeParameters();
             float interval = 1f / Mathf.Max(1f, ResolveSimulationRate());
             simulationAccumulator = Mathf.Min(
                 simulationAccumulator + deltaTime,
@@ -1727,6 +1741,7 @@ namespace ProgrammaticStylized3D.Rivers
             ImpactRippleEventSettings eventSettings)
         {
             if (river == null ||
+                !river.isActiveAndEnabled ||
                 !river.RuntimeDisturbancesEnabled ||
                 river.LiquidFactor <= 0.0001f ||
                 !river.TryProjectWorldPoint(
@@ -1776,6 +1791,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         public bool RegisterStaticSource(
             EntityId sourceId,
+            EntityId ownerId,
             Vector3 worldPosition,
             float acrossHalfWidth,
             float alongHalfLength,
@@ -1810,11 +1826,21 @@ namespace ProgrammaticStylized3D.Rivers
             IReadOnlyList<Vector2> rippleCollisionContour = null)
         {
             if (river == null ||
+                !river.isActiveAndEnabled ||
                 !river.RuntimeDisturbancesEnabled ||
                 !river.TryProjectWorldPoint(
                     worldPosition,
                     out StylizedRiverProjection projection) ||
                 !projection.IsInside)
+            {
+                RemoveContinuousSource(sourceId);
+                return false;
+            }
+
+            if (!TryClaimContinuousSourceOwner(
+                    ownerId,
+                    sourceId,
+                    true))
             {
                 RemoveContinuousSource(sourceId);
                 return false;
@@ -1984,6 +2010,7 @@ namespace ProgrammaticStylized3D.Rivers
                         rippleCollisionContour ?? contour),
                     MovementSpeed = 0f,
                     Phase = phase,
+                    OwnerId = ownerId,
                     IsStatic = true,
                     StationaryObstruction = true,
                     LastSeen = double.PositiveInfinity
@@ -2002,6 +2029,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         public bool UpdateContinuousSource(
             EntityId sourceId,
+            EntityId ownerId,
             Vector3 previousWorldPosition,
             Vector3 currentWorldPosition,
             float sampleDeltaTime,
@@ -2013,11 +2041,21 @@ namespace ProgrammaticStylized3D.Rivers
             bool stationaryObstruction)
         {
             if (river == null ||
+                !river.isActiveAndEnabled ||
                 !river.RuntimeDisturbancesEnabled ||
                 !river.TryProjectWorldPoint(
                     currentWorldPosition,
                     out StylizedRiverProjection currentProjection) ||
                 !currentProjection.IsInside)
+            {
+                RemoveContinuousSource(sourceId);
+                return false;
+            }
+
+            if (!TryClaimContinuousSourceOwner(
+                    ownerId,
+                    sourceId,
+                    false))
             {
                 RemoveContinuousSource(sourceId);
                 return false;
@@ -2107,6 +2145,7 @@ namespace ProgrammaticStylized3D.Rivers
                         riverSpaceTravel /
                         Mathf.Max(0.001f, sampleDeltaTime),
                     Phase = ResolveSourcePhase(sourceId),
+                    OwnerId = ownerId,
                     IsStatic = false,
                     StationaryObstruction = stationaryObstruction,
                     LastSeen = Time.realtimeSinceStartupAsDouble
@@ -2123,17 +2162,94 @@ namespace ProgrammaticStylized3D.Rivers
 
         public void RemoveContinuousSource(EntityId sourceId)
         {
-            if (continuousSources.TryGetValue(
+            if (!continuousSources.TryGetValue(
                     sourceId,
-                    out ContinuousSource source) &&
-                source.IsStatic)
+                    out ContinuousSource source))
+            {
+                return;
+            }
+
+            if (source.IsStatic)
             {
                 staticPressureTargetDirty = true;
                 staticWakeSourceDirty = true;
                 rippleBoundaryDirty = true;
             }
 
+            if (continuousSourceIdsByOwner.TryGetValue(
+                    source.OwnerId,
+                    out EntityId ownedSourceId) &&
+                EntityIdsEqual(ownedSourceId, sourceId))
+            {
+                continuousSourceIdsByOwner.Remove(source.OwnerId);
+                ownershipConflictWarningOwnerIds.Remove(source.OwnerId);
+            }
+
             continuousSources.Remove(sourceId);
+        }
+
+        private bool TryClaimContinuousSourceOwner(
+            EntityId ownerId,
+            EntityId sourceId,
+            bool staticRegistrySource)
+        {
+            if (continuousSources.TryGetValue(
+                    sourceId,
+                    out ContinuousSource previousSource) &&
+                !EntityIdsEqual(previousSource.OwnerId, ownerId) &&
+                continuousSourceIdsByOwner.TryGetValue(
+                    previousSource.OwnerId,
+                    out EntityId previousOwnerSourceId) &&
+                EntityIdsEqual(previousOwnerSourceId, sourceId))
+            {
+                continuousSourceIdsByOwner.Remove(previousSource.OwnerId);
+            }
+
+            if (continuousSourceIdsByOwner.TryGetValue(
+                    ownerId,
+                    out EntityId existingSourceId) &&
+                !EntityIdsEqual(existingSourceId, sourceId))
+            {
+                if (!continuousSources.TryGetValue(
+                        existingSourceId,
+                        out ContinuousSource existingSource))
+                {
+                    continuousSourceIdsByOwner.Remove(ownerId);
+                }
+                else if (staticRegistrySource && !existingSource.IsStatic)
+                {
+                    RemoveContinuousSource(existingSourceId);
+                }
+                else
+                {
+                    ReportOwnershipConflict(ownerId);
+                    return false;
+                }
+            }
+
+            continuousSourceIdsByOwner[ownerId] = sourceId;
+            ownershipConflictWarningOwnerIds.Remove(ownerId);
+            return true;
+        }
+
+        private void ReportOwnershipConflict(EntityId ownerId)
+        {
+            if (!ownershipConflictWarningOwnerIds.Add(ownerId))
+            {
+                return;
+            }
+
+            Debug.LogWarning(
+                $"River disturbance continuous-source ownership conflict " +
+                $"on '{name}' for physical owner {ownerId}. Generated " +
+                "stationary geometry takes precedence, and a second " +
+                "continuous source for the same GameObject was rejected.",
+                this);
+        }
+
+        private static bool EntityIdsEqual(EntityId left, EntityId right)
+        {
+            return EqualityComparer<EntityId>.Default.Equals(left, right);
         }
 
         public bool EmitDebugImpact(
@@ -2280,8 +2396,14 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
+                if (!candidate.isActiveAndEnabled)
+                {
+                    continue;
+                }
+
                 StylizedRiver candidateRiver = candidate.river;
                 if (candidateRiver == null ||
+                    !candidateRiver.isActiveAndEnabled ||
                     !candidateRiver.RuntimeDisturbancesEnabled ||
                     !candidateRiver.TryProjectWorldPoint(
                         worldPosition,
@@ -2339,6 +2461,7 @@ namespace ProgrammaticStylized3D.Rivers
         private void RefreshGeneratedGeometrySources()
         {
             if (river == null ||
+                !river.isActiveAndEnabled ||
                 !river.RuntimeDisturbancesEnabled ||
                 !river.Domain.IsValid ||
                 !river.TryGetSurfaceBounds(out Bounds currentRiverBounds))
@@ -2391,7 +2514,7 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 if (!refreshedAutomaticGeneratedSourceIds.Contains(sourceId))
                 {
-                    continuousSources.Remove(sourceId);
+                    RemoveContinuousSource(sourceId);
                     RemoveGeneratedDiagnostic(sourceId);
                 }
             }
@@ -2705,8 +2828,10 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             EntityId sourceId = meshFilter.GetEntityId();
+            EntityId ownerId = meshFilter.gameObject.GetEntityId();
             if (!RegisterStaticSource(
                     sourceId,
+                    ownerId,
                     footprint.WorldPosition,
                     footprint.AcrossHalfWidth,
                     footprint.AlongHalfLength,
@@ -2938,21 +3063,26 @@ namespace ProgrammaticStylized3D.Rivers
                 _ => 96
             };
 
-            int maximumWidth = Mathf.Max(256, SystemInfo.maxTextureSize);
-            if (resolutionPerChunk * chunkCount > maximumWidth)
-            {
-                resolutionPerChunk = Mathf.Max(
+            int maximumTextureSize = SystemInfo.maxTextureSize;
+            if (!TryResolveChunkedTextureWidth(
+                    chunkCount,
+                    resolutionPerChunk,
                     16,
-                    maximumWidth / chunkCount);
-            }
-            if (wakeResolutionPerChunk * chunkCount > maximumWidth)
-            {
-                wakeResolutionPerChunk = Mathf.Max(
+                    maximumTextureSize,
+                    out resolutionPerChunk,
+                    out fieldWidth) ||
+                !TryResolveChunkedTextureWidth(
+                    chunkCount,
+                    wakeResolutionPerChunk,
                     16,
-                    maximumWidth / chunkCount);
+                    maximumTextureSize,
+                    out wakeResolutionPerChunk,
+                    out wakeFieldWidth))
+            {
+                ReportAllocationFailure(maximumTextureSize);
+                return false;
             }
 
-            fieldWidth = Mathf.Max(16, resolutionPerChunk * chunkCount);
             fieldHeight = river.Quality switch
             {
                 StylizedRiverQuality.Low => 32,
@@ -2960,9 +3090,6 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverQuality.High => 64,
                 _ => 48
             };
-            wakeFieldWidth = Mathf.Max(
-                16,
-                wakeResolutionPerChunk * chunkCount);
             wakeFieldHeight = river.Quality switch
             {
                 StylizedRiverQuality.Low => 20,
@@ -2970,10 +3097,27 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverQuality.High => 48,
                 _ => 32
             };
+            if (fieldHeight > maximumTextureSize ||
+                wakeFieldHeight > maximumTextureSize)
+            {
+                ReportAllocationFailure(maximumTextureSize);
+                return false;
+            }
 
             fieldLength = chunkCount * ChunkLengthMetres;
+            validFieldLength = river.Domain.LocalLength;
+            validFieldWidth = ResolveValidColumnCount(
+                fieldWidth,
+                validFieldLength,
+                fieldLength);
+            validWakeFieldWidth = ResolveValidColumnCount(
+                wakeFieldWidth,
+                validFieldLength,
+                fieldLength);
+            allocationWarningReported = false;
             averageSurfaceHalfWidth = ResolveAverageSurfaceHalfWidth();
             domainVersion = river.Domain.Version;
+            SetValidDomainComputeParameters();
 
             if (!BuildRippleMetricData())
             {
@@ -3046,6 +3190,91 @@ namespace ProgrammaticStylized3D.Rivers
             resourcesDirty = false;
             RebuildRippleBoundary(Time.realtimeSinceStartupAsDouble);
             return true;
+        }
+
+        private static bool TryResolveChunkedTextureWidth(
+            int chunks,
+            int desiredResolutionPerChunk,
+            int minimumResolutionPerChunk,
+            int maximumTextureSize,
+            out int resolvedResolutionPerChunk,
+            out int resolvedWidth)
+        {
+            resolvedResolutionPerChunk = 0;
+            resolvedWidth = 0;
+            if (chunks < 1 ||
+                maximumTextureSize < minimumResolutionPerChunk ||
+                (long)chunks * minimumResolutionPerChunk > maximumTextureSize)
+            {
+                return false;
+            }
+
+            resolvedResolutionPerChunk = Math.Min(
+                desiredResolutionPerChunk,
+                maximumTextureSize / chunks);
+            if (resolvedResolutionPerChunk < minimumResolutionPerChunk)
+            {
+                return false;
+            }
+
+            long width = (long)resolvedResolutionPerChunk * chunks;
+            if (width < 1 || width > maximumTextureSize)
+            {
+                return false;
+            }
+
+            resolvedWidth = (int)width;
+            return true;
+        }
+
+        private static int ResolveValidColumnCount(
+            int textureWidth,
+            float validLength,
+            float storageLength)
+        {
+            if (textureWidth <= 1)
+            {
+                return Mathf.Clamp(textureWidth, 0, 1);
+            }
+
+            float lastValidIndex =
+                Mathf.Clamp01(validLength / Mathf.Max(0.001f, storageLength)) *
+                (textureWidth - 1);
+            // Include the first sample at or beyond the endpoint as a
+            // deliberate one-cell outflow guard. Unlike the old padded tail,
+            // it cannot own sources and all following columns are hard-zeroed.
+            return Mathf.Clamp(
+                Mathf.CeilToInt(lastValidIndex) + 1,
+                1,
+                textureWidth);
+        }
+
+        private void SetValidDomainComputeParameters()
+        {
+            if (computeShader == null)
+            {
+                return;
+            }
+
+            computeShader.SetInt("_ValidFieldWidth", validFieldWidth);
+            computeShader.SetInt("_ValidWakeWidth", validWakeFieldWidth);
+        }
+
+        private void ReportAllocationFailure(int maximumTextureSize)
+        {
+            if (allocationWarningReported)
+            {
+                return;
+            }
+
+            Debug.LogWarning(
+                $"StylizedRiver disturbance field on '{name}' is disabled " +
+                $"because the required textures for {chunkCount} chunks " +
+                $"cannot fit within the hardware texture limit of " +
+                $"{maximumTextureSize} pixels. The field requires at least " +
+                "16 columns per chunk.",
+                this);
+            allocationWarningReported = true;
         }
 
         private RenderTexture CreateFieldTexture(
@@ -3134,6 +3363,9 @@ namespace ProgrammaticStylized3D.Rivers
             resolutionPerChunk = 0;
             wakeResolutionPerChunk = 0;
             fieldLength = 0f;
+            validFieldLength = 0f;
+            validFieldWidth = 0;
+            validWakeFieldWidth = 0;
             domainVersion = -1;
             rippleMetricMinimumAlongCell = Array.Empty<float>();
             rippleMetricMinimumLateralCell = Array.Empty<float>();
@@ -4505,11 +4737,11 @@ namespace ProgrammaticStylized3D.Rivers
             float minimumLocal = Mathf.Clamp(
                 sourceLocal - upstreamReach,
                 0f,
-                fieldLength);
+                validFieldLength);
             float maximumLocal = Mathf.Clamp(
                 sourceLocal + downstreamReach,
                 0f,
-                fieldLength);
+                validFieldLength);
             int minimumChunk = Mathf.Clamp(
                 Mathf.FloorToInt(minimumLocal / ChunkLengthMetres),
                 0,
@@ -4575,7 +4807,7 @@ namespace ProgrammaticStylized3D.Rivers
             float localDistance = Mathf.Clamp(
                 globalDistance - river.Domain.GlobalDistanceMinimum,
                 0f,
-                fieldLength);
+                validFieldLength);
             int centreChunk = Mathf.Clamp(
                 Mathf.FloorToInt(localDistance / ChunkLengthMetres),
                 0,
@@ -6350,11 +6582,11 @@ namespace ProgrammaticStylized3D.Rivers
             float minimumLocalDistance = Mathf.Clamp(
                 minimumGlobalDistance - domainMinimum,
                 0f,
-                fieldLength);
+                validFieldLength);
             float maximumLocalDistance = Mathf.Clamp(
                 maximumGlobalDistance - domainMinimum,
                 0f,
-                fieldLength);
+                validFieldLength);
             if (maximumLocalDistance < minimumLocalDistance)
             {
                 float swap = minimumLocalDistance;
@@ -6473,7 +6705,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             for (int index = 0; index < staleSourceIds.Count; index++)
             {
-                continuousSources.Remove(staleSourceIds[index]);
+                RemoveContinuousSource(staleSourceIds[index]);
             }
         }
 
@@ -6613,8 +6845,9 @@ namespace ProgrammaticStylized3D.Rivers
                 float longitudinalDenominator = Mathf.Max(1, fieldWidth - 1);
                 for (int row = 0; row < fieldWidth; row++)
                 {
-                    float orientedDistance =
-                        row / longitudinalDenominator * fieldLength;
+                    float orientedDistance = Mathf.Min(
+                        row / longitudinalDenominator * fieldLength,
+                        validFieldLength);
                     ResolveRippleMetricRow(
                         orientedDistance,
                         out centres[row],
@@ -7035,7 +7268,7 @@ namespace ProgrammaticStylized3D.Rivers
             float localDistance = Mathf.Clamp(
                 globalDistance - river.Domain.GlobalDistanceMinimum,
                 0f,
-                fieldLength);
+                validFieldLength);
             return localDistance / Mathf.Max(0.001f, fieldLength) *
                    Mathf.Max(0, targetWidth - 1);
         }

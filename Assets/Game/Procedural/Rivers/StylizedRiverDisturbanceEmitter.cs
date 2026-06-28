@@ -97,6 +97,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool legacyStaticWarningIssued;
 
         private EntityId SourceId => GetEntityId();
+        private EntityId OwnerId => gameObject.GetEntityId();
 
         private bool IsLegacyStaticEmitter =>
             sourceMobility == LegacySourceMobility.Static;
@@ -247,6 +248,7 @@ namespace ProgrammaticStylized3D.Rivers
                 // Wake settings shared with stationary geometry.
                 currentRuntime.UpdateContinuousSource(
                     SourceId,
+                    OwnerId,
                     previousSamplePosition,
                     currentPosition,
                     sampleDelta,
@@ -313,11 +315,17 @@ namespace ProgrammaticStylized3D.Rivers
         {
             if (explicitRiver != null)
             {
+                if (!explicitRiver.isActiveAndEnabled ||
+                    !explicitRiver.RuntimeDisturbancesEnabled)
+                {
+                    return null;
+                }
+
                 StylizedRiverDisturbanceRuntime runtime =
                     explicitRiver.GetOrCreateDisturbanceRuntime();
 
                 if (runtime != null &&
-                    explicitRiver.RuntimeDisturbancesEnabled &&
+                    runtime.isActiveAndEnabled &&
                     explicitRiver.TryProjectWorldPoint(
                         worldPosition,
                         out StylizedRiverProjection projection) &&

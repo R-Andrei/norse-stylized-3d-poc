@@ -1371,6 +1371,22 @@ namespace ProgrammaticStylized3D.Rivers
         private void OnDisable()
         {
             UnsubscribeFromSplineChanges();
+
+            disturbanceRuntime ??=
+                GetComponent<StylizedRiverDisturbanceRuntime>();
+            foamRuntime ??=
+                GetComponent<StylizedRiverFoamRuntime>();
+
+            if (disturbanceRuntime != null)
+            {
+                disturbanceRuntime.enabled = false;
+            }
+
+            if (foamRuntime != null)
+            {
+                foamRuntime.enabled = false;
+            }
+
             SetRendererEnabled(false);
         }
 
@@ -3037,8 +3053,13 @@ namespace ProgrammaticStylized3D.Rivers
 
             if (disturbanceRuntime != null)
             {
-                disturbanceRuntime.enabled = runtimeDisturbances;
-                disturbanceRuntime.NotifyRiverChanged();
+                bool shouldRun =
+                    runtimeDisturbances && isActiveAndEnabled;
+                disturbanceRuntime.enabled = shouldRun;
+                if (shouldRun)
+                {
+                    disturbanceRuntime.NotifyRiverChanged();
+                }
             }
         }
 
@@ -3058,8 +3079,12 @@ namespace ProgrammaticStylized3D.Rivers
             if (foamRuntime != null)
             {
                 foamRuntime.hideFlags = HideFlags.HideInInspector;
-                foamRuntime.enabled = foamEnabled;
-                foamRuntime.NotifyRiverChanged();
+                bool shouldRun = foamEnabled && isActiveAndEnabled;
+                foamRuntime.enabled = shouldRun;
+                if (shouldRun)
+                {
+                    foamRuntime.NotifyRiverChanged();
+                }
             }
         }
 

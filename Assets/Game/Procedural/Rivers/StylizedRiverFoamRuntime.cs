@@ -153,6 +153,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool resourcesDirty = true;
         private bool boundaryDirty = true;
         private bool supportWarningReported;
+        private bool allocationWarningReported;
         private bool fullyFrozenLastUpdate;
         private int domainVersion = -1;
         private int fieldWidth;
@@ -164,6 +165,8 @@ namespace ProgrammaticStylized3D.Rivers
         private int fractureWidth;
         private int fractureHeight;
         private float fieldLength;
+        private float validFieldLength;
+        private float simulationFieldLength;
         private float simulationAccumulator;
         private float guidanceAccumulator;
         private float populationAccumulator;
@@ -304,7 +307,9 @@ namespace ProgrammaticStylized3D.Rivers
                 river = GetComponent<StylizedRiver>();
             }
 
-            if (river == null || !river.FoamEnabled)
+            if (river == null ||
+                !river.isActiveAndEnabled ||
+                !river.FoamEnabled)
             {
                 BindDisabled();
                 ReleaseResources();
@@ -692,11 +697,19 @@ namespace ProgrammaticStylized3D.Rivers
                 _ => 48
             };
 
-            int maximumWidth = Mathf.Max(256, SystemInfo.maxTextureSize);
-            resolutionPerChunk = Mathf.Max(
-                16,
-                Mathf.Min(resolutionPerChunk, maximumWidth / chunkCount));
-            fieldWidth = Mathf.Max(16, resolutionPerChunk * chunkCount);
+            int maximumTextureSize = SystemInfo.maxTextureSize;
+            if (!TryResolveChunkedTextureWidth(
+                    chunkCount,
+                    resolutionPerChunk,
+                    16,
+                    maximumTextureSize,
+                    out resolutionPerChunk,
+                    out fieldWidth))
+            {
+                ReportAllocationFailure(maximumTextureSize);
+                return false;
+            }
+
             fieldHeight = river.Quality switch
             {
                 StylizedRiverQuality.Low => 32,
@@ -704,15 +717,18 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverQuality.High => 64,
                 _ => 48
             };
-            guidanceWidth = Mathf.Max(
-                24,
-                chunkCount * (river.Quality switch
-                {
-                    StylizedRiverQuality.Low => 12,
-                    StylizedRiverQuality.Medium => 18,
-                    StylizedRiverQuality.High => 24,
-                    _ => 18
-                }));
+            int guidanceResolutionPerChunk = river.Quality switch
+            {
+                StylizedRiverQuality.Low => 12,
+                StylizedRiverQuality.Medium => 18,
+                StylizedRiverQuality.High => 24,
+                _ => 18
+            };
+            long desiredGuidanceWidth =
+                (long)chunkCount * guidanceResolutionPerChunk;
+            guidanceWidth = (int)Math.Min(
+                maximumTextureSize,
+                Math.Max(24L, desiredGuidanceWidth));
             guidanceHeight = river.Quality switch
             {
                 StylizedRiverQuality.Low => 32,
@@ -722,7 +738,28 @@ namespace ProgrammaticStylized3D.Rivers
             };
             fractureWidth = Mathf.Max(16, Mathf.CeilToInt(fieldWidth * 0.5f));
             fractureHeight = Mathf.Max(16, Mathf.CeilToInt(fieldHeight * 0.5f));
+
+            if (maximumTextureSize < 24 ||
+                fieldHeight > maximumTextureSize ||
+                guidanceHeight > maximumTextureSize ||
+                fractureWidth > maximumTextureSize ||
+                fractureHeight > maximumTextureSize)
+            {
+                ReportAllocationFailure(maximumTextureSize);
+                return false;
+            }
+
             fieldLength = chunkCount * ChunkLengthMetres;
+            validFieldLength = domain.LocalLength;
+            float longitudinalSpacing =
+                fieldLength / Mathf.Max(1, fieldWidth - 1);
+            // Keep one inert outflow sample beyond the exact endpoint so
+            // bilinear rendering reaches the visible river end without
+            // reintroducing a padded population domain.
+            simulationFieldLength = Mathf.Min(
+                fieldLength,
+                validFieldLength + longitudinalSpacing);
+            allocationWarningReported = false;
             domainVersion = domain.Version;
             allocatedQuality = river.Quality;
 
@@ -769,6 +806,57 @@ namespace ProgrammaticStylized3D.Rivers
             fractureAccumulator = 0f;
             simulationInterpolation = 1f;
             return true;
+        }
+
+        private static bool TryResolveChunkedTextureWidth(
+            int chunks,
+            int desiredResolutionPerChunk,
+            int minimumResolutionPerChunk,
+            int maximumTextureSize,
+            out int resolvedResolutionPerChunk,
+            out int resolvedWidth)
+        {
+            resolvedResolutionPerChunk = 0;
+            resolvedWidth = 0;
+            if (chunks < 1 ||
+                maximumTextureSize < minimumResolutionPerChunk ||
+                (long)chunks * minimumResolutionPerChunk > maximumTextureSize)
+            {
+                return false;
+            }
+
+            resolvedResolutionPerChunk = Math.Min(
+                desiredResolutionPerChunk,
+                maximumTextureSize / chunks);
+            if (resolvedResolutionPerChunk < minimumResolutionPerChunk)
+            {
+                return false;
+            }
+
+            long width = (long)resolvedResolutionPerChunk * chunks;
+            if (width < 1 || width > maximumTextureSize)
+            {
+                return false;
+            }
+
+            resolvedWidth = (int)width;
+            return true;
+        }
+
+        private void ReportAllocationFailure(int maximumTextureSize)
+        {
+            if (allocationWarningReported)
+            {
+                return;
+            }
+
+            Debug.LogWarning(
+                $"Stage 6 Foam on '{name}' is disabled because the required " +
+                $"textures for {chunkCount} chunks cannot fit within the " +
+                $"hardware texture limit of {maximumTextureSize} pixels. " +
+                "The field requires at least 16 columns per chunk.",
+                this);
+            allocationWarningReported = true;
         }
 
         private RenderTexture CreateFieldTexture(string textureName)
@@ -876,9 +964,11 @@ namespace ProgrammaticStylized3D.Rivers
 
             for (int x = 0; x < fieldWidth; x++)
             {
+                float localDistance =
+                    x / (float)Mathf.Max(1, fieldWidth - 1) * fieldLength;
                 float globalDistance =
                     river.Domain.GlobalDistanceMinimum +
-                    x / (float)Mathf.Max(1, fieldWidth - 1) * fieldLength;
+                    Mathf.Min(localDistance, validFieldLength);
                 StylizedRiverSplineSample sample =
                     river.Domain.SampleAtGlobalDistance(globalDistance);
                 float left = Mathf.Max(0.05f, sample.LeftSurfaceHalfWidth);
@@ -922,9 +1012,16 @@ namespace ProgrammaticStylized3D.Rivers
 
             for (int x = 0; x < fieldWidth; x++)
             {
+                float localDistance =
+                    x / (float)Mathf.Max(1, fieldWidth - 1) * fieldLength;
+                if (localDistance > simulationFieldLength + 0.0001f)
+                {
+                    continue;
+                }
+
                 float globalDistance =
                     river.Domain.GlobalDistanceMinimum +
-                    x / (float)Mathf.Max(1, fieldWidth - 1) * fieldLength;
+                    Mathf.Min(localDistance, validFieldLength);
                 StylizedRiverSplineSample sample =
                     river.Domain.SampleAtGlobalDistance(globalDistance);
                 float leftSurface = Mathf.Max(0.05f, sample.LeftSurfaceHalfWidth);
@@ -1344,6 +1441,10 @@ namespace ProgrammaticStylized3D.Rivers
             int countX = endX - startX + 1;
 
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetFloat("_FoamValidLength", validFieldLength);
+            computeShader.SetFloat(
+                "_FoamSimulationLength",
+                simulationFieldLength);
             computeShader.SetInt("_FoamRangeStart", startX);
             computeShader.SetInt("_FoamRangeCount", countX);
             computeShader.SetFloat("_FoamGlobalStart", river.Domain.GlobalDistanceMinimum);
@@ -1421,6 +1522,10 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetFloat("_FoamValidLength", validFieldLength);
+            computeShader.SetFloat(
+                "_FoamSimulationLength",
+                simulationFieldLength);
             computeShader.SetInts(
                 "_FoamGuidanceDimensions",
                 guidanceWidth,
@@ -1469,6 +1574,10 @@ namespace ProgrammaticStylized3D.Rivers
                 64);
 
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetFloat("_FoamValidLength", validFieldLength);
+            computeShader.SetFloat(
+                "_FoamSimulationLength",
+                simulationFieldLength);
             computeShader.SetInt(
                 "_FoamResolutionPerChunk",
                 resolutionPerChunk);
@@ -1534,6 +1643,10 @@ namespace ProgrammaticStylized3D.Rivers
         private void ConfigureSharedComputeParameters(float deltaTime)
         {
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetFloat("_FoamValidLength", validFieldLength);
+            computeShader.SetFloat(
+                "_FoamSimulationLength",
+                simulationFieldLength);
             computeShader.SetInts(
                 "_FoamGuidanceDimensions",
                 guidanceWidth,
@@ -1833,6 +1946,10 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetFloat("_FoamValidLength", validFieldLength);
+            computeShader.SetFloat(
+                "_FoamSimulationLength",
+                simulationFieldLength);
             computeShader.SetInt("_FoamRangeStart", startX);
             computeShader.SetInt("_FoamRangeCount", countX);
             computeShader.SetTexture(clearKernel, "_FoamStateWrite", target);
@@ -1850,6 +1967,10 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetFloat("_FoamValidLength", validFieldLength);
+            computeShader.SetFloat(
+                "_FoamSimulationLength",
+                simulationFieldLength);
             computeShader.SetInt("_FoamRangeStart", 0);
             computeShader.SetInt("_FoamRangeCount", fieldWidth);
             computeShader.SetTexture(
@@ -2021,6 +2142,8 @@ namespace ProgrammaticStylized3D.Rivers
             chunkCount = 0;
             resolutionPerChunk = 0;
             fieldLength = 0f;
+            validFieldLength = 0f;
+            simulationFieldLength = 0f;
             chunkActive = Array.Empty<bool>();
             chunkActiveUntil = Array.Empty<double>();
             resourcesDirty = true;

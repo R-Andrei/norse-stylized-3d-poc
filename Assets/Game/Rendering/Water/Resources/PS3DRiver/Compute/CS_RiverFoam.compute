@@ -62,6 +62,8 @@ int _FoamChunkCount;
 float _FoamDeltaTime;
 float _FoamGlobalStart;
 float _FoamFieldLength;
+float _FoamValidLength;
+float _FoamSimulationLength;
 float _FoamFlowSpeed;
 float _FoamEvolution;
 float _FoamBreakup;
@@ -95,6 +97,28 @@ float _FoamInjectionElongation;
 float _FoamInjectionShapeSeed;
 float _FoamInjectionShapeVariety;
 float _FoamInjectionCompound;
+
+bool IsFoamColumnInsideDomain(int x)
+{
+    float localDistance =
+        x / max(1.0, (float)(_FoamDimensions.x - 1)) *
+        _FoamFieldLength;
+    return localDistance <= _FoamValidLength + 0.0001;
+}
+
+bool IsFoamUInsideDomain(float u)
+{
+    return saturate(u) * _FoamFieldLength <=
+        _FoamValidLength + 0.0001;
+}
+
+bool IsFoamColumnInsideSimulation(int x)
+{
+    float localDistance =
+        x / max(1.0, (float)(_FoamDimensions.x - 1)) *
+        _FoamFieldLength;
+    return localDistance <= _FoamSimulationLength + 0.0001;
+}
 
 int ClampX(int x)
 {
@@ -894,6 +918,12 @@ void ApplyBoundary(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 coordinate = int2(x, y);
+    if (!IsFoamColumnInsideSimulation(x))
+    {
+        _FoamStateWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
     float coverage = LoadBoundary(coordinate).x;
     float4 state = _FoamStateWrite[coordinate];
     state.xyz *= coverage;
@@ -923,6 +953,12 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 coordinate = int2(x, y);
+    if (!IsFoamColumnInsideDomain(x))
+    {
+        _FoamStateWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
     float coverage = LoadBoundary(coordinate).x;
     if (coverage <= 0.001)
     {
@@ -1002,6 +1038,12 @@ void BuildGuidance(uint3 dispatchId : SV_DispatchThreadID)
     float2 epsilon = 1.0 /
         max(float2(2.0, 2.0), (float2)_FoamGuidanceDimensions);
 
+    if (!IsFoamUInsideDomain(uv.x))
+    {
+        _FoamGuidanceWrite[int2(dispatchId.xy)] = 0.0.xxxx;
+        return;
+    }
+
     float4 centreSample = EvaluateNetworkSample(uv);
     float left = EvaluateNetworkDistance(saturate(uv - float2(epsilon.x, 0.0)));
     float right = EvaluateNetworkDistance(saturate(uv + float2(epsilon.x, 0.0)));
@@ -1059,6 +1101,11 @@ void MeasurePopulation(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 coordinate = int2(dispatchId.xy);
+    if (!IsFoamColumnInsideDomain(coordinate.x))
+    {
+        return;
+    }
+
     float coverage = LoadBoundary(coordinate).x;
     if (coverage <= 0.05)
     {
@@ -1267,6 +1314,12 @@ void AdvectForward(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 coordinate = int2(x, y);
+    if (!IsFoamColumnInsideSimulation(x))
+    {
+        _FoamAdvectionWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
     float coverage = LoadBoundary(coordinate).x;
     if (coverage <= 0.001)
     {
@@ -1306,6 +1359,12 @@ void AdvectReverse(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 coordinate = int2(x, y);
+    if (!IsFoamColumnInsideSimulation(x))
+    {
+        _FoamAdvectionWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
     float coverage = LoadBoundary(coordinate).x;
     if (coverage <= 0.001)
     {
@@ -1345,6 +1404,13 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 coordinate = int2(x, y);
+    bool insidePhysicalDomain = IsFoamColumnInsideDomain(x);
+    if (!IsFoamColumnInsideSimulation(x))
+    {
+        _FoamStateWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
     float2 boundary = LoadBoundary(coordinate);
     float coverage = boundary.x;
     if (coverage <= 0.001)
@@ -1534,7 +1600,8 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     localCapacity *= 1.0 - upstreamMergeSuppression * 0.96;
 
     float sourceRate =
-        max(0.0, _FoamSupplyRate) * sourceNeed * laneBirth * localCapacity * coverage;
+        max(0.0, _FoamSupplyRate) * sourceNeed * laneBirth *
+        localCapacity * coverage * (insidePhysicalDomain ? 1.0 : 0.0);
     float bornAmount = sourceRate * _FoamDeltaTime;
     if (bornAmount > 0.000001)
     {
