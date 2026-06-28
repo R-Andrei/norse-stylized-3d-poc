@@ -97,15 +97,13 @@ namespace ProgrammaticStylized3D.Rivers
 
     public enum StylizedRiverFoamDebugView
     {
+        // Zero is the normal rendered result and acts as the debug-off state.
         Final = 0,
-        Amount = 1,
-        Freshness = 2,
-        FinalMask = 3,
-        Integrity = 4,
-        Phase = 5,
-        Guidance = 6,
-        Capture = 7,
-        Fracture = 8
+        // Numeric values 3, 6, and 7 are retained so existing serialized
+        // selections survive the removal of obsolete Foam diagnostics.
+        CaptureZones = 3,
+        PositiveNegativeZones = 6,
+        PositiveZoneClasses = 7
     }
 
     public enum StylizedRiverDisturbanceDebugView
@@ -148,18 +146,6 @@ namespace ProgrammaticStylized3D.Rivers
         FreezeAmount = 12
     }
 
-    public enum StylizedRiverDebugView
-    {
-        Final = 0,
-        Depth = 1,
-        Normals = 2,
-        FoamState = 3,
-        FinalFoam = 4,
-        Refraction = 5,
-        PlanarReflection = 6,
-        WaveEdgeMask = 7
-    }
-
     [ExecuteAlways]
     [DisallowMultipleComponent]
     [RequireComponent(typeof(SplineContainer))]
@@ -186,7 +172,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private const string LegacyStaticFoamObjectName =
             "__PS3D_RiverStaticFoam";
-        private const int CurrentFoamAuthoringVersion = 1;
+        private const int CurrentFoamAuthoringVersion = 4;
 
         private const string CorridorObjectName =
             "__PS3D_RiverCorridor";
@@ -665,33 +651,45 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamAmount = 0.48f;
 
-        [Tooltip("Controls topology failure rather than global lifespan: edge cracking, phase-seam weakness, internal pitting, neck collapse, and how difficult tiny reconnections are to preserve.")]
+        [Tooltip("Controls the physical scale hierarchy of the structural film topology. Lower values favour fewer broad rafts, large pockets, and long ribbons; higher values introduce smaller branches and tighter pocket spacing without changing texture-cell scale.")]
         [Range(0f, 1f)]
-        [SerializeField] private float foamFragmentation = 0.68f;
+        [SerializeField] private float foamWebGranularity = 0.52f;
 
-        [Tooltip("Controls persistent material and fragment lifetime. Freshness expires much sooner than Amount, so a source imprint changes quickly while the resulting network can travel, merge, and break for many seconds.")]
+        [Tooltip("Controls how quickly free-water rafts, protected pockets, and connector candidates evolve. Shore, obstacle, bend, Pressure, and lee organisation remain anchored to their sources.")]
         [Range(0f, 1f)]
-        [SerializeField] private float foamPersistence = 0.58f;
+        [SerializeField] private float foamNetworkEvolution = 0.56f;
 
-        [Tooltip("Controls filament-guidance evolution, lateral wandering, differential shear, and network reconfiguration. Authoritative river flow still owns the downstream direction.")]
+        [Tooltip("Controls how often connected film receives opportunities to open holes, fail at narrow necks, peel, and shed secondary fragments. It is not a second global lifetime control.")]
         [Range(0f, 1f)]
-        [SerializeField] private float foamAgitation = 0.56f;
+        [SerializeField] private float foamBreakupFrequency = 0.68f;
 
-        [Tooltip("Controls only the hardness of the visible graphical Foam edge. Zero allows a softer anti-aliased transition; one produces an extremely crisp stylized silhouette.")]
+        [Tooltip("Controls downstream transport speed of the persistent film relative to the river's authoritative flow speed. It cannot reverse the downstream direction.")]
         [Range(0f, 1f)]
-        [SerializeField] private float foamSharpness = 0.88f;
+        [SerializeField] private float foamSpeed = 0.56f;
 
         [Tooltip("Lit, non-emissive Foam tint. The alpha channel controls maximum Foam opacity, so no separate opacity control is required.")]
         [SerializeField] private Color foamColour =
             new Color(0.94f, 0.97f, 0.94f, 0.72f);
 
+        // Internal/serialized compatibility inputs. Stage 6.2 exposes only the
+        // six canonical controls above; persistence and contour hardness remain
+        // implementation details until testing proves they require authorship.
+        [HideInInspector, SerializeField, Range(0f, 1f)]
+        private float foamFragmentation = 0.68f;
+        [HideInInspector, SerializeField, Range(0f, 1f)]
+        private float foamPersistence = 0.58f;
+        [HideInInspector, SerializeField, Range(0f, 1f)]
+        private float foamAgitation = 0.56f;
+        [HideInInspector, SerializeField, Range(0f, 1f)]
+        private float foamSharpness = 0.88f;
+
         [HideInInspector, SerializeField]
         private int foamAuthoringVersion;
 
         // Hidden F1/F2A compatibility values. Existing scenes are migrated
-        // once into the canonical Amount / Fragmentation / Persistence /
-        // Agitation / Sharpness language. Runtime response is then derived
-        // only from the canonical controls above.
+        // through the former authoring language and then into the canonical
+        // Amount / Web Granularity / Network Evolution / Breakup Frequency /
+        // Foam Speed / Foam Colour contract.
         [HideInInspector, SerializeField] private float foamStrength = 1f;
         [HideInInspector, SerializeField] private float foamCoverage = 0.50f;
         [HideInInspector, SerializeField] private float foamConnectivity = 0.30f;
@@ -712,7 +710,7 @@ namespace ProgrammaticStylized3D.Rivers
         [HideInInspector, SerializeField] private float foamDetailScale = 0.65f;
         [HideInInspector, SerializeField] private float foamDetailStrength = 0.35f;
 
-        [Tooltip("Selects a Stage 6 diagnostic view. Amount shows persistent material, Freshness recent activation, Integrity structural resistance, Phase transported provenance, and Final Mask the exact rendered network silhouette.")]
+        [Tooltip("Selects one of the retained Stage 6 diagnostics. Final is the normal rendered result; all obsolete Foam debug modes have been removed.")]
         [SerializeField] private StylizedRiverFoamDebugView foamDebugView =
             StylizedRiverFoamDebugView.Final;
 
@@ -833,10 +831,6 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(1, 9999)]
         [SerializeField] private int visualSeed = 1731;
 
-        [SerializeField]
-        private StylizedRiverDebugView debugView =
-            StylizedRiverDebugView.Final;
-
         private static readonly int ShallowColorId = Shader.PropertyToID("_ShallowColor");
         private static readonly int DeepColorId = Shader.PropertyToID("_DeepColor");
         private static readonly int ClarityId = Shader.PropertyToID("_Clarity");
@@ -947,7 +941,6 @@ namespace ProgrammaticStylized3D.Rivers
         private static readonly int FlowDirectionId = Shader.PropertyToID("_FlowDirection");
         private static readonly int RiverTimeId = Shader.PropertyToID("_RiverTime");
         private static readonly int VisualSeedId = Shader.PropertyToID("_VisualSeed");
-        private static readonly int DebugViewId = Shader.PropertyToID("_DebugView");
 
         private static readonly int PlanarReflectionTextureId = Shader.PropertyToID("_PlanarReflectionTexture");
         private static readonly int PlanarReflectionVpId = Shader.PropertyToID("_PlanarReflectionVP");
@@ -1121,9 +1114,13 @@ namespace ProgrammaticStylized3D.Rivers
         public bool FoamEnabled => foamEnabled;
         public StylizedRiverFoamPreset FoamPreset => foamPreset;
         public float FoamAmount => foamAmount;
-        public float FoamFragmentation => foamFragmentation;
+        public float FoamWebGranularity => foamWebGranularity;
+        public float FoamNetworkEvolution => foamNetworkEvolution;
+        public float FoamBreakupFrequency => foamBreakupFrequency;
+        public float FoamSpeed => foamSpeed;
+        public float FoamFragmentation => foamBreakupFrequency;
         public float FoamPersistence => foamPersistence;
-        public float FoamAgitation => foamAgitation;
+        public float FoamAgitation => foamNetworkEvolution;
         public float FoamStrength => ResolveFoamStrength();
         public float FoamCoverage => ResolveFoamCoverage();
         public float FoamSharpness => foamSharpness;
@@ -1352,6 +1349,7 @@ namespace ProgrammaticStylized3D.Rivers
         private void OnEnable()
         {
             MigrateFoamAuthoringIfNeeded();
+            foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
             CacheComponents();
@@ -1421,9 +1419,26 @@ namespace ProgrammaticStylized3D.Rivers
             return StylizedRiverDisturbanceDebugView.Final;
         }
 
+
+        private static StylizedRiverFoamDebugView ResolveFoamDebugView(
+            StylizedRiverFoamDebugView value)
+        {
+            switch ((int)value)
+            {
+                case (int)StylizedRiverFoamDebugView.CaptureZones:
+                    return StylizedRiverFoamDebugView.CaptureZones;
+                case (int)StylizedRiverFoamDebugView.PositiveNegativeZones:
+                    return StylizedRiverFoamDebugView.PositiveNegativeZones;
+                case (int)StylizedRiverFoamDebugView.PositiveZoneClasses:
+                    return StylizedRiverFoamDebugView.PositiveZoneClasses;
+                default:
+                    return StylizedRiverFoamDebugView.Final;
+            }
+        }
         private void OnValidate()
         {
             MigrateFoamAuthoringIfNeeded();
+            foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
             ValidateSettings();
@@ -1875,9 +1890,13 @@ namespace ProgrammaticStylized3D.Rivers
                 case StylizedRiverFoamPreset.Subtle:
                     foamEnabled = true;
                     foamAmount = 0.22f;
-                    foamFragmentation = 0.62f;
+                    foamWebGranularity = 0.38f;
+                    foamNetworkEvolution = 0.32f;
+                    foamBreakupFrequency = 0.62f;
+                    foamSpeed = 0.32f;
+                    foamFragmentation = foamBreakupFrequency;
                     foamPersistence = 0.42f;
-                    foamAgitation = 0.32f;
+                    foamAgitation = foamNetworkEvolution;
                     foamSharpness = 0.92f;
                     foamColour = new Color(0.94f, 0.97f, 0.94f, 0.58f);
                     break;
@@ -1885,9 +1904,13 @@ namespace ProgrammaticStylized3D.Rivers
                 case StylizedRiverFoamPreset.Flowing:
                     foamEnabled = true;
                     foamAmount = 0.48f;
-                    foamFragmentation = 0.68f;
+                    foamWebGranularity = 0.52f;
+                    foamNetworkEvolution = 0.56f;
+                    foamBreakupFrequency = 0.68f;
+                    foamSpeed = 0.56f;
+                    foamFragmentation = foamBreakupFrequency;
                     foamPersistence = 0.58f;
-                    foamAgitation = 0.56f;
+                    foamAgitation = foamNetworkEvolution;
                     foamSharpness = 0.88f;
                     foamColour = new Color(0.94f, 0.97f, 0.94f, 0.72f);
                     break;
@@ -1895,9 +1918,13 @@ namespace ProgrammaticStylized3D.Rivers
                 case StylizedRiverFoamPreset.Whitewater:
                     foamEnabled = true;
                     foamAmount = 0.78f;
-                    foamFragmentation = 0.78f;
+                    foamWebGranularity = 0.68f;
+                    foamNetworkEvolution = 0.82f;
+                    foamBreakupFrequency = 0.78f;
+                    foamSpeed = 0.82f;
+                    foamFragmentation = foamBreakupFrequency;
                     foamPersistence = 0.72f;
-                    foamAgitation = 0.82f;
+                    foamAgitation = foamNetworkEvolution;
                     foamSharpness = 0.84f;
                     foamColour = new Color(0.94f, 0.97f, 0.94f, 0.86f);
                     break;
@@ -1920,47 +1947,130 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void MigrateFoamAuthoringIfNeeded()
         {
-            if (foamAuthoringVersion >= CurrentFoamAuthoringVersion)
+            if (foamAuthoringVersion < 1)
             {
-                return;
+                float strength01 = Mathf.Clamp01(foamStrength / 1.5f);
+                float densityFromSparsity = 1f - Mathf.Clamp01(foamSparsity);
+                float fineDetail = 1f - Mathf.InverseLerp(0.10f, 5f, foamDetailScale);
+                float legacyFlowResponse = Mathf.InverseLerp(0.50f, 1.50f, foamFlowFollow);
+
+                // Best-effort migration from the former implementation-level
+                // controls into the first compact authoring language.
+                foamAmount = Mathf.Clamp01(
+                    foamGlobalPresence * 0.35f +
+                    foamCoverage * 0.20f +
+                    strength01 * 0.25f +
+                    densityFromSparsity * 0.15f +
+                    Mathf.Clamp01(foamShoreRetention) * 0.05f);
+                foamFragmentation = Mathf.Clamp01(
+                    foamBreakup * 0.62f +
+                    (1f - foamConnectivity) * 0.22f +
+                    (1f - foamCohesion) * 0.10f +
+                    fineDetail * 0.06f);
+                foamPersistence = Mathf.Clamp01(
+                    Mathf.Clamp01(foamLifetime / 12f) * 0.55f +
+                    Mathf.Clamp01(foamFreshnessLifetime / 5f) * 0.15f +
+                    foamLongLivedFraction * 0.15f +
+                    Mathf.Clamp01(foamLifetimeVariation) * 0.15f);
+                foamAgitation = Mathf.Clamp01(
+                    Mathf.Clamp01(foamEvolution / 2f) * 0.45f +
+                    foamLateralSpread * 0.20f +
+                    foamDetailStrength * 0.15f +
+                    Mathf.Clamp01(foamSupplyRate / 2f) * 0.10f +
+                    legacyFlowResponse * 0.10f);
+                foamSharpness = Mathf.Clamp01(foamSharpness);
+                foamColour.a = Mathf.Clamp01(foamOpacity);
+                foamAuthoringVersion = 1;
             }
 
-            float strength01 = Mathf.Clamp01(foamStrength / 1.5f);
-            float densityFromSparsity = 1f - Mathf.Clamp01(foamSparsity);
-            float fineDetail = 1f - Mathf.InverseLerp(0.10f, 5f, foamDetailScale);
-            float legacyFlowResponse = Mathf.InverseLerp(0.50f, 1.50f, foamFlowFollow);
+            if (foamAuthoringVersion < 2)
+            {
+                // Preserve the existing response while translating the former
+                // Fragmentation/Agitation language into the six canonical
+                // Stage 6.2 controls. Web Granularity has no former direct
+                // equivalent, so it is derived conservatively from evolution.
+                foamWebGranularity = Mathf.Lerp(
+                    0.42f,
+                    0.62f,
+                    Mathf.Clamp01(foamAgitation));
+                foamNetworkEvolution = Mathf.Clamp01(foamAgitation);
+                foamBreakupFrequency = Mathf.Clamp01(foamFragmentation);
+                foamSpeed = Mathf.Clamp01(foamAgitation);
+                foamPreset = StylizedRiverFoamPreset.Custom;
+                foamAuthoringVersion = 2;
+            }
 
-            // Best-effort one-time migration from the former implementation-level
-            // controls into the compact canonical authoring language. Every
-            // retained compatibility field contributes only where it has a
-            // defensible visual analogue; runtime response no longer reads these
-            // values after migration.
-            foamAmount = Mathf.Clamp01(
-                foamGlobalPresence * 0.35f +
-                foamCoverage * 0.20f +
-                strength01 * 0.25f +
-                densityFromSparsity * 0.15f +
-                Mathf.Clamp01(foamShoreRetention) * 0.05f);
-            foamFragmentation = Mathf.Clamp01(
-                foamBreakup * 0.62f +
-                (1f - foamConnectivity) * 0.22f +
-                (1f - foamCohesion) * 0.10f +
-                fineDetail * 0.06f);
-            foamPersistence = Mathf.Clamp01(
-                Mathf.Clamp01(foamLifetime / 12f) * 0.55f +
-                Mathf.Clamp01(foamFreshnessLifetime / 5f) * 0.15f +
-                foamLongLivedFraction * 0.15f +
-                Mathf.Clamp01(foamLifetimeVariation) * 0.15f);
-            foamAgitation = Mathf.Clamp01(
-                Mathf.Clamp01(foamEvolution / 2f) * 0.45f +
-                foamLateralSpread * 0.20f +
-                foamDetailStrength * 0.15f +
-                Mathf.Clamp01(foamSupplyRate / 2f) * 0.10f +
-                legacyFlowResponse * 0.10f);
-            foamSharpness = Mathf.Clamp01(foamSharpness);
-            foamColour.a = Mathf.Clamp01(foamOpacity);
-            foamPreset = StylizedRiverFoamPreset.Custom;
-            foamAuthoringVersion = CurrentFoamAuthoringVersion;
+            if (foamAuthoringVersion < 3)
+            {
+                // Migrate the former broad diagnostic menu into the three
+                // retained topology diagnostics. Values without a useful
+                // equivalent return to the normal Final view.
+                int legacyDebug = (int)foamDebugView;
+                switch (legacyDebug)
+                {
+                    case 7:  // Capture
+                    case 14: // Topology Sources
+                    case 15: // Capture and Residence
+                        foamDebugView =
+                            StylizedRiverFoamDebugView.CaptureZones;
+                        break;
+
+                    case 9:  // Major Capacity
+                    case 10: // Connector Capacity
+                    case 12: // Boundary Organisation
+                        foamDebugView =
+                            StylizedRiverFoamDebugView.PositiveZoneClasses;
+                        break;
+
+                    case 11: // Pocket Exclusion
+                    case 13: // Composed Topology
+                    case 17: // Material vs Capacity
+                        foamDebugView =
+                            StylizedRiverFoamDebugView.PositiveNegativeZones;
+                        break;
+
+                    default:
+                        foamDebugView = StylizedRiverFoamDebugView.Final;
+                        break;
+                }
+
+                foamAuthoringVersion = 3;
+            }
+
+            if (foamAuthoringVersion < 4)
+            {
+                // Remove the later compact-but-obsolete diagnostics while
+                // preserving the three retained views by their serialized
+                // numeric values.
+                switch ((int)foamDebugView)
+                {
+                    case 1: // Former Composed Topology
+                        foamDebugView =
+                            StylizedRiverFoamDebugView.PositiveNegativeZones;
+                        break;
+                    case 2: // Former Topology Breakdown
+                        foamDebugView =
+                            StylizedRiverFoamDebugView.PositiveZoneClasses;
+                        break;
+                    case 3:
+                        foamDebugView =
+                            StylizedRiverFoamDebugView.CaptureZones;
+                        break;
+                    case 6:
+                        foamDebugView =
+                            StylizedRiverFoamDebugView.PositiveNegativeZones;
+                        break;
+                    case 7:
+                        foamDebugView =
+                            StylizedRiverFoamDebugView.PositiveZoneClasses;
+                        break;
+                    default:
+                        foamDebugView = StylizedRiverFoamDebugView.Final;
+                        break;
+                }
+
+                foamAuthoringVersion = 4;
+            }
         }
 
         private float ResolveFoamStrength()
@@ -1981,7 +2091,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private float ResolveFoamConnectivity()
         {
-            return Mathf.Lerp(0.58f, 0.08f, Mathf.Clamp01(foamFragmentation));
+            return Mathf.Lerp(0.58f, 0.08f, Mathf.Clamp01(foamBreakupFrequency));
         }
 
         private float ResolveFoamSparsity()
@@ -2012,12 +2122,12 @@ namespace ProgrammaticStylized3D.Rivers
 
         private float ResolveFoamGuidanceStrength()
         {
-            return Mathf.Lerp(0.88f, 1.34f, Mathf.Clamp01(foamAgitation));
+            return Mathf.Lerp(0.88f, 1.34f, Mathf.Clamp01(foamNetworkEvolution));
         }
 
         private float ResolveFoamBoundaryAttraction()
         {
-            return Mathf.Lerp(1.35f, 2.35f, Mathf.Clamp01(foamAgitation));
+            return Mathf.Lerp(1.35f, 2.35f, Mathf.Clamp01(foamNetworkEvolution));
         }
 
         private float ResolveFoamWakeReinforcement()
@@ -2027,7 +2137,10 @@ namespace ProgrammaticStylized3D.Rivers
 
         private float ResolveFoamImpactReinforcement()
         {
-            return Mathf.Lerp(0.70f, 1.30f, Mathf.Clamp01(foamAgitation));
+            // Stage 6.2 deliberately defers Impact Ripple-to-Film behaviour.
+            // The legacy material solver retains the binding for compatibility,
+            // but the resolved contribution is neutral until a later approved pass.
+            return 0f;
         }
 
         private float ResolveFoamLifetimeVariation()
@@ -2049,29 +2162,29 @@ namespace ProgrammaticStylized3D.Rivers
 
         private float ResolveFoamEvolution()
         {
-            return Mathf.Lerp(0.45f, 1.80f, Mathf.Clamp01(foamAgitation));
+            return Mathf.Lerp(0.45f, 1.80f, Mathf.Clamp01(foamNetworkEvolution));
         }
 
         private float ResolveFoamBreakup()
         {
-            // Fragmentation is structural susceptibility, not global Amount loss.
-            return Mathf.Clamp01(foamFragmentation);
+            // Breakup Frequency is structural susceptibility, not global Amount loss.
+            return Mathf.Clamp01(foamBreakupFrequency);
         }
 
         private float ResolveFoamFlowFollow()
         {
-            return Mathf.Lerp(0.92f, 1.10f, Mathf.Clamp01(foamAgitation));
+            return Mathf.Lerp(0.92f, 1.10f, Mathf.Clamp01(foamSpeed));
         }
 
         private float ResolveFoamLateralSpread()
         {
-            return Mathf.Lerp(0.08f, 0.66f, Mathf.Clamp01(foamAgitation));
+            return Mathf.Lerp(0.08f, 0.66f, Mathf.Clamp01(foamNetworkEvolution));
         }
 
         private float ResolveFoamReconnection()
         {
-            float fragmentation = Mathf.Clamp01(foamFragmentation);
-            float agitation = Mathf.Clamp01(foamAgitation);
+            float fragmentation = Mathf.Clamp01(foamBreakupFrequency);
+            float agitation = Mathf.Clamp01(foamNetworkEvolution);
             return Mathf.Lerp(0.16f, 0.025f, fragmentation) *
                    Mathf.Lerp(1f, 0.78f, agitation);
         }
@@ -2083,20 +2196,20 @@ namespace ProgrammaticStylized3D.Rivers
 
         private float ResolveFoamDetailScale()
         {
-            return Mathf.Lerp(0.82f, 0.42f, Mathf.Clamp01(foamAgitation));
+            return Mathf.Lerp(0.82f, 0.42f, Mathf.Clamp01(foamNetworkEvolution));
         }
 
         private float ResolveFoamDetailStrength()
         {
-            return Mathf.Lerp(0.30f, 0.78f, Mathf.Clamp01(foamFragmentation));
+            return Mathf.Lerp(0.30f, 0.78f, Mathf.Clamp01(foamBreakupFrequency));
         }
 
         private float ResolveFoamShapeVariety()
         {
             return Mathf.Clamp01(
                 0.30f +
-                Mathf.Clamp01(foamFragmentation) * 0.42f +
-                Mathf.Clamp01(foamAgitation) * 0.28f);
+                Mathf.Clamp01(foamBreakupFrequency) * 0.42f +
+                Mathf.Clamp01(foamNetworkEvolution) * 0.28f);
         }
 
         public bool EmitFoamTestPatch()
@@ -2958,9 +3071,13 @@ namespace ProgrammaticStylized3D.Rivers
             specularStrength = Mathf.Clamp(specularStrength, 0f, 4f);
             lightingSteps = Mathf.Clamp(lightingSteps, 1f, 8f);
             foamAmount = Mathf.Clamp01(foamAmount);
-            foamFragmentation = Mathf.Clamp01(foamFragmentation);
+            foamWebGranularity = Mathf.Clamp01(foamWebGranularity);
+            foamNetworkEvolution = Mathf.Clamp01(foamNetworkEvolution);
+            foamBreakupFrequency = Mathf.Clamp01(foamBreakupFrequency);
+            foamSpeed = Mathf.Clamp01(foamSpeed);
+            foamFragmentation = foamBreakupFrequency;
             foamPersistence = Mathf.Clamp01(foamPersistence);
-            foamAgitation = Mathf.Clamp01(foamAgitation);
+            foamAgitation = foamNetworkEvolution;
             foamSharpness = Mathf.Clamp01(foamSharpness);
             foamColour.a = Mathf.Clamp01(foamColour.a);
             foamTestDistanceNormalized = Mathf.Clamp01(
@@ -3686,7 +3803,6 @@ namespace ProgrammaticStylized3D.Rivers
             bodyProperties.SetFloat(FlowDirectionId, FlowDirection);
             bodyProperties.SetFloat(RiverTimeId, riverTime);
             bodyProperties.SetFloat(VisualSeedId, visualSeed);
-            bodyProperties.SetFloat(DebugViewId, (float)debugView);
 
             bodyProperties.SetTexture(
                 PlanarReflectionTextureId,

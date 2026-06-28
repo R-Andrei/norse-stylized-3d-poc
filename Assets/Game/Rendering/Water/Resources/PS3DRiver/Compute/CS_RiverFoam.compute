@@ -1,6 +1,12 @@
 #pragma kernel ClearRange
 #pragma kernel InjectFoam
 #pragma kernel BuildGuidance
+#pragma kernel BuildTopologyMajor
+#pragma kernel BuildTopologyPockets
+#pragma kernel BuildTopologyConnectors
+#pragma kernel ComposeTopology
+#pragma kernel ResetTopologyMetrics
+#pragma kernel MeasureTopologyMetrics
 #pragma kernel ResetPopulation
 #pragma kernel MeasurePopulation
 #pragma kernel UpdateFracture
@@ -16,6 +22,9 @@ struct FoamMetricRow
     // x = left surface half-width, y = right surface half-width,
     // z = longitudinal cell spacing, w = minimum lateral cell spacing.
     float4 widthsAndSpacing;
+    // x = signed centreline curvature, y = width derivative,
+    // z = left/right width asymmetry, w = valid-domain flag.
+    float4 topologyData;
 };
 
 // Shared Stage 6 material state:
@@ -28,9 +37,19 @@ Texture2D<float4> _FoamStateRead;
 RWTexture2D<float4> _FoamAdvectionWrite;
 Texture2D<float4> _FoamAdvectedRead;
 Texture2D<float4> _FoamReverseRead;
-Texture2D<float2> _FoamBoundary;
+Texture2D<float4> _FoamBoundary;
 RWTexture2D<float4> _FoamGuidanceWrite;
 Texture2D<float4> _FoamGuidanceRead;
+RWTexture2D<float4> _FoamTopologyMajorWrite;
+Texture2D<float4> _FoamTopologyMajorRead;
+RWTexture2D<float4> _FoamTopologyPocketWrite;
+Texture2D<float4> _FoamTopologyPocketRead;
+RWTexture2D<float4> _FoamTopologyConnectorWrite;
+Texture2D<float4> _FoamTopologyConnectorRead;
+RWTexture2D<float4> _FoamTopologyWrite;
+RWTexture2D<float4> _FoamTopologySourcesWrite;
+Texture2D<float4> _FoamTopologyRead;
+Texture2D<float4> _FoamTopologySourcesRead;
 Texture2D<float4> _FoamWakeField;
 Texture2D<float4> _FoamRippleField;
 Texture2D<float4> _FoamStaticWakeField;
@@ -46,8 +65,21 @@ StructuredBuffer<FoamMetricRow> _FoamMetricRows;
 //           z = boundary-capture visible count, w = visible guidance-lane count.
 RWByteAddressBuffer _FoamPopulationMetrics;
 
+// One global topology diagnostic record. Values are uint counters; deficit is
+// quantised to 0..1023 per supported topology cell.
+//  0 valid cells             8 boundary-supported cells
+//  1 major-capacity cells    9 boundary-occupied cells
+//  2 connector cells        10 obstacle-supported cells
+//  3 protected-pocket cells 11 obstacle-occupied cells
+//  4 pocket violations      12 Pressure/lee-supported cells
+//  5 visible material cells 13 Pressure/lee-occupied cells
+//  6 composed-support cells 14 perimeter-visible cells
+//  7 summed material deficit 15 connector cells overlapping major interiors
+RWByteAddressBuffer _FoamTopologyMetrics;
+
 int2 _FoamDimensions;
 int2 _FoamGuidanceDimensions;
+int2 _FoamTopologyDimensions;
 int2 _FoamWakeDimensions;
 int2 _FoamRippleDimensions;
 int2 _FoamStaticWakeDimensions;
@@ -81,6 +113,8 @@ float _FoamSupplyRate;
 float _FoamVisibleThreshold;
 float _FoamGuidanceStrength;
 float _FoamBoundaryAttraction;
+float _FoamWebGranularity;
+float _FoamNetworkEvolution;
 float _FoamWakeReinforcement;
 float _FoamImpactReinforcement;
 float _FoamDisturbanceEnabled;
@@ -136,10 +170,15 @@ float4 LoadState(int2 coordinate)
         int3(ClampX(coordinate.x), ClampY(coordinate.y), 0));
 }
 
-float2 LoadBoundary(int2 coordinate)
+float4 LoadBoundaryClasses(int2 coordinate)
 {
     return saturate(_FoamBoundary.Load(
         int3(ClampX(coordinate.x), ClampY(coordinate.y), 0)));
+}
+
+float2 LoadBoundary(int2 coordinate)
+{
+    return LoadBoundaryClasses(coordinate).rg;
 }
 
 float Across01ToMetres(
@@ -235,7 +274,7 @@ float4 SampleAdvectedBilinear(float2 pixelCoordinate)
 }
 
 
-float2 SampleBoundaryBilinear(float2 pixelCoordinate)
+float4 SampleBoundaryClassesBilinear(float2 pixelCoordinate)
 {
     float2 clamped = clamp(
         pixelCoordinate,
@@ -248,11 +287,18 @@ float2 SampleBoundaryBilinear(float2 pixelCoordinate)
         baseCoordinate + int2(1, 1),
         _FoamDimensions - int2(1, 1));
     float2 blend = frac(clamped);
-    float2 a = LoadBoundary(baseCoordinate);
-    float2 b = LoadBoundary(int2(nextCoordinate.x, baseCoordinate.y));
-    float2 c = LoadBoundary(int2(baseCoordinate.x, nextCoordinate.y));
-    float2 d = LoadBoundary(nextCoordinate);
+    float4 a = LoadBoundaryClasses(baseCoordinate);
+    float4 b = LoadBoundaryClasses(
+        int2(nextCoordinate.x, baseCoordinate.y));
+    float4 c = LoadBoundaryClasses(
+        int2(baseCoordinate.x, nextCoordinate.y));
+    float4 d = LoadBoundaryClasses(nextCoordinate);
     return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+float2 SampleBoundaryBilinear(float2 pixelCoordinate)
+{
+    return SampleBoundaryClassesBilinear(pixelCoordinate).rg;
 }
 
 float4 SampleGuidanceBilinear(float2 uv)
@@ -805,10 +851,11 @@ FoamMotionSample ResolveMotion(float2 pixelCoordinate, float2 fieldUV)
         pressureGradient *
         max(0.0, _FoamBoundaryAttraction) *
         0.08;
+    float impactInfluence = max(0.0, _FoamImpactReinforcement);
     float2 rippleVelocity = float2(
         -rippleState.b,
         -rippleState.a) *
-        max(0.0, _FoamImpactReinforcement) *
+        impactInfluence *
         0.055;
 
     float wakeEnergy = max(0.0, wakeState.x);
@@ -817,7 +864,8 @@ FoamMotionSample ResolveMotion(float2 pixelCoordinate, float2 fieldUV)
     float rippleIntensity = saturate(
         abs(rippleState.x) * 4.0 +
         abs(rippleState.y) * 0.12 +
-        length(rippleState.ba) * 0.38);
+        length(rippleState.ba) * 0.38) *
+        saturate(impactInfluence);
 
     float capture = saturate(
         boundary.y * boundaryStrength * 1.35 +
@@ -1022,6 +1070,1069 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
     previous.z = max(saturate(previous.z), injectedIntegrity);
     previous.w = combinedAmount > 0.001 ? phase : 0.0;
     _FoamStateWrite[coordinate] = saturate(previous);
+}
+
+
+float FoamTopologyBand(float value, float halfWidth, float feather)
+{
+    float safeHalfWidth = max(0.0001, halfWidth);
+    float safeFeather = max(0.0001, feather);
+    return 1.0 - smoothstep(
+        safeHalfWidth,
+        safeHalfWidth + safeFeather,
+        abs(value));
+}
+
+float FoamTopologyLateralNormalized(
+    float lateralMetres,
+    float leftHalfWidth,
+    float rightHalfWidth)
+{
+    float halfWidth = lateralMetres < 0.0
+        ? max(0.05, leftHalfWidth)
+        : max(0.05, rightHalfWidth);
+    return clamp(lateralMetres / halfWidth, -1.0, 1.0);
+}
+
+float FoamTopologyNodeHash(float nodeIndex, float salt)
+{
+    return FoamHash11(
+        nodeIndex * 73.173 +
+        salt * 19.319 +
+        _FoamSeed * 0.0371);
+}
+
+float FoamTopologyDistanceToSegmentWithT(
+    float2 samplePosition,
+    float2 startPosition,
+    float2 endPosition,
+    out float along)
+{
+    float2 segment = endPosition - startPosition;
+    float segmentLengthSquared = max(0.00001, dot(segment, segment));
+    along = saturate(
+        dot(samplePosition - startPosition, segment) /
+        segmentLengthSquared);
+    return length(
+        samplePosition -
+        (startPosition + segment * along));
+}
+
+float FoamTopologyDistanceToBentPath(
+    float2 samplePosition,
+    float2 startPosition,
+    float2 middlePosition,
+    float2 endPosition,
+    out float along)
+{
+    float firstAlong;
+    float secondAlong;
+    float firstDistance = FoamTopologyDistanceToSegmentWithT(
+        samplePosition,
+        startPosition,
+        middlePosition,
+        firstAlong);
+    float secondDistance = FoamTopologyDistanceToSegmentWithT(
+        samplePosition,
+        middlePosition,
+        endPosition,
+        secondAlong);
+    if (firstDistance <= secondDistance)
+    {
+        along = firstAlong * 0.5;
+        return firstDistance;
+    }
+
+    along = 0.5 + secondAlong * 0.5;
+    return secondDistance;
+}
+
+struct FoamMajorStructure
+{
+    float enabled;
+    float broad;
+    float centreDistance;
+    float halfLength;
+    float centreLateral;
+    float halfWidth;
+    float lateralDrift;
+    float centreBow;
+    float identity;
+};
+
+float FoamTopologyStructureSpacing()
+{
+    return lerp(15.0, 8.5, saturate(_FoamWebGranularity));
+}
+
+float FoamTopologyStructureShift(float spacing)
+{
+    return FoamHash11(_FoamSeed * 0.071 + 91.3) * spacing;
+}
+
+FoamMajorStructure FoamGetMajorStructure(
+    float structureIndex,
+    float topologyClock,
+    float granularity,
+    float evolution)
+{
+    FoamMajorStructure structure;
+    float spacing = FoamTopologyStructureSpacing();
+    float shift = FoamTopologyStructureShift(spacing);
+    float enableHash = FoamTopologyNodeHash(structureIndex, 50.0);
+    float broadHash = FoamTopologyNodeHash(structureIndex, 51.0);
+    float previousEnabled = step(
+        0.36,
+        FoamTopologyNodeHash(structureIndex - 1.0, 50.0));
+    float nextEnabled = step(
+        0.36,
+        FoamTopologyNodeHash(structureIndex + 1.0, 50.0));
+
+    // Finite structures are allowed to be absent. A bounded recovery rule avoids
+    // long empty runs without recreating an always-on river-length chain.
+    structure.enabled = max(
+        step(0.36, enableHash),
+        (1.0 - previousEnabled) * (1.0 - nextEnabled));
+    structure.broad = step(0.38, broadHash);
+    structure.centreDistance =
+        structureIndex * spacing - shift +
+        lerp(-0.24, 0.24,
+            FoamTopologyNodeHash(structureIndex, 52.0)) * spacing;
+    structure.halfLength = spacing * lerp(
+        lerp(0.30, 0.42, structure.broad),
+        lerp(0.58, 0.76, structure.broad),
+        FoamTopologyNodeHash(structureIndex, 53.0));
+    structure.centreLateral = lerp(
+        -0.58,
+        0.58,
+        FoamTopologyNodeHash(structureIndex, 54.0));
+    structure.halfWidth = lerp(
+        lerp(0.075, 0.22, structure.broad),
+        lerp(0.16, 0.46, structure.broad),
+        FoamTopologyNodeHash(structureIndex, 55.0));
+    structure.lateralDrift = lerp(
+        -0.34,
+        0.34,
+        FoamTopologyNodeHash(structureIndex, 56.0));
+    structure.centreBow = lerp(
+        -0.16,
+        0.16,
+        FoamTopologyNodeHash(structureIndex, 57.0));
+    float phase = FoamTopologyNodeHash(structureIndex, 58.0) * 6.2831853;
+    structure.centreLateral += sin(
+        topologyClock * lerp(
+            0.44,
+            0.86,
+            FoamTopologyNodeHash(structureIndex, 60.0)) + phase) *
+        lerp(0.018, 0.060, granularity) * evolution;
+    structure.identity = FoamTopologyNodeHash(structureIndex, 61.0);
+    return structure;
+}
+
+float FoamStructureCentreAtLocal(
+    FoamMajorStructure structure,
+    float localX)
+{
+    float clampedX = clamp(localX, -1.0, 1.0);
+    return clamp(
+        structure.centreLateral +
+        structure.lateralDrift * clampedX +
+        structure.centreBow * (1.0 - clampedX * clampedX),
+        -0.86,
+        0.86);
+}
+
+void FoamEvaluateMajorStructure(
+    FoamMajorStructure structure,
+    float globalDistance,
+    float lateralNormalized,
+    float granularity,
+    out float support,
+    out float broadInterior,
+    out float contourSupport)
+{
+    support = 0.0;
+    broadInterior = 0.0;
+    contourSupport = 0.0;
+    if (structure.enabled <= 0.0)
+    {
+        return;
+    }
+
+    float localX =
+        (globalDistance - structure.centreDistance) /
+        max(0.001, structure.halfLength);
+    float longitudinalWindow = 1.0 - smoothstep(
+        0.70,
+        1.0,
+        abs(localX));
+    if (longitudinalWindow <= 0.0001)
+    {
+        return;
+    }
+
+    float centre = FoamStructureCentreAtLocal(structure, localX);
+    float edgeWarp = (
+        FoamFbm(float2(
+            globalDistance * lerp(0.065, 0.12, granularity),
+            lateralNormalized * lerp(1.35, 2.25, granularity)) +
+            structure.identity * 17.37) - 0.5) *
+        lerp(0.025, 0.065, granularity);
+    float widthTaper = pow(
+        saturate(longitudinalWindow),
+        0.55);
+    float localHalfWidth = max(
+        0.002,
+        structure.halfWidth * widthTaper);
+    float acrossDistance = abs(
+        lateralNormalized - centre + edgeWarp);
+    float body = 1.0 - smoothstep(
+        localHalfWidth * 0.72,
+        localHalfWidth,
+        acrossDistance);
+    body *= longitudinalWindow;
+
+    float ribbonWidth = lerp(0.050, 0.026, granularity);
+    float leftContour = FoamTopologyBand(
+        lateralNormalized -
+            (centre - localHalfWidth * 0.78),
+        ribbonWidth,
+        ribbonWidth * 1.65);
+    float rightContour = FoamTopologyBand(
+        lateralNormalized -
+            (centre + localHalfWidth * 0.78),
+        ribbonWidth,
+        ribbonWidth * 1.65);
+    contourSupport = max(leftContour, rightContour) *
+        longitudinalWindow * structure.broad;
+
+    float ribbonBody = (1.0 - structure.broad) * body;
+    float broadBody = structure.broad * max(
+        body,
+        contourSupport);
+    support = saturate((ribbonBody + broadBody) * structure.enabled);
+    broadInterior = structure.broad * longitudinalWindow *
+        (1.0 - smoothstep(
+            localHalfWidth * 0.46,
+            localHalfWidth * 0.74,
+            acrossDistance));
+}
+
+float2 FoamTopologyUV(float globalDistance, float lateralNormalized)
+{
+    return float2(
+        (globalDistance - _FoamGlobalStart) /
+            max(0.001, _FoamFieldLength),
+        lateralNormalized * 0.5 + 0.5);
+}
+
+float4 FoamSampleMajorBilinear(float2 uv)
+{
+    if (uv.x < 0.0 || uv.x > 1.0 ||
+        uv.y < 0.0 || uv.y > 1.0 ||
+        !IsFoamUInsideDomain(uv.x))
+    {
+        return 0.0.xxxx;
+    }
+
+    float2 dimensions = max(
+        float2(1.0, 1.0),
+        (float2)_FoamTopologyDimensions);
+    float2 coordinate = saturate(uv) *
+        max(float2(0.0, 0.0), dimensions - 1.0);
+    int2 baseCoordinate = int2(floor(coordinate));
+    int2 nextCoordinate = min(
+        baseCoordinate + int2(1, 1),
+        _FoamTopologyDimensions - int2(1, 1));
+    float2 blend = frac(coordinate);
+    float4 a = _FoamTopologyMajorRead.Load(int3(baseCoordinate, 0));
+    float4 b = _FoamTopologyMajorRead.Load(
+        int3(nextCoordinate.x, baseCoordinate.y, 0));
+    float4 c = _FoamTopologyMajorRead.Load(
+        int3(baseCoordinate.x, nextCoordinate.y, 0));
+    float4 d = _FoamTopologyMajorRead.Load(int3(nextCoordinate, 0));
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+
+float FoamSampleFluidCoverageAtTopologyUV(float2 uv)
+{
+    if (uv.x < 0.0 || uv.x > 1.0 ||
+        uv.y < 0.0 || uv.y > 1.0 ||
+        !IsFoamUInsideDomain(uv.x))
+    {
+        return 0.0;
+    }
+
+    float2 fullPixel = uv *
+        max(float2(0.0, 0.0), (float2)_FoamDimensions - 1.0);
+    return SampleBoundaryClassesBilinear(fullPixel).r;
+}
+
+
+float FoamCombinedCaptureSupport(float4 captureSources)
+{
+    return max(
+        max(captureSources.r, captureSources.g),
+        max(captureSources.b, captureSources.a));
+}
+
+float FoamComposeTopologySupport(
+    float4 topology,
+    float4 captureSources)
+{
+    float positiveSupport = max(
+        max(topology.r, topology.g),
+        FoamCombinedCaptureSupport(captureSources));
+    return saturate(positiveSupport * (1.0 - topology.b));
+}
+
+[numthreads(8, 8, 1)]
+void BuildTopologyMajor(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamTopologyDimensions.x ||
+        dispatchId.y >= (uint)_FoamTopologyDimensions.y)
+    {
+        return;
+    }
+
+    int2 outputCoordinate = int2(dispatchId.xy);
+    float2 uv = (float2(dispatchId.xy) + 0.5) /
+        max(float2(1.0, 1.0), (float2)_FoamTopologyDimensions);
+    if (!IsFoamUInsideDomain(uv.x))
+    {
+        _FoamTopologyMajorWrite[outputCoordinate] = 0.0.xxxx;
+        return;
+    }
+
+    float2 fullPixel = uv *
+        max(float2(0.0, 0.0), (float2)_FoamDimensions - 1.0);
+    float4 boundaryClasses = SampleBoundaryClassesBilinear(fullPixel);
+    float fluidCoverage = saturate(boundaryClasses.r);
+    if (fluidCoverage <= 0.001)
+    {
+        _FoamTopologyMajorWrite[outputCoordinate] = 0.0.xxxx;
+        return;
+    }
+
+    int metricX = clamp(
+        (int)round(fullPixel.x),
+        0,
+        max(0, _FoamDimensions.x - 1));
+    FoamMetricRow metric = _FoamMetricRows[metricX];
+    float globalDistance = _FoamGlobalStart + uv.x * _FoamFieldLength;
+    float lateralMetres = Across01ToMetres(
+        uv.y,
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+    float lateralNormalized = FoamTopologyLateralNormalized(
+        lateralMetres,
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+
+    float granularity = saturate(_FoamWebGranularity);
+    float evolution = saturate(_FoamNetworkEvolution);
+    float topologyClock = _FoamTime * lerp(0.0, 0.035, evolution);
+    float spacing = FoamTopologyStructureSpacing();
+    float shift = FoamTopologyStructureShift(spacing);
+    float baseIndex = floor((globalDistance + shift) / spacing);
+
+    float majorCapacity = 0.0;
+    float broadInterior = 0.0;
+    float contourCapacity = 0.0;
+    float dominantIdentity = 0.0;
+    float dominantSupport = 0.0;
+
+    [unroll]
+    for (int neighbour = -2; neighbour <= 2; neighbour++)
+    {
+        float structureIndex = baseIndex + (float)neighbour;
+        FoamMajorStructure structure = FoamGetMajorStructure(
+            structureIndex,
+            topologyClock,
+            granularity,
+            evolution);
+        float support;
+        float interior;
+        float contour;
+        FoamEvaluateMajorStructure(
+            structure,
+            globalDistance,
+            lateralNormalized,
+            granularity,
+            support,
+            interior,
+            contour);
+        majorCapacity = max(majorCapacity, support);
+        broadInterior = max(broadInterior, interior);
+        contourCapacity = max(contourCapacity, contour);
+        if (support > dominantSupport)
+        {
+            dominantSupport = support;
+            dominantIdentity = structure.identity;
+        }
+    }
+
+    float signedCurvature = metric.topologyData.x;
+    float curvatureStrength = saturate(abs(signedCurvature) * 13.0);
+    float bendSide = signedCurvature >= 0.0 ? 1.0 : -1.0;
+    float bendCentre = bendSide * lerp(0.60, 0.48, granularity);
+    float bendRibbon = curvatureStrength *
+        max(majorCapacity, contourCapacity) *
+        (1.0 - smoothstep(
+            lerp(0.14, 0.10, granularity),
+            lerp(0.44, 0.30, granularity),
+            abs(lateralNormalized - bendCentre)));
+    majorCapacity = saturate(max(majorCapacity, bendRibbon));
+
+    float domainMask = fluidCoverage * saturate(metric.topologyData.w);
+    _FoamTopologyMajorWrite[outputCoordinate] = saturate(float4(
+        majorCapacity * domainMask,
+        broadInterior * domainMask,
+        dominantIdentity * domainMask,
+        contourCapacity * domainMask));
+}
+
+void FoamAccumulatePocketRingSample(
+    float centreDistance,
+    float centreLateral,
+    float radiusDistance,
+    float radiusLateral,
+    float2 offset,
+    float cardinal,
+    inout float supportSum,
+    inout float cardinalMinimum,
+    inout float minimumFluid)
+{
+    float2 sampleUV = FoamTopologyUV(
+        centreDistance + offset.x * radiusDistance,
+        centreLateral + offset.y * radiusLateral);
+    float broadSupport = FoamSampleMajorBilinear(sampleUV).g;
+    float support = smoothstep(0.26, 0.64, broadSupport);
+    supportSum += support;
+    cardinalMinimum = cardinal > 0.5
+        ? min(cardinalMinimum, support)
+        : cardinalMinimum;
+    minimumFluid = min(
+        minimumFluid,
+        FoamSampleFluidCoverageAtTopologyUV(sampleUV));
+}
+
+float FoamPocketRingCoverage(
+    float centreDistance,
+    float centreLateral,
+    float radiusDistance,
+    float radiusLateral,
+    out float boundaryExposure)
+{
+    float supportSum = 0.0;
+    float cardinalMinimum = 1.0;
+    float minimumFluid = 1.0;
+    FoamAccumulatePocketRingSample(
+        centreDistance, centreLateral, radiusDistance, radiusLateral,
+        float2(1.0, 0.0), 1.0,
+        supportSum, cardinalMinimum, minimumFluid);
+    FoamAccumulatePocketRingSample(
+        centreDistance, centreLateral, radiusDistance, radiusLateral,
+        float2(-1.0, 0.0), 1.0,
+        supportSum, cardinalMinimum, minimumFluid);
+    FoamAccumulatePocketRingSample(
+        centreDistance, centreLateral, radiusDistance, radiusLateral,
+        float2(0.0, 1.0), 1.0,
+        supportSum, cardinalMinimum, minimumFluid);
+    FoamAccumulatePocketRingSample(
+        centreDistance, centreLateral, radiusDistance, radiusLateral,
+        float2(0.0, -1.0), 1.0,
+        supportSum, cardinalMinimum, minimumFluid);
+    FoamAccumulatePocketRingSample(
+        centreDistance, centreLateral, radiusDistance, radiusLateral,
+        float2(0.7071, 0.7071), 0.0,
+        supportSum, cardinalMinimum, minimumFluid);
+    FoamAccumulatePocketRingSample(
+        centreDistance, centreLateral, radiusDistance, radiusLateral,
+        float2(-0.7071, 0.7071), 0.0,
+        supportSum, cardinalMinimum, minimumFluid);
+    FoamAccumulatePocketRingSample(
+        centreDistance, centreLateral, radiusDistance, radiusLateral,
+        float2(0.7071, -0.7071), 0.0,
+        supportSum, cardinalMinimum, minimumFluid);
+    FoamAccumulatePocketRingSample(
+        centreDistance, centreLateral, radiusDistance, radiusLateral,
+        float2(-0.7071, -0.7071), 0.0,
+        supportSum, cardinalMinimum, minimumFluid);
+
+    boundaryExposure = 1.0 - minimumFluid;
+    float averageSupport = supportSum / 8.0;
+    return smoothstep(0.62, 0.82, averageSupport) *
+        smoothstep(0.28, 0.56, cardinalMinimum) *
+        smoothstep(0.70, 0.94, minimumFluid);
+}
+
+[numthreads(8, 8, 1)]
+void BuildTopologyPockets(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamTopologyDimensions.x ||
+        dispatchId.y >= (uint)_FoamTopologyDimensions.y)
+    {
+        return;
+    }
+
+    int2 outputCoordinate = int2(dispatchId.xy);
+    float2 uv = (float2(dispatchId.xy) + 0.5) /
+        max(float2(1.0, 1.0), (float2)_FoamTopologyDimensions);
+    if (!IsFoamUInsideDomain(uv.x) ||
+        FoamSampleFluidCoverageAtTopologyUV(uv) <= 0.001)
+    {
+        _FoamTopologyPocketWrite[outputCoordinate] = 0.0.xxxx;
+        return;
+    }
+
+    float2 fullPixel = uv *
+        max(float2(0.0, 0.0), (float2)_FoamDimensions - 1.0);
+    int metricX = clamp(
+        (int)round(fullPixel.x),
+        0,
+        max(0, _FoamDimensions.x - 1));
+    FoamMetricRow metric = _FoamMetricRows[metricX];
+    float globalDistance = _FoamGlobalStart + uv.x * _FoamFieldLength;
+    float lateralMetres = Across01ToMetres(
+        uv.y,
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+    float lateralNormalized = FoamTopologyLateralNormalized(
+        lateralMetres,
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+
+    float granularity = saturate(_FoamWebGranularity);
+    float evolution = saturate(_FoamNetworkEvolution);
+    float topologyClock = _FoamTime * lerp(0.0, 0.035, evolution);
+    float spacing = FoamTopologyStructureSpacing();
+    float shift = FoamTopologyStructureShift(spacing);
+    float baseIndex = floor((globalDistance + shift) / spacing);
+
+    float acceptedPocket = 0.0;
+    float bestEnclosure = 0.0;
+    float bestHost = 0.0;
+    float bestBoundaryExposure = 1.0;
+
+    [unroll]
+    for (int neighbour = -2; neighbour <= 2; neighbour++)
+    {
+        float structureIndex = baseIndex + (float)neighbour;
+        FoamMajorStructure structure = FoamGetMajorStructure(
+            structureIndex,
+            topologyClock,
+            granularity,
+            evolution);
+        if (structure.enabled <= 0.0 || structure.broad <= 0.0)
+        {
+            continue;
+        }
+
+        [unroll]
+        for (int pocketIndex = 0; pocketIndex < 2; pocketIndex++)
+        {
+            float pocketSalt = 70.0 + (float)pocketIndex * 11.0;
+            float candidateEnabled = pocketIndex == 0
+                ? 1.0
+                : step(0.64, FoamTopologyNodeHash(
+                    structureIndex,
+                    pocketSalt + 1.0));
+            float localCentreX = lerp(
+                -0.36,
+                0.36,
+                FoamTopologyNodeHash(
+                    structureIndex,
+                    pocketSalt + 2.0));
+            float centreDistance = structure.centreDistance +
+                localCentreX * structure.halfLength;
+            float centreLateral = FoamStructureCentreAtLocal(
+                structure,
+                localCentreX) +
+                lerp(-0.18, 0.18,
+                    FoamTopologyNodeHash(
+                        structureIndex,
+                        pocketSalt + 3.0)) *
+                structure.halfWidth;
+            float radiusDistance = structure.halfLength * lerp(
+                0.14,
+                0.30,
+                FoamTopologyNodeHash(
+                    structureIndex,
+                    pocketSalt + 4.0));
+            float radiusLateral = structure.halfWidth * lerp(
+                0.20,
+                0.43,
+                FoamTopologyNodeHash(
+                    structureIndex,
+                    pocketSalt + 5.0));
+
+            float boundaryExposure;
+            float enclosure = FoamPocketRingCoverage(
+                centreDistance,
+                centreLateral,
+                radiusDistance * 1.36,
+                radiusLateral * 1.36,
+                boundaryExposure);
+            float hostSupport = FoamSampleMajorBilinear(
+                FoamTopologyUV(
+                    centreDistance,
+                    centreLateral)).g;
+            float acceptance = candidateEnabled * enclosure *
+                smoothstep(0.34, 0.68, hostSupport);
+
+            float2 local = float2(
+                (globalDistance - centreDistance) /
+                    max(0.001, radiusDistance),
+                (lateralNormalized - centreLateral) /
+                    max(0.001, radiusLateral));
+            float core = 1.0 - smoothstep(
+                0.72,
+                1.0,
+                length(local));
+            float pocket = core * acceptance;
+            if (pocket > acceptedPocket)
+            {
+                acceptedPocket = pocket;
+                bestEnclosure = enclosure;
+                bestHost = hostSupport;
+                bestBoundaryExposure = boundaryExposure;
+            }
+        }
+    }
+
+    _FoamTopologyPocketWrite[outputCoordinate] = saturate(float4(
+        acceptedPocket,
+        bestEnclosure,
+        bestHost,
+        bestBoundaryExposure));
+}
+
+float FoamConnectorMask(
+    float2 samplePosition,
+    float2 startPosition,
+    float2 endPosition,
+    float bow,
+    float width,
+    out float along)
+{
+    float2 middle = (startPosition + endPosition) * 0.5 +
+        float2(0.0, bow);
+    float distanceToPath = FoamTopologyDistanceToBentPath(
+        samplePosition,
+        startPosition,
+        middle,
+        endPosition,
+        along);
+    return 1.0 - smoothstep(width, width * 1.85, distanceToPath);
+}
+
+[numthreads(8, 8, 1)]
+void BuildTopologyConnectors(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamTopologyDimensions.x ||
+        dispatchId.y >= (uint)_FoamTopologyDimensions.y)
+    {
+        return;
+    }
+
+    int2 outputCoordinate = int2(dispatchId.xy);
+    float2 uv = (float2(dispatchId.xy) + 0.5) /
+        max(float2(1.0, 1.0), (float2)_FoamTopologyDimensions);
+    if (!IsFoamUInsideDomain(uv.x) ||
+        FoamSampleFluidCoverageAtTopologyUV(uv) <= 0.001)
+    {
+        _FoamTopologyConnectorWrite[outputCoordinate] = 0.0.xxxx;
+        return;
+    }
+
+    float2 fullPixel = uv *
+        max(float2(0.0, 0.0), (float2)_FoamDimensions - 1.0);
+    int metricX = clamp(
+        (int)round(fullPixel.x),
+        0,
+        max(0, _FoamDimensions.x - 1));
+    FoamMetricRow metric = _FoamMetricRows[metricX];
+    float globalDistance = _FoamGlobalStart + uv.x * _FoamFieldLength;
+    float lateralMetres = Across01ToMetres(
+        uv.y,
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+    float lateralNormalized = FoamTopologyLateralNormalized(
+        lateralMetres,
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+
+    float granularity = saturate(_FoamWebGranularity);
+    float evolution = saturate(_FoamNetworkEvolution);
+    float topologyClock = _FoamTime * lerp(0.0, 0.035, evolution);
+    float spacing = FoamTopologyStructureSpacing();
+    float shift = FoamTopologyStructureShift(spacing);
+    float baseIndex = floor((globalDistance + shift) / spacing);
+    float currentMajor = FoamSampleMajorBilinear(uv).r;
+
+    float connectorCapacity = 0.0;
+    float branchCapacity = 0.0;
+    float endpointConfidence = 0.0;
+    float overlapAmount = 0.0;
+    float2 samplePosition = float2(
+        globalDistance / max(0.001, spacing),
+        lateralNormalized);
+
+    [unroll]
+    for (int pairOffset = -2; pairOffset <= 1; pairOffset++)
+    {
+        float firstIndex = baseIndex + (float)pairOffset;
+        FoamMajorStructure first = FoamGetMajorStructure(
+            firstIndex,
+            topologyClock,
+            granularity,
+            evolution);
+        FoamMajorStructure second = FoamGetMajorStructure(
+            firstIndex + 1.0,
+            topologyClock,
+            granularity,
+            evolution);
+        if (second.enabled <= 0.0)
+        {
+            second = FoamGetMajorStructure(
+                firstIndex + 2.0,
+                topologyClock,
+                granularity,
+                evolution);
+        }
+
+        float startDistance = first.centreDistance +
+            first.halfLength * 0.82;
+        float endDistance = second.centreDistance -
+            second.halfLength * 0.82;
+        float gap = endDistance - startDistance;
+        float pairEnabled = first.enabled * second.enabled *
+            step(0.35, gap) *
+            (1.0 - step(spacing * 0.92, gap));
+        pairEnabled *= step(
+            0.30,
+            FoamTopologyNodeHash(firstIndex, 90.0));
+
+        float startLateral = FoamStructureCentreAtLocal(first, 0.82);
+        float endLateral = FoamStructureCentreAtLocal(second, -0.82);
+        float endpointA = FoamSampleMajorBilinear(
+            FoamTopologyUV(startDistance, startLateral)).r;
+        float endpointB = FoamSampleMajorBilinear(
+            FoamTopologyUV(endDistance, endLateral)).r;
+        float endpointsValid = smoothstep(0.18, 0.48, endpointA) *
+            smoothstep(0.18, 0.48, endpointB);
+
+        float2 startPosition = float2(
+            startDistance / max(0.001, spacing),
+            startLateral);
+        float2 endPosition = float2(
+            endDistance / max(0.001, spacing),
+            endLateral);
+        float bow = lerp(
+            -0.16,
+            0.16,
+            FoamTopologyNodeHash(firstIndex, 91.0));
+        float pathAlong;
+        float path = FoamConnectorMask(
+            samplePosition,
+            startPosition,
+            endPosition,
+            bow,
+            lerp(0.050, 0.028, granularity),
+            pathAlong);
+        float endpointRegion = max(
+            1.0 - smoothstep(0.0, 0.20, pathAlong),
+            smoothstep(0.80, 1.0, pathAlong));
+        float connector = path * pairEnabled * endpointsValid;
+        connectorCapacity = max(connectorCapacity, connector);
+        endpointConfidence = max(
+            endpointConfidence,
+            pairEnabled * endpointsValid);
+        overlapAmount = max(
+            overlapAmount,
+            connector * smoothstep(0.18, 0.52, currentMajor) *
+            (1.0 - endpointRegion));
+    }
+
+    [unroll]
+    for (int neighbour = -2; neighbour <= 2; neighbour++)
+    {
+        float structureIndex = baseIndex + (float)neighbour;
+        FoamMajorStructure parent = FoamGetMajorStructure(
+            structureIndex,
+            topologyClock,
+            granularity,
+            evolution);
+        float branchEnabled = parent.enabled * step(
+            0.54,
+            FoamTopologyNodeHash(structureIndex, 100.0));
+        float branchSide = FoamTopologyNodeHash(
+            structureIndex,
+            101.0) < 0.5 ? -1.0 : 1.0;
+        float startLocal = lerp(
+            -0.18,
+            0.38,
+            FoamTopologyNodeHash(structureIndex, 102.0));
+        float startDistance = parent.centreDistance +
+            startLocal * parent.halfLength;
+        float startLateral = FoamStructureCentreAtLocal(
+            parent,
+            startLocal) +
+            branchSide * parent.halfWidth * 0.48;
+        float endDistance = startDistance + parent.halfLength * lerp(
+            0.42,
+            0.88,
+            FoamTopologyNodeHash(structureIndex, 103.0));
+        float endLateral = clamp(
+            startLateral + branchSide * lerp(
+                0.20,
+                0.48,
+                FoamTopologyNodeHash(structureIndex, 104.0)),
+            -0.88,
+            0.88);
+        float startSupport = FoamSampleMajorBilinear(
+            FoamTopologyUV(startDistance, startLateral)).r;
+        float endpointFluid = FoamSampleFluidCoverageAtTopologyUV(
+            FoamTopologyUV(endDistance, endLateral));
+        float2 startPosition = float2(
+            startDistance / max(0.001, spacing),
+            startLateral);
+        float2 endPosition = float2(
+            endDistance / max(0.001, spacing),
+            endLateral);
+        float branchAlong;
+        float branch = FoamConnectorMask(
+            samplePosition,
+            startPosition,
+            endPosition,
+            branchSide * lerp(0.04, 0.15,
+                FoamTopologyNodeHash(structureIndex, 105.0)),
+            lerp(0.044, 0.024, granularity),
+            branchAlong);
+        branch *= branchEnabled *
+            smoothstep(0.18, 0.48, startSupport) *
+            smoothstep(0.68, 0.94, endpointFluid);
+        branchCapacity = max(branchCapacity, branch);
+
+        float forkEnabled = branchEnabled * step(
+            0.84,
+            FoamTopologyNodeHash(structureIndex, 106.0));
+        float forkEndLateral = clamp(
+            startLateral - branchSide * lerp(
+                0.15,
+                0.34,
+                FoamTopologyNodeHash(structureIndex, 107.0)),
+            -0.88,
+            0.88);
+        float forkAlong;
+        float fork = FoamConnectorMask(
+            samplePosition,
+            startPosition,
+            float2(
+                (endDistance * 0.92 + startDistance * 0.08) /
+                    max(0.001, spacing),
+                forkEndLateral),
+            -branchSide * 0.07,
+            lerp(0.038, 0.021, granularity),
+            forkAlong);
+        fork *= forkEnabled *
+            smoothstep(0.18, 0.48, startSupport);
+        branchCapacity = max(branchCapacity, fork);
+    }
+
+    _FoamTopologyConnectorWrite[outputCoordinate] = saturate(float4(
+        connectorCapacity,
+        branchCapacity,
+        endpointConfidence,
+        overlapAmount));
+}
+
+[numthreads(8, 8, 1)]
+void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamTopologyDimensions.x ||
+        dispatchId.y >= (uint)_FoamTopologyDimensions.y)
+    {
+        return;
+    }
+
+    int2 outputCoordinate = int2(dispatchId.xy);
+    float2 uv = (float2(dispatchId.xy) + 0.5) /
+        max(float2(1.0, 1.0), (float2)_FoamTopologyDimensions);
+    if (!IsFoamUInsideDomain(uv.x))
+    {
+        _FoamTopologyWrite[outputCoordinate] = 0.0.xxxx;
+        _FoamTopologySourcesWrite[outputCoordinate] = 0.0.xxxx;
+        return;
+    }
+
+    float2 fullPixel = uv *
+        max(float2(0.0, 0.0), (float2)_FoamDimensions - 1.0);
+    float4 boundaryClasses = SampleBoundaryClassesBilinear(fullPixel);
+    float fluidCoverage = saturate(boundaryClasses.r);
+    if (fluidCoverage <= 0.001)
+    {
+        _FoamTopologyWrite[outputCoordinate] = 0.0.xxxx;
+        _FoamTopologySourcesWrite[outputCoordinate] = 0.0.xxxx;
+        return;
+    }
+
+    int metricX = clamp(
+        (int)round(fullPixel.x),
+        0,
+        max(0, _FoamDimensions.x - 1));
+    FoamMetricRow metric = _FoamMetricRows[metricX];
+    float4 majorWork = _FoamTopologyMajorRead.Load(
+        int3(outputCoordinate, 0));
+    float4 pocketWork = _FoamTopologyPocketRead.Load(
+        int3(outputCoordinate, 0));
+    float4 connectorWork = _FoamTopologyConnectorRead.Load(
+        int3(outputCoordinate, 0));
+
+    float majorCapacity = majorWork.r;
+    float connectorCapacity = max(
+        connectorWork.r,
+        connectorWork.g);
+    float pocketExclusion = pocketWork.r;
+
+    float4 staticPressure = 0.0.xxxx;
+    float4 staticWake = 0.0.xxxx;
+    if (_FoamDisturbanceEnabled > 0.5)
+    {
+        staticPressure = SampleStaticPressureBilinear(uv);
+        staticWake = SampleStaticWakeBilinear(uv);
+    }
+
+    // Canonical source classes are independent. Each class is derived only
+    // from its own source data plus the valid fluid-domain mask. No positive
+    // class gates, boosts, attenuates, or reshapes another positive class.
+    float pressureCapture = saturate(max(
+        abs(staticPressure.r),
+        length(staticPressure.gb)));
+    float leeCapture = saturate(max(0.0, staticWake.g));
+    float shoreCapture = saturate(boundaryClasses.b);
+    float obstacleCapture = saturate(boundaryClasses.a);
+
+    float domainMask = fluidCoverage * saturate(metric.topologyData.w);
+    float4 topology = saturate(float4(
+        majorCapacity * domainMask,
+        connectorCapacity * domainMask,
+        pocketExclusion * domainMask,
+        0.0));
+    float4 sources = saturate(float4(
+        pressureCapture,
+        leeCapture,
+        shoreCapture,
+        obstacleCapture) * domainMask);
+
+    _FoamTopologyWrite[outputCoordinate] = topology;
+    _FoamTopologySourcesWrite[outputCoordinate] = sources;
+}
+
+[numthreads(64, 1, 1)]
+void ResetTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= 16u)
+    {
+        return;
+    }
+
+    _FoamTopologyMetrics.Store(dispatchId.x * 4u, 0u);
+}
+
+[numthreads(8, 8, 1)]
+void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamTopologyDimensions.x ||
+        dispatchId.y >= (uint)_FoamTopologyDimensions.y)
+    {
+        return;
+    }
+
+    float2 uv = (float2(dispatchId.xy) + 0.5) /
+        max(float2(1.0, 1.0), (float2)_FoamTopologyDimensions);
+    if (!IsFoamUInsideDomain(uv.x))
+    {
+        return;
+    }
+
+    float2 fullPixel = uv *
+        max(float2(0.0, 0.0), (float2)_FoamDimensions - 1.0);
+    if (SampleBoundaryBilinear(fullPixel).x <= 0.001)
+    {
+        return;
+    }
+
+    float4 topology = _FoamTopologyRead.Load(int3(dispatchId.xy, 0));
+    float4 sources = _FoamTopologySourcesRead.Load(int3(dispatchId.xy, 0));
+    float composed = FoamComposeTopologySupport(topology, sources);
+    float amount = SampleStateAtUV(uv).x;
+    bool visible = amount >= _FoamVisibleThreshold;
+    bool major = topology.r >= 0.15;
+    bool connector = topology.g >= 0.12;
+    bool pocket = topology.b >= 0.35;
+    bool supported = composed >= 0.15;
+    bool boundarySupported = max(sources.b, sources.a) >= 0.15;
+    bool obstacleSupported = sources.a >= 0.15;
+    bool pressureLeeSupported = max(sources.r, sources.g) >= 0.15;
+
+    float2 texel = 1.0 /
+        max(float2(2.0, 2.0), (float2)_FoamTopologyDimensions);
+    bool perimeter = visible && (
+        SampleStateAtUV(saturate(uv + float2(texel.x, 0.0))).x < _FoamVisibleThreshold ||
+        SampleStateAtUV(saturate(uv - float2(texel.x, 0.0))).x < _FoamVisibleThreshold ||
+        SampleStateAtUV(saturate(uv + float2(0.0, texel.y))).x < _FoamVisibleThreshold ||
+        SampleStateAtUV(saturate(uv - float2(0.0, texel.y))).x < _FoamVisibleThreshold);
+
+    uint originalValue;
+    _FoamTopologyMetrics.InterlockedAdd(0u, 1u, originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(4u, major ? 1u : 0u, originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(8u, connector ? 1u : 0u, originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(12u, pocket ? 1u : 0u, originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(
+        16u,
+        pocket && visible ? 1u : 0u,
+        originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(20u, visible ? 1u : 0u, originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(24u, supported ? 1u : 0u, originalValue);
+    uint deficitValue = supported
+        ? (uint)round(saturate(composed - amount) * 1023.0)
+        : 0u;
+    _FoamTopologyMetrics.InterlockedAdd(28u, deficitValue, originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(
+        32u,
+        boundarySupported ? 1u : 0u,
+        originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(
+        36u,
+        boundarySupported && visible ? 1u : 0u,
+        originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(
+        40u,
+        obstacleSupported ? 1u : 0u,
+        originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(
+        44u,
+        obstacleSupported && visible ? 1u : 0u,
+        originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(
+        48u,
+        pressureLeeSupported ? 1u : 0u,
+        originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(
+        52u,
+        pressureLeeSupported && visible ? 1u : 0u,
+        originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(
+        56u,
+        perimeter ? 1u : 0u,
+        originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(
+        60u,
+        connector && topology.r >= 0.24 ? 1u : 0u,
+        originalValue);
 }
 
 [numthreads(8, 8, 1)]

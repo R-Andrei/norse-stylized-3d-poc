@@ -79,6 +79,8 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamPrevious("Foam Previous", 2D) = "black" {}
         [HideInInspector] _FoamCurrent("Foam Current", 2D) = "black" {}
         [HideInInspector] _FoamGuidance("Foam Guidance", 2D) = "black" {}
+        [HideInInspector] _FoamTopology("Foam Topology", 2D) = "black" {}
+        [HideInInspector] _FoamTopologySources("Foam Topology Sources", 2D) = "black" {}
         [HideInInspector] _FoamFracture("Foam Fracture", 2D) = "black" {}
         [HideInInspector] _FoamBoundary("Foam Boundary", 2D) = "black" {}
         [HideInInspector] _FoamInterpolation("Foam Interpolation", Range(0, 1)) = 1
@@ -266,7 +268,14 @@ Shader "PS3D/Stylized River Water"
             TEXTURE2D(_FoamCurrent);
             SAMPLER(sampler_FoamCurrent);
             TEXTURE2D(_FoamGuidance);
-            SAMPLER(sampler_FoamGuidance);
+            // Guidance remains a bound compatibility/debug texture, but the
+            // compact Batch 1 debug menu no longer samples it in this pass.
+            // Topology diagnostics reuse sampler_FoamCurrent, which is already
+            // recognized and allocated by the normal foam path. This adds zero
+            // fragment samplers and avoids Unity's requirement that a shared
+            // sampler name remain associated with an actively sampled texture.
+            TEXTURE2D(_FoamTopology);
+            TEXTURE2D(_FoamTopologySources);
             TEXTURE2D(_FoamFracture);
             SAMPLER(sampler_FoamFracture);
             TEXTURE2D(_FoamBoundary);
@@ -756,92 +765,61 @@ Shader "PS3D/Stylized River Water"
                 finalColour = MixFog(finalColour, input.motionData.w);
 
                 int foamDebug = (int)round(_FoamDebugView);
-                if (foamDebug == 1)
+                if (foamDebug == 3 || foamDebug == 6 || foamDebug == 7)
                 {
-                    return half4(foam.amount.xxx, 1.0);
-                }
-
-                if (foamDebug == 2)
-                {
-                    return half4(foam.freshness.xxx, 1.0);
-                }
-
-                if (foamDebug == 3)
-                {
-                    return half4(foam.mask.xxx, 1.0);
-                }
-
-                if (foamDebug == 4)
-                {
-                    return half4(foam.integrity.xxx, 1.0);
-                }
-
-                if (foamDebug == 5)
-                {
-                    float3 phaseColour = RiverWaterFoamPhaseDebugColour(
-                        foam.phase) * saturate(foam.amount * 2.0);
-                    return half4(phaseColour, 1.0);
-                }
-
-                if (foamDebug == 6)
-                {
-                    float4 guidanceDebug = SAMPLE_TEXTURE2D_LOD(
-                        _FoamGuidance,
-                        sampler_FoamGuidance,
+                    float4 topologyDebug = SAMPLE_TEXTURE2D_LOD(
+                        _FoamTopology,
+                        sampler_FoamCurrent,
                         foam.fieldUV,
                         0.0);
-                    float3 directionColour = float3(
-                        guidanceDebug.x * 0.5 + 0.5,
-                        guidanceDebug.y * 0.5 + 0.5,
-                        guidanceDebug.z);
-                    return half4(
-                        lerp(
-                            directionColour * 0.35,
-                            float3(1.0, 1.0, 1.0),
-                            guidanceDebug.z),
-                        1.0);
-                }
-
-                if (foamDebug == 7)
-                {
-                    float2 boundaryDebug = SAMPLE_TEXTURE2D_LOD(
-                        _FoamBoundary,
-                        sampler_FoamBoundary,
-                        foam.fieldUV,
-                        0.0).rg;
-                    float4 staticWakeDebug = SAMPLE_TEXTURE2D_LOD(
-                        _DisturbanceStaticWakeSource,
-                        sampler_DisturbanceStaticWakeSource,
+                    float4 topologySources = SAMPLE_TEXTURE2D_LOD(
+                        _FoamTopologySources,
+                        sampler_FoamCurrent,
                         foam.fieldUV,
                         0.0);
-                    float4 pressureDebug = SAMPLE_TEXTURE2D_LOD(
-                        _DisturbanceStaticTarget,
-                        sampler_DisturbanceStaticTarget,
-                        foam.fieldUV,
-                        0.0);
-                    float captureDebug = saturate(
-                        boundaryDebug.g * 1.35 +
-                        staticWakeDebug.g * 1.85 +
-                        abs(pressureDebug.r) / 0.18 * 0.48);
-                    return half4(
-                        captureDebug,
-                        boundaryDebug.g,
-                        staticWakeDebug.g,
-                        1.0);
-                }
 
+                    float freeWaterSupport = max(
+                        topologyDebug.r,
+                        topologyDebug.g);
+                    float combinedCaptureSupport = max(
+                        max(topologySources.r, topologySources.g),
+                        max(topologySources.b, topologySources.a));
 
-                if (foamDebug == 8)
-                {
-                    float2 fractureDebug = SAMPLE_TEXTURE2D_LOD(
-                        _FoamFracture,
-                        sampler_FoamFracture,
-                        foam.fieldUV,
-                        0.0).rg;
+                    if (foamDebug == 3)
+                    {
+                        // Canonical independent capture classes. Red =
+                        // Pressure, green = Lee, blue = Shore, and magenta =
+                        // Obstacle. No positive class modifies another.
+                        return half4(
+                            saturate(topologySources.r + topologySources.a),
+                            saturate(topologySources.g),
+                            saturate(topologySources.b + topologySources.a),
+                            1.0);
+                    }
+
+                    if (foamDebug == 6)
+                    {
+                        // Green is every positive class before subtraction,
+                        // using the same canonical effective-capture channels
+                        // as Capture Zones and Positive Zone Classes. Red is
+                        // Pocket Exclusion; additive overlap is yellow.
+                        float positiveSupport = saturate(
+                            max(freeWaterSupport, combinedCaptureSupport));
+                        float negativeSupport = saturate(topologyDebug.b);
+                        return half4(
+                            negativeSupport,
+                            positiveSupport,
+                            0.0,
+                            1.0);
+                    }
+
+                    // Red = independent Major Capacity, green = independent
+                    // Connector Capacity, and blue = the same combined
+                    // canonical Capture Capacity used above.
                     return half4(
-                        fractureDebug.r,
-                        fractureDebug.g,
-                        0.0,
+                        saturate(topologyDebug.r),
+                        saturate(topologyDebug.g),
+                        saturate(combinedCaptureSupport),
                         1.0);
                 }
 

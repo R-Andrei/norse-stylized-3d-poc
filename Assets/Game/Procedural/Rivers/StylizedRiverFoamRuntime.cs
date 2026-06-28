@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ProgrammaticStylized3D.Geometry;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace ProgrammaticStylized3D.Rivers
 {
@@ -26,6 +27,8 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MaximumManualReservationSeconds = 90f;
         private const float DecayToFivePercent = 2.995732f;
         private const int ThreadGroupSize = 8;
+        private const int TopologyMetricCount = 16;
+        private const float TopologyMetricQuantisation = 1023f;
 
         private static readonly int FoamEnabledId =
             Shader.PropertyToID("_FoamEnabled");
@@ -35,6 +38,10 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamCurrent");
         private static readonly int FoamGuidanceId =
             Shader.PropertyToID("_FoamGuidance");
+        private static readonly int FoamTopologyId =
+            Shader.PropertyToID("_FoamTopology");
+        private static readonly int FoamTopologySourcesId =
+            Shader.PropertyToID("_FoamTopologySources");
         private static readonly int FoamFractureId =
             Shader.PropertyToID("_FoamFracture");
         private static readonly int FoamBoundaryId =
@@ -119,6 +126,7 @@ namespace ProgrammaticStylized3D.Rivers
         private struct FoamMetricRow
         {
             public Vector4 WidthsAndSpacing;
+            public Vector4 TopologyData;
         }
 
         private StylizedRiver river;
@@ -133,6 +141,11 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture currentState;
         private RenderTexture writeState;
         private RenderTexture guidanceTexture;
+        private RenderTexture topologyTexture;
+        private RenderTexture topologySourcesTexture;
+        private RenderTexture topologyMajorTexture;
+        private RenderTexture topologyPocketTexture;
+        private RenderTexture topologyConnectorTexture;
         private RenderTexture fractureA;
         private RenderTexture fractureB;
         private RenderTexture currentFracture;
@@ -141,8 +154,14 @@ namespace ProgrammaticStylized3D.Rivers
         private Texture2D boundaryTexture;
         private ComputeBuffer metricBuffer;
         private ComputeBuffer populationMetricsBuffer;
+        private ComputeBuffer topologyMetricsBuffer;
         private StylizedRiverDisturbanceRuntime disturbanceRuntime;
         private FoamMetricRow[] metricRows = Array.Empty<FoamMetricRow>();
+        private readonly uint[] latestTopologyMetrics =
+            new uint[TopologyMetricCount];
+        private bool topologyMetricsReadbackPending;
+        private bool topologyMetricsAvailable;
+        private int topologyMetricsGeneration;
 
         private readonly List<PendingInjection> pendingInjections = new();
         private readonly List<FoamReservation> reservations = new();
@@ -177,6 +196,12 @@ namespace ProgrammaticStylized3D.Rivers
         private int clearKernel = -1;
         private int injectKernel = -1;
         private int buildGuidanceKernel = -1;
+        private int buildTopologyMajorKernel = -1;
+        private int buildTopologyPocketsKernel = -1;
+        private int buildTopologyConnectorsKernel = -1;
+        private int composeTopologyKernel = -1;
+        private int resetTopologyMetricsKernel = -1;
+        private int measureTopologyMetricsKernel = -1;
         private int resetPopulationKernel = -1;
         private int measurePopulationKernel = -1;
         private int updateFractureKernel = -1;
@@ -203,6 +228,28 @@ namespace ProgrammaticStylized3D.Rivers
         public int FieldHeight => currentState != null ? currentState.height : 0;
         public int GuidanceWidth => guidanceTexture != null ? guidanceTexture.width : 0;
         public int GuidanceHeight => guidanceTexture != null ? guidanceTexture.height : 0;
+        public int TopologyWidth => topologyTexture != null ? topologyTexture.width : 0;
+        public int TopologyHeight => topologyTexture != null ? topologyTexture.height : 0;
+        public bool TopologyMetricsAvailable => topologyMetricsAvailable;
+        public float MajorCapacityCoverage => TopologyCoverageRatio(1);
+        public float ConnectorCapacityCoverage => TopologyCoverageRatio(2);
+        public float ProtectedPocketCoverage => TopologyCoverageRatio(3);
+        public float ProtectedPocketViolation => TopologyRegionRatio(4, 3);
+        public float VisibleMaterialCoverage => TopologyCoverageRatio(5);
+        public float MaterialDeficitInsideCapacity =>
+            topologyMetricsAvailable && latestTopologyMetrics[6] > 0u
+                ? latestTopologyMetrics[7] /
+                  (TopologyMetricQuantisation * latestTopologyMetrics[6])
+                : 0f;
+        public float BoundaryOccupancy => TopologyRegionRatio(9, 8);
+        public float ObstacleOccupancy => TopologyRegionRatio(11, 10);
+        public float PressureLeeOccupancy => TopologyRegionRatio(13, 12);
+        public float PerimeterRatio => TopologyRegionRatio(14, 5);
+        public float ComposedTopologyCoverage => TopologyCoverageRatio(6);
+        public float OpenSpanCoverage => topologyMetricsAvailable
+            ? Mathf.Clamp01(1f - ComposedTopologyCoverage)
+            : 0f;
+        public float ConnectorInMajorOverlap => TopologyRegionRatio(15, 2);
         public int FractureWidth => currentFracture != null ? currentFracture.width : 0;
         public int FractureHeight => currentFracture != null ? currentFracture.height : 0;
         public float GuidanceUpdateRate => ResolveGuidanceUpdateRate();
@@ -227,6 +274,7 @@ namespace ProgrammaticStylized3D.Rivers
             reverseState != null;
         public bool IsSleeping =>
             !IsAutonomousPopulationActive &&
+            !IsTopologyDebugActive &&
             pendingInjections.Count == 0 &&
             reservations.Count == 0 &&
             CountActiveChunks() == 0;
@@ -236,6 +284,11 @@ namespace ProgrammaticStylized3D.Rivers
             EstimateTextureBytes(advectedState) +
             EstimateTextureBytes(reverseState) +
             EstimateTextureBytes(guidanceTexture) +
+            EstimateTextureBytes(topologyTexture) +
+            EstimateTextureBytes(topologySourcesTexture) +
+            EstimateTextureBytes(topologyMajorTexture) +
+            EstimateTextureBytes(topologyPocketTexture) +
+            EstimateTextureBytes(topologyConnectorTexture) +
             EstimateTextureBytes(fractureA) +
             EstimateTextureBytes(fractureB) +
             EstimateTextureBytes(neutralDisturbanceTexture) +
@@ -245,15 +298,35 @@ namespace ProgrammaticStylized3D.Rivers
                 : 0L) +
             (populationMetricsBuffer != null
                 ? (long)populationMetricsBuffer.count * populationMetricsBuffer.stride
+                : 0L) +
+            (topologyMetricsBuffer != null
+                ? (long)topologyMetricsBuffer.count * topologyMetricsBuffer.stride
                 : 0L);
 
         private bool IsAutonomousPopulationActive =>
             river != null && river.FoamAmount > 0.0001f;
 
+        private bool IsTopologyDebugActive
+        {
+            get
+            {
+                if (river == null)
+                {
+                    return false;
+                }
+
+                StylizedRiverFoamDebugView view = river.FoamDebugView;
+                return view == StylizedRiverFoamDebugView.CaptureZones ||
+                    view == StylizedRiverFoamDebugView.PositiveNegativeZones ||
+                    view == StylizedRiverFoamDebugView.PositiveZoneClasses;
+            }
+        }
+
         private bool IsSupported =>
             SystemInfo.supportsComputeShaders &&
             SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBHalf) &&
-            SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.RGHalf);
+            SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.RGHalf) &&
+            SystemInfo.SupportsTextureFormat(TextureFormat.RGBAHalf);
 
         private void OnEnable()
         {
@@ -383,12 +456,14 @@ namespace ProgrammaticStylized3D.Rivers
 
             bool autonomousDecayActive =
                 currentState != null && nowAsDouble < autonomousDecayUntil;
-            bool hasWork =
+            bool topologyDebugActive = IsTopologyDebugActive;
+            bool materialWork =
                 autonomousPopulationActive ||
                 autonomousDecayActive ||
                 pendingInjections.Count > 0 ||
                 reservations.Count > 0 ||
                 CountActiveChunks() > 0;
+            bool hasWork = materialWork || topologyDebugActive;
 
             if (!hasWork && currentState == null)
             {
@@ -432,47 +507,68 @@ namespace ProgrammaticStylized3D.Rivers
                 while (simulationAccumulator >= stepDuration)
                 {
                     simulationAccumulator -= stepDuration;
-                    UpdateReservations(stepDuration, now);
+                    bool materialStepActive =
+                        autonomousPopulationActive ||
+                        autonomousDecayActive ||
+                        reservations.Count > 0 ||
+                        CountActiveChunks() > 0;
 
-                    if (autonomousPopulationActive || autonomousDecayActive)
+                    if (materialStepActive)
                     {
-                        ActivateAllChunks(now + stepDuration * 3f);
-                    }
-                    else
-                    {
-                        UpdateActiveChunks(now);
+                        UpdateReservations(stepDuration, now);
+
+                        if (autonomousPopulationActive || autonomousDecayActive)
+                        {
+                            ActivateAllChunks(now + stepDuration * 3f);
+                        }
+                        else
+                        {
+                            UpdateActiveChunks(now);
+                        }
+
+                        ConfigureSharedComputeParameters(stepDuration);
+                        populationAccumulator += stepDuration;
+                        fractureAccumulator += stepDuration;
                     }
 
-                    ConfigureSharedComputeParameters(stepDuration);
                     guidanceAccumulator += stepDuration;
-                    populationAccumulator += stepDuration;
-                    fractureAccumulator += stepDuration;
-
                     float guidanceInterval = 1f /
                         Mathf.Max(1f, ResolveGuidanceUpdateRate());
                     if (guidanceAccumulator >= guidanceInterval)
                     {
-                        BuildGuidanceField(guidanceAccumulator);
+                        if (materialStepActive)
+                        {
+                            BuildGuidanceField(guidanceAccumulator);
+                        }
+
+                        if (topologyDebugActive)
+                        {
+                            BuildTopologyField(guidanceAccumulator);
+                        }
+
                         guidanceAccumulator %= guidanceInterval;
                     }
 
-                    float populationInterval = 1f /
-                        Mathf.Max(1f, ResolvePopulationUpdateRate());
-                    if (populationAccumulator >= populationInterval)
+                    if (materialStepActive)
                     {
-                        MeasurePopulation();
-                        populationAccumulator %= populationInterval;
-                    }
+                        float populationInterval = 1f /
+                            Mathf.Max(1f, ResolvePopulationUpdateRate());
+                        if (populationAccumulator >= populationInterval)
+                        {
+                            MeasurePopulation();
+                            populationAccumulator %= populationInterval;
+                        }
 
-                    float fractureInterval = 1f /
-                        Mathf.Max(1f, ResolveFractureUpdateRate());
-                    if (fractureAccumulator >= fractureInterval)
-                    {
-                        UpdateFractureField(fractureAccumulator);
-                        fractureAccumulator %= fractureInterval;
-                    }
+                        float fractureInterval = 1f /
+                            Mathf.Max(1f, ResolveFractureUpdateRate());
+                        if (fractureAccumulator >= fractureInterval)
+                        {
+                            UpdateFractureField(fractureAccumulator);
+                            fractureAccumulator %= fractureInterval;
+                        }
 
-                    SimulateActiveChunks(stepDuration);
+                        SimulateActiveChunks(stepDuration);
+                    }
                 }
 
                 simulationInterpolation = Mathf.Clamp01(
@@ -639,6 +735,11 @@ namespace ProgrammaticStylized3D.Rivers
                 advectedState != null &&
                 reverseState != null &&
                 guidanceTexture != null &&
+                topologyTexture != null &&
+                topologySourcesTexture != null &&
+                topologyMajorTexture != null &&
+                topologyPocketTexture != null &&
+                topologyConnectorTexture != null &&
                 currentFracture != null &&
                 writeFracture != null &&
                 neutralDisturbanceTexture != null &&
@@ -646,12 +747,14 @@ namespace ProgrammaticStylized3D.Rivers
                 boundaryTexture != null &&
                 metricBuffer != null &&
                 populationMetricsBuffer != null &&
+                topologyMetricsBuffer != null &&
                 domainVersion == river.Domain.Version &&
                 allocatedQuality == river.Quality)
             {
                 if (boundaryDirty)
                 {
                     RebuildBoundaryTexture();
+                    BuildTopologyField(0f);
                 }
 
                 return true;
@@ -671,6 +774,18 @@ namespace ProgrammaticStylized3D.Rivers
             clearKernel = computeShader.FindKernel("ClearRange");
             injectKernel = computeShader.FindKernel("InjectFoam");
             buildGuidanceKernel = computeShader.FindKernel("BuildGuidance");
+            buildTopologyMajorKernel =
+                computeShader.FindKernel("BuildTopologyMajor");
+            buildTopologyPocketsKernel =
+                computeShader.FindKernel("BuildTopologyPockets");
+            buildTopologyConnectorsKernel =
+                computeShader.FindKernel("BuildTopologyConnectors");
+            composeTopologyKernel =
+                computeShader.FindKernel("ComposeTopology");
+            resetTopologyMetricsKernel =
+                computeShader.FindKernel("ResetTopologyMetrics");
+            measureTopologyMetricsKernel =
+                computeShader.FindKernel("MeasureTopologyMetrics");
             resetPopulationKernel = computeShader.FindKernel("ResetPopulation");
             measurePopulationKernel = computeShader.FindKernel("MeasurePopulation");
             updateFractureKernel = computeShader.FindKernel("UpdateFracture");
@@ -769,6 +884,16 @@ namespace ProgrammaticStylized3D.Rivers
             reverseState = CreateFieldTexture("PS3D_RiverFoam_Reverse");
             guidanceTexture = CreateGuidanceTexture(
                 "PS3D_RiverFoam_Guidance");
+            topologyTexture = CreateGuidanceTexture(
+                "PS3D_RiverFoam_Topology");
+            topologySourcesTexture = CreateGuidanceTexture(
+                "PS3D_RiverFoam_TopologySources");
+            topologyMajorTexture = CreateGuidanceTexture(
+                "PS3D_RiverFoam_TopologyMajorWork");
+            topologyPocketTexture = CreateGuidanceTexture(
+                "PS3D_RiverFoam_TopologyPocketWork");
+            topologyConnectorTexture = CreateGuidanceTexture(
+                "PS3D_RiverFoam_TopologyConnectorWork");
             fractureA = CreateFractureTexture("PS3D_RiverFoam_FractureA");
             fractureB = CreateFractureTexture("PS3D_RiverFoam_FractureB");
             currentFracture = fractureA;
@@ -780,6 +905,10 @@ namespace ProgrammaticStylized3D.Rivers
 
             populationMetricsBuffer = new ComputeBuffer(
                 chunkCount * 8,
+                sizeof(uint),
+                ComputeBufferType.Raw);
+            topologyMetricsBuffer = new ComputeBuffer(
+                TopologyMetricCount,
                 sizeof(uint),
                 ComputeBufferType.Raw);
 
@@ -796,6 +925,7 @@ namespace ProgrammaticStylized3D.Rivers
             DispatchClearFracture(fractureA, 0, fractureWidth);
             DispatchClearFracture(fractureB, 0, fractureWidth);
             BuildGuidanceField(0f);
+            BuildTopologyField(0f);
             MeasurePopulation();
 
             resourcesDirty = false;
@@ -961,14 +1091,20 @@ namespace ProgrammaticStylized3D.Rivers
             metricRows = new FoamMetricRow[fieldWidth];
             float longitudinalSpacing =
                 fieldLength / Mathf.Max(1, fieldWidth - 1);
+            float curvatureSampleDistance = Mathf.Max(
+                0.5f,
+                longitudinalSpacing * 2f);
+            float flowSign = river.Domain.ReverseFlow ? -1f : 1f;
 
             for (int x = 0; x < fieldWidth; x++)
             {
                 float localDistance =
                     x / (float)Mathf.Max(1, fieldWidth - 1) * fieldLength;
+                float clampedLocalDistance = Mathf.Min(
+                    localDistance,
+                    validFieldLength);
                 float globalDistance =
-                    river.Domain.GlobalDistanceMinimum +
-                    Mathf.Min(localDistance, validFieldLength);
+                    river.Domain.GlobalDistanceMinimum + clampedLocalDistance;
                 StylizedRiverSplineSample sample =
                     river.Domain.SampleAtGlobalDistance(globalDistance);
                 float left = Mathf.Max(0.05f, sample.LeftSurfaceHalfWidth);
@@ -976,13 +1112,55 @@ namespace ProgrammaticStylized3D.Rivers
                 float minimumLateralSpacing =
                     (left + right) / Mathf.Max(1, fieldHeight - 1);
 
+                float previousGlobal = Mathf.Max(
+                    river.Domain.GlobalDistanceMinimum,
+                    globalDistance - curvatureSampleDistance);
+                float nextGlobal = Mathf.Min(
+                    river.Domain.GlobalDistanceMaximum,
+                    globalDistance + curvatureSampleDistance);
+                StylizedRiverSplineSample previousSample =
+                    river.Domain.SampleAtGlobalDistance(previousGlobal);
+                StylizedRiverSplineSample nextSample =
+                    river.Domain.SampleAtGlobalDistance(nextGlobal);
+                Vector3 previousTangent =
+                    previousSample.Tangent * flowSign;
+                Vector3 nextTangent =
+                    nextSample.Tangent * flowSign;
+                // Topology lateral coordinates retain the domain's stored
+                // Side basis under reverse flow, so curvature sign must be
+                // expressed in that same basis rather than a flipped flow-side.
+                Vector3 topologySide = sample.Side;
+                float curvatureDistance = Mathf.Max(
+                    0.01f,
+                    nextGlobal - previousGlobal);
+                float signedCurvature = Vector3.Dot(
+                    (nextTangent - previousTangent) / curvatureDistance,
+                    topologySide);
+                float previousWidth =
+                    previousSample.LeftSurfaceHalfWidth +
+                    previousSample.RightSurfaceHalfWidth;
+                float nextWidth =
+                    nextSample.LeftSurfaceHalfWidth +
+                    nextSample.RightSurfaceHalfWidth;
+                float widthDerivative =
+                    (nextWidth - previousWidth) / curvatureDistance;
+                float asymmetry =
+                    (right - left) / Mathf.Max(0.05f, left + right);
+
                 metricRows[x] = new FoamMetricRow
                 {
                     WidthsAndSpacing = new Vector4(
                         left,
                         right,
                         longitudinalSpacing,
-                        minimumLateralSpacing)
+                        minimumLateralSpacing),
+                    TopologyData = new Vector4(
+                        signedCurvature,
+                        widthDerivative,
+                        asymmetry,
+                        localDistance <= validFieldLength + 0.0001f
+                            ? 1f
+                            : 0f)
                 };
             }
 
@@ -1066,8 +1244,8 @@ namespace ProgrammaticStylized3D.Rivers
                     pixels[y * fieldWidth + x] = new Color(
                         coverage,
                         attraction,
-                        0f,
-                        1f);
+                        attraction,
+                        0f);
                 }
             }
 
@@ -1105,7 +1283,7 @@ namespace ProgrammaticStylized3D.Rivers
                 boundaryTexture = new Texture2D(
                     fieldWidth,
                     fieldHeight,
-                    TextureFormat.RGHalf,
+                    TextureFormat.RGBAHalf,
                     false,
                     true)
                 {
@@ -1235,13 +1413,15 @@ namespace ProgrammaticStylized3D.Rivers
                         float obstacleAttraction = Mathf.Clamp01(
                             1f - edgeDistance /
                             Mathf.Max(0.001f, edgeWidth * 5.5f));
-                        previous.g = Mathf.Max(
-                            previous.g,
-                            obstacleAttraction * obstacleCoverage);
+                        float obstacleSignal =
+                            obstacleAttraction * obstacleCoverage;
+                        previous.g = Mathf.Max(previous.g, obstacleSignal);
+                        previous.a = Mathf.Max(previous.a, obstacleSignal);
                     }
                     else
                     {
                         previous.g = 0f;
+                        previous.a = 0f;
                     }
                     pixels[pixelIndex] = previous;
                 }
@@ -1552,6 +1732,308 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamGuidanceWrite",
                 guidanceTexture);
             Dispatch(buildGuidanceKernel, guidanceWidth, guidanceHeight);
+        }
+
+        private void BuildTopologyField(float deltaTime)
+        {
+            if (computeShader == null || topologyTexture == null ||
+                topologySourcesTexture == null ||
+                topologyMajorTexture == null ||
+                topologyPocketTexture == null ||
+                topologyConnectorTexture == null ||
+                boundaryTexture == null || metricBuffer == null ||
+                buildTopologyMajorKernel < 0 ||
+                buildTopologyPocketsKernel < 0 ||
+                buildTopologyConnectorsKernel < 0 ||
+                composeTopologyKernel < 0)
+            {
+                return;
+            }
+
+            disturbanceRuntime ??=
+                GetComponent<StylizedRiverDisturbanceRuntime>();
+            bool disturbanceAvailable =
+                disturbanceRuntime != null &&
+                disturbanceRuntime.IsAllocated;
+            RenderTexture staticWakeSource = disturbanceAvailable
+                ? disturbanceRuntime.StaticWakeSourceTexture
+                : null;
+            RenderTexture staticPressureSource = disturbanceAvailable
+                ? disturbanceRuntime.StaticPressureTexture
+                : null;
+            bool staticWakeAvailable = IsCreatedTexture(staticWakeSource);
+            bool staticPressureAvailable = IsCreatedTexture(staticPressureSource);
+            Texture staticWakeTexture = staticWakeAvailable
+                ? staticWakeSource
+                : neutralDisturbanceTexture;
+            Texture staticPressureTexture = staticPressureAvailable
+                ? staticPressureSource
+                : neutralDisturbanceTexture;
+            Vector2Int staticWakeDimensions = staticWakeAvailable
+                ? new Vector2Int(staticWakeSource.width, staticWakeSource.height)
+                : Vector2Int.one;
+            Vector2Int staticPressureDimensions = staticPressureAvailable
+                ? new Vector2Int(
+                    staticPressureSource.width,
+                    staticPressureSource.height)
+                : Vector2Int.one;
+
+            computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetInts(
+                "_FoamTopologyDimensions",
+                guidanceWidth,
+                guidanceHeight);
+            computeShader.SetInts(
+                "_FoamStaticWakeDimensions",
+                staticWakeDimensions.x,
+                staticWakeDimensions.y);
+            computeShader.SetInts(
+                "_FoamStaticPressureDimensions",
+                staticPressureDimensions.x,
+                staticPressureDimensions.y);
+            computeShader.SetFloat(
+                "_FoamDisturbanceEnabled",
+                staticWakeAvailable || staticPressureAvailable ? 1f : 0f);
+            computeShader.SetFloat("_FoamValidLength", validFieldLength);
+            computeShader.SetFloat(
+                "_FoamGlobalStart",
+                river.Domain.GlobalDistanceMinimum);
+            computeShader.SetFloat("_FoamFieldLength", fieldLength);
+            computeShader.SetFloat("_FoamDeltaTime", deltaTime);
+            computeShader.SetFloat("_FoamTime", river.MotionTime);
+            computeShader.SetFloat("_FoamSeed", river.VisualSeed);
+            computeShader.SetFloat(
+                "_FoamWebGranularity",
+                river.FoamWebGranularity);
+            computeShader.SetFloat(
+                "_FoamNetworkEvolution",
+                river.FoamNetworkEvolution);
+
+            computeShader.SetBuffer(
+                buildTopologyMajorKernel,
+                "_FoamMetricRows",
+                metricBuffer);
+            computeShader.SetTexture(
+                buildTopologyMajorKernel,
+                "_FoamBoundary",
+                boundaryTexture);
+            computeShader.SetTexture(
+                buildTopologyMajorKernel,
+                "_FoamTopologyMajorWrite",
+                topologyMajorTexture);
+            Dispatch(
+                buildTopologyMajorKernel,
+                guidanceWidth,
+                guidanceHeight);
+
+            computeShader.SetBuffer(
+                buildTopologyPocketsKernel,
+                "_FoamMetricRows",
+                metricBuffer);
+            computeShader.SetTexture(
+                buildTopologyPocketsKernel,
+                "_FoamBoundary",
+                boundaryTexture);
+            computeShader.SetTexture(
+                buildTopologyPocketsKernel,
+                "_FoamTopologyMajorRead",
+                topologyMajorTexture);
+            computeShader.SetTexture(
+                buildTopologyPocketsKernel,
+                "_FoamTopologyPocketWrite",
+                topologyPocketTexture);
+            Dispatch(
+                buildTopologyPocketsKernel,
+                guidanceWidth,
+                guidanceHeight);
+
+            computeShader.SetBuffer(
+                buildTopologyConnectorsKernel,
+                "_FoamMetricRows",
+                metricBuffer);
+            computeShader.SetTexture(
+                buildTopologyConnectorsKernel,
+                "_FoamBoundary",
+                boundaryTexture);
+            computeShader.SetTexture(
+                buildTopologyConnectorsKernel,
+                "_FoamTopologyMajorRead",
+                topologyMajorTexture);
+            computeShader.SetTexture(
+                buildTopologyConnectorsKernel,
+                "_FoamTopologyPocketRead",
+                topologyPocketTexture);
+            computeShader.SetTexture(
+                buildTopologyConnectorsKernel,
+                "_FoamTopologyConnectorWrite",
+                topologyConnectorTexture);
+            Dispatch(
+                buildTopologyConnectorsKernel,
+                guidanceWidth,
+                guidanceHeight);
+
+            computeShader.SetBuffer(
+                composeTopologyKernel,
+                "_FoamMetricRows",
+                metricBuffer);
+            computeShader.SetTexture(
+                composeTopologyKernel,
+                "_FoamBoundary",
+                boundaryTexture);
+            computeShader.SetTexture(
+                composeTopologyKernel,
+                "_FoamTopologyMajorRead",
+                topologyMajorTexture);
+            computeShader.SetTexture(
+                composeTopologyKernel,
+                "_FoamTopologyPocketRead",
+                topologyPocketTexture);
+            computeShader.SetTexture(
+                composeTopologyKernel,
+                "_FoamTopologyConnectorRead",
+                topologyConnectorTexture);
+            computeShader.SetTexture(
+                composeTopologyKernel,
+                "_FoamStaticWakeField",
+                staticWakeTexture);
+            computeShader.SetTexture(
+                composeTopologyKernel,
+                "_FoamStaticPressureField",
+                staticPressureTexture);
+            computeShader.SetTexture(
+                composeTopologyKernel,
+                "_FoamTopologyWrite",
+                topologyTexture);
+            computeShader.SetTexture(
+                composeTopologyKernel,
+                "_FoamTopologySourcesWrite",
+                topologySourcesTexture);
+            Dispatch(
+                composeTopologyKernel,
+                guidanceWidth,
+                guidanceHeight);
+            MeasureTopologyMetrics();
+        }
+
+        private void MeasureTopologyMetrics()
+        {
+            if (computeShader == null || currentState == null ||
+                topologyTexture == null || topologySourcesTexture == null ||
+                topologyMetricsBuffer == null ||
+                resetTopologyMetricsKernel < 0 ||
+                measureTopologyMetricsKernel < 0)
+            {
+                return;
+            }
+
+            computeShader.SetBuffer(
+                resetTopologyMetricsKernel,
+                "_FoamTopologyMetrics",
+                topologyMetricsBuffer);
+            DispatchOneDimensional(
+                resetTopologyMetricsKernel,
+                TopologyMetricCount,
+                64);
+
+            computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetInts(
+                "_FoamTopologyDimensions",
+                guidanceWidth,
+                guidanceHeight);
+            computeShader.SetFloat("_FoamValidLength", validFieldLength);
+            computeShader.SetFloat("_FoamFieldLength", fieldLength);
+            computeShader.SetFloat(
+                "_FoamVisibleThreshold",
+                river.FoamPopulationVisibleThreshold);
+            computeShader.SetTexture(
+                measureTopologyMetricsKernel,
+                "_FoamTopologyRead",
+                topologyTexture);
+            computeShader.SetTexture(
+                measureTopologyMetricsKernel,
+                "_FoamTopologySourcesRead",
+                topologySourcesTexture);
+            computeShader.SetTexture(
+                measureTopologyMetricsKernel,
+                "_FoamStateRead",
+                currentState);
+            computeShader.SetTexture(
+                measureTopologyMetricsKernel,
+                "_FoamBoundary",
+                boundaryTexture);
+            computeShader.SetBuffer(
+                measureTopologyMetricsKernel,
+                "_FoamTopologyMetrics",
+                topologyMetricsBuffer);
+            Dispatch(
+                measureTopologyMetricsKernel,
+                guidanceWidth,
+                guidanceHeight);
+            RequestTopologyMetricsReadback();
+        }
+
+        private void RequestTopologyMetricsReadback()
+        {
+            if (!SystemInfo.supportsAsyncGPUReadback ||
+                topologyMetricsReadbackPending ||
+                topologyMetricsBuffer == null)
+            {
+                return;
+            }
+
+            topologyMetricsReadbackPending = true;
+            int generation = topologyMetricsGeneration;
+            ComputeBuffer requestedBuffer = topologyMetricsBuffer;
+            AsyncGPUReadback.Request(
+                requestedBuffer,
+                request =>
+                {
+                    if (this == null || generation != topologyMetricsGeneration)
+                    {
+                        requestedBuffer?.Release();
+                        return;
+                    }
+
+                    topologyMetricsReadbackPending = false;
+                    if (request.hasError)
+                    {
+                        topologyMetricsAvailable = false;
+                        return;
+                    }
+
+                    var data = request.GetData<uint>();
+                    int count = Mathf.Min(
+                        data.Length,
+                        latestTopologyMetrics.Length);
+                    for (int index = 0; index < count; index++)
+                    {
+                        latestTopologyMetrics[index] = data[index];
+                    }
+
+                    topologyMetricsAvailable = count == TopologyMetricCount;
+                });
+        }
+
+        private float TopologyCoverageRatio(int numeratorIndex)
+        {
+            return TopologyRegionRatio(numeratorIndex, 0);
+        }
+
+        private float TopologyRegionRatio(
+            int numeratorIndex,
+            int denominatorIndex)
+        {
+            if (!topologyMetricsAvailable ||
+                numeratorIndex < 0 || numeratorIndex >= TopologyMetricCount ||
+                denominatorIndex < 0 || denominatorIndex >= TopologyMetricCount)
+            {
+                return 0f;
+            }
+
+            uint denominator = latestTopologyMetrics[denominatorIndex];
+            return denominator > 0u
+                ? latestTopologyMetrics[numeratorIndex] / (float)denominator
+                : 0f;
         }
 
         private void MeasurePopulation()
@@ -2051,6 +2533,10 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(FoamPreviousId, previousState);
             propertyBlock.SetTexture(FoamCurrentId, currentState);
             propertyBlock.SetTexture(FoamGuidanceId, guidanceTexture);
+            propertyBlock.SetTexture(FoamTopologyId, topologyTexture);
+            propertyBlock.SetTexture(
+                FoamTopologySourcesId,
+                topologySourcesTexture);
             propertyBlock.SetTexture(FoamFractureId, currentFracture);
             propertyBlock.SetTexture(FoamBoundaryId, boundaryTexture);
             propertyBlock.SetFloat(FoamInterpolationId, simulationInterpolation);
@@ -2083,6 +2569,10 @@ namespace ProgrammaticStylized3D.Rivers
             surfaceRenderer.GetPropertyBlock(propertyBlock);
             propertyBlock.SetFloat(FoamEnabledId, 0f);
             propertyBlock.SetTexture(FoamGuidanceId, Texture2D.blackTexture);
+            propertyBlock.SetTexture(FoamTopologyId, Texture2D.blackTexture);
+            propertyBlock.SetTexture(
+                FoamTopologySourcesId,
+                Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamFractureId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamBoundaryId, Texture2D.blackTexture);
             propertyBlock.SetFloat(FoamInterpolationId, 1f);
@@ -2101,6 +2591,11 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseTexture(ref advectedState);
             ReleaseTexture(ref reverseState);
             ReleaseTexture(ref guidanceTexture);
+            ReleaseTexture(ref topologyTexture);
+            ReleaseTexture(ref topologySourcesTexture);
+            ReleaseTexture(ref topologyMajorTexture);
+            ReleaseTexture(ref topologyPocketTexture);
+            ReleaseTexture(ref topologyConnectorTexture);
             ReleaseTexture(ref fractureA);
             ReleaseTexture(ref fractureB);
             ReleaseTexture(ref neutralDisturbanceTexture);
@@ -2120,11 +2615,36 @@ namespace ProgrammaticStylized3D.Rivers
             metricBuffer = null;
             populationMetricsBuffer?.Release();
             populationMetricsBuffer = null;
+            if (topologyMetricsReadbackPending)
+            {
+                // The request callback owns this retired buffer until the GPU
+                // copy completes. Releasing it here can invalidate the request.
+                topologyMetricsBuffer = null;
+            }
+            else
+            {
+                topologyMetricsBuffer?.Release();
+                topologyMetricsBuffer = null;
+            }
+
+            topologyMetricsGeneration++;
+            topologyMetricsReadbackPending = false;
+            topologyMetricsAvailable = false;
+            Array.Clear(
+                latestTopologyMetrics,
+                0,
+                latestTopologyMetrics.Length);
             metricRows = Array.Empty<FoamMetricRow>();
             computeShader = null;
             clearKernel = -1;
             injectKernel = -1;
             buildGuidanceKernel = -1;
+            buildTopologyMajorKernel = -1;
+            buildTopologyPocketsKernel = -1;
+            buildTopologyConnectorsKernel = -1;
+            composeTopologyKernel = -1;
+            resetTopologyMetricsKernel = -1;
+            measureTopologyMetricsKernel = -1;
             resetPopulationKernel = -1;
             measurePopulationKernel = -1;
             updateFractureKernel = -1;

@@ -1404,6 +1404,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent($"{bytes / (1024f * 1024f):0.00} MB"));
         }
 
+        private static string FormatPercent(float value)
+        {
+            return $"{Mathf.Clamp01(value) * 100f:0.0}%";
+        }
+
         private void DrawFoam()
         {
             EditorGUILayout.Space(8f);
@@ -1411,7 +1416,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6 now runs the complete shared Foam network: measured autonomous population, evolving filament guidance, persistent Amount/Freshness/Integrity/phase state, real merging and structural failure, shore and obstacle organisation, and Wake/Impact reinforcement. Manual tools remain diagnostics rather than the normal source of Foam.",
+                "Stage 6.2 Batch 1B adds read-only Pressure and stationary-lee organisation, retains shore and obstacle classes separately, and measures how actual material relates to the priority-composed structural capacity. Impact remains deliberately inactive.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1426,7 +1431,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 preset,
                 new GUIContent(
                     "Foam Preset",
-                    "Applies one coherent stylized Foam personality using the five canonical controls. Custom preserves the current values."));
+                    "Applies one coherent stylized Foam personality using the six canonical controls. Custom preserves the current values."));
             if (EditorGUI.EndChangeCheck())
             {
                 serializedObject.ApplyModifiedProperties();
@@ -1451,27 +1456,27 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("foamAmount"),
                 new GUIContent(
                     "Amount",
-                    "Canonical measured population control. It changes the GPU target and supply capacity while maximum Amount still preserves substantial open water."));
+                    "Total supported material population and bounded supply. Zero stops new material while existing material decays normally."));
             EditorGUILayout.PropertyField(
-                Find("foamFragmentation"),
+                Find("foamWebGranularity"),
                 new GUIContent(
-                    "Fragmentation",
-                    "Controls edge crack growth, phase-seam weakness, internal pitting, neck collapse, and how difficult tiny reconnections are to preserve. It does not multiply global lifetime."));
+                    "Web Granularity",
+                    "Controls the metric scale hierarchy of rafts, pockets, branches, and connectors. Lower values favour fewer broad structures; higher values support finer subdivision."));
             EditorGUILayout.PropertyField(
-                Find("foamPersistence"),
+                Find("foamNetworkEvolution"),
                 new GUIContent(
-                    "Persistence",
-                    "Controls persistent Amount lifetime. Freshness intentionally expires much sooner, so the initial injection shape can lose its youth while the material continues travelling for many seconds."));
+                    "Network Evolution",
+                    "Controls slow asynchronous evolution of free-water rafts, protected pockets, and connector candidates. Geometry-anchored structures remain stable."));
             EditorGUILayout.PropertyField(
-                Find("foamAgitation"),
+                Find("foamBreakupFrequency"),
                 new GUIContent(
-                    "Agitation",
-                    "Controls secondary wandering, shear, spreading, and structural evolution. Downstream direction still comes from the authoritative river flow."));
+                    "Breakup Frequency",
+                    "Controls opportunities for hole opening, neck failure, peeling, and fragment shedding. It is not a global lifetime control."));
             EditorGUILayout.PropertyField(
-                Find("foamSharpness"),
+                Find("foamSpeed"),
                 new GUIContent(
-                    "Sharpness",
-                    "Controls visible edge hardness only. It does not change supply, lifetime, transport, or simulation topology."));
+                    "Foam Speed",
+                    "Controls downstream material transport relative to the river flow. The solver still forbids coherent upstream travel."));
             EditorGUILayout.PropertyField(
                 Find("foamColour"),
                 new GUIContent(
@@ -1616,11 +1621,47 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 return;
             }
 
-            EditorGUILayout.PropertyField(
-                Find("foamDebugView"),
+            SerializedProperty foamDebugProperty = Find("foamDebugView");
+            string[] foamDebugLabels =
+            {
+                "Final Foam (Debug Off)",
+                "Capture Zones",
+                "Positive Zone Classes",
+                "Positive and Negative Zones"
+            };
+            int[] foamDebugValues =
+            {
+                (int)StylizedRiverFoamDebugView.Final,
+                (int)StylizedRiverFoamDebugView.CaptureZones,
+                (int)StylizedRiverFoamDebugView.PositiveZoneClasses,
+                (int)StylizedRiverFoamDebugView.PositiveNegativeZones
+            };
+            int currentDebugIndex = System.Array.IndexOf(
+                foamDebugValues,
+                foamDebugProperty.intValue);
+            if (currentDebugIndex < 0)
+            {
+                currentDebugIndex = 0;
+            }
+
+            EditorGUI.BeginChangeCheck();
+            int selectedDebugIndex = EditorGUILayout.Popup(
                 new GUIContent(
                     "Debug View",
-                    "Amount displays persistent material, Freshness displays source youth, Integrity displays structural resistance, Phase displays transported provenance, Guidance displays the invisible metric filament lanes, Capture displays shore/obstacle/lee retention strength, Fracture displays persistent damage in red and crack coherence in green, and Final Mask displays the exact visible silhouette. Empty or sleeping fields intentionally display black."));
+                    "Final Foam disables Foam diagnostics. Only the three currently authoritative topology diagnostics remain available."),
+                currentDebugIndex,
+                foamDebugLabels);
+            if (EditorGUI.EndChangeCheck())
+            {
+                foamDebugProperty.intValue =
+                    foamDebugValues[selectedDebugIndex];
+            }
+
+            StylizedRiverFoamDebugView selectedFoamDebug =
+                (StylizedRiverFoamDebugView)foamDebugProperty.intValue;
+            EditorGUILayout.HelpBox(
+                GetFoamDebugViewDescription(selectedFoamDebug),
+                MessageType.None);
 
             if (runtime == null)
             {
@@ -1636,8 +1677,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "The cohesive-web correction is active: metric multi-scale guidance, lane-aware population control, bounded corrected advection, persistent coherent fracture state, donor-causal merging, downstream-only transport, environmental capture, Wake, and Impact reinforcement."),
-                new GUIContent("Cohesive web + coherent fracture"));
+                    "Batch 1C replaces the continuous river-length chain with finite local rafts and ribbons. Enclosed pockets are ring-validated, connectors require separate structure endpoints, branches form deliberate forks, and obstacles deform major support before composition. Capacity still does not feed material simulation."),
+                new GUIContent("Batch 1C finite structures"));
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
                 new GUIContent(
@@ -1654,6 +1695,64 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         : "Not allocated"));
             EditorGUILayout.LabelField(
                 new GUIContent(
+                    "Topology Resolution",
+                    "Primary RGBAHalf topology field: red is Major Capacity, green Connector/Branch Capacity, blue Pocket Exclusion, and alpha is reserved. The companion source-class texture stores canonical Pressure, Lee, Shore, and Obstacle capture separately. Every positive class is computed independently; no positive class gates, boosts, attenuates, or reshapes another."),
+                new GUIContent(
+                    runtime.ResourcesAllocated
+                        ? $"{runtime.TopologyWidth} × {runtime.TopologyHeight}"
+                        : "Not allocated"));
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Topology Metrics",
+                    "Low-rate asynchronous GPU reduction over the valid river domain. Metrics do not stall the simulation and never include padded storage."),
+                new GUIContent(
+                    runtime.TopologyMetricsAvailable
+                        ? "Available"
+                        : "Waiting for GPU readback"));
+            if (runtime.TopologyMetricsAvailable)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField(
+                    "Major Capacity Coverage",
+                    FormatPercent(runtime.MajorCapacityCoverage));
+                EditorGUILayout.LabelField(
+                    "Composed Topology Coverage",
+                    FormatPercent(runtime.ComposedTopologyCoverage));
+                EditorGUILayout.LabelField(
+                    "Open Span Coverage",
+                    FormatPercent(runtime.OpenSpanCoverage));
+                EditorGUILayout.LabelField(
+                    "Connector Capacity Coverage",
+                    FormatPercent(runtime.ConnectorCapacityCoverage));
+                EditorGUILayout.LabelField(
+                    "Connector in Major Overlap",
+                    FormatPercent(runtime.ConnectorInMajorOverlap));
+                EditorGUILayout.LabelField(
+                    "Pocket Interior Coverage",
+                    FormatPercent(runtime.ProtectedPocketCoverage));
+                EditorGUILayout.LabelField(
+                    "Pocket Violation",
+                    FormatPercent(runtime.ProtectedPocketViolation));
+                EditorGUILayout.LabelField(
+                    "Visible Material Coverage",
+                    FormatPercent(runtime.VisibleMaterialCoverage));
+                EditorGUILayout.LabelField(
+                    "Boundary Occupancy",
+                    FormatPercent(runtime.BoundaryOccupancy));
+                EditorGUILayout.LabelField(
+                    "Obstacle Occupancy",
+                    FormatPercent(runtime.ObstacleOccupancy));
+                EditorGUILayout.LabelField(
+                    "Pressure / Lee Occupancy",
+                    FormatPercent(runtime.PressureLeeOccupancy));
+                EditorGUILayout.LabelField(
+                    "Perimeter Ratio",
+                    FormatPercent(runtime.PerimeterRatio));
+                EditorGUI.indentLevel--;
+            }
+
+            EditorGUILayout.LabelField(
+                new GUIContent(
                     "Fracture Resolution",
                     "Half-resolution persistent structural-damage field. Red stores accumulated damage; green stores crack coherence. It advances at a lower rate than material transport and never directly renders or deletes Foam."),
                 new GUIContent(
@@ -1663,7 +1762,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent("Subsystem Rates"),
                 new GUIContent(
-                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz"));
+                    $"Topology/Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz"));
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Transport",
@@ -1720,7 +1819,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawMemoryDiagnostic(
                 "Allocated Foam Memory",
                 runtime.EstimatedMemoryBytes,
-                "Estimated RGBAHalf ping-pong material state, forward and reverse corrected-advection scratch textures, multi-scale guidance, boundary texture, perimeter-aware population metrics, and local river metric buffer.");
+                "Estimated material state, corrected-advection scratch textures, guidance, Batch 1A topology, Batch 1B source-class topology, fracture, boundary, population/topology metrics, and local river metric buffer.");
 
             if (GUILayout.Button(
                     new GUIContent(
@@ -2107,6 +2206,32 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 "GameObject Layer",
                 LayerMask.LayerToName(river.gameObject.layer));
+        }
+
+        private static string GetFoamDebugViewDescription(
+            StylizedRiverFoamDebugView view)
+        {
+            switch (view)
+            {
+                case StylizedRiverFoamDebugView.Final:
+                    return
+                        "Normal rendered Foam result. No Foam diagnostic colour encoding is active.";
+
+                case StylizedRiverFoamDebugView.CaptureZones:
+                    return
+                        "Canonical independent Capture Zones. Red = Pressure. Green = attached Lee. Blue = Shore. Magenta = Obstacle. Each class comes directly from its own source plus valid fluid-domain masking; no capture class or free-water class modifies another. Overlaps mix directly. These same four values are collapsed into the blue Capture class in Positive Zone Classes.";
+
+                case StylizedRiverFoamDebugView.PositiveZoneClasses:
+                    return
+                        "Red = independent Major Capacity. Green = independent Connector Capacity. Blue = the maximum of the exact canonical Pressure, Lee, Shore, and Obstacle values shown separately in Capture Zones. No positive class is weighted against another. Overlaps mix. Black = no positive support. Pocket Exclusion is intentionally omitted.";
+
+                case StylizedRiverFoamDebugView.PositiveNegativeZones:
+                    return
+                        "Green = the unweighted maximum of Major Capacity, Connector Capacity, and the same canonical Capture data used by the other two diagnostics. Red = Pocket Exclusion, applied only at final composition. Yellow = overlap where exclusion can remove positive support. Black = neither.";
+
+                default:
+                    return "Normal rendered Foam result. No Foam diagnostic colour encoding is active.";
+            }
         }
 
         private void DrawButtons()

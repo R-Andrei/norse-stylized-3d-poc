@@ -361,6 +361,10 @@ The former Stage 6.1 result is an implementation baseline, not an accepted visua
 
 ## Batch 1A — Geometry-Driven Topology Proof
 
+**Status:** implemented in code. The first Unity visual review rejected the initial noise-dominated distribution because connectors and pockets concentrated into isolated longitudinal areas and raw boundary bands dominated their diagnostic. A geometry-hierarchy correction is implemented; Unity revalidation is pending.
+
+The implementation adds one simulation-neutral `RGBAHalf` topology field at guidance resolution. Its active channels are `Major Capacity`, `Connector Capacity`, and `Pocket Exclusion`; alpha is reserved and written as zero. A companion texture retains canonical Pressure, Lee, Shore, and Obstacle capture separately. Each positive class is computed independently from its own source data plus valid fluid-domain masking. The existing persistent material solver does not read these fields during Batch 1A.
+
 ### Objective
 
 Prove that a field-based topology representation can create the correct paused composition before material simulation is changed.
@@ -381,15 +385,27 @@ Do not integrate Pressure, Wake/lee, or Impact yet.
 
 Do not retune material transport, tearing, shader thresholds, population control, or rendering to hide topology defects.
 
-### Required Debug Views
+### Retained Debug Views
 
-- `Major Capacity`
-- `Connector Capacity`
-- `Pocket Exclusion`
-- `Boundary Organisation`
-- `Composed Topology`
+`Final Foam (Debug Off)` returns to the normal rendered result. The Inspector exposes only three Foam diagnostics:
 
-The composed view must show structural support and protected negative space, not a claimed final rendered mask.
+- `Capture Zones`
+- `Positive Zone Classes`
+- `Positive and Negative Zones`
+
+Each selected view displays its own colour legend and interpretation directly beneath the selector. All former Foam diagnostics and their shader/runtime branches have been removed. Additional views are added only when a concrete diagnostic question requires them.
+
+### Implemented Batch 1A scope
+
+- Construct overlapping metric topology regions across the complete valid river length so every region receives bounded opportunities for major sheets and contour ribbons.
+- Use deterministic regional variation only to deform this hierarchy; noise cannot remove topology from most of the river.
+- Generate connectors relationally between the end centres of neighbouring major regions rather than as an independent thresholded line field.
+- Generate one or more bounded pocket candidates per region and accept them only inside the interior of broad-sheet support.
+- Read the authoritative shore and projected stationary-obstacle boundary fields directly as independent capture classes. They are not gated, boosted, attenuated, or reshaped by Major or Connector capacity.
+- Exclude all storage padding beyond `Domain.LocalLength`.
+- Expose the three retained diagnostics, the normal Debug Off state, and topology resolution/memory diagnostics.
+- Expose only the six canonical public controls.
+- Leave material transport, population supply, capture response, tearing, merging, and final foam rendering unchanged.
 
 ### Batch 1A Acceptance
 
@@ -411,6 +427,8 @@ If these conditions fail, stop before Batch 1B.
 
 ## Batch 1B — Accepted Interaction Inputs and Diagnostics
 
+**Status:** implemented in code. Compact diagnostics, canonical capture storage, and the independent-zone cleanup are implemented; Unity revalidation is pending.
+
 ### Objective
 
 Integrate stable read-only Stage 5 organisation and establish measurable topology behaviour after the representation passes Batch 1A.
@@ -421,23 +439,63 @@ Integrate stable read-only Stage 5 organisation and establish measurable topolog
 - Add stationary lee capture and organisation.
 - Keep Impact deferred.
 - Add final topology composition rules using the canonical priority order.
-- Map the six canonical public controls.
+- Validate and complete the six canonical public-control mappings across accepted topology sources.
 - Validate update cadence, quality scaling, memory, chunk activity, sleeping, freeze, and resource release.
 - Keep persistent material visually unchanged except where required to display diagnostic comparisons.
 
+### Implemented Batch 1B Scope
+
+- Add one same-resolution `RGBAHalf` source-class field retaining `Pressure`, stationary `Lee`, `Shore`, and `Obstacle` organisation separately.
+- Expand the cached CPU boundary texture without changing its established red/green solver contract: blue retains shore attraction and alpha retains obstacle attraction for exact diagnostic authorship.
+- Sample only the accepted Stage 5 static Pressure target and stationary Wake-source lee channel; transported Wake energy and Impact Ripple are excluded.
+- Store every positive class independently, combine them with an unweighted maximum, and apply Pocket Exclusion exactly once at final topology composition.
+- Keep the source fields diagnostic-only: neither topology texture is consumed by material transport, supply, capture, tearing, merging, or final Foam rendering in Batch 1B.
+- Add low-rate asynchronous GPU topology metrics over the valid river domain. Padded storage is excluded.
+- Neutralise the legacy Impact-to-Foam reinforcement value so Impact has no Stage 6 influence during this retarget.
+- Preserve the six canonical public controls; no new authoring controls are introduced.
+
 ### Diagnostics
 
-Required views:
+The normal rendered state and retained diagnostics are:
 
-- `Composed Topology`
-- `Topology Sources`
-- `Pocket Exclusion`
-- `Capture and Residence`
-- `Material State`
-- `Material vs Capacity`
-- `Final Mask`
+| View | Meaning and colour encoding |
+|---|---|
+| `Final Foam (Debug Off)` | Normally lit visible Foam from the current persistent material solver. No Foam diagnostic colour encoding is active. |
+| `Capture Zones` | Canonical independent capture values. Red = Pressure; green = stationary attached Lee; blue = Shore; magenta = Obstacle. Each class comes only from its own source plus valid fluid-domain masking. Overlaps mix directly. |
+| `Positive Zone Classes` | Red = independent Major Capacity; green = independent Connector Capacity; blue = the maximum of the exact Pressure, Lee, Shore, and Obstacle values shown separately in Capture Zones. No class weighting is applied. Overlaps mix; black means no positive support. Pocket Exclusion is not shown. |
+| `Positive and Negative Zones` | Green = the unweighted maximum of Major, Connector, and combined Capture support before subtraction; red = Pocket Exclusion; yellow = overlap where exclusion can remove positive support; black = neither. |
 
-Source diagnostics should separate categories only when the underlying data is actually retained separately.
+### Canonical Independent-Zone Contract
+
+Every positive class is generated and stored independently. A positive class may use only its own source data, valid river-domain masking, fluid coverage, and solid exclusion inherent to that source. No positive class may gate, boost, attenuate, shift, cut, or otherwise reshape another positive class.
+
+The sole structural exception is Connector endpoint validation: a connector may use Major structures to establish that its endpoints exist, because that relationship defines a connector. Major values do not attenuate the connector along its path, and Pocket or Capture fields do not pre-clip Connector capacity.
+
+The canonical source rules are:
+
+- **Major Capacity:** generated from its own free-water structure rules and river metrics; Obstacle capture does not deform or cut it.
+- **Connector Capacity:** generated from its own connector/branch paths after endpoint validation; it is not weighted against Major, Capture, Pocket, or Obstacle fields.
+- **Shore Capture:** the cached geometric shore-attraction band directly. No random longitudinal gating and no Major/Connector context.
+- **Obstacle Capture:** the cached projected-obstacle attraction band directly. No Major/Connector context.
+- **Pressure Capture:** the direct magnitude available from the accepted static Pressure texture, with no hidden importance weight or external context multiplier.
+- **Lee Capture:** the direct positive attached-lee value available from the accepted stationary Wake source, with no hidden importance weight or external context multiplier.
+- **Pocket Exclusion:** stored separately and applied exactly once, after all positive classes are combined.
+
+Composition is deliberately simple:
+
+```text
+Positive Support = max(Major, Connector, Pressure, Lee, Shore, Obstacle)
+Composed Topology = Positive Support × (1 - Pocket Exclusion)
+```
+
+Underlying texture encoding is:
+
+```text
+Topology RGBA:         Major Capacity, Connector Capacity, Pocket Exclusion, reserved zero
+Topology Sources RGBA: Pressure, stationary Lee, Shore, Obstacle
+```
+
+No class-specific diagnostic contrast curve is applied. Every selected diagnostic repeats its legend in a context-sensitive Inspector help box. Source-specific shape construction still contains explicit geometric thresholds and widths; those define the source itself and are not cross-class importance modifiers. Any future normalization or weighting must be introduced explicitly, documented, and validated as a separate decision.
 
 Required runtime metrics:
 
@@ -468,6 +526,41 @@ A connected-component count is optional and must not be treated as a success met
 - Quality changes affect resolution and cadence without changing topology scale or identity.
 - Stage 5 visuals remain unchanged.
 - Impact has no influence on Stage 6.
+
+## Batch 1C — Finite Structure Topology
+
+**Status:** implemented in code; Unity compilation and visual validation pending.
+
+Batch 1C replaces the rejected continuous-chain grammar rather than tuning it. The topology is now generated through four ordered low-rate passes:
+
+1. **Major structures:** deterministic finite rafts and contour ribbons are rasterised with explicit enable/disable state, physical start/end extents, pointed tapers, lateral drift, overlap, and absence. There is no always-on river-length primary sheet.
+2. **Pocket validation:** pocket candidates belong to broad host structures and are accepted only when an eight-sample surrounding ring has sufficient broad support, remains inside fluid, avoids solids, and fits the host structure.
+3. **Connectors and branches:** connectors require two separate accepted major-structure endpoints and an open middle span. Deliberate diagonal branches and occasional asymmetric forks grow from accepted parent structures. Connector interiors are suppressed where major capacity already exists.
+4. **Composition:** obstacle data deforms and cuts major support before final composition; shore, obstacle, Pressure, and stationary lee organisation then enter through the existing priority contract.
+
+Three simulation-neutral working textures retain major structures, validated pockets, and connector/branch candidates. The existing final topology texture remains:
+
+```text
+R = finite Major Capacity
+G = relational Connector / Branch Capacity
+B = validated Pocket Exclusion
+A = reserved zero
+```
+
+The normal Foam view menu contains the Debug Off state and only the three documented diagnostics. Added metrics are composed-topology coverage, open-span coverage, pocket-interior coverage, major-capacity coverage, and connector-in-major overlap.
+
+Batch 1C does not change material transport, autonomous supply, capture response, tearing, merging, Impact integration, or final Foam rendering. Topology is still built only for Batch 1 diagnostics; Batch 2 must move topology updates into the ordinary material-work schedule before material consumes it.
+
+### Batch 1C Acceptance
+
+- Major support consists of finite rafts and ribbons with visible starts, ends, tapers, overlaps, and genuine unsupported spans.
+- The composition does not default to one continuous river-length highway.
+- Protected pockets read as enclosed interior holes rather than gaps between parallel lanes.
+- Connectors visibly bridge separate structures; connector-in-major overlap remains low away from endpoints.
+- Diagonal branches, asymmetric forks, and irregular joins coexist with long eye-traceable structures.
+- Obstacles split or redirect major structures and support shoulder/lee/peel organisation rather than appearing only as source-colour overlays.
+- Substantial open water remains before material simulation is connected.
+- The seven compact, documented debug views remain sufficient; no obsolete per-channel F1/F2 menu is restored.
 
 ## Batch 2 — Persistent Material Response
 
@@ -576,9 +669,10 @@ Do not respond with another breakup, supply, Voronoi, or noise-coefficient patch
 
 Stage 6 closes only after:
 
-1. Batch 1A topology proof is accepted.
+1. Batch 1A topology plumbing is accepted.
 2. Batch 1B interaction integration and diagnostics are accepted.
-3. Batch 2 persistent material response is accepted.
-4. Final rendering and six-control authoring are accepted.
-5. PC-first performance, quality, lifecycle, and long-running regression pass.
-6. The roadmap is updated with a conservative validated summary.
+3. Batch 1C finite-structure topology is visually accepted.
+4. Batch 2 persistent material response is accepted.
+5. Final rendering and six-control authoring are accepted.
+6. PC-first performance, quality, lifecycle, and long-running regression pass.
+7. The roadmap is updated with a conservative validated summary.

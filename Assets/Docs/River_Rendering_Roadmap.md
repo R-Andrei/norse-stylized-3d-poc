@@ -337,9 +337,11 @@ Capture, persistence, connector durability, pocket protection, convergence, repa
 
 ### Stage 6.2 — Surface Film Retarget
 
-**Status:** planned.
+**Status:** in progress. Batch 1A and Batch 1B established the simulation-neutral topology and interaction plumbing. The continuous-chain topology correction improved distribution but remained visually biased toward parallel river-length lanes. Batch 1C now replaces that grammar with finite local structures and ordered low-rate validation passes; Unity compilation and visual validation are pending.
 
 #### Batch 1A — Geometry-Driven Topology Proof
+
+**Implementation status:** complete in code; Unity validation pending. The new topology field is simulation-neutral and does not yet alter material transport, supply, tearing, or rendering.
 
 Build and debug the topology representation before changing material behaviour.
 
@@ -355,13 +357,14 @@ Initial inputs:
 
 Pressure, Wake/lee, and Impact are excluded from this first proof.
 
-Required views:
+Canonical Foam view menu:
 
-- `Major Capacity`
-- `Connector Capacity`
-- `Pocket Exclusion`
-- `Boundary Organisation`
-- `Composed Topology`
+- `Final Foam (Debug Off)`
+- `Capture Zones`
+- `Positive Zone Classes`
+- `Positive and Negative Zones`
+
+All former Foam diagnostics and their shader/runtime branches have been removed. New views are added only when a specific diagnostic question requires them.
 
 **Acceptance:** paused topology must already show several long dominant structures, broad and narrow forms, medium and large protected pockets, clear bank/rock organisation, sparse subordinate connectors, substantial open water, stable metric scale, and no dominance by isolated ovals, short parallel lanes, stipple, or uniform fine webbing.
 
@@ -369,18 +372,43 @@ If this fails, stop before further integration.
 
 #### Batch 1B — Accepted Interaction Inputs and Diagnostics
 
-After Batch 1A passes:
+**Implementation status:** complete in code; Unity validation pending. The interaction fields remain read-only and simulation-neutral.
 
-- add Pressure-shoulder organisation;
-- add stationary lee capture and organisation;
-- compose sources using the canonical priority order;
-- map the six public controls;
-- add target/material diagnostics and topology metrics;
-- validate quality, cadence, memory, chunk activity, sleeping, freeze, and release.
+Implemented:
+
+- Pressure-shoulder organisation from the accepted static Pressure target;
+- stationary lee organisation from the accepted static Wake-source lee channel;
+- separate retained Pressure, lee, shore, and obstacle source classes;
+- priority composition with protected pockets suppressing all lower-priority support;
+- one canonical `Capture Zones` diagnostic with Pressure, lee, shore, and obstacle classes;
+- one `Positive Zone Classes` diagnostic for Major, Connector, and combined Capture support, plus one `Positive and Negative Zones` diagnostic for support/exclusion overlap;
+- canonical independent Pressure, lee, shore, and obstacle capture channels with no cross-class context or hidden importance weights;
+- asynchronous GPU metrics for capacity coverage, pocket violations, source occupancy, perimeter ratio, dispatches, cadence, memory, chunks, sleeping, and release;
+- Impact-to-Foam reinforcement neutralised;
+- the six canonical public controls preserved without adding implementation-level controls.
 
 Impact remains deferred.
 
+**Independent-zone cleanup:** every positive Stage 6 topology class is now stored independently. Major, Connector, Pressure, Lee, Shore, and Obstacle values use only their own source data plus valid fluid-domain masking. Cross-class context multipliers, random shore gating, fixed class-importance weights, obstacle-driven Major cutting, Pocket pre-clipping of Connector capacity, and repeated Pocket subtraction have been removed. Positive support is the unweighted maximum of the six classes; Pocket Exclusion is applied once at final composition. Any future source weighting or normalization requires a separate documented and validated decision.
+
 **Acceptance:** anchored sources remain stable, free-water topology evolves slowly and regionally, protected pockets survive lower-priority systems, Pressure/lee organise without becoming overlays, quality does not change physical topology scale, and Stage 5 visuals remain unchanged.
+
+#### Batch 1C — Finite Structure Topology
+
+**Implementation status:** complete in code; Unity compilation and visual validation pending.
+
+- Remove the always-on primary sheet and continuous metric node chain.
+- Rasterise finite enabled/disabled rafts and contour ribbons with explicit start/end extents, pointed tapers, lateral drift, overlap, and absence.
+- Validate pocket candidates through surrounding-ring support, host size, fluid boundary exposure, and solid exclusion.
+- Generate connectors only between separate accepted structure endpoints. Major capacity may validate endpoints but does not attenuate connector strength along the path.
+- Add deliberate diagonal branches and occasional asymmetric forks from accepted parent structures.
+- Keep Major Capacity independent from Obstacle capture. Solid exclusion and obstacle-capture behaviour remain separate source responsibilities.
+- Retain only the three canonical Foam diagnostics plus the normal Debug Off state, and add composed coverage, open-span coverage, pocket-interior coverage, and connector-in-major overlap metrics.
+- Use three low-rate working fields for major structures, pockets, and connector/branch candidates; the final water shader still receives only the existing fixed-cost topology textures.
+
+No material transport, supply, tearing, merging, Impact integration, Stage 5 response, or final Foam rendering changes are part of Batch 1C.
+
+**Acceptance:** `Positive Zone Classes` and `Positive and Negative Zones` must expose finite support regions, real unsupported spans, exclusion overlap, relational connectors, obstacle influence, and substantial open water without hiding source-class failures behind a single grayscale composite.
 
 #### Batch 2 — Persistent Material Response
 
@@ -399,12 +427,13 @@ Make actual material inhabit and leave the accepted topology without directly co
 
 ### Remaining Stage 6 work
 
-1. Complete and validate Batch 1A.
-2. Complete and validate Batch 1B.
-3. Complete and validate Batch 2.
-4. Finalise lit off-white rendering and the six-control authoring pass.
-5. Profile PC-first memory, dispatches, active chunks, quality tiers, and worst-case overlap.
-6. Regress bends, width variation, connected offsets, reverse flow, freeze/thaw, Amount zero, quality switching, obstacle registration/removal, sleeping, delayed release, scene reload, and long-running stability.
+1. Compile and visually validate the retained diagnostics: `Capture Zones`, `Positive Zone Classes`, and `Positive and Negative Zones`.
+2. Accept or reject the finite-structure field representation before Batch 2.
+3. Move topology updates from debug-only scheduling into ordinary material work when Batch 2 begins.
+4. Complete and validate Batch 2.
+5. Finalise lit off-white rendering and the six-control authoring pass.
+6. Profile PC-first memory, dispatches, active chunks, quality tiers, and worst-case overlap.
+7. Regress bends, width variation, connected offsets, reverse flow, freeze/thaw, Amount zero, quality switching, obstacle registration/removal, sleeping, delayed release, scene reload, and long-running stability.
 
 ### Failure gate
 
