@@ -29,6 +29,11 @@ namespace ProgrammaticStylized3D.Rivers
         private const int ThreadGroupSize = 8;
         private const int TopologyMetricCount = 16;
         private const float TopologyMetricQuantisation = 1023f;
+        // Canonical Stage 6 shore-capture band measured inward from the
+        // instantaneous Stage 3 visible water edge. These are deliberately
+        // fixed while the capture contract is being validated.
+        private const float ShoreCaptureCoreWidthMetres = 0.35f;
+        private const float ShoreCaptureFadeWidthMetres = 0.10f;
 
         private static readonly int FoamEnabledId =
             Shader.PropertyToID("_FoamEnabled");
@@ -127,6 +132,7 @@ namespace ProgrammaticStylized3D.Rivers
         {
             public Vector4 WidthsAndSpacing;
             public Vector4 TopologyData;
+            public Vector4 ShoreData;
         }
 
         private StylizedRiver river;
@@ -146,6 +152,7 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture topologyMajorTexture;
         private RenderTexture topologyPocketTexture;
         private RenderTexture topologyConnectorTexture;
+        private RenderTexture currentShoreEdgesTexture;
         private RenderTexture fractureA;
         private RenderTexture fractureB;
         private RenderTexture currentFracture;
@@ -196,6 +203,7 @@ namespace ProgrammaticStylized3D.Rivers
         private int clearKernel = -1;
         private int injectKernel = -1;
         private int buildGuidanceKernel = -1;
+        private int buildCurrentShoreEdgesKernel = -1;
         private int buildTopologyMajorKernel = -1;
         private int buildTopologyPocketsKernel = -1;
         private int buildTopologyConnectorsKernel = -1;
@@ -230,6 +238,9 @@ namespace ProgrammaticStylized3D.Rivers
         public int GuidanceHeight => guidanceTexture != null ? guidanceTexture.height : 0;
         public int TopologyWidth => topologyTexture != null ? topologyTexture.width : 0;
         public int TopologyHeight => topologyTexture != null ? topologyTexture.height : 0;
+        public int DynamicShoreRowCount => currentShoreEdgesTexture != null
+            ? currentShoreEdgesTexture.width
+            : 0;
         public bool TopologyMetricsAvailable => topologyMetricsAvailable;
         public float MajorCapacityCoverage => TopologyCoverageRatio(1);
         public float ConnectorCapacityCoverage => TopologyCoverageRatio(2);
@@ -289,6 +300,7 @@ namespace ProgrammaticStylized3D.Rivers
             EstimateTextureBytes(topologyMajorTexture) +
             EstimateTextureBytes(topologyPocketTexture) +
             EstimateTextureBytes(topologyConnectorTexture) +
+            EstimateTextureBytes(currentShoreEdgesTexture) +
             EstimateTextureBytes(fractureA) +
             EstimateTextureBytes(fractureB) +
             EstimateTextureBytes(neutralDisturbanceTexture) +
@@ -534,6 +546,7 @@ namespace ProgrammaticStylized3D.Rivers
                     guidanceAccumulator += stepDuration;
                     float guidanceInterval = 1f /
                         Mathf.Max(1f, ResolveGuidanceUpdateRate());
+                    bool topologyStructuresRebuilt = false;
                     if (guidanceAccumulator >= guidanceInterval)
                     {
                         if (materialStepActive)
@@ -544,9 +557,20 @@ namespace ProgrammaticStylized3D.Rivers
                         if (topologyDebugActive)
                         {
                             BuildTopologyField(guidanceAccumulator);
+                            topologyStructuresRebuilt = true;
                         }
 
                         guidanceAccumulator %= guidanceInterval;
+                    }
+
+                    // The expensive free-water topology remains low-rate, but
+                    // the current Stage 3 shoreline edge and its capture band
+                    // refresh at the normal Foam update cadence so the band
+                    // follows visible shore-wave motion without stepping at the
+                    // 4/6/8 Hz topology cadence.
+                    if (topologyDebugActive && !topologyStructuresRebuilt)
+                    {
+                        RefreshDynamicTopologySources(false);
                     }
 
                     if (materialStepActive)
@@ -740,6 +764,7 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyMajorTexture != null &&
                 topologyPocketTexture != null &&
                 topologyConnectorTexture != null &&
+                currentShoreEdgesTexture != null &&
                 currentFracture != null &&
                 writeFracture != null &&
                 neutralDisturbanceTexture != null &&
@@ -774,6 +799,8 @@ namespace ProgrammaticStylized3D.Rivers
             clearKernel = computeShader.FindKernel("ClearRange");
             injectKernel = computeShader.FindKernel("InjectFoam");
             buildGuidanceKernel = computeShader.FindKernel("BuildGuidance");
+            buildCurrentShoreEdgesKernel =
+                computeShader.FindKernel("BuildCurrentShoreEdges");
             buildTopologyMajorKernel =
                 computeShader.FindKernel("BuildTopologyMajor");
             buildTopologyPocketsKernel =
@@ -894,6 +921,8 @@ namespace ProgrammaticStylized3D.Rivers
                 "PS3D_RiverFoam_TopologyPocketWork");
             topologyConnectorTexture = CreateGuidanceTexture(
                 "PS3D_RiverFoam_TopologyConnectorWork");
+            currentShoreEdgesTexture = CreateShoreEdgesTexture(
+                "PS3D_RiverFoam_CurrentShoreEdges");
             fractureA = CreateFractureTexture("PS3D_RiverFoam_FractureA");
             fractureB = CreateFractureTexture("PS3D_RiverFoam_FractureB");
             currentFracture = fractureA;
@@ -1018,6 +1047,27 @@ namespace ProgrammaticStylized3D.Rivers
                 guidanceHeight,
                 0,
                 RenderTextureFormat.ARGBHalf,
+                RenderTextureReadWrite.Linear)
+            {
+                name = textureName,
+                enableRandomWrite = true,
+                useMipMap = false,
+                autoGenerateMips = false,
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+            texture.Create();
+            return texture;
+        }
+
+        private RenderTexture CreateShoreEdgesTexture(string textureName)
+        {
+            RenderTexture texture = new RenderTexture(
+                guidanceWidth,
+                1,
+                0,
+                RenderTextureFormat.RGHalf,
                 RenderTextureReadWrite.Linear)
             {
                 name = textureName,
@@ -1160,7 +1210,12 @@ namespace ProgrammaticStylized3D.Rivers
                         asymmetry,
                         localDistance <= validFieldLength + 0.0001f
                             ? 1f
-                            : 0f)
+                            : 0f),
+                    ShoreData = new Vector4(
+                        Mathf.Max(0.01f, sample.LeftHalfWidth),
+                        Mathf.Max(0.01f, sample.RightHalfWidth),
+                        0f,
+                        0f)
                 };
             }
 
@@ -1241,10 +1296,16 @@ namespace ProgrammaticStylized3D.Rivers
                             0f,
                             1f,
                             Mathf.InverseLerp(0.10f, 0.95f, coverage)));
+                    // R/G remain the legacy material-simulation fluid and
+                    // attraction contract. B is reserved for registered solid
+                    // coverage so dynamic Stage 6 Shore Capture can obey solid
+                    // exclusion without depending on this static shore reach.
+                    // Canonical Shore Capture comes from the instantaneous
+                    // Stage 3 edge texture.
                     pixels[y * fieldWidth + x] = new Color(
                         coverage,
                         attraction,
-                        attraction,
+                        0f,
                         0f);
                 }
             }
@@ -1421,6 +1482,7 @@ namespace ProgrammaticStylized3D.Rivers
                     else
                     {
                         previous.g = 0f;
+                        previous.b = 1f;
                         previous.a = 0f;
                     }
                     pixels[pixelIndex] = previous;
@@ -1741,7 +1803,9 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyMajorTexture == null ||
                 topologyPocketTexture == null ||
                 topologyConnectorTexture == null ||
+                currentShoreEdgesTexture == null ||
                 boundaryTexture == null || metricBuffer == null ||
+                buildCurrentShoreEdgesKernel < 0 ||
                 buildTopologyMajorKernel < 0 ||
                 buildTopologyPocketsKernel < 0 ||
                 buildTopologyConnectorsKernel < 0 ||
@@ -1750,64 +1814,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
-            disturbanceRuntime ??=
-                GetComponent<StylizedRiverDisturbanceRuntime>();
-            bool disturbanceAvailable =
-                disturbanceRuntime != null &&
-                disturbanceRuntime.IsAllocated;
-            RenderTexture staticWakeSource = disturbanceAvailable
-                ? disturbanceRuntime.StaticWakeSourceTexture
-                : null;
-            RenderTexture staticPressureSource = disturbanceAvailable
-                ? disturbanceRuntime.StaticPressureTexture
-                : null;
-            bool staticWakeAvailable = IsCreatedTexture(staticWakeSource);
-            bool staticPressureAvailable = IsCreatedTexture(staticPressureSource);
-            Texture staticWakeTexture = staticWakeAvailable
-                ? staticWakeSource
-                : neutralDisturbanceTexture;
-            Texture staticPressureTexture = staticPressureAvailable
-                ? staticPressureSource
-                : neutralDisturbanceTexture;
-            Vector2Int staticWakeDimensions = staticWakeAvailable
-                ? new Vector2Int(staticWakeSource.width, staticWakeSource.height)
-                : Vector2Int.one;
-            Vector2Int staticPressureDimensions = staticPressureAvailable
-                ? new Vector2Int(
-                    staticPressureSource.width,
-                    staticPressureSource.height)
-                : Vector2Int.one;
-
-            computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
-            computeShader.SetInts(
-                "_FoamTopologyDimensions",
-                guidanceWidth,
-                guidanceHeight);
-            computeShader.SetInts(
-                "_FoamStaticWakeDimensions",
-                staticWakeDimensions.x,
-                staticWakeDimensions.y);
-            computeShader.SetInts(
-                "_FoamStaticPressureDimensions",
-                staticPressureDimensions.x,
-                staticPressureDimensions.y);
-            computeShader.SetFloat(
-                "_FoamDisturbanceEnabled",
-                staticWakeAvailable || staticPressureAvailable ? 1f : 0f);
-            computeShader.SetFloat("_FoamValidLength", validFieldLength);
-            computeShader.SetFloat(
-                "_FoamGlobalStart",
-                river.Domain.GlobalDistanceMinimum);
-            computeShader.SetFloat("_FoamFieldLength", fieldLength);
-            computeShader.SetFloat("_FoamDeltaTime", deltaTime);
-            computeShader.SetFloat("_FoamTime", river.MotionTime);
-            computeShader.SetFloat("_FoamSeed", river.VisualSeed);
-            computeShader.SetFloat(
-                "_FoamWebGranularity",
-                river.FoamWebGranularity);
-            computeShader.SetFloat(
-                "_FoamNetworkEvolution",
-                river.FoamNetworkEvolution);
+            ConfigureTopologyParameters(deltaTime);
 
             computeShader.SetBuffer(
                 buildTopologyMajorKernel,
@@ -1872,6 +1879,135 @@ namespace ProgrammaticStylized3D.Rivers
                 guidanceWidth,
                 guidanceHeight);
 
+            RefreshDynamicTopologySources(true);
+        }
+
+        private void ConfigureTopologyParameters(float deltaTime)
+        {
+            computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetInts(
+                "_FoamTopologyDimensions",
+                guidanceWidth,
+                guidanceHeight);
+            computeShader.SetFloat("_FoamValidLength", validFieldLength);
+            computeShader.SetFloat(
+                "_FoamGlobalStart",
+                river.Domain.GlobalDistanceMinimum);
+            computeShader.SetFloat("_FoamFieldLength", fieldLength);
+            computeShader.SetFloat("_FoamDeltaTime", deltaTime);
+            computeShader.SetFloat("_FoamTime", river.MotionTime);
+            computeShader.SetFloat("_FoamSeed", river.VisualSeed);
+            computeShader.SetFloat(
+                "_FoamWebGranularity",
+                river.FoamWebGranularity);
+            computeShader.SetFloat(
+                "_FoamNetworkEvolution",
+                river.FoamNetworkEvolution);
+            computeShader.SetFloat(
+                "_FoamMotionFlowSpeed",
+                river.FlowSpeedMetresPerSecond);
+            computeShader.SetFloat(
+                "_FoamMotionWaveHeight",
+                river.MotionWaveHeight);
+            computeShader.SetFloat(
+                "_FoamMotionWaveLength",
+                river.MotionWaveLength);
+            computeShader.SetFloat(
+                "_FoamMotionWaveSteepness",
+                river.MotionWaveSteepness);
+            computeShader.SetFloat(
+                "_FoamMotionTurbulence",
+                river.MotionTurbulence);
+            computeShader.SetFloat(
+                "_FoamShoreMotion",
+                river.ShoreMotion);
+            computeShader.SetFloat(
+                "_FoamShoreMotionWidth",
+                river.ShoreMotionWidth);
+            computeShader.SetFloat(
+                "_FoamShoreBankCover",
+                river.ShorelineBankCover);
+            computeShader.SetFloat(
+                "_FoamFreezeAmount",
+                river.FreezeAmount);
+            computeShader.SetFloat(
+                "_FoamShoreCaptureCoreWidth",
+                ShoreCaptureCoreWidthMetres);
+            computeShader.SetFloat(
+                "_FoamShoreCaptureFadeWidth",
+                ShoreCaptureFadeWidthMetres);
+        }
+
+        private void RefreshDynamicTopologySources(bool measureMetrics)
+        {
+            if (computeShader == null || topologyTexture == null ||
+                topologySourcesTexture == null ||
+                topologyMajorTexture == null ||
+                topologyPocketTexture == null ||
+                topologyConnectorTexture == null ||
+                currentShoreEdgesTexture == null ||
+                boundaryTexture == null || metricBuffer == null ||
+                buildCurrentShoreEdgesKernel < 0 ||
+                composeTopologyKernel < 0)
+            {
+                return;
+            }
+
+            ConfigureTopologyParameters(0f);
+
+            disturbanceRuntime ??=
+                GetComponent<StylizedRiverDisturbanceRuntime>();
+            bool disturbanceAvailable =
+                disturbanceRuntime != null &&
+                disturbanceRuntime.IsAllocated;
+            RenderTexture staticWakeSource = disturbanceAvailable
+                ? disturbanceRuntime.StaticWakeSourceTexture
+                : null;
+            RenderTexture staticPressureSource = disturbanceAvailable
+                ? disturbanceRuntime.StaticPressureTexture
+                : null;
+            bool staticWakeAvailable = IsCreatedTexture(staticWakeSource);
+            bool staticPressureAvailable = IsCreatedTexture(staticPressureSource);
+            Texture staticWakeTexture = staticWakeAvailable
+                ? staticWakeSource
+                : neutralDisturbanceTexture;
+            Texture staticPressureTexture = staticPressureAvailable
+                ? staticPressureSource
+                : neutralDisturbanceTexture;
+            Vector2Int staticWakeDimensions = staticWakeAvailable
+                ? new Vector2Int(staticWakeSource.width, staticWakeSource.height)
+                : Vector2Int.one;
+            Vector2Int staticPressureDimensions = staticPressureAvailable
+                ? new Vector2Int(
+                    staticPressureSource.width,
+                    staticPressureSource.height)
+                : Vector2Int.one;
+
+            computeShader.SetInts(
+                "_FoamStaticWakeDimensions",
+                staticWakeDimensions.x,
+                staticWakeDimensions.y);
+            computeShader.SetInts(
+                "_FoamStaticPressureDimensions",
+                staticPressureDimensions.x,
+                staticPressureDimensions.y);
+            computeShader.SetFloat(
+                "_FoamDisturbanceEnabled",
+                staticWakeAvailable || staticPressureAvailable ? 1f : 0f);
+
+            computeShader.SetBuffer(
+                buildCurrentShoreEdgesKernel,
+                "_FoamMetricRows",
+                metricBuffer);
+            computeShader.SetTexture(
+                buildCurrentShoreEdgesKernel,
+                "_FoamCurrentShoreEdgesWrite",
+                currentShoreEdgesTexture);
+            DispatchOneDimensional(
+                buildCurrentShoreEdgesKernel,
+                guidanceWidth,
+                64);
+
             computeShader.SetBuffer(
                 composeTopologyKernel,
                 "_FoamMetricRows",
@@ -1902,6 +2038,10 @@ namespace ProgrammaticStylized3D.Rivers
                 staticPressureTexture);
             computeShader.SetTexture(
                 composeTopologyKernel,
+                "_FoamCurrentShoreEdgesRead",
+                currentShoreEdgesTexture);
+            computeShader.SetTexture(
+                composeTopologyKernel,
                 "_FoamTopologyWrite",
                 topologyTexture);
             computeShader.SetTexture(
@@ -1912,7 +2052,11 @@ namespace ProgrammaticStylized3D.Rivers
                 composeTopologyKernel,
                 guidanceWidth,
                 guidanceHeight);
-            MeasureTopologyMetrics();
+
+            if (measureMetrics)
+            {
+                MeasureTopologyMetrics();
+            }
         }
 
         private void MeasureTopologyMetrics()
@@ -2596,6 +2740,7 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseTexture(ref topologyMajorTexture);
             ReleaseTexture(ref topologyPocketTexture);
             ReleaseTexture(ref topologyConnectorTexture);
+            ReleaseTexture(ref currentShoreEdgesTexture);
             ReleaseTexture(ref fractureA);
             ReleaseTexture(ref fractureB);
             ReleaseTexture(ref neutralDisturbanceTexture);
@@ -2639,6 +2784,7 @@ namespace ProgrammaticStylized3D.Rivers
             clearKernel = -1;
             injectKernel = -1;
             buildGuidanceKernel = -1;
+            buildCurrentShoreEdgesKernel = -1;
             buildTopologyMajorKernel = -1;
             buildTopologyPocketsKernel = -1;
             buildTopologyConnectorsKernel = -1;

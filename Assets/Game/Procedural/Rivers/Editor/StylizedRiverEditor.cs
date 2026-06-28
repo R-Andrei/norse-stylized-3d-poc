@@ -1703,6 +1703,14 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         : "Not allocated"));
             EditorGUILayout.LabelField(
                 new GUIContent(
+                    "Dynamic Shore Rows",
+                    "One shared Stage 3 shoreline record per topology column. Each record stores the current left and right visible water edges after macro-wave displacement and hidden-bank-cover intersection. Shore Capture is a 0.35 m solid band plus a 0.10 m inward fade from those moving edges."),
+                new GUIContent(
+                    runtime.ResourcesAllocated
+                        ? runtime.DynamicShoreRowCount.ToString()
+                        : "Not allocated"));
+            EditorGUILayout.LabelField(
+                new GUIContent(
                     "Topology Metrics",
                     "Low-rate asynchronous GPU reduction over the valid river domain. Metrics do not stall the simulation and never include padded storage."),
                 new GUIContent(
@@ -2219,7 +2227,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.CaptureZones:
                     return
-                        "Canonical independent Capture Zones. Red = Pressure. Green = attached Lee. Blue = Shore. Magenta = Obstacle. Each class comes directly from its own source plus valid fluid-domain masking; no capture class or free-water class modifies another. Overlaps mix directly. These same four values are collapsed into the blue Capture class in Positive Zone Classes.";
+                        "Canonical independent Capture Zones. Red = Pressure. Green = attached Lee. Blue = Shore. Magenta = Obstacle. Shore is a fixed metric band measured inward from the instantaneous Stage 3 visible water edge: 0.35 m solid capture plus a 0.10 m fade. The edge is resolved from the same macro-wave and shore attenuation functions used by the water shader, not from the static shoreline allowance. No capture class or free-water class modifies another. Overlaps mix directly. These same four values are collapsed into the blue Capture class in Positive Zone Classes.";
 
                 case StylizedRiverFoamDebugView.PositiveZoneClasses:
                     return

@@ -446,7 +446,7 @@ Integrate stable read-only Stage 5 organisation and establish measurable topolog
 ### Implemented Batch 1B Scope
 
 - Add one same-resolution `RGBAHalf` source-class field retaining `Pressure`, stationary `Lee`, `Shore`, and `Obstacle` organisation separately.
-- Expand the cached CPU boundary texture without changing its established red/green solver contract: blue retains shore attraction and alpha retains obstacle attraction for exact diagnostic authorship.
+- Preserve the cached CPU boundary texture red/green material-solver contract and alpha obstacle-attraction channel. Its former blue static-shore channel is retired and now stores registered solid coverage solely for exclusion. Canonical Shore Capture comes exclusively from the dynamic Stage 3 edge rows.
 - Sample only the accepted Stage 5 static Pressure target and stationary Wake-source lee channel; transported Wake energy and Impact Ripple are excluded.
 - Store every positive class independently, combine them with an unweighted maximum, and apply Pocket Exclusion exactly once at final topology composition.
 - Keep the source fields diagnostic-only: neither topology texture is consumed by material transport, supply, capture, tearing, merging, or final Foam rendering in Batch 1B.
@@ -461,7 +461,7 @@ The normal rendered state and retained diagnostics are:
 | View | Meaning and colour encoding |
 |---|---|
 | `Final Foam (Debug Off)` | Normally lit visible Foam from the current persistent material solver. No Foam diagnostic colour encoding is active. |
-| `Capture Zones` | Canonical independent capture values. Red = Pressure; green = stationary attached Lee; blue = Shore; magenta = Obstacle. Each class comes only from its own source plus valid fluid-domain masking. Overlaps mix directly. |
+| `Capture Zones` | Canonical independent capture values. Red = Pressure; green = stationary attached Lee; blue = the fixed-width band following the instantaneous Stage 3 visible shoreline; magenta = Obstacle. Shore uses `0.35 m` full capture plus a `0.10 m` inward fade from the current left/right edge. Each class comes only from its own source plus valid domain/solid masking. Overlaps mix directly. |
 | `Positive Zone Classes` | Red = independent Major Capacity; green = independent Connector Capacity; blue = the maximum of the exact Pressure, Lee, Shore, and Obstacle values shown separately in Capture Zones. No class weighting is applied. Overlaps mix; black means no positive support. Pocket Exclusion is not shown. |
 | `Positive and Negative Zones` | Green = the unweighted maximum of Major, Connector, and combined Capture support before subtraction; red = Pocket Exclusion; yellow = overlap where exclusion can remove positive support; black = neither. |
 
@@ -475,11 +475,24 @@ The canonical source rules are:
 
 - **Major Capacity:** generated from its own free-water structure rules and river metrics; Obstacle capture does not deform or cut it.
 - **Connector Capacity:** generated from its own connector/branch paths after endpoint validation; it is not weighted against Major, Capture, Pocket, or Obstacle fields.
-- **Shore Capture:** the cached geometric shore-attraction band directly. No random longitudinal gating and no Major/Connector context.
+- **Shore Capture:** a fixed metric band measured inward from the instantaneous Stage 3 visible shoreline, not from the static normal or maximum shoreline allowance. Stage 3 and Stage 6 share the same macro-wave, river-space noise, and shore attenuation functions. A compact `RGHalf` row texture stores current signed left/right visible edges for every topology column. The current validation band is `0.35 m` of full capture plus a `0.10 m` inward fade. No random longitudinal gating and no Major/Connector context.
 - **Obstacle Capture:** the cached projected-obstacle attraction band directly. No Major/Connector context.
 - **Pressure Capture:** the direct magnitude available from the accepted static Pressure texture, with no hidden importance weight or external context multiplier.
 - **Lee Capture:** the direct positive attached-lee value available from the accepted stationary Wake source, with no hidden importance weight or external context multiplier.
 - **Pocket Exclusion:** stored separately and applied exactly once, after all positive classes are combined.
+
+### Shared Stage 3 Shoreline Contract
+
+Shore Capture does not infer the shoreline from the normal allowance, maximum overlap, a static interpolation factor, or a second procedural wave. Stage 3 exposes the current visible edge through a shared evaluator:
+
+1. use the authoritative global river distance and current motion time;
+2. evaluate the exact Stage 3 macro height and shore attenuation used by the water shader;
+3. test positive displacement against the corridor's mandatory hidden bank-cover profile between normal and maximum surface widths;
+4. store the outermost visible left and right edges in a compact row texture;
+5. construct Shore Capture inward from those moving edges in world metres;
+6. remove registered solid cells using the boundary texture's dedicated solid-coverage channel.
+
+The free-water topology remains low-rate, but the current edge and capture-source composition refresh at the ordinary Foam update cadence so visible shore motion is not quantised to the `4/6/8 Hz` topology-generation cadence. Future Stage 3 shore-wave changes must preserve this contract by changing the shared evaluator rather than adding a second approximation in Stage 6.
 
 Composition is deliberately simple:
 
@@ -492,7 +505,9 @@ Underlying texture encoding is:
 
 ```text
 Topology RGBA:         Major Capacity, Connector Capacity, Pocket Exclusion, reserved zero
-Topology Sources RGBA: Pressure, stationary Lee, Shore, Obstacle
+Topology Sources RGBA: Pressure, stationary Lee, dynamic Shore band, Obstacle
+Current Shore Edges RG: signed left visible edge, signed right visible edge
+Boundary RGBA: legacy fluid coverage, legacy material attraction, registered solid coverage, obstacle attraction
 ```
 
 No class-specific diagnostic contrast curve is applied. Every selected diagnostic repeats its legend in a context-sensitive Inspector help box. Source-specific shape construction still contains explicit geometric thresholds and widths; those define the source itself and are not cross-class importance modifiers. Any future normalization or weighting must be introduced explicitly, documented, and validated as a separate decision.

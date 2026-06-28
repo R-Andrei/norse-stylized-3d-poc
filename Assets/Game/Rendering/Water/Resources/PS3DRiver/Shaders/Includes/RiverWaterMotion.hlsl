@@ -1,8 +1,6 @@
 #ifndef PS3D_RIVER_WATER_MOTION_INCLUDED
 #define PS3D_RIVER_WATER_MOTION_INCLUDED
 
-#define PS3D_RIVER_TWO_PI 6.28318530718
-
 struct RiverWaterMotionInputs
 {
     float3 positionWS;
@@ -29,97 +27,6 @@ struct RiverWaterMotionResult
     float3 disturbanceNormalWS;
 };
 
-float RiverWaterHash21(float2 p)
-{
-    p = frac(p * float2(123.34, 456.21));
-    p += dot(p, p + 45.32);
-    return frac(p.x * p.y);
-}
-
-float RiverWaterValueNoise(float2 p)
-{
-    float2 cell = floor(p);
-    float2 f = frac(p);
-    f = f * f * (3.0 - 2.0 * f);
-    float a = RiverWaterHash21(cell);
-    float b = RiverWaterHash21(cell + float2(1.0, 0.0));
-    float c = RiverWaterHash21(cell + float2(0.0, 1.0));
-    float d = RiverWaterHash21(cell + 1.0);
-    return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
-}
-
-float RiverWaterResolveMotionBankMask(
-    float lateralMetres,
-    float visibleHalfWidth,
-    float surfaceHalfWidth,
-    float shoreMotion,
-    float shoreMotionWidth)
-{
-    float lateral = abs(lateralMetres);
-    float visible = max(0.001, visibleHalfWidth);
-    float surface = max(visible + 0.001, surfaceHalfWidth);
-    float retainedAtShore = saturate(shoreMotion);
-
-    if (lateral <= visible)
-    {
-        float interiorDistance = visible - lateral;
-        float interiorBlend = smoothstep(
-            0.0,
-            max(0.001, shoreMotionWidth),
-            interiorDistance);
-        return lerp(retainedAtShore, 1.0, interiorBlend);
-    }
-
-    float hiddenWidth = max(0.001, surface - visible);
-    float hiddenRemaining = saturate((surface - lateral) / hiddenWidth);
-    return retainedAtShore * smoothstep(0.0, 1.0, hiddenRemaining);
-}
-
-
-float RiverWaterEvaluateMacroHeight(
-    float globalDistance,
-    float lateralMetres,
-    float time,
-    float flowSpeed,
-    float waveHeight,
-    float waveLength,
-    float steepness,
-    float turbulence,
-    float seed)
-{
-    float wavelength = max(0.25, waveLength);
-    float phaseSpeed = flowSpeed * PS3D_RIVER_TWO_PI / wavelength;
-    float seedPhase = frac(seed * 0.01371) * PS3D_RIVER_TWO_PI;
-    float2 noiseCoordinate = float2(
-        globalDistance / max(1.0, wavelength * 1.8),
-        lateralMetres / max(1.0, wavelength * 0.8));
-    float evolvingNoise = RiverWaterValueNoise(
-        noiseCoordinate +
-        float2(-time * flowSpeed / max(1.0, wavelength * 5.0),
-               time * 0.035));
-    float distortion =
-        (evolvingNoise * 2.0 - 1.0) *
-        saturate(turbulence) *
-        1.65;
-    float phase =
-        globalDistance * PS3D_RIVER_TWO_PI / wavelength -
-        time * phaseSpeed +
-        seedPhase +
-        distortion;
-    float crossPhase =
-        lateralMetres * PS3D_RIVER_TWO_PI /
-        max(0.75, wavelength * 1.35);
-    float primary = sin(phase + sin(crossPhase) * turbulence * 0.55);
-    float secondary = sin(
-        phase * 1.73 -
-        crossPhase * 0.42 +
-        seedPhase * 0.31 +
-        time * phaseSpeed * 0.21);
-    float combined = primary * 0.72 + secondary * 0.28;
-    float crest = sign(combined) *
-        pow(abs(combined), lerp(1.0, 0.58, saturate(steepness)));
-    return crest * max(0.0, waveHeight);
-}
 
 float3 RiverWaterEvaluateMacroNormal(
     RiverWaterMotionInputs input,

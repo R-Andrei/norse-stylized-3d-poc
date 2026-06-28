@@ -1,6 +1,7 @@
 #pragma kernel ClearRange
 #pragma kernel InjectFoam
 #pragma kernel BuildGuidance
+#pragma kernel BuildCurrentShoreEdges
 #pragma kernel BuildTopologyMajor
 #pragma kernel BuildTopologyPockets
 #pragma kernel BuildTopologyConnectors
@@ -17,6 +18,8 @@
 #pragma kernel ApplyBoundary
 #pragma target 5.0
 
+#include "../Shaders/Includes/RiverWaterCommon.hlsl"
+
 struct FoamMetricRow
 {
     // x = left surface half-width, y = right surface half-width,
@@ -25,6 +28,9 @@ struct FoamMetricRow
     // x = signed centreline curvature, y = width derivative,
     // z = left/right width asymmetry, w = valid-domain flag.
     float4 topologyData;
+    // x = left normal visible half-width, y = right normal visible half-width,
+    // z/w reserved for future shared shoreline-profile data.
+    float4 shoreData;
 };
 
 // Shared Stage 6 material state:
@@ -48,6 +54,8 @@ RWTexture2D<float4> _FoamTopologyConnectorWrite;
 Texture2D<float4> _FoamTopologyConnectorRead;
 RWTexture2D<float4> _FoamTopologyWrite;
 RWTexture2D<float4> _FoamTopologySourcesWrite;
+RWTexture2D<float2> _FoamCurrentShoreEdgesWrite;
+Texture2D<float2> _FoamCurrentShoreEdgesRead;
 Texture2D<float4> _FoamTopologyRead;
 Texture2D<float4> _FoamTopologySourcesRead;
 Texture2D<float4> _FoamWakeField;
@@ -119,6 +127,17 @@ float _FoamWakeReinforcement;
 float _FoamImpactReinforcement;
 float _FoamDisturbanceEnabled;
 float _FoamFractureDeltaTime;
+float _FoamMotionFlowSpeed;
+float _FoamMotionWaveHeight;
+float _FoamMotionWaveLength;
+float _FoamMotionWaveSteepness;
+float _FoamMotionTurbulence;
+float _FoamShoreMotion;
+float _FoamShoreMotionWidth;
+float _FoamShoreBankCover;
+float _FoamFreezeAmount;
+float _FoamShoreCaptureCoreWidth;
+float _FoamShoreCaptureFadeWidth;
 
 float _FoamInjectionGlobalDistance;
 float _FoamInjectionAcrossNormalized;
@@ -744,7 +763,7 @@ struct FoamMotionSample
 FoamMotionSample ResolveMotion(float2 pixelCoordinate, float2 fieldUV)
 {
     FoamMotionSample result;
-    result.velocity = 0.0.xx;
+    result.velocity = float2(0.0, 0.0);
     result.capture = 0.0;
     result.lane = 0.0;
     result.junction = 0.0;
@@ -777,9 +796,9 @@ FoamMotionSample ResolveMotion(float2 pixelCoordinate, float2 fieldUV)
     float4 rippleState = 0.0.xxxx;
     float4 staticWakeState = 0.0.xxxx;
     float4 pressureState = 0.0.xxxx;
-    float2 wakeGradient = 0.0.xx;
-    float2 leeGradient = 0.0.xx;
-    float2 pressureGradient = 0.0.xx;
+    float2 wakeGradient = float2(0.0, 0.0);
+    float2 leeGradient = float2(0.0, 0.0);
+    float2 pressureGradient = float2(0.0, 0.0);
 
     if (_FoamDisturbanceEnabled > 0.5)
     {
@@ -1387,6 +1406,73 @@ float FoamComposeTopologySupport(
     return saturate(positiveSupport * (1.0 - topology.b));
 }
 
+[numthreads(64, 1, 1)]
+void BuildCurrentShoreEdges(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamTopologyDimensions.x)
+    {
+        return;
+    }
+
+    int outputX = (int)dispatchId.x;
+    float u = (outputX + 0.5) / max(1.0, (float)_FoamTopologyDimensions.x);
+    if (!IsFoamUInsideDomain(u))
+    {
+        _FoamCurrentShoreEdgesWrite[int2(outputX, 0)] = float2(0.0, 0.0);
+        return;
+    }
+
+    int metricX = clamp(
+        (int)round(u * max(0.0, (float)(_FoamDimensions.x - 1))),
+        0,
+        max(0, _FoamDimensions.x - 1));
+    FoamMetricRow metric = _FoamMetricRows[metricX];
+    if (metric.topologyData.w <= 0.0)
+    {
+        _FoamCurrentShoreEdgesWrite[int2(outputX, 0)] = float2(0.0, 0.0);
+        return;
+    }
+
+    float globalDistance = _FoamGlobalStart + u * _FoamFieldLength;
+    float liquidFactor = 1.0 - saturate(_FoamFreezeAmount);
+    float leftVisible = RiverWaterResolveCurrentVisibleShoreHalfWidth(
+        globalDistance,
+        -1.0,
+        metric.shoreData.x,
+        metric.widthsAndSpacing.x,
+        _FoamTime,
+        _FoamMotionFlowSpeed,
+        _FoamMotionWaveHeight,
+        _FoamMotionWaveLength,
+        _FoamMotionWaveSteepness,
+        _FoamMotionTurbulence,
+        _FoamShoreMotion,
+        _FoamShoreMotionWidth,
+        _FoamShoreBankCover,
+        liquidFactor,
+        _FoamSeed);
+    float rightVisible = RiverWaterResolveCurrentVisibleShoreHalfWidth(
+        globalDistance,
+        1.0,
+        metric.shoreData.y,
+        metric.widthsAndSpacing.y,
+        _FoamTime,
+        _FoamMotionFlowSpeed,
+        _FoamMotionWaveHeight,
+        _FoamMotionWaveLength,
+        _FoamMotionWaveSteepness,
+        _FoamMotionTurbulence,
+        _FoamShoreMotion,
+        _FoamShoreMotionWidth,
+        _FoamShoreBankCover,
+        liquidFactor,
+        _FoamSeed);
+
+    _FoamCurrentShoreEdgesWrite[int2(outputX, 0)] = float2(
+        -leftVisible,
+        rightVisible);
+}
+
 [numthreads(8, 8, 1)]
 void BuildTopologyMajor(uint3 dispatchId : SV_DispatchThreadID)
 {
@@ -1972,12 +2058,6 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
         max(float2(0.0, 0.0), (float2)_FoamDimensions - 1.0);
     float4 boundaryClasses = SampleBoundaryClassesBilinear(fullPixel);
     float fluidCoverage = saturate(boundaryClasses.r);
-    if (fluidCoverage <= 0.001)
-    {
-        _FoamTopologyWrite[outputCoordinate] = 0.0.xxxx;
-        _FoamTopologySourcesWrite[outputCoordinate] = 0.0.xxxx;
-        return;
-    }
 
     int metricX = clamp(
         (int)round(fullPixel.x),
@@ -2012,20 +2092,44 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
         abs(staticPressure.r),
         length(staticPressure.gb)));
     float leeCapture = saturate(max(0.0, staticWake.g));
-    float shoreCapture = saturate(boundaryClasses.b);
     float obstacleCapture = saturate(boundaryClasses.a);
 
-    float domainMask = fluidCoverage * saturate(metric.topologyData.w);
+    float2 currentShoreEdges = _FoamCurrentShoreEdgesRead.Load(
+        int3(outputCoordinate.x, 0, 0));
+    float lateralMetres = Across01ToMetres(
+        uv.y,
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+    float leftInsideDistance = lateralMetres - currentShoreEdges.x;
+    float rightInsideDistance = currentShoreEdges.y - lateralMetres;
+    float nearestCurrentShore = min(
+        leftInsideDistance,
+        rightInsideDistance);
+    float shoreTotalWidth = max(
+        0.001,
+        _FoamShoreCaptureCoreWidth + _FoamShoreCaptureFadeWidth);
+    float shoreCapture = nearestCurrentShore >= 0.0
+        ? 1.0 - smoothstep(
+            max(0.0, _FoamShoreCaptureCoreWidth),
+            shoreTotalWidth,
+            nearestCurrentShore)
+        : 0.0;
+
+    float validDomainMask = saturate(metric.topologyData.w);
+    float solidExclusion = saturate(boundaryClasses.b);
+    float staticFluidMask = fluidCoverage * validDomainMask;
+    float dynamicShoreMask = shoreCapture * validDomainMask *
+        (1.0 - solidExclusion);
     float4 topology = saturate(float4(
-        majorCapacity * domainMask,
-        connectorCapacity * domainMask,
-        pocketExclusion * domainMask,
+        majorCapacity * staticFluidMask,
+        connectorCapacity * staticFluidMask,
+        pocketExclusion * staticFluidMask,
         0.0));
     float4 sources = saturate(float4(
-        pressureCapture,
-        leeCapture,
-        shoreCapture,
-        obstacleCapture) * domainMask);
+        pressureCapture * staticFluidMask,
+        leeCapture * staticFluidMask,
+        dynamicShoreMask,
+        obstacleCapture * staticFluidMask));
 
     _FoamTopologyWrite[outputCoordinate] = topology;
     _FoamTopologySourcesWrite[outputCoordinate] = sources;
@@ -2289,7 +2393,7 @@ void ClearFractureRange(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    _FoamFractureWrite[int2(x, (int)dispatchId.y)] = 0.0.xx;
+    _FoamFractureWrite[int2(x, (int)dispatchId.y)] = float2(0.0, 0.0);
 }
 
 [numthreads(8, 8, 1)]
@@ -2307,7 +2411,7 @@ void UpdateFracture(uint3 dispatchId : SV_DispatchThreadID)
     float2 boundary = SampleBoundaryBilinear(fullPixel);
     if (boundary.x <= 0.001)
     {
-        _FoamFractureWrite[int2(dispatchId.xy)] = 0.0.xx;
+        _FoamFractureWrite[int2(dispatchId.xy)] = float2(0.0, 0.0);
         return;
     }
 

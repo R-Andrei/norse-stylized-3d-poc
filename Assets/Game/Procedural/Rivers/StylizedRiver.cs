@@ -1014,6 +1014,7 @@ namespace ProgrammaticStylized3D.Rivers
         public float MotionTime => riverTime;
         public float MotionSeed => visualSeed;
         public float ShoreMotion => shoreMotion;
+        public float ShoreMotionWidth => shoreMotionWidth;
         public bool RuntimeDisturbancesEnabled => runtimeDisturbances;
         public StylizedRiverDisturbancePreset DisturbancePreset =>
             disturbancePreset;

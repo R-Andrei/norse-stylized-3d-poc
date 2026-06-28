@@ -66,6 +66,8 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 
 **Implemented:** A shared river-space HLSL motion layer provides vertical macro displacement, evolving flow-aligned normal detail, directional current accents, visible-shore motion with hidden-edge safety fading, automatic surface refinement, displacement clearance reporting, and a neutral persistent-disturbance input reserved for Stage 5.
 
+**Shared shoreline output — implemented; Stage 6 validation pending:** The macro-wave, river-space noise, and shore attenuation primitives now live in the shared water-motion contract rather than only in the render pass. Stage 6 uses those exact functions to resolve one instantaneous left/right visible shoreline edge per longitudinal topology row by intersecting current positive shore-wave displacement with the corridor's mandatory hidden bank-cover profile. Future changes to shore-wave height, longitudinal length, lateral reach, asymmetry, or runtime evolution must update this shared evaluator; consumers must not recreate an approximate shoreline rhythm independently. This addition does not retune the accepted Stage 3 render result.
+
 **Validated:** Complete and accepted. Calm through furious motion, lighting response, reverse flow, irregular shores, shoreline lapping, and frozen-state suppression passed visual testing. Presets favour turbulence and shore activity over excessively fast, uniform macro-wave bands; detached splashes remain assigned to Stage 7.
 
 ## 4. Refraction and Optical Distortion
