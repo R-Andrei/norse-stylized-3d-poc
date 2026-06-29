@@ -344,11 +344,20 @@ Topology does not create material. Upstream inflow remains the primary planned c
 
 The remaining free-water topology will use persistent evolving fields, not an evolving graph, node set, pathfinding network, or pool of tracked moving structures.
 
-- **Major Support:** one persistent broad-support field, advected and reshaped through asynchronous local growth, decay, shear, drift, merging, and splitting.
+- **Major Support:** implemented as one persistent broad-support ping-pong field driven by a compact width-aware GPU nucleus cache rebuilt once per evolution tick. Longitudinal intervals derive lateral opportunity count and placement from the actual local water width; footprint-aware candidate scoring avoids banks, Anchored Support, Obstacle Footprint, and invalid water. A five-archetype variable-width spine family replaces fixed lateral rows and repeated oval silhouettes: compact raft/occasional oval, bean/crescent, long strip/ribbon, hook/wedge, and compound raft. Beans and strips carry the highest initial weights. It awaits visual acceptance.
 - **Connector Support:** a persistent field that approaches locally derived bridge targets only where meaningful positive support exists on two sides of a gap.
 - **Pocket Aging Pressure:** a persistent negative field whose targets are generated inside sufficiently broad Major interiors while protecting Anchored Support and important Connector Support cores.
 
 “Birth” and “death” are growth and decay operations on these persistent fields, not separate stored layers.
+
+Major Support now exposes two shape controls and two cadence controls:
+
+- `Major Support Amount`: default `0.56`, range `0–1`; controls longitudinal spacing through a nonlinear remap of approximately `9.5 m` to `2.8 m`, while actual local water width determines whether one or several nuclei fit laterally;
+- `Major Support Size`: default `0.46`, range `0–1`; controls physical region size independently from amount through a nonlinear remap of approximately `0.45 m` to `1.95 m`, giving substantially more small-scale control;
+- `Major Evolution Rate (Hz)`: default `2`, range `0.5–10`;
+- `Major Cleanup Rate (Hz)`: default `1`, range `0.5–10`.
+
+The evolution pass first rebuilds a fixed-capacity width-aware nucleus buffer, then applies gradual persistent growth or decay from nearby buffered nuclei. Longitudinal intervals derive their lateral candidate count from actual local water width, so narrow rivers do not collapse to a permanent centre lane and broad rivers may host several nuclei across. Candidate centres and approximate footprint samples are scored against banks, Anchored Support, Obstacle Footprint, and invalid water before acceptance. Each nucleus chooses a compact raft, bean/crescent, long strip/ribbon, hook/wedge, or compound raft. The shared bounded four-point spine kernel varies taper, curvature, width, constrictions, optional bites, and evolving noise to produce materially different silhouettes without separate shape systems. The cleanup pass is one-sided: it may remove isolated remnants and derive broad-interior support, but it never fills holes, expands support, or merges gaps closed.
 
 Topology work runs at lower cadence than material transport and is staggered across classes/chunks. Complexity should scale primarily with structural texel count rather than `texels × structures`.
 
@@ -392,6 +401,10 @@ The accepted main controls remain:
 - `Amount`
 - `Web Granularity`
 - `Network Evolution`
+- `Major Support Amount` — default `0.56`, range `0–1`; nonlinear longitudinal spacing remap of approximately `9.5 m` to `2.8 m`, with lateral opportunity count derived from actual local width
+- `Major Support Size` — default `0.46`, range `0–1`; nonlinear base-size remap of approximately `0.45 m` to `1.95 m`
+- `Major Evolution Rate (Hz)` — default `2`, range `0.5–10`
+- `Major Cleanup Rate (Hz)` — default `1`, range `0.5–10`
 - `Breakup Frequency`
 - `Foam Speed`
 - `Foam Colour`
@@ -402,7 +415,7 @@ Base lifetime and support/aging-pressure response also require authoring, but th
 
 1. Documentation cleanup — complete.
 2. Canonical topology terminology rename — complete; serialized debug values and texture channels preserved.
-3. Replace and validate Major Support alone.
+3. Validity-aware persistent Major Support implementation — complete; visual validation of distribution, size controls, and asynchronous evolution pending.
 4. Replace and validate Connector Support after Major passes.
 5. Replace and validate Pocket Aging Pressure after Major and Connector pass.
 6. Integrate soft topology-to-lifetime material response.
@@ -419,8 +432,17 @@ Major, Connector, and Pocket must be handled one at a time.
 - no final-shader loops over objects or topology structures;
 - anchored geometry preprocessing only when sources change;
 - low-rate and staggered topology evolution;
+- Major Support rebuilds a fixed-capacity sparse GPU nucleus buffer at low cadence and each structural texel samples only nearby interval slots with a bounded lateral maximum, never a growing list of structures;
 - inactive, sleeping, frozen, and distant chunks perform no unnecessary work;
 - profile update spikes as well as average cost.
+
+Deferred optimization notes:
+
+- Static Pressure still performs an independent generated-mesh height-slice scan during source refresh. It should eventually consume the shared compact geometry/footprint source and apply only pressure-specific directional shaping; do not add another object-geometry scanner.
+- Foam Obstacle Footprint may rebuild once before generated-source refresh has completed and again after `ObstacleGeometryVersion` settles. Defer Foam obstacle rebuilds until the disturbance refresh is complete enough to avoid redundant startup work.
+- Foam Obstacle Footprint rasterization should reuse its pixel buffer instead of allocating a fresh structural-grid `Color[]` per rebuild.
+- Audit topology/debug work so `Final Foam (Debug Off)` does not accidentally force diagnostic-grade topology composition or metric refreshes.
+- Tighten Static Pressure, Static Wake, and ripple-boundary dirty flags so source/profile changes rebuild only the affected textures and passes.
 
 ### Failure rule
 

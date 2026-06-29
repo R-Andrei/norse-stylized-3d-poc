@@ -255,6 +255,35 @@ namespace ProgrammaticStylized3D.Rivers
         public string Status { get; }
     }
 
+    public readonly struct RiverObstacleExclusionFootprint
+    {
+        public RiverObstacleExclusionFootprint(
+            EntityId sourceId,
+            float globalDistance,
+            float acrossMetres,
+            float surfaceHalfWidth,
+            float alongHalfLength,
+            float acrossHalfWidth,
+            Vector2[] contour)
+        {
+            SourceId = sourceId;
+            GlobalDistance = globalDistance;
+            AcrossMetres = acrossMetres;
+            SurfaceHalfWidth = surfaceHalfWidth;
+            AlongHalfLength = alongHalfLength;
+            AcrossHalfWidth = acrossHalfWidth;
+            Contour = contour ?? Array.Empty<Vector2>();
+        }
+
+        public EntityId SourceId { get; }
+        public float GlobalDistance { get; }
+        public float AcrossMetres { get; }
+        public float SurfaceHalfWidth { get; }
+        public float AlongHalfLength { get; }
+        public float AcrossHalfWidth { get; }
+        public Vector2[] Contour { get; }
+    }
+
 #if UNITY_EDITOR
     public readonly struct GeneratedRiverPressureProfileDebugData
     {
@@ -964,9 +993,10 @@ namespace ProgrammaticStylized3D.Rivers
             public Vector2[] StaticPressureContour;
             public RiverDisturbancePressureBakeProfile StaticPressureProfile;
             public RiverDisturbancePressureBakeProfile StaticPressureBaseProfile;
-            // Exact generated mesh retained for the one-time Stage 6 solid
-            // interval bake. Static Pressure still has its older independent
-            // scan and is explicitly marked for a future shared-data refactor.
+            // Exact generated mesh retained for future editor-time solid data.
+            // Runtime Foam consumes StaticContour; Static Pressure still has
+            // its older independent scan and is explicitly marked for a future
+            // shared-data refactor.
             public MeshFilter ObstacleExclusionMeshFilter;
             public float[] StaticPressureCurrentMultipliers;
             public float[] StaticPressureTransitionStartMultipliers;
@@ -2172,9 +2202,8 @@ namespace ProgrammaticStylized3D.Rivers
 
         /// <summary>
         /// Copies the exact generated meshes currently registered as static
-        /// river obstructions. Stage 6 performs its conservative solid-interval
-        /// bake from these meshes only when the generated-geometry version
-        /// changes; gameplay updates never rescan triangles.
+        /// river obstructions. Retained for future editor-time exact interval
+        /// baking; runtime Foam now consumes waterline contour footprints.
         /// </summary>
         public void CopyObstacleExclusionMeshFiltersTo(
             List<MeshFilter> output)
@@ -2185,6 +2214,11 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             output.Clear();
+            if (river == null || !river.Domain.IsValid)
+            {
+                return;
+            }
+
             foreach (KeyValuePair<EntityId, ContinuousSource> pair in
                      continuousSources)
             {
@@ -2204,6 +2238,64 @@ namespace ProgrammaticStylized3D.Rivers
 
             output.Sort((left, right) =>
                 left.GetEntityId().CompareTo(right.GetEntityId()));
+        }
+
+        /// <summary>
+        /// Copies mesh-derived waterline contours for the Stage 6 Foam
+        /// Obstacle Footprint. Runtime Foam uses this surface silhouette
+        /// instead of rescanning full triangle meshes on Play startup.
+        /// </summary>
+        public void CopyObstacleExclusionFootprintsTo(
+            List<RiverObstacleExclusionFootprint> output)
+        {
+            if (output == null)
+            {
+                throw new ArgumentNullException(nameof(output));
+            }
+
+            output.Clear();
+            if (river == null || !river.Domain.IsValid)
+            {
+                return;
+            }
+
+            foreach (KeyValuePair<EntityId, ContinuousSource> pair in
+                     continuousSources)
+            {
+                ContinuousSource source = pair.Value;
+                MeshFilter meshFilter = source.ObstacleExclusionMeshFilter;
+                if (!source.IsStatic ||
+                    source.StaticContour == null ||
+                    source.StaticContour.Length < 3 ||
+                    meshFilter == null ||
+                    meshFilter.sharedMesh == null ||
+                    !meshFilter.gameObject.activeInHierarchy ||
+                    !river.TryProjectWorldPoint(
+                        source.WorldPosition,
+                        out StylizedRiverProjection projection) ||
+                    !projection.IsInside)
+                {
+                    continue;
+                }
+
+                StylizedRiverSplineSample sample =
+                    river.SampleAtLocalDistance(projection.LocalDistance);
+                float surfaceHalfWidth = Mathf.Max(
+                    0.05f,
+                    sample.GetSurfaceHalfWidth(projection.AcrossMetres));
+                output.Add(
+                    new RiverObstacleExclusionFootprint(
+                        pair.Key,
+                        projection.GlobalDistance,
+                        projection.AcrossMetres,
+                        surfaceHalfWidth,
+                        source.AlongHalfLength,
+                        source.AcrossHalfWidth,
+                        CopyStaticContour(source.StaticContour)));
+            }
+
+            output.Sort((left, right) =>
+                left.SourceId.CompareTo(right.SourceId));
         }
 
         public void RemoveContinuousSource(EntityId sourceId)
@@ -2811,10 +2903,9 @@ namespace ProgrammaticStylized3D.Rivers
                         pressureFootprint.AcrossHalfWidth,
                         localRiverWidth);
 
-                // TODO: Pressure currently performs its own height-slice scan.
-                // Stage 6 Obstacle Footprint now bakes exact solid intervals
-                // from this same generated mesh. Pressure should eventually
-                // consume that shared underlying solid data and apply only its
+                // TODO: Pressure currently performs its own height-slice mesh
+                // scan. It should eventually consume the shared compact
+                // generated-geometry/footprint source and apply only its
                 // directional shaping, rather than scanning geometry again.
                 if (!RiverDisturbanceFootprintResolver.TryResolvePressureSupport(
                         river,
@@ -3479,6 +3570,9 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void SimulateStep(float deltaTime, double now)
         {
+            // TODO: Tighten these broad dirty flags so source/profile changes
+            // rebuild only affected Static Pressure, Static Wake, and ripple
+            // boundary textures instead of whole-pass targets.
             if (staticPressureTargetDirty)
             {
                 RebuildStaticPressureTarget(now);

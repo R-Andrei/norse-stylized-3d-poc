@@ -7829,7 +7829,7 @@ MonoBehaviour:
   shorelineIrregularityScale: 4.2
   bankAsymmetry: 0.881
   quality: 1
-  surfaceOffset: 0.035
+  surfaceOffset: 0.056
   bodyPreset: 3
   shallowColor: {r: 0.21693662, g: 0.26945412, b: 0.3679245, a: 1}
   deepColor: {r: 0.027100397, g: 0.11657065, b: 0.1981132, a: 1}
@@ -7931,6 +7931,10 @@ MonoBehaviour:
   foamAmount: 0.59466666
   foamWebGranularity: 0.5402
   foamNetworkEvolution: 0.601
+  foamMajorSupportAmount: 0.56
+  foamMajorSupportSize: 0.46
+  foamMajorSupportEvolutionRate: 2
+  foamMajorSupportCleanupRate: 1
   foamBreakupFrequency: 0.7037469
   foamSpeed: 0.601
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}
@@ -7958,7 +7962,7 @@ MonoBehaviour:
   foamShoreRetention: 0.32
   foamDetailScale: 0.48
   foamDetailStrength: 0.48
-  foamDebugView: 0
+  foamDebugView: 7
   foamTestDistanceNormalized: 0.5
   foamTestAcrossNormalized: 0
   foamTestRadius: 0.8
