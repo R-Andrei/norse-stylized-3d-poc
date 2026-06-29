@@ -1455,7 +1455,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6.2 Batch 1B adds read-only Pressure and stationary-lee organisation, retains shore and obstacle classes separately, and measures how actual material relates to the priority-composed structural capacity. Impact remains deliberately inactive.",
+                "Stage 6.2 retains read-only Pressure, stationary Lee, and dynamic Shore as independent positive classes, while Pocket Exclusion and water-level-aware Obstacle Exclusion remain independent negative classes. Impact remains deliberately inactive.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1666,6 +1666,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Final Foam (Debug Off)",
                 "Capture Zones",
                 "Positive Zone Classes",
+                "Negative Zone Classes",
                 "Positive and Negative Zones"
             };
             int[] foamDebugValues =
@@ -1673,6 +1674,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.Final,
                 (int)StylizedRiverFoamDebugView.CaptureZones,
                 (int)StylizedRiverFoamDebugView.PositiveZoneClasses,
+                (int)StylizedRiverFoamDebugView.NegativeZoneClasses,
                 (int)StylizedRiverFoamDebugView.PositiveNegativeZones
             };
             int currentDebugIndex = System.Array.IndexOf(
@@ -1687,7 +1689,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             int selectedDebugIndex = EditorGUILayout.Popup(
                 new GUIContent(
                     "Debug View",
-                    "Final Foam disables Foam diagnostics. Only the three currently authoritative topology diagnostics remain available."),
+                    "Final Foam disables Foam diagnostics. Only the four currently authoritative topology diagnostics remain available."),
                 currentDebugIndex,
                 foamDebugLabels);
             if (EditorGUI.EndChangeCheck())
@@ -1716,7 +1718,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Batch 1C replaces the continuous river-length chain with finite local rafts and ribbons. Enclosed pockets are ring-validated, connectors require separate structure endpoints, branches form deliberate forks, and obstacles deform major support before composition. Capacity still does not feed material simulation."),
+                    "Batch 1C replaces the continuous river-length chain with finite local rafts and ribbons. Enclosed pockets are ring-validated, connectors require separate structure endpoints, branches form deliberate forks, and conservative water-level solid cross-sections remain separate negative topology instead of deforming positive classes. Capacity still does not feed material simulation."),
                 new GUIContent("Batch 1C finite structures"));
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
@@ -1735,7 +1737,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Topology Resolution",
-                    "Primary RGBAHalf topology field: red is Major Capacity, green Connector/Branch Capacity, blue Pocket Exclusion, and alpha is reserved. The companion source-class texture stores canonical Pressure, Lee, Shore, and Obstacle capture separately. Every positive class is computed independently; no positive class gates, boosts, attenuates, or reshapes another."),
+                    "Primary RGBAHalf topology field: red is Major Capacity, green Connector/Branch Capacity, blue Pocket Exclusion, and alpha is the guidance-resolution copy of water-level-aware Obstacle Exclusion. The authoritative debug mask is a dedicated full-resolution point-sampled texture reconstructed from one-time exact transformed-mesh solid intervals at the current Stage 3 water height. The companion source-class texture stores canonical Pressure, Lee, and Shore capture separately; alpha is reserved zero. Every positive class is computed independently, while negative classes remain separate until final composition."),
                 new GUIContent(
                     runtime.ResourcesAllocated
                         ? $"{runtime.TopologyWidth} × {runtime.TopologyHeight}"
@@ -1784,11 +1786,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Visible Material Coverage",
                     FormatPercent(runtime.VisibleMaterialCoverage));
                 EditorGUILayout.LabelField(
-                    "Boundary Occupancy",
-                    FormatPercent(runtime.BoundaryOccupancy));
-                EditorGUILayout.LabelField(
-                    "Obstacle Occupancy",
-                    FormatPercent(runtime.ObstacleOccupancy));
+                    "Shore Occupancy",
+                    FormatPercent(runtime.ShoreOccupancy));
                 EditorGUILayout.LabelField(
                     "Pressure / Lee Occupancy",
                     FormatPercent(runtime.PressureLeeOccupancy));
@@ -2266,15 +2265,19 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.CaptureZones:
                     return
-                        "Canonical independent Capture Zones. Red = Pressure. Green = attached Lee. Blue = Shore. Magenta = Obstacle. Shore is a fixed metric band measured inward from the instantaneous Stage 3 visible water edge: 0.24 m solid capture plus a 0.03 m fade. The edge is resolved from the same macro-wave and shore attenuation functions used by the water shader, not from the static shoreline allowance. No capture class or free-water class modifies another. Overlaps mix directly. These same four values are collapsed into the blue Capture class in Positive Zone Classes.";
+                        "Canonical independent positive Capture Zones. Red = Pressure. Green = attached Lee. Blue = Shore. Shore is a fixed metric band measured inward from the instantaneous Stage 3 visible water edge: 0.24 m solid capture plus a 0.03 m fade. The edge is resolved from the same macro-wave and shore attenuation functions used by the water shader, not from the static shoreline allowance. No capture class or free-water class modifies another. Overlaps mix directly. These same three values are collapsed into the blue Capture class in Positive Zone Classes.";
 
                 case StylizedRiverFoamDebugView.PositiveZoneClasses:
                     return
-                        "Red = independent Major Capacity. Green = independent Connector Capacity. Blue = the maximum of the exact canonical Pressure, Lee, Shore, and Obstacle values shown separately in Capture Zones. No positive class is weighted against another. Overlaps mix. Black = no positive support. Pocket Exclusion is intentionally omitted.";
+                        "Red = independent Major Capacity. Green = independent Connector Capacity. Blue = the maximum of the exact canonical Pressure, Lee, and Shore values shown separately in Capture Zones. No positive class is weighted against another. Overlaps mix. Black = no positive support. Negative topology is intentionally omitted.";
+
+                case StylizedRiverFoamDebugView.NegativeZoneClasses:
+                    return
+                        "Independent negative topology classes. Red = Pocket Exclusion. Blue = Obstacle Exclusion from the conservative current-water-level solid cross-section. Magenta = overlap. The mask is point-sampled; each retained texel must pass a conservative 3×3 set of exact-mesh solid-interval tests across its displayed rectangle, and it is never expanded into a surrounding halo.";
 
                 case StylizedRiverFoamDebugView.PositiveNegativeZones:
                     return
-                        "Green = the unweighted maximum of Major Capacity, Connector Capacity, and the same canonical Capture data used by the other two diagnostics. Red = Pocket Exclusion, applied only at final composition. Yellow = overlap where exclusion can remove positive support. Black = neither.";
+                        "Green = the unweighted maximum of Major Capacity, Connector Capacity, Pressure, Lee, and Shore before exclusion. Red = the maximum of Pocket Exclusion and Obstacle Exclusion. Yellow = overlap where combined negative topology removes positive support. Black = neither.";
 
                 default:
                     return "Normal rendered Foam result. No Foam diagnostic colour encoding is active.";

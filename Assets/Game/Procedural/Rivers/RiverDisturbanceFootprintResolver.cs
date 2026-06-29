@@ -446,6 +446,16 @@ namespace ProgrammaticStylized3D.Rivers
             return true;
         }
 
+        /// <summary>
+        /// Builds the accepted Static Pressure support profile.
+        ///
+        /// TODO: this still performs an independent height-slice/contour scan.
+        /// Stage 6 now owns an exact solid-volume interval cache derived from
+        /// the same generated mesh. A future Pressure refactor should consume
+        /// that shared underlying solid data and apply Pressure-specific
+        /// directional shaping instead of scanning the mesh again. Do not add
+        /// another geometry approximation or mesh scanner in the meantime.
+        /// </summary>
         public static bool TryResolvePressureSupport(
             StylizedRiver river,
             MeshFilter meshFilter,

@@ -6,6 +6,8 @@
 #pragma kernel BuildTopologyPockets
 #pragma kernel BuildTopologyConnectors
 #pragma kernel ComposeTopology
+#pragma kernel ClearObstacleExclusion
+#pragma kernel UpdateObstacleExclusion
 #pragma kernel ResetTopologyMetrics
 #pragma kernel MeasureTopologyMetrics
 #pragma kernel ResetPopulation
@@ -29,8 +31,25 @@ struct FoamMetricRow
     // z = left/right width asymmetry, w = valid-domain flag.
     float4 topologyData;
     // x = left normal visible half-width, y = right normal visible half-width,
-    // z/w reserved for future shared shoreline-profile data.
+    // z = base river surface height, w reserved.
     float4 shoreData;
+};
+
+struct FoamObstacleSample
+{
+    // x/y = first exact solid interval; z/w = optional second interval.
+    float4 intervals;
+    // x = global distance, y = lateral metres,
+    // z = visible half-width, w = generated surface half-width.
+    float4 waterParameters;
+};
+
+struct FoamObstacleIntervalCell
+{
+    // x/y = full-resolution Foam texel coordinate,
+    // z = first of nine consecutive exact-mesh interval samples,
+    // w = reserved.
+    float4 coordinateAndOffset;
 };
 
 // Shared Stage 6 material state:
@@ -44,6 +63,8 @@ RWTexture2D<float4> _FoamAdvectionWrite;
 Texture2D<float4> _FoamAdvectedRead;
 Texture2D<float4> _FoamReverseRead;
 Texture2D<float4> _FoamBoundary;
+RWTexture2D<float> _FoamObstacleExclusionWrite;
+Texture2D<float> _FoamObstacleExclusionRead;
 RWTexture2D<float4> _FoamGuidanceWrite;
 Texture2D<float4> _FoamGuidanceRead;
 RWTexture2D<float4> _FoamTopologyMajorWrite;
@@ -65,6 +86,8 @@ Texture2D<float4> _FoamStaticPressureField;
 RWTexture2D<float2> _FoamFractureWrite;
 Texture2D<float2> _FoamFractureRead;
 StructuredBuffer<FoamMetricRow> _FoamMetricRows;
+StructuredBuffer<FoamObstacleSample> _FoamObstacleSamples;
+StructuredBuffer<FoamObstacleIntervalCell> _FoamObstacleCells;
 
 // Per chunk, two uint4 records are stored in one raw buffer:
 // record 0: x = quantised Amount sum, y = visible-cell count,
@@ -77,8 +100,8 @@ RWByteAddressBuffer _FoamPopulationMetrics;
 // quantised to 0..1023 per supported topology cell.
 //  0 valid cells             8 boundary-supported cells
 //  1 major-capacity cells    9 boundary-occupied cells
-//  2 connector cells        10 obstacle-supported cells
-//  3 protected-pocket cells 11 obstacle-occupied cells
+//  2 connector cells        10 reserved
+//  3 protected-pocket cells 11 reserved
 //  4 pocket violations      12 Pressure/lee-supported cells
 //  5 visible material cells 13 Pressure/lee-occupied cells
 //  6 composed-support cells 14 perimeter-visible cells
@@ -97,6 +120,7 @@ int _FoamRangeStart;
 int _FoamRangeCount;
 int _FoamFractureRangeStart;
 int _FoamFractureRangeCount;
+int _FoamObstacleCellCount;
 int _FoamResolutionPerChunk;
 int _FoamChunkCount;
 float _FoamDeltaTime;
@@ -1400,7 +1424,12 @@ float FoamCombinedCaptureSupport(float4 captureSources)
 {
     return max(
         max(captureSources.r, captureSources.g),
-        max(captureSources.b, captureSources.a));
+        captureSources.b);
+}
+
+float FoamCombinedNegativeSupport(float4 topology)
+{
+    return max(topology.b, topology.a);
 }
 
 float FoamComposeTopologySupport(
@@ -1410,7 +1439,9 @@ float FoamComposeTopologySupport(
     float positiveSupport = max(
         max(topology.r, topology.g),
         FoamCombinedCaptureSupport(captureSources));
-    return saturate(positiveSupport * (1.0 - topology.b));
+    return saturate(
+        positiveSupport *
+        (1.0 - FoamCombinedNegativeSupport(topology)));
 }
 
 [numthreads(64, 1, 1)]
@@ -1492,6 +1523,114 @@ void BuildCurrentShoreEdges(uint3 dispatchId : SV_DispatchThreadID)
     _FoamCurrentShoreEdgesWrite[int2(outputX, 0)] = float2(
         -leftVisible,
         rightVisible);
+}
+
+bool IsObstacleIntervalHeightInside(
+    float4 intervals,
+    float waterHeight)
+{
+    bool insideFirst =
+        intervals.y > intervals.x &&
+        waterHeight >= intervals.x &&
+        waterHeight <= intervals.y;
+    bool insideSecond =
+        intervals.w > intervals.z &&
+        waterHeight >= intervals.z &&
+        waterHeight <= intervals.w;
+    return insideFirst || insideSecond;
+}
+
+bool IsObstacleIntervalSampleInside(
+    int sampleOffset,
+    int sampleIndex)
+{
+    FoamObstacleSample sample =
+        _FoamObstacleSamples[sampleOffset + sampleIndex];
+    float globalDistance = sample.waterParameters.x;
+    float lateralMetres = sample.waterParameters.y;
+    float visibleHalfWidth = max(0.01, sample.waterParameters.z);
+    float surfaceHalfWidth = max(0.01, sample.waterParameters.w);
+    float liquidFactor = 1.0 - saturate(_FoamFreezeAmount);
+    float bankMask;
+    float dynamicHeight = RiverWaterEvaluateSurfaceHeight(
+        globalDistance,
+        lateralMetres,
+        visibleHalfWidth,
+        surfaceHalfWidth,
+        _FoamTime,
+        _FoamMotionFlowSpeed,
+        _FoamMotionWaveHeight,
+        _FoamMotionWaveLength,
+        _FoamMotionWaveSteepness,
+        _FoamMotionTurbulence,
+        _FoamShoreMotion,
+        _FoamShoreMotionWidth,
+        _FoamShoreWaveHeightScale,
+        _FoamShoreWaveLengthScale,
+        _FoamShoreWaveReach,
+        _FoamShoreWaveTransitionLength,
+        _FoamShoreWaveSizeVariation,
+        _FoamShoreWaveSideAsymmetry,
+        _FoamShoreWaveProfileVariation,
+        liquidFactor,
+        _FoamSeed,
+        bankMask);
+
+    return IsObstacleIntervalHeightInside(
+        sample.intervals,
+        dynamicHeight);
+}
+
+[numthreads(8, 8, 1)]
+void ClearObstacleExclusion(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamDimensions.x ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    _FoamObstacleExclusionWrite[int2(dispatchId.xy)] = 0.0;
+}
+
+[numthreads(64, 1, 1)]
+void UpdateObstacleExclusion(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamObstacleCellCount)
+    {
+        return;
+    }
+
+    FoamObstacleIntervalCell cell =
+        _FoamObstacleCells[dispatchId.x];
+    int2 coordinate = int2(
+        (int)round(cell.coordinateAndOffset.x),
+        (int)round(cell.coordinateAndOffset.y));
+    int intervalOffset = (int)round(cell.coordinateAndOffset.z);
+    if (coordinate.x < 0 || coordinate.x >= _FoamDimensions.x ||
+        coordinate.y < 0 || coordinate.y >= _FoamDimensions.y ||
+        intervalOffset < 0)
+    {
+        return;
+    }
+
+    [unroll]
+    for (int sampleY = 0; sampleY < 3; sampleY++)
+    {
+        [unroll]
+        for (int sampleX = 0; sampleX < 3; sampleX++)
+        {
+            int sampleIndex = sampleY * 3 + sampleX;
+            if (!IsObstacleIntervalSampleInside(
+                    intervalOffset,
+                    sampleIndex))
+            {
+                return;
+            }
+        }
+    }
+
+    _FoamObstacleExclusionWrite[coordinate] = 1.0;
 }
 
 [numthreads(8, 8, 1)]
@@ -2113,7 +2252,6 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
         abs(staticPressure.r),
         length(staticPressure.gb)));
     float leeCapture = saturate(max(0.0, staticWake.g));
-    float obstacleCapture = saturate(boundaryClasses.a);
 
     float2 currentShoreEdges = _FoamCurrentShoreEdgesRead.Load(
         int3(outputCoordinate.x, 0, 0));
@@ -2137,20 +2275,33 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
         : 0.0;
 
     float validDomainMask = saturate(metric.topologyData.w);
-    float solidExclusion = saturate(boundaryClasses.b);
+    // Obstacle Exclusion is point-sampled and each texel owns its complete
+    // UV rectangle. Use the same floor(uv * dimensions) convention as the
+    // final shader diagnostic so the derived topology copy cannot shift by a
+    // half texel relative to the authoritative full-resolution mask.
+    int2 obstacleCoordinate = clamp(
+        (int2)floor(uv * (float2)_FoamDimensions),
+        int2(0, 0),
+        _FoamDimensions - 1);
+    float obstacleExclusion = saturate(
+        _FoamObstacleExclusionRead.Load(
+            int3(obstacleCoordinate, 0))) * validDomainMask;
     float staticFluidMask = fluidCoverage * validDomainMask;
     float dynamicShoreMask = shoreCapture * validDomainMask *
-        (1.0 - solidExclusion);
+        (1.0 - obstacleExclusion);
+    // Topology RGBA = Major, Connector, Pocket Exclusion, and the derived
+    // guidance-resolution copy of the conservative current-water solid mask.
+    // Positive source RGBA = Pressure, Lee, Shore, zero.
     float4 topology = saturate(float4(
         majorCapacity * staticFluidMask,
         connectorCapacity * staticFluidMask,
         pocketExclusion * staticFluidMask,
-        0.0));
+        obstacleExclusion));
     float4 sources = saturate(float4(
         pressureCapture * staticFluidMask,
         leeCapture * staticFluidMask,
         dynamicShoreMask,
-        obstacleCapture * staticFluidMask));
+        0.0));
 
     _FoamTopologyWrite[outputCoordinate] = topology;
     _FoamTopologySourcesWrite[outputCoordinate] = sources;
@@ -2199,8 +2350,7 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     bool connector = topology.g >= 0.12;
     bool pocket = topology.b >= 0.35;
     bool supported = composed >= 0.15;
-    bool boundarySupported = max(sources.b, sources.a) >= 0.15;
-    bool obstacleSupported = sources.a >= 0.15;
+    bool shoreSupported = sources.b >= 0.15;
     bool pressureLeeSupported = max(sources.r, sources.g) >= 0.15;
 
     float2 texel = 1.0 /
@@ -2228,20 +2378,14 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     _FoamTopologyMetrics.InterlockedAdd(28u, deficitValue, originalValue);
     _FoamTopologyMetrics.InterlockedAdd(
         32u,
-        boundarySupported ? 1u : 0u,
+        shoreSupported ? 1u : 0u,
         originalValue);
     _FoamTopologyMetrics.InterlockedAdd(
         36u,
-        boundarySupported && visible ? 1u : 0u,
+        shoreSupported && visible ? 1u : 0u,
         originalValue);
-    _FoamTopologyMetrics.InterlockedAdd(
-        40u,
-        obstacleSupported ? 1u : 0u,
-        originalValue);
-    _FoamTopologyMetrics.InterlockedAdd(
-        44u,
-        obstacleSupported && visible ? 1u : 0u,
-        originalValue);
+    // Metric slots 10 and 11 remain reserved after removal of the
+    // former positive obstacle-source metric.
     _FoamTopologyMetrics.InterlockedAdd(
         48u,
         pressureLeeSupported ? 1u : 0u,

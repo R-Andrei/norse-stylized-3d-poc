@@ -78,7 +78,7 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 - `Shore Side Asymmetry` blends from shared left/right size and profile values to independent bank values;
 - `Shore Wave Profile Variation` creates deterministic variation inside each wave between its start, middle, and end.
 
-Within-wave profile knots use a slope-continuous cubic curve that blends toward a smoother B-spline response as Transition Length increases. Successive wave-size values also blend across that configured metric span, eliminating abrupt corners both inside a wave and where a small wave meets a larger one. Size identities are deterministic and travel with the existing carrier; they do not reseed or fluctuate independently at runtime. Left and right profiles are identical when Side Asymmetry is zero and become increasingly independent as it rises. Neutral values (`1`, `1`, `1`, `1 m`, `0`, `0`, `0`) preserve the prior Stage 3 result because Transition Length and Side Asymmetry have no visible effect while both variation controls are zero. Water displacement, surface normals, liquid refraction motion, instantaneous shoreline resolution, and Stage 6 Shore Capture all consume the same shared evaluator. This is an intermediate extension of the existing carrier, not the later explicit travelling-wave-packet redesign; individual packet speeds, lifetimes, births, and independent length evolution remain deferred.
+Within-wave profile knots use a slope-continuous cubic curve that blends toward a smoother B-spline response as Transition Length increases. Successive wave-size values also blend across that configured metric span. A final zero-slope activation envelope is now applied to the signed shore-wave height near zero crossings and to lateral reach near both the normal shoreline and the maximum hidden-water allowance. This prevents the visible shore from leaving or rejoining either hard bound with a tangent discontinuity instead of merely smoothing the earlier profile values. Size identities are deterministic and travel with the existing carrier; they do not reseed or fluctuate independently at runtime. Left and right profiles are identical when Side Asymmetry is zero and become increasingly independent as it rises. Neutral size/profile variation values preserve the previous wave identities, while Transition Length still controls the new final shoreline onset/exit smoothing. Water displacement, surface normals, liquid refraction motion, instantaneous shoreline resolution, and Stage 6 Shore Capture all consume the same shared evaluator. This is an intermediate extension of the existing carrier, not the later explicit travelling-wave-packet redesign; individual packet speeds, lifetimes, births, and independent length evolution remain deferred.
 
 **Validated:** The original calm-through-furious motion contract remains accepted at neutral shore-profile values. The new shore-specific controls require focused Unity validation across reverse flow, freeze/thaw, asymmetric banks, and hidden-allowance limits. Presets reset the new controls to neutral values so selecting an existing motion preset preserves the accepted appearance. Detached splashes remain assigned to Stage 7.
 
@@ -314,7 +314,7 @@ Stage 6 separates three responsibilities:
 
 Structural topology is capacity, not a final picture. Material does not appear merely because capacity is high.
 
-Capture and supply are separate. Shores, obstacles, Pressure shoulders, and lee regions primarily organise, slow, and preserve existing material; they are not unlimited emitters. New Amount comes mainly from upstream inflow, bounded underfilled capture replenishment, tightly limited donor-supported repair, and weak extinction prevention.
+Capture and supply are separate. Shores, Pressure shoulders, and lee regions primarily organise, slow, and preserve existing material; solid objects instead remove invalid occupancy through Obstacle Exclusion. None of these are unlimited emitters. New Amount comes mainly from upstream inflow, bounded underfilled capture replenishment, tightly limited donor-supported repair, and weak extinction prevention.
 
 Conflict priority is:
 
@@ -363,7 +363,7 @@ Initial inputs:
 
 - river geometry and global metric coordinates;
 - shore structure;
-- projected obstacle wraps;
+- projected obstacle footprints;
 - bend organisation;
 - broad free-water rafts;
 - protected pocket fields;
@@ -376,6 +376,7 @@ Canonical Foam view menu:
 - `Final Foam (Debug Off)`
 - `Capture Zones`
 - `Positive Zone Classes`
+- `Negative Zone Classes`
 - `Positive and Negative Zones`
 
 All former Foam diagnostics and their shader/runtime branches have been removed. New views are added only when a specific diagnostic question requires them.
@@ -392,18 +393,25 @@ Implemented:
 
 - Pressure-shoulder organisation from the accepted static Pressure target;
 - stationary lee organisation from the accepted static Wake-source lee channel;
-- separate retained Pressure, lee, shore, and obstacle source classes;
-- priority composition with protected pockets suppressing all lower-priority support;
-- one canonical `Capture Zones` diagnostic with Pressure, lee, shore, and obstacle classes;
-- one `Positive Zone Classes` diagnostic for Major, Connector, and combined Capture support, plus one `Positive and Negative Zones` diagnostic for support/exclusion overlap;
-- canonical independent Pressure, lee, shore, and obstacle capture channels with no cross-class context or hidden importance weights;
+- separate retained Pressure, lee, and shore positive source classes;
+- separate Pocket Exclusion and water-level-aware Obstacle Exclusion negative classes;
+- one one-time exact transformed-mesh solid-interval bake for Obstacle Exclusion, restricted to full-resolution Foam texels touched by each registered static solid;
+- nine conservative exact-mesh samples per retained texel, each storing up to two solid-height intervals plus the parameters required by the complete current Stage 3 surface-height evaluator;
+- a dedicated full-resolution point-sampled `RHalf` Obstacle Exclusion mask, reconstructed from those cached intervals only for bounded candidate texels;
+- one canonical `Capture Zones` diagnostic with Pressure, lee, and shore classes;
+- one `Positive Zone Classes` diagnostic for Major, Connector, and combined Capture support;
+- one `Negative Zone Classes` diagnostic distinguishing Pocket and Obstacle Exclusion;
+- one `Positive and Negative Zones` diagnostic showing combined positive support against combined negative topology;
+- canonical independent Pressure, lee, and shore capture channels with no cross-class context or hidden importance weights;
 - asynchronous GPU metrics for capacity coverage, pocket violations, source occupancy, perimeter ratio, dispatches, cadence, memory, chunks, sleeping, and release;
 - Impact-to-Foam reinforcement neutralised;
 - the six canonical public controls preserved without adding implementation-level controls.
 
 Impact remains deferred.
 
-**Independent-zone cleanup:** every positive Stage 6 topology class is now stored independently. Major, Connector, Pressure, Lee, Shore, and Obstacle values use only their own source data plus valid fluid-domain masking. Cross-class context multipliers, random shore gating, fixed class-importance weights, obstacle-driven Major cutting, Pocket pre-clipping of Connector capacity, and repeated Pocket subtraction have been removed. Positive support is the unweighted maximum of the six classes; Pocket Exclusion is applied once at final composition. Any future source weighting or normalization requires a separate documented and validated decision.
+**Independent-zone cleanup:** every positive Stage 6 topology class is stored independently. Major, Connector, Pressure, Lee, and Shore use only their own source data plus valid fluid-domain masking. Pocket Exclusion and water-level-aware Obstacle Exclusion are stored independently as negative classes. Obstacle Exclusion never uses the padded disturbance footprint, convex hull, pressure envelope, profile interpolation, or bounds fallback. It bakes exact solid-height entry/exit intervals from the transformed generated mesh once, using nine local-river-Up line/triangle samples for every retained full-resolution texel. During updates it evaluates the complete current Stage 3 water height at those exact sample positions and accepts a texel only when all nine positions are inside cached solid intervals. Ambiguous samples are rejected, so the point-sampled mask errs inward rather than extending beyond the visible object. Cross-class context multipliers, random shore gating, fixed class-importance weights, obstacle-driven Major cutting, Pocket pre-clipping of Connector capacity, repeated exclusion, and the former positive obstacle-attraction halo have been removed. Positive support is the unweighted maximum of the five positive classes; negative support is the unweighted maximum of the two exclusions; combined negative support is applied once at final composition. Any future source weighting or normalization requires a separate documented and validated decision.
+
+**Future Static Pressure geometry refactor:** the accepted Pressure system still performs a separate height-slice scan of the same generated mesh. It may be migrated later to derive its directional pressure envelope from the exact solid-volume interval data introduced for Obstacle Exclusion. That refactor is deliberately deferred because Pressure visuals are already accepted, but another independent mesh scanner must not be added.
 
 **Acceptance:** anchored sources remain stable, free-water topology evolves slowly and regionally, protected pockets survive lower-priority systems, Pressure/lee organise without becoming overlays, quality does not change physical topology scale, and Stage 5 visuals remain unchanged.
 
@@ -416,13 +424,13 @@ Impact remains deferred.
 - Validate pocket candidates through surrounding-ring support, host size, fluid boundary exposure, and solid exclusion.
 - Generate connectors only between separate accepted structure endpoints. Major capacity may validate endpoints but does not attenuate connector strength along the path.
 - Add deliberate diagonal branches and occasional asymmetric forks from accepted parent structures.
-- Keep Major Capacity independent from Obstacle capture. Solid exclusion and obstacle-capture behaviour remain separate source responsibilities.
-- Retain only the three canonical Foam diagnostics plus the normal Debug Off state, and add composed coverage, open-span coverage, pocket-interior coverage, and connector-in-major overlap metrics.
+- Keep Major Capacity independent from object-related positive and negative classes. Water-level-aware solid exclusion remains a separate source responsibility.
+- Retain only the four canonical Foam diagnostics plus the normal Debug Off state, and add composed coverage, open-span coverage, pocket-interior coverage, and connector-in-major overlap metrics.
 - Use three low-rate working fields for major structures, pockets, and connector/branch candidates; the final water shader still receives only the existing fixed-cost topology textures.
 
 No material transport, supply, tearing, merging, Impact integration, Stage 5 response, or final Foam rendering changes are part of Batch 1C.
 
-**Acceptance:** `Positive Zone Classes` and `Positive and Negative Zones` must expose finite support regions, real unsupported spans, exclusion overlap, relational connectors, obstacle influence, and substantial open water without hiding source-class failures behind a single grayscale composite.
+**Acceptance:** `Positive Zone Classes`, `Negative Zone Classes`, and `Positive and Negative Zones` must expose finite support regions, real unsupported spans, separate Pocket and water-level-aware Obstacle Exclusion, combined exclusion overlap, relational connectors, object influence through Pressure/Lee, and substantial open water without hiding source-class failures behind a single grayscale composite.
 
 #### Batch 2 — Persistent Material Response
 
@@ -441,7 +449,7 @@ Make actual material inhabit and leave the accepted topology without directly co
 
 ### Remaining Stage 6 work
 
-1. Compile and visually validate the retained diagnostics: `Capture Zones`, `Positive Zone Classes`, and `Positive and Negative Zones`.
+1. Compile and visually validate the retained diagnostics: `Capture Zones`, `Positive Zone Classes`, `Negative Zone Classes`, and `Positive and Negative Zones`.
 2. Accept or reject the finite-structure field representation before Batch 2.
 3. Move topology updates from debug-only scheduling into ordinary material work when Batch 2 begins.
 4. Complete and validate Batch 2.

@@ -733,6 +733,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool rippleBoundaryDirty = true;
         private int validStaticSourceCount;
         private int validStaticWakeSourceCount;
+        private int obstacleGeometryVersion;
         private int rippleCollisionSourceCount;
         private bool generatedGeometryRegistryDirty = true;
         private bool generatedGeometryRefreshInProgress;
@@ -827,6 +828,7 @@ namespace ProgrammaticStylized3D.Rivers
             CountRegisteredStationarySources();
         public int ValidStaticPressureSourceCount => validStaticSourceCount;
         public int ValidStaticWakeSourceCount => validStaticWakeSourceCount;
+        public int ObstacleGeometryVersion => obstacleGeometryVersion;
         public int LastUpdateComputeDispatchCount =>
             lastUpdateComputeDispatchCount;
         public int RecentPeakComputeDispatchCount =>
@@ -962,6 +964,10 @@ namespace ProgrammaticStylized3D.Rivers
             public Vector2[] StaticPressureContour;
             public RiverDisturbancePressureBakeProfile StaticPressureProfile;
             public RiverDisturbancePressureBakeProfile StaticPressureBaseProfile;
+            // Exact generated mesh retained for the one-time Stage 6 solid
+            // interval bake. Static Pressure still has its older independent
+            // scan and is explicitly marked for a future shared-data refactor.
+            public MeshFilter ObstacleExclusionMeshFilter;
             public float[] StaticPressureCurrentMultipliers;
             public float[] StaticPressureTransitionStartMultipliers;
             public float[] StaticPressureTargetMultipliers;
@@ -1526,6 +1532,7 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseResources();
             continuousSources.Clear();
             continuousSourceIdsByOwner.Clear();
+            obstacleGeometryVersion = 0;
             ownershipConflictWarningOwnerIds.Clear();
             automaticGeneratedSourceIds.Clear();
             refreshedAutomaticGeneratedSourceIds.Clear();
@@ -1809,6 +1816,7 @@ namespace ProgrammaticStylized3D.Rivers
             float pressureAlongHalfLength = -1f,
             IReadOnlyList<Vector2> pressureContour = null,
             RiverDisturbancePressureBakeProfile pressureProfile = default,
+            MeshFilter obstacleExclusionMeshFilter = null,
             bool deferStaticTargetRebuild = false,
             float wakeSpreadMultiplier = 1f,
             float profileChangeIntervalMin =
@@ -1933,6 +1941,8 @@ namespace ProgrammaticStylized3D.Rivers
                         pressureContour ?? contour),
                     StaticPressureProfile = animatedPressureProfile,
                     StaticPressureBaseProfile = basePressureProfile,
+                    ObstacleExclusionMeshFilter =
+                        obstacleExclusionMeshFilter,
                     StaticPressureCurrentMultipliers =
                         currentProfileMultipliers,
                     StaticPressureTransitionStartMultipliers =
@@ -2158,6 +2168,42 @@ namespace ProgrammaticStylized3D.Rivers
         public bool ContainsContinuousSource(EntityId sourceId)
         {
             return continuousSources.ContainsKey(sourceId);
+        }
+
+        /// <summary>
+        /// Copies the exact generated meshes currently registered as static
+        /// river obstructions. Stage 6 performs its conservative solid-interval
+        /// bake from these meshes only when the generated-geometry version
+        /// changes; gameplay updates never rescan triangles.
+        /// </summary>
+        public void CopyObstacleExclusionMeshFiltersTo(
+            List<MeshFilter> output)
+        {
+            if (output == null)
+            {
+                throw new ArgumentNullException(nameof(output));
+            }
+
+            output.Clear();
+            foreach (KeyValuePair<EntityId, ContinuousSource> pair in
+                     continuousSources)
+            {
+                ContinuousSource source = pair.Value;
+                MeshFilter meshFilter = source.ObstacleExclusionMeshFilter;
+                if (!source.IsStatic ||
+                    meshFilter == null ||
+                    meshFilter.sharedMesh == null ||
+                    !meshFilter.gameObject.activeInHierarchy ||
+                    output.Contains(meshFilter))
+                {
+                    continue;
+                }
+
+                output.Add(meshFilter);
+            }
+
+            output.Sort((left, right) =>
+                left.GetEntityId().CompareTo(right.GetEntityId()));
         }
 
         public void RemoveContinuousSource(EntityId sourceId)
@@ -2524,6 +2570,7 @@ namespace ProgrammaticStylized3D.Rivers
                 refreshedAutomaticGeneratedSourceIds);
             generatedGeometryRefreshInProgress = false;
             generatedGeometryRefreshIndex = 0;
+            obstacleGeometryVersion++;
             staticPressureTargetDirty = true;
             staticWakeSourceDirty = true;
             rippleBoundaryDirty = true;
@@ -2764,6 +2811,11 @@ namespace ProgrammaticStylized3D.Rivers
                         pressureFootprint.AcrossHalfWidth,
                         localRiverWidth);
 
+                // TODO: Pressure currently performs its own height-slice scan.
+                // Stage 6 Obstacle Exclusion now bakes exact solid intervals
+                // from this same generated mesh. Pressure should eventually
+                // consume that shared underlying solid data and apply only its
+                // directional shaping, rather than scanning geometry again.
                 if (!RiverDisturbanceFootprintResolver.TryResolvePressureSupport(
                         river,
                         meshFilter,
@@ -2849,6 +2901,7 @@ namespace ProgrammaticStylized3D.Rivers
                     pressureFootprint.AlongHalfLength,
                     pressureFootprint.Contour,
                     pressureProfile,
+                    meshFilter,
                     true,
                     interaction.ObstructionWakeSpread,
                     interaction.StaticPressureProfileChangeIntervalMin,

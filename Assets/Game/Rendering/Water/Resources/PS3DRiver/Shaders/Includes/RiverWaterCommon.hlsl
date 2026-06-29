@@ -71,6 +71,84 @@ float RiverWaterValueNoise(float2 p)
 // the world-space blend around the boundary between those wave identities.
 // Both controls share the same left/right asymmetry contract and never reseed
 // during runtime.
+
+float RiverWaterHermiteZeroToLinear(float t)
+{
+    t = saturate(t);
+    return t * t * (2.0 - t);
+}
+
+float RiverWaterHermiteLinearToZero(float t)
+{
+    t = saturate(t);
+    return t * (1.0 + t - t * t);
+}
+
+// Keeps the original value through the middle of the unit interval while
+// forcing zero derivative at both hard bounds. This removes longitudinal
+// shoreline corners caused by max/saturate activation at the normal shore or
+// at the outer hidden-water allowance.
+float RiverWaterResolveZeroSlopeBoundedReach(
+    float rawReach,
+    float transitionLength,
+    float wavelength)
+{
+    float reach = saturate(rawReach);
+    float transitionFraction = clamp(
+        max(0.0, transitionLength) / max(0.25, wavelength),
+        0.0005,
+        0.49);
+
+    if (reach < transitionFraction)
+    {
+        float t = reach / transitionFraction;
+        return transitionFraction * RiverWaterHermiteZeroToLinear(t);
+    }
+
+    if (reach > 1.0 - transitionFraction)
+    {
+        float t = (reach - (1.0 - transitionFraction)) /
+            transitionFraction;
+        return (1.0 - transitionFraction) +
+            transitionFraction * RiverWaterHermiteLinearToZero(t);
+    }
+
+    return reach;
+}
+
+// Applies a zero-slope activation around shore-wave zero crossings while
+// preserving the original signed height once it leaves the transition band.
+// The transition is derived from the authored world-space Transition Length,
+// so the visible shoreline can leave and rejoin the normal edge without a
+// tangent discontinuity.
+float RiverWaterResolveZeroSlopeShoreHeight(
+    float signedHeight,
+    float maximumAmplitude,
+    float transitionLength,
+    float wavelength)
+{
+    float amplitude = max(0.0001, maximumAmplitude);
+    float transitionFraction = clamp(
+        max(0.0, transitionLength) / max(0.25, wavelength),
+        0.0005,
+        0.49);
+    float normalizedThreshold = max(
+        0.001,
+        sin(3.14159265359 * transitionFraction));
+    float threshold = amplitude * normalizedThreshold;
+    float magnitude = abs(signedHeight);
+
+    if (magnitude >= threshold)
+    {
+        return signedHeight;
+    }
+
+    float t = magnitude / threshold;
+    float smoothedMagnitude =
+        threshold * RiverWaterHermiteZeroToLinear(t);
+    return signedHeight < 0.0 ? -smoothedMagnitude : smoothedMagnitude;
+}
+
 float RiverWaterResolveShoreProfileKnot(
     float knotIndex,
     float seed,
@@ -484,16 +562,23 @@ float RiverWaterEvaluateBlendedMacroHeight(
         heightProfile,
         unusedReachProfile);
 
+    float shoreAmplitude =
+        waveHeight * max(0.0, shoreWaveHeightScale) * heightProfile;
     float shoreHeight = RiverWaterEvaluateMacroHeight(
         globalDistance,
         lateralMetres,
         time,
         flowSpeed,
-        waveHeight * max(0.0, shoreWaveHeightScale) * heightProfile,
+        shoreAmplitude,
         shoreLength,
         steepness,
         turbulence,
         seed);
+    shoreHeight = RiverWaterResolveZeroSlopeShoreHeight(
+        shoreHeight,
+        shoreAmplitude,
+        shoreWaveTransitionLength,
+        shoreLength);
     float shoreBlend = RiverWaterResolveShoreBlend(
         lateralMetres,
         visibleHalfWidth,
@@ -545,8 +630,10 @@ float RiverWaterEvaluateSurfaceHeight(
         unusedHeightProfile,
         reachProfile);
 
-    float resolvedReach = saturate(
-        saturate(shoreWaveReach) * reachProfile);
+    float resolvedReach = RiverWaterResolveZeroSlopeBoundedReach(
+        saturate(shoreWaveReach) * reachProfile,
+        shoreWaveTransitionLength,
+        shoreLength);
     bankMask = RiverWaterResolveMotionBankMask(
         lateralMetres,
         visibleHalfWidth,

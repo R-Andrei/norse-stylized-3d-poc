@@ -103,7 +103,8 @@ namespace ProgrammaticStylized3D.Rivers
         // selections survive the removal of obsolete Foam diagnostics.
         CaptureZones = 3,
         PositiveNegativeZones = 6,
-        PositiveZoneClasses = 7
+        PositiveZoneClasses = 7,
+        NegativeZoneClasses = 8
     }
 
     public enum StylizedRiverDisturbanceDebugView
@@ -1481,6 +1482,8 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.PositiveNegativeZones;
                 case (int)StylizedRiverFoamDebugView.PositiveZoneClasses:
                     return StylizedRiverFoamDebugView.PositiveZoneClasses;
+                case (int)StylizedRiverFoamDebugView.NegativeZoneClasses:
+                    return StylizedRiverFoamDebugView.NegativeZoneClasses;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }
@@ -2067,8 +2070,8 @@ namespace ProgrammaticStylized3D.Rivers
 
             if (foamAuthoringVersion < 3)
             {
-                // Migrate the former broad diagnostic menu into the three
-                // retained topology diagnostics. Values without a useful
+                // Migrate the former broad diagnostic menu into the then-retained
+                // topology diagnostics. Values without a useful
                 // equivalent return to the normal Final view.
                 int legacyDebug = (int)foamDebugView;
                 switch (legacyDebug)
@@ -2105,7 +2108,7 @@ namespace ProgrammaticStylized3D.Rivers
             if (foamAuthoringVersion < 4)
             {
                 // Remove the later compact-but-obsolete diagnostics while
-                // preserving the three retained views by their serialized
+                // preserving the then-retained views by their serialized
                 // numeric values.
                 switch ((int)foamDebugView)
                 {

@@ -51,6 +51,8 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamFracture");
         private static readonly int FoamBoundaryId =
             Shader.PropertyToID("_FoamBoundary");
+        private static readonly int FoamObstacleExclusionId =
+            Shader.PropertyToID("_FoamObstacleExclusion");
         private static readonly int FoamInterpolationId =
             Shader.PropertyToID("_FoamInterpolation");
         private static readonly int FoamGlobalStartId =
@@ -135,6 +137,15 @@ namespace ProgrammaticStylized3D.Rivers
             public Vector4 ShoreData;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FoamObstacleIntervalCell
+        {
+            // x/y = full-resolution Foam texel coordinate,
+            // z = first of nine consecutive exact-mesh interval samples,
+            // w = reserved.
+            public Vector4 CoordinateAndOffset;
+        }
+
         private StylizedRiver river;
         private MeshRenderer surfaceRenderer;
         private MaterialPropertyBlock propertyBlock;
@@ -153,6 +164,7 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture topologyPocketTexture;
         private RenderTexture topologyConnectorTexture;
         private RenderTexture currentShoreEdgesTexture;
+        private RenderTexture obstacleExclusionTexture;
         private RenderTexture fractureA;
         private RenderTexture fractureB;
         private RenderTexture currentFracture;
@@ -160,6 +172,8 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture neutralDisturbanceTexture;
         private Texture2D boundaryTexture;
         private ComputeBuffer metricBuffer;
+        private ComputeBuffer obstacleSampleBuffer;
+        private ComputeBuffer obstacleIntervalCellBuffer;
         private ComputeBuffer populationMetricsBuffer;
         private ComputeBuffer topologyMetricsBuffer;
         private StylizedRiverDisturbanceRuntime disturbanceRuntime;
@@ -172,7 +186,12 @@ namespace ProgrammaticStylized3D.Rivers
 
         private readonly List<PendingInjection> pendingInjections = new();
         private readonly List<FoamReservation> reservations = new();
-        private readonly List<IGeneratedGeometrySource> generatedSources = new();
+        private readonly List<MeshFilter> obstacleExclusionMeshes = new();
+        private readonly List<RiverObstacleExclusionCell>
+            obstacleBakedCells = new();
+        private readonly List<RiverObstacleExclusionSample> obstacleSamples = new();
+        private readonly List<FoamObstacleIntervalCell> obstacleIntervalCells =
+            new();
 
         private bool[] chunkActive = Array.Empty<bool>();
         private double[] chunkActiveUntil = Array.Empty<double>();
@@ -180,6 +199,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool boundaryDirty = true;
         private bool supportWarningReported;
         private bool allocationWarningReported;
+        private bool obstacleBakeWarningReported;
         private bool fullyFrozenLastUpdate;
         private int domainVersion = -1;
         private int fieldWidth;
@@ -208,6 +228,8 @@ namespace ProgrammaticStylized3D.Rivers
         private int buildTopologyPocketsKernel = -1;
         private int buildTopologyConnectorsKernel = -1;
         private int composeTopologyKernel = -1;
+        private int clearObstacleExclusionKernel = -1;
+        private int updateObstacleExclusionKernel = -1;
         private int resetTopologyMetricsKernel = -1;
         private int measureTopologyMetricsKernel = -1;
         private int resetPopulationKernel = -1;
@@ -218,6 +240,8 @@ namespace ProgrammaticStylized3D.Rivers
         private int advectReverseKernel = -1;
         private int simulateKernel = -1;
         private int applyBoundaryKernel = -1;
+        private int obstacleIntervalCellCount;
+        private int obstacleGeometryVersion = -1;
         private double autonomousDecayUntil;
         private bool autonomousPopulationWasEnabled;
         private StylizedRiverQuality allocatedQuality;
@@ -252,8 +276,7 @@ namespace ProgrammaticStylized3D.Rivers
                 ? latestTopologyMetrics[7] /
                   (TopologyMetricQuantisation * latestTopologyMetrics[6])
                 : 0f;
-        public float BoundaryOccupancy => TopologyRegionRatio(9, 8);
-        public float ObstacleOccupancy => TopologyRegionRatio(11, 10);
+        public float ShoreOccupancy => TopologyRegionRatio(9, 8);
         public float PressureLeeOccupancy => TopologyRegionRatio(13, 12);
         public float PerimeterRatio => TopologyRegionRatio(14, 5);
         public float ComposedTopologyCoverage => TopologyCoverageRatio(6);
@@ -301,12 +324,21 @@ namespace ProgrammaticStylized3D.Rivers
             EstimateTextureBytes(topologyPocketTexture) +
             EstimateTextureBytes(topologyConnectorTexture) +
             EstimateTextureBytes(currentShoreEdgesTexture) +
+            EstimateTextureBytes(obstacleExclusionTexture) +
             EstimateTextureBytes(fractureA) +
             EstimateTextureBytes(fractureB) +
             EstimateTextureBytes(neutralDisturbanceTexture) +
             EstimateTextureBytes(boundaryTexture) +
             (metricBuffer != null
                 ? (long)metricBuffer.count * metricBuffer.stride
+                : 0L) +
+            (obstacleSampleBuffer != null
+                ? (long)obstacleSampleBuffer.count *
+                  obstacleSampleBuffer.stride
+                : 0L) +
+            (obstacleIntervalCellBuffer != null
+                ? (long)obstacleIntervalCellBuffer.count *
+                  obstacleIntervalCellBuffer.stride
                 : 0L) +
             (populationMetricsBuffer != null
                 ? (long)populationMetricsBuffer.count * populationMetricsBuffer.stride
@@ -330,7 +362,8 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverFoamDebugView view = river.FoamDebugView;
                 return view == StylizedRiverFoamDebugView.CaptureZones ||
                     view == StylizedRiverFoamDebugView.PositiveNegativeZones ||
-                    view == StylizedRiverFoamDebugView.PositiveZoneClasses;
+                    view == StylizedRiverFoamDebugView.PositiveZoneClasses ||
+                    view == StylizedRiverFoamDebugView.NegativeZoneClasses;
             }
         }
 
@@ -338,6 +371,7 @@ namespace ProgrammaticStylized3D.Rivers
             SystemInfo.supportsComputeShaders &&
             SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBHalf) &&
             SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.RGHalf) &&
+            SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.RHalf) &&
             SystemInfo.SupportsTextureFormat(TextureFormat.RGBAHalf);
 
         private void OnEnable()
@@ -417,7 +451,7 @@ namespace ProgrammaticStylized3D.Rivers
                 if (!supportWarningReported)
                 {
                     Debug.LogWarning(
-                        $"Stage 6 Foam on '{name}' is disabled because compute shaders or ARGBHalf/RGHalf random-write textures are unavailable.",
+                        $"Stage 6 Foam on '{name}' is disabled because compute shaders or ARGBHalf/RGHalf/RHalf random-write textures are unavailable.",
                         this);
                     supportWarningReported = true;
                 }
@@ -483,14 +517,27 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            disturbanceRuntime ??=
+                GetComponent<StylizedRiverDisturbanceRuntime>();
+
             if (!EnsureResources())
             {
                 BindDisabled();
                 return;
             }
 
-            disturbanceRuntime ??=
-                GetComponent<StylizedRiverDisturbanceRuntime>();
+            int currentObstacleGeometryVersion =
+                disturbanceRuntime != null
+                    ? disturbanceRuntime.ObstacleGeometryVersion
+                    : -1;
+            if (currentObstacleGeometryVersion != obstacleGeometryVersion)
+            {
+                RebuildObstacleExclusionCache();
+                if (topologyDebugActive)
+                {
+                    BuildTopologyField(0f);
+                }
+            }
 
             float now = Time.realtimeSinceStartup;
             float deltaTime = Mathf.Clamp(now - lastRuntimeTime, 0f, 0.1f);
@@ -765,6 +812,8 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyPocketTexture != null &&
                 topologyConnectorTexture != null &&
                 currentShoreEdgesTexture != null &&
+                obstacleExclusionTexture != null &&
+                obstacleExclusionTexture.IsCreated() &&
                 currentFracture != null &&
                 writeFracture != null &&
                 neutralDisturbanceTexture != null &&
@@ -809,6 +858,10 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.FindKernel("BuildTopologyConnectors");
             composeTopologyKernel =
                 computeShader.FindKernel("ComposeTopology");
+            clearObstacleExclusionKernel =
+                computeShader.FindKernel("ClearObstacleExclusion");
+            updateObstacleExclusionKernel =
+                computeShader.FindKernel("UpdateObstacleExclusion");
             resetTopologyMetricsKernel =
                 computeShader.FindKernel("ResetTopologyMetrics");
             measureTopologyMetricsKernel =
@@ -923,6 +976,8 @@ namespace ProgrammaticStylized3D.Rivers
                 "PS3D_RiverFoam_TopologyConnectorWork");
             currentShoreEdgesTexture = CreateShoreEdgesTexture(
                 "PS3D_RiverFoam_CurrentShoreEdges");
+            obstacleExclusionTexture = CreateObstacleExclusionTexture(
+                "PS3D_RiverFoam_ObstacleExclusion");
             fractureA = CreateFractureTexture("PS3D_RiverFoam_FractureA");
             fractureB = CreateFractureTexture("PS3D_RiverFoam_FractureB");
             currentFracture = fractureA;
@@ -946,6 +1001,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             BuildMetricBuffer();
             RebuildBoundaryTexture(false);
+            RebuildObstacleExclusionCache();
 
             DispatchClear(stateA, 0, fieldWidth);
             DispatchClear(stateB, 0, fieldWidth);
@@ -1075,6 +1131,28 @@ namespace ProgrammaticStylized3D.Rivers
                 useMipMap = false,
                 autoGenerateMips = false,
                 filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+            texture.Create();
+            return texture;
+        }
+
+        private RenderTexture CreateObstacleExclusionTexture(
+            string textureName)
+        {
+            RenderTexture texture = new RenderTexture(
+                fieldWidth,
+                fieldHeight,
+                0,
+                RenderTextureFormat.RHalf,
+                RenderTextureReadWrite.Linear)
+            {
+                name = textureName,
+                enableRandomWrite = true,
+                useMipMap = false,
+                autoGenerateMips = false,
+                filterMode = FilterMode.Point,
                 wrapMode = TextureWrapMode.Clamp,
                 hideFlags = HideFlags.DontSave
             };
@@ -1214,7 +1292,7 @@ namespace ProgrammaticStylized3D.Rivers
                     ShoreData = new Vector4(
                         Mathf.Max(0.01f, sample.LeftHalfWidth),
                         Mathf.Max(0.01f, sample.RightHalfWidth),
-                        0f,
+                        sample.SurfaceHeight,
                         0f)
                 };
             }
@@ -1297,11 +1375,10 @@ namespace ProgrammaticStylized3D.Rivers
                             1f,
                             Mathf.InverseLerp(0.10f, 0.95f, coverage)));
                     // R/G remain the legacy material-simulation fluid and
-                    // attraction contract. B is reserved for registered solid
-                    // coverage so dynamic Stage 6 Shore Capture can obey solid
-                    // exclusion without depending on this static shore reach.
-                    // Canonical Shore Capture comes from the instantaneous
-                    // Stage 3 edge texture.
+                    // attraction contract. B/A are reserved zero: registered
+                    // solids now use the one-time exact-mesh interval bake
+                    // and full-resolution Obstacle Exclusion mask. Canonical
+                    // Shore Capture comes from the instantaneous Stage 3 edge.
                     pixels[y * fieldWidth + x] = new Color(
                         coverage,
                         attraction,
@@ -1310,27 +1387,10 @@ namespace ProgrammaticStylized3D.Rivers
                 }
             }
 
-            GeneratedGeometryRegistry.CopySourcesTo(generatedSources);
-            for (int index = 0; index < generatedSources.Count; index++)
-            {
-                IGeneratedGeometrySource source = generatedSources[index];
-                if (!IsUsableStaticSource(source))
-                {
-                    continue;
-                }
-
-                if (!RiverDisturbanceFootprintResolver.TryResolve(
-                        river,
-                        source.GeometryMeshFilter,
-                        0f,
-                        out RiverDisturbanceFootprint footprint,
-                        out _))
-                {
-                    continue;
-                }
-
-                RasterizeObstacle(footprint, pixels);
-            }
+            // Registered solid geometry is no longer rasterised into this
+            // static boundary texture. Obstacle Exclusion is reconstructed
+            // from cached exact transformed-mesh solid intervals and the current
+            // Stage 3 water height in a dedicated point-sampled mask.
 
             if (boundaryTexture == null ||
                 boundaryTexture.width != fieldWidth ||
@@ -1366,128 +1426,186 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
-        private void RasterizeObstacle(
-            RiverDisturbanceFootprint footprint,
-            Color[] pixels)
+        private void RebuildObstacleExclusionCache()
         {
-            if (footprint.Contour == null || footprint.Contour.Length < 3 ||
-                footprint.WorldDownstream.sqrMagnitude < 0.0001f ||
-                footprint.WorldAcross.sqrMagnitude < 0.0001f)
+            ReleaseObstacleExclusionBuffers();
+            obstacleExclusionMeshes.Clear();
+            obstacleBakedCells.Clear();
+            obstacleSamples.Clear();
+            obstacleIntervalCells.Clear();
+            obstacleIntervalCellCount = 0;
+
+            disturbanceRuntime ??=
+                GetComponent<StylizedRiverDisturbanceRuntime>();
+            obstacleGeometryVersion = disturbanceRuntime != null
+                ? disturbanceRuntime.ObstacleGeometryVersion
+                : -1;
+
+            if (disturbanceRuntime == null ||
+                fieldWidth < 1 || fieldHeight < 1 ||
+                fieldLength <= 0.0001f ||
+                river == null || !river.Domain.IsValid)
+            {
+                ClearObstacleExclusionMask();
+                return;
+            }
+
+            disturbanceRuntime.CopyObstacleExclusionMeshFiltersTo(
+                obstacleExclusionMeshes);
+            if (obstacleExclusionMeshes.Count == 0)
+            {
+                obstacleBakeWarningReported = false;
+                ClearObstacleExclusionMask();
+                return;
+            }
+
+            int successfulMeshCount = 0;
+            for (int meshIndex = 0;
+                 meshIndex < obstacleExclusionMeshes.Count;
+                 meshIndex++)
+            {
+                MeshFilter meshFilter = obstacleExclusionMeshes[meshIndex];
+                if (RiverObstacleExclusionResolver.TryBake(
+                        river,
+                        meshFilter,
+                        fieldWidth,
+                        fieldHeight,
+                        fieldLength,
+                        obstacleBakedCells,
+                        obstacleSamples,
+                        out string bakeStatus))
+                {
+                    successfulMeshCount++;
+                    continue;
+                }
+
+                if (!obstacleBakeWarningReported)
+                {
+                    Debug.LogWarning(
+                        $"{name}: exact Foam Obstacle Exclusion could not be " +
+                        $"baked for '{meshFilter.name}'. {bakeStatus} " +
+                        "No bounds, hull, or rectangle fallback was created.",
+                        this);
+                    obstacleBakeWarningReported = true;
+                }
+            }
+
+            if (successfulMeshCount > 0)
+            {
+                obstacleBakeWarningReported = false;
+            }
+
+            for (int index = 0; index < obstacleBakedCells.Count; index++)
+            {
+                RiverObstacleExclusionCell cell = obstacleBakedCells[index];
+                obstacleIntervalCells.Add(
+                    new FoamObstacleIntervalCell
+                    {
+                        CoordinateAndOffset = new Vector4(
+                            cell.Coordinate.x,
+                            cell.Coordinate.y,
+                            cell.IntervalOffset,
+                            0f)
+                    });
+            }
+
+            obstacleIntervalCellCount = obstacleIntervalCells.Count;
+            if (obstacleIntervalCellCount <= 0 ||
+                obstacleSamples.Count <
+                    obstacleIntervalCellCount *
+                    RiverObstacleExclusionResolver.SamplesPerCell)
+            {
+                ClearObstacleExclusionMask();
+                return;
+            }
+
+            obstacleSampleBuffer = new ComputeBuffer(
+                obstacleSamples.Count,
+                Marshal.SizeOf<RiverObstacleExclusionSample>(),
+                ComputeBufferType.Structured);
+            obstacleSampleBuffer.SetData(obstacleSamples.ToArray());
+
+            obstacleIntervalCellBuffer = new ComputeBuffer(
+                obstacleIntervalCellCount,
+                Marshal.SizeOf<FoamObstacleIntervalCell>(),
+                ComputeBufferType.Structured);
+            obstacleIntervalCellBuffer.SetData(
+                obstacleIntervalCells.ToArray());
+
+            ClearObstacleExclusionMask();
+        }
+
+        private void ReleaseObstacleExclusionBuffers()
+        {
+            obstacleSampleBuffer?.Release();
+            obstacleSampleBuffer = null;
+            obstacleIntervalCellBuffer?.Release();
+            obstacleIntervalCellBuffer = null;
+        }
+
+        private void ClearObstacleExclusionMask()
+        {
+            if (computeShader == null ||
+                obstacleExclusionTexture == null ||
+                clearObstacleExclusionKernel < 0)
             {
                 return;
             }
 
-            // The cached contour is source-local, not river-local. Reconstruct
-            // every actual world-space vertex and project it independently so
-            // object rotation, irregular outlines, and changing river frames
-            // survive the boundary bake.
-            Vector2[] projectedContour =
-                new Vector2[footprint.Contour.Length];
-            float minimumGlobal = float.PositiveInfinity;
-            float maximumGlobal = float.NegativeInfinity;
-            float minimumAcross = float.PositiveInfinity;
-            float maximumAcross = float.NegativeInfinity;
+            computeShader.SetInts(
+                "_FoamDimensions",
+                fieldWidth,
+                fieldHeight);
+            computeShader.SetTexture(
+                clearObstacleExclusionKernel,
+                "_FoamObstacleExclusionWrite",
+                obstacleExclusionTexture);
+            Dispatch(
+                clearObstacleExclusionKernel,
+                fieldWidth,
+                fieldHeight);
+        }
 
-            for (int index = 0; index < footprint.Contour.Length; index++)
-            {
-                Vector2 localVertex = footprint.Contour[index];
-                Vector3 worldVertex =
-                    footprint.WorldPosition +
-                    footprint.WorldDownstream * localVertex.x +
-                    footprint.WorldAcross * localVertex.y;
-
-                if (!river.TryProjectWorldPoint(
-                        worldVertex,
-                        out StylizedRiverProjection projection))
-                {
-                    return;
-                }
-
-                Vector2 projectedVertex = new Vector2(
-                    projection.GlobalDistance,
-                    projection.AcrossMetres);
-                projectedContour[index] = projectedVertex;
-                minimumGlobal = Mathf.Min(minimumGlobal, projectedVertex.x);
-                maximumGlobal = Mathf.Max(maximumGlobal, projectedVertex.x);
-                minimumAcross = Mathf.Min(minimumAcross, projectedVertex.y);
-                maximumAcross = Mathf.Max(maximumAcross, projectedVertex.y);
-            }
-
-            if (float.IsInfinity(minimumGlobal) ||
-                float.IsInfinity(minimumAcross))
+        private void UpdateObstacleExclusionMask()
+        {
+            if (computeShader == null ||
+                obstacleExclusionTexture == null ||
+                updateObstacleExclusionKernel < 0)
             {
                 return;
             }
 
-            int minimumX = GlobalDistanceToX(minimumGlobal) - 2;
-            int maximumX = GlobalDistanceToX(maximumGlobal) + 2;
-            minimumX = Mathf.Clamp(minimumX, 0, fieldWidth - 1);
-            maximumX = Mathf.Clamp(maximumX, 0, fieldWidth - 1);
+            // Multiple static meshes may cover the same texel. Clear first,
+            // then each thread writes only accepted solid cells; no source ever
+            // writes zero over a cell accepted by another source.
+            ClearObstacleExclusionMask();
 
-            float projectedAcrossExtent = Mathf.Max(
-                0.04f,
-                maximumAcross - minimumAcross);
-            float edgeWidth = Mathf.Max(
-                0.04f,
-                projectedAcrossExtent / Mathf.Max(2f, fieldHeight * 0.50f));
-
-            for (int x = minimumX; x <= maximumX; x++)
+            if (obstacleSampleBuffer == null ||
+                obstacleIntervalCellBuffer == null ||
+                obstacleIntervalCellCount <= 0)
             {
-                float globalDistance = XToGlobalDistance(x);
-                Vector4 metrics = metricRows[x].WidthsAndSpacing;
-                int minimumY = AcrossMetresToY(
-                    minimumAcross - edgeWidth * 2f,
-                    metrics.x,
-                    metrics.y) - 1;
-                int maximumY = AcrossMetresToY(
-                    maximumAcross + edgeWidth * 2f,
-                    metrics.x,
-                    metrics.y) + 1;
-                minimumY = Mathf.Clamp(minimumY, 0, fieldHeight - 1);
-                maximumY = Mathf.Clamp(maximumY, 0, fieldHeight - 1);
-
-                for (int y = minimumY; y <= maximumY; y++)
-                {
-                    float across01 = y / (float)Mathf.Max(1, fieldHeight - 1);
-                    float lateral = Across01ToMetres(
-                        across01,
-                        metrics.x,
-                        metrics.y);
-                    Vector2 riverPoint = new Vector2(
-                        globalDistance,
-                        lateral);
-
-                    bool inside = PointInPolygon(
-                        riverPoint,
-                        projectedContour);
-                    float edgeDistance = DistanceToPolygon(
-                        riverPoint,
-                        projectedContour);
-                    float obstacleCoverage = inside
-                        ? 0f
-                        : Mathf.Clamp01(edgeDistance / edgeWidth);
-                    int pixelIndex = y * fieldWidth + x;
-                    Color previous = pixels[pixelIndex];
-                    previous.r = Mathf.Min(previous.r, obstacleCoverage);
-                    if (!inside)
-                    {
-                        float obstacleAttraction = Mathf.Clamp01(
-                            1f - edgeDistance /
-                            Mathf.Max(0.001f, edgeWidth * 5.5f));
-                        float obstacleSignal =
-                            obstacleAttraction * obstacleCoverage;
-                        previous.g = Mathf.Max(previous.g, obstacleSignal);
-                        previous.a = Mathf.Max(previous.a, obstacleSignal);
-                    }
-                    else
-                    {
-                        previous.g = 0f;
-                        previous.b = 1f;
-                        previous.a = 0f;
-                    }
-                    pixels[pixelIndex] = previous;
-                }
+                return;
             }
+
+            computeShader.SetInt(
+                "_FoamObstacleCellCount",
+                obstacleIntervalCellCount);
+            computeShader.SetBuffer(
+                updateObstacleExclusionKernel,
+                "_FoamObstacleSamples",
+                obstacleSampleBuffer);
+            computeShader.SetBuffer(
+                updateObstacleExclusionKernel,
+                "_FoamObstacleCells",
+                obstacleIntervalCellBuffer);
+            computeShader.SetTexture(
+                updateObstacleExclusionKernel,
+                "_FoamObstacleExclusionWrite",
+                obstacleExclusionTexture);
+            DispatchOneDimensional(
+                updateObstacleExclusionKernel,
+                obstacleIntervalCellCount,
+                64);
         }
 
         private void ResetManualInjectionSequence()
@@ -1804,6 +1922,7 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyPocketTexture == null ||
                 topologyConnectorTexture == null ||
                 currentShoreEdgesTexture == null ||
+                obstacleExclusionTexture == null ||
                 boundaryTexture == null || metricBuffer == null ||
                 buildCurrentShoreEdgesKernel < 0 ||
                 buildTopologyMajorKernel < 0 ||
@@ -1967,6 +2086,7 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyPocketTexture == null ||
                 topologyConnectorTexture == null ||
                 currentShoreEdgesTexture == null ||
+                obstacleExclusionTexture == null ||
                 boundaryTexture == null || metricBuffer == null ||
                 buildCurrentShoreEdgesKernel < 0 ||
                 composeTopologyKernel < 0)
@@ -2029,6 +2149,8 @@ namespace ProgrammaticStylized3D.Rivers
                 guidanceWidth,
                 64);
 
+            UpdateObstacleExclusionMask();
+
             computeShader.SetBuffer(
                 composeTopologyKernel,
                 "_FoamMetricRows",
@@ -2037,6 +2159,10 @@ namespace ProgrammaticStylized3D.Rivers
                 composeTopologyKernel,
                 "_FoamBoundary",
                 boundaryTexture);
+            computeShader.SetTexture(
+                composeTopologyKernel,
+                "_FoamObstacleExclusionRead",
+                obstacleExclusionTexture);
             computeShader.SetTexture(
                 composeTopologyKernel,
                 "_FoamTopologyMajorRead",
@@ -2704,6 +2830,9 @@ namespace ProgrammaticStylized3D.Rivers
                 topologySourcesTexture);
             propertyBlock.SetTexture(FoamFractureId, currentFracture);
             propertyBlock.SetTexture(FoamBoundaryId, boundaryTexture);
+            propertyBlock.SetTexture(
+                FoamObstacleExclusionId,
+                obstacleExclusionTexture);
             propertyBlock.SetFloat(FoamInterpolationId, simulationInterpolation);
             propertyBlock.SetFloat(FoamGlobalStartId, river.Domain.GlobalDistanceMinimum);
             propertyBlock.SetFloat(FoamFieldLengthId, Mathf.Max(0.001f, fieldLength));
@@ -2740,6 +2869,9 @@ namespace ProgrammaticStylized3D.Rivers
                 Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamFractureId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamBoundaryId, Texture2D.blackTexture);
+            propertyBlock.SetTexture(
+                FoamObstacleExclusionId,
+                Texture2D.blackTexture);
             propertyBlock.SetFloat(FoamInterpolationId, 1f);
             propertyBlock.SetFloat(
                 FoamDebugViewId,
@@ -2762,6 +2894,7 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseTexture(ref topologyPocketTexture);
             ReleaseTexture(ref topologyConnectorTexture);
             ReleaseTexture(ref currentShoreEdgesTexture);
+            ReleaseTexture(ref obstacleExclusionTexture);
             ReleaseTexture(ref fractureA);
             ReleaseTexture(ref fractureB);
             ReleaseTexture(ref neutralDisturbanceTexture);
@@ -2779,6 +2912,13 @@ namespace ProgrammaticStylized3D.Rivers
 
             metricBuffer?.Release();
             metricBuffer = null;
+            ReleaseObstacleExclusionBuffers();
+            obstacleIntervalCellCount = 0;
+            obstacleExclusionMeshes.Clear();
+            obstacleBakedCells.Clear();
+            obstacleSamples.Clear();
+            obstacleIntervalCells.Clear();
+            obstacleGeometryVersion = -1;
             populationMetricsBuffer?.Release();
             populationMetricsBuffer = null;
             if (topologyMetricsReadbackPending)
@@ -2810,6 +2950,8 @@ namespace ProgrammaticStylized3D.Rivers
             buildTopologyPocketsKernel = -1;
             buildTopologyConnectorsKernel = -1;
             composeTopologyKernel = -1;
+            clearObstacleExclusionKernel = -1;
+            updateObstacleExclusionKernel = -1;
             resetTopologyMetricsKernel = -1;
             measureTopologyMetricsKernel = -1;
             resetPopulationKernel = -1;
@@ -2852,22 +2994,6 @@ namespace ProgrammaticStylized3D.Rivers
         private void HandleGeneratedSourceChanged(IGeneratedGeometrySource _)
         {
             boundaryDirty = true;
-        }
-
-        private static bool IsUsableStaticSource(IGeneratedGeometrySource source)
-        {
-            if (source == null || !source.IsSolidGeometry || !source.IsStaticGeometry)
-            {
-                return false;
-            }
-
-            if (source is UnityEngine.Object unityObject && unityObject == null)
-            {
-                return false;
-            }
-
-            MeshFilter meshFilter = source.GeometryMeshFilter;
-            return meshFilter != null && meshFilter.sharedMesh != null;
         }
 
         private float ResolveGuidanceUpdateRate()
@@ -2945,12 +3071,6 @@ namespace ProgrammaticStylized3D.Rivers
                 fieldWidth - 1);
         }
 
-        private float XToGlobalDistance(int x)
-        {
-            return river.Domain.GlobalDistanceMinimum +
-                   x / (float)Mathf.Max(1, fieldWidth - 1) * fieldLength;
-        }
-
         private int GlobalDistanceToChunk(float globalDistance)
         {
             float local = globalDistance - river.Domain.GlobalDistanceMinimum;
@@ -3019,6 +3139,7 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     RenderTextureFormat.ARGBHalf => 8L,
                     RenderTextureFormat.RGHalf => 4L,
+                    RenderTextureFormat.RHalf => 2L,
                     _ => 4L
                 };
             }
@@ -3077,81 +3198,22 @@ namespace ProgrammaticStylized3D.Rivers
             return rightHalfWidth * (across01 * 2f - 1f);
         }
 
-        private int AcrossMetresToY(
+        private static float AcrossMetresTo01(
             float acrossMetres,
             float leftHalfWidth,
             float rightHalfWidth)
         {
-            float across01;
             if (acrossMetres <= 0f)
             {
-                across01 = 0.5f *
-                    (1f + acrossMetres / Mathf.Max(0.001f, leftHalfWidth));
-            }
-            else
-            {
-                across01 = 0.5f + 0.5f *
-                    acrossMetres / Mathf.Max(0.001f, rightHalfWidth);
+                return Mathf.Clamp01(
+                    0.5f + acrossMetres /
+                    Mathf.Max(0.001f, leftHalfWidth * 2f));
             }
 
-            return Mathf.RoundToInt(
-                Mathf.Clamp01(across01) * Mathf.Max(1, fieldHeight - 1));
+            return Mathf.Clamp01(
+                0.5f + acrossMetres /
+                Mathf.Max(0.001f, rightHalfWidth * 2f));
         }
 
-        private static bool PointInPolygon(Vector2 point, Vector2[] polygon)
-        {
-            bool inside = false;
-            int previous = polygon.Length - 1;
-
-            for (int current = 0; current < polygon.Length; current++)
-            {
-                Vector2 a = polygon[current];
-                Vector2 b = polygon[previous];
-                float denominator = b.y - a.y;
-                bool crosses =
-                    (a.y > point.y) != (b.y > point.y) &&
-                    Mathf.Abs(denominator) > 0.000001f &&
-                    point.x <
-                    (b.x - a.x) * (point.y - a.y) /
-                    denominator + a.x;
-                if (crosses)
-                {
-                    inside = !inside;
-                }
-
-                previous = current;
-            }
-
-            return inside;
-        }
-
-        private static float DistanceToPolygon(Vector2 point, Vector2[] polygon)
-        {
-            float minimum = float.PositiveInfinity;
-            int previous = polygon.Length - 1;
-
-            for (int current = 0; current < polygon.Length; current++)
-            {
-                minimum = Mathf.Min(
-                    minimum,
-                    DistanceToSegment(point, polygon[previous], polygon[current]));
-                previous = current;
-            }
-
-            return minimum;
-        }
-
-        private static float DistanceToSegment(
-            Vector2 point,
-            Vector2 a,
-            Vector2 b)
-        {
-            Vector2 ab = b - a;
-            float denominator = Vector2.Dot(ab, ab);
-            float t = denominator > 0.000001f
-                ? Mathf.Clamp01(Vector2.Dot(point - a, ab) / denominator)
-                : 0f;
-            return Vector2.Distance(point, a + ab * t);
-        }
     }
 }

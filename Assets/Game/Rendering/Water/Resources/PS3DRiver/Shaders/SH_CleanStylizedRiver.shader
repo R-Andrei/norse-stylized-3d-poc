@@ -90,6 +90,7 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamTopologySources("Foam Topology Sources", 2D) = "black" {}
         [HideInInspector] _FoamFracture("Foam Fracture", 2D) = "black" {}
         [HideInInspector] _FoamBoundary("Foam Boundary", 2D) = "black" {}
+        [HideInInspector] _FoamObstacleExclusion("Foam Obstacle Exclusion", 2D) = "black" {}
         [HideInInspector] _FoamInterpolation("Foam Interpolation", Range(0, 1)) = 1
         [HideInInspector] _FoamGlobalStart("Foam Global Start", Float) = 0
         [HideInInspector] _FoamFieldLength("Foam Field Length", Float) = 1
@@ -256,6 +257,7 @@ Shader "PS3D/Stylized River Water"
                 float _FoamDetailStrength;
                 float _FoamDebugView;
                 float _FoamSeed;
+                float4 _FoamObstacleExclusion_TexelSize;
 
                 float _DomainFallbackDepth;
                 float _BodyDebugView;
@@ -294,6 +296,7 @@ Shader "PS3D/Stylized River Water"
             SAMPLER(sampler_FoamFracture);
             TEXTURE2D(_FoamBoundary);
             SAMPLER(sampler_FoamBoundary);
+            TEXTURE2D(_FoamObstacleExclusion);
 
             struct Attributes
             {
@@ -800,7 +803,8 @@ Shader "PS3D/Stylized River Water"
                 finalColour = MixFog(finalColour, input.motionData.w);
 
                 int foamDebug = (int)round(_FoamDebugView);
-                if (foamDebug == 3 || foamDebug == 6 || foamDebug == 7)
+                if (foamDebug == 3 || foamDebug == 6 ||
+                    foamDebug == 7 || foamDebug == 8)
                 {
                     float4 topologyDebug = SAMPLE_TEXTURE2D_LOD(
                         _FoamTopology,
@@ -818,39 +822,63 @@ Shader "PS3D/Stylized River Water"
                         topologyDebug.g);
                     float combinedCaptureSupport = max(
                         max(topologySources.r, topologySources.g),
-                        max(topologySources.b, topologySources.a));
+                        topologySources.b);
+                    int2 obstacleDimensions = int2(
+                        max(1.0, _FoamObstacleExclusion_TexelSize.z),
+                        max(1.0, _FoamObstacleExclusion_TexelSize.w));
+                    int2 obstacleCoordinate = clamp(
+                        (int2)floor(
+                            foam.fieldUV *
+                            (float2)obstacleDimensions),
+                        int2(0, 0),
+                        obstacleDimensions - 1);
+                    float obstacleExclusion = saturate(
+                        _FoamObstacleExclusion.Load(
+                            int3(obstacleCoordinate, 0)).r);
+                    float combinedNegativeSupport = max(
+                        topologyDebug.b,
+                        obstacleExclusion);
 
                     if (foamDebug == 3)
                     {
-                        // Canonical independent capture classes. Red =
-                        // Pressure, green = Lee, blue = Shore, and magenta =
-                        // Obstacle. No positive class modifies another.
+                        // Canonical independent positive capture classes.
+                        // Red = Pressure, green = Lee, blue = Shore.
                         return half4(
-                            saturate(topologySources.r + topologySources.a),
+                            saturate(topologySources.r),
                             saturate(topologySources.g),
-                            saturate(topologySources.b + topologySources.a),
+                            saturate(topologySources.b),
+                            1.0);
+                    }
+
+                    if (foamDebug == 8)
+                    {
+                        // Independent negative topology classes. Red = Pocket
+                        // Exclusion, blue = conservative current-water Obstacle
+                        // Exclusion from the full-resolution exact-mesh solid-interval mask.
+                        return half4(
+                            saturate(topologyDebug.b),
+                            0.0,
+                            obstacleExclusion,
                             1.0);
                     }
 
                     if (foamDebug == 6)
                     {
-                        // Green is every positive class before subtraction,
-                        // using the same canonical effective-capture channels
-                        // as Capture Zones and Positive Zone Classes. Red is
-                        // Pocket Exclusion; additive overlap is yellow.
+                        // Green is every positive class before subtraction.
+                        // Red is the combined negative topology. Additive
+                        // overlap is yellow.
                         float positiveSupport = saturate(
                             max(freeWaterSupport, combinedCaptureSupport));
-                        float negativeSupport = saturate(topologyDebug.b);
                         return half4(
-                            negativeSupport,
+                            saturate(combinedNegativeSupport),
                             positiveSupport,
                             0.0,
                             1.0);
                     }
 
                     // Red = independent Major Capacity, green = independent
-                    // Connector Capacity, and blue = the same combined
-                    // canonical Capture Capacity used above.
+                    // Connector Capacity, and blue = combined Pressure, Lee,
+                    // and Shore Capture.
                     return half4(
                         saturate(topologyDebug.r),
                         saturate(topologyDebug.g),

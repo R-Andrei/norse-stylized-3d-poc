@@ -54,12 +54,40 @@ The topology representation must expose conceptually separate outputs, even if s
 
 - **Major Capacity** — support for broad rafts, sheets, and dominant ribbons.
 - **Connector Capacity** — weaker support for medium branches, narrow links, and junctions.
-- **Pocket Exclusion** — protected negative space that ordinary convergence, capture, and repair may not fill.
+- **Pocket Exclusion** — protected open-water negative space that ordinary convergence, capture, and repair may not fill.
+- **Obstacle Exclusion** — the conservative registered-solid cross-section at the current Stage 3 water level, which no positive topology or material may occupy.
 - **Convergence Preference** — direction and strength encouraging existing material toward supported structures.
 - **Capture and Residence** — slowdown, survival, and temporary structural support near boundaries and accepted interaction regions.
 - **Permitted Supply** — locations and limits under which genuinely new material may enter.
 
 These values have different meanings and must not be treated as aliases for one desired-density mask.
+
+### Habitat Versus Visible Foam
+
+Structural topology is the foam habitat, not the rendered foam layer.
+
+The topology field answers where foam is allowed to organise, survive, connect, or be protected from filling. It should carry the broad composition language of the reference: supported major sheets, possible connector routes, capture regions near environmental causes, and protected dark-water pockets. It is not expected to contain every final frayed edge, white streak, or turbulent particle-scale detail.
+
+The final reference-like effect is produced by three stacked scales:
+
+1. **Topology / habitat scale** defines where foam can plausibly exist. Major Capacity supports broad broken sheets. Connector Capacity supports curved links, branches, and junction routes. Capture classes support residence near accepted Pressure, lee, and shore contexts. Pocket Exclusion protects holes and open-water cutouts, while Obstacle Exclusion removes the conservative solid cross-section at the current Stage 3 water level.
+2. **Material occupancy scale** decides what foam actually exists right now. Amount, Freshness, Integrity, advection, convergence, decay, tearing, peeling, and merging determine whether a supported region is full, partial, damaged, empty, or recovering.
+3. **Rendering / filament scale** turns occupied material into the visible surface. Shader thresholds, directional erosion, flow-stretched noise, edge breakup, brightness falloff, and integrity/freshness variation create the thin white filaments, torn rims, gaps, and frayed tips.
+
+Therefore:
+
+```text
+Positive Support = max(Major, Connector, Capture)
+Negative Support = max(Pocket Exclusion, Obstacle Exclusion)
+Foam Support = Positive Support * (1 - Negative Support)
+Visible Foam = render(Material State shaped by Foam Support)
+```
+
+High support does not guarantee visible foam. Low or zero support should make material decay, tear, or fail to repair. Pocket Exclusion and Obstacle Exclusion remove support even if a positive class is present.
+
+Connector Capacity must include genuinely thin, curved subregions, because persistent long filaments need coherent routes to inhabit. These routes should be softer and usually wider than the final visible strands; they are permission corridors, not finished white lines. The material layer should occupy them intermittently, and rendering should narrow, erode, and break them into frayed visible filaments.
+
+If connector topology contains no thin routes, the material and shader can make temporary noisy edges but cannot reliably form long curved bridges. If connector topology is too continuous, clean, parallel, or river-length, the material will inherit that highway structure. Thinness alone is not enough: connector support must also be broken, uneven, locally disappearing, and allowed to fork, merge, and fail.
 
 ### Persistent Material State
 
@@ -113,7 +141,7 @@ Capture answers:
 
 > How slowly should existing material move, and how long should it survive here?
 
-Capture may attract nearby material and support Integrity. It must not act as an unlimited source. Shore and obstacle capture must remain intermittent and capacity-limited rather than becoming permanent white outlines.
+Capture may attract nearby material and support Integrity. It must not act as an unlimited source. Shore capture must remain capacity-limited rather than becoming an excessively thick permanent white outline. Object-related positive residence comes from Pressure and Lee, not from an always-on obstacle halo.
 
 ### Supply
 
@@ -194,20 +222,22 @@ Purpose:
 - produce broken contour bands and bank-following ribbons;
 - attract and retain material without producing continuous white outlines.
 
-### Obstacle Wraps
+### Object Interaction Regions
 
 Derived from:
 
-- projected registered stationary-obstacle polygon;
-- signed distance from the polygon;
-- local obstacle tangent and upstream/downstream shoulder classification;
-- solid exclusion from the same authoritative contour.
+- the exact transformed generated mesh exposed by each registered static solid;
+- a one-time conservative solid-interval bake over only the full-resolution Foam texels touched by that mesh;
+- the complete current Stage 3 surface-height evaluator at each retained sample;
+- the accepted static Pressure representation upstream;
+- the accepted attached stationary Lee representation downstream.
 
 Purpose:
 
-- split approaching material;
-- create tangential wrapping structures around shoulders;
-- support downstream peeling and lee release;
+- split approaching material through water-level-aware Obstacle Exclusion;
+- create upstream and shoulder capture through Pressure;
+- support downstream residence and peeling through Lee;
+- never create an unconditional positive halo around the object;
 - never place material inside the solid footprint.
 
 ### Bend Organisation
@@ -295,7 +325,7 @@ Purpose:
 The following should remain spatially stable while their underlying geometry or Stage 5 source remains unchanged:
 
 - shore organisation;
-- obstacle wraps;
+- obstacle footprints and exclusion;
 - bend tendencies;
 - Pressure shoulders;
 - stationary lee regions.
@@ -363,7 +393,7 @@ The former Stage 6.1 result is an implementation baseline, not an accepted visua
 
 **Status:** implemented in code. The first Unity visual review rejected the initial noise-dominated distribution because connectors and pockets concentrated into isolated longitudinal areas and raw boundary bands dominated their diagnostic. A geometry-hierarchy correction is implemented; Unity revalidation is pending.
 
-The implementation adds one simulation-neutral `RGBAHalf` topology field at guidance resolution. Its active channels are `Major Capacity`, `Connector Capacity`, and `Pocket Exclusion`; alpha is reserved and written as zero. A companion texture retains canonical Pressure, Lee, Shore, and Obstacle capture separately. Each positive class is computed independently from its own source data plus valid fluid-domain masking. The existing persistent material solver does not read these fields during Batch 1A.
+The implementation adds one simulation-neutral `RGBAHalf` topology field at guidance resolution. Its channels are `Major Capacity`, `Connector Capacity`, `Pocket Exclusion`, and a derived guidance-resolution copy of `Obstacle Exclusion`. The authoritative obstacle mask is a separate full-resolution `RHalf` texture. A companion texture retains canonical Pressure, Lee, and Shore capture separately; its alpha channel is reserved zero. Each positive class is computed independently from its own source data plus valid fluid-domain masking, and each negative class remains independently inspectable until final composition. The existing persistent material solver does not read these fields during Batch 1A.
 
 ### Objective
 
@@ -375,7 +405,7 @@ Implement debug-only or simulation-neutral topology using only:
 
 - river geometry and metric coordinates;
 - shore structure;
-- projected obstacle wraps;
+- projected obstacle footprints;
 - bend organisation;
 - broad free-water rafts;
 - pocket exclusion;
@@ -387,10 +417,11 @@ Do not retune material transport, tearing, shader thresholds, population control
 
 ### Retained Debug Views
 
-`Final Foam (Debug Off)` returns to the normal rendered result. The Inspector exposes only three Foam diagnostics:
+`Final Foam (Debug Off)` returns to the normal rendered result. The Inspector exposes only four Foam diagnostics:
 
 - `Capture Zones`
 - `Positive Zone Classes`
+- `Negative Zone Classes`
 - `Positive and Negative Zones`
 
 Each selected view displays its own colour legend and interpretation directly beneath the selector. All former Foam diagnostics and their shader/runtime branches have been removed. Additional views are added only when a concrete diagnostic question requires them.
@@ -401,9 +432,9 @@ Each selected view displays its own colour legend and interpretation directly be
 - Use deterministic regional variation only to deform this hierarchy; noise cannot remove topology from most of the river.
 - Generate connectors relationally between the end centres of neighbouring major regions rather than as an independent thresholded line field.
 - Generate one or more bounded pocket candidates per region and accept them only inside the interior of broad-sheet support.
-- Read the authoritative shore and projected stationary-obstacle boundary fields directly as independent capture classes. They are not gated, boosted, attenuated, or reshaped by Major or Connector capacity.
+- Read the authoritative shore field as an independent positive capture class and the projected stationary-obstacle solid footprint as an independent negative exclusion class. Neither is gated, boosted, attenuated, or reshaped by Major or Connector capacity.
 - Exclude all storage padding beyond `Domain.LocalLength`.
-- Expose the three retained diagnostics, the normal Debug Off state, and topology resolution/memory diagnostics.
+- Expose the four retained diagnostics, the normal Debug Off state, and topology resolution/memory diagnostics.
 - Expose only the six canonical public controls.
 - Leave material transport, population supply, capture response, tearing, merging, and final foam rendering unchanged.
 
@@ -445,10 +476,10 @@ Integrate stable read-only Stage 5 organisation and establish measurable topolog
 
 ### Implemented Batch 1B Scope
 
-- Add one same-resolution `RGBAHalf` source-class field retaining `Pressure`, stationary `Lee`, `Shore`, and `Obstacle` organisation separately.
-- Preserve the cached CPU boundary texture red/green material-solver contract and alpha obstacle-attraction channel. Its former blue static-shore channel is retired and now stores registered solid coverage solely for exclusion. Canonical Shore Capture comes exclusively from the dynamic Stage 3 edge rows.
+- Add one same-resolution `RGBAHalf` source-class field retaining `Pressure`, stationary `Lee`, and `Shore` positive capture separately; alpha is reserved zero.
+- Preserve the cached CPU boundary texture red/green material-solver contract. Its blue and alpha channels are reserved zero. Registered solids expose their exact transformed generated mesh. Stage 6 performs a one-time conservative line/triangle solid-interval bake only for touched full-resolution Foam texels, then reconstructs a point-sampled runtime Obstacle Exclusion mask from those cached intervals at the current Stage 3 water level. Canonical Shore Capture comes exclusively from the dynamic Stage 3 edge rows.
 - Sample only the accepted Stage 5 static Pressure target and stationary Wake-source lee channel; transported Wake energy and Impact Ripple are excluded.
-- Store every positive class independently, combine them with an unweighted maximum, and apply Pocket Exclusion exactly once at final topology composition.
+- Store every positive class independently, combine them with an unweighted maximum, combine Pocket Exclusion and Obstacle Exclusion with an unweighted maximum, and apply the combined negative topology exactly once at final composition.
 - Keep the source fields diagnostic-only: neither topology texture is consumed by material transport, supply, capture, tearing, merging, or final Foam rendering in Batch 1B.
 - Add low-rate asynchronous GPU topology metrics over the valid river domain. Padded storage is excluded.
 - Neutralise the legacy Impact-to-Foam reinforcement value so Impact has no Stage 6 influence during this retarget.
@@ -461,9 +492,10 @@ The normal rendered state and retained diagnostics are:
 | View | Meaning and colour encoding |
 |---|---|
 | `Final Foam (Debug Off)` | Normally lit visible Foam from the current persistent material solver. No Foam diagnostic colour encoding is active. |
-| `Capture Zones` | Canonical independent capture values. Red = Pressure; green = stationary attached Lee; blue = the fixed-width band following the instantaneous Stage 3 visible shoreline; magenta = Obstacle. Shore uses `0.24 m` full capture plus a `0.03 m` inward fade from the current left/right edge. Each class comes only from its own source plus valid domain/solid masking. Overlaps mix directly. |
-| `Positive Zone Classes` | Red = independent Major Capacity; green = independent Connector Capacity; blue = the maximum of the exact Pressure, Lee, Shore, and Obstacle values shown separately in Capture Zones. No class weighting is applied. Overlaps mix; black means no positive support. Pocket Exclusion is not shown. |
-| `Positive and Negative Zones` | Green = the unweighted maximum of Major, Connector, and combined Capture support before subtraction; red = Pocket Exclusion; yellow = overlap where exclusion can remove positive support; black = neither. |
+| `Capture Zones` | Canonical independent positive capture values. Red = Pressure; green = stationary attached Lee; blue = the fixed-width band following the instantaneous Stage 3 visible shoreline. Shore uses `0.24 m` full capture plus a `0.03 m` inward fade from the current left/right edge. Each class comes only from its own source plus valid domain/solid masking. Overlaps mix directly. |
+| `Positive Zone Classes` | Red = independent Major Capacity; green = independent Connector Capacity; blue = the maximum of the exact Pressure, Lee, and Shore values shown separately in Capture Zones. No class weighting is applied. Overlaps mix; black means no positive support. Negative topology is not shown. |
+| `Negative Zone Classes` | Red = Pocket Exclusion; blue = Obstacle Exclusion from the conservative registered-solid cross-section at the current Stage 3 water level; magenta = overlap. No obstacle expansion or surrounding halo is added. |
+| `Positive and Negative Zones` | Green = the unweighted maximum of Major, Connector, and combined Capture support before subtraction; red = the unweighted maximum of Pocket Exclusion and Obstacle Exclusion; yellow = overlap where combined negative topology removes positive support; black = neither. |
 
 ### Canonical Independent-Zone Contract
 
@@ -473,13 +505,13 @@ The sole structural exception is Connector endpoint validation: a connector may 
 
 The canonical source rules are:
 
-- **Major Capacity:** generated from its own free-water structure rules and river metrics; Obstacle capture does not deform or cut it.
-- **Connector Capacity:** generated from its own connector/branch paths after endpoint validation; it is not weighted against Major, Capture, Pocket, or Obstacle fields.
+- **Major Capacity:** generated from its own free-water structure rules and river metrics; object-related positive or negative classes do not reshape its generated value.
+- **Connector Capacity:** generated from its own connector/branch paths after endpoint validation; it is not weighted against Major, Capture, Pocket, or Obstacle Exclusion fields.
 - **Shore Capture:** a fixed metric band measured inward from the instantaneous Stage 3 visible shoreline, not from the static normal or maximum shoreline allowance. Stage 3 and Stage 6 share the same macro-wave, river-space noise, shore-specific profile, lateral-reach, asymmetry, and attenuation functions. A compact `RGHalf` row texture stores current signed left/right visible edges for every topology column. The current validation band is `0.24 m` of full capture plus a `0.03 m` inward fade. No random longitudinal gating and no Major/Connector context.
-- **Obstacle Capture:** the cached projected-obstacle attraction band directly. No Major/Connector context.
+- **Obstacle Exclusion:** generated directly from the exact transformed generated mesh, not from the padded disturbance footprint, a convex hull, an object-bounds rectangle, or the Static Pressure envelope. During the one-time geometry bake, Stage 6 examines only candidate full-resolution Foam texels covered by the projected mesh. Nine sample lines per texel are intersected with the actual mesh triangles along the local river Up direction. Sorted entry/exit pairs retain up to two exact solid-height intervals per sample, with a tiny vertical inset; ambiguous odd intersection counts are rejected rather than approximated. At runtime, the complete current Stage 3 surface height is evaluated independently at all nine samples. The texel is accepted only when every sample lies inside a cached solid interval. The authoritative `RHalf` mask is point-sampled and therefore deliberately errs smaller rather than extending outside the visible generated rock. No hull, contour padding, profile interpolation, or bounds fallback is allowed. The guidance-resolution topology alpha channel is only a derived copy for composition and metrics. Static Pressure still performs an independent accepted geometry scan; a future refactor should derive its directional pressure envelope from this same exact solid-volume source data instead of duplicating mesh calculations.
 - **Pressure Capture:** the direct magnitude available from the accepted static Pressure texture, with no hidden importance weight or external context multiplier.
 - **Lee Capture:** the direct positive attached-lee value available from the accepted stationary Wake source, with no hidden importance weight or external context multiplier.
-- **Pocket Exclusion:** stored separately and applied exactly once, after all positive classes are combined.
+- **Pocket Exclusion:** stored separately from Obstacle Exclusion; both negative classes are combined and applied exactly once after all positive classes are combined.
 
 ### Shared Stage 3 Shoreline Contract
 
@@ -490,24 +522,28 @@ Shore Capture does not infer the shoreline from the normal allowance, maximum ov
 3. test positive displacement against the corridor's mandatory hidden bank-cover profile between normal and maximum surface widths, while respecting the current per-wave reach limit;
 4. store the outermost visible left and right edges in a compact row texture;
 5. construct Shore Capture inward from those moving edges in world metres;
-6. remove registered solid cells using the boundary texture's dedicated solid-coverage channel.
+6. remove registered solid cells using the dedicated full-resolution Obstacle Exclusion mask evaluated from the current Stage 3 water height and the cached exact-mesh solid intervals.
 
-The free-water topology remains low-rate, but the current edge and capture-source composition refresh at the ordinary Foam update cadence so visible shore motion is not quantised to the `4/6/8 Hz` topology-generation cadence. The current intermediate Stage 3 controls are `Shore Wave Height Scale`, `Shore Wave Length Scale`, `Shore Wave Reach`, `Shore Wave Transition Length`, `Shore Wave Size Variation`, `Shore Side Asymmetry`, and `Shore Wave Profile Variation`. Size Variation produces stable deterministic differences between successive travelling waves; Transition Length smooths both the within-wave profile and wave-to-wave size changes over a physical distance; Profile Variation shapes an individual wave through slope-continuous start/middle/end interpolation. Stage 6 receives only the resolved shoreline result through the shared evaluator and does not reinterpret those controls. Future packet-based shore-wave work must replace or extend this evaluator rather than adding a second approximation in Stage 6.
+The free-water topology remains low-rate, but the current edge and capture-source composition refresh at the ordinary Foam update cadence so visible shore motion is not quantised to the `4/6/8 Hz` topology-generation cadence. The current intermediate Stage 3 controls are `Shore Wave Height Scale`, `Shore Wave Length Scale`, `Shore Wave Reach`, `Shore Wave Transition Length`, `Shore Wave Size Variation`, `Shore Side Asymmetry`, and `Shore Wave Profile Variation`. Size Variation produces stable deterministic differences between successive travelling waves; Profile Variation shapes an individual wave through slope-continuous start/middle/end interpolation. Transition Length also drives the final zero-slope shoreline activation envelope: signed shore height is flattened around zero crossings, and resolved lateral reach approaches both the normal shoreline and the maximum allowance with zero derivative. Stage 6 receives only that resolved shoreline result through the shared evaluator and does not reinterpret those controls. Future packet-based shore-wave work must replace or extend this evaluator rather than adding a second approximation in Stage 6.
 
 Composition is deliberately simple:
 
 ```text
-Positive Support = max(Major, Connector, Pressure, Lee, Shore, Obstacle)
-Composed Topology = Positive Support × (1 - Pocket Exclusion)
+Positive Support = max(Major, Connector, Pressure, Lee, Shore)
+Negative Support = max(Pocket Exclusion, Obstacle Exclusion)
+Composed Topology = Positive Support × (1 - Negative Support)
 ```
 
 Underlying texture encoding is:
 
 ```text
-Topology RGBA:         Major Capacity, Connector Capacity, Pocket Exclusion, reserved zero
-Topology Sources RGBA: Pressure, stationary Lee, dynamic Shore band, Obstacle
+Topology RGBA:         Major Capacity, Connector Capacity, Pocket Exclusion, derived guidance-resolution Obstacle Exclusion
+Topology Sources RGBA: Pressure, stationary Lee, dynamic Shore band, reserved zero
 Current Shore Edges RG: signed left visible edge, signed right visible edge
-Boundary RGBA: legacy fluid coverage, legacy material attraction, registered solid coverage, obstacle attraction
+Boundary RGBA: legacy fluid coverage, legacy material attraction, reserved zero, reserved zero
+Obstacle Exact-Mesh Samples: cached solid-height interval pairs plus exact Stage 3 water-evaluation parameters for nine positions in each retained texel
+Obstacle Candidate Cells: full-resolution texel coordinate plus exact-sample offset
+Obstacle Exclusion RHalf: authoritative full-resolution point-sampled current-water solid mask
 ```
 
 No class-specific diagnostic contrast curve is applied. Every selected diagnostic repeats its legend in a context-sensitive Inspector help box. Source-specific shape construction still contains explicit geometric thresholds and widths; those define the source itself and are not cross-class importance modifiers. Any future normalization or weighting must be introduced explicitly, documented, and validated as a separate decision.
@@ -520,8 +556,7 @@ Required runtime metrics:
 - protected-pocket violation;
 - visible material coverage;
 - material deficit inside supported regions;
-- boundary occupancy;
-- obstacle occupancy;
+- shore occupancy;
 - Pressure/lee occupancy;
 - perimeter ratio;
 - active chunks;
@@ -551,7 +586,7 @@ Batch 1C replaces the rejected continuous-chain grammar rather than tuning it. T
 1. **Major structures:** deterministic finite rafts and contour ribbons are rasterised with explicit enable/disable state, physical start/end extents, pointed tapers, lateral drift, overlap, and absence. There is no always-on river-length primary sheet.
 2. **Pocket validation:** pocket candidates belong to broad host structures and are accepted only when an eight-sample surrounding ring has sufficient broad support, remains inside fluid, avoids solids, and fits the host structure.
 3. **Connectors and branches:** connectors require two separate accepted major-structure endpoints and an open middle span. Deliberate diagonal branches and occasional asymmetric forks grow from accepted parent structures. Connector interiors are suppressed where major capacity already exists.
-4. **Composition:** obstacle data deforms and cuts major support before final composition; shore, obstacle, Pressure, and stationary lee organisation then enter through the existing priority contract.
+4. **Composition:** Major, Connector, Pressure, Lee, and Shore remain independent positive classes. Pocket and water-level-aware Obstacle Exclusion remain independent negative classes and combine only at final composition.
 
 Three simulation-neutral working textures retain major structures, validated pockets, and connector/branch candidates. The existing final topology texture remains:
 
@@ -559,10 +594,10 @@ Three simulation-neutral working textures retain major structures, validated poc
 R = finite Major Capacity
 G = relational Connector / Branch Capacity
 B = validated Pocket Exclusion
-A = reserved zero
+A = derived guidance-resolution water-level-aware Obstacle Exclusion
 ```
 
-The normal Foam view menu contains the Debug Off state and only the three documented diagnostics. Added metrics are composed-topology coverage, open-span coverage, pocket-interior coverage, major-capacity coverage, and connector-in-major overlap.
+The normal Foam view menu contains the Debug Off state and only the four documented diagnostics. Added metrics are composed-topology coverage, open-span coverage, pocket-interior coverage, major-capacity coverage, connector-in-major overlap, and source occupancy.
 
 Batch 1C does not change material transport, autonomous supply, capture response, tearing, merging, Impact integration, or final Foam rendering. Topology is still built only for Batch 1 diagnostics; Batch 2 must move topology updates into the ordinary material-work schedule before material consumes it.
 
@@ -573,9 +608,9 @@ Batch 1C does not change material transport, autonomous supply, capture response
 - Protected pockets read as enclosed interior holes rather than gaps between parallel lanes.
 - Connectors visibly bridge separate structures; connector-in-major overlap remains low away from endpoints.
 - Diagonal branches, asymmetric forks, and irregular joins coexist with long eye-traceable structures.
-- Obstacles split or redirect major structures and support shoulder/lee/peel organisation rather than appearing only as source-colour overlays.
+- Conservative current-water solid cross-sections appear as Obstacle Exclusion, while Pressure and Lee separately provide object-related positive organisation outside the solid.
 - Substantial open water remains before material simulation is connected.
-- The seven compact, documented debug views remain sufficient; no obsolete per-channel F1/F2 menu is restored.
+- The compact documented debug views remain sufficient; no obsolete per-channel F1/F2 menu is restored.
 
 ## Batch 2 — Persistent Material Response
 
