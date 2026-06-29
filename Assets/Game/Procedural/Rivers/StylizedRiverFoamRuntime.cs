@@ -36,11 +36,11 @@ namespace ProgrammaticStylized3D.Rivers
         private const int ThreadGroupSize = 8;
         private const int TopologyMetricCount = 16;
         private const float TopologyMetricQuantisation = 1023f;
-        // Canonical Stage 6 shore-capture band measured inward from the
-        // instantaneous Stage 3 visible water edge. These are deliberately
-        // fixed while the capture contract is being validated.
-        private const float ShoreCaptureCoreWidthMetres = 0.24f;
-        private const float ShoreCaptureFadeWidthMetres = 0.03f;
+        // Canonical Stage 6 Shore Support band measured inward from the
+        // instantaneous Stage 3 visible water edge. These metric widths remain
+        // fixed while the accepted anchored-support contract is retained.
+        private const float ShoreSupportCoreWidthMetres = 0.24f;
+        private const float ShoreSupportFadeWidthMetres = 0.03f;
 
         private static readonly int FoamEnabledId =
             Shader.PropertyToID("_FoamEnabled");
@@ -273,24 +273,24 @@ namespace ProgrammaticStylized3D.Rivers
             ? currentShoreEdgesTexture.width
             : 0;
         public bool TopologyMetricsAvailable => topologyMetricsAvailable;
-        public float MajorCapacityCoverage => TopologyCoverageRatio(1);
-        public float ConnectorCapacityCoverage => TopologyCoverageRatio(2);
-        public float ProtectedPocketCoverage => TopologyCoverageRatio(3);
-        public float ProtectedPocketViolation => TopologyRegionRatio(4, 3);
+        public float MajorSupportCoverage => TopologyCoverageRatio(1);
+        public float ConnectorSupportCoverage => TopologyCoverageRatio(2);
+        public float PocketPressureCoverage => TopologyCoverageRatio(3);
+        public float FoamWithinPocketPressure => TopologyRegionRatio(4, 3);
         public float VisibleMaterialCoverage => TopologyCoverageRatio(5);
-        public float MaterialDeficitInsideCapacity =>
+        public float MaterialDeficitInsideNetSupport =>
             topologyMetricsAvailable && latestTopologyMetrics[6] > 0u
                 ? latestTopologyMetrics[7] /
                   (TopologyMetricQuantisation * latestTopologyMetrics[6])
                 : 0f;
-        public float ShoreOccupancy => TopologyRegionRatio(9, 8);
-        public float PressureLeeOccupancy => TopologyRegionRatio(13, 12);
+        public float FoamWithinShoreSupport => TopologyRegionRatio(9, 8);
+        public float FoamWithinPressureLeeSupport => TopologyRegionRatio(13, 12);
         public float PerimeterRatio => TopologyRegionRatio(14, 5);
-        public float ComposedTopologyCoverage => TopologyCoverageRatio(6);
+        public float LegacyNetSupportCoverage => TopologyCoverageRatio(6);
         public float OpenSpanCoverage => topologyMetricsAvailable
-            ? Mathf.Clamp01(1f - ComposedTopologyCoverage)
+            ? Mathf.Clamp01(1f - LegacyNetSupportCoverage)
             : 0f;
-        public float ConnectorInMajorOverlap => TopologyRegionRatio(15, 2);
+        public float ConnectorMajorOverlap => TopologyRegionRatio(15, 2);
         public int FractureWidth => currentFracture != null ? currentFracture.width : 0;
         public int FractureHeight => currentFracture != null ? currentFracture.height : 0;
         public float GuidanceUpdateRate => ResolveGuidanceUpdateRate();
@@ -367,10 +367,10 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 StylizedRiverFoamDebugView view = river.FoamDebugView;
-                return view == StylizedRiverFoamDebugView.CaptureZones ||
-                    view == StylizedRiverFoamDebugView.PositiveNegativeZones ||
-                    view == StylizedRiverFoamDebugView.PositiveZoneClasses ||
-                    view == StylizedRiverFoamDebugView.NegativeZoneClasses;
+                return view == StylizedRiverFoamDebugView.AnchoredSupport ||
+                    view == StylizedRiverFoamDebugView.SupportAndNegativeInfluence ||
+                    view == StylizedRiverFoamDebugView.SupportClasses ||
+                    view == StylizedRiverFoamDebugView.NegativeInfluenceClasses;
             }
         }
 
@@ -618,7 +618,7 @@ namespace ProgrammaticStylized3D.Rivers
                     }
 
                     // The expensive free-water topology remains low-rate, but
-                    // the current Stage 3 shoreline edge and its capture band
+                    // the current Stage 3 shoreline edge and its Shore Support band
                     // refresh at the normal Foam update cadence so the band
                     // follows visible shore-wave motion without stepping at the
                     // 4/6/8 Hz topology cadence.
@@ -1374,8 +1374,8 @@ namespace ProgrammaticStylized3D.Rivers
                     // R/G remain the legacy material-simulation fluid and
                     // attraction contract. B/A are reserved zero: registered
                     // solids now use the one-time exact-mesh interval bake
-                    // and full-resolution Obstacle Exclusion mask. Canonical
-                    // Shore Capture comes from the instantaneous Stage 3 edge.
+                    // and full-resolution Obstacle Footprint mask. Canonical
+                    // Shore Support comes from the instantaneous Stage 3 edge.
                     pixels[y * fieldWidth + x] = new Color(
                         coverage,
                         attraction,
@@ -1385,7 +1385,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             // Registered solid geometry is no longer rasterised into this
-            // static boundary texture. Obstacle Exclusion is reconstructed
+            // static boundary texture. Obstacle Footprint is reconstructed
             // from cached exact transformed-mesh solid intervals and the current
             // Stage 3 water height in a dedicated point-sampled mask.
 
@@ -1479,7 +1479,7 @@ namespace ProgrammaticStylized3D.Rivers
                 if (!obstacleBakeWarningReported)
                 {
                     Debug.LogWarning(
-                        $"{name}: exact Foam Obstacle Exclusion could not be " +
+                        $"{name}: exact Foam Obstacle Footprint could not be " +
                         $"baked for '{meshFilter.name}'. {bakeStatus} " +
                         "No bounds, hull, or rectangle fallback was created.",
                         this);
@@ -2069,10 +2069,10 @@ namespace ProgrammaticStylized3D.Rivers
                 river.FreezeAmount);
             computeShader.SetFloat(
                 "_FoamShoreCaptureCoreWidth",
-                ShoreCaptureCoreWidthMetres);
+                ShoreSupportCoreWidthMetres);
             computeShader.SetFloat(
                 "_FoamShoreCaptureFadeWidth",
-                ShoreCaptureFadeWidthMetres);
+                ShoreSupportFadeWidthMetres);
         }
 
         private void RefreshDynamicTopologySources(bool measureMetrics)
@@ -2439,6 +2439,13 @@ namespace ProgrammaticStylized3D.Rivers
                 river.FlowSpeedMetresPerSecond *
                 river.FoamFlowFollow *
                 river.LiquidFactor);
+            // Pressure Support builds its fail-closed upstream support
+            // envelope from the exact obstacle mask. Flow direction selects
+            // which side of each solid cell is the object-facing front on both
+            // normal-flow and reverse-flow rivers.
+            computeShader.SetFloat(
+                "_FoamFlowDirection",
+                river.FlowDirection);
             computeShader.SetFloat("_FoamEvolution", river.FoamEvolution);
             computeShader.SetFloat("_FoamBreakup", river.FoamBreakup);
             computeShader.SetFloat("_FoamSpread", river.FoamLateralSpread);

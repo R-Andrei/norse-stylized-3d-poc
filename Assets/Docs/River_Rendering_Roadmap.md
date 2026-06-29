@@ -78,7 +78,7 @@ Prefer handwritten HLSL over Shader Graphs whenever practical. Graphs should onl
 - `Shore Side Asymmetry` blends from shared left/right size and profile values to independent bank values;
 - `Shore Wave Profile Variation` creates deterministic variation inside each wave between its start, middle, and end.
 
-Within-wave profile knots use a slope-continuous cubic curve that blends toward a smoother B-spline response as Transition Length increases. Successive wave-size values also blend across that configured metric span. A final zero-slope activation envelope is now applied to the signed shore-wave height near zero crossings and to lateral reach near both the normal shoreline and the maximum hidden-water allowance. This prevents the visible shore from leaving or rejoining either hard bound with a tangent discontinuity instead of merely smoothing the earlier profile values. Size identities are deterministic and travel with the existing carrier; they do not reseed or fluctuate independently at runtime. Left and right profiles are identical when Side Asymmetry is zero and become increasingly independent as it rises. Neutral size/profile variation values preserve the previous wave identities, while Transition Length still controls the new final shoreline onset/exit smoothing. Water displacement, surface normals, liquid refraction motion, instantaneous shoreline resolution, and Stage 6 Shore Capture all consume the same shared evaluator. This is an intermediate extension of the existing carrier, not the later explicit travelling-wave-packet redesign; individual packet speeds, lifetimes, births, and independent length evolution remain deferred.
+Within-wave profile knots use a slope-continuous cubic curve that blends toward a smoother B-spline response as Transition Length increases. Successive wave-size values also blend across that configured metric span. A final zero-slope activation envelope is now applied to the signed shore-wave height near zero crossings and to lateral reach near both the normal shoreline and the maximum hidden-water allowance. This prevents the visible shore from leaving or rejoining either hard bound with a tangent discontinuity instead of merely smoothing the earlier profile values. Size identities are deterministic and travel with the existing carrier; they do not reseed or fluctuate independently at runtime. Left and right profiles are identical when Side Asymmetry is zero and become increasingly independent as it rises. Neutral size/profile variation values preserve the previous wave identities, while Transition Length still controls the new final shoreline onset/exit smoothing. Water displacement, surface normals, liquid refraction motion, instantaneous shoreline resolution, and Stage 6 Shore Support all consume the same shared evaluator. This is an intermediate extension of the existing carrier, not the later explicit travelling-wave-packet redesign; individual packet speeds, lifetimes, births, and independent length evolution remain deferred.
 
 **Validated:** The original calm-through-furious motion contract remains accepted at neutral shore-profile values. The new shore-specific controls require focused Unity validation across reverse flow, freeze/thaw, asymmetric banks, and hidden-allowance limits. Presets reset the new controls to neutral values so selecting an existing motion preset preserves the accepted appearance. Detached splashes remain assigned to Stage 7.
 
@@ -279,70 +279,115 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 
 ## 6. Foam and Surface Tracing
 
-**Problem:** Create a persistent stylized surface film that forms torn contour networks at gameplay distance: dominant ribbons, broad broken sheets, dark-water pockets, medium branches, thin temporary connectors, peeling strips, and secondary fragments. The result must preserve substantial open water, remain organised by real river geometry and accepted disturbance inputs, and never suggest upstream material or upstream-growing repair.
+**Problem:** Create a persistent stylized surface film that forms broad broken sheets, dominant ribbons, medium branches, temporary connectors, enclosed dark-water pockets, peeling strips, and secondary fragments while preserving substantial open water and downstream causality.
 
-**Current status:** The existing Stage 6.1 field solver provides useful infrastructure—persistent material state, corrected downstream transport, metric coordinates, obstacle contours, capture inputs, fracture support, population reduction, chunking, quality, freezing, sleeping, and fixed-cost shader sampling—but its visual result is not accepted. It remains dominated by sparse strokes, similarly scaled marks, and insufficient large-scale surface-film organisation.
-
-The canonical architecture and acceptance record is maintained in:
+The canonical detailed contract is maintained in:
 
 ```text
 Assets/Docs/River_Foam_Stage6_Architecture.md
 ```
 
-### Canonical visual target
+### Current status
 
-Foam is one persistent floating surface material, not a collection of decals and not a shader-generated mask.
+Accepted and retained:
 
-The ordinary composition should contain:
+- the shared `64 / 96 / 128` structural tiers, with `96` as standard/default;
+- the thin dynamic Shore Support strip;
+- stationary attached Lee Support;
+- the geometry-supported Pressure Support envelope that removed unsupported forward shelves;
+- separate support and negative-influence diagnostics;
+- current water-level-aware Obstacle Footprint, accepted as sufficient for the present stage;
+- persistent field, chunking, quality, sleeping, freezing, and fixed-cost GPU infrastructure.
 
-- a few dominant eye-traceable contour ribbons and broken sheets;
-- medium branches and sparse fragile connectors;
-- medium and large dark-water pockets enclosed by film;
-- strong but intermittent organisation around shores, rocks, Pressure shoulders, and stationary lee regions;
-- torn edges, peeling strips, neck failures, splinters, and small secondary fragments;
-- substantial open water.
+Still unaccepted and scheduled for replacement:
 
-The network may move between connected, partly connected, and fragmented states. Small fragments must remain secondary.
+- Major Support;
+- Connector Support;
+- Pocket Aging Pressure;
+- topology-to-material response;
+- final lifespan, fragmentation, dissipation, and rendering behaviour.
 
-### Canonical architecture
+The provisional finite-structure Major/Connector/Pocket implementation is no longer canonical.
 
-Stage 6 separates three responsibilities:
+### Canonical material/topology relationship
 
-1. **Structural Topology** defines major and connector capacity, protected pockets, convergence preference, capture/residence, and permitted supply.
-2. **Persistent Material State** records actual Amount, Freshness, Integrity, and phase/provenance.
-3. **Material Processes** transport, supply, capture, preserve, damage, tear, peel, merge, and remove that material.
+Topology is a **soft lifespan influence**, not a binary occupancy map.
 
-Structural topology is capacity, not a final picture. Material does not appear merely because capacity is high.
+- Positive influence slows foam aging.
+- Neutral water uses the normal aging rate.
+- Negative influence accelerates foam aging.
+- Positive and negative influence may overlap and must remain separately available.
+- Topology does not directly spawn, erase, hide, or reveal foam.
+- A topology change alters future aging rate; existing foam continues through its own remaining lifetime.
 
-Capture and supply are separate. Shores, Pressure shoulders, and lee regions primarily organise, slow, and preserve existing material; solid objects instead remove invalid occupancy through Obstacle Exclusion. None of these are unlimited emitters. New Amount comes mainly from upstream inflow, bounded underfilled capture replenishment, tightly limited donor-supported repair, and weak extinction prevention.
+The old destructive composition:
 
-Conflict priority is:
+```text
+Positive × (1 - Negative)
+```
 
-1. valid domain and solid exclusion;
-2. downstream-only material causality;
-3. protected negative space;
-4. boundary and interaction capture;
-5. major film structures;
-6. branches, connectors, and junctions;
-7. tearing, fragments, and rendering detail.
+is no longer the canonical material response.
 
-### Preserved contracts
+The accepted direction is a continuous local aging multiplier derived from separate positive and negative fields. Exact formulae, defaults, and control names will be finalized only after visual testing.
 
-- authoritative river domain, metric spacing, bends, connected offsets, width variation, and reverse flow;
-- invalid storage padding beyond `Domain.LocalLength` contributes no topology, supply, population, retained state, or rendering;
-- accepted Stage 5 Pressure, stationary Wake/lee, boundary, registry, freeze, chunking, and lifecycle inputs remain read-only;
-- Impact Ripple-to-Film behaviour is deferred and is not part of current Stage 6 acceptance;
-- no coherent material feature, repair front, or merge front may travel upstream;
-- fixed-cost final shader with no per-source loops;
-- quality tiers, freezing, Amount zero, active chunks, sleeping, delayed release, resource cleanup, and scene reload remain mandatory.
+Obstacle handling is cost-first. Because opaque objects already hide most foam inside their footprint, Stage 6 will not add expensive hard removal merely for invisible polish. Batch 2 may use rapid negative aging, a cheap render clip, or no special hidden-material work, whichever fits the existing paths at the lowest cost. Hard transport/storage blocking is deferred unless visible leakage proves it necessary.
+
+### Foam lifecycle
+
+Persistent foam must carry lifetime information in addition to material amount and structural state.
+
+Foam death must not pop. The accepted direction is gradual loss of cohesion, stronger fragmentation, material dissipation, and visual thinning/fade near end of life. Exact thresholds remain provisional until implementation can be judged in motion.
+
+Topology does not create material. Upstream inflow remains the primary planned continuous source. Any additional source must be separately justified and rate-limited.
+
+### Remaining topology architecture
+
+The remaining free-water topology will use persistent evolving fields, not an evolving graph, node set, pathfinding network, or pool of tracked moving structures.
+
+- **Major Support:** one persistent broad-support field, advected and reshaped through asynchronous local growth, decay, shear, drift, merging, and splitting.
+- **Connector Support:** a persistent field that approaches locally derived bridge targets only where meaningful positive support exists on two sides of a gap.
+- **Pocket Aging Pressure:** a persistent negative field whose targets are generated inside sufficiently broad Major interiors while protecting Anchored Support and important Connector Support cores.
+
+“Birth” and “death” are growth and decay operations on these persistent fields, not separate stored layers.
+
+Topology work runs at lower cadence than material transport and is staggered across classes/chunks. Complexity should scale primarily with structural texel count rather than `texels × structures`.
+
+### Terminology
+
+The canonical Stage 6 names now describe lifecycle influence rather than hard occupancy:
+
+- `Pressure Support`, `Lee Support`, and `Shore Support` form `Anchored Support`;
+- `Major Support` and `Connector Support` are evolving positive lifespan support;
+- `Pocket Aging Pressure` is evolving negative lifespan influence;
+- `Obstacle Footprint` is water-level-aware object geometry, not a promise of an expensive hard simulation barrier.
+
+Retained debug enum numeric values and texture channel packing are unchanged. Low-level compatibility resource identifiers may keep older internal names where changing them would add risk without improving user-facing clarity.
+
+### Diagnostics
+
+Retain:
+
+- `Anchored Support` — Pressure Support, Lee Support, Shore Support;
+- `Support Classes` — Major Support, Connector Support, combined Anchored Support;
+- `Negative Influence Classes` — Pocket Aging Pressure and Obstacle Footprint;
+- `Support and Negative Influence` — combined support and combined negative influence shown together without destructive subtraction;
+- `Final Foam (Debug Off)` — normal rendered material.
+
+Yellow overlap in `Support and Negative Influence` means both influences exist. It does not mean either field has already erased the other.
 
 ### Structural resolution policy
 
-Stage 6 now uses the same quality-scaled structural grid for persistent material, topology, guidance, and exact Obstacle Exclusion instead of building topology on a much coarser hidden lattice. `Low` uses `64 × 64` cells per 32 m chunk region, `Medium` uses `96 × 96` and is the standard/default tier, and `High` uses `128 × 128`. Multi-chunk rivers extend the longitudinal dimension by chunk count. The existing channel-packed resource set is retained; no additional conceptual topology layers are introduced. The auxiliary fracture field remains half-resolution.
+Stage 6 uses one quality-scaled structural grid for persistent material, topology, guidance, and current Obstacle Footprint:
 
-### Canonical public controls
+- `Low`: `64 × 64` per 32 m chunk region;
+- `Medium`: `96 × 96`, standard/default;
+- `High`: `128 × 128`.
 
-The normal Inspector exposes only:
+Multi-chunk rivers extend the longitudinal dimension by chunk count. Physical topology scale and lifecycle behaviour remain metric and quality-independent.
+
+### Public controls
+
+The accepted main controls remain:
 
 - `Amount`
 - `Web Granularity`
@@ -351,121 +396,35 @@ The normal Inspector exposes only:
 - `Foam Speed`
 - `Foam Colour`
 
-Capture, persistence, connector durability, pocket protection, convergence, repair strength, and edge sharpness remain internal unless testing proves that a separate public control is necessary.
+Base lifetime and support/aging-pressure response also require authoring, but their names, ranges, grouping, and defaults are deferred to the future lifecycle-authoring pass.
 
-### Stage 6.2 — Surface Film Retarget
+### Implementation order
 
-**Status:** in progress. Batch 1A and Batch 1B established the simulation-neutral topology and interaction plumbing. The continuous-chain topology correction improved distribution but remained visually biased toward parallel river-length lanes. Batch 1C now replaces that grammar with finite local structures and ordered low-rate validation passes; Unity compilation and visual validation are pending.
+1. Documentation cleanup — complete.
+2. Canonical topology terminology rename — complete; serialized debug values and texture channels preserved.
+3. Replace and validate Major Support alone.
+4. Replace and validate Connector Support after Major passes.
+5. Replace and validate Pocket Aging Pressure after Major and Connector pass.
+6. Integrate soft topology-to-lifetime material response.
+7. Implement and tune end-of-life fragmentation/dissipation.
+8. Finalize rendering, controls, and PC-first profiling.
 
-#### Batch 1A — Geometry-Driven Topology Proof
+Major, Connector, and Pocket must be handled one at a time.
 
-**Implementation status:** complete in code; Unity validation pending. The new topology field is simulation-neutral and does not yet alter material transport, supply, tearing, or rendering.
+### Performance constraints
 
-Build and debug the topology representation before changing material behaviour.
+- no continuously maintained topology graph;
+- no permanent node network or pathfinding;
+- no GameObjects or managed records per foam patch or free-water structure;
+- no final-shader loops over objects or topology structures;
+- anchored geometry preprocessing only when sources change;
+- low-rate and staggered topology evolution;
+- inactive, sleeping, frozen, and distant chunks perform no unnecessary work;
+- profile update spikes as well as average cost.
 
-Initial inputs:
+### Failure rule
 
-- river geometry and global metric coordinates;
-- shore structure;
-- projected obstacle footprints;
-- bend organisation;
-- broad free-water rafts;
-- protected pocket fields;
-- medium branches and sparse connectors.
-
-Pressure, Wake/lee, and Impact are excluded from this first proof.
-
-Canonical Foam view menu:
-
-- `Final Foam (Debug Off)`
-- `Capture Zones`
-- `Positive Zone Classes`
-- `Negative Zone Classes`
-- `Positive and Negative Zones`
-
-All former Foam diagnostics and their shader/runtime branches have been removed. New views are added only when a specific diagnostic question requires them.
-
-**Acceptance:** paused topology must already show several long dominant structures, broad and narrow forms, medium and large protected pockets, clear bank/rock organisation, sparse subordinate connectors, substantial open water, stable metric scale, and no dominance by isolated ovals, short parallel lanes, stipple, or uniform fine webbing.
-
-If this fails, stop before further integration.
-
-#### Batch 1B — Accepted Interaction Inputs and Diagnostics
-
-**Implementation status:** complete in code; Unity validation pending. The interaction fields remain read-only and simulation-neutral.
-
-Implemented:
-
-- Pressure-shoulder organisation from the accepted static Pressure target;
-- stationary lee organisation from the accepted static Wake-source lee channel;
-- separate retained Pressure, lee, and shore positive source classes;
-- separate Pocket Exclusion and water-level-aware Obstacle Exclusion negative classes;
-- one one-time exact transformed-mesh solid-interval bake for Obstacle Exclusion, restricted to structural-grid Foam texels touched by each registered static solid;
-- nine conservative exact-mesh samples per retained structural texel, each storing up to two solid-height intervals plus the parameters required by the complete current Stage 3 surface-height evaluator;
-- a dedicated point-sampled `RHalf` Obstacle Exclusion mask at the shared structural resolution, reconstructed from those cached intervals only for bounded candidate texels;
-- one canonical `Capture Zones` diagnostic with Pressure, lee, and shore classes;
-- one `Positive Zone Classes` diagnostic for Major, Connector, and combined Capture support;
-- one `Negative Zone Classes` diagnostic distinguishing Pocket and Obstacle Exclusion;
-- one `Positive and Negative Zones` diagnostic showing combined positive support against combined negative topology;
-- canonical independent Pressure, lee, and shore capture channels with no cross-class context or hidden importance weights;
-- asynchronous GPU metrics for capacity coverage, pocket violations, source occupancy, perimeter ratio, dispatches, cadence, memory, chunks, sleeping, and release;
-- Impact-to-Foam reinforcement neutralised;
-- the six canonical public controls preserved without adding implementation-level controls.
-
-Impact remains deferred.
-
-**Independent-zone cleanup:** every positive Stage 6 topology class is stored independently. Major, Connector, Pressure, Lee, and Shore use only their own source data plus valid fluid-domain masking. Pocket Exclusion and water-level-aware Obstacle Exclusion are stored independently as negative classes. Obstacle Exclusion never uses the padded disturbance footprint, convex hull, pressure envelope, profile interpolation, or bounds fallback. It bakes exact solid-height entry/exit intervals from the transformed generated mesh once, using nine local-river-Up line/triangle samples for every retained full-resolution texel. During updates it evaluates the complete current Stage 3 water height at those exact sample positions and accepts a texel only when all nine positions are inside cached solid intervals. Ambiguous samples are rejected, so the point-sampled mask errs inward rather than extending beyond the visible object. Cross-class context multipliers, random shore gating, fixed class-importance weights, obstacle-driven Major cutting, Pocket pre-clipping of Connector capacity, repeated exclusion, and the former positive obstacle-attraction halo have been removed. Positive support is the unweighted maximum of the five positive classes; negative support is the unweighted maximum of the two exclusions; combined negative support is applied once at final composition. Any future source weighting or normalization requires a separate documented and validated decision.
-
-**Future Static Pressure geometry refactor:** the accepted Pressure system still performs a separate height-slice scan of the same generated mesh. It may be migrated later to derive its directional pressure envelope from the exact solid-volume interval data introduced for Obstacle Exclusion. That refactor is deliberately deferred because Pressure visuals are already accepted, but another independent mesh scanner must not be added.
-
-**Acceptance:** anchored sources remain stable, free-water topology evolves slowly and regionally, protected pockets survive lower-priority systems, Pressure/lee organise without becoming overlays, quality does not change physical topology scale, and Stage 5 visuals remain unchanged.
-
-#### Batch 1C — Finite Structure Topology
-
-**Implementation status:** complete in code; Unity compilation and visual validation pending.
-
-- Remove the always-on primary sheet and continuous metric node chain.
-- Rasterise finite enabled/disabled rafts and contour ribbons with explicit start/end extents, pointed tapers, lateral drift, overlap, and absence.
-- Validate pocket candidates through surrounding-ring support, host size, fluid boundary exposure, and solid exclusion.
-- Generate connectors only between separate accepted structure endpoints. Major capacity may validate endpoints but does not attenuate connector strength along the path.
-- Add deliberate diagonal branches and occasional asymmetric forks from accepted parent structures.
-- Keep Major Capacity independent from object-related positive and negative classes. Water-level-aware solid exclusion remains a separate source responsibility.
-- Retain only the four canonical Foam diagnostics plus the normal Debug Off state, and add composed coverage, open-span coverage, pocket-interior coverage, and connector-in-major overlap metrics.
-- Use three low-rate working fields for major structures, pockets, and connector/branch candidates; the final water shader still receives only the existing fixed-cost topology textures.
-
-No material transport, supply, tearing, merging, Impact integration, Stage 5 response, or final Foam rendering changes are part of Batch 1C.
-
-**Acceptance:** `Positive Zone Classes`, `Negative Zone Classes`, and `Positive and Negative Zones` must expose finite support regions, real unsupported spans, separate Pocket and water-level-aware Obstacle Exclusion, combined exclusion overlap, relational connectors, object influence through Pressure/Lee, and substantial open water without hiding source-class failures behind a single grayscale composite.
-
-#### Batch 2 — Persistent Material Response
-
-Make actual material inhabit and leave the accepted topology without directly copying it.
-
-- Upstream inflow is the primary continuous supply.
-- Capacity alone creates no material.
-- Convergence and capture remain downstream-causal.
-- Capture slows and preserves material temporarily, then permits peeling and release.
-- Repair is bounded and donor-supported.
-- Tearing opens holes, breaks necks, reopens seams, peels strips, and sheds secondary fragments.
-- Merging requires overlap or extremely short donor-causal convergence.
-- The shader provides only lit material response and stable sub-cell contour treatment.
-
-**Acceptance:** 10-second and 60-second gameplay views retain comparable broad population; several connected paths remain traceable; sheets, ribbons, branches, connectors, pockets, and secondary fragments coexist; torn areas do not repaint immediately; shores, rocks, Pressure shoulders, and lee regions capture and release material; no upstream feature or repair front, lattice, stipple cloud, synchronized pattern, or shader-created breakup is visible.
-
-### Remaining Stage 6 work
-
-1. Compile and visually validate the retained diagnostics: `Capture Zones`, `Positive Zone Classes`, `Negative Zone Classes`, and `Positive and Negative Zones`.
-2. Accept or reject the finite-structure field representation before Batch 2.
-3. Move topology updates from debug-only scheduling into ordinary material work when Batch 2 begins.
-4. Complete and validate Batch 2.
-5. Finalise lit off-white rendering and the six-control authoring pass.
-6. Profile PC-first memory, dispatches, active chunks, quality tiers, and worst-case overlap.
-7. Regress bends, width variation, connected offsets, reverse flow, freeze/thaw, Amount zero, quality switching, obstacle registration/removal, sleeping, delayed release, scene reload, and long-running stability.
-
-### Failure gate
-
-If Batch 1A cannot produce a convincing paused field-based topology, Stage 6 must switch to a low-rate GPU graph/ribbon topology rasterised into the shared capacity and material fields.
-
-The next response must change representation rather than apply another breakup, supply, Voronoi, or noise-coefficient patch around a failed topology.
+If the persistent field-based Major implementation fails, stop and diagnose the field scale, evolution, and relational rules. Do not automatically revert to a graph, moving-primitive conveyor, or unrelated noise masks. Any representation change requires measured evidence and explicit approval.
 
 ## 7. Secondary Water Effects
 

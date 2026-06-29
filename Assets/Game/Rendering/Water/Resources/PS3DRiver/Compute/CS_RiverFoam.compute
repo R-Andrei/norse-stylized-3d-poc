@@ -93,19 +93,19 @@ StructuredBuffer<FoamObstacleIntervalCell> _FoamObstacleCells;
 // record 0: x = quantised Amount sum, y = visible-cell count,
 //           z = valid fluid-cell count, w = guidance-lane cell count.
 // record 1: x = perimeter-cell count, y = broad-interior count,
-//           z = boundary-capture visible count, w = visible guidance-lane count.
+//           z = shore-support visible count, w = visible guidance-lane count.
 RWByteAddressBuffer _FoamPopulationMetrics;
 
 // One global topology diagnostic record. Values are uint counters; deficit is
 // quantised to 0..1023 per supported topology cell.
-//  0 valid cells             8 boundary-supported cells
-//  1 major-capacity cells    9 boundary-occupied cells
-//  2 connector cells        10 reserved
-//  3 protected-pocket cells 11 reserved
-//  4 pocket violations      12 Pressure/lee-supported cells
-//  5 visible material cells 13 Pressure/lee-occupied cells
-//  6 composed-support cells 14 perimeter-visible cells
-//  7 summed material deficit 15 connector cells overlapping major interiors
+//  0 valid cells                  8 shore-support cells
+//  1 major-support cells           9 foam within shore support
+//  2 connector-support cells      10 reserved
+//  3 pocket-pressure cells        11 reserved
+//  4 foam within pocket pressure  12 Pressure/Lee-support cells
+//  5 visible material cells       13 foam within Pressure/Lee support
+//  6 legacy net-support cells     14 perimeter-visible cells
+//  7 summed legacy deficit        15 Connector/Major overlap cells
 RWByteAddressBuffer _FoamTopologyMetrics;
 
 int2 _FoamDimensions;
@@ -129,6 +129,7 @@ float _FoamFieldLength;
 float _FoamValidLength;
 float _FoamSimulationLength;
 float _FoamFlowSpeed;
+float _FoamFlowDirection;
 float _FoamEvolution;
 float _FoamBreakup;
 float _FoamSpread;
@@ -229,6 +230,149 @@ float4 LoadBoundaryClasses(int2 coordinate)
 float2 LoadBoundary(int2 coordinate)
 {
     return LoadBoundaryClasses(coordinate).rg;
+}
+
+float LoadObstacleExclusionCell(int2 coordinate)
+{
+    if (coordinate.x < 0 || coordinate.x >= _FoamDimensions.x ||
+        coordinate.y < 0 || coordinate.y >= _FoamDimensions.y)
+    {
+        return 0.0;
+    }
+
+    return saturate(_FoamObstacleExclusionRead.Load(
+        int3(coordinate, 0)));
+}
+
+// Build the geometry-following Pressure support envelope implicitly from
+// upstream-facing cells in the authoritative exact-mesh Obstacle Footprint
+// mask. Each solid boundary cell supports only a short region immediately
+// upstream of its own lateral row. Adjacent rows provide at most one cell of
+// penalised side support for sloped/rotated silhouettes. Unsupported Pressure
+// fails closed: the Stage 5 candidate survives only where an actual current-
+// water solid boundary explicitly supports it.
+float ResolvePressureSupportEnvelope(
+    int2 coordinate,
+    float longitudinalSpacing,
+    float lateralSpacing)
+{
+    const int MaximumSearchCells = 10;
+    const int MaximumThicknessCells = 16;
+    const float MaximumSearchMetres = 1.35;
+    const int LateralProbeCount = 3;
+
+    if (LoadObstacleExclusionCell(coordinate) >= 0.5)
+    {
+        return 1.0;
+    }
+
+    int downstreamStep = _FoamFlowDirection >= 0.0 ? 1 : -1;
+    float support = 0.0;
+
+    [loop]
+    for (int probe = 0; probe < LateralProbeCount; probe++)
+    {
+        int lateralOffset = probe == 0 ? 0 :
+            (probe == 1 ? -1 : 1);
+        int firstSolidStep = -1;
+        int2 boundaryCoordinate = coordinate;
+
+        [loop]
+        for (int stepIndex = 0;
+             stepIndex < MaximumSearchCells;
+             stepIndex++)
+        {
+            if ((float)stepIndex * longitudinalSpacing >
+                MaximumSearchMetres)
+            {
+                break;
+            }
+
+            int2 sampleCoordinate = coordinate + int2(
+                downstreamStep * stepIndex,
+                lateralOffset);
+            if (LoadObstacleExclusionCell(sampleCoordinate) < 0.5)
+            {
+                continue;
+            }
+
+            firstSolidStep = stepIndex;
+            boundaryCoordinate = sampleCoordinate;
+            break;
+        }
+
+        if (firstSolidStep < 0)
+        {
+            continue;
+        }
+
+        // The first solid reached from open upstream water must be the local
+        // upstream-facing boundary. Reject any ambiguous interior hit rather
+        // than letting a deeper solid row support a forward shelf.
+        int2 upstreamNeighbour = boundaryCoordinate - int2(
+            downstreamStep,
+            0);
+        if (LoadObstacleExclusionCell(upstreamNeighbour) >= 0.5)
+        {
+            continue;
+        }
+
+        int thicknessCells = 0;
+        [loop]
+        for (int thicknessIndex = 0;
+             thicknessIndex < MaximumThicknessCells;
+             thicknessIndex++)
+        {
+            int2 sampleCoordinate = boundaryCoordinate + int2(
+                downstreamStep * thicknessIndex,
+                0);
+            if (LoadObstacleExclusionCell(sampleCoordinate) < 0.5)
+            {
+                break;
+            }
+
+            thicknessCells++;
+        }
+
+        float localThickness = max(
+            longitudinalSpacing,
+            (float)thicknessCells * longitudinalSpacing);
+        float minimumReach = max(
+            0.18,
+            longitudinalSpacing * 0.65);
+        float allowedReach = clamp(
+            0.16 + localThickness * 0.16,
+            minimumReach,
+            0.78);
+
+        float lateralDistance =
+            abs((float)lateralOffset) * lateralSpacing;
+        allowedReach = max(
+            0.0,
+            allowedReach - lateralDistance * 1.35);
+
+        float frontDistance = max(
+            0.0,
+            ((float)firstSolidStep - 0.5) * longitudinalSpacing);
+        float feather = max(
+            0.05,
+            longitudinalSpacing * 0.40);
+        float localSupport = 1.0 - smoothstep(
+            allowedReach,
+            allowedReach + feather,
+            frontDistance);
+
+        // Adjacent-row support exists only to keep angled silhouettes joined;
+        // it must not become an equal-strength source of flat lateral shelves.
+        if (lateralOffset != 0)
+        {
+            localSupport *= 0.82;
+        }
+
+        support = max(support, localSupport);
+    }
+
+    return saturate(support);
 }
 
 float Across01ToMetres(
@@ -1420,28 +1564,31 @@ float FoamSampleFluidCoverageAtTopologyUV(float2 uv)
 }
 
 
-float FoamCombinedCaptureSupport(float4 captureSources)
+float FoamCombinedAnchoredSupport(float4 anchoredSources)
 {
     return max(
-        max(captureSources.r, captureSources.g),
-        captureSources.b);
+        max(anchoredSources.r, anchoredSources.g),
+        anchoredSources.b);
 }
 
-float FoamCombinedNegativeSupport(float4 topology)
+float FoamCombinedNegativeInfluence(float4 topology)
 {
     return max(topology.b, topology.a);
 }
 
-float FoamComposeTopologySupport(
+// Compatibility helper for provisional metrics/guidance only. The accepted
+// soft-lifecycle material response must keep support and negative influence
+// separate rather than using this destructive composition.
+float FoamComposeLegacyNetSupport(
     float4 topology,
-    float4 captureSources)
+    float4 anchoredSources)
 {
-    float positiveSupport = max(
+    float combinedSupport = max(
         max(topology.r, topology.g),
-        FoamCombinedCaptureSupport(captureSources));
+        FoamCombinedAnchoredSupport(anchoredSources));
     return saturate(
-        positiveSupport *
-        (1.0 - FoamCombinedNegativeSupport(topology)));
+        combinedSupport *
+        (1.0 - FoamCombinedNegativeInfluence(topology)));
 }
 
 [numthreads(64, 1, 1)]
@@ -1683,7 +1830,7 @@ void BuildTopologyMajor(uint3 dispatchId : SV_DispatchThreadID)
     float shift = FoamTopologyStructureShift(spacing);
     float baseIndex = floor((globalDistance + shift) / spacing);
 
-    float majorCapacity = 0.0;
+    float majorSupport = 0.0;
     float broadInterior = 0.0;
     float contourCapacity = 0.0;
     float dominantIdentity = 0.0;
@@ -1709,7 +1856,7 @@ void BuildTopologyMajor(uint3 dispatchId : SV_DispatchThreadID)
             support,
             interior,
             contour);
-        majorCapacity = max(majorCapacity, support);
+        majorSupport = max(majorSupport, support);
         broadInterior = max(broadInterior, interior);
         contourCapacity = max(contourCapacity, contour);
         if (support > dominantSupport)
@@ -1724,16 +1871,16 @@ void BuildTopologyMajor(uint3 dispatchId : SV_DispatchThreadID)
     float bendSide = signedCurvature >= 0.0 ? 1.0 : -1.0;
     float bendCentre = bendSide * lerp(0.60, 0.48, granularity);
     float bendRibbon = curvatureStrength *
-        max(majorCapacity, contourCapacity) *
+        max(majorSupport, contourCapacity) *
         (1.0 - smoothstep(
             lerp(0.14, 0.10, granularity),
             lerp(0.44, 0.30, granularity),
             abs(lateralNormalized - bendCentre)));
-    majorCapacity = saturate(max(majorCapacity, bendRibbon));
+    majorSupport = saturate(max(majorSupport, bendRibbon));
 
     float domainMask = fluidCoverage * saturate(metric.topologyData.w);
     _FoamTopologyMajorWrite[outputCoordinate] = saturate(float4(
-        majorCapacity * domainMask,
+        majorSupport * domainMask,
         broadInterior * domainMask,
         dominantIdentity * domainMask,
         contourCapacity * domainMask));
@@ -2018,7 +2165,7 @@ void BuildTopologyConnectors(uint3 dispatchId : SV_DispatchThreadID)
     float baseIndex = floor((globalDistance + shift) / spacing);
     float currentMajor = FoamSampleMajorBilinear(uv).r;
 
-    float connectorCapacity = 0.0;
+    float connectorSupport = 0.0;
     float branchCapacity = 0.0;
     float endpointConfidence = 0.0;
     float overlapAmount = 0.0;
@@ -2092,7 +2239,7 @@ void BuildTopologyConnectors(uint3 dispatchId : SV_DispatchThreadID)
             1.0 - smoothstep(0.0, 0.20, pathAlong),
             smoothstep(0.80, 1.0, pathAlong));
         float connector = path * pairEnabled * endpointsValid;
-        connectorCapacity = max(connectorCapacity, connector);
+        connectorSupport = max(connectorSupport, connector);
         endpointConfidence = max(
             endpointConfidence,
             pairEnabled * endpointsValid);
@@ -2189,7 +2336,7 @@ void BuildTopologyConnectors(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     _FoamTopologyConnectorWrite[outputCoordinate] = saturate(float4(
-        connectorCapacity,
+        connectorSupport,
         branchCapacity,
         endpointConfidence,
         overlapAmount));
@@ -2224,6 +2371,13 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
         0,
         max(0, _FoamDimensions.x - 1));
     FoamMetricRow metric = _FoamMetricRows[metricX];
+    // The exact obstacle mask uses the full structural grid. Resolve its texel
+    // once here so Pressure Support and negative topology consume the same
+    // geometry-aligned coordinate without a half-texel disagreement.
+    int2 obstacleCoordinate = clamp(
+        (int2)floor(uv * (float2)_FoamDimensions),
+        int2(0, 0),
+        _FoamDimensions - 1);
     float4 majorWork = _FoamTopologyMajorRead.Load(
         int3(outputCoordinate, 0));
     float4 pocketWork = _FoamTopologyPocketRead.Load(
@@ -2231,11 +2385,11 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
     float4 connectorWork = _FoamTopologyConnectorRead.Load(
         int3(outputCoordinate, 0));
 
-    float majorCapacity = majorWork.r;
-    float connectorCapacity = max(
+    float majorSupport = majorWork.r;
+    float connectorSupport = max(
         connectorWork.r,
         connectorWork.g);
-    float pocketExclusion = pocketWork.r;
+    float pocketAgingPressure = pocketWork.r;
 
     float4 staticPressure = 0.0.xxxx;
     float4 staticWake = 0.0.xxxx;
@@ -2245,13 +2399,77 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
         staticWake = SampleStaticWakeBilinear(uv);
     }
 
-    // Canonical source classes are independent. Each class is derived only
-    // from its own source data plus the valid fluid-domain mask. No positive
-    // class gates, boosts, attenuates, or reshapes another positive class.
-    float pressureCapture = saturate(max(
-        abs(staticPressure.r),
-        length(staticPressure.gb)));
-    float leeCapture = saturate(max(0.0, staticWake.g));
+    // Canonical Anchored Support classes remain independent: no support class
+    // gates, boosts, attenuates, or reshapes another support class. Pressure
+    // may additionally consume the shared exact solid geometry mask solely to
+    // cap implausible open-water reach; that mask is not lifespan support and
+    // does not generate Pressure support.
+    // Pressure Support keeps the accepted Stage 5 pressure footprint, but it
+    // must be a measurable support area rather than a visualization of
+    // raw pressure amplitude. The pressure gradient already stores world-space
+    // height change per metre. Height / gradient therefore gives a local
+    // distance-to-edge estimate without rebuilding or resampling object
+    // geometry. Only the exposed upstream/side edges are tightened; the rear
+    // contact edge remains attached to the source.
+    float pressureHeight = max(0.0, staticPressure.r);
+    float2 pressureGradient = staticPressure.gb;
+    float pressureGradientLength = length(pressureGradient);
+    float pressureEdgeDistance = pressureHeight /
+        max(0.00001, pressureGradientLength);
+    float upstreamEdgeWeight = saturate(
+        max(0.0, pressureGradient.x) /
+        max(0.00001, pressureGradientLength));
+    float sideEdgeWeight = saturate(
+        abs(pressureGradient.y) /
+        max(0.00001, pressureGradientLength));
+    float exposedEdgeWeight = saturate(
+        upstreamEdgeWeight + sideEdgeWeight);
+    float upstreamShare = upstreamEdgeWeight /
+        max(0.00001, upstreamEdgeWeight + sideEdgeWeight);
+
+    // Contract the upstream reach only slightly. The metric-scaled values keep
+    // the adjustment consistent across the 64/96/128 structural tiers while
+    // preserving a narrow, at-most-one-cell transition instead of the former
+    // broad fuzzy shoulder.
+    float pressureUpstreamInset = max(
+        0.08,
+        metric.widthsAndSpacing.z * 0.35);
+    float pressureUpstreamFeather = max(
+        0.05,
+        metric.widthsAndSpacing.z * 0.22);
+    float pressureSideFeather = max(
+        0.025,
+        metric.widthsAndSpacing.w * 0.75);
+    float pressureEdgeInset = pressureUpstreamInset * upstreamShare;
+    float pressureEdgeFeather = lerp(
+        pressureSideFeather,
+        pressureUpstreamFeather,
+        upstreamShare);
+    float pressureEdgeGate = smoothstep(
+        pressureEdgeInset,
+        pressureEdgeInset + pressureEdgeFeather,
+        pressureEdgeDistance);
+    float pressurePresence = smoothstep(
+        0.0005,
+        0.003,
+        pressureHeight);
+    float pressureSupport = saturate(
+        pressurePresence *
+        lerp(1.0, pressureEdgeGate, exposedEdgeWeight));
+
+    // Keep the accepted Stage 5 field as the candidate shape, but intersect it
+    // with a fail-closed envelope emitted by the exact current-water upstream
+    // solid boundary. This removes unsupported forward shelves without
+    // rebuilding Pressure, expanding it, or changing Stage 5 behaviour.
+    if (pressureSupport > 0.0001)
+    {
+        pressureSupport *= ResolvePressureSupportEnvelope(
+            obstacleCoordinate,
+            max(0.001, metric.widthsAndSpacing.z),
+            max(0.001, metric.widthsAndSpacing.w));
+    }
+
+    float leeSupport = saturate(max(0.0, staticWake.g));
 
     float2 currentShoreEdges = _FoamCurrentShoreEdgesRead.Load(
         int3(outputCoordinate.x, 0, 0));
@@ -2267,7 +2485,7 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
     float shoreTotalWidth = max(
         0.001,
         _FoamShoreCaptureCoreWidth + _FoamShoreCaptureFadeWidth);
-    float shoreCapture = nearestCurrentShore >= 0.0
+    float shoreSupport = nearestCurrentShore >= 0.0
         ? 1.0 - smoothstep(
             max(0.0, _FoamShoreCaptureCoreWidth),
             shoreTotalWidth,
@@ -2275,31 +2493,26 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
         : 0.0;
 
     float validDomainMask = saturate(metric.topologyData.w);
-    // Obstacle Exclusion is point-sampled and each texel owns its complete
-    // UV rectangle. Use the same floor(uv * dimensions) convention as the
-    // final shader diagnostic so the derived topology copy cannot shift by a
-    // half texel relative to the authoritative full-resolution mask.
-    int2 obstacleCoordinate = clamp(
-        (int2)floor(uv * (float2)_FoamDimensions),
-        int2(0, 0),
-        _FoamDimensions - 1);
-    float obstacleExclusion = saturate(
+    // Obstacle Footprint is point-sampled and each texel owns its complete
+    // UV rectangle. Pressure Support above uses this exact same coordinate and
+    // source mask for its local upstream boundary clamp.
+    float obstacleFootprint = saturate(
         _FoamObstacleExclusionRead.Load(
             int3(obstacleCoordinate, 0))) * validDomainMask;
     float staticFluidMask = fluidCoverage * validDomainMask;
-    float dynamicShoreMask = shoreCapture * validDomainMask *
-        (1.0 - obstacleExclusion);
-    // Topology RGBA = Major, Connector, Pocket Exclusion, and the derived
+    float dynamicShoreMask = shoreSupport * validDomainMask *
+        (1.0 - obstacleFootprint);
+    // Topology RGBA = Major, Connector, Pocket Aging Pressure, and the derived
     // guidance-resolution copy of the conservative current-water solid mask.
-    // Positive source RGBA = Pressure, Lee, Shore, zero.
+    // Anchored source RGBA = Pressure Support, Lee Support, Shore Support, zero.
     float4 topology = saturate(float4(
-        majorCapacity * staticFluidMask,
-        connectorCapacity * staticFluidMask,
-        pocketExclusion * staticFluidMask,
-        obstacleExclusion));
+        majorSupport * staticFluidMask,
+        connectorSupport * staticFluidMask,
+        pocketAgingPressure * staticFluidMask,
+        obstacleFootprint));
     float4 sources = saturate(float4(
-        pressureCapture * staticFluidMask,
-        leeCapture * staticFluidMask,
+        pressureSupport * staticFluidMask,
+        leeSupport * staticFluidMask,
         dynamicShoreMask,
         0.0));
 
@@ -2343,13 +2556,13 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
 
     float4 topology = _FoamTopologyRead.Load(int3(dispatchId.xy, 0));
     float4 sources = _FoamTopologySourcesRead.Load(int3(dispatchId.xy, 0));
-    float composed = FoamComposeTopologySupport(topology, sources);
+    float legacyNetSupport = FoamComposeLegacyNetSupport(topology, sources);
     float amount = SampleStateAtUV(uv).x;
     bool visible = amount >= _FoamVisibleThreshold;
     bool major = topology.r >= 0.15;
     bool connector = topology.g >= 0.12;
     bool pocket = topology.b >= 0.35;
-    bool supported = composed >= 0.15;
+    bool supported = legacyNetSupport >= 0.15;
     bool shoreSupported = sources.b >= 0.15;
     bool pressureLeeSupported = max(sources.r, sources.g) >= 0.15;
 
@@ -2373,7 +2586,7 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     _FoamTopologyMetrics.InterlockedAdd(20u, visible ? 1u : 0u, originalValue);
     _FoamTopologyMetrics.InterlockedAdd(24u, supported ? 1u : 0u, originalValue);
     uint deficitValue = supported
-        ? (uint)round(saturate(composed - amount) * 1023.0)
+        ? (uint)round(saturate(legacyNetSupport - amount) * 1023.0)
         : 0u;
     _FoamTopologyMetrics.InterlockedAdd(28u, deficitValue, originalValue);
     _FoamTopologyMetrics.InterlockedAdd(

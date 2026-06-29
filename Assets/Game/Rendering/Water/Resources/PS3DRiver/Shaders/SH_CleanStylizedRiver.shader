@@ -90,7 +90,7 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamTopologySources("Foam Topology Sources", 2D) = "black" {}
         [HideInInspector] _FoamFracture("Foam Fracture", 2D) = "black" {}
         [HideInInspector] _FoamBoundary("Foam Boundary", 2D) = "black" {}
-        [HideInInspector] _FoamObstacleExclusion("Foam Obstacle Exclusion", 2D) = "black" {}
+        [HideInInspector] _FoamObstacleExclusion("Foam Obstacle Footprint", 2D) = "black" {}
         [HideInInspector] _FoamInterpolation("Foam Interpolation", Range(0, 1)) = 1
         [HideInInspector] _FoamGlobalStart("Foam Global Start", Float) = 0
         [HideInInspector] _FoamFieldLength("Foam Field Length", Float) = 1
@@ -806,83 +806,80 @@ Shader "PS3D/Stylized River Water"
                 if (foamDebug == 3 || foamDebug == 6 ||
                     foamDebug == 7 || foamDebug == 8)
                 {
-                    float4 topologyDebug = SAMPLE_TEXTURE2D_LOD(
-                        _FoamTopology,
-                        sampler_FoamCurrent,
-                        foam.fieldUV,
-                        0.0);
-                    float4 topologySources = SAMPLE_TEXTURE2D_LOD(
-                        _FoamTopologySources,
-                        sampler_FoamCurrent,
-                        foam.fieldUV,
-                        0.0);
+                    // Stage 6 support, negative-influence, and obstacle-footprint textures share
+                    // the same structural grid. Diagnostics deliberately use
+                    // point loads so a displayed boundary is the actual stored
+                    // topology boundary, not a bilinear visualization blur.
+                    int2 structuralDimensions = int2(
+                        max(1.0, _FoamObstacleExclusion_TexelSize.z),
+                        max(1.0, _FoamObstacleExclusion_TexelSize.w));
+                    int2 structuralCoordinate = clamp(
+                        (int2)floor(
+                            foam.fieldUV *
+                            (float2)structuralDimensions),
+                        int2(0, 0),
+                        structuralDimensions - 1);
+                    float4 topologyDebug = _FoamTopology.Load(
+                        int3(structuralCoordinate, 0));
+                    float4 anchoredSources = _FoamTopologySources.Load(
+                        int3(structuralCoordinate, 0));
 
                     float freeWaterSupport = max(
                         topologyDebug.r,
                         topologyDebug.g);
-                    float combinedCaptureSupport = max(
-                        max(topologySources.r, topologySources.g),
-                        topologySources.b);
-                    int2 obstacleDimensions = int2(
-                        max(1.0, _FoamObstacleExclusion_TexelSize.z),
-                        max(1.0, _FoamObstacleExclusion_TexelSize.w));
-                    int2 obstacleCoordinate = clamp(
-                        (int2)floor(
-                            foam.fieldUV *
-                            (float2)obstacleDimensions),
-                        int2(0, 0),
-                        obstacleDimensions - 1);
-                    float obstacleExclusion = saturate(
+                    float combinedAnchoredSupport = max(
+                        max(anchoredSources.r, anchoredSources.g),
+                        anchoredSources.b);
+                    float obstacleFootprint = saturate(
                         _FoamObstacleExclusion.Load(
-                            int3(obstacleCoordinate, 0)).r);
-                    float combinedNegativeSupport = max(
+                            int3(structuralCoordinate, 0)).r);
+                    float combinedNegativeInfluence = max(
                         topologyDebug.b,
-                        obstacleExclusion);
+                        obstacleFootprint);
 
                     if (foamDebug == 3)
                     {
-                        // Canonical independent positive capture classes.
-                        // Red = Pressure, green = Lee, blue = Shore.
+                        // Canonical independent Anchored Support classes.
+                        // Red = Pressure Support, green = Lee Support, blue = Shore Support.
                         return half4(
-                            saturate(topologySources.r),
-                            saturate(topologySources.g),
-                            saturate(topologySources.b),
+                            saturate(anchoredSources.r),
+                            saturate(anchoredSources.g),
+                            saturate(anchoredSources.b),
                             1.0);
                     }
 
                     if (foamDebug == 8)
                     {
-                        // Independent negative topology classes. Red = Pocket
-                        // Exclusion, blue = conservative current-water Obstacle
-                        // Exclusion from the full-resolution exact-mesh solid-interval mask.
+                        // Independent negative-influence inputs. Red = Pocket Aging
+                        // Pressure, blue = the conservative current-water Obstacle
+                        // Footprint from the exact-mesh solid-interval mask.
                         return half4(
                             saturate(topologyDebug.b),
                             0.0,
-                            obstacleExclusion,
+                            obstacleFootprint,
                             1.0);
                     }
 
                     if (foamDebug == 6)
                     {
-                        // Green is every positive class before subtraction.
-                        // Red is the combined negative topology. Additive
-                        // overlap is yellow.
-                        float positiveSupport = saturate(
-                            max(freeWaterSupport, combinedCaptureSupport));
+                        // Green is combined lifespan support. Red is combined negative
+                        // influence. Additive overlap is yellow and does not imply
+                        // that either field has already erased the other.
+                        float combinedSupport = saturate(
+                            max(freeWaterSupport, combinedAnchoredSupport));
                         return half4(
-                            saturate(combinedNegativeSupport),
-                            positiveSupport,
+                            saturate(combinedNegativeInfluence),
+                            combinedSupport,
                             0.0,
                             1.0);
                     }
 
-                    // Red = independent Major Capacity, green = independent
-                    // Connector Capacity, and blue = combined Pressure, Lee,
-                    // and Shore Capture.
+                    // Red = independent Major Support, green = independent
+                    // Connector Support, and blue = combined Anchored Support.
                     return half4(
                         saturate(topologyDebug.r),
                         saturate(topologyDebug.g),
-                        saturate(combinedCaptureSupport),
+                        saturate(combinedAnchoredSupport),
                         1.0);
                 }
 

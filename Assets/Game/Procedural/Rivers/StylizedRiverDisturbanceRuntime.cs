@@ -786,7 +786,7 @@ namespace ProgrammaticStylized3D.Rivers
         public RenderTexture CurrentRippleTexture => currentState;
         public RenderTexture StaticWakeSourceTexture => staticWakeSource;
         // Stage 6 consumes the already accepted stationary Pressure target as
-        // a read-only capture influence. Foam never writes to or reinterprets
+        // a read-only Pressure Support input. Foam never writes to or reinterprets
         // the Stage 5 field.
         public RenderTexture StaticPressureTexture => staticTarget;
         public Vector2Int WakeTextureDimensions => currentWake != null
@@ -2812,7 +2812,7 @@ namespace ProgrammaticStylized3D.Rivers
                         localRiverWidth);
 
                 // TODO: Pressure currently performs its own height-slice scan.
-                // Stage 6 Obstacle Exclusion now bakes exact solid intervals
+                // Stage 6 Obstacle Footprint now bakes exact solid intervals
                 // from this same generated mesh. Pressure should eventually
                 // consume that shared underlying solid data and apply only its
                 // directional shaping, rather than scanning geometry again.

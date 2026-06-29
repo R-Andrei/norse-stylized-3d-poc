@@ -36,7 +36,7 @@ namespace ProgrammaticStylized3D.Rivers
     }
 
     /// <summary>
-    /// One-time exact-mesh baker for Stage 6 Obstacle Exclusion.
+    /// One-time exact-mesh baker for Stage 6 Obstacle Footprint.
     ///
     /// For every conservative sample inside a candidate Foam texel, the baker
     /// intersects a line through the actual transformed generated mesh along

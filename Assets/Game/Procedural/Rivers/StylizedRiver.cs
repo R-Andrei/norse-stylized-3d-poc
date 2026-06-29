@@ -99,12 +99,12 @@ namespace ProgrammaticStylized3D.Rivers
     {
         // Zero is the normal rendered result and acts as the debug-off state.
         Final = 0,
-        // Numeric values 3, 6, and 7 are retained so existing serialized
+        // Numeric values 3, 6, 7, and 8 are retained so existing serialized
         // selections survive the removal of obsolete Foam diagnostics.
-        CaptureZones = 3,
-        PositiveNegativeZones = 6,
-        PositiveZoneClasses = 7,
-        NegativeZoneClasses = 8
+        AnchoredSupport = 3,
+        SupportAndNegativeInfluence = 6,
+        SupportClasses = 7,
+        NegativeInfluenceClasses = 8
     }
 
     public enum StylizedRiverDisturbanceDebugView
@@ -1476,14 +1476,14 @@ namespace ProgrammaticStylized3D.Rivers
         {
             switch ((int)value)
             {
-                case (int)StylizedRiverFoamDebugView.CaptureZones:
-                    return StylizedRiverFoamDebugView.CaptureZones;
-                case (int)StylizedRiverFoamDebugView.PositiveNegativeZones:
-                    return StylizedRiverFoamDebugView.PositiveNegativeZones;
-                case (int)StylizedRiverFoamDebugView.PositiveZoneClasses:
-                    return StylizedRiverFoamDebugView.PositiveZoneClasses;
-                case (int)StylizedRiverFoamDebugView.NegativeZoneClasses:
-                    return StylizedRiverFoamDebugView.NegativeZoneClasses;
+                case (int)StylizedRiverFoamDebugView.AnchoredSupport:
+                    return StylizedRiverFoamDebugView.AnchoredSupport;
+                case (int)StylizedRiverFoamDebugView.SupportAndNegativeInfluence:
+                    return StylizedRiverFoamDebugView.SupportAndNegativeInfluence;
+                case (int)StylizedRiverFoamDebugView.SupportClasses:
+                    return StylizedRiverFoamDebugView.SupportClasses;
+                case (int)StylizedRiverFoamDebugView.NegativeInfluenceClasses:
+                    return StylizedRiverFoamDebugView.NegativeInfluenceClasses;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }
@@ -2076,25 +2076,25 @@ namespace ProgrammaticStylized3D.Rivers
                 int legacyDebug = (int)foamDebugView;
                 switch (legacyDebug)
                 {
-                    case 7:  // Capture
-                    case 14: // Topology Sources
-                    case 15: // Capture and Residence
+                    case 7:  // Former anchored-source diagnostic
+                    case 14: // Former source-class diagnostic
+                    case 15: // Former source/residence diagnostic
                         foamDebugView =
-                            StylizedRiverFoamDebugView.CaptureZones;
+                            StylizedRiverFoamDebugView.AnchoredSupport;
                         break;
 
-                    case 9:  // Major Capacity
-                    case 10: // Connector Capacity
+                    case 9:  // Former broad-support diagnostic
+                    case 10: // Former connector diagnostic
                     case 12: // Boundary Organisation
                         foamDebugView =
-                            StylizedRiverFoamDebugView.PositiveZoneClasses;
+                            StylizedRiverFoamDebugView.SupportClasses;
                         break;
 
-                    case 11: // Pocket Exclusion
+                    case 11: // Former pocket diagnostic
                     case 13: // Composed Topology
-                    case 17: // Material vs Capacity
+                    case 17: // Former material/support comparison
                         foamDebugView =
-                            StylizedRiverFoamDebugView.PositiveNegativeZones;
+                            StylizedRiverFoamDebugView.SupportAndNegativeInfluence;
                         break;
 
                     default:
@@ -2114,23 +2114,23 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     case 1: // Former Composed Topology
                         foamDebugView =
-                            StylizedRiverFoamDebugView.PositiveNegativeZones;
+                            StylizedRiverFoamDebugView.SupportAndNegativeInfluence;
                         break;
                     case 2: // Former Topology Breakdown
                         foamDebugView =
-                            StylizedRiverFoamDebugView.PositiveZoneClasses;
+                            StylizedRiverFoamDebugView.SupportClasses;
                         break;
                     case 3:
                         foamDebugView =
-                            StylizedRiverFoamDebugView.CaptureZones;
+                            StylizedRiverFoamDebugView.AnchoredSupport;
                         break;
                     case 6:
                         foamDebugView =
-                            StylizedRiverFoamDebugView.PositiveNegativeZones;
+                            StylizedRiverFoamDebugView.SupportAndNegativeInfluence;
                         break;
                     case 7:
                         foamDebugView =
-                            StylizedRiverFoamDebugView.PositiveZoneClasses;
+                            StylizedRiverFoamDebugView.SupportClasses;
                         break;
                     default:
                         foamDebugView = StylizedRiverFoamDebugView.Final;

@@ -329,7 +329,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("quality"),
                 new GUIContent(
                     "Quality",
-                    "Controls water geometry and the Stage 6 structural grid. Foam/material, topology, guidance, and obstacle exclusion use 64 cells across at Low, 96 at Medium (standard), and 128 at High. The Stage 1 domain remains the authoritative coordinate source."));
+                    "Controls water geometry and the Stage 6 structural grid. Foam/material, topology, guidance, and obstacle footprint use 64 cells across at Low, 96 at Medium (standard), and 128 at High. The Stage 1 domain remains the authoritative coordinate source."));
             EditorGUILayout.PropertyField(
                 Find("surfaceOffset"),
                 new GUIContent("Water Level Offset"));
@@ -1455,7 +1455,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6.2 retains read-only Pressure, stationary Lee, and dynamic Shore as independent positive classes, while Pocket Exclusion and water-level-aware Obstacle Exclusion remain independent negative classes. Impact remains deliberately inactive.",
+                "Stage 6.2 retains Pressure Support, stationary Lee Support, and dynamic Shore Support as independent anchored lifespan-support classes. Pocket Aging Pressure remains a soft negative influence, while the water-level-aware Obstacle Footprint remains a separate geometry mask. Impact remains deliberately inactive.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1664,18 +1664,18 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             string[] foamDebugLabels =
             {
                 "Final Foam (Debug Off)",
-                "Capture Zones",
-                "Positive Zone Classes",
-                "Negative Zone Classes",
-                "Positive and Negative Zones"
+                "Anchored Support",
+                "Support Classes",
+                "Negative Influence Classes",
+                "Support and Negative Influence"
             };
             int[] foamDebugValues =
             {
                 (int)StylizedRiverFoamDebugView.Final,
-                (int)StylizedRiverFoamDebugView.CaptureZones,
-                (int)StylizedRiverFoamDebugView.PositiveZoneClasses,
-                (int)StylizedRiverFoamDebugView.NegativeZoneClasses,
-                (int)StylizedRiverFoamDebugView.PositiveNegativeZones
+                (int)StylizedRiverFoamDebugView.AnchoredSupport,
+                (int)StylizedRiverFoamDebugView.SupportClasses,
+                (int)StylizedRiverFoamDebugView.NegativeInfluenceClasses,
+                (int)StylizedRiverFoamDebugView.SupportAndNegativeInfluence
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -1718,8 +1718,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Batch 1C replaces the continuous river-length chain with finite local rafts and ribbons. Enclosed pockets are ring-validated, connectors require separate structure endpoints, branches form deliberate forks, and conservative water-level solid cross-sections remain separate negative topology instead of deforming positive classes. Capacity still does not feed material simulation."),
-                new GUIContent("Batch 1C finite structures"));
+                    "The accepted anchored support and obstacle-footprint inputs use the new soft-lifecycle terminology. The current free-water Major, Connector, and Pocket implementation remains provisional and will be replaced one class at a time; this naming pass changes no topology behaviour or material response."),
+                new GUIContent("Soft-lifecycle terminology"));
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
                 new GUIContent(
@@ -1737,7 +1737,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Topology Resolution",
-                    "Primary RGBAHalf topology field at the same structural resolution as persistent material: red is Major Capacity, green Connector/Branch Capacity, blue Pocket Exclusion, and alpha is the structural-grid copy of water-level-aware Obstacle Exclusion. The authoritative debug mask is a dedicated point-sampled texture at that same resolution, reconstructed from one-time exact transformed-mesh solid intervals at the current Stage 3 water height. The companion source-class texture stores canonical Pressure, Lee, and Shore capture separately; alpha is reserved zero. Every positive class is computed independently, while negative classes remain separate until final composition."),
+                    "Primary RGBAHalf topology field at the same structural resolution as persistent material: red is Major Support, green Connector Support, blue Pocket Aging Pressure, and alpha is the structural-grid copy of the water-level-aware Obstacle Footprint. The authoritative footprint diagnostic uses a dedicated point-sampled texture at that same resolution, reconstructed from one-time exact transformed-mesh solid intervals at the current Stage 3 water height. The companion anchored-source texture stores Pressure Support, Lee Support, and Shore Support separately; alpha is reserved zero. Support and negative influence remain separately available rather than being treated as hard occupancy permission."),
                 new GUIContent(
                     runtime.ResourcesAllocated
                         ? $"{runtime.TopologyWidth} × {runtime.TopologyHeight}"
@@ -1745,7 +1745,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Dynamic Shore Rows",
-                    "One shared Stage 3 shoreline record per topology column. Each record stores the current left and right visible water edges after macro-wave displacement and hidden-bank-cover intersection. Shore Capture is a 0.24 m solid band plus a 0.03 m inward fade from those moving edges."),
+                    "One shared Stage 3 shoreline record per topology column. Each record stores the current left and right visible water edges after macro-wave displacement and hidden-bank-cover intersection. Shore Support is a 0.24 m solid band plus a 0.03 m inward fade from those moving edges."),
                 new GUIContent(
                     runtime.ResourcesAllocated
                         ? runtime.DynamicShoreRowCount.ToString()
@@ -1762,35 +1762,35 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 EditorGUI.indentLevel++;
                 EditorGUILayout.LabelField(
-                    "Major Capacity Coverage",
-                    FormatPercent(runtime.MajorCapacityCoverage));
+                    "Major Support Coverage",
+                    FormatPercent(runtime.MajorSupportCoverage));
                 EditorGUILayout.LabelField(
-                    "Composed Topology Coverage",
-                    FormatPercent(runtime.ComposedTopologyCoverage));
+                    "Legacy Net Support Coverage",
+                    FormatPercent(runtime.LegacyNetSupportCoverage));
                 EditorGUILayout.LabelField(
                     "Open Span Coverage",
                     FormatPercent(runtime.OpenSpanCoverage));
                 EditorGUILayout.LabelField(
-                    "Connector Capacity Coverage",
-                    FormatPercent(runtime.ConnectorCapacityCoverage));
+                    "Connector Support Coverage",
+                    FormatPercent(runtime.ConnectorSupportCoverage));
                 EditorGUILayout.LabelField(
-                    "Connector in Major Overlap",
-                    FormatPercent(runtime.ConnectorInMajorOverlap));
+                    "Connector / Major Overlap",
+                    FormatPercent(runtime.ConnectorMajorOverlap));
                 EditorGUILayout.LabelField(
-                    "Pocket Interior Coverage",
-                    FormatPercent(runtime.ProtectedPocketCoverage));
+                    "Pocket Aging Pressure Coverage",
+                    FormatPercent(runtime.PocketPressureCoverage));
                 EditorGUILayout.LabelField(
-                    "Pocket Violation",
-                    FormatPercent(runtime.ProtectedPocketViolation));
+                    "Foam Within Pocket Pressure",
+                    FormatPercent(runtime.FoamWithinPocketPressure));
                 EditorGUILayout.LabelField(
                     "Visible Material Coverage",
                     FormatPercent(runtime.VisibleMaterialCoverage));
                 EditorGUILayout.LabelField(
-                    "Shore Occupancy",
-                    FormatPercent(runtime.ShoreOccupancy));
+                    "Foam Within Shore Support",
+                    FormatPercent(runtime.FoamWithinShoreSupport));
                 EditorGUILayout.LabelField(
-                    "Pressure / Lee Occupancy",
-                    FormatPercent(runtime.PressureLeeOccupancy));
+                    "Foam Within Pressure / Lee Support",
+                    FormatPercent(runtime.FoamWithinPressureLeeSupport));
                 EditorGUILayout.LabelField(
                     "Perimeter Ratio",
                     FormatPercent(runtime.PerimeterRatio));
@@ -2263,21 +2263,21 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     return
                         "Normal rendered Foam result. No Foam diagnostic colour encoding is active.";
 
-                case StylizedRiverFoamDebugView.CaptureZones:
+                case StylizedRiverFoamDebugView.AnchoredSupport:
                     return
-                        "Canonical independent positive Capture Zones. Red = Pressure. Green = attached Lee. Blue = Shore. Shore is a fixed metric band measured inward from the instantaneous Stage 3 visible water edge: 0.24 m solid capture plus a 0.03 m fade. The edge is resolved from the same macro-wave and shore attenuation functions used by the water shader, not from the static shoreline allowance. No capture class or free-water class modifies another. Overlaps mix directly. These same three values are collapsed into the blue Capture class in Positive Zone Classes.";
+                        "Canonical independent Anchored Support, point-sampled from the shared structural grid so the displayed boundary is the actual stored topology boundary rather than a bilinear blur. Red = Pressure Support. It preserves the accepted Stage 5 footprint as its candidate field, then intersects it with the fail-closed upstream support envelope emitted by the exact current-water solid boundary. Green = attached Lee Support. Blue = Shore Support, measured inward from the instantaneous Stage 3 visible edge as a 0.24 m solid band plus a 0.03 m fade. No support class reshapes another. Overlaps mix directly. The same three values are collapsed into the blue Anchored Support class in Support Classes.";
 
-                case StylizedRiverFoamDebugView.PositiveZoneClasses:
+                case StylizedRiverFoamDebugView.SupportClasses:
                     return
-                        "Red = independent Major Capacity. Green = independent Connector Capacity. Blue = the maximum of the exact canonical Pressure, Lee, and Shore values shown separately in Capture Zones. No positive class is weighted against another. Overlaps mix. Black = no positive support. Negative topology is intentionally omitted.";
+                        "Red = independent Major Support. Green = independent Connector Support. Blue = the maximum of Pressure Support, Lee Support, and Shore Support shown separately in Anchored Support. No support class is weighted against another. Overlaps mix. Black = no lifespan support. Negative influence is intentionally omitted.";
 
-                case StylizedRiverFoamDebugView.NegativeZoneClasses:
+                case StylizedRiverFoamDebugView.NegativeInfluenceClasses:
                     return
-                        "Independent negative topology classes. Red = Pocket Exclusion. Blue = Obstacle Exclusion from the conservative current-water-level solid cross-section. Magenta = overlap. The mask is point-sampled; each retained texel must pass a conservative 3×3 set of exact-mesh solid-interval tests across its displayed rectangle, and it is never expanded into a surrounding halo.";
+                        "Independent negative-influence inputs. Red = Pocket Aging Pressure. Blue = Obstacle Footprint from the conservative current-water-level solid cross-section. Magenta = overlap. The footprint is point-sampled; each retained texel must pass the conservative exact-mesh solid-interval tests across its displayed rectangle, and it is never expanded into a surrounding halo.";
 
-                case StylizedRiverFoamDebugView.PositiveNegativeZones:
+                case StylizedRiverFoamDebugView.SupportAndNegativeInfluence:
                     return
-                        "Green = the unweighted maximum of Major Capacity, Connector Capacity, Pressure, Lee, and Shore before exclusion. Red = the maximum of Pocket Exclusion and Obstacle Exclusion. Yellow = overlap where combined negative topology removes positive support. Black = neither.";
+                        "Green = the unweighted maximum of Major Support, Connector Support, Pressure Support, Lee Support, and Shore Support. Red = the maximum of Pocket Aging Pressure and Obstacle Footprint. Yellow means both are present at the same location; it does not mean either field has already erased the other. Black = neither.";
 
                 default:
                     return "Normal rendered Foam result. No Foam diagnostic colour encoding is active.";
