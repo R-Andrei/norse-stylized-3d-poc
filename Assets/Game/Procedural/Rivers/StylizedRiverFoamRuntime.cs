@@ -10,8 +10,8 @@ namespace ProgrammaticStylized3D.Rivers
     /// <summary>
     /// Hidden Stage 6 runtime that owns the complete shared Foam network.
     /// Amount, Freshness, Integrity, and material phase are transported in one
-    /// persistent state while a low-resolution guidance field, GPU-only
-    /// population controller, boundaries, Wake, and Impact activity organise
+    /// persistent state while a shared structural-resolution guidance field,
+    /// GPU-only population controller, boundaries, Wake, and Impact activity organise
     /// that material into an evolving web-like tracer network.
     /// </summary>
     [ExecuteAlways]
@@ -23,6 +23,13 @@ namespace ProgrammaticStylized3D.Rivers
         private const string ComputeResourcePath =
             "PS3DRiver/Compute/CS_RiverFoam";
         private const float ChunkLengthMetres = 32f;
+        // Stage 6 structural resolution is shared by persistent material,
+        // topology, guidance, and the authoritative obstacle mask. Medium is
+        // the standard project tier; Low and High preserve the same physical
+        // topology scale while changing only spatial precision and workload.
+        private const int LowStructuralResolution = 64;
+        private const int MediumStructuralResolution = 96;
+        private const int HighStructuralResolution = 128;
         private const float ResourceReleaseDelaySeconds = 2f;
         private const float MaximumManualReservationSeconds = 90f;
         private const float DecayToFivePercent = 2.995732f;
@@ -884,13 +891,9 @@ namespace ProgrammaticStylized3D.Rivers
             chunkCount = Mathf.Max(
                 1,
                 Mathf.CeilToInt(domain.LocalLength / ChunkLengthMetres));
-            resolutionPerChunk = river.Quality switch
-            {
-                StylizedRiverQuality.Low => 32,
-                StylizedRiverQuality.Medium => 48,
-                StylizedRiverQuality.High => 64,
-                _ => 48
-            };
+            int desiredStructuralResolution =
+                ResolveStructuralResolution(river.Quality);
+            resolutionPerChunk = desiredStructuralResolution;
 
             int maximumTextureSize = SystemInfo.maxTextureSize;
             if (!TryResolveChunkedTextureWidth(
@@ -905,32 +908,14 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            fieldHeight = river.Quality switch
-            {
-                StylizedRiverQuality.Low => 32,
-                StylizedRiverQuality.Medium => 48,
-                StylizedRiverQuality.High => 64,
-                _ => 48
-            };
-            int guidanceResolutionPerChunk = river.Quality switch
-            {
-                StylizedRiverQuality.Low => 12,
-                StylizedRiverQuality.Medium => 18,
-                StylizedRiverQuality.High => 24,
-                _ => 18
-            };
-            long desiredGuidanceWidth =
-                (long)chunkCount * guidanceResolutionPerChunk;
-            guidanceWidth = (int)Math.Min(
-                maximumTextureSize,
-                Math.Max(24L, desiredGuidanceWidth));
-            guidanceHeight = river.Quality switch
-            {
-                StylizedRiverQuality.Low => 32,
-                StylizedRiverQuality.Medium => 44,
-                StylizedRiverQuality.High => 56,
-                _ => 44
-            };
+            fieldHeight = desiredStructuralResolution;
+
+            // Topology and guidance now use the same structural grid as the
+            // persistent material. This is deliberate: narrow connectors,
+            // pockets, rock silhouettes, and torn boundaries must not be
+            // authored on a much coarser hidden lattice and merely upsampled.
+            guidanceWidth = fieldWidth;
+            guidanceHeight = fieldHeight;
             fractureWidth = Mathf.Max(16, Mathf.CeilToInt(fieldWidth * 0.5f));
             fractureHeight = Mathf.Max(16, Mathf.CeilToInt(fieldHeight * 0.5f));
 
@@ -1021,6 +1006,18 @@ namespace ProgrammaticStylized3D.Rivers
             fractureAccumulator = 0f;
             simulationInterpolation = 1f;
             return true;
+        }
+
+        private static int ResolveStructuralResolution(
+            StylizedRiverQuality quality)
+        {
+            return quality switch
+            {
+                StylizedRiverQuality.Low => LowStructuralResolution,
+                StylizedRiverQuality.Medium => MediumStructuralResolution,
+                StylizedRiverQuality.High => HighStructuralResolution,
+                _ => MediumStructuralResolution
+            };
         }
 
         private static bool TryResolveChunkedTextureWidth(

@@ -328,8 +328,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.PropertyField(
                 Find("quality"),
                 new GUIContent(
-                    "Geometry Quality",
-                    "Controls water cross-channel tessellation plus corridor cross-section detail and smooth longitudinal refinement. The Stage 1 domain remains the authoritative coordinate source."));
+                    "Quality",
+                    "Controls water geometry and the Stage 6 structural grid. Foam/material, topology, guidance, and obstacle exclusion use 64 cells across at Low, 96 at Medium (standard), and 128 at High. The Stage 1 domain remains the authoritative coordinate source."));
             EditorGUILayout.PropertyField(
                 Find("surfaceOffset"),
                 new GUIContent("Water Level Offset"));
@@ -1729,7 +1729,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Guidance Resolution",
-                    "Low-resolution evolving network field used only to move persistent material toward branches and junctions; it is never rendered directly."),
+                    "Shared Stage 6 structural grid used to organise persistent material toward branches and junctions. It now matches the material/topology resolution instead of using a coarser hidden lattice, and it is never rendered directly."),
                 new GUIContent(
                     runtime.ResourcesAllocated
                         ? $"{runtime.GuidanceWidth} × {runtime.GuidanceHeight}"
@@ -1737,7 +1737,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Topology Resolution",
-                    "Primary RGBAHalf topology field: red is Major Capacity, green Connector/Branch Capacity, blue Pocket Exclusion, and alpha is the guidance-resolution copy of water-level-aware Obstacle Exclusion. The authoritative debug mask is a dedicated full-resolution point-sampled texture reconstructed from one-time exact transformed-mesh solid intervals at the current Stage 3 water height. The companion source-class texture stores canonical Pressure, Lee, and Shore capture separately; alpha is reserved zero. Every positive class is computed independently, while negative classes remain separate until final composition."),
+                    "Primary RGBAHalf topology field at the same structural resolution as persistent material: red is Major Capacity, green Connector/Branch Capacity, blue Pocket Exclusion, and alpha is the structural-grid copy of water-level-aware Obstacle Exclusion. The authoritative debug mask is a dedicated point-sampled texture at that same resolution, reconstructed from one-time exact transformed-mesh solid intervals at the current Stage 3 water height. The companion source-class texture stores canonical Pressure, Lee, and Shore capture separately; alpha is reserved zero. Every positive class is computed independently, while negative classes remain separate until final composition."),
                 new GUIContent(
                     runtime.ResourcesAllocated
                         ? $"{runtime.TopologyWidth} × {runtime.TopologyHeight}"

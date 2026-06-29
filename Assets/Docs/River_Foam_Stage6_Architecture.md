@@ -393,7 +393,7 @@ The former Stage 6.1 result is an implementation baseline, not an accepted visua
 
 **Status:** implemented in code. The first Unity visual review rejected the initial noise-dominated distribution because connectors and pockets concentrated into isolated longitudinal areas and raw boundary bands dominated their diagnostic. A geometry-hierarchy correction is implemented; Unity revalidation is pending.
 
-The implementation adds one simulation-neutral `RGBAHalf` topology field at guidance resolution. Its channels are `Major Capacity`, `Connector Capacity`, `Pocket Exclusion`, and a derived guidance-resolution copy of `Obstacle Exclusion`. The authoritative obstacle mask is a separate full-resolution `RHalf` texture. A companion texture retains canonical Pressure, Lee, and Shore capture separately; its alpha channel is reserved zero. Each positive class is computed independently from its own source data plus valid fluid-domain masking, and each negative class remains independently inspectable until final composition. The existing persistent material solver does not read these fields during Batch 1A.
+The implementation adds one simulation-neutral `RGBAHalf` topology field at the shared Stage 6 structural resolution. Its channels are `Major Capacity`, `Connector Capacity`, `Pocket Exclusion`, and a derived structural-grid copy of `Obstacle Exclusion`. The authoritative obstacle mask is a separate point-sampled `RHalf` texture at that same resolution. A companion texture retains canonical Pressure, Lee, and Shore capture separately; its alpha channel is reserved zero. Each positive class is computed independently from its own source data plus valid fluid-domain masking, and each negative class remains independently inspectable until final composition. The existing persistent material solver does not read these fields during Batch 1A.
 
 ### Objective
 
@@ -508,7 +508,7 @@ The canonical source rules are:
 - **Major Capacity:** generated from its own free-water structure rules and river metrics; object-related positive or negative classes do not reshape its generated value.
 - **Connector Capacity:** generated from its own connector/branch paths after endpoint validation; it is not weighted against Major, Capture, Pocket, or Obstacle Exclusion fields.
 - **Shore Capture:** a fixed metric band measured inward from the instantaneous Stage 3 visible shoreline, not from the static normal or maximum shoreline allowance. Stage 3 and Stage 6 share the same macro-wave, river-space noise, shore-specific profile, lateral-reach, asymmetry, and attenuation functions. A compact `RGHalf` row texture stores current signed left/right visible edges for every topology column. The current validation band is `0.24 m` of full capture plus a `0.03 m` inward fade. No random longitudinal gating and no Major/Connector context.
-- **Obstacle Exclusion:** generated directly from the exact transformed generated mesh, not from the padded disturbance footprint, a convex hull, an object-bounds rectangle, or the Static Pressure envelope. During the one-time geometry bake, Stage 6 examines only candidate full-resolution Foam texels covered by the projected mesh. Nine sample lines per texel are intersected with the actual mesh triangles along the local river Up direction. Sorted entry/exit pairs retain up to two exact solid-height intervals per sample, with a tiny vertical inset; ambiguous odd intersection counts are rejected rather than approximated. At runtime, the complete current Stage 3 surface height is evaluated independently at all nine samples. The texel is accepted only when every sample lies inside a cached solid interval. The authoritative `RHalf` mask is point-sampled and therefore deliberately errs smaller rather than extending outside the visible generated rock. No hull, contour padding, profile interpolation, or bounds fallback is allowed. The guidance-resolution topology alpha channel is only a derived copy for composition and metrics. Static Pressure still performs an independent accepted geometry scan; a future refactor should derive its directional pressure envelope from this same exact solid-volume source data instead of duplicating mesh calculations.
+- **Obstacle Exclusion:** generated directly from the exact transformed generated mesh, not from the padded disturbance footprint, a convex hull, an object-bounds rectangle, or the Static Pressure envelope. During the one-time geometry bake, Stage 6 examines only candidate full-resolution Foam texels covered by the projected mesh. Nine sample lines per texel are intersected with the actual mesh triangles along the local river Up direction. Sorted entry/exit pairs retain up to two exact solid-height intervals per sample, with a tiny vertical inset; ambiguous odd intersection counts are rejected rather than approximated. At runtime, the complete current Stage 3 surface height is evaluated independently at all nine samples. The texel is accepted only when every sample lies inside a cached solid interval. The authoritative `RHalf` mask is point-sampled and therefore deliberately errs smaller rather than extending outside the visible generated rock. No hull, contour padding, profile interpolation, or bounds fallback is allowed. The topology alpha channel is only a derived copy for composition and metrics, now at the same structural resolution rather than a coarser guidance grid. Static Pressure still performs an independent accepted geometry scan; a future refactor should derive its directional pressure envelope from this same exact solid-volume source data instead of duplicating mesh calculations.
 - **Pressure Capture:** the direct magnitude available from the accepted static Pressure texture, with no hidden importance weight or external context multiplier.
 - **Lee Capture:** the direct positive attached-lee value available from the accepted stationary Wake source, with no hidden importance weight or external context multiplier.
 - **Pocket Exclusion:** stored separately from Obstacle Exclusion; both negative classes are combined and applied exactly once after all positive classes are combined.
@@ -537,7 +537,7 @@ Composed Topology = Positive Support × (1 - Negative Support)
 Underlying texture encoding is:
 
 ```text
-Topology RGBA:         Major Capacity, Connector Capacity, Pocket Exclusion, derived guidance-resolution Obstacle Exclusion
+Topology RGBA:         Major Capacity, Connector Capacity, Pocket Exclusion, derived structural-grid Obstacle Exclusion
 Topology Sources RGBA: Pressure, stationary Lee, dynamic Shore band, reserved zero
 Current Shore Edges RG: signed left visible edge, signed right visible edge
 Boundary RGBA: legacy fluid coverage, legacy material attraction, reserved zero, reserved zero
@@ -594,7 +594,7 @@ Three simulation-neutral working textures retain major structures, validated poc
 R = finite Major Capacity
 G = relational Connector / Branch Capacity
 B = validated Pocket Exclusion
-A = derived guidance-resolution water-level-aware Obstacle Exclusion
+A = derived structural-grid water-level-aware Obstacle Exclusion
 ```
 
 The normal Foam view menu contains the Debug Off state and only the four documented diagnostics. Added metrics are composed-topology coverage, open-span coverage, pocket-interior coverage, major-capacity coverage, connector-in-major overlap, and source occupancy.
@@ -683,6 +683,16 @@ Pass only if:
 - Impact remains deferred and visually inactive;
 - Stage 5 behaviour remains unchanged;
 - freeze, Amount zero, reverse flow, quality switching, sleeping, delayed release, obstacle registration/removal, scene reload, and long-running stability remain correct.
+
+## Stage 6 Structural Resolution Policy
+
+Stage 6 uses one shared structural grid for persistent material, topology, guidance, and the authoritative Obstacle Exclusion mask. The quality tiers are:
+
+- `Low`: `64` cells across the river and `64` longitudinal cells per 32 m chunk;
+- `Medium`: `96 × 96` per chunk region and the standard/default project tier;
+- `High`: `128 × 128` per chunk region.
+
+A multi-chunk river extends the longitudinal texture width by the number of 32 m chunks while retaining the selected cross-river resolution. The topology and guidance textures deliberately match the material field instead of being authored on a coarser hidden lattice and upsampled. The fracture field remains half-resolution because it is an auxiliary damage representation rather than authoritative spatial topology. Existing conceptual resources remain channel-packed; this change increases their spatial precision without adding new topology layers. Runtime cost and memory scale approximately with the number of texels, so doubling one axis would roughly quadruple full-field work; quality, chunk activity, sleeping, and lower-rate topology updates remain mandatory. Hardware texture limits may reduce longitudinal columns per chunk according to the existing explicit allocation fallback, but Medium remains the normal authored target.
 
 ## Performance and Lifecycle Requirements
 

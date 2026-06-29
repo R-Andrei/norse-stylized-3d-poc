@@ -336,6 +336,10 @@ Conflict priority is:
 - fixed-cost final shader with no per-source loops;
 - quality tiers, freezing, Amount zero, active chunks, sleeping, delayed release, resource cleanup, and scene reload remain mandatory.
 
+### Structural resolution policy
+
+Stage 6 now uses the same quality-scaled structural grid for persistent material, topology, guidance, and exact Obstacle Exclusion instead of building topology on a much coarser hidden lattice. `Low` uses `64 × 64` cells per 32 m chunk region, `Medium` uses `96 × 96` and is the standard/default tier, and `High` uses `128 × 128`. Multi-chunk rivers extend the longitudinal dimension by chunk count. The existing channel-packed resource set is retained; no additional conceptual topology layers are introduced. The auxiliary fracture field remains half-resolution.
+
 ### Canonical public controls
 
 The normal Inspector exposes only:
@@ -395,9 +399,9 @@ Implemented:
 - stationary lee organisation from the accepted static Wake-source lee channel;
 - separate retained Pressure, lee, and shore positive source classes;
 - separate Pocket Exclusion and water-level-aware Obstacle Exclusion negative classes;
-- one one-time exact transformed-mesh solid-interval bake for Obstacle Exclusion, restricted to full-resolution Foam texels touched by each registered static solid;
-- nine conservative exact-mesh samples per retained texel, each storing up to two solid-height intervals plus the parameters required by the complete current Stage 3 surface-height evaluator;
-- a dedicated full-resolution point-sampled `RHalf` Obstacle Exclusion mask, reconstructed from those cached intervals only for bounded candidate texels;
+- one one-time exact transformed-mesh solid-interval bake for Obstacle Exclusion, restricted to structural-grid Foam texels touched by each registered static solid;
+- nine conservative exact-mesh samples per retained structural texel, each storing up to two solid-height intervals plus the parameters required by the complete current Stage 3 surface-height evaluator;
+- a dedicated point-sampled `RHalf` Obstacle Exclusion mask at the shared structural resolution, reconstructed from those cached intervals only for bounded candidate texels;
 - one canonical `Capture Zones` diagnostic with Pressure, lee, and shore classes;
 - one `Positive Zone Classes` diagnostic for Major, Connector, and combined Capture support;
 - one `Negative Zone Classes` diagnostic distinguishing Pocket and Obstacle Exclusion;
