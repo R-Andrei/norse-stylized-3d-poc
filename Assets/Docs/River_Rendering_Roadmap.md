@@ -298,16 +298,31 @@ Accepted and retained:
 - separate support and negative-influence diagnostics;
 - current water-level-aware Obstacle Footprint, accepted as sufficient for the present stage;
 - persistent field, chunking, quality, sleeping, freezing, and fixed-cost GPU infrastructure.
+- permanent phase-level Foam profiler instrumentation;
+- staged single-river Foam initialization, with one phase per frame and Foam disabled until complete readiness.
 
-Still unaccepted and scheduled for replacement:
+Active and unaccepted:
 
-- Major Support;
+- deterministic continuous static Major Support Patch 1.
+
+Still unimplemented or scheduled for replacement:
+
+- monotonic downstream Major Support movement;
 - Connector Support;
 - Pocket Aging Pressure;
+- combined topology validation;
 - topology-to-material response;
 - final lifespan, fragmentation, dissipation, and rendering behaviour.
 
-The provisional finite-structure Major/Connector/Pocket implementation is no longer canonical.
+The former class/family/candidate-retry Major generator and the provisional finite-structure Major/Connector/Pocket implementation are no longer canonical.
+
+### Current performance scheduling status
+
+- Instrumentation and per-river staged bootstrap are complete and validated. The previous combined Foam initialization burst has been divided into explicit dependency-ordered phases.
+- Ready-state boundary and obstacle changes use an accepted coalesced per-river rebuild queue. Only one rebuild phase advances per frame, obstacle versions must settle before rasterization, and ordinary topology maintenance is paused while the rebuild dependency chain is active.
+- Final topology remains bound during preparatory source refresh; the final field is replaced only during the queued final-composition phase.
+- Further performance work is paused while Major Support, Connector Support, Pocket Aging Pressure, and their combined behaviour are implemented and validated.
+- Staggered steady-state maintenance, compute splitting, striped dispatch, jobs, and global cross-river scheduling resume only after the final single-river topology dependency graph is known.
 
 ### Canonical material/topology relationship
 
@@ -342,24 +357,34 @@ Topology does not create material. Upstream inflow remains the primary planned c
 
 ### Remaining topology architecture
 
-The remaining free-water topology will use persistent evolving fields, not an evolving graph, node set, pathfinding network, or pool of tracked moving structures.
+The remaining free-water topology uses persistent fields, not an evolving graph, node set, pathfinding network, or pool of tracked moving structures.
 
-- **Major Support:** implemented as one persistent broad-support ping-pong field driven by a compact width-aware GPU nucleus cache rebuilt once per evolution tick. Longitudinal intervals derive lateral opportunity count and placement from the actual local water width; deterministic lateral band targets keep candidate selection from collapsing to the safest centre lane, while footprint-aware scoring still avoids banks, Anchored Support, Obstacle Footprint, and invalid water. The same existing footprint samples derive a room score, so squeezed obstacle/bank funnels shrink and weaken large/medium nuclei without adding texture reads or passes. Each nucleus chooses an internal size class: rare large parent, medium body, or secondary small fragment. The active performance-capped path uses class-aware archetypes, four candidate attempts, no downstream travel phase, and no extra mini-spine/lobe family overlay.
-- **Connector Support:** temporarily disabled under the hard performance cap. The connector texture is cleared and no connector dispatch is run. It must remain disabled until a replacement design proves it solves green-in-red placement without increasing runtime or startup cost.
-- **Pocket Aging Pressure:** a persistent negative field whose targets are generated inside sufficiently broad Major interiors while protecting Anchored Support and important Connector Support cores.
+- **Major Support:** Patch 1 replaces the class/family/retry generator with one deterministic seeded continuous descriptor equation. A fixed lattice provides two stratified opportunities every five river metres. `Major Support Amount` activates a nested subset through `Amount × (2 - Amount)`, so raising Amount adds descriptors without moving existing ones. `Major Support Size` scales the same descriptors through a heavy-tailed continuous quantile, so small, medium, and occasional large regions emerge without discrete classes. Aspect, orientation, spread, bend, imbalance, and one subtractive bite are resolved once in the sparse descriptor kernel. One direct capacity solve clamps scale to local longitudinal and lateral room. The full-grid raster retains the existing three-lobe/one-bite descriptor and checks at most six nearby descriptors per texel.
+- **Connector Support:** not yet implemented in the accepted pipeline and remains disabled. It follows accepted moving Major Support and must use a bounded relational design without a maintained graph or green bodies inside broad red interiors.
+- **Pocket Aging Pressure:** remains provisional and is replaced after Connector Support.
 
-“Birth” and “death” are growth and decay operations on these persistent fields, not separate stored layers.
+Major Support controls are now:
 
-Major Support now exposes two shape controls and two cadence controls:
-
-- `Major Support Amount`: default `0.56`, range `0–1`; controls longitudinal spacing through a nonlinear remap of approximately `9.5 m` to `2.8 m`, while actual local water width determines whether one or several nuclei fit laterally;
-- `Major Support Size`: default `0.46`, range `0–1`; controls the physical family scale envelope independently from amount through a nonlinear remap of approximately `0.45 m` to `1.95 m`, followed by internal small/medium/large multipliers;
+- `Major Support Amount`: default `0.56`, range `0–1`; deterministic nested activation only;
+- `Major Support Size`: default `0.46`, range `0–1`; continuous scale envelope only;
+- `Major Support Seed`: default `1`; deterministic placement and morphology identity;
 - `Major Evolution Rate (Hz)`: default `2`, range `0.5–10`;
 - `Major Cleanup Rate (Hz)`: default `1`, range `0.5–10`.
 
-The evolution pass first rebuilds a fixed-capacity width-aware nucleus buffer, then applies gradual persistent growth or decay from nearby buffered nuclei. Longitudinal intervals derive their lateral candidate count from actual local water width, so narrow rivers do not collapse to a permanent centre lane and broad rivers may host several nuclei across. Candidate scoring includes deterministic lateral band targets, with stronger interior-side bias for sparse one-across intervals, so low amount settings do not aggregate permanently around the centre. Candidate centres and approximate footprint samples are scored against banks, Anchored Support, Obstacle Footprint, and invalid water before acceptance. Those same footprint samples also derive a room score; squeezed corridors penalize broad classes and shrink accepted nuclei by class, so object funnels should prefer small fragments and anchored influence instead of repeated full-strength Major overlap. Each nucleus chooses a size class and class-aware archetype, so `Major Support Size` defines a family scale envelope rather than a uniform stamp size. Downstream Major placement travel is disabled under the hard performance cap because it added candidate work and worsened obstacle-funnel pileups. Activity modulation keeps a nonzero floor, strongest for large parents and sparse settings, so long-running simulations should evolve without slowly emptying the Major field. The cleanup pass is one-sided: it may remove isolated remnants and derive broad-interior support, but it never fills holes, expands support, or merges gaps closed.
+Static Patch 1 does not include movement. The next Major milestone adds strictly positive downstream drift with different deterministic rhythms and no visible upstream wrap. Connector and Pocket work remain separate later milestones.
 
-Topology work runs at lower cadence than material transport and is staggered across classes/chunks. Complexity should scale primarily with structural texel count rather than `texels × structures`.
+Topology work runs at lower cadence than material transport. The completed staged initialization and dirty-rebuild queue remain active protections. Further scheduling optimisation is deliberately paused until the complete topology pipeline establishes the real dependency graph.
+
+### Immediate continuation order
+
+1. Validate deterministic static Major Support Patch 1 across a small fixed seed/settings matrix.
+2. Confirm same-seed reproducibility, nested Amount behaviour, Size stability, size hierarchy, lateral distribution, morphology, and cold-start performance.
+3. Add monotonic downstream Major movement using the same deterministic identity.
+4. Implement Connector Support.
+5. Replace Pocket Aging Pressure.
+6. Validate Major + Connector + Pocket together.
+7. Integrate topology into material lifetime and fragmentation.
+8. Resume deferred performance work against the completed topology pipeline.
 
 ### Terminology
 
@@ -401,8 +426,9 @@ The accepted main controls remain:
 - `Amount`
 - `Web Granularity`
 - `Network Evolution`
-- `Major Support Amount` — default `0.56`, range `0–1`; nonlinear longitudinal spacing remap of approximately `9.5 m` to `2.8 m`, with lateral opportunity count derived from actual local width
-- `Major Support Size` — default `0.46`, range `0–1`; nonlinear family-envelope remap of approximately `0.45 m` to `1.95 m`, followed by internal small/medium/large multipliers
+- `Major Support Amount` — default `0.56`, range `0–1`; deterministic nested activation only
+- `Major Support Size` — default `0.46`, range `0–1`; continuous physical scale envelope only
+- `Major Support Seed` — default `1`; deterministic placement, scale quantile, aspect, orientation, spread, bend, imbalance, and bite
 - `Major Evolution Rate (Hz)` — default `2`, range `0.5–10`
 - `Major Cleanup Rate (Hz)` — default `1`, range `0.5–10`
 - `Breakup Frequency`
@@ -414,13 +440,18 @@ Base lifetime and support/aging-pressure response also require authoring, but th
 ### Implementation order
 
 1. Documentation cleanup — complete.
-2. Canonical topology terminology rename — complete; serialized debug values and texture channels preserved.
-3. Validity-aware persistent Major Support implementation — complete; visual validation of distribution, size controls, and asynchronous evolution pending.
-4. Persistent relational Connector Support implementation — complete; visual validation of density, span placement, and gradual evolution pending.
-5. Replace and validate Pocket Aging Pressure after Major and Connector pass.
-6. Integrate soft topology-to-lifetime material response.
-7. Implement and tune end-of-life fragmentation/dissipation.
-8. Finalize rendering, controls, and PC-first profiling.
+2. Canonical topology terminology — complete; serialized debug values and texture channels preserved.
+3. Profiler instrumentation — complete and retained.
+4. Per-river staged initialization — complete and retained.
+5. Queued/coalesced dirty rebuilds — complete and retained.
+6. Deterministic continuous static Major Support Patch 1 — active.
+7. Monotonic downstream Major movement.
+8. Connector Support.
+9. Pocket Aging Pressure replacement.
+10. Combined topology validation.
+11. Soft topology-to-lifetime material response.
+12. End-of-life fragmentation/dissipation.
+13. Resume deferred performance work and final PC-first profiling.
 
 Major, Connector, and Pocket must be handled one at a time.
 
@@ -431,10 +462,12 @@ Major, Connector, and Pocket must be handled one at a time.
 - no GameObjects or managed records per foam patch or free-water structure;
 - no final-shader loops over objects or topology structures;
 - anchored geometry preprocessing only when sources change;
-- low-rate and staggered topology evolution;
-- Major Support rebuilds a fixed-capacity sparse GPU nucleus buffer at low cadence and each structural texel samples only nearby interval slots with a bounded lateral maximum, never a growing list of structures;
+- low-rate topology evolution;
+- Major Support rebuilds a fixed-capacity deterministic GPU descriptor buffer at low cadence; each structural texel checks at most six nearby descriptors, never a growing list;
+- no Major class table, family switch, candidate retry loop, or fallback composition tree;
 - inactive, sleeping, frozen, and distant chunks perform no unnecessary work;
 - profile update spikes as well as average cost.
+- further scheduling optimisation remains paused until Major, Connector, Pocket, and combined topology validation are complete.
 
 Deferred optimization notes:
 

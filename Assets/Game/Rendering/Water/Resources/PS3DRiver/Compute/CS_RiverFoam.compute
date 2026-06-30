@@ -57,14 +57,21 @@ struct FoamObstacleIntervalCell
 struct FoamMajorNucleus
 {
     // x = global river distance, y = lateral metres,
-    // z = current target strength, w = deterministic identity.
-    float4 positionStrengthIdentity;
-    // x = conservative longitudinal bound, y = conservative lateral bound,
-    // z = effective shape size in metres, w = internal size class.
-    float4 boundsAndSize;
+    // z = target strength, w = subtractive bite strength.
+    float4 positionStrengthBite;
+    // x/y = conservative world-space bounds,
+    // z/w = local major-axis cosine/sine.
+    float4 boundsFrame;
+    // Each lobe stores local centre x/y and local radii x/y.
+    // A zero radius disables that primitive.
+    float4 lobe0;
+    float4 lobe1;
+    float4 lobe2;
+    // Local subtractive bay/bite centre and radii.
+    float4 bite;
 };
 
-static const int FoamMajorMaxAcross = 8;
+static const int FoamMajorMaxAcross = 2;
 
 // Shared Stage 6 material state:
 // R = persistent Amount
@@ -169,6 +176,7 @@ float _FoamWebGranularity;
 float _FoamNetworkEvolution;
 float _FoamMajorSupportAmount;
 float _FoamMajorSupportSize;
+int _FoamMajorSupportSeed;
 float _FoamWakeReinforcement;
 float _FoamImpactReinforcement;
 float _FoamDisturbanceEnabled;
@@ -1852,223 +1860,58 @@ float FoamMajorAnchoredBuffer(float2 uv)
     return saturate(support);
 }
 
-float FoamMajorRegionHash(int segmentIndex, int acrossIndex, float salt)
+uint FoamMajorMixBits(uint value)
 {
-    float2 identityCoordinate = float2(
-        (float)segmentIndex,
-        (float)acrossIndex);
-    return FoamHash11(
-        dot(identityCoordinate, float2(127.173, 311.719)) +
-        salt * 37.117 +
-        _FoamSeed * 0.0413);
+    value ^= value >> 16;
+    value *= 0x7FEB352Du;
+    value ^= value >> 15;
+    value *= 0x846CA68Bu;
+    value ^= value >> 16;
+    return value;
 }
 
-float FoamMajorSegmentSpacing(float amount)
+uint FoamMajorIdentity(int segmentIndex, int acrossIndex)
 {
-    return lerp(
-        9.5,
-        2.8,
-        pow(saturate(amount), 0.82));
+    uint identity = (uint)_FoamMajorSupportSeed;
+    identity ^= (uint)segmentIndex * 0x9E3779B9u;
+    identity ^= (uint)acrossIndex * 0x85EBCA6Bu;
+    return FoamMajorMixBits(identity);
 }
 
-float FoamMajorBaseSize(float size)
+float FoamMajorHash01(uint identity, uint stream)
 {
-    return lerp(
-        0.45,
-        1.95,
-        pow(saturate(size), 1.30));
+    uint mixed = FoamMajorMixBits(
+        identity ^ FoamMajorMixBits(stream + 0xC2B2AE35u));
+    return (float)(mixed & 0x00FFFFFFu) * (1.0 / 16777216.0);
 }
 
-int FoamMajorSizeClass(float identity, float amount)
+float FoamMajorSegmentSpacing()
 {
-    float density = pow(saturate(amount), 0.85);
-    float largeDensity = pow(saturate(amount), 0.70);
-    float smallShare = lerp(0.16, 0.40, density);
-    float largeShare = lerp(0.20, 0.08, largeDensity);
-    float selector = FoamHash11(identity * 53.7 + 4.1);
-
-    if (selector < smallShare)
-    {
-        return 0;
-    }
-    if (selector < 1.0 - largeShare)
-    {
-        return 1;
-    }
-
-    return 2;
+    // The opportunity lattice is fixed. Amount activates a nested subset;
+    // it never changes spacing, descriptor identity, or existing positions.
+    return 5.0;
 }
 
-float FoamMajorSizeMultiplier(float identity, int classIndex)
+float FoamMajorActivationProbability(float amount)
 {
-    float selector = FoamHash11(identity * 57.1 + 2.9);
-    if (classIndex <= 0)
-    {
-        return lerp(0.42, 0.70, selector);
-    }
-    if (classIndex == 1)
-    {
-        return lerp(0.78, 1.18, selector);
-    }
-
-    return lerp(1.35, 1.85, selector);
+    amount = saturate(amount);
+    return amount * (2.0 - amount);
 }
 
-int FoamMajorShapeArchetype(float identity, int classIndex)
+float FoamMajorGlobalScale(float size)
 {
-    float selector = FoamHash11(identity * 59.3 + 8.7);
-
-    if (classIndex <= 0)
-    {
-        // Small pieces are secondary debris. Keep striplets occasional so
-        // dense settings do not collapse back into repeated slash marks.
-        if (selector < 0.50)
-        {
-            return 0;
-        }
-        if (selector < 0.83)
-        {
-            return 1;
-        }
-        if (selector < 0.90)
-        {
-            return 2;
-        }
-        return 3;
-    }
-
-    if (classIndex == 1)
-    {
-        // Medium bodies carry the main visible population.
-        if (selector < 0.12)
-        {
-            return 0;
-        }
-        if (selector < 0.52)
-        {
-            return 1;
-        }
-        if (selector < 0.60)
-        {
-            return 2;
-        }
-        if (selector < 0.78)
-        {
-            return 3;
-        }
-        return 4;
-    }
-
-    // Large parents never use the strip archetype; they must read as parent
-    // sheets or broad bodies, not oversized parallel strokes.
-    if (selector < 0.54)
-    {
-        return 5;
-    }
-    if (selector < 0.78)
-    {
-        return 4;
-    }
-    if (selector < 0.94)
-    {
-        return 1;
-    }
-    return 3;
+    // Useful across the complete control range without collapsing the low end
+    // or returning to the oversized 2.15x experiment.
+    return 1.10 * exp2(lerp(-0.24, 0.22, saturate(size)));
 }
 
-float2 FoamMajorShapeBounds(
-    float identity,
-    float effectiveSize,
-    int classIndex)
+float FoamMajorLocalScale(float sizeQuantile)
 {
-    int archetype = FoamMajorShapeArchetype(identity, classIndex);
-    float longitudinal = effectiveSize;
-    float lateral = effectiveSize;
-
-    if (archetype == 0)
-    {
-        float halfLength = effectiveSize * lerp(
-            0.88,
-            1.28,
-            FoamHash11(identity * 61.1 + 1.7));
-        float halfWidth = effectiveSize * lerp(
-            0.50,
-            0.78,
-            FoamHash11(identity * 67.7 + 3.9));
-        longitudinal = halfLength + halfWidth * 0.48;
-        lateral = halfWidth * 1.40;
-    }
-    else if (archetype == 1)
-    {
-        float halfLength = effectiveSize * lerp(
-            1.18,
-            1.78,
-            FoamHash11(identity * 71.3 + 7.1));
-        float halfWidth = effectiveSize * lerp(
-            0.48,
-            0.82,
-            FoamHash11(identity * 79.9 + 2.3));
-        longitudinal = halfLength + halfWidth * 0.50;
-        lateral = halfWidth * 1.82;
-    }
-    else if (archetype == 2)
-    {
-        float halfLength = effectiveSize * lerp(
-            1.42,
-            2.22,
-            FoamHash11(identity * 83.1 + 4.9));
-        float halfWidth = effectiveSize * lerp(
-            0.24,
-            0.46,
-            FoamHash11(identity * 89.7 + 6.1));
-        longitudinal = halfLength + halfWidth * 0.44;
-        lateral = halfWidth * 1.86;
-    }
-    else if (archetype == 3)
-    {
-        float halfLength = effectiveSize * lerp(
-            1.34,
-            2.05,
-            FoamHash11(identity * 97.3 + 5.7));
-        float halfWidth = effectiveSize * lerp(
-            0.40,
-            0.73,
-            FoamHash11(identity * 101.9 + 7.3));
-        longitudinal = halfLength + halfWidth * 0.78;
-        lateral = halfWidth * 1.72;
-    }
-    else if (archetype == 4)
-    {
-        float halfLength = effectiveSize * lerp(
-            1.18,
-            1.74,
-            FoamHash11(identity * 109.1 + 2.7));
-        float halfWidth = effectiveSize * lerp(
-            0.54,
-            0.84,
-            FoamHash11(identity * 113.7 + 8.9));
-        longitudinal = halfLength + halfWidth * 0.92;
-        lateral = halfWidth * 1.92;
-    }
-    else
-    {
-        float halfLength = effectiveSize * lerp(
-            1.08,
-            1.52,
-            FoamHash11(identity * 191.3 + 4.9));
-        float halfWidth = effectiveSize * lerp(
-            0.88,
-            1.28,
-            FoamHash11(identity * 193.7 + 6.3));
-        longitudinal = halfLength + halfWidth * 0.86;
-        lateral = halfWidth * 2.34;
-    }
-
-    // Conservative room for animated warp, noisy edge breakup, and internal
-    // child lobes. The bound is only for placement and early raster rejection.
-    return float2(
-        longitudinal + effectiveSize * 0.42,
-        lateral + effectiveSize * 0.38);
+    // A continuous heavy-tailed distribution: many small regions, a healthy
+    // middle population, and uncommon large regions. u*sqrt(u) replaces a
+    // discrete class table and needs no fallback or reclassification path.
+    float shapedQuantile = sizeQuantile * sqrt(max(0.0, sizeQuantile));
+    return 0.55 * exp2(shapedQuantile * 1.54);
 }
 
 float FoamMajorPointAvailability(
@@ -2150,79 +1993,161 @@ float FoamMajorPointAvailability(
         anchoredClearance);
 }
 
-float FoamMajorCandidateFootprintScore(
-    float2 candidatePosition,
-    float2 shapeBounds,
-    float preference,
-    int classIndex,
-    out float roomScore,
-    out float roomStrength)
+float2 FoamMajorLocalToWorld(
+    float2 localPoint,
+    float2 frame)
 {
-    roomScore = 0.0;
-    roomStrength = 0.0;
+    return float2(
+        localPoint.x * frame.x - localPoint.y * frame.y,
+        localPoint.x * frame.y + localPoint.y * frame.x);
+}
 
-    float centre = FoamMajorPointAvailability(
-        candidatePosition.x,
-        candidatePosition.y);
-    if (centre <= 0.001)
-    {
-        return 0.0;
-    }
+float2 FoamMajorPrimitiveWorldExtent(
+    float4 primitive,
+    float2 frame)
+{
+    float2 radii = max(float2(0.0, 0.0), primitive.zw);
+    return float2(
+        abs(frame.x) * radii.x + abs(frame.y) * radii.y,
+        abs(frame.y) * radii.x + abs(frame.x) * radii.y);
+}
 
-    float sampleScale = classIndex >= 2 ? 0.54 : 0.68;
-    float longitudinalOffset = shapeBounds.x * sampleScale;
-    float lateralOffset = shapeBounds.y * sampleScale;
-    float upstream = FoamMajorPointAvailability(
-        candidatePosition.x - longitudinalOffset,
-        candidatePosition.y);
-    float downstream = FoamMajorPointAvailability(
-        candidatePosition.x + longitudinalOffset,
-        candidatePosition.y);
-    float left = FoamMajorPointAvailability(
-        candidatePosition.x,
-        candidatePosition.y - lateralOffset);
-    float right = FoamMajorPointAvailability(
-        candidatePosition.x,
-        candidatePosition.y + lateralOffset);
+float2 FoamMajorDescriptorBounds(
+    float4 lobe0,
+    float4 lobe1,
+    float4 lobe2,
+    float2 frame)
+{
+    float2 centre0 = FoamMajorLocalToWorld(lobe0.xy, frame);
+    float2 centre1 = FoamMajorLocalToWorld(lobe1.xy, frame);
+    float2 centre2 = FoamMajorLocalToWorld(lobe2.xy, frame);
+    float2 bounds0 = abs(centre0) +
+        FoamMajorPrimitiveWorldExtent(lobe0, frame);
+    float2 bounds1 = abs(centre1) +
+        FoamMajorPrimitiveWorldExtent(lobe1, frame);
+    float2 bounds2 = abs(centre2) +
+        FoamMajorPrimitiveWorldExtent(lobe2, frame);
+    float2 resolved = max(bounds0, max(bounds1, bounds2));
+    return resolved + float2(0.06, 0.06);
+}
 
-    float footprintAverage =
-        (centre + upstream + downstream + left + right) * 0.20;
-    float footprintMinimum = min(
-        min(centre, upstream),
-        min(min(downstream, left), right));
-    float lateralRoom = min(left, right);
-    float longitudinalRoom = min(upstream, downstream);
-    float surroundingRoom = min(
-        longitudinalRoom,
-        lerp(
-            (left + right) * 0.5,
-            lateralRoom,
-            0.72));
-    roomScore = smoothstep(0.18, 0.74, surroundingRoom);
-    float footprintFit = lerp(
-        footprintAverage,
-        footprintMinimum,
-        classIndex >= 2 ? 0.34 : 0.58);
-    float classBias = classIndex >= 2
-        ? 1.16
-        : 1.0;
-    float roomPenalty = classIndex >= 2
-        ? lerp(0.10, 1.0, roomScore)
-        : (classIndex == 1
-            ? lerp(0.36, 1.0, roomScore)
-            : lerp(0.78, 1.0, roomScore));
-    roomStrength = classIndex >= 2
-        ? lerp(0.40, 1.0, roomScore)
-        : (classIndex == 1
-            ? lerp(0.62, 1.0, roomScore)
-            : lerp(0.88, 1.0, roomScore));
+void FoamMajorScalePrimitive(
+    inout float4 primitive,
+    float scaleValue)
+{
+    primitive *= scaleValue;
+}
 
-    return saturate(
-        centre *
-        footprintFit *
-        lerp(0.84, 1.0, preference) *
-        classBias *
-        roomPenalty);
+void FoamMajorApplyAxisScale(
+    inout float4 primitive,
+    float2 axisScale)
+{
+    primitive.xy *= axisScale;
+    primitive.zw *= axisScale;
+}
+
+void FoamMajorBuildContinuousGrammar(
+    uint identity,
+    float elongation,
+    out float2 frame,
+    out float4 lobe0,
+    out float4 lobe1,
+    out float4 lobe2,
+    out float4 bite,
+    out float biteStrength)
+{
+    // The local X axis is always the descriptor's long axis. Orientation then
+    // decides whether that axis points downstream, diagonally, or laterally.
+    // The power curve keeps a flow-aware majority while retaining a real tail
+    // of strongly transverse regions without a separate lateral class.
+    float orientationValue =
+        FoamMajorHash01(identity, 5u) * 2.0 - 1.0;
+    float orientationBias = sign(orientationValue) *
+        pow(abs(orientationValue), 1.6);
+    float angle = orientationBias * 1.57079632679;
+    float sineValue;
+    float cosineValue;
+    sincos(angle, sineValue, cosineValue);
+    frame = float2(cosineValue, sineValue);
+
+    // Continuous morphology values replace family switches. Compact, broad,
+    // fan-like, hooked, and necked structures all emerge from one equation
+    // set applied once per descriptor.
+    float openness = FoamMajorHash01(identity, 6u);
+    float fan = FoamMajorHash01(identity, 7u);
+    float bendSeed = FoamMajorHash01(identity, 8u) * 2.0 - 1.0;
+    float imbalance = FoamMajorHash01(identity, 9u) * 2.0 - 1.0;
+    float biteVariation = FoamMajorHash01(identity, 10u);
+
+    float bend = bendSeed * lerp(0.10, 0.78, openness);
+    float opennessDistance = lerp(0.18, 0.80, openness);
+    float axial = lerp(0.98, 0.34, fan);
+    float sideways = lerp(0.02, 0.92, fan);
+
+    float2 dir1 = normalize(float2(
+        axial,
+        sideways + bend));
+    float2 dir2 = normalize(float2(
+        -axial,
+        -sideways + bend));
+
+    float broadness = fan * openness;
+    float positiveWeight = 1.0 + 0.34 * imbalance;
+    float negativeWeight = 1.0 - 0.34 * imbalance;
+
+    float centralLong = lerp(0.92, 0.62, openness);
+    float centralWide = lerp(0.82, 0.48, openness) +
+        broadness * 0.10;
+    float armLong = lerp(0.66, 0.48, openness) -
+        broadness * 0.05;
+    float armWide = lerp(0.60, 0.34, openness) +
+        broadness * 0.12;
+
+    float2 centralOffset = float2(
+        -imbalance * 0.10 * openness,
+        bend * 0.06 * openness);
+    float distance1 = opennessDistance * (1.0 + 0.26 * imbalance);
+    float distance2 = opennessDistance * (1.0 - 0.26 * imbalance);
+
+    lobe0 = float4(
+        centralOffset,
+        centralLong,
+        max(0.08, centralWide));
+    lobe1 = float4(
+        dir1 * distance1,
+        armLong * positiveWeight,
+        max(0.08, armWide * (1.0 - 0.14 * imbalance)));
+    lobe2 = float4(
+        dir2 * distance2,
+        armLong * negativeWeight,
+        max(0.08, armWide * (1.0 + 0.14 * imbalance)));
+
+    float fallbackSide = abs(imbalance) > 0.08
+        ? sign(imbalance)
+        : (FoamMajorHash01(identity, 11u) < 0.5 ? -1.0 : 1.0);
+    float concaveSide = abs(bendSeed) > 0.08
+        ? -sign(bendSeed)
+        : fallbackSide;
+    float concavity = openness * (fan + abs(bendSeed) * 0.85);
+    bite = float4(
+        imbalance * lerp(0.06, 0.22, openness) +
+            bendSeed * 0.08 * fan,
+        concaveSide * lerp(0.18, 0.58, saturate(concavity)),
+        lerp(0.34, 0.80, saturate(concavity)),
+        lerp(0.26, 0.58, fan));
+    biteStrength = smoothstep(
+        0.22,
+        1.05,
+        concavity) *
+        lerp(0.36, 0.96, biteVariation);
+
+    float2 axisScale = float2(
+        sqrt(max(1.0, elongation)),
+        rsqrt(max(1.0, elongation)));
+    FoamMajorApplyAxisScale(lobe0, axisScale);
+    FoamMajorApplyAxisScale(lobe1, axisScale);
+    FoamMajorApplyAxisScale(lobe2, axisScale);
+    FoamMajorApplyAxisScale(bite, axisScale);
 }
 
 [numthreads(64, 1, 1)]
@@ -2234,872 +2159,249 @@ void BuildMajorNuclei(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int bufferIndex = (int)dispatchId.x;
-    int segmentIndex = bufferIndex >> 3;
+    int segmentIndex = bufferIndex >> 1;
     int acrossIndex = bufferIndex & (FoamMajorMaxAcross - 1);
 
     FoamMajorNucleus nucleus;
-    nucleus.positionStrengthIdentity = 0.0.xxxx;
-    nucleus.boundsAndSize = 0.0.xxxx;
+    nucleus.positionStrengthBite = 0.0.xxxx;
+    nucleus.boundsFrame = 0.0.xxxx;
+    nucleus.lobe0 = 0.0.xxxx;
+    nucleus.lobe1 = 0.0.xxxx;
+    nucleus.lobe2 = 0.0.xxxx;
+    nucleus.bite = 0.0.xxxx;
 
-    float amount = saturate(_FoamMajorSupportAmount);
-    float baseSize = FoamMajorBaseSize(_FoamMajorSupportSize);
-    float segmentSpacing = FoamMajorSegmentSpacing(amount);
+    float segmentSpacing = FoamMajorSegmentSpacing();
     int segmentCount = min(
         _FoamMajorNucleusSegmentCapacity,
         max(1, (int)ceil(
-            _FoamValidLength / max(0.25, segmentSpacing)) + 1));
+            _FoamValidLength / segmentSpacing) + 1));
     if (segmentIndex >= segmentCount)
     {
         _FoamMajorNucleiWrite[bufferIndex] = nucleus;
         return;
     }
 
-    float segmentHash = FoamMajorRegionHash(
-        segmentIndex,
-        0,
-        2.1);
-    float segmentCentre = _FoamGlobalStart +
-        ((float)segmentIndex + 0.5) * segmentSpacing +
-        (segmentHash - 0.5) * segmentSpacing * 0.34;
-    float segmentU = (segmentCentre - _FoamGlobalStart) /
-        max(0.001, _FoamFieldLength);
-    if (segmentU < 0.0 || segmentU > 1.0 ||
-        !IsFoamUInsideDomain(segmentU))
+    uint identity = FoamMajorIdentity(segmentIndex, acrossIndex);
+    float activationProbability = FoamMajorActivationProbability(
+        _FoamMajorSupportAmount);
+    if (FoamMajorHash01(identity, 0u) >= activationProbability)
     {
         _FoamMajorNucleiWrite[bufferIndex] = nucleus;
         return;
     }
 
-    int segmentMetricX = clamp(
+    float segmentCentre = _FoamGlobalStart +
+        ((float)segmentIndex + 0.5) * segmentSpacing;
+    float candidateDistance = segmentCentre +
+        (FoamMajorHash01(identity, 1u) - 0.5) *
+        segmentSpacing * 0.78;
+    float candidateU = (candidateDistance - _FoamGlobalStart) /
+        max(0.001, _FoamFieldLength);
+    if (candidateU < 0.0 || candidateU > 1.0 ||
+        !IsFoamUInsideDomain(candidateU))
+    {
+        _FoamMajorNucleiWrite[bufferIndex] = nucleus;
+        return;
+    }
+
+    int metricX = clamp(
         (int)round(
-            segmentU * max(0.0, (float)(_FoamDimensions.x - 1))),
+            candidateU * max(0.0, (float)(_FoamDimensions.x - 1))),
         0,
         max(0, _FoamDimensions.x - 1));
-    FoamMetricRow segmentMetric = _FoamMetricRows[segmentMetricX];
-    float segmentWidth = max(
-        0.0,
-        segmentMetric.widthsAndSpacing.x +
-        segmentMetric.widthsAndSpacing.y);
-    float lateralSpacing = max(
-        baseSize * 2.35,
-        lerp(7.0, 2.4, pow(amount, 0.85)));
-    int acrossCount = clamp(
-        (int)round(segmentWidth / max(0.75, lateralSpacing)),
-        1,
-        FoamMajorMaxAcross);
-    if (acrossIndex >= acrossCount)
+    FoamMetricRow metric = _FoamMetricRows[metricX];
+    if (metric.topologyData.w <= 0.0)
     {
         _FoamMajorNucleiWrite[bufferIndex] = nucleus;
         return;
     }
 
-    float bestScore = 0.0;
-    float2 bestPosition = float2(segmentCentre, 0.0);
-    float bestIdentity = 0.0;
-    float2 bestBounds = float2(baseSize * 1.8, baseSize);
-    float bestEffectiveSize = baseSize;
-    int bestClassIndex = 1;
-    float bestRoomStrength = 1.0;
-
-    [unroll]
-    for (int candidateIndex = 0; candidateIndex < 4; candidateIndex++)
+    float leftWidth = max(0.05, metric.widthsAndSpacing.x);
+    float rightWidth = max(0.05, metric.widthsAndSpacing.y);
+    float usableWidth = leftWidth + rightWidth;
+    float edgeInset = min(
+        usableWidth * 0.18,
+        max(metric.widthsAndSpacing.w * 1.75, 0.08));
+    float usableLeft = -leftWidth + edgeInset;
+    float usableRight = rightWidth - edgeInset;
+    if (usableRight <= usableLeft)
     {
-        float candidateSalt = (float)candidateIndex;
-        float identity = FoamMajorRegionHash(
-            segmentIndex,
-            acrossIndex,
-            10.0 + candidateSalt);
-        int classIndex = FoamMajorSizeClass(identity, amount);
-        float effectiveSize = baseSize *
-            FoamMajorSizeMultiplier(identity, classIndex);
-        float distanceJitter =
-            (FoamMajorRegionHash(
-                segmentIndex,
-                acrossIndex,
-                20.0 + candidateSalt * 2.0) - 0.5) *
-            segmentSpacing * 0.62;
-        float candidateDistance = segmentCentre + distanceJitter;
-        float candidateU = (candidateDistance - _FoamGlobalStart) /
-            max(0.001, _FoamFieldLength);
-        if (candidateU < 0.0 || candidateU > 1.0 ||
-            !IsFoamUInsideDomain(candidateU))
-        {
-            continue;
-        }
-
-        int candidateMetricX = clamp(
-            (int)round(
-                candidateU * max(0.0, (float)(_FoamDimensions.x - 1))),
-            0,
-            max(0, _FoamDimensions.x - 1));
-        FoamMetricRow candidateMetric = _FoamMetricRows[candidateMetricX];
-        float leftWidth = max(0.05, candidateMetric.widthsAndSpacing.x);
-        float rightWidth = max(0.05, candidateMetric.widthsAndSpacing.y);
-        float usableWidth = leftWidth + rightWidth;
-        float edgeInset = min(
-            usableWidth * 0.20,
-            max(
-                candidateMetric.widthsAndSpacing.w * 0.65,
-                effectiveSize * 0.20));
-        float usableLeft = -leftWidth + edgeInset;
-        float usableRight = rightWidth - edgeInset;
-        if (usableRight <= usableLeft)
-        {
-            continue;
-        }
-
-        float localStratum = lerp(
-            0.12,
-            0.88,
-            FoamMajorRegionHash(
-                segmentIndex,
-                acrossIndex,
-                31.0 + candidateSalt));
-        float lateral01 =
-            ((float)acrossIndex + localStratum) /
-            max(1.0, (float)acrossCount);
-        if (candidateIndex >= 4)
-        {
-            float fallbackDirection = candidateIndex == 4
-                ? -1.0
-                : 1.0;
-            lateral01 += fallbackDirection *
-                0.36 / max(1.0, (float)acrossCount);
-        }
-        lateral01 = saturate(lateral01);
-
-        float bandSelector = FoamMajorRegionHash(
-            segmentIndex,
-            acrossIndex,
-            39.0 + candidateSalt);
-        float bandJitter = FoamMajorRegionHash(
-            segmentIndex,
-            acrossIndex,
-            40.0 + candidateSalt);
-        float bandTarget = bandSelector < 0.333
-            ? lerp(0.18, 0.34, bandJitter)
-            : (bandSelector < 0.666
-                ? lerp(0.42, 0.58, bandJitter)
-                : lerp(0.66, 0.82, bandJitter));
-        float bandInfluence = classIndex >= 2
-            ? 0.28
-            : (classIndex == 1 ? 0.46 : 0.58);
-        bandInfluence += (1.0 - step(1.5, (float)acrossCount)) * 0.18;
-        lateral01 = lerp(
-            lateral01,
-            bandTarget,
-            saturate(bandInfluence));
-
-        float sparseSingleAcross =
-            (1.0 - smoothstep(0.24, 0.64, amount)) *
-            (1.0 - step(1.5, (float)acrossCount));
-        if (sparseSingleAcross > 0.001)
-        {
-            float sideSelector = FoamMajorRegionHash(
-                segmentIndex,
-                acrossIndex,
-                43.0 + candidateSalt);
-            float sideJitter = FoamMajorRegionHash(
-                segmentIndex,
-                acrossIndex,
-                47.0 + candidateSalt);
-            float sideTarget = sideSelector < 0.5
-                ? lerp(0.16, 0.34, sideJitter)
-                : lerp(0.66, 0.84, sideJitter);
-            lateral01 = lerp(
-                lateral01,
-                sideTarget,
-                sparseSingleAcross * 0.72);
-        }
-
-        float phase = identity * 6.2831853;
-        float lateralDrift = sin(
-            _FoamTime * lerp(0.010, 0.031, identity) + phase) *
-            min(effectiveSize * 0.34, usableWidth * 0.055);
-        float candidateLateral = lerp(
-            usableLeft,
-            usableRight,
-            lateral01) + lateralDrift;
-        float candidateAcross01 = saturate(
-            (candidateLateral - usableLeft) /
-            max(0.001, usableRight - usableLeft));
-
-        float2 shapeBounds = FoamMajorShapeBounds(
-            identity,
-            effectiveSize,
-            classIndex);
-        float preference = FoamValueNoise(float2(
-            candidateDistance * 0.13 + identity * 17.0,
-            candidateLateral * 0.19 - identity * 11.0 +
-                _FoamTime * lerp(0.004, 0.018, _FoamNetworkEvolution)));
-        float roomScore;
-        float roomStrength;
-        float score = FoamMajorCandidateFootprintScore(
-            float2(candidateDistance, candidateLateral),
-            shapeBounds,
-            preference,
-            classIndex,
-            roomScore,
-            roomStrength);
-        float bandError = abs(candidateAcross01 - bandTarget);
-        float bandAffinity = 1.0 - smoothstep(0.12, 0.36, bandError);
-        score *= lerp(0.78, 1.18, bandAffinity);
-
-        if (sparseSingleAcross > 0.001)
-        {
-            float offCentre = abs(candidateAcross01 - 0.5) * 2.0;
-            float interiorSide = smoothstep(0.18, 0.58, offCentre) *
-                (1.0 - smoothstep(0.88, 1.0, offCentre));
-            score *= lerp(
-                1.0,
-                lerp(0.82, 1.24, interiorSide),
-                sparseSingleAcross);
-        }
-
-        if (score > bestScore)
-        {
-            float squeezedSizeScale = classIndex >= 2
-                ? lerp(0.58, 1.0, roomScore)
-                : (classIndex == 1
-                    ? lerp(0.72, 1.0, roomScore)
-                    : lerp(0.90, 1.0, roomScore));
-            float resolvedEffectiveSize =
-                effectiveSize * squeezedSizeScale;
-            bestScore = score;
-            bestPosition = float2(
-                candidateDistance,
-                candidateLateral);
-            bestIdentity = identity;
-            bestBounds = FoamMajorShapeBounds(
-                identity,
-                resolvedEffectiveSize,
-                classIndex);
-            bestEffectiveSize = resolvedEffectiveSize;
-            bestClassIndex = classIndex;
-            bestRoomStrength = roomStrength;
-        }
+        _FoamMajorNucleiWrite[bufferIndex] = nucleus;
+        return;
     }
 
-    float activityPhase = FoamMajorRegionHash(
-        segmentIndex,
-        acrossIndex,
-        71.0) * 6.2831853;
-    float activitySpeed = lerp(
-        0.008,
-        0.030,
-        saturate(_FoamNetworkEvolution)) *
-        lerp(
-            0.72,
-            1.28,
-            FoamMajorRegionHash(
-                segmentIndex,
-                acrossIndex,
-                72.0));
-    float activityWave = 0.5 + 0.5 * sin(
-        _FoamTime * activitySpeed + activityPhase);
-    float activityPulse = smoothstep(0.08, 0.58, activityWave);
-    float classActivityFloor = bestClassIndex >= 2
-        ? 0.54
-        : (bestClassIndex == 1 ? 0.40 : 0.30);
-    float sparseActivityFloor = lerp(
-        0.52,
-        0.30,
-        smoothstep(0.18, 0.72, amount));
-    float activity = lerp(
-        max(classActivityFloor, sparseActivityFloor),
-        1.0,
-        activityPulse);
-    float strengthVariation = lerp(
-        0.78,
-        1.0,
-        FoamMajorRegionHash(
-            segmentIndex,
-            acrossIndex,
-            73.0));
-    float resolvedScore = smoothstep(0.10, 0.52, bestScore);
+    // Two stratified opportunities cover the local width without fixed lanes.
+    // Independent longitudinal jitter prevents them from reading as pairs.
+    float lateral01 = (
+        (float)acrossIndex +
+        lerp(0.12, 0.88, FoamMajorHash01(identity, 2u))) * 0.5;
+    float candidateLateral = lerp(
+        usableLeft,
+        usableRight,
+        lateral01);
+    // Elongation is continuous and always extends the local major axis. The
+    // orientation equation above is solely responsible for whether that long
+    // axis is longitudinal or lateral, avoiding reciprocal-aspect bias.
+    float elongationQuantile = FoamMajorHash01(identity, 4u);
+    float elongation = exp2(
+        pow(elongationQuantile, 2.2) * 1.13750352375);
+    float2 frame;
+    float4 lobe0;
+    float4 lobe1;
+    float4 lobe2;
+    float4 bite;
+    float biteStrength;
+    FoamMajorBuildContinuousGrammar(
+        identity,
+        elongation,
+        frame,
+        lobe0,
+        lobe1,
+        lobe2,
+        bite,
+        biteStrength);
 
-    nucleus.positionStrengthIdentity = float4(
-        bestPosition,
-        resolvedScore *
-            activity *
-            strengthVariation *
-            bestRoomStrength,
-        bestIdentity);
-    nucleus.boundsAndSize = float4(
-        bestBounds,
-        bestEffectiveSize,
-        (float)bestClassIndex);
+    // Long, strongly lateral descriptors receive one smooth inward bias so
+    // the direct capacity solve can retain them instead of reducing almost all
+    // of them at a bank. Compact and flow-aligned descriptors are unchanged.
+    float lateralness = abs(frame.y) *
+        smoothstep(1.15, 2.0, elongation);
+    float centreTarget = clamp(0.0, usableLeft, usableRight);
+    candidateLateral = lerp(
+        candidateLateral,
+        centreTarget,
+        lateralness * 0.58);
+
+    float centreAvailability = FoamMajorPointAvailability(
+        candidateDistance,
+        candidateLateral);
+    if (centreAvailability <= 0.001)
+    {
+        _FoamMajorNucleiWrite[bufferIndex] = nucleus;
+        return;
+    }
+
+    float2 unitBounds = FoamMajorDescriptorBounds(
+        lobe0,
+        lobe1,
+        lobe2,
+        frame);
+    float availableLateralHalfExtent = max(
+        0.0,
+        min(
+            candidateLateral - usableLeft,
+            usableRight - candidateLateral));
+    float capacityScale = min(
+        segmentSpacing * 0.88 / max(0.001, unitBounds.x),
+        availableLateralHalfExtent / max(0.001, unitBounds.y));
+    float minimumResolvedScale = max(
+        1.25 * metric.widthsAndSpacing.z /
+            max(0.001, unitBounds.x),
+        1.25 * metric.widthsAndSpacing.w /
+            max(0.001, unitBounds.y));
+    if (capacityScale < minimumResolvedScale)
+    {
+        _FoamMajorNucleiWrite[bufferIndex] = nucleus;
+        return;
+    }
+
+    // Sample the deterministic size inside the actual feasible interval
+    // rather than requesting a scale and clamping both tails back toward the
+    // middle. This preserves clearer small and large populations naturally.
+    float globalScale = FoamMajorGlobalScale(
+        _FoamMajorSupportSize);
+    float upperScale = min(capacityScale, globalScale * 1.75);
+    float lowerScale = min(
+        upperScale,
+        max(
+            minimumResolvedScale,
+            globalScale * 0.40));
+    float sizeValue = FoamMajorHash01(identity, 3u);
+    float signedSize = sizeValue * 2.0 - 1.0;
+    float sizeQuantile = 0.5 + 0.5 * sign(signedSize) *
+        pow(abs(signedSize), 0.62);
+    float finalScale = exp2(lerp(
+        log2(max(0.0001, lowerScale)),
+        log2(max(lowerScale + 0.0001, upperScale)),
+        saturate(sizeQuantile)));
+
+    FoamMajorScalePrimitive(lobe0, finalScale);
+    FoamMajorScalePrimitive(lobe1, finalScale);
+    FoamMajorScalePrimitive(lobe2, finalScale);
+    FoamMajorScalePrimitive(bite, finalScale);
+    float2 bounds = FoamMajorDescriptorBounds(
+        lobe0,
+        lobe1,
+        lobe2,
+        frame);
+    float strength = centreAvailability * lerp(
+        0.82,
+        1.0,
+        FoamMajorHash01(identity, 12u));
+
+    nucleus.positionStrengthBite = float4(
+        candidateDistance,
+        candidateLateral,
+        strength,
+        biteStrength);
+    nucleus.boundsFrame = float4(bounds, frame);
+    nucleus.lobe0 = lobe0;
+    nucleus.lobe1 = lobe1;
+    nucleus.lobe2 = lobe2;
+    nucleus.bite = bite;
     _FoamMajorNucleiWrite[bufferIndex] = nucleus;
 }
 
-float2 FoamMajorRotate(float2 inputPoint, float angle)
+float FoamMajorEllipseMask(
+    float2 localPoint,
+    float4 primitive)
 {
-    float sineValue = sin(angle);
-    float cosineValue = cos(angle);
-    return float2(
-        inputPoint.x * cosineValue + inputPoint.y * sineValue,
-        -inputPoint.x * sineValue + inputPoint.y * cosineValue);
-}
-
-float FoamMajorVariableSegmentField(
-    float2 samplePoint,
-    float2 startPoint,
-    float2 endPoint,
-    float startRadius,
-    float endRadius)
-{
-    float2 axis = endPoint - startPoint;
-    float axisLengthSquared = max(0.00001, dot(axis, axis));
-    float t = saturate(
-        dot(samplePoint - startPoint, axis) /
-        axisLengthSquared);
-    float2 closestPoint = lerp(startPoint, endPoint, t);
-    float radius = max(0.025, lerp(startRadius, endRadius, t));
-    return 1.0 - length(samplePoint - closestPoint) / radius;
-}
-
-float FoamMajorSpineField(
-    float2 samplePoint,
-    float2 p0,
-    float2 p1,
-    float2 p2,
-    float2 p3,
-    float r0,
-    float r1,
-    float r2,
-    float r3)
-{
-    return max(
-        FoamMajorVariableSegmentField(
-            samplePoint,
-            p0,
-            p1,
-            r0,
-            r1),
-        max(
-            FoamMajorVariableSegmentField(
-                samplePoint,
-                p1,
-                p2,
-                r1,
-                r2),
-            FoamMajorVariableSegmentField(
-                samplePoint,
-                p2,
-                p3,
-                r2,
-                r3)));
-}
-
-float FoamMajorBiteField(
-    float2 samplePoint,
-    float2 centre,
-    float2 radii,
-    float angle)
-{
-    float2 rotated = FoamMajorRotate(
-        samplePoint - centre,
-        angle);
-    float2 safeRadii = max(float2(0.03, 0.03), radii);
-    return 1.0 - length(rotated / safeRadii);
+    float active = step(0.001, min(primitive.z, primitive.w));
+    float2 safeRadii = max(float2(0.001, 0.001), primitive.zw);
+    float2 normalizedPoint =
+        (localPoint - primitive.xy) / safeRadii;
+    float ellipseMetric = dot(
+        normalizedPoint,
+        normalizedPoint);
+    float boxMetric = max(
+        abs(normalizedPoint.x),
+        abs(normalizedPoint.y));
+    boxMetric *= boxMetric;
+    float distanceMetric = lerp(
+        ellipseMetric,
+        boxMetric,
+        0.16);
+    return active * (
+        1.0 - smoothstep(0.56, 1.0, distanceMetric));
 }
 
 float FoamMajorNucleusShape(
     float globalDistance,
     float lateralMetres,
-    FoamMajorNucleus nucleus,
-    float evolution)
+    FoamMajorNucleus nucleus)
 {
-    float strength = nucleus.positionStrengthIdentity.z;
-    if (strength <= 0.001)
-    {
-        return 0.0;
-    }
-
-    float identity = nucleus.positionStrengthIdentity.w;
-    float baseSize = nucleus.boundsAndSize.z;
-    int classIndex = clamp((int)round(nucleus.boundsAndSize.w), 0, 2);
+    float strength = nucleus.positionStrengthBite.z;
     float2 delta = float2(
-        globalDistance - nucleus.positionStrengthIdentity.x,
-        lateralMetres - nucleus.positionStrengthIdentity.y);
-    if (abs(delta.x) > nucleus.boundsAndSize.x ||
-        abs(delta.y) > nucleus.boundsAndSize.y)
-    {
-        return 0.0;
-    }
+        globalDistance - nucleus.positionStrengthBite.x,
+        lateralMetres - nucleus.positionStrengthBite.y);
+    float2 frame = nucleus.boundsFrame.zw;
+    float2 localPoint = float2(
+        delta.x * frame.x + delta.y * frame.y,
+        -delta.x * frame.y + delta.y * frame.x);
 
-    float timeScale = lerp(0.006, 0.026, evolution);
-    float2 noiseCoordinate = float2(
-        (globalDistance + identity * 23.0) * 0.31 -
-            _FoamTime * timeScale *
-            lerp(0.48, 1.12, identity),
-        (lateralMetres - identity * 17.0) * 0.49 +
-            _FoamTime * timeScale * 0.37);
-    float warpX = FoamValueNoise(
-        noiseCoordinate + float2(11.3, 3.7)) - 0.5;
-    float warpY = FoamValueNoise(
-        noiseCoordinate * 1.21 + float2(29.1, 17.9)) - 0.5;
-    float edgeNoise = FoamFbm(
-        noiseCoordinate * 0.92 + float2(47.1, 9.2)) - 0.5;
-
-    float2 localPoint = delta;
-    localPoint.x += warpX * baseSize * lerp(0.05, 0.15, evolution);
-    localPoint.y += warpY * baseSize * lerp(0.07, 0.20, evolution);
-
-    int archetype = FoamMajorShapeArchetype(identity, classIndex);
-    float direction = FoamHash11(identity * 127.9 + 3.1) < 0.5
-        ? -1.0
-        : 1.0;
-    float composite = -16.0;
-
-    if (archetype == 0)
-    {
-        // Compact raft / occasional oval. It remains broad and simple, but
-        // uses an off-centre spine so it is not a perfect radial stamp.
-        float halfLength = baseSize * lerp(
-            0.88,
-            1.28,
-            FoamHash11(identity * 61.1 + 1.7));
-        float halfWidth = baseSize * lerp(
-            0.50,
-            0.78,
-            FoamHash11(identity * 67.7 + 3.9));
-        float bend = direction * halfWidth * lerp(
-            0.08,
-            0.30,
-            FoamHash11(identity * 131.3 + 6.7));
-        composite = FoamMajorSpineField(
-            localPoint,
-            float2(-halfLength, -bend * 0.20),
-            float2(-halfLength * 0.34, bend * 0.72),
-            float2(halfLength * 0.36, bend * 0.30),
-            float2(halfLength, -bend * 0.16),
-            halfWidth * 0.34,
-            halfWidth * 0.98,
-            halfWidth * 0.84,
-            halfWidth * 0.28);
-
-        if (FoamHash11(identity * 137.9 + 1.9) > 0.66)
-        {
-            float bite = FoamMajorBiteField(
-                localPoint,
-                float2(
-                    halfLength * 0.12,
-                    -direction * halfWidth * 0.76),
-                float2(
-                    halfLength * 0.38,
-                    halfWidth * 0.48),
-                direction * 0.16);
-            composite = min(composite, -bite + 0.11);
-        }
-    }
-    else if (archetype == 1)
-    {
-        // Bean / crescent. A strongly bowed spine and an inner-side bite
-        // create a genuinely concave silhouette rather than a warped oval.
-        float halfLength = baseSize * lerp(
-            1.18,
-            1.78,
-            FoamHash11(identity * 71.3 + 7.1));
-        float halfWidth = baseSize * lerp(
-            0.48,
-            0.82,
-            FoamHash11(identity * 79.9 + 2.3));
-        float bow = direction * halfWidth * lerp(
-            0.36,
-            0.70,
-            FoamHash11(identity * 149.1 + 4.3));
-        composite = FoamMajorSpineField(
-            localPoint,
-            float2(-halfLength, -bow * 0.10),
-            float2(-halfLength * 0.36, bow * 0.66),
-            float2(halfLength * 0.32, bow),
-            float2(halfLength, bow * 0.16),
-            halfWidth * 0.22,
-            halfWidth,
-            halfWidth * 0.82,
-            halfWidth * 0.20);
-
-        float biteDepth = lerp(
-            0.05,
-            0.20,
-            FoamHash11(identity * 151.7 + 9.1));
-        float bite = FoamMajorBiteField(
-            localPoint,
-            float2(
-                halfLength * 0.04,
-                -direction * halfWidth * 0.50),
-            float2(
-                halfLength * 0.55,
-                halfWidth * 0.68),
-            direction * 0.18);
-        composite = min(composite, -bite + biteDepth);
-    }
-    else if (archetype == 2)
-    {
-        // Broken strip / peel ribbon. It stays directional, but is shorter
-        // and more interrupted than the old dominant slash shape.
-        float halfLength = baseSize * lerp(
-            1.42,
-            2.22,
-            FoamHash11(identity * 83.1 + 4.9));
-        float halfWidth = baseSize * lerp(
-            0.24,
-            0.46,
-            FoamHash11(identity * 89.7 + 6.1));
-        float stripVariant = FoamHash11(identity * 159.7 + 3.9);
-        float stripAngle = direction * lerp(
-            -0.34,
-            0.36,
-            FoamHash11(identity * 161.3 + 8.1));
-        float2 stripPoint = FoamMajorRotate(localPoint, stripAngle);
-        halfLength *= lerp(
-            0.72,
-            1.08,
-            FoamHash11(identity * 162.7 + 4.9));
-        halfWidth *= lerp(
-            0.82,
-            1.22,
-            FoamHash11(identity * 164.3 + 1.7));
-        float curve = direction * halfWidth * lerp(
-            stripVariant < 0.45 ? -0.48 : 0.18,
-            stripVariant < 0.45 ? 0.36 : 0.92,
-            FoamHash11(identity * 157.3 + 5.1));
-        bool pinchFirst = FoamHash11(identity * 163.1 + 2.1) < 0.5;
-        float pinch = lerp(
-            0.46,
-            0.76,
-            FoamHash11(identity * 167.9 + 7.9));
-        float r1 = halfWidth * (pinchFirst ? pinch : 0.92);
-        float r2 = halfWidth * (pinchFirst ? 0.96 : pinch);
-        composite = FoamMajorSpineField(
-            stripPoint,
-            float2(-halfLength, -curve * 0.15),
-            float2(-halfLength * 0.36, curve * 0.78),
-            float2(halfLength * 0.34, curve * 0.24),
-            float2(halfLength, -curve * 0.24),
-            halfWidth * 0.10,
-            r1,
-            r2,
-            halfWidth * 0.08);
-
-        float gapA = FoamMajorBiteField(
-            stripPoint,
-            float2(
-                -halfLength * lerp(
-                    0.10,
-                    0.34,
-                    FoamHash11(identity * 169.1 + 1.3)),
-                -direction * halfWidth * 0.34),
-            float2(
-                halfLength * 0.18,
-                halfWidth * 0.70),
-            direction * 0.22);
-        composite = min(composite, -gapA + 0.18);
-
-        if (FoamHash11(identity * 171.7 + 4.1) > 0.46)
-        {
-            float gapB = FoamMajorBiteField(
-                stripPoint,
-                float2(
-                    halfLength * lerp(
-                        0.18,
-                        0.48,
-                        FoamHash11(identity * 175.1 + 5.3)),
-                    direction * halfWidth * 0.42),
-                float2(
-                    halfLength * 0.16,
-                    halfWidth * 0.62),
-                -direction * 0.18);
-            composite = min(composite, -gapB + 0.14);
-        }
-
-        if (stripVariant > 0.58)
-        {
-            float fork = FoamMajorSpineField(
-                stripPoint,
-                float2(-halfLength * 0.22, direction * halfWidth * 0.06),
-                float2(halfLength * 0.02, -direction * halfWidth * 0.34),
-                float2(halfLength * 0.28, -direction * halfWidth * 0.58),
-                float2(halfLength * 0.54, -direction * halfWidth * 0.42),
-                halfWidth * 0.12,
-                halfWidth * 0.36,
-                halfWidth * 0.30,
-                halfWidth * 0.08);
-            composite = max(composite, fork - 0.10);
-        }
-    }
-    else if (archetype == 3)
-    {
-        // Hook / wedge. One broad shoulder feeds a bent, narrowing arm.
-        float halfLength = baseSize * lerp(
-            1.46,
-            2.18,
-            FoamHash11(identity * 97.3 + 5.7));
-        float halfWidth = baseSize * lerp(
-            0.42,
-            0.73,
-            FoamHash11(identity * 101.9 + 7.3));
-        float hook = direction * halfWidth * lerp(
-            0.92,
-            1.38,
-            FoamHash11(identity * 173.3 + 4.7));
-        composite = FoamMajorSpineField(
-            localPoint,
-            float2(-halfLength, -direction * halfWidth * 0.10),
-            float2(-halfLength * 0.34, direction * halfWidth * 0.08),
-            float2(halfLength * 0.36, hook * 0.42),
-            float2(halfLength * 0.82, hook),
-            halfWidth * 0.54,
-            halfWidth,
-            halfWidth * 0.52,
-            halfWidth * 0.10);
-
-        if (FoamHash11(identity * 179.9 + 3.3) > 0.52)
-        {
-            float bite = FoamMajorBiteField(
-                localPoint,
-                float2(
-                    -halfLength * 0.08,
-                    -direction * halfWidth * 0.72),
-                float2(
-                    halfLength * 0.34,
-                    halfWidth * 0.50),
-                -direction * 0.22);
-            composite = min(composite, -bite + 0.08);
-        }
-    }
-    else if (archetype == 4)
-    {
-        // Compound raft. A broad primary spine and an offset secondary arm
-        // form an irregular shoulder or narrow waist without tracked parts.
-        float halfLength = baseSize * lerp(
-            1.18,
-            1.74,
-            FoamHash11(identity * 109.1 + 2.7));
-        float halfWidth = baseSize * lerp(
-            0.54,
-            0.84,
-            FoamHash11(identity * 113.7 + 8.9));
-        float primary = FoamMajorSpineField(
-            localPoint,
-            float2(-halfLength, -direction * halfWidth * 0.12),
-            float2(-halfLength * 0.34, direction * halfWidth * 0.18),
-            float2(halfLength * 0.34, -direction * halfWidth * 0.04),
-            float2(halfLength * 0.92, direction * halfWidth * 0.20),
-            halfWidth * 0.28,
-            halfWidth,
-            halfWidth * 0.78,
-            halfWidth * 0.22);
-        float branchField = FoamMajorSpineField(
-            localPoint,
-            float2(-halfLength * 0.18, direction * halfWidth * 0.05),
-            float2(halfLength * 0.06, direction * halfWidth * 0.58),
-            float2(halfLength * 0.52, direction * halfWidth * 0.86),
-            float2(halfLength * 0.78, direction * halfWidth * 0.54),
-            halfWidth * 0.22,
-            halfWidth * 0.64,
-            halfWidth * 0.52,
-            halfWidth * 0.14);
-        composite = max(primary, branchField);
-
-        if (FoamHash11(identity * 181.7 + 8.1) > 0.42)
-        {
-            float bite = FoamMajorBiteField(
-                localPoint,
-                float2(
-                    halfLength * 0.12,
-                    -direction * halfWidth * 0.72),
-                float2(
-                    halfLength * 0.42,
-                    halfWidth * 0.58),
-                direction * 0.20);
-            composite = min(composite, -bite + 0.10);
-        }
-    }
-    else
-    {
-        // Broad sheet parent. A heavy irregular body with shoulder lobes,
-        // dents, and a small downstream tongue gives future material a parent
-        // region without turning every major support into a plain blob.
-        float halfLength = baseSize * lerp(
-            1.08,
-            1.52,
-            FoamHash11(identity * 191.3 + 4.9));
-        float halfWidth = baseSize * lerp(
-            0.88,
-            1.28,
-            FoamHash11(identity * 193.7 + 6.3));
-        float bend = direction * halfWidth * lerp(
-            0.10,
-            0.34,
-            FoamHash11(identity * 197.9 + 2.7));
-
-        float mainSheet = FoamMajorSpineField(
-            localPoint,
-            float2(-halfLength, -bend * 0.18),
-            float2(-halfLength * 0.36, bend * 0.38),
-            float2(halfLength * 0.18, -bend * 0.08),
-            float2(halfLength * 0.82, -bend * 0.16),
-            halfWidth * 0.72,
-            halfWidth * 1.06,
-            halfWidth * 0.96,
-            halfWidth * 0.42);
-        float shoulder = FoamMajorBiteField(
-            localPoint,
-            float2(
-                -halfLength * 0.26,
-                direction * halfWidth * 0.62),
-            float2(
-                halfLength * 0.52,
-                halfWidth * 0.62),
-            -direction * 0.20);
-        float oppositeShoulder = FoamMajorBiteField(
-            localPoint,
-            float2(
-                halfLength * 0.20,
-                -direction * halfWidth * 0.54),
-            float2(
-                halfLength * 0.44,
-                halfWidth * 0.48),
-            direction * 0.16);
-        float downstreamTongue = FoamMajorSpineField(
-            localPoint,
-            float2(halfLength * 0.18, -direction * halfWidth * 0.04),
-            float2(halfLength * 0.42, -direction * halfWidth * 0.18),
-            float2(halfLength * 0.62, -direction * halfWidth * 0.24),
-            float2(halfLength * 0.82, -direction * halfWidth * 0.16),
-            halfWidth * 0.28,
-            halfWidth * 0.34,
-            halfWidth * 0.24,
-            halfWidth * 0.08);
-        composite = max(
-            max(mainSheet, shoulder),
-            max(oppositeShoulder, downstreamTongue - 0.08));
-
-        float upperBite = FoamMajorBiteField(
-            localPoint,
-            float2(
-                halfLength * 0.02,
-                -direction * halfWidth * 0.74),
-            float2(
-                halfLength * 0.52,
-                halfWidth * 0.46),
-            direction * 0.24);
-        composite = min(composite, -upperBite + 0.08);
-
-        float lowerBite = FoamMajorBiteField(
-            localPoint,
-            float2(
-                -halfLength * 0.44,
-                direction * halfWidth * 0.80),
-            float2(
-                halfLength * 0.40,
-                halfWidth * 0.40),
-            -direction * 0.18);
-        composite = min(composite, -lowerBite + 0.12);
-
-        float centreTear = FoamMajorBiteField(
-            localPoint,
-            float2(
-                halfLength * lerp(
-                    -0.16,
-                    0.22,
-                    FoamHash11(identity * 199.7 + 8.9)),
-                direction * halfWidth * lerp(
-                    -0.10,
-                    0.22,
-                    FoamHash11(identity * 201.1 + 6.1))),
-            float2(
-                halfLength * 0.26,
-                halfWidth * 0.22),
-            direction * 0.32);
-        composite = min(composite, -centreTear + 0.18);
-    }
-
-    if (classIndex >= 1)
-    {
-        float childGate = FoamHash11(identity * 211.3 + 9.7);
-        float childStrength = classIndex >= 2
-            ? -0.02
-            : 0.18;
-        if (classIndex >= 2 || childGate > 0.58)
-        {
-            float childA = FoamMajorBiteField(
-                localPoint,
-                float2(
-                    baseSize * lerp(
-                        0.34,
-                        0.78,
-                        FoamHash11(identity * 213.7 + 3.1)),
-                    direction * baseSize * lerp(
-                        0.40,
-                        0.74,
-                        FoamHash11(identity * 217.1 + 5.9))),
-                float2(
-                    baseSize * lerp(0.24, 0.42, childGate),
-                    baseSize * lerp(
-                        0.16,
-                        0.32,
-                        FoamHash11(identity * 219.7 + 8.3))),
-                direction * 0.30);
-            composite = max(composite, childA - childStrength);
-        }
-
-        if (classIndex >= 2 && FoamHash11(identity * 223.1 + 2.3) > 0.34)
-        {
-            float childB = FoamMajorBiteField(
-                localPoint,
-                float2(
-                    baseSize * lerp(
-                        -0.42,
-                        0.22,
-                        FoamHash11(identity * 227.7 + 6.7)),
-                    -direction * baseSize * lerp(
-                        0.46,
-                        0.86,
-                        FoamHash11(identity * 229.3 + 1.5))),
-                float2(
-                    baseSize * lerp(
-                        0.22,
-                        0.38,
-                        FoamHash11(identity * 233.9 + 7.1)),
-                    baseSize * lerp(
-                        0.16,
-                        0.30,
-                        FoamHash11(identity * 239.1 + 4.7))),
-                -direction * 0.22);
-            composite = max(composite, childB - 0.02);
-        }
-
-        if (classIndex >= 2)
-        {
-            float trailingChild = FoamMajorSpineField(
-                localPoint,
-                float2(
-                    baseSize * 0.58,
-                    direction * baseSize * 0.18),
-                float2(
-                    baseSize * 0.80,
-                    direction * baseSize * 0.30),
-                float2(
-                    baseSize * 1.02,
-                    direction * baseSize * 0.42),
-                float2(
-                    baseSize * 1.22,
-                    direction * baseSize * 0.34),
-                baseSize * 0.18,
-                baseSize * 0.26,
-                baseSize * 0.22,
-                baseSize * 0.08);
-            composite = max(composite, trailingChild - 0.08);
-        }
-    }
-
-    composite += edgeNoise * lerp(0.07, 0.17, evolution);
-    float body = smoothstep(-0.060, 0.17, composite);
+    float body = max(
+        FoamMajorEllipseMask(localPoint, nucleus.lobe0),
+        max(
+            FoamMajorEllipseMask(localPoint, nucleus.lobe1),
+            FoamMajorEllipseMask(localPoint, nucleus.lobe2)));
+    float biteMask = FoamMajorEllipseMask(
+        localPoint,
+        nucleus.bite);
+    body *= 1.0 - biteMask *
+        saturate(nucleus.positionStrengthBite.w);
     return saturate(body * strength);
 }
+
 
 float FoamLoadMajorSupport(int2 coordinate)
 {
@@ -3153,9 +2455,8 @@ void BuildTopologyMajor(uint3 dispatchId : SV_DispatchThreadID)
         metric.widthsAndSpacing.x,
         metric.widthsAndSpacing.y);
 
-    float amount = saturate(_FoamMajorSupportAmount);
     float evolution = saturate(_FoamNetworkEvolution);
-    float segmentSpacing = FoamMajorSegmentSpacing(amount);
+    float segmentSpacing = FoamMajorSegmentSpacing();
     int segmentCount = min(
         _FoamMajorNucleusSegmentCapacity,
         max(1, (int)ceil(
@@ -3192,16 +2493,16 @@ void BuildTopologyMajor(uint3 dispatchId : SV_DispatchThreadID)
 
             FoamMajorNucleus nucleus =
                 _FoamMajorNucleiRead[nucleusIndex];
-            if (nucleus.positionStrengthIdentity.z <= 0.001)
+            if (nucleus.positionStrengthBite.z <= 0.001)
             {
                 continue;
             }
 
             float2 nucleusDelta = float2(
-                globalDistance - nucleus.positionStrengthIdentity.x,
-                lateralMetres - nucleus.positionStrengthIdentity.y);
-            if (abs(nucleusDelta.x) > nucleus.boundsAndSize.x ||
-                abs(nucleusDelta.y) > nucleus.boundsAndSize.y)
+                globalDistance - nucleus.positionStrengthBite.x,
+                lateralMetres - nucleus.positionStrengthBite.y);
+            if (abs(nucleusDelta.x) > nucleus.boundsFrame.x ||
+                abs(nucleusDelta.y) > nucleus.boundsFrame.y)
             {
                 continue;
             }
@@ -3211,8 +2512,7 @@ void BuildTopologyMajor(uint3 dispatchId : SV_DispatchThreadID)
                 FoamMajorNucleusShape(
                     globalDistance,
                     lateralMetres,
-                    nucleus,
-                    evolution));
+                    nucleus));
         }
     }
 
