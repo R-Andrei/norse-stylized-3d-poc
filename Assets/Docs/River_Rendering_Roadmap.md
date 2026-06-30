@@ -344,8 +344,8 @@ Topology does not create material. Upstream inflow remains the primary planned c
 
 The remaining free-water topology will use persistent evolving fields, not an evolving graph, node set, pathfinding network, or pool of tracked moving structures.
 
-- **Major Support:** implemented as one persistent broad-support ping-pong field driven by a compact width-aware GPU nucleus cache rebuilt once per evolution tick. Longitudinal intervals derive lateral opportunity count and placement from the actual local water width; footprint-aware candidate scoring avoids banks, Anchored Support, Obstacle Footprint, and invalid water. A five-archetype variable-width spine family replaces fixed lateral rows and repeated oval silhouettes: compact raft/occasional oval, bean/crescent, long strip/ribbon, hook/wedge, and compound raft. Beans and strips carry the highest initial weights. It awaits visual acceptance.
-- **Connector Support:** a persistent field that approaches locally derived bridge targets only where meaningful positive support exists on two sides of a gap.
+- **Major Support:** implemented as one persistent broad-support ping-pong field driven by a compact width-aware GPU nucleus cache rebuilt once per evolution tick. Longitudinal intervals derive lateral opportunity count and placement from the actual local water width; deterministic lateral band targets keep candidate selection from collapsing to the safest centre lane, while footprint-aware scoring still avoids banks, Anchored Support, Obstacle Footprint, and invalid water. The same existing footprint samples derive a room score, so squeezed obstacle/bank funnels shrink and weaken large/medium nuclei without adding texture reads or passes. Each nucleus chooses an internal size class: rare large parent, medium body, or secondary small fragment. The active performance-capped path uses class-aware archetypes, four candidate attempts, no downstream travel phase, and no extra mini-spine/lobe family overlay.
+- **Connector Support:** temporarily disabled under the hard performance cap. The connector texture is cleared and no connector dispatch is run. It must remain disabled until a replacement design proves it solves green-in-red placement without increasing runtime or startup cost.
 - **Pocket Aging Pressure:** a persistent negative field whose targets are generated inside sufficiently broad Major interiors while protecting Anchored Support and important Connector Support cores.
 
 “Birth” and “death” are growth and decay operations on these persistent fields, not separate stored layers.
@@ -353,11 +353,11 @@ The remaining free-water topology will use persistent evolving fields, not an ev
 Major Support now exposes two shape controls and two cadence controls:
 
 - `Major Support Amount`: default `0.56`, range `0–1`; controls longitudinal spacing through a nonlinear remap of approximately `9.5 m` to `2.8 m`, while actual local water width determines whether one or several nuclei fit laterally;
-- `Major Support Size`: default `0.46`, range `0–1`; controls physical region size independently from amount through a nonlinear remap of approximately `0.45 m` to `1.95 m`, giving substantially more small-scale control;
+- `Major Support Size`: default `0.46`, range `0–1`; controls the physical family scale envelope independently from amount through a nonlinear remap of approximately `0.45 m` to `1.95 m`, followed by internal small/medium/large multipliers;
 - `Major Evolution Rate (Hz)`: default `2`, range `0.5–10`;
 - `Major Cleanup Rate (Hz)`: default `1`, range `0.5–10`.
 
-The evolution pass first rebuilds a fixed-capacity width-aware nucleus buffer, then applies gradual persistent growth or decay from nearby buffered nuclei. Longitudinal intervals derive their lateral candidate count from actual local water width, so narrow rivers do not collapse to a permanent centre lane and broad rivers may host several nuclei across. Candidate centres and approximate footprint samples are scored against banks, Anchored Support, Obstacle Footprint, and invalid water before acceptance. Each nucleus chooses a compact raft, bean/crescent, long strip/ribbon, hook/wedge, or compound raft. The shared bounded four-point spine kernel varies taper, curvature, width, constrictions, optional bites, and evolving noise to produce materially different silhouettes without separate shape systems. The cleanup pass is one-sided: it may remove isolated remnants and derive broad-interior support, but it never fills holes, expands support, or merges gaps closed.
+The evolution pass first rebuilds a fixed-capacity width-aware nucleus buffer, then applies gradual persistent growth or decay from nearby buffered nuclei. Longitudinal intervals derive their lateral candidate count from actual local water width, so narrow rivers do not collapse to a permanent centre lane and broad rivers may host several nuclei across. Candidate scoring includes deterministic lateral band targets, with stronger interior-side bias for sparse one-across intervals, so low amount settings do not aggregate permanently around the centre. Candidate centres and approximate footprint samples are scored against banks, Anchored Support, Obstacle Footprint, and invalid water before acceptance. Those same footprint samples also derive a room score; squeezed corridors penalize broad classes and shrink accepted nuclei by class, so object funnels should prefer small fragments and anchored influence instead of repeated full-strength Major overlap. Each nucleus chooses a size class and class-aware archetype, so `Major Support Size` defines a family scale envelope rather than a uniform stamp size. Downstream Major placement travel is disabled under the hard performance cap because it added candidate work and worsened obstacle-funnel pileups. Activity modulation keeps a nonzero floor, strongest for large parents and sparse settings, so long-running simulations should evolve without slowly emptying the Major field. The cleanup pass is one-sided: it may remove isolated remnants and derive broad-interior support, but it never fills holes, expands support, or merges gaps closed.
 
 Topology work runs at lower cadence than material transport and is staggered across classes/chunks. Complexity should scale primarily with structural texel count rather than `texels × structures`.
 
@@ -402,7 +402,7 @@ The accepted main controls remain:
 - `Web Granularity`
 - `Network Evolution`
 - `Major Support Amount` — default `0.56`, range `0–1`; nonlinear longitudinal spacing remap of approximately `9.5 m` to `2.8 m`, with lateral opportunity count derived from actual local width
-- `Major Support Size` — default `0.46`, range `0–1`; nonlinear base-size remap of approximately `0.45 m` to `1.95 m`
+- `Major Support Size` — default `0.46`, range `0–1`; nonlinear family-envelope remap of approximately `0.45 m` to `1.95 m`, followed by internal small/medium/large multipliers
 - `Major Evolution Rate (Hz)` — default `2`, range `0.5–10`
 - `Major Cleanup Rate (Hz)` — default `1`, range `0.5–10`
 - `Breakup Frequency`
@@ -416,7 +416,7 @@ Base lifetime and support/aging-pressure response also require authoring, but th
 1. Documentation cleanup — complete.
 2. Canonical topology terminology rename — complete; serialized debug values and texture channels preserved.
 3. Validity-aware persistent Major Support implementation — complete; visual validation of distribution, size controls, and asynchronous evolution pending.
-4. Replace and validate Connector Support after Major passes.
+4. Persistent relational Connector Support implementation — complete; visual validation of density, span placement, and gradual evolution pending.
 5. Replace and validate Pocket Aging Pressure after Major and Connector pass.
 6. Integrate soft topology-to-lifetime material response.
 7. Implement and tune end-of-life fragmentation/dissipation.
@@ -438,7 +438,7 @@ Major, Connector, and Pocket must be handled one at a time.
 
 Deferred optimization notes:
 
-- Static Pressure still performs an independent generated-mesh height-slice scan during source refresh. It should eventually consume the shared compact geometry/footprint source and apply only pressure-specific directional shaping; do not add another object-geometry scanner.
+- Automatic generated-source Static Pressure support now consumes bounds-derived/cached footprint contours under the hard performance cap. It must not perform a generated-mesh height-slice scan during Play startup. Future fidelity work should use editor-time/cached compact geometry or remove equal or greater runtime cost elsewhere.
 - Foam Obstacle Footprint may rebuild once before generated-source refresh has completed and again after `ObstacleGeometryVersion` settles. Defer Foam obstacle rebuilds until the disturbance refresh is complete enough to avoid redundant startup work.
 - Foam Obstacle Footprint rasterization should reuse its pixel buffer instead of allocating a fresh structural-grid `Color[]` per rebuild.
 - Audit topology/debug work so `Final Foam (Debug Off)` does not accidentally force diagnostic-grade topology composition or metric refreshes.

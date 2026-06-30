@@ -1738,8 +1738,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Anchored Support and the water-level-aware Obstacle Footprint are accepted. Major Support now resolves a tiny width-aware nucleus buffer once per evolution tick: longitudinal search intervals derive their lateral candidate count and placement from the actual local water width, footprint-aware scoring relocates candidates away from banks, Anchored Support, and solid footprints, and the five-archetype variable-width spine family shapes the visible support. Connector Support and Pocket Aging Pressure remain provisional and will be replaced one class at a time. Topology still does not modify Foam material in this batch."),
-                new GUIContent("Validity-Aware Major Support"));
+                    "Anchored Support and the water-level-aware Obstacle Footprint are accepted. Major Support resolves a tiny width-aware nucleus buffer once per evolution tick, with class-aware parent/body/fragment families. Connector Support is now a persistent relational field that samples existing positive support on two sides of a local gap without building a graph. Pocket Aging Pressure remains provisional and will be replaced after Connector validation. Topology still does not modify Foam material in this batch."),
+                new GUIContent("Major + Connector Support"));
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
                 new GUIContent(
@@ -1885,7 +1885,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawMemoryDiagnostic(
                 "Allocated Foam Memory",
                 runtime.EstimatedMemoryBytes,
-                "Estimated material state, corrected-advection scratch textures, guidance, persistent Major Support ping-pong state, compact width-aware Major nucleus buffer, provisional Connector/Pocket work fields, anchored-source topology, fracture, boundary, population/topology metrics, and local river metric buffer.");
+                "Estimated material state, corrected-advection scratch textures, guidance, persistent Major and Connector support ping-pong state, compact width-aware Major nucleus buffer, provisional Pocket work field, anchored-source topology, fracture, boundary, population/topology metrics, and local river metric buffer.");
 
             if (GUILayout.Button(
                     new GUIContent(
@@ -2289,7 +2289,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.SupportClasses:
                     return
-                        "Red = persistent Major Support. A compact GPU nucleus buffer is rebuilt once per Major evolution tick. Longitudinal search intervals distribute one or more candidates across the actual local water width, footprint-aware scoring avoids banks, Anchored Support, and solid footprints, and a weighted family of compact rafts, beans/crescents, long strips/ribbons, hooks/wedges, and compound rafts produces varied host silhouettes through one bounded variable-width spine kernel. Persistent state supplies gradual growth and decay. Major Support Amount controls density; Major Support Size controls physical scale. Cleanup only removes isolated remnants and never fills gaps. Green = the still-provisional Connector Support. Blue = the maximum of Pressure Support, Lee Support, and Shore Support shown separately in Anchored Support. No support class is weighted against another. Overlaps mix. Black = no lifespan support. Negative influence is intentionally omitted.";
+                        "Red = persistent Major Support. A compact GPU nucleus buffer is rebuilt once per Major evolution tick. Longitudinal search intervals distribute candidates across the actual local water width, lateral band scoring resists centre-lane collapse, existing footprint samples derive a squeeze/room score so obstacle funnels shrink and weaken broad nuclei without extra reads, and nuclei travel slowly downstream at varied class-scaled rates. Green = Connector Support, currently disabled under the hard performance cap and expected to remain black/zero. Blue = the maximum of Pressure Support, Lee Support, and Shore Support shown separately in Anchored Support. No support class is weighted against another. Overlaps mix. Black = no lifespan support. Negative influence is intentionally omitted.";
 
                 case StylizedRiverFoamDebugView.NegativeInfluenceClasses:
                     return

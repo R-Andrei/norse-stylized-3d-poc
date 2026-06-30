@@ -446,15 +446,168 @@ namespace ProgrammaticStylized3D.Rivers
             return true;
         }
 
+        public static bool TryResolveBoundsOnly(
+            StylizedRiver river,
+            MeshFilter meshFilter,
+            float padding,
+            out RiverDisturbanceFootprint footprint,
+            out string status)
+        {
+            footprint = default;
+
+            if (river == null)
+            {
+                status = "No river was supplied.";
+                return false;
+            }
+
+            Mesh mesh = meshFilter != null ? meshFilter.sharedMesh : null;
+            if (meshFilter == null || mesh == null)
+            {
+                status = "No generated mesh is available.";
+                return false;
+            }
+
+            if (!TryGetWorldBounds(meshFilter, out Bounds worldBounds) ||
+                !river.TryProjectWorldPoint(
+                    worldBounds.center,
+                    out StylizedRiverProjection centreProjection))
+            {
+                status = "The generated mesh bounds could not be projected into the river domain.";
+                return false;
+            }
+
+            Vector3 up = centreProjection.Up.sqrMagnitude > 0.0001f
+                ? centreProjection.Up.normalized
+                : Vector3.up;
+            Vector3 downstream =
+                centreProjection.Tangent * river.FlowDirection;
+            downstream.y = 0f;
+            downstream = downstream.sqrMagnitude > 0.0001f
+                ? downstream.normalized
+                : Vector3.forward;
+            Vector3 across = centreProjection.Side.sqrMagnitude > 0.0001f
+                ? centreProjection.Side.normalized
+                : Vector3.Cross(up, downstream).normalized;
+            Vector3 planePoint = centreProjection.SurfacePoint;
+
+            List<Vector3> waterlinePoints = new();
+            AddBoundsPlaneIntersections(
+                meshFilter,
+                mesh.bounds,
+                planePoint,
+                up,
+                waterlinePoints);
+
+            if (waterlinePoints.Count < 2)
+            {
+                AddWorldBoundsProjectionPoints(
+                    worldBounds,
+                    downstream,
+                    across,
+                    waterlinePoints);
+            }
+
+            if (waterlinePoints.Count < 2)
+            {
+                status = "The generated mesh bounds do not intersect the river surface.";
+                return false;
+            }
+
+            float minimumAlong = float.PositiveInfinity;
+            float maximumAlong = float.NegativeInfinity;
+            float minimumAcross = float.PositiveInfinity;
+            float maximumAcross = float.NegativeInfinity;
+            List<Vector2> projectedPoints = new();
+
+            for (int index = 0; index < waterlinePoints.Count; index++)
+            {
+                Vector3 offset = waterlinePoints[index] - planePoint;
+                float along = Vector3.Dot(offset, downstream);
+                float lateral = Vector3.Dot(offset, across);
+                minimumAlong = Mathf.Min(minimumAlong, along);
+                maximumAlong = Mathf.Max(maximumAlong, along);
+                minimumAcross = Mathf.Min(minimumAcross, lateral);
+                maximumAcross = Mathf.Max(maximumAcross, lateral);
+                projectedPoints.Add(new Vector2(along, lateral));
+            }
+
+            if (float.IsInfinity(minimumAlong) ||
+                float.IsInfinity(minimumAcross))
+            {
+                status = "The generated bounds footprint was invalid.";
+                return false;
+            }
+
+            float centreAlong = (minimumAlong + maximumAlong) * 0.5f;
+            float centreAcross = (minimumAcross + maximumAcross) * 0.5f;
+            Vector2 contourCentre = new Vector2(centreAlong, centreAcross);
+            Vector2[] contour = BuildPaddedContour(
+                projectedPoints,
+                contourCentre,
+                Mathf.Max(0f, padding));
+
+            float alongHalfLength = MinimumHalfExtent;
+            float acrossHalfWidth = MinimumHalfExtent;
+            if (contour.Length >= 3)
+            {
+                for (int index = 0; index < contour.Length; index++)
+                {
+                    alongHalfLength = Mathf.Max(
+                        alongHalfLength,
+                        Mathf.Abs(contour[index].x));
+                    acrossHalfWidth = Mathf.Max(
+                        acrossHalfWidth,
+                        Mathf.Abs(contour[index].y));
+                }
+            }
+            else
+            {
+                alongHalfLength = Mathf.Max(
+                    MinimumHalfExtent,
+                    (maximumAlong - minimumAlong) * 0.5f +
+                    Mathf.Max(0f, padding));
+                acrossHalfWidth = Mathf.Max(
+                    MinimumHalfExtent,
+                    (maximumAcross - minimumAcross) * 0.5f +
+                    Mathf.Max(0f, padding));
+                contour = BuildRectangleContour(
+                    alongHalfLength,
+                    acrossHalfWidth);
+            }
+
+            Vector3 worldPosition =
+                planePoint +
+                downstream * centreAlong +
+                across * centreAcross;
+
+            if (!river.TryProjectWorldPoint(
+                    worldPosition,
+                    out StylizedRiverProjection resolvedProjection) ||
+                !resolvedProjection.IsInside)
+            {
+                status = "The generated mesh bounds touch the surface, but their resolved footprint centre is outside this river.";
+                return false;
+            }
+
+            footprint = new RiverDisturbanceFootprint(
+                worldPosition,
+                downstream,
+                across,
+                acrossHalfWidth,
+                alongHalfLength,
+                contour,
+                true);
+            status = "Resolved from generated-mesh bounds under the runtime performance cap.";
+            return true;
+        }
+
         /// <summary>
         /// Builds the accepted Static Pressure support profile.
         ///
-        /// TODO: this still performs an independent height-slice/contour scan.
-        /// Stage 6 now owns an exact solid-volume interval cache derived from
-        /// the same generated mesh. A future Pressure refactor should consume
-        /// that shared underlying solid data and apply Pressure-specific
-        /// directional shaping instead of scanning the mesh again. Do not add
-        /// another geometry approximation or mesh scanner in the meantime.
+        /// This exact path scans generated mesh slices and must not be used by
+        /// automatic Play-startup refreshes under the hard performance cap.
+        /// Automatic generated sources use TryResolvePressureSupportFromFootprint.
         /// </summary>
         public static bool TryResolvePressureSupport(
             StylizedRiver river,
@@ -735,6 +888,91 @@ namespace ProgrammaticStylized3D.Rivers
             status = usedBoundsFallback
                 ? "Resolved height-aware pressure support using the generated-mesh bounds fallback."
                 : "Resolved height-aware pressure support from generated-mesh slices.";
+            return profile.IsValid;
+        }
+
+        public static bool TryResolvePressureSupportFromFootprint(
+            RiverDisturbanceFootprint baseFootprint,
+            float maximumHeightToInspect,
+            int requestedLateralSampleCount,
+            out RiverDisturbancePressureSupportProfile profile,
+            out string status)
+        {
+            profile = default;
+
+            if (baseFootprint.Contour == null ||
+                baseFootprint.Contour.Length < 3)
+            {
+                status = "A valid footprint contour is required for pressure support.";
+                return false;
+            }
+
+            int lateralSampleCount =
+                ResolvePressureSupportLateralSampleCount(
+                    requestedLateralSampleCount);
+            float inspectedHeight = Mathf.Clamp(
+                maximumHeightToInspect,
+                0.05f,
+                2.5f);
+            float[] sliceHeights =
+                new float[PressureSupportHeightSlices];
+            Vector4[] samples =
+                new Vector4[
+                    lateralSampleCount * PressureSupportHeightSlices];
+            float acrossHalfWidth = Mathf.Max(
+                MinimumHalfExtent,
+                baseFootprint.AcrossHalfWidth);
+
+            for (int slice = 0;
+                 slice < PressureSupportHeightSlices;
+                 slice++)
+            {
+                float slice01 = slice /
+                    (float)(PressureSupportHeightSlices - 1);
+                float sliceHeight = inspectedHeight * slice01;
+                sliceHeights[slice] = sliceHeight;
+
+                for (int row = 0;
+                     row < lateralSampleCount;
+                     row++)
+                {
+                    float row01 = row /
+                        (float)(lateralSampleCount - 1);
+                    float lateral = Mathf.Lerp(
+                        -acrossHalfWidth,
+                        acrossHalfWidth,
+                        row01);
+                    int sampleIndex =
+                        slice * lateralSampleCount + row;
+
+                    if (TryResolveContourRow(
+                            baseFootprint.Contour,
+                            lateral,
+                            out float upstream,
+                            out float downstreamBoundary))
+                    {
+                        samples[sampleIndex] = new Vector4(
+                            upstream,
+                            downstreamBoundary,
+                            1f,
+                            0f);
+                    }
+                    else
+                    {
+                        samples[sampleIndex] = Vector4.zero;
+                    }
+                }
+            }
+
+            profile = new RiverDisturbancePressureSupportProfile(
+                acrossHalfWidth,
+                inspectedHeight,
+                inspectedHeight,
+                lateralSampleCount,
+                sliceHeights,
+                samples,
+                true);
+            status = "Resolved pressure support from cached footprint contour under the runtime performance cap.";
             return profile.IsValid;
         }
 
@@ -1296,6 +1534,46 @@ namespace ProgrammaticStylized3D.Rivers
                     endDistance,
                     target);
             }
+        }
+
+        private static void AddWorldBoundsProjectionPoints(
+            Bounds worldBounds,
+            Vector3 downstream,
+            Vector3 across,
+            List<Vector3> target)
+        {
+            Vector3 extents = worldBounds.extents;
+            float alongExtent =
+                Mathf.Abs(Vector3.Dot(Vector3.right * extents.x, downstream)) +
+                Mathf.Abs(Vector3.Dot(Vector3.up * extents.y, downstream)) +
+                Mathf.Abs(Vector3.Dot(Vector3.forward * extents.z, downstream));
+            float acrossExtent =
+                Mathf.Abs(Vector3.Dot(Vector3.right * extents.x, across)) +
+                Mathf.Abs(Vector3.Dot(Vector3.up * extents.y, across)) +
+                Mathf.Abs(Vector3.Dot(Vector3.forward * extents.z, across));
+
+            alongExtent = Mathf.Max(MinimumHalfExtent, alongExtent);
+            acrossExtent = Mathf.Max(MinimumHalfExtent, acrossExtent);
+            Vector3 centre = worldBounds.center;
+            target.Add(centre - downstream * alongExtent - across * acrossExtent);
+            target.Add(centre + downstream * alongExtent - across * acrossExtent);
+            target.Add(centre + downstream * alongExtent + across * acrossExtent);
+            target.Add(centre - downstream * alongExtent + across * acrossExtent);
+        }
+
+        private static Vector2[] BuildRectangleContour(
+            float alongHalfLength,
+            float acrossHalfWidth)
+        {
+            alongHalfLength = Mathf.Max(MinimumHalfExtent, alongHalfLength);
+            acrossHalfWidth = Mathf.Max(MinimumHalfExtent, acrossHalfWidth);
+            return new[]
+            {
+                new Vector2(-alongHalfLength, -acrossHalfWidth),
+                new Vector2(alongHalfLength, -acrossHalfWidth),
+                new Vector2(alongHalfLength, acrossHalfWidth),
+                new Vector2(-alongHalfLength, acrossHalfWidth)
+            };
         }
     }
 }

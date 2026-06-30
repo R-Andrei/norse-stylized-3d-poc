@@ -32,8 +32,6 @@ namespace ProgrammaticStylized3D.Rivers
         private const int HighStructuralResolution = 128;
         private const int MajorNucleusMaxAcross = 8;
         private const float MajorNucleusMinimumSpacingMetres = 2.8f;
-        private const int ObstacleFootprintSamplesPerAxis = 3;
-        private const int ObstacleFootprintMinimumAcceptedSamples = 5;
         private const float ResourceReleaseDelaySeconds = 2f;
         private const float MaximumManualReservationSeconds = 90f;
         private const float DecayToFivePercent = 2.995732f;
@@ -199,6 +197,7 @@ namespace ProgrammaticStylized3D.Rivers
         private readonly List<RiverObstacleExclusionFootprint>
             obstacleExclusionFootprints =
             new();
+        private Color[] obstacleExclusionPixels = Array.Empty<Color>();
 
         private bool[] chunkActive = Array.Empty<bool>();
         private double[] chunkActiveUntil = Array.Empty<double>();
@@ -644,6 +643,16 @@ namespace ProgrammaticStylized3D.Rivers
 
                         if (evolveMajor || cleanupMajor)
                         {
+                            float dependentTopologyDelta = Mathf.Max(
+                                stepDuration,
+                                Mathf.Max(
+                                    evolveMajor
+                                        ? majorEvolutionAccumulator
+                                        : 0f,
+                                    cleanupMajor
+                                        ? majorCleanupAccumulator
+                                        : 0f));
+
                             // Refresh Anchored Support and the current-water
                             // Obstacle Footprint before Major samples them.
                             RefreshDynamicTopologySources(false);
@@ -664,7 +673,8 @@ namespace ProgrammaticStylized3D.Rivers
                                     majorCleanupInterval;
                             }
 
-                            BuildProvisionalDependentTopologyFields();
+                            BuildDependentTopologyFields(
+                                dependentTopologyDelta);
                             RefreshDynamicTopologySources(true);
                         }
                         else
@@ -1544,17 +1554,27 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
-            // TODO: Reuse this structural-grid pixel buffer across rebuilds
-            // instead of allocating a fresh array for every obstacle refresh.
-            Color[] pixels = new Color[fieldWidth * fieldHeight];
+            int pixelCount = fieldWidth * fieldHeight;
+            if (obstacleExclusionPixels.Length != pixelCount)
+            {
+                obstacleExclusionPixels = new Color[pixelCount];
+            }
+            else
+            {
+                Array.Clear(
+                    obstacleExclusionPixels,
+                    0,
+                    obstacleExclusionPixels.Length);
+            }
+
             for (int index = 0; index < obstacleExclusionFootprints.Count; index++)
             {
                 RasterizeObstacleFootprint(
                     obstacleExclusionFootprints[index],
-                    pixels);
+                    obstacleExclusionPixels);
             }
 
-            UploadObstacleExclusionPixels(pixels);
+            UploadObstacleExclusionPixels(obstacleExclusionPixels);
         }
 
         private void RasterizeObstacleFootprint(
@@ -1631,78 +1651,20 @@ namespace ProgrammaticStylized3D.Rivers
 
                 for (int y = minimumY; y <= maximumY; y++)
                 {
-                    int insideSamples = 0;
-                    for (int sampleY = 0;
-                         sampleY < ObstacleFootprintSamplesPerAxis;
-                         sampleY++)
-                    {
-                        for (int sampleX = 0;
-                             sampleX < ObstacleFootprintSamplesPerAxis;
-                             sampleX++)
-                        {
-                            float u = (x + ResolveObstacleSampleOffset(sampleX)) /
-                                Mathf.Max(1f, fieldWidth);
-                            float v = (y + ResolveObstacleSampleOffset(sampleY)) /
-                                Mathf.Max(1f, fieldHeight);
-                            if (IsObstacleFootprintSampleInside(
-                                    footprint,
-                                    u,
-                                    v))
-                            {
-                                insideSamples++;
-                            }
-                        }
-                    }
-
-                    if (insideSamples >= ObstacleFootprintMinimumAcceptedSamples)
+                    float v = (y + 0.5f) / Mathf.Max(1f, fieldHeight);
+                    float acrossMetres = Across01ToMetres(
+                        v,
+                        centreSample.LeftSurfaceHalfWidth,
+                        centreSample.RightSurfaceHalfWidth);
+                    Vector2 localPoint = new Vector2(
+                        centreGlobalDistance - footprint.GlobalDistance,
+                        acrossMetres - footprint.AcrossMetres);
+                    if (IsPointInsidePolygon(localPoint, footprint.Contour))
                     {
                         pixels[y * fieldWidth + x] = Color.white;
                     }
                 }
             }
-        }
-
-        private bool IsObstacleFootprintSampleInside(
-            RiverObstacleExclusionFootprint footprint,
-            float u,
-            float v)
-        {
-            u = Mathf.Clamp01(u);
-            v = Mathf.Clamp01(v);
-            float globalDistance =
-                river.Domain.GlobalDistanceMinimum + u * fieldLength;
-            if (globalDistance <
-                    river.Domain.GlobalDistanceMinimum - 0.0001f ||
-                globalDistance >
-                    river.Domain.GlobalDistanceMaximum + 0.0001f)
-            {
-                return false;
-            }
-
-            StylizedRiverSplineSample sample =
-                river.Domain.SampleAtGlobalDistance(
-                    Mathf.Clamp(
-                        globalDistance,
-                        river.Domain.GlobalDistanceMinimum,
-                        river.Domain.GlobalDistanceMaximum));
-            float acrossMetres = Across01ToMetres(
-                v,
-                sample.LeftSurfaceHalfWidth,
-                sample.RightSurfaceHalfWidth);
-            Vector2 localPoint = new Vector2(
-                globalDistance - footprint.GlobalDistance,
-                acrossMetres - footprint.AcrossMetres);
-            return IsPointInsidePolygon(localPoint, footprint.Contour);
-        }
-
-        private static float ResolveObstacleSampleOffset(int sampleIndex)
-        {
-            return sampleIndex switch
-            {
-                0 => 0.001f,
-                1 => 0.5f,
-                _ => 0.999f
-            };
         }
 
         private static bool IsPointInsidePolygon(
@@ -2146,7 +2108,7 @@ namespace ProgrammaticStylized3D.Rivers
             RefreshDynamicTopologySources(false);
             EvolveMajorSupport(deltaTime, !majorSupportInitialized);
             CleanupMajorSupport();
-            BuildProvisionalDependentTopologyFields();
+            BuildDependentTopologyFields(deltaTime);
             RefreshDynamicTopologySources(true);
         }
 
@@ -2292,19 +2254,18 @@ namespace ProgrammaticStylized3D.Rivers
             SwapMajorSupportTextures();
         }
 
-        private void BuildProvisionalDependentTopologyFields()
+        private void BuildDependentTopologyFields(float deltaTime)
         {
             if (!CanBuildTopology())
             {
                 return;
             }
 
-            ConfigureTopologyParameters(0f);
+            ConfigureTopologyParameters(deltaTime);
 
             // Connector Support and Pocket Aging Pressure remain provisional
-            // in this batch. They are rebuilt only so their existing diagnostics
-            // continue to consume the newly persistent Major field until each
-            // class receives its own dedicated replacement pass.
+            // in this performance-capped path. They are rebuilt only so their
+            // diagnostics continue to consume the current Major field.
             computeShader.SetBuffer(
                 buildTopologyPocketsKernel,
                 "_FoamMetricRows",
@@ -2326,30 +2287,8 @@ namespace ProgrammaticStylized3D.Rivers
                 guidanceWidth,
                 guidanceHeight);
 
-            computeShader.SetBuffer(
-                buildTopologyConnectorsKernel,
-                "_FoamMetricRows",
-                metricBuffer);
-            computeShader.SetTexture(
-                buildTopologyConnectorsKernel,
-                "_FoamBoundary",
-                boundaryTexture);
-            computeShader.SetTexture(
-                buildTopologyConnectorsKernel,
-                "_FoamTopologyMajorRead",
-                topologyMajorTexture);
-            computeShader.SetTexture(
-                buildTopologyConnectorsKernel,
-                "_FoamTopologyPocketRead",
-                topologyPocketTexture);
-            computeShader.SetTexture(
-                buildTopologyConnectorsKernel,
-                "_FoamTopologyConnectorWrite",
-                topologyConnectorTexture);
-            Dispatch(
-                buildTopologyConnectorsKernel,
-                guidanceWidth,
-                guidanceHeight);
+            // Connector Support is disabled under the current performance cap.
+            // The texture is cleared at allocation time and remains zero.
         }
 
         private void SwapMajorSupportTextures()
@@ -3301,6 +3240,7 @@ namespace ProgrammaticStylized3D.Rivers
             majorNucleusSegmentCapacity = 0;
             ReleaseObstacleExclusionBuffers();
             obstacleExclusionFootprints.Clear();
+            obstacleExclusionPixels = Array.Empty<Color>();
             obstacleGeometryVersion = -1;
             majorSupportInitialized = false;
             populationMetricsBuffer?.Release();

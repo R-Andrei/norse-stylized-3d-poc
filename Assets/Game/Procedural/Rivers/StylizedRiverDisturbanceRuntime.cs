@@ -2805,7 +2805,7 @@ namespace ProgrammaticStylized3D.Rivers
                 preliminaryRiverWidth,
                 DefaultGeneratedFootprintPadding);
 
-            if (!RiverDisturbanceFootprintResolver.TryResolve(
+            if (!RiverDisturbanceFootprintResolver.TryResolveBoundsOnly(
                     river,
                     meshFilter,
                     effectivePadding,
@@ -2843,7 +2843,7 @@ namespace ProgrammaticStylized3D.Rivers
             RiverDisturbanceFootprint collisionFootprint = footprint;
             if ((interaction.StaticPressureEnabled ||
                  interaction.ImpactRippleCollisionEnabled) &&
-                RiverDisturbanceFootprintResolver.TryResolve(
+                RiverDisturbanceFootprintResolver.TryResolveBoundsOnly(
                     river,
                     meshFilter,
                     0f,
@@ -2903,13 +2903,11 @@ namespace ProgrammaticStylized3D.Rivers
                         pressureFootprint.AcrossHalfWidth,
                         localRiverWidth);
 
-                // TODO: Pressure currently performs its own height-slice mesh
-                // scan. It should eventually consume the shared compact
-                // generated-geometry/footprint source and apply only its
-                // directional shaping, rather than scanning geometry again.
-                if (!RiverDisturbanceFootprintResolver.TryResolvePressureSupport(
-                        river,
-                        meshFilter,
+                // Performance cap: automatic generated sources may not
+                // height-slice or rescan triangles on Play startup. Use the
+                // cached footprint contour as the pressure support source.
+                if (!RiverDisturbanceFootprintResolver
+                    .TryResolvePressureSupportFromFootprint(
                         pressureFootprint,
                         supportInspectionHeight,
                         pressureLateralSampleCount,

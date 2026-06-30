@@ -7931,8 +7931,8 @@ MonoBehaviour:
   foamAmount: 0.59466666
   foamWebGranularity: 0.5402
   foamNetworkEvolution: 0.601
-  foamMajorSupportAmount: 0.56
-  foamMajorSupportSize: 0.46
+  foamMajorSupportAmount: 0.523
+  foamMajorSupportSize: 0.541
   foamMajorSupportEvolutionRate: 2
   foamMajorSupportCleanupRate: 1
   foamBreakupFrequency: 0.7037469
