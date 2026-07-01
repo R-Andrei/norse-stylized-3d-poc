@@ -688,23 +688,27 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamNetworkEvolution = 0.56f;
 
-        [Tooltip("Controls the density of width-aware Major Support nuclei along the river. Nuclei are distributed across the actual local water width rather than fixed lateral rows, so higher values add more regions without collapsing them into a centre lane or changing each region's physical size.")]
+        [Tooltip("Controls the nested deterministic population of whole-river Major Support. Higher values activate later-ranked opportunities without changing the identity or transform of earlier accepted regions. It does not alter the separate local candidate preview.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamMajorSupportAmount = 0.56f;
 
-        [Tooltip("Controls the physical scale envelope of deterministic Major Support regions independently from their population. Each accepted opportunity keeps the same position and morphology while this value scales it through one continuous heavy-tailed distribution, so the field naturally contains small, medium, and occasional large regions without discrete size classes.")]
+        [Tooltip("Controls the physical scale envelope of the same stable whole-river Major opportunities. It preserves opportunity identity and does not enlarge the separate local candidate preview or change candidate field resolution.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamMajorSupportSize = 0.46f;
 
-        [Tooltip("Deterministic seed for Major Support placement, size, orientation, and continuous three-lobe morphology. The same river geometry, settings, obstacle state, and seed reproduce the same static Major topology. Changing the seed requests a queued Major-only topology rebuild during Play mode.")]
+        [Tooltip("Controls the relative size spread between stable Major opportunities without changing their identity. Zero makes their scale multipliers uniform, 0.5 preserves the Patch 2 distribution, and one strongly separates the smallest and largest regions while river-width and placement limits remain authoritative.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamMajorSupportSizeVariation = 0.5f;
+
+        [Tooltip("Deterministic seed for both the field-first candidate proof and stable whole-river opportunity identity, candidate assignment, transforms, and future evolution metadata. The same inputs reproduce the same static Major topology.")]
         [Min(0)]
         [SerializeField] private int foamMajorSupportSeed = 1;
 
-        [Tooltip("How often Major Support performs its persistent validity-aware target update, gradual growth, and decay. The field changes smoothly through stored state, so a low cadence is intentional. Range: 0.5 to 10 updates per second.")]
+        [Tooltip("Retained for the later Major runtime-evolution step. It has no effect on the static Patch 2 whole-river Major field.")]
         [Range(0.5f, 10f)]
         [SerializeField] private float foamMajorSupportEvolutionRate = 2f;
 
-        [Tooltip("How often Major Support removes isolated one-cell remnants and refreshes its broad-interior helper channel. This pass never fills gaps or expands support. Range: 0.5 to 10 cleanups per second.")]
+        [Tooltip("Retained for the later Major runtime-evolution step. It has no effect on the static Patch 2 whole-river Major field.")]
         [Range(0.5f, 10f)]
         [SerializeField] private float foamMajorSupportCleanupRate = 1f;
 
@@ -721,9 +725,9 @@ namespace ProgrammaticStylized3D.Rivers
             new Color(0.94f, 0.97f, 0.94f, 0.72f);
 
         // Internal/serialized compatibility inputs. Stage 6.2 exposes only the
-        // six visual controls above; Major Support amount, size, seed, and
-        // two cadence controls are independent topology controls. Persistence
-        // and contour hardness remain
+        // six visual controls above; Major Support amount, size, size
+        // variation, seed, and two future-evolution cadence controls remain
+        // serialized topology authoring inputs. Persistence and contour hardness remain
         // implementation details until testing proves they require authorship.
         [HideInInspector, SerializeField, Range(0f, 1f)]
         private float foamFragmentation = 0.68f;
@@ -1193,6 +1197,8 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamMajorSupportAmount);
         public float FoamMajorSupportSize =>
             Mathf.Clamp01(foamMajorSupportSize);
+        public float FoamMajorSupportSizeVariation =>
+            Mathf.Clamp01(foamMajorSupportSizeVariation);
         public int FoamMajorSupportSeed =>
             Mathf.Max(0, foamMajorSupportSeed);
         public float FoamMajorSupportEvolutionRate =>
@@ -3195,6 +3201,8 @@ namespace ProgrammaticStylized3D.Rivers
             foamNetworkEvolution = Mathf.Clamp01(foamNetworkEvolution);
             foamMajorSupportAmount = Mathf.Clamp01(foamMajorSupportAmount);
             foamMajorSupportSize = Mathf.Clamp01(foamMajorSupportSize);
+            foamMajorSupportSizeVariation = Mathf.Clamp01(
+                foamMajorSupportSizeVariation);
             foamMajorSupportSeed = Mathf.Max(0, foamMajorSupportSeed);
             if (foamMajorSupportEvolutionRate <= 0f)
             {

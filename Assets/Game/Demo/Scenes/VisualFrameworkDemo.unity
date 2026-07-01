@@ -7933,7 +7933,8 @@ MonoBehaviour:
   foamNetworkEvolution: 0.601
   foamMajorSupportAmount: 0.523
   foamMajorSupportSize: 0.541
-  foamMajorSupportEvolutionRate: 2
+  foamMajorSupportSeed: 0
+  foamMajorSupportEvolutionRate: 1.68
   foamMajorSupportCleanupRate: 1
   foamBreakupFrequency: 0.7037469
   foamSpeed: 0.601

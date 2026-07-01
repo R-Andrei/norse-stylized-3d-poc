@@ -13,6 +13,22 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private bool showPerformanceDiagnostics;
         private bool showFoamTestTools;
         private bool showFoamDiagnostics;
+        private StylizedRiverFoamMajorCandidate majorCandidatePreview;
+        private Texture2D majorCandidatePreviewTexture;
+        private Color32[] majorCandidatePreviewPixels;
+        private int majorCandidatePreviewSeed = int.MinValue;
+        private StylizedRiverFoamMajorCandidatePreviewStage
+            majorCandidatePreviewStage =
+                StylizedRiverFoamMajorCandidatePreviewStage.FinalSupport;
+
+        private void OnDisable()
+        {
+            if (majorCandidatePreviewTexture != null)
+            {
+                DestroyImmediate(majorCandidatePreviewTexture);
+                majorCandidatePreviewTexture = null;
+            }
+        }
 
         public override void OnInspectorGUI()
         {
@@ -1455,7 +1471,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6.2 retains Pressure Support, stationary Lee Support, and dynamic Shore Support as independent anchored lifespan-support classes. Pocket Aging Pressure remains a soft negative influence, while the water-level-aware Obstacle Footprint remains a separate geometry mask. Impact remains deliberately inactive.",
+                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 2 now distributes deterministic field-first Major Support across the actual river. Connector Support and Pocket Aging Pressure remain intentionally absent until their own gated steps.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1510,27 +1526,32 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("foamMajorSupportAmount"),
                 new GUIContent(
                     "Major Support Amount",
-                    "Controls width-aware Major Support density in physical river metres. Accepted nuclei are distributed across the actual local water width rather than fixed lateral rows, so higher values create more regions without forcing a centre lane. Size remains independent."));
+                    "Controls the nested deterministic population of whole-river Major Support. Higher values activate later-ranked opportunities without moving or reshaping earlier accepted regions. It does not alter the separate local candidate preview."));
             EditorGUILayout.PropertyField(
                 Find("foamMajorSupportSize"),
                 new GUIContent(
                     "Major Support Size",
-                    "Controls only the physical scale envelope of deterministic Major Support regions. Position, activation rank, orientation, and morphology remain stable while Size scales the same regions through one continuous heavy-tailed distribution."));
+                    "Controls the physical scale envelope of the same stable whole-river opportunities. It preserves opportunity identity and does not enlarge the separate local candidate preview."));
+            EditorGUILayout.PropertyField(
+                Find("foamMajorSupportSizeVariation"),
+                new GUIContent(
+                    "Major Support Size Variation",
+                    "Controls the relative size spread between stable Major opportunities. Zero makes their scale multipliers uniform, 0.5 preserves the Patch 2 distribution, and one strongly separates the smallest and largest regions without overriding river-width or placement limits."));
             EditorGUILayout.PropertyField(
                 Find("foamMajorSupportSeed"),
                 new GUIContent(
                     "Major Support Seed",
-                    "Deterministic seed for Major Support placement, scale quantile, orientation, spread, bend, imbalance, and bite. The same river geometry, settings, obstacle state, and seed reproduce the same static Major topology. Changing it during Play queues a Major-dependent rebuild."));
+                    "Deterministic seed for the field-first candidate proof and stable whole-river opportunity identity, candidate assignment, transforms, and future evolution metadata. Identical inputs reproduce identical static Major topology."));
             EditorGUILayout.PropertyField(
                 Find("foamMajorSupportEvolutionRate"),
                 new GUIContent(
                     "Major Evolution Rate (Hz)",
-                    "How often the persistent Major Support field rebuilds its validity-aware target and performs gradual local growth and decay. The accepted range is 0.5 to 10 Hz; the default is 2 Hz."));
+                    "Retained for the later runtime-evolution step. It has no effect on the static Patch 2 whole-river Major field."));
             EditorGUILayout.PropertyField(
                 Find("foamMajorSupportCleanupRate"),
                 new GUIContent(
                     "Major Cleanup Rate (Hz)",
-                    "How often Major Support removes isolated one-cell remnants and refreshes broad-interior helper data. Cleanup never fills gaps or expands support. The accepted range is 0.5 to 10 Hz; the default is 1 Hz."));
+                    "Retained for the later runtime-evolution step. It has no effect on the static Patch 2 whole-river Major field."));
             EditorGUILayout.PropertyField(
                 Find("foamBreakupFrequency"),
                 new GUIContent(
@@ -1678,7 +1699,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             showFoamDiagnostics = EditorGUILayout.Foldout(
                 showFoamDiagnostics,
-                "Foam Runtime Diagnostics",
+                "Foam Topology and Runtime Diagnostics",
                 true);
             if (!showFoamDiagnostics)
             {
@@ -1729,6 +1750,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 GetFoamDebugViewDescription(selectedFoamDebug),
                 MessageType.None);
 
+            DrawMajorCandidatePreview();
+
             if (runtime == null)
             {
                 EditorGUILayout.LabelField(
@@ -1743,8 +1766,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Anchored Support and the water-level-aware Obstacle Footprint are accepted. Major Support is the active implementation milestone and uses a deterministic seeded continuous descriptor model. Connector Support remains disabled, Pocket Aging Pressure remains provisional, and topology still does not modify Foam material in this batch."),
-                new GUIContent("Major Support Development"));
+                    "Patch 2 generates and composes static whole-river Major Support while preserving stable region identity and future evolution metadata. Connector and Pocket channels remain empty until Steps 3 and 4. Anchored Support and Obstacle Footprint continue to use their accepted live sources."),
+                new GUIContent("Whole-River Major Distribution"));
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
                 new GUIContent(
@@ -1775,6 +1798,38 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     runtime.ResourcesAllocated
                         ? runtime.DynamicShoreRowCount.ToString()
                         : "Not allocated"));
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Major Generation",
+                    "Deterministic CPU proof generation performed only during staged initialization or an explicit topology rebuild. It is future cache/precompute work rather than accepted steady gameplay cost."),
+                new GUIContent(
+                    runtime.MajorTopologyAvailable
+                        ? "Available"
+                        : "Waiting for staged build"));
+            if (runtime.MajorTopologyAvailable)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField(
+                    "Attempted Opportunities",
+                    runtime.MajorOpportunityCount.ToString());
+                EditorGUILayout.LabelField(
+                    "Accepted Regions",
+                    runtime.MajorAcceptedRegionCount.ToString());
+                EditorGUILayout.LabelField(
+                    "Rejected Regions",
+                    runtime.MajorRejectedRegionCount.ToString());
+                EditorGUILayout.LabelField(
+                    "Top Rejection Reasons",
+                    runtime.MajorTopRejectionReasons);
+                EditorGUILayout.LabelField(
+                    "Generated Major Coverage",
+                    FormatPercent(runtime.MajorGeneratedCoverage));
+                EditorGUILayout.LabelField(
+                    "Generation Time",
+                    $"{runtime.MajorGenerationMilliseconds:0.00} ms");
+                EditorGUI.indentLevel--;
+            }
+
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Topology Metrics",
@@ -1833,7 +1888,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent("Subsystem Rates"),
                 new GUIContent(
-                    $"Major evolve {runtime.MajorSupportEvolutionRate:0.0} Hz · Major cleanup {runtime.MajorSupportCleanupRate:0.0} Hz · Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz"));
+                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz · Major topology is static in Patch 2"));
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Transport",
@@ -1890,7 +1945,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawMemoryDiagnostic(
                 "Allocated Foam Memory",
                 runtime.EstimatedMemoryBytes,
-                "Estimated material state, corrected-advection scratch textures, guidance, persistent Major and Connector support ping-pong state, compact width-aware Major nucleus buffer, provisional Pocket work field, anchored-source topology, fracture, boundary, population/topology metrics, and local river metric buffer.");
+                "Estimated material state, corrected-advection scratch textures, guidance, final topology, generated Major input and upload texture, anchored-source topology, fracture, boundary, population/topology metrics, and the local river metric buffer. Obsolete nucleus, Major ping-pong, Connector, Pocket, and fixture resources are absent.");
 
             if (GUILayout.Button(
                     new GUIContent(
@@ -1899,6 +1954,143 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 runtime.ResetRecentPeaks();
             }
+        }
+
+        private void DrawMajorCandidatePreview()
+        {
+            EditorGUILayout.Space(5f);
+            EditorGUILayout.LabelField(
+                "Major Candidate Proof",
+                EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "This compact preview isolates one local field-first Major shape. The same generator now feeds the static whole-river distribution, which must be judged on the real river through Support Classes.",
+                MessageType.None);
+
+            int seed = Mathf.Max(
+                0,
+                Find("foamMajorSupportSeed").intValue);
+            if (majorCandidatePreview == null ||
+                majorCandidatePreviewSeed != seed)
+            {
+                majorCandidatePreview =
+                    StylizedRiverFoamMajorCandidateGenerator.Generate(seed);
+                majorCandidatePreviewSeed = seed;
+                RefreshMajorCandidatePreviewTexture();
+            }
+
+            string[] stageLabels =
+            {
+                "Raw Field",
+                "Thresholded",
+                "Cleaned",
+                "Final Support"
+            };
+            EditorGUI.BeginChangeCheck();
+            int selectedStage = GUILayout.Toolbar(
+                (int)majorCandidatePreviewStage,
+                stageLabels);
+            if (EditorGUI.EndChangeCheck())
+            {
+                majorCandidatePreviewStage =
+                    (StylizedRiverFoamMajorCandidatePreviewStage)
+                    selectedStage;
+                RefreshMajorCandidatePreviewTexture();
+            }
+
+            if (majorCandidatePreviewTexture != null)
+            {
+                float previewSize = Mathf.Clamp(
+                    EditorGUIUtility.currentViewWidth - 70f,
+                    160f,
+                    280f);
+                Rect previewRect = GUILayoutUtility.GetRect(
+                    previewSize,
+                    previewSize,
+                    GUILayout.ExpandWidth(false));
+                previewRect.x += Mathf.Max(
+                    0f,
+                    (EditorGUIUtility.currentViewWidth -
+                        previewRect.width - 35f) * 0.5f);
+                EditorGUI.DrawPreviewTexture(
+                    previewRect,
+                    majorCandidatePreviewTexture,
+                    null,
+                    ScaleMode.ScaleToFit);
+            }
+
+            EditorGUI.indentLevel++;
+            EditorGUILayout.LabelField(
+                "Status",
+                majorCandidatePreview.Accepted
+                    ? "Accepted"
+                    : "Rejected after bounded retries");
+            EditorGUILayout.LabelField(
+                "Primary Rejection",
+                majorCandidatePreview.Accepted
+                    ? "None"
+                    : ObjectNames.NicifyVariableName(
+                        majorCandidatePreview.RejectionReason.ToString()));
+            EditorGUILayout.LabelField(
+                "Occupied Area",
+                $"{majorCandidatePreview.OccupiedCellCount:N0} cells · " +
+                $"{majorCandidatePreview.OccupiedAreaFraction * 100f:0.0}%");
+            EditorGUILayout.LabelField(
+                "Minimum Neck Width",
+                $"{majorCandidatePreview.MinimumNeckWidthCells} cells");
+            EditorGUILayout.LabelField(
+                "Compactness",
+                majorCandidatePreview.Compactness.ToString("0.000"));
+            EditorGUI.indentLevel--;
+        }
+
+        private void RefreshMajorCandidatePreviewTexture()
+        {
+            if (majorCandidatePreview == null)
+            {
+                return;
+            }
+
+            int resolution = majorCandidatePreview.Resolution;
+            int cellCount = resolution * resolution;
+            if (majorCandidatePreviewTexture == null ||
+                majorCandidatePreviewTexture.width != resolution ||
+                majorCandidatePreviewTexture.height != resolution)
+            {
+                if (majorCandidatePreviewTexture != null)
+                {
+                    DestroyImmediate(majorCandidatePreviewTexture);
+                }
+
+                majorCandidatePreviewTexture = new Texture2D(
+                    resolution,
+                    resolution,
+                    TextureFormat.RGBA32,
+                    false,
+                    true)
+                {
+                    name = "PS3D Major Candidate Preview",
+                    hideFlags = HideFlags.HideAndDontSave,
+                    wrapMode = TextureWrapMode.Clamp
+                };
+                majorCandidatePreviewPixels = new Color32[cellCount];
+            }
+            else if (majorCandidatePreviewPixels == null ||
+                majorCandidatePreviewPixels.Length != cellCount)
+            {
+                majorCandidatePreviewPixels = new Color32[cellCount];
+            }
+
+            majorCandidatePreviewTexture.filterMode =
+                majorCandidatePreviewStage ==
+                StylizedRiverFoamMajorCandidatePreviewStage.FinalSupport
+                    ? FilterMode.Bilinear
+                    : FilterMode.Point;
+            majorCandidatePreview.FillPreview(
+                majorCandidatePreviewStage,
+                majorCandidatePreviewPixels);
+            majorCandidatePreviewTexture.SetPixels32(
+                majorCandidatePreviewPixels);
+            majorCandidatePreviewTexture.Apply(false, false);
         }
 
         private void ApplyFoamTestProperties()
@@ -2294,11 +2486,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.SupportClasses:
                     return
-                        "Red = persistent Major Support. A fixed deterministic opportunity lattice is ranked by Major Support Amount; raising Amount adds descriptors without moving existing ones. Major Support Size scales the same descriptors, while one seeded continuous equation resolves position, heavy-tailed scale, aspect, orientation, spread, bend, imbalance, and one subtractive bite. The full-grid raster only evaluates the precomputed three-lobe descriptor. Green = Connector Support, currently disabled and expected to remain black/zero. Blue = the maximum of Pressure Support, Lee Support, and Shore Support shown separately in Anchored Support. Overlaps mix. Black = no lifespan support. Negative influence is intentionally omitted.";
+                        "Red = static whole-river Major Support generated from stable field-first candidates and actual river context. Green = Connector Support, intentionally black/zero until Step 3. Blue = the maximum of the accepted live Pressure, Lee, and Shore Support classes shown separately in Anchored Support. Overlaps mix. Black = no lifespan support. The compact preview above remains only an isolated candidate inspection.";
 
                 case StylizedRiverFoamDebugView.NegativeInfluenceClasses:
                     return
-                        "Independent negative-influence inputs. Red = Pocket Aging Pressure. Blue = Obstacle Footprint from the conservative current-water-level solid cross-section. Magenta = overlap. The footprint is point-sampled; each retained texel must pass the conservative exact-mesh solid-interval tests across its displayed rectangle, and it is never expanded into a surrounding halo.";
+                        "Independent negative-influence inputs. Red = Pocket Aging Pressure, intentionally black/zero until Step 4. Blue = Obstacle Footprint from the conservative current-water-level solid cross-section. Magenta = overlap. The footprint is point-sampled; each retained texel must pass the conservative exact-mesh solid-interval tests across its displayed rectangle, and it is never expanded into a surrounding halo.";
 
                 case StylizedRiverFoamDebugView.SupportAndNegativeInfluence:
                     return

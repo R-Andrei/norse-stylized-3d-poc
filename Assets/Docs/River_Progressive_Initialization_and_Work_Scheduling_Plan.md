@@ -17,6 +17,7 @@
 **Related architecture documents:**
 
 - `Docs/River_Foam_Stage6_Architecture.md`
+- `Docs/River_Foam_Topology_Implementation_Plan.md`
 - `Docs/River_Rendering_Roadmap.md`
 
 This plan exists because the current river runtime can concentrate too much CPU work, resource creation, GPU dispatch work, and first-use shader work into one frame. The resulting freeze has repeatedly returned when the Foam topology implementation became more complex, even when steady-state runtime cost remained acceptable.
@@ -34,11 +35,11 @@ Current progress:
 - **Step 1 — Instrumentation:** implemented and validated. The original hitch-free baseline showed approximately `29.5 ms` inside `RiverFoam.EnsureResources.Total` in one startup frame, with the individual boundary, obstacle, topology, clear, guidance, and diagnostic phases exposed separately.
 - **Step 2 — Per-river staged bootstrap:** implemented and validated. Initialization now advances one explicit phase per `LateUpdate`; Foam remains disabled until complete readiness. The observed early phases were generally below roughly `2.5 ms` instead of recreating the former combined burst.
 - **Step 3 — Dirty-event queue and obstacle rebuild coalescing:** implemented and accepted. Boundary and obstacle changes no longer execute a complete rebuild chain immediately.
-- **Performance pause:** active. Steady-state maintenance staggering, compute-asset splitting, striped dispatch, CPU jobs, and global cross-river scheduling are deferred until Major Support, Connector Support, Pocket Aging Pressure, and their combined topology behaviour are implemented and validated.
-- **Current implementation milestone:** deterministic continuous Major Support Patch 1. This patch deliberately changes topology generation while retaining the completed Steps 1–3 scheduling foundation.
+- **Performance pause:** active. Steady-state maintenance staggering, compute-asset splitting, striped dispatch, CPU jobs, and global cross-river scheduling are deferred until Major Support, Connector Support, Pocket Aging Pressure, their combined topology behaviour, and the topology-to-material aging response are implemented and validated.
+- **Current implementation milestone:** topology Step 1 — field-first Major candidate vertical slice plus exhaustive obsolete-topology cleanup. This milestone may temporarily run expensive generation during Foam initialization or explicit pre-gameplay preparation while retaining the completed Steps 1–3 scheduling foundation. The expensive work is explicitly future cache/precompute work, not accepted steady-state gameplay runtime.
 - **Global cross-river scheduling:** intentionally deferred. It will be designed only after the final one-river work categories, dependencies, interruption rules, and costs are known.
 
-The current sequencing rule is now: preserve the accepted performance foundation, finish the topology pipeline one class at a time, then resume performance work against the real completed pipeline. Do not invent scheduler categories for features that are still provisional.
+The current sequencing rule is now: preserve the accepted performance foundation, prove each topology slice visually before building the next one, keep every expensive proof-stage operation profiled and named, then resume performance work against the real completed pipeline. Do not invent scheduler categories for features that are still provisional.
 
 ---
 
@@ -52,22 +53,26 @@ The first three performance steps solved the immediate architectural failure mod
 
 Those protections remain permanent. They are not being reverted or bypassed.
 
-Further performance engineering is paused because the free-water topology pipeline is not yet complete. The current implementation still needs, in order:
+Further performance engineering is paused because the free-water topology pipeline is not yet complete. The topology-only implementation now proceeds through the canonical slices in `River_Foam_Topology_Implementation_Plan.md`:
 
-1. accepted static Major Support generation;
-2. strictly downstream Major Support movement;
+1. field-first Major candidate proof plus complete stale-topology cleanup;
+2. whole-river Major distribution and stable identity/evolution metadata;
 3. Connector Support;
 4. Pocket Aging Pressure;
-5. combined Major + Connector + Pocket validation;
-6. topology-to-material lifetime integration.
+5. static combined topology validation;
+6. strictly downstream layer-specific topology evolution;
+7. safe replacement-topology crossfade;
+8. production cache/precompute packaging for the accepted generator/output.
+
+Topology-to-material aging response and final material lifetime integration remain separate Stage 6 work after the relevant topology outputs are accepted.
 
 Optimising ordinary topology maintenance, splitting compute assets, striping full-grid kernels, or designing global multi-river arbitration before those dependencies are real would formalise provisional work categories and likely create avoidable rewrites. Performance work resumes only after the combined topology pipeline has a stable visual and dependency contract.
 
 The pause is not permission to ignore cost. Every topology patch must still preserve these accepted constraints:
 
-- descriptor work stays sparse and bounded;
-- full-grid kernels do not reconstruct descriptor grammar;
-- no unbounded candidate retries or graph searches;
+- proof-stage generation work is profiled with named markers and labelled as future cache/precompute work;
+- full-grid kernels do not reconstruct complex topology grammar during steady-state gameplay;
+- no unbounded candidate retries, path searches, or graph searches in gameplay; proof/bake searches must be bounded;
 - no immediate synchronous rebuild path is reintroduced;
 - cold-start profiling is mandatory after compute changes;
 - startup hitch regressions block acceptance.
@@ -294,9 +299,9 @@ Every compute change must be tested in at least two conditions:
 
 A kernel that only behaves acceptably after it has been cached is not automatically acceptable.
 
-### 5.8 Future Major work is blocked by the scheduling gate
+### 5.8 Future topology work is blocked by the scheduling gate
 
-No further expansion of Major descriptor grammar should be considered complete until at least:
+No further expansion of the topology generator or proof path should be considered complete until at least:
 
 - instrumentation is present;
 - per-river staged initialization is working;
@@ -1650,11 +1655,13 @@ A visual topology change and a scheduling/performance change must not be introdu
 
 ### 21.3 Mandatory bounded hot kernels
 
-The full-grid kernel must not reconstruct complex descriptor data that can be resolved in a sparse descriptor pass. This rule applies especially to Major and future Connector Support.
+The full-grid kernel must not reconstruct complex topology data that can be generated in the proof/bake path and consumed later as accepted fields, compact descriptors, or other bounded cached data. This rule applies especially to Major, Connector, and Pocket topology.
 
 ---
 
 ## 22. Relationship to the Foam Topology Roadmap
+
+`River_Foam_Topology_Implementation_Plan.md` is the canonical topology-only patch sequence. This scheduling document constrains how those patches execute; it does not redefine their visual or implementation order.
 
 The accepted scheduling foundation now supports topology development rather than preceding every topology feature.
 
@@ -1664,27 +1671,29 @@ Completed and retained:
 2. per-river staged initialization;
 3. queued/coalesced dirty rebuilds.
 
-Topology implementation now proceeds in this order:
+Topology implementation now proceeds in separately inspectable slices:
 
-1. deterministic continuous static Major Support;
-2. visual validation of Major population, size hierarchy, lateral distribution, and morphology;
-3. monotonic downstream Major movement using the same deterministic identity;
-4. Connector Support;
-5. Pocket Aging Pressure;
-6. combined Major + Connector + Pocket validation;
-7. topology-to-material lifetime integration;
-8. final fragmentation, dissipation, and rendering response.
+1. remove the complete obsolete topology path and prove one field-first Major candidate;
+2. place Major regions in the real river and validate distribution;
+3. add Connector Support;
+4. add Pocket Aging Pressure;
+5. validate the complete static topology through existing diagnostics;
+6. add strictly downstream Major evolution;
+7. add layer-specific Connector and Pocket evolution;
+8. add safe generated-topology rebuild crossfade;
+9. package accepted topology and evolution metadata into the production cache/precompute path;
+10. hand the stable topology contract to the separate material-lifecycle work.
 
-Only after that sequence is stable does the deferred performance roadmap resume:
+Every slice must expose a real result immediately. Candidate-local work may use one compact preview; every river-dependent result must be shown on the actual river. Diagnostics remain minimal and must not force production-grade work in `Final Foam (Debug Off)`.
+
+Only after that topology sequence is stable does the deferred performance roadmap resume:
 
 1. stagger ordinary steady-state topology maintenance where profiling still justifies it;
 2. isolate compute assets where cold first-use compilation remains a problem;
 3. add striped full-grid processing where completed long-river workloads require it;
 4. design global cross-river scheduling from the accepted final per-river work graph.
 
-Major, Connector, and Pocket remain separate visual-development stages. No performance task may be used as a reason to combine them into one opaque rewrite.
-
----
+No performance task may be used as a reason to combine Major, Connector, and Pocket into one opaque rewrite. The topology plan requires separate implementation and acceptance before combined validation.
 
 ## 23. Deferred Decisions
 
@@ -1726,20 +1735,16 @@ The scheduling architecture is successful when:
 
 ## 25. Immediate Next Step
 
-The active implementation step is **Major Support Patch 1 — deterministic continuous static generation**.
+The active implementation step is **Topology Step 1 — Major Candidate Vertical Slice and Obsolete-Path Removal**.
 
-It changes the Major descriptor generator from class/family/retry logic to one fixed-cost seeded equation:
+The patch must:
 
-- a fixed two-opportunity-per-segment lattice;
-- nested deterministic activation controlled only by Amount;
-- stable position and morphology identity;
-- a continuous heavy-tailed size quantile controlled only by Size;
-- continuous aspect, orientation, spread, bend, imbalance, and one subtractive bite;
-- one direct capacity solve against local longitudinal and lateral room;
-- no candidate retry loop, class fallback, family switch, or descriptor expansion;
-- unchanged fixed three-lobe/one-bite raster representation;
-- a dedicated serialized Major Support Seed;
-- queued seed-change rebuilds through the existing Step 3 path.
+- remove the complete stale topology implementation made unnecessary by the replacement, including but not limited to the three-lobe/one-bite Major grammar, nucleus descriptors and reconstruction kernels, provisional Pocket path, disabled Connector path, unused fixture, and any additional dead resources, states, metrics, bindings, or editor text found through reference tracing;
+- implement one deterministic field-first Major candidate using correlated scalar fields, coordinate warp, percentile thresholding, largest-component retention, hole filling, limited cleanup, neck-width validation, bounded rejection, and soft support output;
+- expose `Raw Field`, `Thresholded`, `Cleaned`, and `Final Support` in one compact candidate preview;
+- report only accepted/rejected state, primary rejection reason, occupied area, minimum neck width, and one compact shape-quality measure;
+- preserve the accepted staged initialization, dirty-rebuild queue, anchored sources, Obstacle Footprint, and topology output contract;
+- avoid whole-river placement, Connector generation, Pocket generation, material response, runtime movement, cache packaging, and unrelated performance changes.
 
-The patch must also confirm that no startup freeze or shader warning returns. After static Major Support passes, the next topology task is monotonic downstream Major movement—not another performance scheduling step.
+If the candidate family fails visually, implementation stops at this step. Whole-river distribution and all later topology work remain blocked until the field-first candidate method is accepted.
 
