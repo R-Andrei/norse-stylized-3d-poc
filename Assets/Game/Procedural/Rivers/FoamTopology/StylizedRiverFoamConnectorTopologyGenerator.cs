@@ -7,14 +7,18 @@ namespace ProgrammaticStylized3D.Rivers
 {
     /// <summary>
     /// Deterministic CPU proof generator for sparse prepared Connector Support.
-    /// Patch 3.2 connects disconnected Major components only and exposes
-    /// bounded Amount, Directness, and Length Preference controls. It does
+    /// Patch 3.3 connects disconnected Major components only, blocks
+    /// unrelated Major interiors during routing, and exposes bounded Amount,
+    /// Directness, and Length Preference controls. It does
     /// not approximate the authoritative live Pressure, Lee, or Shore fields
     /// on the CPU, and performs no work during ordinary gameplay.
     /// </summary>
     public static class StylizedRiverFoamConnectorTopologyGenerator
     {
         private const float MajorComponentThreshold = 0.18f;
+        private const float MajorRoutingInteriorThreshold = 0.42f;
+        private const float MajorRasterSuppressionStart = 0.16f;
+        private const float EndpointMajorAllowanceMetres = 0.38f;
         private const int MinimumComponentCellCount = 5;
         private const int EndpointSectorCount = 12;
         private const int MaximumEndpointsPerComponent = 10;
@@ -208,6 +212,7 @@ namespace ProgrammaticStylized3D.Rivers
                         width,
                         height,
                         validCells,
+                        componentLabels,
                         fluidCoverage,
                         majorSupport,
                         connectorSupport,
@@ -227,8 +232,11 @@ namespace ProgrammaticStylized3D.Rivers
                     height,
                     validCells,
                     componentLabels,
+                    majorSupport,
                     pair.StartComponentIndex,
                     pair.EndComponentIndex,
+                    pair.StartEndpoint.CellIndex,
+                    pair.EndEndpoint.CellIndex,
                     connectorDirectness,
                     curvatureWaypoint,
                     metricPositions);
@@ -252,11 +260,16 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
-                if (PathCrossesOtherMajor(
+                if (PathCrossesBlockedMajorInterior(
                         path,
+                        validCells,
                         componentLabels,
+                        majorSupport,
+                        metricPositions,
                         pair.StartComponentIndex,
-                        pair.EndComponentIndex))
+                        pair.EndComponentIndex,
+                        pair.StartEndpoint.CellIndex,
+                        pair.EndEndpoint.CellIndex))
                 {
                     rejectionCounts[(int)
                         StylizedRiverFoamConnectorRejectionReason
@@ -1050,6 +1063,7 @@ namespace ProgrammaticStylized3D.Rivers
             int width,
             int height,
             bool[] validCells,
+            int[] componentLabels,
             float[] fluidCoverage,
             float[] majorSupport,
             float[] connectorSupport,
@@ -1093,10 +1107,15 @@ namespace ProgrammaticStylized3D.Rivers
                     width,
                     height,
                     validCells,
+                    componentLabels,
                     fluidCoverage,
                     majorSupport,
                     connectorSupport,
                     metricPositions,
+                    pair.StartComponentIndex,
+                    pair.EndComponentIndex,
+                    start,
+                    goal,
                     out path);
                 rejectionReason = foundDirect
                     ? StylizedRiverFoamConnectorRejectionReason.None
@@ -1140,10 +1159,15 @@ namespace ProgrammaticStylized3D.Rivers
                         width,
                         height,
                         validCells,
+                        componentLabels,
                         fluidCoverage,
                         majorSupport,
                         connectorSupport,
                         metricPositions,
+                        pair.StartComponentIndex,
+                        pair.EndComponentIndex,
+                        start,
+                        goal,
                         out List<int> firstLeg))
                 {
                     continue;
@@ -1161,10 +1185,15 @@ namespace ProgrammaticStylized3D.Rivers
                         width,
                         height,
                         validCells,
+                        componentLabels,
                         fluidCoverage,
                         majorSupport,
                         connectorSupport,
                         metricPositions,
+                        pair.StartComponentIndex,
+                        pair.EndComponentIndex,
+                        start,
+                        goal,
                         out List<int> secondLeg))
                 {
                     continue;
@@ -1199,10 +1228,15 @@ namespace ProgrammaticStylized3D.Rivers
             int width,
             int height,
             bool[] validCells,
+            int[] componentLabels,
             float[] fluidCoverage,
             float[] majorSupport,
             float[] connectorSupport,
             Vector2[] metricPositions,
+            int startComponent,
+            int endComponent,
+            int startEndpointCell,
+            int endEndpointCell,
             out List<int> path)
         {
             int cellCount = width * height;
@@ -1260,7 +1294,17 @@ namespace ProgrammaticStylized3D.Rivers
                     }
 
                     int next = x + y * width;
-                    if ((!validCells[next] && next != goal) || closed[next])
+                    if (closed[next] ||
+                        !IsConnectorTraversalCellAllowed(
+                            next,
+                            validCells,
+                            componentLabels,
+                            majorSupport,
+                            metricPositions,
+                            startComponent,
+                            endComponent,
+                            startEndpointCell,
+                            endEndpointCell))
                     {
                         continue;
                     }
@@ -1273,7 +1317,26 @@ namespace ProgrammaticStylized3D.Rivers
                             currentY * width;
                         int sideB = currentX +
                             (currentY + neighbourY[neighbourIndex]) * width;
-                        if (!validCells[sideA] || !validCells[sideB])
+                        if (!IsConnectorTraversalCellAllowed(
+                                sideA,
+                                validCells,
+                                componentLabels,
+                                majorSupport,
+                                metricPositions,
+                                startComponent,
+                                endComponent,
+                                startEndpointCell,
+                                endEndpointCell) ||
+                            !IsConnectorTraversalCellAllowed(
+                                sideB,
+                                validCells,
+                                componentLabels,
+                                majorSupport,
+                                metricPositions,
+                                startComponent,
+                                endComponent,
+                                startEndpointCell,
+                                endEndpointCell))
                         {
                             continue;
                         }
@@ -1442,8 +1505,11 @@ namespace ProgrammaticStylized3D.Rivers
             int height,
             bool[] validCells,
             int[] componentLabels,
+            float[] majorSupport,
             int startComponent,
             int endComponent,
+            int startEndpointCell,
+            int endEndpointCell,
             float directness,
             Vector2 curvatureWaypoint,
             Vector2[] metricPositions)
@@ -1470,8 +1536,12 @@ namespace ProgrammaticStylized3D.Rivers
                     height,
                     validCells,
                     componentLabels,
+                    majorSupport,
+                    metricPositions,
                     startComponent,
                     endComponent,
+                    startEndpointCell,
+                    endEndpointCell,
                     simplified);
                 return simplified;
             }
@@ -1498,8 +1568,12 @@ namespace ProgrammaticStylized3D.Rivers
                 height,
                 validCells,
                 componentLabels,
+                majorSupport,
+                metricPositions,
                 startComponent,
                 endComponent,
+                startEndpointCell,
+                endEndpointCell,
                 simplified);
             AppendSimplifiedRange(
                 path,
@@ -1510,8 +1584,12 @@ namespace ProgrammaticStylized3D.Rivers
                 height,
                 validCells,
                 componentLabels,
+                majorSupport,
+                metricPositions,
                 startComponent,
                 endComponent,
+                startEndpointCell,
+                endEndpointCell,
                 simplified);
             return simplified;
         }
@@ -1525,8 +1603,12 @@ namespace ProgrammaticStylized3D.Rivers
             int height,
             bool[] validCells,
             int[] componentLabels,
+            float[] majorSupport,
+            Vector2[] metricPositions,
             int startComponent,
             int endComponent,
+            int startEndpointCell,
+            int endEndpointCell,
             List<int> destination)
         {
             int anchor = startPathIndex;
@@ -1547,8 +1629,12 @@ namespace ProgrammaticStylized3D.Rivers
                             height,
                             validCells,
                             componentLabels,
+                            majorSupport,
+                            metricPositions,
                             startComponent,
-                            endComponent))
+                            endComponent,
+                            startEndpointCell,
+                            endEndpointCell))
                     {
                         break;
                     }
@@ -1573,8 +1659,12 @@ namespace ProgrammaticStylized3D.Rivers
             int height,
             bool[] validCells,
             int[] componentLabels,
+            float[] majorSupport,
+            Vector2[] metricPositions,
             int startComponent,
-            int endComponent)
+            int endComponent,
+            int startEndpointCell,
+            int endEndpointCell)
         {
             int x0 = start % width;
             int y0 = start / width;
@@ -1594,15 +1684,16 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 int cellIndex = x0 + y0 * width;
-                if (!validCells[cellIndex])
-                {
-                    return false;
-                }
-
-                int label = componentLabels[cellIndex];
-                if (label >= 0 &&
-                    label != startComponent &&
-                    label != endComponent)
+                if (!IsConnectorTraversalCellAllowed(
+                        cellIndex,
+                        validCells,
+                        componentLabels,
+                        majorSupport,
+                        metricPositions,
+                        startComponent,
+                        endComponent,
+                        startEndpointCell,
+                        endEndpointCell))
                 {
                     return false;
                 }
@@ -1619,18 +1710,26 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     int sideX = x0 + sx + y0 * width;
                     int sideY = x0 + (y0 + sy) * width;
-                    if (!IsLineCellAllowed(
+                    if (!IsConnectorTraversalCellAllowed(
                             sideX,
                             validCells,
                             componentLabels,
+                            majorSupport,
+                            metricPositions,
                             startComponent,
-                            endComponent) ||
-                        !IsLineCellAllowed(
+                            endComponent,
+                            startEndpointCell,
+                            endEndpointCell) ||
+                        !IsConnectorTraversalCellAllowed(
                             sideY,
                             validCells,
                             componentLabels,
+                            majorSupport,
+                            metricPositions,
                             startComponent,
-                            endComponent))
+                            endComponent,
+                            startEndpointCell,
+                            endEndpointCell))
                     {
                         return false;
                     }
@@ -1649,12 +1748,16 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
-        private static bool IsLineCellAllowed(
+        private static bool IsConnectorTraversalCellAllowed(
             int cellIndex,
             bool[] validCells,
             int[] componentLabels,
+            float[] majorSupport,
+            Vector2[] metricPositions,
             int startComponent,
-            int endComponent)
+            int endComponent,
+            int startEndpointCell,
+            int endEndpointCell)
         {
             if (cellIndex < 0 || cellIndex >= validCells.Length ||
                 !validCells[cellIndex])
@@ -1662,31 +1765,61 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
+            if (majorSupport[cellIndex] < MajorRoutingInteriorThreshold)
+            {
+                return true;
+            }
+
             int label = componentLabels[cellIndex];
-            return label < 0 ||
-                label == startComponent ||
-                label == endComponent;
+            if (label < 0)
+            {
+                return false;
+            }
+
+            if (label == startComponent)
+            {
+                return Vector2.Distance(
+                    metricPositions[cellIndex],
+                    metricPositions[startEndpointCell]) <=
+                    EndpointMajorAllowanceMetres;
+            }
+
+            if (label == endComponent)
+            {
+                return Vector2.Distance(
+                    metricPositions[cellIndex],
+                    metricPositions[endEndpointCell]) <=
+                    EndpointMajorAllowanceMetres;
+            }
+
+            return false;
         }
 
-        private static bool PathCrossesOtherMajor(
+        private static bool PathCrossesBlockedMajorInterior(
             List<int> path,
+            bool[] validCells,
             int[] componentLabels,
+            float[] majorSupport,
+            Vector2[] metricPositions,
             int startComponent,
-            int endComponent)
+            int endComponent,
+            int startEndpointCell,
+            int endEndpointCell)
         {
-            int foreignCellCount = 0;
-            for (int index = 1; index < path.Count - 1; index++)
+            for (int index = 0; index < path.Count; index++)
             {
-                int label = componentLabels[path[index]];
-                if (label >= 0 &&
-                    label != startComponent &&
-                    label != endComponent)
+                if (!IsConnectorTraversalCellAllowed(
+                        path[index],
+                        validCells,
+                        componentLabels,
+                        majorSupport,
+                        metricPositions,
+                        startComponent,
+                        endComponent,
+                        startEndpointCell,
+                        endEndpointCell))
                 {
-                    foreignCellCount++;
-                    if (foreignCellCount > 2)
-                    {
-                        return true;
-                    }
+                    return true;
                 }
             }
 
@@ -1777,14 +1910,20 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
+                float major = Mathf.Clamp01(majorSupport[cellIndex]);
+                if (major >= MajorRoutingInteriorThreshold)
+                {
+                    continue;
+                }
+
                 float value = 1f - Mathf.SmoothStep(
                     coreRadius,
                     outerRadius,
                     minimumDistance);
                 float majorSuppression = 1f - Mathf.SmoothStep(
-                    0.48f,
-                    0.88f,
-                    Mathf.Clamp01(majorSupport[cellIndex]));
+                    MajorRasterSuppressionStart,
+                    MajorRoutingInteriorThreshold,
+                    major);
                 destination[cellIndex] = Mathf.Max(
                     destination[cellIndex],
                     value * majorSuppression);
