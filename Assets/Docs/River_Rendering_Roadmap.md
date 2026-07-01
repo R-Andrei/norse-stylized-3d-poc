@@ -297,6 +297,7 @@ Accepted and retained:
 - field-first Major Support generation, whole-river distribution, accepted Major controls, and stable identity;
 - Major-to-Major Connector Support with accepted Amount, Directness, Length Preference, endpoint gates, clearance halos, detour limits, and soft participation distribution;
 - initial Interior Pocket negative topology hosted by broad Major interiors;
+- Patch 4.2 implementation of nested Interior Pocket Amount and one-sided Edge Cavities, awaiting visual acceptance;
 - exact transformed-mesh water-level-aware Obstacle Footprint, distinct from padded Pressure/Lee disturbance footprints;
 - persistent field, chunking, freezing, sleeping, and fixed-cost GPU infrastructure;
 - permanent Foam profiler instrumentation;
@@ -319,7 +320,7 @@ Each class receives an independent `0–1` Amount control with default `0.5`. Am
 
 Still unimplemented or unaccepted:
 
-- Patch 4.2 Interior Pocket Amount and Edge Cavities;
+- Patch 4.2 visual acceptance for Interior Pocket Amount and Edge Cavities;
 - Patch 4.3 Connector Weak Spans;
 - Patch 4.4 Free-Water Negative Events;
 - Patch 4.5 complete static topology validation;
@@ -362,14 +363,14 @@ The old destructive composition `Positive × (1 - Negative)` remains non-canonic
 
 The four negative classes retain class identity and evolution metadata even if the current output texture carries one aggregate negative field. They are not direct visible Foam and do not geometrically subtract positive topology.
 
-Current accepted authoring retains Major `Amount`, `Size`, `Size Variation`, and `Seed`, plus Connector `Amount`, `Directness`, and `Length Preference`. Patches 4.2–4.4 add `Interior Pocket Amount`, `Edge Cavity Amount`, `Connector Weak Span Amount`, and `Free-Water Event Amount`, all range `0–1`, default `0.5`.
+Current authoring retains Major `Amount`, `Size`, `Size Variation`, and `Seed`, plus Connector `Amount`, `Directness`, and `Length Preference`. Patch 4.2 now adds `Interior Pocket Amount` and `Edge Cavity Amount`, both range `0–1`, default `0.5`, pending visual acceptance. Patches 4.3–4.4 add `Connector Weak Span Amount` and `Free-Water Event Amount` with the same range/default contract.
 
 Runtime topology evolution remains cheap and metadata-driven. Major and Connector use separate downstream offsets and fades. Interior Pockets and Edge Cavities remain associated with Major hosts; Weak Spans move/fade along Connector identity; Free-Water Events drift downstream, fade, and recycle sparsely. Anchored Pressure, Lee, and Shore Support remain attached to authoritative live sources. No gameplay candidate generation, component cleanup, pathfinding, distance transforms, or rejection loops are permitted.
 
 ### Immediate continuation order
 
 1. Documentation expansion for four-class Negative Aging Pressure — complete.
-2. Patch 4.2 — Interior Pocket Amount and Edge Cavities.
+2. Patch 4.2 — Interior Pocket Amount and Edge Cavities — implemented; visual acceptance pending.
 3. Patch 4.3 — Connector Weak Spans.
 4. Patch 4.4 — Free-Water Negative Events.
 5. Patch 4.5 — static validation of Major, Connector, all four negative classes, Anchored Support, exact Obstacle Footprint, and valid water.
@@ -433,12 +434,12 @@ Accepted normal Inspector controls:
 - `Connector Amount`;
 - `Connector Directness`;
 - `Connector Length Preference`;
+- `Interior Pocket Amount` — range `0–1`, default `0.5`, implemented in Patch 4.2 pending visual acceptance;
+- `Edge Cavity Amount` — range `0–1`, default `0.5`, implemented in Patch 4.2 pending visual acceptance;
 - `Foam Colour`.
 
-Approved additions through Patches 4.2–4.4:
+Approved additions remaining through Patches 4.3–4.4:
 
-- `Interior Pocket Amount` — range `0–1`, default `0.5`;
-- `Edge Cavity Amount` — range `0–1`, default `0.5`;
 - `Connector Weak Span Amount` — range `0–1`, default `0.5`;
 - `Free-Water Event Amount` — range `0–1`, default `0.5`.
 
@@ -455,7 +456,7 @@ Separate material lifetime and topology-response authoring remains deferred unti
 3. Connector Support and refinements — complete.
 4. Initial Interior Pocket proof — complete.
 5. Exact transformed-mesh Obstacle Footprint and procedural chunk/run preparation contract — complete.
-6. Patch 4.2 Interior Pocket Amount and Edge Cavities.
+6. Patch 4.2 Interior Pocket Amount and Edge Cavities — implemented; visual acceptance pending.
 7. Patch 4.3 Connector Weak Spans.
 8. Patch 4.4 Free-Water Negative Events.
 9. Patch 4.5 complete static topology validation.

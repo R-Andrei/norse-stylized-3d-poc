@@ -4,7 +4,7 @@
 
 **Status:** Canonical step-by-step implementation plan for Stage 6 Foam topology only.
 
-**Patch status:** Documentation revision before Patch 4.2. Major Support, Connector Support, the initial Interior Pocket proof, and exact transformed-mesh Obstacle Footprint are accepted as the current static baseline. The remaining negative-topology classes, runtime evolution, rebuild crossfade, and production cache are not yet implemented.
+**Patch status:** Patch 4.2 is implemented and awaiting visual acceptance. Major Support, Connector Support, the initial Interior Pocket proof, and exact transformed-mesh Obstacle Footprint remain the accepted static baseline. The new Interior Pocket Amount contract and Edge Cavity class are present for validation; Connector Weak Spans, Free-Water Negative Events, runtime evolution, rebuild crossfade, and production cache are not yet implemented.
 
 **Primary implementation target:**
 
@@ -709,7 +709,9 @@ The remaining work is intentionally split into small, inspectable subpatches.
 
 ### Patch 4.2 — Major-hosted negative topology
 
-Implement:
+**Implementation status:** Implemented; Unity visual acceptance pending.
+
+Implemented:
 
 - `Interior Pocket Amount`, range `0–1`, default `0.5`, with the existing accepted Interior Pocket population preserved approximately at the default;
 - `Edge Cavity Amount`, range `0–1`, default `0.5`;
@@ -728,6 +730,10 @@ Minimal telemetry per class:
 - accepted regions;
 - dominant rejection reason;
 - generation time.
+
+The implemented Interior Pocket population is mathematically preserved at Amount `0.5` for the previously eligible baseline candidates: the accepted candidate score order, two-per-host cap, spacing, radius, and raster grammar remain unchanged at that value. Values below `0.5` activate a nested stable subset. Values above `0.5` may activate smaller secondary opportunities and a bounded third opportunity per sufficiently broad host.
+
+Edge Cavities derive from broad Major-hosted interior maxima, choose one deterministic true aggregate-Major boundary side, bias their irregular negative field toward that side, and require both inside-host and outside-host coverage. Connector cores and unrelated Major hosts remain protected. A cavity is rejected when the aggregate negative field would consume more than the bounded host fraction or leave too little positive remainder. Stable metadata retains the negative class, host identity, transform, breach direction, and future evolution selectors.
 
 ### Patch 4.3 — Connector Weak Spans
 
@@ -1293,22 +1299,25 @@ A topology patch that cannot answer these questions is not ready.
 
 ## 13. Immediate Next Step
 
-Major Support and Connector Support are accepted. The initial Interior Pocket proof and Patch 4.1 exact transformed-mesh Obstacle Footprint are also accepted as the current negative-topology baseline.
+Major Support and Connector Support are accepted. The initial Interior Pocket proof and Patch 4.1 exact transformed-mesh Obstacle Footprint are also accepted as the prior negative-topology baseline. Patch 4.2 is now implemented and must be visually validated before the next slice begins.
 
-This documentation revision expands the remaining topology work before any Foam-material implementation:
+Immediate validation:
 
-1. **Patch 4.2 — Major-hosted negative topology**
-   - add `Interior Pocket Amount` and preserve the current accepted population at default `0.5`;
-   - add `Edge Cavity Amount` and lopsided one-sided cavities;
-   - retain nested deterministic activation and subtype/host metadata.
-2. **Patch 4.3 — Connector Weak Spans**
+1. inspect `Interior Pocket Amount` at `0`, `0.5`, and `1` with `Edge Cavity Amount = 0`;
+2. inspect `Edge Cavity Amount` at `0`, `0.5`, and `1` with `Interior Pocket Amount = 0`;
+3. inspect both classes together at their default `0.5` values across several seeds;
+4. reject Patch 4.2 if cavities fail to breach one deliberate side, destroy their host, target Connector holes instead of real Major boundaries, or reshuffle lower-Amount identities.
+
+After Patch 4.2 visual acceptance, continue:
+
+1. **Patch 4.3 — Connector Weak Spans**
    - add `Connector Weak Span Amount`;
    - create local Connector-hosted negative sections away from endpoint gates.
-3. **Patch 4.4 — Free-Water Negative Events**
+2. **Patch 4.4 — Free-Water Negative Events**
    - add `Free-Water Event Amount`;
    - create sparse valid-water negative opportunities with future drift/fade/recycle metadata.
-4. **Patch 4.5 — Static combined topology validation**
+3. **Patch 4.5 — Static combined topology validation**
    - validate Major, Connector, all four negative classes, Anchored Support, exact Obstacle Footprint, and valid water together.
-5. Continue with Major evolution, class-specific Connector/negative evolution, safe rebuild crossfade, and procedural chunk/run cache packaging.
+4. Continue with Major evolution, class-specific Connector/negative evolution, safe rebuild crossfade, and procedural chunk/run cache packaging.
 
 Topology is not considered implemented until static topology, runtime evolution, rebuild crossfade, and cache/preparation handoff pass. Only then may the separate Foam material-lifecycle implementation begin.

@@ -692,6 +692,14 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamConnectorLengthPreference = 0.5f;
 
+        [Tooltip("Controls the nested deterministic population of closed Interior Pocket negative regions hosted inside broad Major Support. Zero disables Interior Pockets, 0.5 preserves approximately the accepted Patch 4 population, and one activates additional bounded opportunities without reshuffling earlier identities.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamInteriorPocketAmount = 0.5f;
+
+        [Tooltip("Controls the nested deterministic population of Edge Cavity negative regions. Cavities are hosted by broad Major Support but deliberately breach one selected side while preserving a useful positive remainder. Zero disables them; 0.5 is the normal baseline; one permits the maximum bounded population.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamEdgeCavityAmount = 0.5f;
+
         [Tooltip("Lit, non-emissive Foam tint. The alpha channel controls maximum Foam opacity, so no separate opacity control is required.")]
         [SerializeField] private Color foamColour =
             new Color(0.94f, 0.97f, 0.94f, 0.72f);
@@ -1134,6 +1142,10 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamConnectorDirectness);
         public float FoamConnectorLengthPreference =>
             Mathf.Clamp01(foamConnectorLengthPreference);
+        public float FoamInteriorPocketAmount =>
+            Mathf.Clamp01(foamInteriorPocketAmount);
+        public float FoamEdgeCavityAmount =>
+            Mathf.Clamp01(foamEdgeCavityAmount);
         public Color FoamColour => foamColour;
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
         public float FoamTestDistanceNormalized =>
@@ -2761,6 +2773,10 @@ namespace ProgrammaticStylized3D.Rivers
                 foamConnectorDirectness);
             foamConnectorLengthPreference = Mathf.Clamp01(
                 foamConnectorLengthPreference);
+            foamInteriorPocketAmount = Mathf.Clamp01(
+                foamInteriorPocketAmount);
+            foamEdgeCavityAmount = Mathf.Clamp01(
+                foamEdgeCavityAmount);
             foamColour.a = Mathf.Clamp01(foamColour.a);
             foamTestDistanceNormalized = Mathf.Clamp01(
                 foamTestDistanceNormalized);

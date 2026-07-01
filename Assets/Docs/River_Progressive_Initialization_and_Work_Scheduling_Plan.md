@@ -36,7 +36,7 @@ Current progress:
 - **Step 2 — Per-river staged bootstrap:** implemented and validated. Initialization now advances one explicit phase per `LateUpdate`; Foam remains disabled until complete readiness. The observed early phases were generally below roughly `2.5 ms` instead of recreating the former combined burst.
 - **Step 3 — Dirty-event queue and obstacle rebuild coalescing:** implemented and accepted. Boundary and obstacle changes no longer execute a complete rebuild chain immediately.
 - **Performance pause:** active. Steady-state maintenance staggering, compute-asset splitting, striped dispatch, CPU jobs, and global cross-river scheduling are deferred until Major Support, Connector Support, all four Negative Aging Pressure classes, static combined topology, runtime evolution, rebuild crossfade, and cache/preparation packaging are implemented and validated.
-- **Current implementation milestone:** Patch 4.1 exact Obstacle Footprint is accepted together with the initial Interior Pocket proof. The approved next sequence adds Edge Cavities, Connector Weak Spans, and Free-Water Negative Events before static combined validation. Exact transformed-mesh interval preparation currently runs only in the staged pre-gameplay obstacle phase as a temporary fallback. Production ownership belongs to procedural chunk generation/building/linking after final object placement, with compact data cached for gameplay loading.
+- **Current implementation milestone:** Patch 4.1 exact Obstacle Footprint is accepted together with the initial Interior Pocket proof. Patch 4.2 now implements nested Interior Pocket Amount and one-sided Edge Cavities and is awaiting visual acceptance. Connector Weak Spans and Free-Water Negative Events remain subsequent slices before static combined validation. Exact transformed-mesh interval preparation currently runs only in the staged pre-gameplay obstacle phase as a temporary fallback. Production ownership belongs to procedural chunk generation/building/linking after final object placement, with compact data cached for gameplay loading.
 - **Global cross-river scheduling:** intentionally deferred. It will be designed only after the final one-river work categories, dependencies, interruption rules, and costs are known.
 
 The current sequencing rule is now: preserve the accepted performance foundation, prove each topology slice visually before building the next one, keep every expensive proof-stage operation profiled and named, then resume performance work against the real completed pipeline. Do not invent scheduler categories for features that are still provisional.
@@ -58,7 +58,7 @@ Further performance engineering is paused because the free-water topology pipeli
 1. accepted field-first Major candidate and whole-river Major distribution;
 2. accepted Connector Support;
 3. accepted initial Interior Pocket and exact Obstacle Footprint;
-4. Patch 4.2 Interior Pocket Amount and Edge Cavities;
+4. Patch 4.2 Interior Pocket Amount and Edge Cavities — implemented; visual acceptance pending;
 5. Patch 4.3 Connector Weak Spans;
 6. Patch 4.4 Free-Water Negative Events;
 7. Patch 4.5 static combined topology validation;
@@ -67,8 +67,6 @@ Further performance engineering is paused because the free-water topology pipeli
 10. production procedural chunk/run cache and precompute packaging.
 
 Topology-to-material aging response and final material lifetime integration remain separate Stage 6 work only after topology completion.
-
-Topology-to-material aging response and final material lifetime integration remain separate Stage 6 work after the relevant topology outputs are accepted.
 
 Optimising ordinary topology maintenance, splitting compute assets, striping full-grid kernels, or designing global multi-river arbitration before those dependencies are real would formalise provisional work categories and likely create avoidable rewrites. Performance work resumes only after the combined topology pipeline has a stable visual and dependency contract.
 
@@ -1735,14 +1733,8 @@ The scheduling architecture is successful when:
 
 ## 25. Immediate Next Step
 
-Major Support, Connector Support, the initial Interior Pocket proof, and Patch 4.1 exact transformed-mesh Obstacle Footprint are accepted.
+Major Support, Connector Support, the initial Interior Pocket proof, and Patch 4.1 exact transformed-mesh Obstacle Footprint are accepted. Patch 4.2 is implemented and awaiting visual acceptance.
 
-The next implementation is **Patch 4.2 — Major-hosted negative topology**:
+Validate Patch 4.2 by isolating Interior Pockets and Edge Cavities with their independent Amount controls, testing `0`, `0.5`, and `1`, and checking several seeds. The accepted performance contract remains unchanged: all host assignment, distance analysis, boundary selection, cavity rasterization, and rejection work occurs only in staged preparation or an explicit dirty rebuild.
 
-- introduce `Interior Pocket Amount` and preserve the accepted current Interior Pocket population at default `0.5`;
-- introduce `Edge Cavity Amount`, default `0.5`;
-- generate deterministic lopsided cavities that may breach one Major edge while preserving a viable positive remainder;
-- retain subtype, host, and future evolution metadata;
-- run all expensive host analysis and candidate selection only in staged preparation or explicit dirty rebuilds.
-
-Patches 4.3 and 4.4 then add Connector Weak Spans and Free-Water Negative Events. Patch 4.5 validates the complete static topology. Runtime evolution, rebuild crossfade, and cache/preparation packaging follow before any Foam-material implementation.
+After visual acceptance, Patch 4.3 adds Connector Weak Spans and Patch 4.4 adds Free-Water Negative Events. Patch 4.5 validates the complete static topology. Runtime evolution, rebuild crossfade, and cache/preparation packaging follow before any Foam-material implementation.

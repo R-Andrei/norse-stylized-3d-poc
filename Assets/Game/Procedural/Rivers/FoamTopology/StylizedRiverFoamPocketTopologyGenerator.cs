@@ -6,11 +6,13 @@ using UnityEngine;
 namespace ProgrammaticStylized3D.Rivers
 {
     /// <summary>
-    /// Deterministic CPU proof generator for static Pocket Aging Pressure.
-    /// Pockets are hosted only by broad accepted Major interiors, preserve a
-    /// positive rim, avoid important Connector cores and obstacle context, and
-    /// remain independent from positive support. Authoritative live Pressure,
-    /// Lee, and Shore protection is applied during GPU topology composition.
+    /// Deterministic CPU proof generator for the Major-hosted Negative Aging
+    /// Pressure classes. Interior Pockets preserve a closed positive rim. Edge
+    /// Cavities remain associated with a broad Major host but deliberately bias
+    /// toward and breach one selected side while preserving a useful positive
+    /// remainder. Both classes avoid important Connector cores and obstacle
+    /// context and remain independent from positive support. Authoritative live
+    /// Pressure, Lee, and Shore protection is applied during GPU composition.
     /// </summary>
     public static class StylizedRiverFoamPocketTopologyGenerator
     {
@@ -18,13 +20,21 @@ namespace ProgrammaticStylized3D.Rivers
         private const float ConnectorCoreThreshold = 0.18f;
         private const float ConnectorProtectionRadiusMetres = 0.22f;
         private const float MinimumInteriorRadiusMetres = 0.48f;
+        private const float ExtendedInteriorRadiusMetres = 0.38f;
+        private const float MinimumCavityHostRadiusMetres = 0.58f;
         private const float PositiveRimWidthMetres = 0.22f;
         private const float RimFeatherMetres = 0.10f;
         private const float MinimumPocketRadiusMetres = 0.24f;
         private const float MaximumPocketRadiusMetres = 1.20f;
         private const float MinimumPocketSpacingMetres = 0.62f;
+        private const float MinimumCavitySpacingMetres = 0.54f;
+        private const float CavityOutwardLimitMetres = 0.36f;
+        private const float MaximumCavityHostCoverage = 0.54f;
+        private const float MinimumHostRemainderRatio = 0.28f;
         private const float PocketCoverageThreshold = 0.15f;
-        private const int MaximumPocketsPerHost = 2;
+        private const int MaximumInteriorPocketsPerHost = 3;
+        private const int MaximumCavitiesPerHost = 2;
+        private const uint InvalidHostId = uint.MaxValue;
 
         public static StylizedRiverFoamPocketTopology Generate(
             RiverDomainSnapshot domain,
@@ -35,6 +45,8 @@ namespace ProgrammaticStylized3D.Rivers
             StylizedRiverQuality quality,
             float shoreMotion,
             int seed,
+            float interiorPocketAmount,
+            float edgeCavityAmount,
             float[] obstacleMask,
             StylizedRiverFoamMajorTopology majorTopology,
             StylizedRiverFoamConnectorTopology connectorTopology)
@@ -78,6 +90,9 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             seed = Mathf.Max(0, seed);
+            interiorPocketAmount = Mathf.Clamp01(interiorPocketAmount);
+            edgeCavityAmount = Mathf.Clamp01(edgeCavityAmount);
+
             float[] fluidCoverage = new float[cellCount];
             bool[] validCells = new bool[cellCount];
             StylizedRiverFoamMajorTopologyGenerator.BuildFluidContext(
@@ -105,13 +120,16 @@ namespace ProgrammaticStylized3D.Rivers
                 index => connectorSupport[index] >= ConnectorCoreThreshold,
                 null);
 
+            bool[] majorHostInterior = new bool[cellCount];
             bool[] pocketInterior = new bool[cellCount];
             for (int index = 0; index < cellCount; index++)
             {
-                pocketInterior[index] =
+                majorHostInterior[index] =
                     validCells[index] &&
                     fluidCoverage[index] > 0.35f &&
-                    majorSupport[index] >= MajorInteriorThreshold &&
+                    majorSupport[index] >= MajorInteriorThreshold;
+                pocketInterior[index] =
+                    majorHostInterior[index] &&
                     connectorDistance[index] >
                         ConnectorProtectionRadiusMetres;
             }
@@ -125,7 +143,23 @@ namespace ProgrammaticStylized3D.Rivers
             List<HostMetric> hosts = BuildHostMetrics(
                 majorTopology.Regions,
                 domain);
-            List<PocketCandidate> candidates = FindCandidateCentres(
+            uint[] hostByCell = BuildHostAssignments(
+                majorHostInterior,
+                metricPositions,
+                hosts);
+            Dictionary<uint, int> hostCellCounts = CountHostCells(
+                majorHostInterior,
+                hostByCell);
+            Dictionary<uint, List<HostBoundaryPoint>> hostBoundaries =
+                BuildHostBoundaries(
+                    width,
+                    height,
+                    majorHostInterior,
+                    hostByCell,
+                    connectorDistance,
+                    metricPositions);
+
+            List<PocketCandidate> allCandidates = FindCandidateCentres(
                 width,
                 height,
                 domain,
@@ -135,151 +169,281 @@ namespace ProgrammaticStylized3D.Rivers
                 metricPositions,
                 hosts);
 
-            HashSet<uint> eligibleHosts = new HashSet<uint>();
-            for (int index = 0; index < candidates.Count; index++)
-            {
-                eligibleHosts.Add(candidates[index].HostRegionId);
-            }
-
-            candidates.Sort((a, b) =>
-            {
-                int scoreComparison = b.Score.CompareTo(a.Score);
-                return scoreComparison != 0
-                    ? scoreComparison
-                    : a.StableId.CompareTo(b.StableId);
-            });
-
-            Dictionary<uint, int> acceptedByHost = new();
-            List<AcceptedPocket> accepted = new();
-            List<StylizedRiverFoamPocketRegion> regions = new();
             float[] candidateRaster = new float[cellCount];
-
-            for (int candidateIndex = 0;
-                 candidateIndex < candidates.Count;
-                 candidateIndex++)
+            List<PreparedNegativeRegion> feasibleInteriorRegions = new();
+            if (interiorPocketAmount > 0.0001f)
             {
-                PocketCandidate candidate = candidates[candidateIndex];
-                acceptedByHost.TryGetValue(
-                    candidate.HostRegionId,
-                    out int hostPocketCount);
-                if (hostPocketCount >= MaximumPocketsPerHost)
-                {
-                    rejectionCounts[(int)
-                        StylizedRiverFoamPocketRejectionReason.Spacing]++;
-                    continue;
-                }
+                List<PocketCandidate> orderedInteriorCandidates =
+                    OrderInteriorCandidates(allCandidates);
+                Dictionary<uint, int> feasibleInteriorByHost = new();
+                List<AcceptedNegativeRegion> acceptedInteriorSpacing = new();
 
-                float availableRadius = candidate.InteriorRadius -
-                    PositiveRimWidthMetres;
-                if (availableRadius < MinimumPocketRadiusMetres)
+                for (int candidateIndex = 0;
+                     candidateIndex < orderedInteriorCandidates.Count;
+                     candidateIndex++)
                 {
-                    rejectionCounts[(int)
-                        StylizedRiverFoamPocketRejectionReason.HostTooNarrow]++;
-                    continue;
-                }
-
-                float radiusSelector = Hash01(candidate.StableId, 11u);
-                float baseRadius = Mathf.Clamp(
-                    availableRadius * Mathf.Lerp(
-                        0.62f,
-                        0.88f,
-                        radiusSelector),
-                    MinimumPocketRadiusMetres,
-                    MaximumPocketRadiusMetres);
-                float aspectSelector = Hash01(candidate.StableId, 12u);
-                float alongRadius = baseRadius * Mathf.Lerp(
-                    0.82f,
-                    1.24f,
-                    aspectSelector);
-                float acrossRadius = baseRadius * Mathf.Lerp(
-                    1.12f,
-                    0.72f,
-                    aspectSelector);
-                float largestRadius = Mathf.Max(alongRadius, acrossRadius);
-
-                bool spacingRejected = false;
-                for (int acceptedIndex = 0;
-                     acceptedIndex < accepted.Count;
-                     acceptedIndex++)
-                {
-                    AcceptedPocket existing = accepted[acceptedIndex];
-                    float requiredSpacing = Mathf.Max(
-                        MinimumPocketSpacingMetres,
-                        (largestRadius + existing.LargestRadius) * 0.72f);
-                    if (Vector2.Distance(
-                            candidate.Position,
-                            existing.Position) < requiredSpacing)
+                    PocketCandidate candidate =
+                        orderedInteriorCandidates[candidateIndex];
+                    feasibleInteriorByHost.TryGetValue(
+                        candidate.HostRegionId,
+                        out int hostPocketCount);
+                    if (hostPocketCount >= MaximumInteriorPocketsPerHost)
                     {
-                        spacingRejected = true;
-                        break;
+                        rejectionCounts[(int)
+                            StylizedRiverFoamPocketRejectionReason.Spacing]++;
+                        continue;
                     }
+
+                    float availableRadius = candidate.InteriorRadius -
+                        PositiveRimWidthMetres;
+                    if (availableRadius < MinimumPocketRadiusMetres)
+                    {
+                        rejectionCounts[(int)
+                            StylizedRiverFoamPocketRejectionReason
+                                .HostTooNarrow]++;
+                        continue;
+                    }
+
+                    float radiusSelector = Hash01(candidate.StableId, 11u);
+                    float baseRadius = Mathf.Clamp(
+                        availableRadius * Mathf.Lerp(
+                            0.62f,
+                            0.88f,
+                            radiusSelector),
+                        MinimumPocketRadiusMetres,
+                        MaximumPocketRadiusMetres);
+                    float aspectSelector = Hash01(candidate.StableId, 12u);
+                    float alongRadius = baseRadius * Mathf.Lerp(
+                        0.82f,
+                        1.24f,
+                        aspectSelector);
+                    float acrossRadius = baseRadius * Mathf.Lerp(
+                        1.12f,
+                        0.72f,
+                        aspectSelector);
+                    float largestRadius = Mathf.Max(
+                        alongRadius,
+                        acrossRadius);
+
+                    if (ViolatesSpacing(
+                        candidate.Position,
+                        largestRadius,
+                        StylizedRiverFoamNegativeRegionClass.InteriorPocket,
+                        acceptedInteriorSpacing))
+                    {
+                        rejectionCounts[(int)
+                            StylizedRiverFoamPocketRejectionReason.Spacing]++;
+                        continue;
+                    }
+
+                    float orientation = Mathf.Lerp(
+                        -Mathf.PI,
+                        Mathf.PI,
+                        Hash01(candidate.StableId, 13u));
+                    Array.Clear(candidateRaster, 0, candidateRaster.Length);
+                    int rasterCoverage = RasterizeInteriorPocket(
+                        candidate,
+                        orientation,
+                        alongRadius,
+                        acrossRadius,
+                        width,
+                        height,
+                        validCells,
+                        majorSupport,
+                        connectorSupport,
+                        connectorDistance,
+                        interiorDistance,
+                        metricPositions,
+                        candidateRaster);
+                    if (rasterCoverage <= 0)
+                    {
+                        rejectionCounts[(int)
+                            StylizedRiverFoamPocketRejectionReason
+                                .NoRasterCoverage]++;
+                        continue;
+                    }
+
+                    feasibleInteriorByHost[candidate.HostRegionId] =
+                        hostPocketCount + 1;
+                    acceptedInteriorSpacing.Add(new AcceptedNegativeRegion(
+                        StylizedRiverFoamNegativeRegionClass.InteriorPocket,
+                        candidate.Position,
+                        largestRadius));
+                    feasibleInteriorRegions.Add(new PreparedNegativeRegion(
+                        StylizedRiverFoamNegativeRegionClass.InteriorPocket,
+                        candidate.StableId,
+                        candidate.HostRegionId,
+                        candidate.Position,
+                        candidate.AcrossNormalized,
+                        orientation,
+                        alongRadius,
+                        acrossRadius,
+                        Vector2.zero,
+                        CaptureRaster(candidateRaster)));
                 }
-
-                if (spacingRejected)
-                {
-                    rejectionCounts[(int)
-                        StylizedRiverFoamPocketRejectionReason.Spacing]++;
-                    continue;
-                }
-
-                float orientation = Mathf.Lerp(
-                    -Mathf.PI,
-                    Mathf.PI,
-                    Hash01(candidate.StableId, 13u));
-                Array.Clear(candidateRaster, 0, candidateRaster.Length);
-                int rasterCoverage = RasterizePocket(
-                    candidate,
-                    orientation,
-                    alongRadius,
-                    acrossRadius,
-                    width,
-                    height,
-                    validCells,
-                    majorSupport,
-                    connectorSupport,
-                    connectorDistance,
-                    interiorDistance,
-                    metricPositions,
-                    candidateRaster);
-                if (rasterCoverage <= 0)
-                {
-                    rejectionCounts[(int)
-                        StylizedRiverFoamPocketRejectionReason
-                            .NoRasterCoverage]++;
-                    continue;
-                }
-
-                for (int index = 0; index < pressure.Length; index++)
-                {
-                    pressure[index] = Mathf.Max(
-                        pressure[index],
-                        candidateRaster[index]);
-                }
-
-                acceptedByHost[candidate.HostRegionId] = hostPocketCount + 1;
-                accepted.Add(new AcceptedPocket(
-                    candidate.Position,
-                    largestRadius));
-
-                uint evolutionSeed = MixBits(
-                    candidate.StableId ^ 0xD1B54A35u);
-                regions.Add(new StylizedRiverFoamPocketRegion(
-                    candidate.StableId,
-                    candidate.HostRegionId,
-                    domain.GlobalDistanceMinimum + candidate.Position.x,
-                    candidate.AcrossNormalized,
-                    orientation,
-                    alongRadius,
-                    acrossRadius,
-                    evolutionSeed,
-                    Hash01(evolutionSeed, 21u),
-                    Hash01(evolutionSeed, 22u),
-                    Hash01(evolutionSeed, 23u),
-                    Hash01(evolutionSeed, 24u),
-                    Hash01(evolutionSeed, 25u),
-                    Hash01(evolutionSeed, 26u),
-                    Hash01(evolutionSeed, 27u)));
             }
+
+            List<PreparedNegativeRegion> feasibleCavityRegions = new();
+            int unusableBoundaryCount = 0;
+            if (edgeCavityAmount > 0.0001f)
+            {
+                List<CavityCandidate> cavityCandidates =
+                    BuildCavityCandidates(
+                        allCandidates,
+                        hostBoundaries,
+                        out unusableBoundaryCount);
+                rejectionCounts[(int)
+                    StylizedRiverFoamPocketRejectionReason
+                        .NoUsableBoundary] += unusableBoundaryCount;
+                cavityCandidates = OrderCavityCandidates(cavityCandidates);
+
+                Dictionary<uint, int> feasibleCavitiesByHost = new();
+                List<AcceptedNegativeRegion> acceptedCavitySpacing = new();
+                float[] acceptedCavityPressure = new float[cellCount];
+                for (int candidateIndex = 0;
+                     candidateIndex < cavityCandidates.Count;
+                     candidateIndex++)
+                {
+                    CavityCandidate candidate =
+                        cavityCandidates[candidateIndex];
+                    feasibleCavitiesByHost.TryGetValue(
+                        candidate.HostRegionId,
+                        out int hostCavityCount);
+                    if (hostCavityCount >= MaximumCavitiesPerHost)
+                    {
+                        rejectionCounts[(int)
+                            StylizedRiverFoamPocketRejectionReason.Spacing]++;
+                        continue;
+                    }
+
+                    float radiusSelector = Hash01(candidate.StableId, 31u);
+                    float baseRadius = Mathf.Clamp(
+                        candidate.InteriorRadius * Mathf.Lerp(
+                            0.52f,
+                            0.78f,
+                            radiusSelector),
+                        MinimumPocketRadiusMetres,
+                        MaximumPocketRadiusMetres);
+                    float tangentSelector = Hash01(candidate.StableId, 32u);
+                    float alongRadius = baseRadius * Mathf.Lerp(
+                        0.72f,
+                        0.96f,
+                        tangentSelector);
+                    float acrossRadius = baseRadius * Mathf.Lerp(
+                        0.92f,
+                        1.28f,
+                        tangentSelector);
+                    float largestRadius = Mathf.Max(
+                        alongRadius,
+                        acrossRadius);
+
+                    if (ViolatesSpacing(
+                        candidate.Position,
+                        largestRadius,
+                        StylizedRiverFoamNegativeRegionClass.EdgeCavity,
+                        acceptedCavitySpacing))
+                    {
+                        rejectionCounts[(int)
+                            StylizedRiverFoamPocketRejectionReason.Spacing]++;
+                        continue;
+                    }
+
+                    float orientation = Mathf.Atan2(
+                        candidate.BreachDirection.y,
+                        candidate.BreachDirection.x);
+                    Array.Clear(candidateRaster, 0, candidateRaster.Length);
+                    CavityRasterResult rasterResult = RasterizeEdgeCavity(
+                        candidate,
+                        orientation,
+                        alongRadius,
+                        acrossRadius,
+                        width,
+                        height,
+                        validCells,
+                        majorSupport,
+                        connectorSupport,
+                        connectorDistance,
+                        hostByCell,
+                        metricPositions,
+                        candidateRaster);
+                    if (rasterResult.TotalCoverage <= 0)
+                    {
+                        rejectionCounts[(int)
+                            StylizedRiverFoamPocketRejectionReason
+                                .NoRasterCoverage]++;
+                        continue;
+                    }
+
+                    if (rasterResult.InsideHostCoverage <= 0 ||
+                        rasterResult.OutsideHostCoverage <= 0)
+                    {
+                        rejectionCounts[(int)
+                            StylizedRiverFoamPocketRejectionReason
+                                .NoEdgeBreach]++;
+                        continue;
+                    }
+
+                    if (WouldCollapseHost(
+                        candidate.HostRegionId,
+                        width,
+                        height,
+                        hostByCell,
+                        hostCellCounts,
+                        acceptedCavityPressure,
+                        candidateRaster))
+                    {
+                        rejectionCounts[(int)
+                            StylizedRiverFoamPocketRejectionReason
+                                .HostWouldCollapse]++;
+                        continue;
+                    }
+
+                    MergeMaximum(acceptedCavityPressure, candidateRaster);
+                    feasibleCavitiesByHost[candidate.HostRegionId] =
+                        hostCavityCount + 1;
+                    acceptedCavitySpacing.Add(new AcceptedNegativeRegion(
+                        StylizedRiverFoamNegativeRegionClass.EdgeCavity,
+                        candidate.Position,
+                        largestRadius));
+                    feasibleCavityRegions.Add(new PreparedNegativeRegion(
+                        StylizedRiverFoamNegativeRegionClass.EdgeCavity,
+                        candidate.StableId,
+                        candidate.HostRegionId,
+                        candidate.Position,
+                        ResolveAcrossNormalized(domain, candidate.Position),
+                        orientation,
+                        alongRadius,
+                        acrossRadius,
+                        candidate.BreachDirection,
+                        CaptureRaster(candidateRaster)));
+                }
+            }
+
+            int selectedInteriorCount = ResolveSelectedCount(
+                interiorPocketAmount,
+                feasibleInteriorRegions.Count);
+            int selectedCavityCount = ResolveSelectedCount(
+                edgeCavityAmount,
+                feasibleCavityRegions.Count);
+            List<StylizedRiverFoamPocketRegion> regions = new(
+                selectedInteriorCount + selectedCavityCount);
+            ApplyPreparedPrefix(
+                feasibleInteriorRegions,
+                selectedInteriorCount,
+                domain,
+                pressure,
+                regions);
+            ApplyPreparedPrefix(
+                feasibleCavityRegions,
+                selectedCavityCount,
+                domain,
+                pressure,
+                regions);
+
+            int interiorEligibleHostCount = CountPreparedHosts(
+                feasibleInteriorRegions);
+            int cavityEligibleHostCount = CountPreparedHosts(
+                feasibleCavityRegions);
 
             int coveredCellCount = 0;
             for (int index = 0; index < pressure.Length; index++)
@@ -294,9 +458,12 @@ namespace ProgrammaticStylized3D.Rivers
             return new StylizedRiverFoamPocketTopology(
                 width,
                 height,
-                eligibleHosts.Count,
-                candidates.Count,
-                regions.Count,
+                interiorEligibleHostCount,
+                feasibleInteriorRegions.Count,
+                selectedInteriorCount,
+                cavityEligibleHostCount,
+                feasibleCavityRegions.Count,
+                selectedCavityCount,
                 coveredCellCount,
                 stopwatch.Elapsed.TotalMilliseconds,
                 pressure,
@@ -314,6 +481,9 @@ namespace ProgrammaticStylized3D.Rivers
             return new StylizedRiverFoamPocketTopology(
                 width,
                 height,
+                0,
+                0,
+                0,
                 0,
                 0,
                 0,
@@ -374,7 +544,7 @@ namespace ProgrammaticStylized3D.Rivers
                     int index = x + y * width;
                     float radius = distance[index];
                     if (!interior[index] ||
-                        radius < MinimumInteriorRadiusMetres ||
+                        radius < ExtendedInteriorRadiusMetres ||
                         !IsLocalMaximum(index, width, distance))
                     {
                         continue;
@@ -403,6 +573,49 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             return candidates;
+        }
+
+        private static List<PocketCandidate> OrderInteriorCandidates(
+            List<PocketCandidate> candidates)
+        {
+            List<PocketCandidate> ordered = new(candidates);
+            ordered.Sort((a, b) =>
+            {
+                int scoreComparison = b.Score.CompareTo(a.Score);
+                return scoreComparison != 0
+                    ? scoreComparison
+                    : a.StableId.CompareTo(b.StableId);
+            });
+
+            Dictionary<uint, int> nextHostRank = new();
+            Dictionary<uint, int> hostRankByStableId = new();
+            for (int index = 0; index < ordered.Count; index++)
+            {
+                PocketCandidate candidate = ordered[index];
+                nextHostRank.TryGetValue(
+                    candidate.HostRegionId,
+                    out int hostRank);
+                hostRankByStableId[candidate.StableId] = hostRank;
+                nextHostRank[candidate.HostRegionId] = hostRank + 1;
+            }
+
+            ordered.Sort((a, b) =>
+            {
+                float aBaselineBonus = a.InteriorRadius >=
+                    MinimumInteriorRadiusMetres ? 0.10f : 0f;
+                float bBaselineBonus = b.InteriorRadius >=
+                    MinimumInteriorRadiusMetres ? 0.10f : 0f;
+                float aAdjustedScore = a.Score + aBaselineBonus -
+                    hostRankByStableId[a.StableId] * 0.12f;
+                float bAdjustedScore = b.Score + bBaselineBonus -
+                    hostRankByStableId[b.StableId] * 0.12f;
+                int scoreComparison =
+                    bAdjustedScore.CompareTo(aAdjustedScore);
+                return scoreComparison != 0
+                    ? scoreComparison
+                    : a.StableId.CompareTo(b.StableId);
+            });
+            return ordered;
         }
 
         private static bool IsLocalMaximum(
@@ -438,7 +651,7 @@ namespace ProgrammaticStylized3D.Rivers
             return strictlyGreaterThanOne;
         }
 
-        private static int RasterizePocket(
+        private static int RasterizeInteriorPocket(
             PocketCandidate candidate,
             float orientation,
             float alongRadius,
@@ -482,24 +695,10 @@ namespace ProgrammaticStylized3D.Rivers
                 float normalizedX = localX / Mathf.Max(0.001f, alongRadius);
                 float normalizedY = localY / Mathf.Max(0.001f, acrossRadius);
 
-                float noiseX = normalizedX * 1.75f + 13.7f;
-                float noiseY = normalizedY * 1.75f - 8.3f;
-                float warpX = (ValueNoise(noiseX, noiseY, noiseSeed) - 0.5f) *
-                    0.22f;
-                float warpY = (ValueNoise(
-                    noiseX + 5.17f,
-                    noiseY - 3.43f,
-                    noiseSeed ^ 0x68BC21EBu) - 0.5f) * 0.22f;
-                float warpedX = normalizedX + warpX;
-                float warpedY = normalizedY + warpY;
-                float radial = Mathf.Sqrt(
-                    warpedX * warpedX + warpedY * warpedY);
-                float broadNoise = ValueNoise(
-                    normalizedX * 2.35f + 21.1f,
-                    normalizedY * 2.35f + 4.7f,
-                    noiseSeed ^ 0xC2B2AE35u);
-                float shapeDistance = radial + (broadNoise - 0.5f) * 0.24f;
-                float shape = 1f - SmoothStep(0.70f, 1.02f, shapeDistance);
+                float shape = EvaluateIrregularShape(
+                    normalizedX,
+                    normalizedY,
+                    noiseSeed);
                 if (shape <= 0.001f)
                 {
                     continue;
@@ -523,6 +722,674 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             return written;
+        }
+
+        private static CavityRasterResult RasterizeEdgeCavity(
+            CavityCandidate candidate,
+            float orientation,
+            float alongRadius,
+            float acrossRadius,
+            int width,
+            int height,
+            bool[] validCells,
+            float[] majorSupport,
+            float[] connectorSupport,
+            float[] connectorDistance,
+            uint[] hostByCell,
+            Vector2[] positions,
+            float[] destination)
+        {
+            float cos = Mathf.Cos(orientation);
+            float sin = Mathf.Sin(orientation);
+            float outerRadius = Mathf.Max(alongRadius, acrossRadius) * 1.42f;
+            uint noiseSeed = MixBits(candidate.StableId ^ 0xF1357AE5u);
+            int total = 0;
+            int inside = 0;
+            int outside = 0;
+
+            for (int index = 0; index < destination.Length; index++)
+            {
+                if (!validCells[index] ||
+                    connectorSupport[index] >= ConnectorCoreThreshold ||
+                    connectorDistance[index] <= ConnectorProtectionRadiusMetres)
+                {
+                    continue;
+                }
+
+                bool insideMajor = majorSupport[index] >=
+                    MajorInteriorThreshold;
+                if (insideMajor && hostByCell[index] != candidate.HostRegionId)
+                {
+                    continue;
+                }
+
+                Vector2 delta = positions[index] - candidate.Position;
+                if (delta.sqrMagnitude > outerRadius * outerRadius)
+                {
+                    continue;
+                }
+
+                float outwardFromBoundary = Vector2.Dot(
+                    positions[index] - candidate.BoundaryPosition,
+                    candidate.BreachDirection);
+                if (outwardFromBoundary > CavityOutwardLimitMetres)
+                {
+                    continue;
+                }
+
+                float localX = cos * delta.x + sin * delta.y;
+                float localY = -sin * delta.x + cos * delta.y;
+                float normalizedX = localX / Mathf.Max(0.001f, alongRadius);
+                float normalizedY = localY / Mathf.Max(0.001f, acrossRadius);
+                float shape = EvaluateIrregularShape(
+                    normalizedX,
+                    normalizedY,
+                    noiseSeed);
+                if (shape <= 0.001f)
+                {
+                    continue;
+                }
+
+                // Keep the negative influence biased toward the selected side
+                // of the host instead of allowing a centred closed pocket.
+                float sideProjection = Vector2.Dot(
+                    positions[index] - candidate.InteriorPosition,
+                    candidate.BreachDirection);
+                float sideGate = SmoothStep(
+                    -alongRadius * 0.44f,
+                    alongRadius * 0.16f,
+                    sideProjection);
+                float connectorGate = SmoothStep(
+                    ConnectorProtectionRadiusMetres,
+                    ConnectorProtectionRadiusMetres + 0.12f,
+                    connectorDistance[index]);
+                float value = Mathf.Clamp01(
+                    shape * sideGate * connectorGate);
+                destination[index] = Mathf.Max(destination[index], value);
+                if (value < PocketCoverageThreshold)
+                {
+                    continue;
+                }
+
+                total++;
+                if (insideMajor)
+                {
+                    inside++;
+                }
+                else
+                {
+                    outside++;
+                }
+            }
+
+            return new CavityRasterResult(total, inside, outside);
+        }
+
+        private static float EvaluateIrregularShape(
+            float normalizedX,
+            float normalizedY,
+            uint noiseSeed)
+        {
+            float noiseX = normalizedX * 1.75f + 13.7f;
+            float noiseY = normalizedY * 1.75f - 8.3f;
+            float warpX = (ValueNoise(noiseX, noiseY, noiseSeed) - 0.5f) *
+                0.22f;
+            float warpY = (ValueNoise(
+                noiseX + 5.17f,
+                noiseY - 3.43f,
+                noiseSeed ^ 0x68BC21EBu) - 0.5f) * 0.22f;
+            float warpedX = normalizedX + warpX;
+            float warpedY = normalizedY + warpY;
+            float radial = Mathf.Sqrt(
+                warpedX * warpedX + warpedY * warpedY);
+            float broadNoise = ValueNoise(
+                normalizedX * 2.35f + 21.1f,
+                normalizedY * 2.35f + 4.7f,
+                noiseSeed ^ 0xC2B2AE35u);
+            float shapeDistance = radial + (broadNoise - 0.5f) * 0.24f;
+            return 1f - SmoothStep(0.70f, 1.02f, shapeDistance);
+        }
+
+        private static uint[] BuildHostAssignments(
+            bool[] interior,
+            Vector2[] positions,
+            List<HostMetric> hosts)
+        {
+            uint[] result = new uint[interior.Length];
+            for (int index = 0; index < result.Length; index++)
+            {
+                result[index] = InvalidHostId;
+            }
+
+            for (int index = 0; index < interior.Length; index++)
+            {
+                if (interior[index])
+                {
+                    result[index] = ResolveNearestHost(
+                        positions[index],
+                        hosts);
+                }
+            }
+
+            return result;
+        }
+
+        private static Dictionary<uint, int> CountHostCells(
+            bool[] interior,
+            uint[] hostByCell)
+        {
+            Dictionary<uint, int> counts = new();
+            for (int index = 0; index < hostByCell.Length; index++)
+            {
+                uint hostId = hostByCell[index];
+                if (!interior[index] || hostId == InvalidHostId)
+                {
+                    continue;
+                }
+
+                counts.TryGetValue(hostId, out int count);
+                counts[hostId] = count + 1;
+            }
+
+            return counts;
+        }
+
+        private static Dictionary<uint, List<HostBoundaryPoint>>
+            BuildHostBoundaries(
+                int width,
+                int height,
+                bool[] interior,
+                uint[] hostByCell,
+                float[] connectorDistance,
+                Vector2[] positions)
+        {
+            Dictionary<uint, List<HostBoundaryPoint>> result = new();
+            int[] neighbourX = { -1, 0, 1, -1, 1, -1, 0, 1 };
+            int[] neighbourY = { -1, -1, -1, 0, 0, 1, 1, 1 };
+
+            for (int y = 1; y < height - 1; y++)
+            {
+                for (int x = 1; x < width - 1; x++)
+                {
+                    int index = x + y * width;
+                    uint hostId = hostByCell[index];
+                    if (!interior[index] || hostId == InvalidHostId ||
+                        connectorDistance[index] <=
+                            ConnectorProtectionRadiusMetres)
+                    {
+                        continue;
+                    }
+
+                    bool boundary = false;
+                    for (int neighbourIndex = 0;
+                         neighbourIndex < neighbourX.Length;
+                         neighbourIndex++)
+                    {
+                        int nx = x + neighbourX[neighbourIndex];
+                        int ny = y + neighbourY[neighbourIndex];
+                        int next = nx + ny * width;
+                        if (!interior[next])
+                        {
+                            boundary = true;
+                            break;
+                        }
+                    }
+
+                    if (!boundary)
+                    {
+                        continue;
+                    }
+
+                    if (!result.TryGetValue(
+                        hostId,
+                        out List<HostBoundaryPoint> points))
+                    {
+                        points = new List<HostBoundaryPoint>();
+                        result.Add(hostId, points);
+                    }
+
+                    points.Add(new HostBoundaryPoint(index, positions[index]));
+                }
+            }
+
+            return result;
+        }
+
+        private static List<CavityCandidate> BuildCavityCandidates(
+            List<PocketCandidate> baseCandidates,
+            Dictionary<uint, List<HostBoundaryPoint>> hostBoundaries,
+            out int unusableBoundaryCount)
+        {
+            List<CavityCandidate> result = new();
+            unusableBoundaryCount = 0;
+
+            for (int index = 0; index < baseCandidates.Count; index++)
+            {
+                PocketCandidate source = baseCandidates[index];
+                if (source.InteriorRadius < MinimumCavityHostRadiusMetres)
+                {
+                    continue;
+                }
+
+                uint stableId = MixBits(source.StableId ^ 0xB5297A4Du);
+                if (!hostBoundaries.TryGetValue(
+                    source.HostRegionId,
+                    out List<HostBoundaryPoint> boundaries) ||
+                    !TrySelectBoundary(
+                        source,
+                        stableId,
+                        boundaries,
+                        out HostBoundaryPoint boundary,
+                        out Vector2 breachDirection,
+                        out float boundaryScore))
+                {
+                    unusableBoundaryCount++;
+                    continue;
+                }
+
+                Vector2 position = Vector2.Lerp(
+                    source.Position,
+                    boundary.Position,
+                    0.70f);
+                result.Add(new CavityCandidate(
+                    stableId,
+                    source.HostRegionId,
+                    source.Position,
+                    position,
+                    boundary.Position,
+                    breachDirection,
+                    source.InteriorRadius,
+                    source.Score + boundaryScore * 0.12f));
+            }
+
+            return result;
+        }
+
+        private static List<CavityCandidate> OrderCavityCandidates(
+            List<CavityCandidate> candidates)
+        {
+            List<CavityCandidate> ordered = new(candidates);
+            ordered.Sort((a, b) =>
+            {
+                int scoreComparison = b.Score.CompareTo(a.Score);
+                return scoreComparison != 0
+                    ? scoreComparison
+                    : a.StableId.CompareTo(b.StableId);
+            });
+
+            Dictionary<uint, int> nextHostRank = new();
+            Dictionary<uint, int> hostRankByStableId = new();
+            for (int index = 0; index < ordered.Count; index++)
+            {
+                CavityCandidate candidate = ordered[index];
+                nextHostRank.TryGetValue(
+                    candidate.HostRegionId,
+                    out int hostRank);
+                hostRankByStableId[candidate.StableId] = hostRank;
+                nextHostRank[candidate.HostRegionId] = hostRank + 1;
+            }
+
+            ordered.Sort((a, b) =>
+            {
+                float aAdjustedScore = a.Score -
+                    hostRankByStableId[a.StableId] * 0.14f;
+                float bAdjustedScore = b.Score -
+                    hostRankByStableId[b.StableId] * 0.14f;
+                int scoreComparison =
+                    bAdjustedScore.CompareTo(aAdjustedScore);
+                return scoreComparison != 0
+                    ? scoreComparison
+                    : a.StableId.CompareTo(b.StableId);
+            });
+            return ordered;
+        }
+
+        private static bool TrySelectBoundary(
+            PocketCandidate source,
+            uint stableId,
+            List<HostBoundaryPoint> boundaries,
+            out HostBoundaryPoint selected,
+            out Vector2 breachDirection,
+            out float selectedScore)
+        {
+            selected = default;
+            breachDirection = Vector2.zero;
+            selectedScore = float.NegativeInfinity;
+            if (boundaries == null || boundaries.Count == 0)
+            {
+                return false;
+            }
+
+            float desiredAngle = Mathf.Lerp(
+                -Mathf.PI,
+                Mathf.PI,
+                Hash01(stableId, 42u));
+            Vector2 desiredDirection = new Vector2(
+                Mathf.Cos(desiredAngle),
+                Mathf.Sin(desiredAngle));
+            float maximumDistance = Mathf.Max(
+                1.0f,
+                source.InteriorRadius * 2.5f);
+
+            for (int index = 0; index < boundaries.Count; index++)
+            {
+                HostBoundaryPoint boundary = boundaries[index];
+                Vector2 delta = boundary.Position - source.Position;
+                float distance = delta.magnitude;
+                if (distance < 0.12f || distance > maximumDistance)
+                {
+                    continue;
+                }
+
+                Vector2 direction = delta / distance;
+                float angularFit = Vector2.Dot(direction, desiredDirection) *
+                    0.5f + 0.5f;
+                float distanceFit = 1f - Mathf.Clamp01(
+                    Mathf.Abs(distance - source.InteriorRadius) /
+                    Mathf.Max(0.15f, source.InteriorRadius));
+                float tieBreak = Hash01(
+                    stableId ^ (uint)(boundary.CellIndex + 1),
+                    43u) * 0.025f;
+                float score = angularFit * 0.72f +
+                    distanceFit * 0.28f + tieBreak;
+                if (score <= selectedScore)
+                {
+                    continue;
+                }
+
+                selectedScore = score;
+                selected = boundary;
+                breachDirection = direction;
+            }
+
+            return selectedScore > float.NegativeInfinity &&
+                breachDirection.sqrMagnitude > 0.000001f;
+        }
+
+        private static bool ViolatesSpacing(
+            Vector2 position,
+            float largestRadius,
+            StylizedRiverFoamNegativeRegionClass regionClass,
+            List<AcceptedNegativeRegion> accepted)
+        {
+            for (int index = 0; index < accepted.Count; index++)
+            {
+                AcceptedNegativeRegion existing = accepted[index];
+                bool sameClass = existing.RegionClass == regionClass;
+                if (!sameClass)
+                {
+                    continue;
+                }
+
+                float minimum = regionClass ==
+                    StylizedRiverFoamNegativeRegionClass.InteriorPocket
+                        ? MinimumPocketSpacingMetres
+                        : MinimumCavitySpacingMetres;
+                float scale = 0.72f;
+                float requiredSpacing = Mathf.Max(
+                    minimum,
+                    (largestRadius + existing.LargestRadius) * scale);
+                if (Vector2.Distance(position, existing.Position) <
+                    requiredSpacing)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool WouldCollapseHost(
+            uint hostId,
+            int width,
+            int height,
+            uint[] hostByCell,
+            Dictionary<uint, int> hostCellCounts,
+            float[] acceptedCavityPressure,
+            float[] candidateRaster)
+        {
+            if (!hostCellCounts.TryGetValue(hostId, out int hostCellCount) ||
+                hostCellCount <= 0)
+            {
+                return true;
+            }
+
+            bool[] remainder = new bool[hostByCell.Length];
+            int affected = 0;
+            int remainderCount = 0;
+            for (int index = 0; index < hostByCell.Length; index++)
+            {
+                if (hostByCell[index] != hostId)
+                {
+                    continue;
+                }
+
+                float combinedPressure = Mathf.Max(
+                    acceptedCavityPressure[index],
+                    candidateRaster[index]);
+                if (combinedPressure >= PocketCoverageThreshold)
+                {
+                    affected++;
+                    continue;
+                }
+
+                remainder[index] = true;
+                remainderCount++;
+            }
+
+            float affectedRatio = affected / (float)hostCellCount;
+            float remainderRatio = remainderCount / (float)hostCellCount;
+            if (affectedRatio > MaximumCavityHostCoverage ||
+                remainderRatio < MinimumHostRemainderRatio)
+            {
+                return true;
+            }
+
+            int largestComponent = ResolveLargestComponentSize(
+                width,
+                height,
+                remainder);
+            int requiredConnectedRemainder = Mathf.Max(
+                4,
+                Mathf.CeilToInt(remainderCount * 0.84f));
+            return largestComponent < requiredConnectedRemainder;
+        }
+
+        private static int ResolveLargestComponentSize(
+            int width,
+            int height,
+            bool[] mask)
+        {
+            bool[] visited = new bool[mask.Length];
+            int[] queue = new int[mask.Length];
+            int largest = 0;
+            int[] dx = { -1, 1, 0, 0 };
+            int[] dy = { 0, 0, -1, 1 };
+
+            for (int start = 0; start < mask.Length; start++)
+            {
+                if (!mask[start] || visited[start])
+                {
+                    continue;
+                }
+
+                int head = 0;
+                int tail = 0;
+                queue[tail++] = start;
+                visited[start] = true;
+                int count = 0;
+
+                while (head < tail)
+                {
+                    int index = queue[head++];
+                    count++;
+                    int x = index % width;
+                    int y = index / width;
+                    for (int direction = 0; direction < dx.Length; direction++)
+                    {
+                        int nx = x + dx[direction];
+                        int ny = y + dy[direction];
+                        if (nx < 0 || nx >= width ||
+                            ny < 0 || ny >= height)
+                        {
+                            continue;
+                        }
+
+                        int next = nx + ny * width;
+                        if (!mask[next] || visited[next])
+                        {
+                            continue;
+                        }
+
+                        visited[next] = true;
+                        queue[tail++] = next;
+                    }
+                }
+
+                largest = Mathf.Max(largest, count);
+            }
+
+            return largest;
+        }
+
+        private static void MergeMaximum(
+            float[] destination,
+            float[] source)
+        {
+            for (int index = 0; index < destination.Length; index++)
+            {
+                destination[index] = Mathf.Max(
+                    destination[index],
+                    source[index]);
+            }
+        }
+
+        private static void AddRegionMetadata(
+            List<StylizedRiverFoamPocketRegion> regions,
+            StylizedRiverFoamNegativeRegionClass regionClass,
+            uint stableId,
+            uint hostId,
+            RiverDomainSnapshot domain,
+            Vector2 position,
+            float acrossNormalized,
+            float orientation,
+            float alongRadius,
+            float acrossRadius,
+            Vector2 breachDirection)
+        {
+            uint evolutionSeed = MixBits(stableId ^ 0xD1B54A35u);
+            regions.Add(new StylizedRiverFoamPocketRegion(
+                regionClass,
+                stableId,
+                hostId,
+                domain.GlobalDistanceMinimum + position.x,
+                acrossNormalized,
+                orientation,
+                alongRadius,
+                acrossRadius,
+                breachDirection,
+                evolutionSeed,
+                Hash01(evolutionSeed, 21u),
+                Hash01(evolutionSeed, 22u),
+                Hash01(evolutionSeed, 23u),
+                Hash01(evolutionSeed, 24u),
+                Hash01(evolutionSeed, 25u),
+                Hash01(evolutionSeed, 26u),
+                Hash01(evolutionSeed, 27u)));
+        }
+
+        private static int ResolveSelectedCount(
+            float amount,
+            int feasibleCount)
+        {
+            feasibleCount = Mathf.Max(0, feasibleCount);
+            amount = Mathf.Clamp01(amount);
+            if (feasibleCount == 0 || amount <= 0.0001f)
+            {
+                return 0;
+            }
+
+            if (amount >= 0.9999f)
+            {
+                return feasibleCount;
+            }
+
+            return Mathf.Clamp(
+                Mathf.FloorToInt(amount * feasibleCount + 0.5f),
+                0,
+                feasibleCount);
+        }
+
+        private static RasterSample[] CaptureRaster(float[] source)
+        {
+            List<RasterSample> samples = new();
+            for (int index = 0; index < source.Length; index++)
+            {
+                float value = source[index];
+                if (value > 0.0001f)
+                {
+                    samples.Add(new RasterSample(index, value));
+                }
+            }
+
+            return samples.ToArray();
+        }
+
+        private static void ApplyPreparedPrefix(
+            List<PreparedNegativeRegion> prepared,
+            int selectedCount,
+            RiverDomainSnapshot domain,
+            float[] pressure,
+            List<StylizedRiverFoamPocketRegion> regions)
+        {
+            selectedCount = Mathf.Clamp(
+                selectedCount,
+                0,
+                prepared != null ? prepared.Count : 0);
+            for (int index = 0; index < selectedCount; index++)
+            {
+                PreparedNegativeRegion region = prepared[index];
+                RasterSample[] samples = region.Samples;
+                for (int sampleIndex = 0;
+                     sampleIndex < samples.Length;
+                     sampleIndex++)
+                {
+                    RasterSample sample = samples[sampleIndex];
+                    pressure[sample.Index] = Mathf.Max(
+                        pressure[sample.Index],
+                        sample.Value);
+                }
+
+                AddRegionMetadata(
+                    regions,
+                    region.RegionClass,
+                    region.StableId,
+                    region.HostRegionId,
+                    domain,
+                    region.Position,
+                    region.AcrossNormalized,
+                    region.Orientation,
+                    region.AlongRadius,
+                    region.AcrossRadius,
+                    region.BreachDirection);
+            }
+        }
+
+        private static int CountPreparedHosts(
+            List<PreparedNegativeRegion> prepared)
+        {
+            if (prepared == null || prepared.Count == 0)
+            {
+                return 0;
+            }
+
+            HashSet<uint> hosts = new();
+            for (int index = 0; index < prepared.Count; index++)
+            {
+                hosts.Add(prepared[index].HostRegionId);
+            }
+
+            return hosts.Count;
         }
 
         private static float[] BuildDistanceFromSources(
@@ -800,16 +1667,134 @@ namespace ProgrammaticStylized3D.Rivers
             public float Score { get; }
         }
 
-        private readonly struct AcceptedPocket
+        private readonly struct HostBoundaryPoint
         {
-            public AcceptedPocket(Vector2 position, float largestRadius)
+            public HostBoundaryPoint(int cellIndex, Vector2 position)
             {
+                CellIndex = cellIndex;
+                Position = position;
+            }
+
+            public int CellIndex { get; }
+            public Vector2 Position { get; }
+        }
+
+        private readonly struct CavityCandidate
+        {
+            public CavityCandidate(
+                uint stableId,
+                uint hostRegionId,
+                Vector2 interiorPosition,
+                Vector2 position,
+                Vector2 boundaryPosition,
+                Vector2 breachDirection,
+                float interiorRadius,
+                float score)
+            {
+                StableId = stableId;
+                HostRegionId = hostRegionId;
+                InteriorPosition = interiorPosition;
+                Position = position;
+                BoundaryPosition = boundaryPosition;
+                BreachDirection = breachDirection.sqrMagnitude > 0.000001f
+                    ? breachDirection.normalized
+                    : Vector2.zero;
+                InteriorRadius = interiorRadius;
+                Score = score;
+            }
+
+            public uint StableId { get; }
+            public uint HostRegionId { get; }
+            public Vector2 InteriorPosition { get; }
+            public Vector2 Position { get; }
+            public Vector2 BoundaryPosition { get; }
+            public Vector2 BreachDirection { get; }
+            public float InteriorRadius { get; }
+            public float Score { get; }
+        }
+
+        private readonly struct RasterSample
+        {
+            public RasterSample(int index, float value)
+            {
+                Index = index;
+                Value = Mathf.Clamp01(value);
+            }
+
+            public int Index { get; }
+            public float Value { get; }
+        }
+
+        private readonly struct PreparedNegativeRegion
+        {
+            public PreparedNegativeRegion(
+                StylizedRiverFoamNegativeRegionClass regionClass,
+                uint stableId,
+                uint hostRegionId,
+                Vector2 position,
+                float acrossNormalized,
+                float orientation,
+                float alongRadius,
+                float acrossRadius,
+                Vector2 breachDirection,
+                RasterSample[] samples)
+            {
+                RegionClass = regionClass;
+                StableId = stableId;
+                HostRegionId = hostRegionId;
+                Position = position;
+                AcrossNormalized = acrossNormalized;
+                Orientation = orientation;
+                AlongRadius = alongRadius;
+                AcrossRadius = acrossRadius;
+                BreachDirection = breachDirection;
+                Samples = samples ?? Array.Empty<RasterSample>();
+            }
+
+            public StylizedRiverFoamNegativeRegionClass RegionClass { get; }
+            public uint StableId { get; }
+            public uint HostRegionId { get; }
+            public Vector2 Position { get; }
+            public float AcrossNormalized { get; }
+            public float Orientation { get; }
+            public float AlongRadius { get; }
+            public float AcrossRadius { get; }
+            public Vector2 BreachDirection { get; }
+            public RasterSample[] Samples { get; }
+        }
+
+        private readonly struct AcceptedNegativeRegion
+        {
+            public AcceptedNegativeRegion(
+                StylizedRiverFoamNegativeRegionClass regionClass,
+                Vector2 position,
+                float largestRadius)
+            {
+                RegionClass = regionClass;
                 Position = position;
                 LargestRadius = largestRadius;
             }
 
+            public StylizedRiverFoamNegativeRegionClass RegionClass { get; }
             public Vector2 Position { get; }
             public float LargestRadius { get; }
+        }
+
+        private readonly struct CavityRasterResult
+        {
+            public CavityRasterResult(
+                int totalCoverage,
+                int insideHostCoverage,
+                int outsideHostCoverage)
+            {
+                TotalCoverage = Mathf.Max(0, totalCoverage);
+                InsideHostCoverage = Mathf.Max(0, insideHostCoverage);
+                OutsideHostCoverage = Mathf.Max(0, outsideHostCoverage);
+            }
+
+            public int TotalCoverage { get; }
+            public int InsideHostCoverage { get; }
+            public int OutsideHostCoverage { get; }
         }
 
         private sealed class MinHeap

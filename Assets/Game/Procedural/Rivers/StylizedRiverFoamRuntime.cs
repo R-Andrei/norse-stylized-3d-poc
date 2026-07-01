@@ -479,6 +479,24 @@ namespace ProgrammaticStylized3D.Rivers
         public int PocketAcceptedCount => pocketTopology != null
             ? pocketTopology.AcceptedPocketCount
             : 0;
+        public int InteriorPocketEligibleHostCount => pocketTopology != null
+            ? pocketTopology.InteriorEligibleHostCount
+            : 0;
+        public int InteriorPocketCandidateCount => pocketTopology != null
+            ? pocketTopology.InteriorCandidateCount
+            : 0;
+        public int InteriorPocketAcceptedCount => pocketTopology != null
+            ? pocketTopology.AcceptedInteriorPocketCount
+            : 0;
+        public int EdgeCavityEligibleHostCount => pocketTopology != null
+            ? pocketTopology.CavityEligibleHostCount
+            : 0;
+        public int EdgeCavityCandidateCount => pocketTopology != null
+            ? pocketTopology.CavityCandidateCount
+            : 0;
+        public int EdgeCavityAcceptedCount => pocketTopology != null
+            ? pocketTopology.AcceptedEdgeCavityCount
+            : 0;
         public string PocketTopRejectionReason => pocketTopology != null
             ? pocketTopology.GetTopRejectionSummary()
             : "None";
@@ -821,8 +839,9 @@ namespace ProgrammaticStylized3D.Rivers
                     if (topologyDebugActive &&
                         !topologyMaintenanceBlocked)
                     {
-                        // Patch 4 composes accepted static Major, Connector,
-                        // and Pocket fields with the live anchored sources.
+                        // Patch 4.2 composes accepted static Major and
+                        // Connector fields plus aggregate Major-hosted Negative
+                        // Aging Pressure with the live anchored sources.
                         topologyMetricsAccumulator += stepDuration;
                         float topologyMetricsInterval = 1f /
                             TopologyMetricsUpdateRate;
@@ -1438,9 +1457,9 @@ namespace ProgrammaticStylized3D.Rivers
                             "PS3D_RiverFoam_Topology");
                         topologySourcesTexture = CreateGuidanceTexture(
                             "PS3D_RiverFoam_TopologySources");
-                        // Patch 4 uploads deterministic prepared Major,
-                        // Connector, and Pocket fields through separate
-                        // channels of this generated-topology input.
+                        // Patch 4.2 uploads deterministic prepared Major,
+                        // Connector, and aggregate Major-hosted Negative Aging
+                        // Pressure through separate channels of this input.
                         topologyGeneratedTexture = CreateGuidanceTexture(
                             "PS3D_RiverFoam_TopologyGeneratedInput");
                         currentShoreEdgesTexture = CreateShoreEdgesTexture(
@@ -2924,6 +2943,8 @@ namespace ProgrammaticStylized3D.Rivers
                     river.Quality,
                     river.ShoreMotion,
                     river.FoamMajorSupportSeed,
+                    river.FoamInteriorPocketAmount,
+                    river.FoamEdgeCavityAmount,
                     obstacleExclusionScalar,
                     majorTopology,
                     connectorTopology);
@@ -3056,9 +3077,13 @@ namespace ProgrammaticStylized3D.Rivers
                 int hash = 29;
                 hash = hash * 31 + majorTopologyInputSignature;
                 hash = hash * 31 + connectorTopologyInputSignature;
-                // Version the fixed proof rules so later Pocket algorithm
-                // changes invalidate prepared output without fake controls.
-                hash = hash * 31 + 1;
+                hash = hash * 31 + Mathf.RoundToInt(
+                    river.FoamInteriorPocketAmount * 10000f);
+                hash = hash * 31 + Mathf.RoundToInt(
+                    river.FoamEdgeCavityAmount * 10000f);
+                // Patch 4.2: nested Interior Pocket activation plus one-sided
+                // Edge Cavity generation and host-preservation validation.
+                hash = hash * 31 + 2;
                 return hash;
             }
         }

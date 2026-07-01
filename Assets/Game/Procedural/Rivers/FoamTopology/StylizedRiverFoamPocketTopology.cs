@@ -10,18 +10,34 @@ namespace ProgrammaticStylized3D.Rivers
         None,
         HostTooNarrow,
         Spacing,
-        NoRasterCoverage
+        NoRasterCoverage,
+        NoUsableBoundary,
+        NoEdgeBreach,
+        HostWouldCollapse
+    }
+
+    /// <summary>
+    /// The implemented Major-hosted Negative Aging Pressure classes. The
+    /// legacy Pocket type name remains the low-level aggregate container until
+    /// the later Connector Weak Span and Free-Water Event slices are added.
+    /// </summary>
+    public enum StylizedRiverFoamNegativeRegionClass
+    {
+        InteriorPocket,
+        EdgeCavity
     }
 
     /// <summary>
     /// Stable host identity and cheap future-evolution metadata for one accepted
-    /// Pocket Aging Pressure region. Patch 4 uses only the static negative field;
-    /// normalized selectors defer physical timing, drift, growth, and respawn
-    /// decisions to the later runtime-evolution gate.
+    /// Major-hosted Negative Aging Pressure region. Patch 4.2 uses only the
+    /// static aggregate field; normalized selectors defer physical timing,
+    /// drift, growth, and respawn decisions to the later runtime-evolution gate.
+    /// Edge cavities additionally retain their deliberate breach direction.
     /// </summary>
     public readonly struct StylizedRiverFoamPocketRegion
     {
         public StylizedRiverFoamPocketRegion(
+            StylizedRiverFoamNegativeRegionClass regionClass,
             uint stableId,
             uint hostRegionId,
             float centreGlobalDistance,
@@ -29,6 +45,7 @@ namespace ProgrammaticStylized3D.Rivers
             float orientationRadians,
             float alongRadiusMetres,
             float acrossRadiusMetres,
+            Vector2 breachDirection,
             uint evolutionSeed,
             float driftRateSelector,
             float phaseOffset,
@@ -38,6 +55,7 @@ namespace ProgrammaticStylized3D.Rivers
             float recycleSelector,
             float growthSelector)
         {
+            RegionClass = regionClass;
             StableId = stableId;
             HostRegionId = hostRegionId;
             CentreGlobalDistance = centreGlobalDistance;
@@ -48,6 +66,9 @@ namespace ProgrammaticStylized3D.Rivers
             OrientationRadians = orientationRadians;
             AlongRadiusMetres = Mathf.Max(0f, alongRadiusMetres);
             AcrossRadiusMetres = Mathf.Max(0f, acrossRadiusMetres);
+            BreachDirection = breachDirection.sqrMagnitude > 0.000001f
+                ? breachDirection.normalized
+                : Vector2.zero;
             EvolutionSeed = evolutionSeed;
             DriftRateSelector = Mathf.Clamp01(driftRateSelector);
             PhaseOffset = Mathf.Repeat(phaseOffset, 1f);
@@ -58,6 +79,7 @@ namespace ProgrammaticStylized3D.Rivers
             GrowthSelector = Mathf.Clamp01(growthSelector);
         }
 
+        public StylizedRiverFoamNegativeRegionClass RegionClass { get; }
         public uint StableId { get; }
         public uint HostRegionId { get; }
         public float CentreGlobalDistance { get; }
@@ -65,6 +87,7 @@ namespace ProgrammaticStylized3D.Rivers
         public float OrientationRadians { get; }
         public float AlongRadiusMetres { get; }
         public float AcrossRadiusMetres { get; }
+        public Vector2 BreachDirection { get; }
         public uint EvolutionSeed { get; }
         public float DriftRateSelector { get; }
         public float PhaseOffset { get; }
@@ -76,9 +99,10 @@ namespace ProgrammaticStylized3D.Rivers
     }
 
     /// <summary>
-    /// Immutable result of one deterministic prepared Pocket Aging Pressure
-    /// build. The negative field remains independent from positive support and
-    /// therefore never destructively edits Major or Connector topology.
+    /// Immutable result of one deterministic prepared Major-hosted Negative
+    /// Aging Pressure build. The aggregate field remains independent from
+    /// positive support and therefore never destructively edits Major or
+    /// Connector topology.
     /// </summary>
     public sealed class StylizedRiverFoamPocketTopology
     {
@@ -89,9 +113,12 @@ namespace ProgrammaticStylized3D.Rivers
         internal StylizedRiverFoamPocketTopology(
             int width,
             int height,
-            int eligibleHostCount,
-            int candidateCentreCount,
-            int acceptedPocketCount,
+            int interiorEligibleHostCount,
+            int interiorCandidateCount,
+            int acceptedInteriorPocketCount,
+            int cavityEligibleHostCount,
+            int cavityCandidateCount,
+            int acceptedEdgeCavityCount,
             int coveredCellCount,
             double generationMilliseconds,
             float[] pressure,
@@ -100,9 +127,18 @@ namespace ProgrammaticStylized3D.Rivers
         {
             Width = Mathf.Max(0, width);
             Height = Mathf.Max(0, height);
-            EligibleHostCount = Mathf.Max(0, eligibleHostCount);
-            CandidateCentreCount = Mathf.Max(0, candidateCentreCount);
-            AcceptedPocketCount = Mathf.Max(0, acceptedPocketCount);
+            InteriorEligibleHostCount = Mathf.Max(
+                0,
+                interiorEligibleHostCount);
+            InteriorCandidateCount = Mathf.Max(0, interiorCandidateCount);
+            AcceptedInteriorPocketCount = Mathf.Max(
+                0,
+                acceptedInteriorPocketCount);
+            CavityEligibleHostCount = Mathf.Max(0, cavityEligibleHostCount);
+            CavityCandidateCount = Mathf.Max(0, cavityCandidateCount);
+            AcceptedEdgeCavityCount = Mathf.Max(
+                0,
+                acceptedEdgeCavityCount);
             CoveredCellCount = Mathf.Max(0, coveredCellCount);
             GenerationMilliseconds = Math.Max(0.0, generationMilliseconds);
             this.pressure = pressure ?? Array.Empty<float>();
@@ -115,11 +151,25 @@ namespace ProgrammaticStylized3D.Rivers
 
         public int Width { get; }
         public int Height { get; }
-        public int EligibleHostCount { get; }
-        public int CandidateCentreCount { get; }
-        public int AcceptedPocketCount { get; }
+        public int InteriorEligibleHostCount { get; }
+        public int InteriorCandidateCount { get; }
+        public int AcceptedInteriorPocketCount { get; }
+        public int CavityEligibleHostCount { get; }
+        public int CavityCandidateCount { get; }
+        public int AcceptedEdgeCavityCount { get; }
         public int CoveredCellCount { get; }
         public double GenerationMilliseconds { get; }
+
+        // Compatibility totals retained for the existing concise runtime
+        // telemetry while the two implemented classes also remain inspectable
+        // separately.
+        public int EligibleHostCount =>
+            InteriorEligibleHostCount + CavityEligibleHostCount;
+        public int CandidateCentreCount =>
+            InteriorCandidateCount + CavityCandidateCount;
+        public int AcceptedPocketCount =>
+            AcceptedInteriorPocketCount + AcceptedEdgeCavityCount;
+
         public IReadOnlyList<StylizedRiverFoamPocketRegion> Regions => regions;
 
         internal float[] PressureData => pressure;
@@ -133,9 +183,9 @@ namespace ProgrammaticStylized3D.Rivers
                 : 0;
         }
 
-        public string GetTopRejectionSummary(int maximumReasons = 1)
+        public string GetTopRejectionSummary(int maximumReasons = 2)
         {
-            maximumReasons = Mathf.Clamp(maximumReasons, 1, 4);
+            maximumReasons = Mathf.Clamp(maximumReasons, 1, 6);
             List<(StylizedRiverFoamPocketRejectionReason reason,
                 int count)> ranked = new();
 
@@ -188,7 +238,7 @@ namespace ProgrammaticStylized3D.Rivers
             if (destination == null || destination.Length < cellCount)
             {
                 throw new ArgumentException(
-                    $"Pocket topology upload requires at least {cellCount} pixels.",
+                    $"Negative topology upload requires at least {cellCount} pixels.",
                     nameof(destination));
             }
 
