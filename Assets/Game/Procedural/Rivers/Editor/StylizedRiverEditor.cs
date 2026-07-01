@@ -1471,7 +1471,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 3 adds sparse deterministic Connector Support between disconnected Major components. Pocket Aging Pressure remains intentionally absent until its own gated step.",
+                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 3.2 adds controllable sparse deterministic Connector Support between disconnected Major components. Pocket Aging Pressure remains intentionally absent until its own gated step.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1543,15 +1543,30 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Major Support Seed",
                     "Deterministic seed for the field-first candidate proof and stable whole-river opportunity identity, candidate assignment, transforms, and future evolution metadata. Identical inputs reproduce identical static Major topology."));
             EditorGUILayout.PropertyField(
+                Find("foamConnectorAmount"),
+                new GUIContent(
+                    "Connector Amount",
+                    "Controls the accepted relationship population. Zero keeps only the strongest sparse relationships, 0.5 preserves Patch 3, and one permits more secondary connections plus bounded overlap without creating an all-to-all web."));
+            EditorGUILayout.PropertyField(
+                Find("foamConnectorDirectness"),
+                new GUIContent(
+                    "Connector Directness",
+                    "One preserves near-facing endpoints and the shortest valid route. Lower values deliberately broaden endpoint choice and force one stable broad lateral bend when valid, without random wiggle."));
+            EditorGUILayout.PropertyField(
+                Find("foamConnectorLengthPreference"),
+                new GUIContent(
+                    "Connector Length Preference",
+                    "Controls which valid connection lengths are favoured inside one fixed safe envelope. Zero strongly favours short connections, 0.5 is neutral, and one strongly favours long connections. Safety, obstacle, path-length, and amount limits remain authoritative."));
+            EditorGUILayout.PropertyField(
                 Find("foamMajorSupportEvolutionRate"),
                 new GUIContent(
                     "Major Evolution Rate (Hz)",
-                    "Retained for the later runtime-evolution step. It has no effect on the static Patch 3 Major/Connector topology."));
+                    "Retained for the later runtime-evolution step. It has no effect on the static Patch 3.2 Major/Connector topology."));
             EditorGUILayout.PropertyField(
                 Find("foamMajorSupportCleanupRate"),
                 new GUIContent(
                     "Major Cleanup Rate (Hz)",
-                    "Retained for the later runtime-evolution step. It has no effect on the static Patch 3 Major/Connector topology."));
+                    "Retained for the later runtime-evolution step. It has no effect on the static Patch 3.2 Major/Connector topology."));
             EditorGUILayout.PropertyField(
                 Find("foamBreakupFrequency"),
                 new GUIContent(
@@ -1766,8 +1781,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Patch 3 generates and composes static whole-river Major Support plus sparse Major-to-Major Connector Support while preserving stable region and relationship identity for later evolution. Pocket remains empty until Step 4. Anchored Support and Obstacle Footprint continue to use their accepted live sources."),
-                new GUIContent("Major + Connector Static Topology"));
+                    "Patch 3.2 generates and composes static whole-river Major Support plus controllable sparse Major-to-Major Connector Support while preserving stable region and relationship identity for later evolution. Pocket remains empty until Step 4. Anchored Support and Obstacle Footprint continue to use their accepted live sources."),
+                new GUIContent("Major + Connector Static Topology (Patch 3.2)"));
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
                 new GUIContent(
@@ -1917,7 +1932,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent("Subsystem Rates"),
                 new GUIContent(
-                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz · Major and Connector topology are static in Patch 3"));
+                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz · Major and Connector topology are static in Patch 3.2"));
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Transport",

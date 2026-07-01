@@ -704,11 +704,24 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0)]
         [SerializeField] private int foamMajorSupportSeed = 1;
 
-        [Tooltip("Retained for the later Major runtime-evolution step. It has no effect on the static Patch 2 whole-river Major field.")]
+        [Tooltip("Controls how many eligible Major-to-Major relationships become Connector Support. Zero keeps only the strongest sparse relationships, 0.5 preserves the Patch 3 result, and one permits more secondary connections and bounded overlap without becoming an all-to-all web.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamConnectorAmount = 0.5f;
+
+        [Tooltip("Controls how directly Connector Support joins Major regions. One preserves near-facing endpoints and the shortest valid route. Lower values deliberately broaden endpoint choice and force one stable broad lateral bend when valid, without adding random wiggle.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamConnectorDirectness = 1f;
+
+        [Tooltip("Controls which Connector lengths are favoured within one fixed safe relationship envelope. Zero strongly favours short connections, 0.5 applies no short-versus-long preference, and one strongly favours long connections. It does not remove obstacle, valid-water, path-length, or connection-count limits.")]
+        [FormerlySerializedAs("foamConnectorReach")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamConnectorLengthPreference = 0.5f;
+
+        [Tooltip("Retained for the later Major runtime-evolution step. It has no effect on the static Patch 3.2 Major/Connector topology.")]
         [Range(0.5f, 10f)]
         [SerializeField] private float foamMajorSupportEvolutionRate = 2f;
 
-        [Tooltip("Retained for the later Major runtime-evolution step. It has no effect on the static Patch 2 whole-river Major field.")]
+        [Tooltip("Retained for the later Major runtime-evolution step. It has no effect on the static Patch 3.2 Major/Connector topology.")]
         [Range(0.5f, 10f)]
         [SerializeField] private float foamMajorSupportCleanupRate = 1f;
 
@@ -726,8 +739,10 @@ namespace ProgrammaticStylized3D.Rivers
 
         // Internal/serialized compatibility inputs. Stage 6.2 exposes only the
         // six visual controls above; Major Support amount, size, size
-        // variation, seed, and two future-evolution cadence controls remain
-        // serialized topology authoring inputs. Persistence and contour hardness remain
+        // variation, seed, Connector amount/directness/length preference,
+        // and two
+        // future-evolution cadence controls remain serialized topology
+        // authoring inputs. Persistence and contour hardness remain
         // implementation details until testing proves they require authorship.
         [HideInInspector, SerializeField, Range(0f, 1f)]
         private float foamFragmentation = 0.68f;
@@ -1201,6 +1216,12 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamMajorSupportSizeVariation);
         public int FoamMajorSupportSeed =>
             Mathf.Max(0, foamMajorSupportSeed);
+        public float FoamConnectorAmount =>
+            Mathf.Clamp01(foamConnectorAmount);
+        public float FoamConnectorDirectness =>
+            Mathf.Clamp01(foamConnectorDirectness);
+        public float FoamConnectorLengthPreference =>
+            Mathf.Clamp01(foamConnectorLengthPreference);
         public float FoamMajorSupportEvolutionRate =>
             Mathf.Clamp(foamMajorSupportEvolutionRate, 0.5f, 10f);
         public float FoamMajorSupportCleanupRate =>
@@ -3204,6 +3225,11 @@ namespace ProgrammaticStylized3D.Rivers
             foamMajorSupportSizeVariation = Mathf.Clamp01(
                 foamMajorSupportSizeVariation);
             foamMajorSupportSeed = Mathf.Max(0, foamMajorSupportSeed);
+            foamConnectorAmount = Mathf.Clamp01(foamConnectorAmount);
+            foamConnectorDirectness = Mathf.Clamp01(
+                foamConnectorDirectness);
+            foamConnectorLengthPreference = Mathf.Clamp01(
+                foamConnectorLengthPreference);
             if (foamMajorSupportEvolutionRate <= 0f)
             {
                 foamMajorSupportEvolutionRate = 2f;

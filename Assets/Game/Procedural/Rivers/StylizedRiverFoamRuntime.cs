@@ -293,6 +293,7 @@ namespace ProgrammaticStylized3D.Rivers
         private StylizedRiverFoamMajorTopology majorTopology;
         private StylizedRiverFoamConnectorTopology connectorTopology;
         private int majorTopologyInputSignature = int.MinValue;
+        private int connectorTopologyInputSignature = int.MinValue;
 
         private readonly List<PendingInjection> pendingInjections = new();
         private readonly List<FoamReservation> reservations = new();
@@ -313,6 +314,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool pendingBoundaryRebuild;
         private bool pendingObstacleRebuild;
         private bool pendingMajorRebuild;
+        private bool pendingConnectorRebuild;
         private bool pendingTopologyRefresh;
         private int pendingObstacleObservedVersion = int.MinValue;
         private int pendingObstacleStableFrameCount;
@@ -549,6 +551,7 @@ namespace ProgrammaticStylized3D.Rivers
             pendingBoundaryRebuild = false;
             pendingObstacleRebuild = false;
             pendingMajorRebuild = false;
+            pendingConnectorRebuild = false;
             pendingTopologyRefresh = false;
             pendingObstacleObservedVersion = int.MinValue;
             pendingObstacleStableFrameCount = 0;
@@ -1006,6 +1009,7 @@ namespace ProgrammaticStylized3D.Rivers
             pendingBoundaryRebuild ||
             pendingObstacleRebuild ||
             pendingMajorRebuild ||
+            pendingConnectorRebuild ||
             pendingTopologyRefresh;
 
         private void RequestBoundaryRebuild()
@@ -1044,13 +1048,22 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void QueueMajorTopologyRebuildIfNeeded()
         {
-            if (majorTopologyInputSignature ==
+            if (majorTopologyInputSignature !=
                 ResolveMajorTopologyInputSignature())
+            {
+                pendingMajorRebuild = true;
+                pendingConnectorRebuild = true;
+                pendingTopologyRefresh = true;
+                return;
+            }
+
+            if (connectorTopologyInputSignature ==
+                ResolveConnectorTopologyInputSignature())
             {
                 return;
             }
 
-            pendingMajorRebuild = true;
+            pendingConnectorRebuild = true;
             pendingTopologyRefresh = true;
         }
 
@@ -1085,7 +1098,9 @@ namespace ProgrammaticStylized3D.Rivers
                         ? RebuildPhase.WaitForObstacleStability
                         : pendingMajorRebuild
                             ? RebuildPhase.BuildMajorTopology
-                            : RebuildPhase.RefreshTopologySources;
+                            : pendingConnectorRebuild
+                                ? RebuildPhase.BuildConnectorTopology
+                                : RebuildPhase.RefreshTopologySources;
                     break;
 
                 case RebuildPhase.WaitForObstacleStability:
@@ -1137,6 +1152,7 @@ namespace ProgrammaticStylized3D.Rivers
                     }
 
                     pendingMajorRebuild = false;
+                    pendingConnectorRebuild = true;
                     rebuildPhase = RebuildPhase.BuildConnectorTopology;
                     break;
 
@@ -1146,6 +1162,7 @@ namespace ProgrammaticStylized3D.Rivers
                         BuildConnectorTopology();
                     }
 
+                    pendingConnectorRebuild = false;
                     rebuildPhase = pendingTopologyRefresh
                         ? RebuildPhase.RefreshTopologySources
                         : RebuildPhase.Idle;
@@ -1190,6 +1207,15 @@ namespace ProgrammaticStylized3D.Rivers
                     (int)RebuildPhase.BuildMajorTopology))
             {
                 rebuildPhase = RebuildPhase.BuildMajorTopology;
+                return;
+            }
+
+            if (pendingConnectorRebuild &&
+                (rebuildPhase == RebuildPhase.Idle ||
+                 (int)rebuildPhase >
+                    (int)RebuildPhase.BuildConnectorTopology))
+            {
+                rebuildPhase = RebuildPhase.BuildConnectorTopology;
                 return;
             }
 
@@ -1643,6 +1669,14 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            if (connectorTopologyInputSignature !=
+                ResolveConnectorTopologyInputSignature())
+            {
+                initializationPhase =
+                    InitializationPhase.BuildConnectorTopology;
+                return;
+            }
+
             resourcesDirty = false;
             simulationAccumulator = 0f;
             guidanceAccumulator = 0f;
@@ -1655,6 +1689,7 @@ namespace ProgrammaticStylized3D.Rivers
             pendingBoundaryRebuild = false;
             pendingObstacleRebuild = false;
             pendingMajorRebuild = false;
+            pendingConnectorRebuild = false;
             pendingTopologyRefresh = false;
             pendingObstacleObservedVersion = int.MinValue;
             pendingObstacleStableFrameCount = 0;
@@ -2677,6 +2712,7 @@ namespace ProgrammaticStylized3D.Rivers
                 majorTopology = null;
                 connectorTopology = null;
                 majorTopologyInputSignature = int.MinValue;
+                connectorTopologyInputSignature = int.MinValue;
                 ClearRenderTexture(topologyGeneratedTexture);
                 return;
             }
@@ -2710,6 +2746,7 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamMajorSupportSeed,
                     obstacleExclusionScalar);
             connectorTopology = null;
+            connectorTopologyInputSignature = int.MinValue;
             UploadGeneratedTopology();
             majorTopologyInputSignature = ResolveMajorTopologyInputSignature();
         }
@@ -2725,6 +2762,7 @@ namespace ProgrammaticStylized3D.Rivers
                 fieldLength <= 0.0001f || validFieldLength <= 0.0001f)
             {
                 connectorTopology = null;
+                connectorTopologyInputSignature = int.MinValue;
                 UploadGeneratedTopology();
                 return;
             }
@@ -2739,8 +2777,13 @@ namespace ProgrammaticStylized3D.Rivers
                     river.Quality,
                     river.ShoreMotion,
                     river.FoamMajorSupportSeed,
+                    river.FoamConnectorAmount,
+                    river.FoamConnectorDirectness,
+                    river.FoamConnectorLengthPreference,
                     obstacleExclusionScalar,
                     majorTopology);
+            connectorTopologyInputSignature =
+                ResolveConnectorTopologyInputSignature();
             UploadGeneratedTopology();
         }
 
@@ -2825,6 +2868,29 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamMajorSupportSizeVariation * 10000f);
                 hash = hash * 31 + Mathf.RoundToInt(
                     river.ShoreMotion * 10000f);
+                return hash;
+            }
+        }
+
+        private int ResolveConnectorTopologyInputSignature()
+        {
+            if (river == null || !river.Domain.IsValid ||
+                fieldWidth < 2 || fieldHeight < 2 ||
+                majorTopology == null)
+            {
+                return int.MinValue + 2;
+            }
+
+            unchecked
+            {
+                int hash = 23;
+                hash = hash * 31 + majorTopologyInputSignature;
+                hash = hash * 31 + Mathf.RoundToInt(
+                    river.FoamConnectorAmount * 10000f);
+                hash = hash * 31 + Mathf.RoundToInt(
+                    river.FoamConnectorDirectness * 10000f);
+                hash = hash * 31 + Mathf.RoundToInt(
+                    river.FoamConnectorLengthPreference * 10000f);
                 return hash;
             }
         }
@@ -3757,6 +3823,7 @@ namespace ProgrammaticStylized3D.Rivers
             majorTopology = null;
             connectorTopology = null;
             majorTopologyInputSignature = int.MinValue;
+            connectorTopologyInputSignature = int.MinValue;
             obstacleGeometryVersion = -1;
             populationMetricsBuffer?.Release();
             populationMetricsBuffer = null;
@@ -3818,6 +3885,7 @@ namespace ProgrammaticStylized3D.Rivers
             pendingBoundaryRebuild = false;
             pendingObstacleRebuild = false;
             pendingMajorRebuild = false;
+            pendingConnectorRebuild = false;
             pendingTopologyRefresh = false;
             pendingObstacleObservedVersion = int.MinValue;
             pendingObstacleStableFrameCount = 0;

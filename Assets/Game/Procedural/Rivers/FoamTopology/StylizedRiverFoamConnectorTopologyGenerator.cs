@@ -7,9 +7,10 @@ namespace ProgrammaticStylized3D.Rivers
 {
     /// <summary>
     /// Deterministic CPU proof generator for sparse prepared Connector Support.
-    /// Patch 3 deliberately connects disconnected Major components only. It
-    /// does not approximate the authoritative live Pressure, Lee, or Shore
-    /// fields on the CPU and performs no work during ordinary gameplay.
+    /// Patch 3.2 connects disconnected Major components only and exposes
+    /// bounded Amount, Directness, and Length Preference controls. It does
+    /// not approximate the authoritative live Pressure, Lee, or Shore fields
+    /// on the CPU, and performs no work during ordinary gameplay.
     /// </summary>
     public static class StylizedRiverFoamConnectorTopologyGenerator
     {
@@ -17,8 +18,8 @@ namespace ProgrammaticStylized3D.Rivers
         private const int MinimumComponentCellCount = 5;
         private const int EndpointSectorCount = 12;
         private const int MaximumEndpointsPerComponent = 10;
-        private const int MaximumPairAttempts = 48;
-        private const int MaximumComponentDegree = 2;
+        private const int BaselineMaximumPairAttempts = 48;
+        private const int BaselineMaximumComponentDegree = 2;
         private const float MinimumGapMetres = 0.28f;
         private const float MinimumUnsupportedSpanMetres = 0.24f;
         private const float ConnectorCoverageThreshold = 0.15f;
@@ -32,6 +33,9 @@ namespace ProgrammaticStylized3D.Rivers
             StylizedRiverQuality quality,
             float shoreMotion,
             int seed,
+            float connectorAmount,
+            float connectorDirectness,
+            float connectorLengthPreference,
             float[] obstacleMask,
             StylizedRiverFoamMajorTopology majorTopology)
         {
@@ -68,6 +72,11 @@ namespace ProgrammaticStylized3D.Rivers
                     connectorSupport,
                     rejectionCounts);
             }
+
+            connectorAmount = Mathf.Clamp01(connectorAmount);
+            connectorDirectness = Mathf.Clamp01(connectorDirectness);
+            connectorLengthPreference = Mathf.Clamp01(
+                connectorLengthPreference);
 
             float[] fluidCoverage = new float[cellCount];
             bool[] validCells = new bool[cellCount];
@@ -121,6 +130,8 @@ namespace ProgrammaticStylized3D.Rivers
                 components,
                 domain,
                 seed,
+                connectorDirectness,
+                connectorLengthPreference,
                 rejectionCounts);
 
             int[] componentDegree = new int[components.Count];
@@ -128,13 +139,45 @@ namespace ProgrammaticStylized3D.Rivers
             List<StylizedRiverFoamConnectorRelationship>
                 acceptedRelationships = new();
             int pathAttemptCount = 0;
+            int maximumPairAttempts = Mathf.Max(
+                1,
+                Mathf.RoundToInt(Mathf.Lerp(
+                    BaselineMaximumPairAttempts - 36f,
+                    BaselineMaximumPairAttempts + 36f,
+                    connectorAmount)));
+            int maximumComponentDegree = Mathf.Clamp(
+                Mathf.RoundToInt(Mathf.Lerp(
+                    BaselineMaximumComponentDegree - 1f,
+                    BaselineMaximumComponentDegree + 1f,
+                    connectorAmount)),
+                1,
+                3);
+            int cycleBudget = connectorAmount > 0.5f
+                ? Mathf.CeilToInt(
+                    (connectorAmount - 0.5f) * 2f *
+                    Mathf.Max(1f, components.Count * 0.35f))
+                : 0;
+            int maximumRelationshipCap = components.Count > 1
+                ? Mathf.Max(
+                    components.Count - 1,
+                    components.Count - 1 + cycleBudget)
+                : 0;
             int maximumAccepted = components.Count > 1
                 ? Mathf.Clamp(
-                    Mathf.CeilToInt(components.Count * 0.58f),
+                    Mathf.CeilToInt(
+                        components.Count * Mathf.Lerp(
+                            0.10f,
+                            1.06f,
+                            connectorAmount)),
                     1,
-                    components.Count - 1)
+                    maximumRelationshipCap)
                 : 0;
-            int pairLimit = Mathf.Min(MaximumPairAttempts, pairs.Count);
+            int pairLimit = Mathf.Min(maximumPairAttempts, pairs.Count);
+            float maximumOverlapRatio = Mathf.Lerp(
+                0.12f,
+                0.56f,
+                connectorAmount);
+            int acceptedCycleCount = 0;
 
             float[] candidateRaster = new float[cellCount];
             for (int pairIndex = 0;
@@ -144,15 +187,17 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 ComponentPair pair = pairs[pairIndex];
                 if (componentDegree[pair.StartComponentIndex] >=
-                        MaximumComponentDegree ||
+                        maximumComponentDegree ||
                     componentDegree[pair.EndComponentIndex] >=
-                        MaximumComponentDegree)
+                        maximumComponentDegree)
                 {
                     continue;
                 }
 
-                if (relationships.Find(pair.StartComponentIndex) ==
-                    relationships.Find(pair.EndComponentIndex))
+                bool createsCycle =
+                    relationships.Find(pair.StartComponentIndex) ==
+                    relationships.Find(pair.EndComponentIndex);
+                if (createsCycle && acceptedCycleCount >= cycleBudget)
                 {
                     continue;
                 }
@@ -167,7 +212,9 @@ namespace ProgrammaticStylized3D.Rivers
                         majorSupport,
                         connectorSupport,
                         metricPositions,
+                        connectorDirectness,
                         out List<int> path,
+                        out Vector2 curvatureWaypoint,
                         out StylizedRiverFoamConnectorRejectionReason reason))
                 {
                     rejectionCounts[(int)reason]++;
@@ -181,11 +228,23 @@ namespace ProgrammaticStylized3D.Rivers
                     validCells,
                     componentLabels,
                     pair.StartComponentIndex,
-                    pair.EndComponentIndex);
+                    pair.EndComponentIndex,
+                    connectorDirectness,
+                    curvatureWaypoint,
+                    metricPositions);
                 float pathLength = MeasurePathLength(
                     simplifiedPath,
                     metricPositions);
-                if (pathLength > pair.DistanceMetres * 1.80f + 0.65f ||
+                float relativePathLimit = Mathf.Lerp(
+                    2.65f,
+                    1.80f,
+                    connectorDirectness);
+                float pathPadding = Mathf.Lerp(
+                    1.15f,
+                    0.65f,
+                    connectorDirectness);
+                if (pathLength >
+                        pair.DistanceMetres * relativePathLimit + pathPadding ||
                     pathLength > pair.MaximumPathLengthMetres)
                 {
                     rejectionCounts[(int)
@@ -258,7 +317,8 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
-                if (existingOverlap > rasterCoverage * 0.34f)
+                if (existingOverlap >
+                    rasterCoverage * maximumOverlapRatio)
                 {
                     rejectionCounts[(int)
                         StylizedRiverFoamConnectorRejectionReason
@@ -275,9 +335,16 @@ namespace ProgrammaticStylized3D.Rivers
 
                 componentDegree[pair.StartComponentIndex]++;
                 componentDegree[pair.EndComponentIndex]++;
-                relationships.Union(
-                    pair.StartComponentIndex,
-                    pair.EndComponentIndex);
+                if (createsCycle)
+                {
+                    acceptedCycleCount++;
+                }
+                else
+                {
+                    relationships.Union(
+                        pair.StartComponentIndex,
+                        pair.EndComponentIndex);
+                }
 
                 uint evolutionSeed = MixBits(relationshipId ^ 0xD1B54A35u);
                 acceptedRelationships.Add(
@@ -709,19 +776,34 @@ namespace ProgrammaticStylized3D.Rivers
             List<MajorComponent> components,
             RiverDomainSnapshot domain,
             int seed,
+            float directness,
+            float lengthPreference,
             int[] rejectionCounts)
         {
-            const int alternativesPerComponentPair = 3;
+            int alternativesPerComponentPair = Mathf.Clamp(
+                Mathf.RoundToInt(Mathf.Lerp(8f, 3f, directness)),
+                3,
+                8);
             List<ComponentPair> pairs = new();
             float averageVisibleWidth = ResolveAverageVisibleWidth(domain);
-            float maximumGapMetres = Mathf.Clamp(
+            float baselineMaximumGapMetres = Mathf.Clamp(
                 averageVisibleWidth * 0.74f,
                 1.55f,
                 5.25f);
-            float maximumPathLength = Mathf.Clamp(
-                maximumGapMetres * 1.85f,
+
+            // Length Preference ranks relationships inside one fixed safe
+            // envelope. It does not change the absolute distance at which a
+            // connection becomes unsafe or implausible.
+            float maximumGapMetres = baselineMaximumGapMetres * 1.55f;
+            float baselineMaximumPathLength = Mathf.Clamp(
+                baselineMaximumGapMetres * 1.85f,
                 2.5f,
                 8.5f);
+            float maximumPathLength = baselineMaximumPathLength * 1.55f;
+            float centredLengthPreference =
+                (Mathf.Clamp01(lengthPreference) - 0.5f) * 2f;
+            float lengthPreferenceStrength = Mathf.Abs(
+                centredLengthPreference);
             bool foundAnySeparatedComponents = false;
 
             for (int startIndex = 0;
@@ -735,16 +817,33 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     MajorComponent end = components[endIndex];
                     List<EndpointPairCandidate> endpointPairs =
-                        ResolveClosestEndpointPairs(
+                        ResolveEndpointPairs(
                             start,
                             end,
-                            alternativesPerComponentPair);
+                            alternativesPerComponentPair,
+                            directness,
+                            seed);
                     if (endpointPairs.Count == 0)
                     {
                         continue;
                     }
 
                     foundAnySeparatedComponents = true;
+                    float relationshipDistance = Vector2.Distance(
+                        start.Centroid,
+                        end.Centroid);
+                    float normalizedRelationshipLength = Mathf.InverseLerp(
+                        MinimumGapMetres,
+                        maximumGapMetres,
+                        relationshipDistance);
+                    float lengthPreferenceScore =
+                        -centredLengthPreference *
+                        normalizedRelationshipLength *
+                        Mathf.Lerp(
+                            0f,
+                            1.45f,
+                            lengthPreferenceStrength);
+
                     for (int alternativeIndex = 0;
                          alternativeIndex < endpointPairs.Count;
                          alternativeIndex++)
@@ -779,14 +878,21 @@ namespace ProgrammaticStylized3D.Rivers
                         float deterministicTie = Hash01(
                             stablePairSeed,
                             12u);
-                        float score = distance +
-                            lateralDifference * 0.08f +
+
+                        // Endpoint selection is owned by Directness. The
+                        // relationship-length bias is shared by all endpoint
+                        // alternatives of the same component pair so Length
+                        // Preference cannot silently undo that choice.
+                        float score =
+                            endpointPair.SelectionScore * 0.82f +
+                            lateralDifference * 0.035f +
                             Mathf.Max(
                                 0f,
                                 lateralDifference -
-                                longitudinalDifference * 1.8f) * 0.18f +
-                            alternativeIndex * 0.04f +
-                            deterministicTie * 0.0001f;
+                                longitudinalDifference * 2.0f) * 0.075f +
+                            alternativeIndex * 0.012f +
+                            deterministicTie * 0.008f +
+                            lengthPreferenceScore;
 
                         pairs.Add(new ComponentPair(
                             startIndex,
@@ -834,12 +940,17 @@ namespace ProgrammaticStylized3D.Rivers
         }
 
         private static List<EndpointPairCandidate>
-            ResolveClosestEndpointPairs(
+            ResolveEndpointPairs(
                 MajorComponent start,
                 MajorComponent end,
-                int maximumPairs)
+                int maximumPairs,
+                float directness,
+                int seed)
         {
             List<EndpointPairCandidate> candidates = new();
+            float minimumDistance = float.PositiveInfinity;
+            float maximumDistance = 0f;
+
             for (int startIndex = 0;
                  startIndex < start.Endpoints.Count;
                  startIndex++)
@@ -850,15 +961,68 @@ namespace ProgrammaticStylized3D.Rivers
                      endIndex++)
                 {
                     ConnectorEndpoint b = end.Endpoints[endIndex];
+                    float distance = Vector2.Distance(a.Position, b.Position);
+                    minimumDistance = Mathf.Min(minimumDistance, distance);
+                    maximumDistance = Mathf.Max(maximumDistance, distance);
+                    uint choiceSeed = MixBits(
+                        start.StableId ^
+                        RotateLeft(end.StableId, 11) ^
+                        RotateLeft(a.StableId, 19) ^
+                        RotateLeft(b.StableId, 25) ^
+                        (uint)seed);
                     candidates.Add(new EndpointPairCandidate(
                         a,
                         b,
-                        Vector2.Distance(a.Position, b.Position)));
+                        distance,
+                        Hash01(choiceSeed, 16u),
+                        0f));
                 }
+            }
+
+            float indirectness = 1f - Mathf.Clamp01(directness);
+            uint componentPairSeed = MixBits(
+                start.StableId ^
+                RotateLeft(end.StableId, 17) ^
+                (uint)seed ^
+                0xA511E9B3u);
+            float targetNormalizedDistance = indirectness * Mathf.Lerp(
+                0.56f,
+                0.84f,
+                Hash01(componentPairSeed, 17u));
+            float distanceRange = Mathf.Max(
+                0.0001f,
+                maximumDistance - minimumDistance);
+
+            for (int index = 0; index < candidates.Count; index++)
+            {
+                EndpointPairCandidate candidate = candidates[index];
+                float normalizedDistance = Mathf.Clamp01(
+                    (candidate.DistanceMetres - minimumDistance) /
+                    distanceRange);
+                float targetError = Mathf.Abs(
+                    normalizedDistance - targetNormalizedDistance);
+                float selectionScore = targetError +
+                    candidate.SelectionBias * Mathf.Lerp(
+                        0.11f,
+                        0.0005f,
+                        directness);
+                candidates[index] = new EndpointPairCandidate(
+                    candidate.Start,
+                    candidate.End,
+                    candidate.DistanceMetres,
+                    candidate.SelectionBias,
+                    selectionScore);
             }
 
             candidates.Sort((a, b) =>
             {
+                int selectionComparison = a.SelectionScore.CompareTo(
+                    b.SelectionScore);
+                if (selectionComparison != 0)
+                {
+                    return selectionComparison;
+                }
+
                 int distanceComparison = a.DistanceMetres.CompareTo(
                     b.DistanceMetres);
                 if (distanceComparison != 0)
@@ -890,8 +1054,156 @@ namespace ProgrammaticStylized3D.Rivers
             float[] majorSupport,
             float[] connectorSupport,
             Vector2[] metricPositions,
+            float directness,
             out List<int> path,
+            out Vector2 curvatureWaypoint,
             out StylizedRiverFoamConnectorRejectionReason rejectionReason)
+        {
+            int start = pair.StartEndpoint.CellIndex;
+            int goal = pair.EndEndpoint.CellIndex;
+            Vector2 directStart = metricPositions[start];
+            Vector2 directEnd = metricPositions[goal];
+            curvatureWaypoint = (directStart + directEnd) * 0.5f;
+            uint pathSeed = ResolveRelationshipId(pair);
+            float indirectness = 1f - Mathf.Clamp01(directness);
+            int baselineMaximumExpansions = Mathf.Clamp(
+                width * height / 2,
+                768,
+                8192);
+            int maximumExpansions = Mathf.Clamp(
+                Mathf.RoundToInt(
+                    baselineMaximumExpansions * Mathf.Lerp(
+                        1f,
+                        1.35f,
+                        indirectness)),
+                768,
+                12288);
+
+            if (indirectness <= 0.0001f)
+            {
+                bool foundDirect = TryFindPathSegment(
+                    start,
+                    goal,
+                    directStart,
+                    directEnd,
+                    pathSeed,
+                    maximumExpansions,
+                    0.16f,
+                    0.035f,
+                    width,
+                    height,
+                    validCells,
+                    fluidCoverage,
+                    majorSupport,
+                    connectorSupport,
+                    metricPositions,
+                    out path);
+                rejectionReason = foundDirect
+                    ? StylizedRiverFoamConnectorRejectionReason.None
+                    : StylizedRiverFoamConnectorRejectionReason.SearchExhausted;
+                return foundDirect;
+            }
+
+            float preferredSide = Hash01(pathSeed, 23u) < 0.5f
+                ? -1f
+                : 1f;
+            for (int sideAttempt = 0; sideAttempt < 2; sideAttempt++)
+            {
+                float side = sideAttempt == 0
+                    ? preferredSide
+                    : -preferredSide;
+                if (!TryResolveCurvatureWaypoint(
+                        directStart,
+                        directEnd,
+                        pathSeed,
+                        directness,
+                        side,
+                        validCells,
+                        fluidCoverage,
+                        majorSupport,
+                        metricPositions,
+                        out int waypointCell,
+                        out Vector2 waypointPosition))
+                {
+                    continue;
+                }
+
+                if (!TryFindPathSegment(
+                        start,
+                        waypointCell,
+                        directStart,
+                        waypointPosition,
+                        pathSeed ^ 0x68BC21EBu,
+                        maximumExpansions,
+                        0.20f,
+                        0.028f,
+                        width,
+                        height,
+                        validCells,
+                        fluidCoverage,
+                        majorSupport,
+                        connectorSupport,
+                        metricPositions,
+                        out List<int> firstLeg))
+                {
+                    continue;
+                }
+
+                if (!TryFindPathSegment(
+                        waypointCell,
+                        goal,
+                        waypointPosition,
+                        directEnd,
+                        pathSeed ^ 0x02E5BE93u,
+                        maximumExpansions,
+                        0.20f,
+                        0.028f,
+                        width,
+                        height,
+                        validCells,
+                        fluidCoverage,
+                        majorSupport,
+                        connectorSupport,
+                        metricPositions,
+                        out List<int> secondLeg))
+                {
+                    continue;
+                }
+
+                path = firstLeg;
+                for (int index = 1; index < secondLeg.Count; index++)
+                {
+                    path.Add(secondLeg[index]);
+                }
+                curvatureWaypoint = waypointPosition;
+                rejectionReason =
+                    StylizedRiverFoamConnectorRejectionReason.None;
+                return path.Count >= 3;
+            }
+
+            path = new List<int>();
+            rejectionReason =
+                StylizedRiverFoamConnectorRejectionReason.SearchExhausted;
+            return false;
+        }
+
+        private static bool TryFindPathSegment(
+            int start,
+            int goal,
+            Vector2 corridorStart,
+            Vector2 corridorEnd,
+            uint pathSeed,
+            int maximumExpansions,
+            float corridorPenaltyScale,
+            float noiseAmplitude,
+            int width,
+            int height,
+            bool[] validCells,
+            float[] fluidCoverage,
+            float[] majorSupport,
+            float[] connectorSupport,
+            Vector2[] metricPositions,
+            out List<int> path)
         {
             int cellCount = width * height;
             float[] cost = new float[cellCount];
@@ -903,8 +1215,6 @@ namespace ProgrammaticStylized3D.Rivers
                 previous[index] = -1;
             }
 
-            int start = pair.StartEndpoint.CellIndex;
-            int goal = pair.EndEndpoint.CellIndex;
             MinHeap open = new MinHeap();
             cost[start] = 0f;
             open.Push(new HeapEntry(
@@ -914,14 +1224,7 @@ namespace ProgrammaticStylized3D.Rivers
                     metricPositions[goal]),
                 0u));
 
-            int maximumExpansions = Mathf.Clamp(
-                cellCount / 2,
-                768,
-                8192);
             int expansions = 0;
-            Vector2 directStart = metricPositions[start];
-            Vector2 directEnd = metricPositions[goal];
-            uint pathSeed = ResolveRelationshipId(pair);
             int[] neighbourX = { -1, 1, 0, 0, -1, -1, 1, 1 };
             int[] neighbourY = { 0, 0, -1, 1, -1, 1, -1, 1 };
 
@@ -937,7 +1240,6 @@ namespace ProgrammaticStylized3D.Rivers
                 if (current == goal)
                 {
                     path = ReconstructPath(previous, start, goal);
-                    rejectionReason = StylizedRiverFoamConnectorRejectionReason.None;
                     return path.Count >= 2;
                 }
 
@@ -996,14 +1298,15 @@ namespace ProgrammaticStylized3D.Rivers
                         1.70f,
                         generated);
 
-                    float directDeviation = DistancePointToSegment(
+                    float corridorDeviation = DistancePointToSegment(
                         metricPositions[next],
-                        directStart,
-                        directEnd);
-                    float corridorPenalty = directDeviation * 0.16f;
+                        corridorStart,
+                        corridorEnd);
+                    float corridorPenalty = corridorDeviation *
+                        corridorPenaltyScale;
                     float noise = (Hash01(
                         pathSeed ^ (uint)(next + 1),
-                        19u) - 0.5f) * 0.035f;
+                        19u) - 0.5f) * noiseAmplitude;
                     float tentative = cost[current] +
                         physicalStep * traversalMultiplier +
                         corridorPenalty * physicalStep +
@@ -1029,9 +1332,86 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             path = new List<int>();
-            rejectionReason =
-                StylizedRiverFoamConnectorRejectionReason.SearchExhausted;
             return false;
+        }
+
+        private static bool TryResolveCurvatureWaypoint(
+            Vector2 start,
+            Vector2 end,
+            uint pathSeed,
+            float directness,
+            float side,
+            bool[] validCells,
+            float[] fluidCoverage,
+            float[] majorSupport,
+            Vector2[] metricPositions,
+            out int waypointCell,
+            out Vector2 waypointPosition)
+        {
+            waypointCell = -1;
+            waypointPosition = (start + end) * 0.5f;
+            float indirectness = 1f - Mathf.Clamp01(directness);
+            Vector2 segment = end - start;
+            float segmentLength = segment.magnitude;
+            if (indirectness <= 0.0001f || segmentLength <= 0.0001f)
+            {
+                return false;
+            }
+
+            Vector2 direction = segment / segmentLength;
+            Vector2 perpendicular = new Vector2(-direction.y, direction.x);
+            float bendEnvelope = Mathf.SmoothStep(0f, 1f, indirectness);
+            float offsetScale = Mathf.Lerp(
+                0.24f,
+                0.42f,
+                Hash01(pathSeed, 24u));
+            float targetOffset = segmentLength * offsetScale * bendEnvelope;
+            float targetAlong = Mathf.Lerp(
+                0.42f,
+                0.58f,
+                Hash01(pathSeed, 25u));
+            Vector2 desired = start + segment * targetAlong +
+                perpendicular * (side * targetOffset);
+            float minimumSignedDeviation = targetOffset * 0.48f;
+            float bestScore = float.PositiveInfinity;
+
+            for (int index = 0; index < validCells.Length; index++)
+            {
+                if (!validCells[index] ||
+                    majorSupport[index] >= MajorComponentThreshold * 0.72f)
+                {
+                    continue;
+                }
+
+                Vector2 position = metricPositions[index];
+                float along = Vector2.Dot(position - start, direction) /
+                    segmentLength;
+                if (along < 0.24f || along > 0.76f)
+                {
+                    continue;
+                }
+
+                Vector2 projected = start + segment * along;
+                float signedDeviation = Vector2.Dot(
+                    position - projected,
+                    perpendicular) * side;
+                if (signedDeviation < minimumSignedDeviation)
+                {
+                    continue;
+                }
+
+                float score = Vector2.SqrMagnitude(position - desired);
+                score += (1f - Mathf.Clamp01(fluidCoverage[index])) * 0.18f;
+                score += Mathf.Clamp01(majorSupport[index]) * 0.14f;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    waypointCell = index;
+                    waypointPosition = position;
+                }
+            }
+
+            return waypointCell >= 0;
         }
 
         private static List<int> ReconstructPath(
@@ -1063,19 +1443,99 @@ namespace ProgrammaticStylized3D.Rivers
             bool[] validCells,
             int[] componentLabels,
             int startComponent,
-            int endComponent)
+            int endComponent,
+            float directness,
+            Vector2 curvatureWaypoint,
+            Vector2[] metricPositions)
         {
             if (path.Count <= 2)
             {
                 return path;
             }
 
+            int maximumProbeDistance = Mathf.Clamp(
+                Mathf.RoundToInt(Mathf.Lerp(10f, 18f, directness)),
+                10,
+                18);
             List<int> simplified = new() { path[0] };
-            int anchor = 0;
-            while (anchor < path.Count - 1)
+
+            if (directness >= 0.9999f)
+            {
+                AppendSimplifiedRange(
+                    path,
+                    0,
+                    path.Count - 1,
+                    maximumProbeDistance,
+                    width,
+                    height,
+                    validCells,
+                    componentLabels,
+                    startComponent,
+                    endComponent,
+                    simplified);
+                return simplified;
+            }
+
+            int pivotPathIndex = 1;
+            float pivotDistance = float.PositiveInfinity;
+            for (int index = 1; index < path.Count - 1; index++)
+            {
+                float distance = Vector2.SqrMagnitude(
+                    metricPositions[path[index]] - curvatureWaypoint);
+                if (distance < pivotDistance)
+                {
+                    pivotDistance = distance;
+                    pivotPathIndex = index;
+                }
+            }
+
+            AppendSimplifiedRange(
+                path,
+                0,
+                pivotPathIndex,
+                maximumProbeDistance,
+                width,
+                height,
+                validCells,
+                componentLabels,
+                startComponent,
+                endComponent,
+                simplified);
+            AppendSimplifiedRange(
+                path,
+                pivotPathIndex,
+                path.Count - 1,
+                maximumProbeDistance,
+                width,
+                height,
+                validCells,
+                componentLabels,
+                startComponent,
+                endComponent,
+                simplified);
+            return simplified;
+        }
+
+        private static void AppendSimplifiedRange(
+            List<int> path,
+            int startPathIndex,
+            int endPathIndex,
+            int maximumProbeDistance,
+            int width,
+            int height,
+            bool[] validCells,
+            int[] componentLabels,
+            int startComponent,
+            int endComponent,
+            List<int> destination)
+        {
+            int anchor = startPathIndex;
+            while (anchor < endPathIndex)
             {
                 int furthest = anchor + 1;
-                int maximumProbe = Mathf.Min(path.Count - 1, anchor + 18);
+                int maximumProbe = Mathf.Min(
+                    endPathIndex,
+                    anchor + maximumProbeDistance);
                 for (int candidate = anchor + 2;
                      candidate <= maximumProbe;
                      candidate++)
@@ -1096,11 +1556,14 @@ namespace ProgrammaticStylized3D.Rivers
                     furthest = candidate;
                 }
 
-                simplified.Add(path[furthest]);
+                int cellIndex = path[furthest];
+                if (destination.Count == 0 ||
+                    destination[destination.Count - 1] != cellIndex)
+                {
+                    destination.Add(cellIndex);
+                }
                 anchor = furthest;
             }
-
-            return simplified;
         }
 
         private static bool HasGridLineOfSight(
@@ -1486,16 +1949,22 @@ namespace ProgrammaticStylized3D.Rivers
             public EndpointPairCandidate(
                 ConnectorEndpoint start,
                 ConnectorEndpoint end,
-                float distanceMetres)
+                float distanceMetres,
+                float selectionBias,
+                float selectionScore)
             {
                 Start = start;
                 End = end;
                 DistanceMetres = distanceMetres;
+                SelectionBias = selectionBias;
+                SelectionScore = selectionScore;
             }
 
             public ConnectorEndpoint Start { get; }
             public ConnectorEndpoint End { get; }
             public float DistanceMetres { get; }
+            public float SelectionBias { get; }
+            public float SelectionScore { get; }
         }
 
         private readonly struct ComponentPair
