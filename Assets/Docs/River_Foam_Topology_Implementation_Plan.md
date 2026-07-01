@@ -145,7 +145,7 @@ The following existing work remains useful unless implementation proves otherwis
 - queued and coalesced rebuild scheduling;
 - resource lifecycle, sleeping, freezing, and chunk ownership;
 - existing profiler infrastructure;
-- deterministic `Amount`, `Size`, and `Seed` authoring contracts where they remain meaningful.
+- deterministic Major `Amount`, `Size`, `Size Variation`, and `Seed` authoring contracts, plus the accepted Connector `Amount`, `Directness`, and `Length Preference` contracts.
 
 ### 4.2 Known obsolete topology implementation
 
@@ -590,19 +590,21 @@ Remove the whole-river placement and metadata integration while retaining the ac
 
 ### Purpose
 
-Generate sparse relational support only after Major Support and Anchored Support provide meaningful endpoints.
+Generate sparse relational support between disconnected accepted Major components. Anchored-support endpoints remain a later optional extension and must not be approximated on the CPU merely to increase connection count.
 
 ### Exact behaviour change
 
 Implement:
 
-- endpoint extraction from accepted Major regions and approved anchored-support context;
+- endpoint extraction from accepted Major regions;
 - endpoint clustering or deduplication;
 - bounded candidate-pair selection;
 - a metric-aware traversal cost field;
 - bounded A* or Dijkstra-style path search, or another explicitly approved bounded equivalent;
 - obstacle and invalid-water blocking;
 - penalties for unsupported open water and implausibly long paths;
+- blocked Major clearance halos outside compact source/destination endpoint gates;
+- rejection of routes that orbit a Major perimeter or exceed a bounded detour ratio;
 - removal of path segments already covered by broad positive support;
 - narrow soft Connector rasterization;
 - stable connector relationship identity and evolution metadata.
@@ -632,6 +634,7 @@ Permanent telemetry is limited to:
 - no persistent gameplay graph;
 - no per-frame pathfinding;
 - no Connector drawing through broad Major interiors;
+- no perimeter-following route that wraps around most of a source or destination Major region to reach an unlikely endpoint;
 - no Pocket generation;
 - no material response;
 - no runtime connector fading yet.
@@ -643,7 +646,6 @@ Test:
 - two nearby Major regions with a plausible gap;
 - two regions separated by an obstacle;
 - regions too far apart;
-- Major-to-approved anchored support;
 - dense Major composition;
 - sparse Major composition;
 - bends, width changes, and reverse flow;
@@ -657,6 +659,8 @@ Pass only if:
 - connectors remain sparse and subordinate;
 - accepted paths avoid obstacles and invalid water;
 - broad Major interiors are not repainted as Connector;
+- endpoint gates and Major clearance halos prevent perimeter-orbiting routes;
+- routed length remains a bounded detour over the selected endpoint gap;
 - missing connectors are explainable by endpoint or path telemetry;
 - searches are bounded and occur only in preparation/generation;
 - connector identity is stable for unchanged inputs.
@@ -1203,15 +1207,16 @@ A topology patch that cannot answer these questions is not ready.
 
 ## 13. Immediate Next Step
 
-After Patch 0 is accepted, proceed with **Step 1 — Major Candidate Vertical Slice and Obsolete-Path Removal**.
+Patches 1 through 3.5 have accepted:
 
-That patch must deliver, together:
+- the field-first Major candidate family and compact preview;
+- whole-river Major distribution, size hierarchy, and stable identity;
+- sparse Major-to-Major Connector Support;
+- Connector `Amount`, `Directness`, and `Length Preference` controls;
+- endpoint gates, Major clearance halos, strong-Major raster suppression, and bounded detour rejection;
+- soft degree-aware relationship ranking and a mild longitudinal load bias, so disconnected regions are encouraged without forcing weak links or forbidding attractive repeated connections;
+- removal of obsolete topology paths and obsolete broad Foam authoring controls.
 
-- complete reference-driven removal of obsolete topology code made unnecessary by the new candidate path;
-- one deterministic field-first Major candidate generator;
-- the compact four-stage candidate preview;
-- the five essential candidate diagnostics;
-- bounded retries and rejection reasons;
-- no whole-river placement, Connector, Pocket, material response, movement, or cache work.
+Proceed with **Step 4 — Pocket Aging Pressure**.
 
-The purpose is to prove the core shape-generation method immediately. If the candidate family is wrong, the project stops there and changes the generator before any river distribution, relationship, or runtime-evolution work is built on top of it.
+That patch must derive hosted negative influence from broad accepted Major interiors, expose the result immediately on the actual river, retain concise Pocket telemetry, and leave material response, runtime evolution, rebuild crossfade, and cache packaging untouched.

@@ -7927,42 +7927,14 @@ MonoBehaviour:
     geometryContribution: 0.65
     normalContribution: 1
   foamEnabled: 1
-  foamPreset: 3
-  foamAmount: 0.59466666
-  foamWebGranularity: 0.5402
-  foamNetworkEvolution: 0.601
-  foamMajorSupportAmount: 0.523
-  foamMajorSupportSize: 0.541
-  foamMajorSupportSeed: 0
-  foamMajorSupportEvolutionRate: 1.68
-  foamMajorSupportCleanupRate: 1
-  foamBreakupFrequency: 0.7037469
-  foamSpeed: 0.601
+  foamMajorSupportAmount: 0.485
+  foamMajorSupportSize: 0.405
+  foamMajorSupportSizeVariation: 0.887
+  foamMajorSupportSeed: 55
+  foamConnectorAmount: 0.436
+  foamConnectorDirectness: 0.4
+  foamConnectorLengthPreference: 0.407
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}
-  foamFragmentation: 0.7037469
-  foamPersistence: 0.5646667
-  foamAgitation: 0.601
-  foamSharpness: 0.78
-  foamAuthoringVersion: 4
-  foamStrength: 1.45
-  foamCoverage: 0.68
-  foamConnectivity: 0.44
-  foamGlobalPresence: 0.42
-  foamSparsity: 0.64
-  foamSupplyRate: 0.75
-  foamLifetimeVariation: 0.58
-  foamLongLivedFraction: 0.18
-  foamLifetime: 8
-  foamEvolution: 1.5
-  foamBreakup: 0.76
-  foamOpacity: 0.84
-  foamFlowFollow: 1.08
-  foamLateralSpread: 0.48
-  foamCohesion: 0.46
-  foamFreshnessLifetime: 2.8
-  foamShoreRetention: 0.32
-  foamDetailScale: 0.48
-  foamDetailStrength: 0.48
   foamDebugView: 7
   foamTestDistanceNormalized: 0.5
   foamTestAcrossNormalized: 0

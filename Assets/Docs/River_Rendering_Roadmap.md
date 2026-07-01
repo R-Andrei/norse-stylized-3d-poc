@@ -356,27 +356,28 @@ The old destructive composition `Positive × (1 - Negative)` remains non-canonic
 ### Remaining topology architecture
 
 - **Major Support:** broad positive support regions generated as field-first soft topology from actual river context. Static placement stays deterministic and seedable. Accepted regions must be connected, filled, broad enough to host material, and varied through low-frequency contour structure rather than pixel damage, toy path descriptors, or repeated primitive stamps.
-- **Connector Support:** generated from meaningful Major and anchored-support endpoints using bounded relational rules. It must remain sparse and subordinate, and must not paint connector bodies through broad Major interiors.
+- **Connector Support:** currently generated between meaningful disconnected Major components using bounded relational rules. It remains sparse and subordinate, uses endpoint gates plus Major clearance halos, rejects excessive detours, does not paint connector bodies through broad Major interiors, and softly favours regions and longitudinal sections with less existing Connector participation without forcing quotas. Anchored endpoints remain an optional later extension rather than a CPU approximation requirement.
 - **Pocket Aging Pressure:** generated after positive support from sufficiently broad Major interiors. It provides negative lifespan influence hosted by positive structure and must avoid connector cores, important anchored support, obstacles, and unrelated neutral water.
 
-Major Support authoring retains `Amount`, `Size`, `Seed`, evolution cadence, and cleanup cadence for now. Generator/developer controls for field scale, warp, scoring, connector cost, and pocket spacing remain provisional until the visual result is accepted and the cache/bake packaging is chosen.
+Active topology authoring retains Major `Amount`, `Size`, `Size Variation`, and `Seed`, plus Connector `Amount`, `Directness`, and `Length Preference`. Patch 3.4 removed the obsolete broad Foam controls and the inert Major evolution/cleanup cadence fields. Generator coefficients for field scale, warp, scoring, path cost, endpoint gates, clearance halos, detour limits, and pocket spacing remain implementation details until the visual result is accepted and cache/bake packaging is chosen.
 
 Runtime topology evolution remains cheap and metadata-driven. Major, Connector, and Pocket may use separate downstream offsets, phases, fades, strengthening/weakening, and recycle intervals. Free-water topology never moves upstream or pops as a whole region. Anchored Pressure, Lee, and Shore Support remain attached to their authoritative live sources. No gameplay candidate generation, component cleanup, pathfinding, distance transforms, or rejection loops are permitted.
 
 ### Immediate continuation order
 
 1. Patch 0 documentation alignment — complete.
-2. Remove all obsolete topology code made unnecessary by the replacement and implement one field-first Major candidate vertical slice.
-3. Inspect `Raw Field`, `Thresholded`, `Cleaned`, and `Final Support` in one compact candidate preview; stop if the candidate family fails.
-4. Implement whole-river Major distribution and inspect the accumulated Major field on the actual river.
-5. Implement Connector Support and inspect it on the actual river.
-6. Implement Pocket Aging Pressure and inspect it on the actual river.
-7. Validate the complete static topology through the existing support and negative-influence views.
-8. Add cheap strictly downstream Major, Connector, and Pocket evolution using stable identity, separate pacing, and fades.
-9. Add safe generated-topology rebuild crossfade.
-10. Move expensive generation into the accepted cache/precompute path.
-11. Hand the accepted topology contract to the separate material-lifecycle work.
-12. Resume deferred performance work against the completed topology pipeline.
+2. Field-first Major candidate generation and stale-topology removal — complete.
+3. Whole-river Major distribution, size hierarchy, and stable identity — complete.
+4. Major-to-Major Connector Support with Amount, Directness, and Length Preference — complete.
+5. Connector endpoint gates, Major clearance halos, bounded detour rejection, and obsolete Foam-control cleanup — complete in Patch 3.4.
+6. Soft degree-aware and longitudinally distributed Connector selection — complete in Patch 3.5.
+7. Implement Pocket Aging Pressure and inspect it on the actual river.
+8. Validate the complete static topology through the existing support and negative-influence views.
+9. Add cheap strictly downstream Major, Connector, and Pocket evolution using stable identity, separate pacing, and fades.
+10. Add safe generated-topology rebuild crossfade.
+11. Move expensive generation into the accepted cache/precompute path.
+12. Hand the accepted topology contract to the separate material-lifecycle work.
+13. Resume deferred performance work against the completed topology pipeline.
 
 ### Terminology
 
@@ -420,21 +421,21 @@ Multi-chunk rivers extend the longitudinal dimension by chunk count. Physical to
 
 ### Public controls
 
-The accepted main controls remain:
+The accepted normal Inspector controls are:
 
-- `Amount`
-- `Web Granularity`
-- `Network Evolution`
-- `Major Support Amount` — default `0.56`, range `0–1`; deterministic nested activation only
-- `Major Support Size` — default `0.46`, range `0–1`; continuous physical scale envelope only
-- `Major Support Seed` — default `1`; deterministic topology generation, opportunity activation, shape/field identity, transform, and later drift identity
-- `Major Evolution Rate (Hz)` — default `2`, range `0.5–10`
-- `Major Cleanup Rate (Hz)` — default `1`, range `0.5–10`
-- `Breakup Frequency`
-- `Foam Speed`
-- `Foam Colour`
+- `Foam Enabled`;
+- `Major Support Amount`;
+- `Major Support Size`;
+- `Major Support Size Variation`;
+- `Major Support Seed`;
+- `Connector Amount`;
+- `Connector Directness`;
+- `Connector Length Preference`;
+- `Foam Colour`.
 
-Base lifetime and support/aging-pressure response also require authoring, but their names, ranges, grouping, and defaults are deferred to the future lifecycle-authoring pass.
+Patch 3.4 removed `Foam Preset`, the old broad `Amount`, `Web Granularity`, `Network Evolution`, `Breakup Frequency`, `Foam Speed`, `Major Evolution Rate`, and `Major Cleanup Rate`, together with their obsolete preset, migration, compatibility, and resolver code. The current material simulation uses a fixed internal provisional baseline until the separate lifecycle-authoring pass introduces controls justified by accepted behaviour.
+
+Base lifetime and support/aging-pressure response still require future authoring, but their names, ranges, grouping, and defaults remain deferred to that lifecycle pass.
 
 ### Implementation order
 
@@ -443,17 +444,19 @@ Base lifetime and support/aging-pressure response also require authoring, but th
 3. Per-river staged initialization — complete and retained.
 4. Queued/coalesced dirty rebuilds — complete and retained.
 5. Topology Patch 0 implementation plan and cross-document alignment — complete.
-6. Major candidate vertical slice plus exhaustive stale-topology cleanup — active.
-7. Whole-river Major distribution and stable identity/evolution metadata.
-8. Connector Support.
-9. Pocket Aging Pressure.
-10. Static combined topology validation.
-11. Strictly downstream per-layer topology evolution.
-12. Safe topology rebuild crossfade.
-13. Production cache/precompute packaging.
-14. Separate topology-to-material lifespan integration.
-15. End-of-life fragmentation/dissipation.
-16. Resume deferred performance work and final PC-first profiling.
+6. Major candidate vertical slice plus exhaustive stale-topology cleanup — complete.
+7. Whole-river Major distribution, size hierarchy, and stable identity/evolution metadata — complete.
+8. Connector Support with Amount, Directness, and Length Preference — complete.
+9. Connector endpoint gates, Major clearance halos, and bounded detour rejection — complete.
+10. Obsolete broad Foam control and migration cleanup — complete.
+11. Pocket Aging Pressure — active next slice.
+12. Static combined topology validation.
+13. Strictly downstream per-layer topology evolution.
+14. Safe topology rebuild crossfade.
+15. Production cache/precompute packaging.
+16. Separate topology-to-material lifespan integration.
+17. End-of-life fragmentation/dissipation.
+18. Resume deferred performance work and final PC-first profiling.
 
 Major, Connector, and Pocket are implemented and accepted separately before the combined topology is judged. This is an explicit anti-regression rule, not merely a debugging preference.
 

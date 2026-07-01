@@ -41,9 +41,39 @@ namespace ProgrammaticStylized3D.Rivers
         // Canonical Stage 6 Shore Support band measured inward from the
         // instantaneous Stage 3 visible water edge. These metric widths remain
         // fixed while the accepted anchored-support contract is retained.
-        private const float ShoreSupportCoreWidthMetres = 0.24f;
+        private const float ShoreSupportCoreWidthMetres = 0.228127f;
         private const float ShoreSupportFadeWidthMetres = 0.03f;
         private const int ObstacleRebuildStableFrameCount = 2;
+
+        // The old broad Foam authoring controls were removed in Patch 3.4.
+        // Persistent material behaviour remains on one fixed provisional
+        // baseline matching the supplied project state until the dedicated
+        // lifecycle pass proves and exposes a new canonical control set. These
+        // are implementation values, not public
+        // topology authoring controls.
+        private const float ProvisionalMaterialStrength = 1.342259f;
+        private const float ProvisionalMaterialCoverage = 0.394613f;
+        private const float ProvisionalMaterialSharpness = 0.78f;
+        private const float ProvisionalMaterialDetailScale = 0.5796f;
+        private const float ProvisionalMaterialDetailStrength = 0.637799f;
+        private const float ProvisionalMaterialShapeVariety = 0.763854f;
+        private const float ProvisionalMaterialFlowFollow = 1.02818f;
+        private const float ProvisionalMaterialEvolution = 1.26135f;
+        private const float ProvisionalMaterialBreakup = 0.703747f;
+        private const float ProvisionalMaterialSpread = 0.42858f;
+        private const float ProvisionalMaterialCohesion = 0.056401f;
+        private const float ProvisionalMaterialConnectivity = 0.228127f;
+        private const float ProvisionalMaterialLifetime = 29.810668f;
+        private const float ProvisionalMaterialFreshnessLifetime = 2.307567f;
+        private const float ProvisionalMaterialIntegrityDamage = 0.703747f;
+        private const float ProvisionalMaterialShoreRetention = 1.35f;
+        private const float ProvisionalMaterialTargetCoverage = 0.203078f;
+        private const float ProvisionalMaterialSupplyRate = 1.1152f;
+        private const float ProvisionalMaterialVisibleThreshold = 0.16432f;
+        private const float ProvisionalMaterialGuidanceStrength = 1.15646f;
+        private const float ProvisionalMaterialBoundaryAttraction = 1.951f;
+        private const float ProvisionalMaterialWakeReinforcement = 1.047333f;
+        private const float ProvisionalMaterialImpactReinforcement = 0f;
 
         private enum InitializationPhase
         {
@@ -362,8 +392,6 @@ namespace ProgrammaticStylized3D.Rivers
         private int simulateKernel = -1;
         private int applyBoundaryKernel = -1;
         private int obstacleGeometryVersion = -1;
-        private double autonomousDecayUntil;
-        private bool autonomousPopulationWasEnabled;
         private StylizedRiverQuality allocatedQuality;
 
         private int lastUpdateDispatches;
@@ -470,7 +498,7 @@ namespace ProgrammaticStylized3D.Rivers
             advectedState != null &&
             reverseState != null;
         public bool IsSleeping =>
-            !IsAutonomousPopulationActive &&
+            !IsAutomaticMaterialSupplyActive &&
             !IsTopologyDebugActive &&
             pendingInjections.Count == 0 &&
             reservations.Count == 0 &&
@@ -502,8 +530,8 @@ namespace ProgrammaticStylized3D.Rivers
                 ? (long)topologyMetricsBuffer.count * topologyMetricsBuffer.stride
                 : 0L);
 
-        private bool IsAutonomousPopulationActive =>
-            river != null && river.FoamAmount > 0.0001f;
+        private bool IsAutomaticMaterialSupplyActive =>
+            river != null && river.FoamEnabled;
 
         private bool IsTopologyDebugActive
         {
@@ -649,32 +677,13 @@ namespace ProgrammaticStylized3D.Rivers
 
             fullyFrozenLastUpdate = false;
 
-            double nowAsDouble = Time.realtimeSinceStartupAsDouble;
-            bool autonomousPopulationActive = IsAutonomousPopulationActive;
-            if (autonomousPopulationActive)
-            {
-                autonomousPopulationWasEnabled = true;
-                autonomousDecayUntil = 0.0;
-            }
-            else if (autonomousPopulationWasEnabled)
-            {
-                // Amount zero stops all new supply immediately, but the complete
-                // field remains simulated long enough for existing material to
-                // travel, fragment, decay, and then return to the normal sleep
-                // and delayed-release path.
-                autonomousPopulationWasEnabled = false;
-                autonomousDecayUntil = nowAsDouble +
-                    Mathf.Max(3f, river.FoamLifetime * 1.25f);
-            }
-
-            bool autonomousDecayActive =
-                currentState != null && nowAsDouble < autonomousDecayUntil;
+            bool automaticMaterialSupplyActive =
+                IsAutomaticMaterialSupplyActive;
             // TODO: Audit topology/debug gating so Final Foam does not force
             // diagnostic-grade topology composition or metric refreshes.
             bool topologyDebugActive = IsTopologyDebugActive;
             bool materialWork =
-                autonomousPopulationActive ||
-                autonomousDecayActive ||
+                automaticMaterialSupplyActive ||
                 pendingInjections.Count > 0 ||
                 reservations.Count > 0 ||
                 CountActiveChunks() > 0;
@@ -729,8 +738,7 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     simulationAccumulator -= stepDuration;
                     bool materialStepActive =
-                        autonomousPopulationActive ||
-                        autonomousDecayActive ||
+                        automaticMaterialSupplyActive ||
                         reservations.Count > 0 ||
                         CountActiveChunks() > 0;
 
@@ -738,7 +746,7 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         UpdateReservations(stepDuration, now);
 
-                        if (autonomousPopulationActive || autonomousDecayActive)
+                        if (automaticMaterialSupplyActive)
                         {
                             ActivateAllChunks(now + stepDuration * 3f);
                         }
@@ -912,7 +920,7 @@ namespace ProgrammaticStylized3D.Rivers
                     Mathf.Clamp(elongation, 0.25f, 8f),
                     true,
                     shapeSeed,
-                    river.FoamShapeVariety,
+                    ProvisionalMaterialShapeVariety,
                     true));
             idleSince = 0.0;
             return true;
@@ -2437,10 +2445,13 @@ namespace ProgrammaticStylized3D.Rivers
             float liquid = river.LiquidFactor;
             float speed =
                 river.FlowSpeedMetresPerSecond *
-                river.FoamFlowFollow * liquid;
+                ProvisionalMaterialFlowFollow * liquid;
             float amountDecay =
-                DecayToFivePercent / Mathf.Max(0.05f, river.FoamLifetime);
-            float spread = river.FoamLateralSpread * river.FoamEvolution;
+                DecayToFivePercent /
+                Mathf.Max(0.05f, ProvisionalMaterialLifetime);
+            float spread =
+                ProvisionalMaterialSpread *
+                ProvisionalMaterialEvolution;
 
             for (int index = reservations.Count - 1; index >= 0; index--)
             {
@@ -2469,14 +2480,18 @@ namespace ProgrammaticStylized3D.Rivers
             ActivateGlobalRange(
                 injection.GlobalDistance - padding,
                 injection.GlobalDistance + padding,
-                now + Mathf.Max(river.FoamLifetime, river.FoamFreshnessLifetime));
+                now + Mathf.Max(
+                    ProvisionalMaterialLifetime,
+                    ProvisionalMaterialFreshnessLifetime));
         }
 
         private void ActivateReservationRange(FoamReservation reservation, float now)
         {
             float margin = Mathf.Max(
                 0.5f,
-                Mathf.Abs(river.FlowSpeedMetresPerSecond * river.FoamFlowFollow) /
+                Mathf.Abs(
+                    river.FlowSpeedMetresPerSecond *
+                    ProvisionalMaterialFlowFollow) /
                 Mathf.Max(1f, ResolveUpdateRate()) * 2f);
             ActivateGlobalRange(
                 reservation.CentreGlobalDistance - reservation.AlongRadius - margin,
@@ -2689,7 +2704,9 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamTime",
                 ResolveInitializationMotionTime());
             computeShader.SetFloat("_FoamSeed", river.VisualSeed);
-            computeShader.SetFloat("_FoamEvolution", river.FoamEvolution);
+            computeShader.SetFloat(
+                "_FoamEvolution",
+                ProvisionalMaterialEvolution);
             computeShader.SetBuffer(
                 buildGuidanceKernel,
                 "_FoamMetricRows",
@@ -3126,7 +3143,7 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat("_FoamFieldLength", fieldLength);
             computeShader.SetFloat(
                 "_FoamVisibleThreshold",
-                river.FoamPopulationVisibleThreshold);
+                ProvisionalMaterialVisibleThreshold);
             computeShader.SetTexture(
                 measureTopologyMetricsKernel,
                 "_FoamTopologyRead",
@@ -3248,7 +3265,7 @@ namespace ProgrammaticStylized3D.Rivers
                 resolutionPerChunk);
             computeShader.SetFloat(
                 "_FoamVisibleThreshold",
-                river.FoamPopulationVisibleThreshold);
+                ProvisionalMaterialVisibleThreshold);
             computeShader.SetTexture(
                 measurePopulationKernel,
                 "_FoamStateRead",
@@ -3332,7 +3349,7 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamFlowSpeed",
                 river.FlowSpeedMetresPerSecond *
-                river.FoamFlowFollow *
+                ProvisionalMaterialFlowFollow *
                 river.LiquidFactor);
             // Pressure Support builds its fail-closed upstream support
             // envelope from the exact obstacle mask. Flow direction selects
@@ -3341,54 +3358,56 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamFlowDirection",
                 river.FlowDirection);
-            computeShader.SetFloat("_FoamEvolution", river.FoamEvolution);
-            computeShader.SetFloat("_FoamBreakup", river.FoamBreakup);
-            computeShader.SetFloat("_FoamSpread", river.FoamLateralSpread);
-            computeShader.SetFloat("_FoamCohesion", river.FoamCohesion);
+            computeShader.SetFloat(
+                "_FoamEvolution",
+                ProvisionalMaterialEvolution);
+            computeShader.SetFloat("_FoamBreakup", ProvisionalMaterialBreakup);
+            computeShader.SetFloat("_FoamSpread", ProvisionalMaterialSpread);
+            computeShader.SetFloat("_FoamCohesion", ProvisionalMaterialCohesion);
             computeShader.SetFloat(
                 "_FoamConnectivity",
-                river.FoamConnectivity);
+                ProvisionalMaterialConnectivity);
             computeShader.SetFloat(
                 "_FoamAmountDecay",
                 DecayToFivePercent /
-                Mathf.Max(0.05f, river.FoamLifetime));
+                Mathf.Max(0.05f, ProvisionalMaterialLifetime));
             computeShader.SetFloat(
                 "_FoamFreshnessDecay",
                 DecayToFivePercent /
-                Mathf.Max(0.05f, river.FoamFreshnessLifetime));
+                Mathf.Max(0.05f, ProvisionalMaterialFreshnessLifetime));
             computeShader.SetFloat(
                 "_FoamIntegrityDamage",
-                Mathf.Clamp01(river.FoamFragmentation));
+                Mathf.Clamp01(ProvisionalMaterialIntegrityDamage));
             computeShader.SetFloat(
                 "_FoamShoreRetention",
-                river.FoamShoreRetention);
+                ProvisionalMaterialShoreRetention);
             computeShader.SetFloat("_FoamTime", river.MotionTime);
             computeShader.SetFloat("_FoamSeed", river.VisualSeed);
             computeShader.SetFloat(
                 "_FoamTargetCoverage",
-                IsAutonomousPopulationActive
-                    ? river.FoamTargetCoverage
+                IsAutomaticMaterialSupplyActive
+                    ? ProvisionalMaterialTargetCoverage
                     : 0f);
             computeShader.SetFloat(
                 "_FoamSupplyRate",
-                IsAutonomousPopulationActive
-                    ? river.FoamSupplyRate
+                IsAutomaticMaterialSupplyActive
+                    ? ProvisionalMaterialSupplyRate
                     : 0f);
             computeShader.SetFloat(
                 "_FoamVisibleThreshold",
-                river.FoamPopulationVisibleThreshold);
+                ProvisionalMaterialVisibleThreshold);
             computeShader.SetFloat(
                 "_FoamGuidanceStrength",
-                river.FoamGuidanceStrength);
+                ProvisionalMaterialGuidanceStrength);
             computeShader.SetFloat(
                 "_FoamBoundaryAttraction",
-                river.FoamBoundaryAttraction);
+                ProvisionalMaterialBoundaryAttraction);
             computeShader.SetFloat(
                 "_FoamWakeReinforcement",
-                river.FoamWakeReinforcement);
+                ProvisionalMaterialWakeReinforcement);
             computeShader.SetFloat(
                 "_FoamImpactReinforcement",
-                river.FoamImpactReinforcement);
+                ProvisionalMaterialImpactReinforcement);
 
             bool disturbanceAvailable =
                 disturbanceRuntime != null &&
@@ -3736,11 +3755,21 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(FoamGlobalStartId, river.Domain.GlobalDistanceMinimum);
             propertyBlock.SetFloat(FoamFieldLengthId, Mathf.Max(0.001f, fieldLength));
             propertyBlock.SetColor(FoamColourId, river.FoamColour);
-            propertyBlock.SetFloat(FoamStrengthId, river.FoamStrength);
-            propertyBlock.SetFloat(FoamCoverageId, river.FoamCoverage);
-            propertyBlock.SetFloat(FoamSharpnessId, river.FoamSharpness);
-            propertyBlock.SetFloat(FoamDetailScaleId, river.FoamDetailScale);
-            propertyBlock.SetFloat(FoamDetailStrengthId, river.FoamDetailStrength);
+            propertyBlock.SetFloat(
+                FoamStrengthId,
+                ProvisionalMaterialStrength);
+            propertyBlock.SetFloat(
+                FoamCoverageId,
+                ProvisionalMaterialCoverage);
+            propertyBlock.SetFloat(
+                FoamSharpnessId,
+                ProvisionalMaterialSharpness);
+            propertyBlock.SetFloat(
+                FoamDetailScaleId,
+                ProvisionalMaterialDetailScale);
+            propertyBlock.SetFloat(
+                FoamDetailStrengthId,
+                ProvisionalMaterialDetailStrength);
             propertyBlock.SetFloat(FoamDebugViewId, (float)river.FoamDebugView);
             propertyBlock.SetFloat(FoamSeedId, river.VisualSeed);
             surfaceRenderer.SetPropertyBlock(propertyBlock);
@@ -3893,8 +3922,6 @@ namespace ProgrammaticStylized3D.Rivers
             initializationObstacleStableFrameCount = 0;
             initializationPhase = InitializationPhase.NotStarted;
             domainVersion = -1;
-            autonomousDecayUntil = 0.0;
-            autonomousPopulationWasEnabled = false;
             guidanceAccumulator = 0f;
             topologyMetricsAccumulator = 0f;
             populationAccumulator = 0f;

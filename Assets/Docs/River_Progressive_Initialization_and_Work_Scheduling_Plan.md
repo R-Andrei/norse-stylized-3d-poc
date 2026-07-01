@@ -1735,16 +1735,16 @@ The scheduling architecture is successful when:
 
 ## 25. Immediate Next Step
 
-The active implementation step is **Topology Step 1 — Major Candidate Vertical Slice and Obsolete-Path Removal**.
+Topology Patches 1 through 3.5 are accepted:
 
-The patch must:
+- field-first Major candidate generation and inspectable cleanup stages;
+- whole-river Major distribution and stable metadata;
+- Major-to-Major Connector Support with bounded pathfinding;
+- Connector Amount, Directness, and Length Preference;
+- endpoint gates, Major clearance halos, strong-Major suppression, and bounded detour rejection;
+- soft dynamic re-ranking that mildly favours unconnected Major regions and underrepresented longitudinal sections without imposing quotas;
+- removal of obsolete topology paths and obsolete broad Foam authoring controls.
 
-- remove the complete stale topology implementation made unnecessary by the replacement, including but not limited to the three-lobe/one-bite Major grammar, nucleus descriptors and reconstruction kernels, provisional Pocket path, disabled Connector path, unused fixture, and any additional dead resources, states, metrics, bindings, or editor text found through reference tracing;
-- implement one deterministic field-first Major candidate using correlated scalar fields, coordinate warp, percentile thresholding, largest-component retention, hole filling, limited cleanup, neck-width validation, bounded rejection, and soft support output;
-- expose `Raw Field`, `Thresholded`, `Cleaned`, and `Final Support` in one compact candidate preview;
-- report only accepted/rejected state, primary rejection reason, occupied area, minimum neck width, and one compact shape-quality measure;
-- preserve the accepted staged initialization, dirty-rebuild queue, anchored sources, Obstacle Footprint, and topology output contract;
-- avoid whole-river placement, Connector generation, Pocket generation, material response, runtime movement, cache packaging, and unrelated performance changes.
+The active implementation step is **Topology Step 4 — Pocket Aging Pressure**.
 
-If the candidate family fails visually, implementation stops at this step. Whole-river distribution and all later topology work remain blocked until the field-first candidate method is accepted.
-
+The scheduling contract remains unchanged: Pocket generation may use bounded preparation-time distance analysis and candidate selection during the temporary visual-proof path, but it must not become ordinary per-frame gameplay work. The result must be immediately inspectable on the actual river and remain separately measurable before static combined-topology validation begins.

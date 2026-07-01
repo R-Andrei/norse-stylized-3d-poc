@@ -902,7 +902,7 @@ Further performance work is now formally paused after the accepted profiler inst
 - The active generator may use candidate retries, connected-component cleanup, hole filling, distance transforms, endpoint clustering, bounded pathfinding, rejection, and composition scoring because those operations are necessary to prove the final visual model.
 - Active gameplay must not run those expensive topology-generation operations once the production pipeline exists. Gameplay should consume cached per-river/per-run fields, cached descriptors, or another accepted compact representation.
 - During the temporary proof path, generation runs only on initialization or queued topology rebuilds, never every frame as ordinary steady-state maintenance.
-- Connector Support and Pocket Aging Pressure are now part of the integrated visual proof. They remain separately validated, but they are no longer blocked behind a cached Major shape-library implementation.
+- Connector Support and Pocket Aging Pressure are part of the integrated visual proof. Connector Support is currently accepted as a Major-to-Major relationship layer; its selection uses a soft degree-aware and longitudinal-distribution bias so wider participation is encouraged without mandatory first connections or section quotas. Anchored endpoints remain optional future work. Pocket remains the next separately validated slice.
 - The final runtime target remains bounded sampling/composition of accepted fields or compact descriptors. No final shader loop may scan candidate lists, shape libraries, path graphs, or growing structure collections.
 - Foam runtime Obstacle Footprint rebuilds must never call exact mesh triangle baking. Runtime rebuilds consume generated footprint contours and rasterize a single centre sample per candidate cell; any return to 3x3 CPU sampling, exact mesh interval baking, or per-object triangle scanning is a performance regression.
 - Automatic generated-source footprint and Static Pressure support refreshes must not read mesh triangles during Play startup. They use bounds-derived/cached contours unless exact data has already been authored or cached offline.
@@ -929,23 +929,23 @@ Deferred optimization notes:
 
 ## Public Controls
 
-The currently accepted main Inspector controls remain:
+The currently active normal Inspector controls are:
 
-- `Amount`
-- `Web Granularity`
-- `Network Evolution`
-- `Major Support Amount` — default `0.56`, range `0–1`; activates a nested deterministic subset of the fixed opportunity lattice and does not change existing descriptor positions or cached-shape assignments
-- `Major Support Size` — default `0.46`, range `0–1`; scales the same deterministic opportunities and does not change their activation rank or position
-- `Major Support Seed` — default `1`, non-negative integer; deterministically controls topology generation, opportunity activation, shape/field identity, transforms, and later drift identity
-- `Major Evolution Rate (Hz)` — default `2`, range `0.5–10`
-- `Major Cleanup Rate (Hz)` — default `1`, range `0.5–10`
-- `Breakup Frequency`
-- `Foam Speed`
-- `Foam Colour`
+- `Foam Enabled`;
+- `Major Support Amount` — range `0–1`; nested deterministic population;
+- `Major Support Size` — range `0–1`; overall physical scale envelope;
+- `Major Support Size Variation` — range `0–1`; relative spread between stable Major opportunity sizes;
+- `Major Support Seed` — non-negative integer; deterministic candidate, opportunity, transform, and future evolution identity;
+- `Connector Amount` — range `0–1`; accepted relationship population and bounded overlap tolerance;
+- `Connector Directness` — range `0–1`; endpoint directness and one broad deterministic bend;
+- `Connector Length Preference` — range `0–1`; short-biased through neutral to long-biased ranking inside a fixed safe envelope;
+- `Foam Colour`.
 
-Generator controls such as field structure scale, warp, occupancy, angular retention, composition scoring, connector cost, pocket spacing, and acceptance thresholds are temporary proof/developer controls until the visual model is accepted. Final production authoring may move them into a cached topology profile, build step, or per-run bake settings rather than exposing raw coefficients in the normal river Inspector.
+Patch 3.4 removed `Foam Preset`, the old broad `Amount`, `Web Granularity`, `Network Evolution`, `Breakup Frequency`, `Foam Speed`, `Major Evolution Rate`, and `Major Cleanup Rate`. Their preset, migration, compatibility, and resolver code was removed as well. The persistent material solver temporarily uses one fixed internal provisional baseline until the separate lifecycle-authoring pass proves a new canonical control set.
 
-The soft-lifecycle design also requires tunable base lifetime and support/aging-pressure response. Their exact public names, ranges, grouping, and defaults are intentionally deferred to the future lifecycle-authoring pass. Do not expose raw implementation coefficients before the lifecycle behaviour is visually proven.
+Generator coefficients such as field structure scale, warp, occupancy, composition scoring, path cost, gate radius, clearance thresholds, detour limits, and future pocket spacing remain implementation details until visual testing proves that normal authoring requires them.
+
+The soft-lifecycle design still requires tunable base lifetime and support/aging-pressure response. Their exact public names, ranges, grouping, and defaults are intentionally deferred to the future lifecycle-authoring pass. Do not expose raw implementation coefficients before the lifecycle behaviour is visually proven.
 
 ## Implementation Sequence
 
@@ -966,25 +966,27 @@ The canonical topology-only rollout is maintained in `River_Foam_Topology_Implem
 11. Queued/coalesced boundary and obstacle rebuild scheduling.
 12. Deterministic Major opportunity placement, seed control, lateral distribution, and orientation experiments sufficient to preserve those contracts in the replacement.
 13. Patch 0 topology implementation documentation and cross-document alignment.
+14. Field-first Major candidate generation, cleanup, preview, and obsolete-path removal.
+15. Whole-river Major placement, size hierarchy, nested Amount, and stable metadata.
+16. Sparse Major-to-Major Connector Support with `Amount`, `Directness`, and `Length Preference`.
+17. Connector endpoint gates, Major clearance halos, strong-Major raster suppression, and bounded detour rejection.
+18. Soft degree-aware Connector selection and mild longitudinal load balancing, while preserving geometric/path quality as the dominant criterion.
+19. Removal of obsolete broad Foam authoring controls, inert cadence controls, presets, migrations, compatibility fields, and dependent resolver code.
 
 ### Active
 
-1. Remove the complete obsolete topology path through a reference-driven audit, including but not limited to the lobe/nucleus Major grammar, provisional Pocket path, disabled Connector path, and unused fixture.
-2. Implement one deterministic field-first Major candidate vertical slice.
-3. Expose the candidate immediately through the compact four-stage preview and essential rejection metrics.
-4. Stop and validate the candidate family before whole-river placement.
+1. Implement Pocket Aging Pressure from broad accepted Major interiors.
+2. Expose Pocket hosts, accepted pressure, and concise rejection telemetry on the actual river.
+3. Stop and validate Pocket placement before combined static topology acceptance.
 
 ### Next topology slices
 
-1. Whole-river Major distribution and compact stable identity/evolution metadata.
-2. Connector Support from meaningful positive and anchored endpoints.
-3. Pocket Aging Pressure from broad accepted Major interiors.
-4. Static combined topology validation using the existing river diagnostics.
-5. Strictly downstream Major movement through cheap runtime evolution.
-6. Layer-specific Connector and Pocket evolution.
-7. Safe generated-topology rebuild crossfade.
-8. Production cache/precompute packaging for the accepted generator and evolution metadata.
-9. Topology completion and handoff to the separate Foam material-lifecycle work.
+1. Static combined topology validation using the existing river diagnostics.
+2. Strictly downstream Major movement through cheap runtime evolution.
+3. Layer-specific Connector and Pocket evolution.
+4. Safe generated-topology rebuild crossfade.
+5. Production cache/precompute packaging for the accepted generator and evolution metadata.
+6. Topology completion and handoff to the separate Foam material-lifecycle work.
 
 Material aging response, fragmentation, dissipation, and rendering are not topology implementation steps. They remain later Stage 6 work after the relevant topology outputs are accepted.
 
@@ -1019,6 +1021,9 @@ Pass only if connectors:
 - remain sparse and subordinate;
 - evolve gradually rather than popping;
 - avoid obvious obstacle and domain violations;
+- leave and enter Major regions only through compact endpoint gates;
+- do not orbit around Major perimeters to force unlikely endpoint relationships;
+- remain within the accepted bounded detour ratio;
 - may use bounded pathfinding or cost-field search during proof/bake generation, but do not require a persistent gameplay graph or steady-state path search.
 
 ### Pocket Aging Pressure

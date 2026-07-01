@@ -7,8 +7,10 @@ namespace ProgrammaticStylized3D.Rivers
 {
     /// <summary>
     /// Deterministic CPU proof generator for sparse prepared Connector Support.
-    /// Patch 3.3 connects disconnected Major components only, blocks
-    /// unrelated Major interiors during routing, and exposes bounded Amount,
+    /// Patch 3.5 connects disconnected Major components only, blocks
+    /// Major clearance halos outside narrow endpoint gates, rejects excessive
+    /// detours, softly favours wider component and longitudinal participation,
+    /// and exposes bounded Amount,
     /// Directness, and Length Preference controls. It does
     /// not approximate the authoritative live Pressure, Lee, or Shore fields
     /// on the CPU, and performs no work during ordinary gameplay.
@@ -17,8 +19,9 @@ namespace ProgrammaticStylized3D.Rivers
     {
         private const float MajorComponentThreshold = 0.18f;
         private const float MajorRoutingInteriorThreshold = 0.42f;
+        private const float MajorRoutingHaloThreshold = 0.08f;
         private const float MajorRasterSuppressionStart = 0.16f;
-        private const float EndpointMajorAllowanceMetres = 0.38f;
+        private const float EndpointGateRadiusMetres = 0.46f;
         private const int MinimumComponentCellCount = 5;
         private const int EndpointSectorCount = 12;
         private const int MaximumEndpointsPerComponent = 10;
@@ -27,6 +30,10 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumGapMetres = 0.28f;
         private const float MinimumUnsupportedSpanMetres = 0.24f;
         private const float ConnectorCoverageThreshold = 0.15f;
+        private const int LongitudinalDistributionSectionCount = 6;
+        private const float UnconnectedComponentScoreBonus = 0.045f;
+        private const float RepeatedComponentScorePenalty = 0.040f;
+        private const float LongitudinalSectionLoadPenalty = 0.020f;
 
         public static StylizedRiverFoamConnectorTopology Generate(
             RiverDomainSnapshot domain,
@@ -176,35 +183,40 @@ namespace ProgrammaticStylized3D.Rivers
                     1,
                     maximumRelationshipCap)
                 : 0;
-            int pairLimit = Mathf.Min(maximumPairAttempts, pairs.Count);
             float maximumOverlapRatio = Mathf.Lerp(
                 0.12f,
                 0.56f,
                 connectorAmount);
             int acceptedCycleCount = 0;
+            bool[] evaluatedPairs = new bool[pairs.Count];
+            int[] acceptedRelationshipsBySection =
+                new int[LongitudinalDistributionSectionCount];
 
             float[] candidateRaster = new float[cellCount];
-            for (int pairIndex = 0;
-                 pairIndex < pairLimit &&
-                 acceptedRelationships.Count < maximumAccepted;
-                 pairIndex++)
+            while (pathAttemptCount < maximumPairAttempts &&
+                   acceptedRelationships.Count < maximumAccepted)
             {
-                ComponentPair pair = pairs[pairIndex];
-                if (componentDegree[pair.StartComponentIndex] >=
-                        maximumComponentDegree ||
-                    componentDegree[pair.EndComponentIndex] >=
-                        maximumComponentDegree)
+                int pairIndex = SelectNextPairIndex(
+                    pairs,
+                    evaluatedPairs,
+                    componentDegree,
+                    relationships,
+                    acceptedCycleCount,
+                    cycleBudget,
+                    maximumComponentDegree,
+                    acceptedRelationshipsBySection,
+                    acceptedRelationships.Count,
+                    validFieldLength);
+                if (pairIndex < 0)
                 {
-                    continue;
+                    break;
                 }
 
+                evaluatedPairs[pairIndex] = true;
+                ComponentPair pair = pairs[pairIndex];
                 bool createsCycle =
                     relationships.Find(pair.StartComponentIndex) ==
                     relationships.Find(pair.EndComponentIndex);
-                if (createsCycle && acceptedCycleCount >= cycleBudget)
-                {
-                    continue;
-                }
 
                 pathAttemptCount++;
                 if (!TryFindPath(
@@ -243,13 +255,18 @@ namespace ProgrammaticStylized3D.Rivers
                 float pathLength = MeasurePathLength(
                     simplifiedPath,
                     metricPositions);
+                // Curved routes may be longer than the direct endpoint gap,
+                // but a Connector must still read as a bridge rather than an
+                // orbit around either Major region. The bend allowance remains
+                // broad enough for the approved single-waypoint grammar and
+                // sensible obstacle avoidance.
                 float relativePathLimit = Mathf.Lerp(
-                    2.65f,
-                    1.80f,
+                    1.85f,
+                    1.65f,
                     connectorDirectness);
                 float pathPadding = Mathf.Lerp(
-                    1.15f,
-                    0.65f,
+                    0.58f,
+                    0.38f,
                     connectorDirectness);
                 if (pathLength >
                         pair.DistanceMetres * relativePathLimit + pathPadding ||
@@ -260,7 +277,7 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
-                if (PathCrossesBlockedMajorInterior(
+                if (PathCrossesBlockedMajorHalo(
                         path,
                         validCells,
                         componentLabels,
@@ -360,6 +377,12 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 uint evolutionSeed = MixBits(relationshipId ^ 0xD1B54A35u);
+                int acceptedSection = ResolveLongitudinalSection(
+                    pair,
+                    validFieldLength,
+                    acceptedRelationshipsBySection.Length);
+                acceptedRelationshipsBySection[acceptedSection]++;
+
                 acceptedRelationships.Add(
                     new StylizedRiverFoamConnectorRelationship(
                         relationshipId,
@@ -411,6 +434,132 @@ namespace ProgrammaticStylized3D.Rivers
                 connectorSupport,
                 acceptedRelationships.ToArray(),
                 rejectionCounts);
+        }
+
+        private static int SelectNextPairIndex(
+            IReadOnlyList<ComponentPair> pairs,
+            bool[] evaluatedPairs,
+            int[] componentDegree,
+            DisjointSet relationships,
+            int acceptedCycleCount,
+            int cycleBudget,
+            int maximumComponentDegree,
+            int[] acceptedRelationshipsBySection,
+            int acceptedRelationshipCount,
+            float validFieldLength)
+        {
+            int bestIndex = -1;
+            float bestScore = float.PositiveInfinity;
+
+            for (int index = 0; index < pairs.Count; index++)
+            {
+                if (evaluatedPairs[index])
+                {
+                    continue;
+                }
+
+                ComponentPair pair = pairs[index];
+                int startDegree = componentDegree[
+                    pair.StartComponentIndex];
+                int endDegree = componentDegree[
+                    pair.EndComponentIndex];
+                if (startDegree >= maximumComponentDegree ||
+                    endDegree >= maximumComponentDegree)
+                {
+                    continue;
+                }
+
+                bool createsCycle =
+                    relationships.Find(pair.StartComponentIndex) ==
+                    relationships.Find(pair.EndComponentIndex);
+                if (createsCycle && acceptedCycleCount >= cycleBudget)
+                {
+                    continue;
+                }
+
+                // These are deliberately small ordering biases. The
+                // relationship geometry remains the primary score, and a
+                // strong repeated relationship may still outrank a weak first
+                // connection elsewhere.
+                float dynamicScore = pair.Score +
+                    ResolveComponentDegreeScoreAdjustment(startDegree) +
+                    ResolveComponentDegreeScoreAdjustment(endDegree) +
+                    ResolveLongitudinalSectionScoreAdjustment(
+                        pair,
+                        validFieldLength,
+                        acceptedRelationshipsBySection,
+                        acceptedRelationshipCount);
+
+                if (dynamicScore < bestScore - 0.000001f ||
+                    (Mathf.Abs(dynamicScore - bestScore) <= 0.000001f &&
+                     (bestIndex < 0 || index < bestIndex)))
+                {
+                    bestIndex = index;
+                    bestScore = dynamicScore;
+                }
+            }
+
+            return bestIndex;
+        }
+
+        private static float ResolveComponentDegreeScoreAdjustment(
+            int degree)
+        {
+            if (degree <= 0)
+            {
+                return -UnconnectedComponentScoreBonus;
+            }
+
+            if (degree == 1)
+            {
+                return 0f;
+            }
+
+            return (degree - 1) * RepeatedComponentScorePenalty;
+        }
+
+        private static float ResolveLongitudinalSectionScoreAdjustment(
+            ComponentPair pair,
+            float validFieldLength,
+            int[] acceptedRelationshipsBySection,
+            int acceptedRelationshipCount)
+        {
+            if (acceptedRelationshipsBySection == null ||
+                acceptedRelationshipsBySection.Length == 0 ||
+                acceptedRelationshipCount <= 0)
+            {
+                return 0f;
+            }
+
+            int section = ResolveLongitudinalSection(
+                pair,
+                validFieldLength,
+                acceptedRelationshipsBySection.Length);
+            float averageLoad = acceptedRelationshipCount /
+                (float)acceptedRelationshipsBySection.Length;
+            float relativeLoad =
+                acceptedRelationshipsBySection[section] - averageLoad;
+            return relativeLoad * LongitudinalSectionLoadPenalty;
+        }
+
+        private static int ResolveLongitudinalSection(
+            ComponentPair pair,
+            float validFieldLength,
+            int sectionCount)
+        {
+            if (sectionCount <= 1)
+            {
+                return 0;
+            }
+
+            float midpointDistance =
+                (pair.StartEndpoint.Position.x +
+                 pair.EndEndpoint.Position.x) * 0.5f;
+            float normalizedDistance = Mathf.Clamp01(
+                midpointDistance / Mathf.Max(0.0001f, validFieldLength));
+            return Mathf.Min(
+                sectionCount - 1,
+                Mathf.FloorToInt(normalizedDistance * sectionCount));
         }
 
         private static StylizedRiverFoamConnectorTopology CreateEmpty(
@@ -1441,7 +1590,7 @@ namespace ProgrammaticStylized3D.Rivers
             for (int index = 0; index < validCells.Length; index++)
             {
                 if (!validCells[index] ||
-                    majorSupport[index] >= MajorComponentThreshold * 0.72f)
+                    majorSupport[index] >= MajorRoutingHaloThreshold)
                 {
                     continue;
                 }
@@ -1765,37 +1914,50 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            if (majorSupport[cellIndex] < MajorRoutingInteriorThreshold)
+            float major = majorSupport[cellIndex];
+            if (major < MajorRoutingHaloThreshold)
             {
                 return true;
             }
 
             int label = componentLabels[cellIndex];
-            if (label < 0)
+            if (label >= 0 &&
+                label != startComponent &&
+                label != endComponent)
             {
                 return false;
             }
 
+            // Major Support forms a blocked clearance halo. Only compact gates
+            // around the selected source and destination endpoints are open.
+            // This prevents the pathfinder from travelling around a region's
+            // perimeter merely to reach an unlikely corner.
+            bool insideStartGate = Vector2.Distance(
+                metricPositions[cellIndex],
+                metricPositions[startEndpointCell]) <=
+                EndpointGateRadiusMetres;
+            bool insideEndGate = Vector2.Distance(
+                metricPositions[cellIndex],
+                metricPositions[endEndpointCell]) <=
+                EndpointGateRadiusMetres;
+
             if (label == startComponent)
             {
-                return Vector2.Distance(
-                    metricPositions[cellIndex],
-                    metricPositions[startEndpointCell]) <=
-                    EndpointMajorAllowanceMetres;
+                return insideStartGate;
             }
 
             if (label == endComponent)
             {
-                return Vector2.Distance(
-                    metricPositions[cellIndex],
-                    metricPositions[endEndpointCell]) <=
-                    EndpointMajorAllowanceMetres;
+                return insideEndGate;
             }
 
-            return false;
+            // Soft support outside the labelled component interior belongs to
+            // the same clearance halo. It is traversable only through one of
+            // the two endpoint gates.
+            return insideStartGate || insideEndGate;
         }
 
-        private static bool PathCrossesBlockedMajorInterior(
+        private static bool PathCrossesBlockedMajorHalo(
             List<int> path,
             bool[] validCells,
             int[] componentLabels,
