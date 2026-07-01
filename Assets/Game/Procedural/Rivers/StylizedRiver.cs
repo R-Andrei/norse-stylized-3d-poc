@@ -700,6 +700,10 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamEdgeCavityAmount = 0.5f;
 
+        [Tooltip("Controls the nested deterministic population of Connector Weak Span negative regions. Weak Spans remain bound to accepted Connector identities, stay away from endpoint gates, and locally weaken a short path section without deleting or regenerating the Connector. Zero disables them; 0.5 is the normal baseline; one permits the maximum bounded population.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamConnectorWeakSpanAmount = 0.5f;
+
         [Tooltip("Lit, non-emissive Foam tint. The alpha channel controls maximum Foam opacity, so no separate opacity control is required.")]
         [SerializeField] private Color foamColour =
             new Color(0.94f, 0.97f, 0.94f, 0.72f);
@@ -1146,6 +1150,8 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamInteriorPocketAmount);
         public float FoamEdgeCavityAmount =>
             Mathf.Clamp01(foamEdgeCavityAmount);
+        public float FoamConnectorWeakSpanAmount =>
+            Mathf.Clamp01(foamConnectorWeakSpanAmount);
         public Color FoamColour => foamColour;
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
         public float FoamTestDistanceNormalized =>
@@ -2777,6 +2783,8 @@ namespace ProgrammaticStylized3D.Rivers
                 foamInteriorPocketAmount);
             foamEdgeCavityAmount = Mathf.Clamp01(
                 foamEdgeCavityAmount);
+            foamConnectorWeakSpanAmount = Mathf.Clamp01(
+                foamConnectorWeakSpanAmount);
             foamColour.a = Mathf.Clamp01(foamColour.a);
             foamTestDistanceNormalized = Mathf.Clamp01(
                 foamTestDistanceNormalized);

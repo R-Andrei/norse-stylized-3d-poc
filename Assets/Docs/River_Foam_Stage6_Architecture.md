@@ -23,7 +23,7 @@ Accepted static topology foundation:
 - accepted Major-to-Major Connector Support with `Amount`, `Directness`, and `Length Preference`;
 - Connector endpoint gates, Major clearance halos, bounded detour rejection, and soft participation/distribution balancing;
 - the initial Interior Pocket proof hosted by broad Major interiors;
-- Patch 4.2 implementation of nested `Interior Pocket Amount` and one-sided `Edge Cavity Amount`, currently awaiting visual acceptance;
+- Patch 4.2 Interior Pocket and Edge Cavity classes accepted for feature progression, with population coefficients still provisional;
 - exact transformed-mesh Obstacle Footprint, distinct from padded Pressure/Lee disturbance footprints;
 - separate support and negative-influence diagnostics;
 - field-based GPU infrastructure, chunking, sleeping, freezing, and resource lifecycle support;
@@ -36,16 +36,15 @@ Approved negative-topology expansion before runtime evolution:
 
 - rename the aggregate negative output concept to **Negative Aging Pressure**;
 - retain the current closed Major-hosted class as **Interior Pocket**;
-- implement **Edge Cavity** in Patch 4.2 and add **Connector Weak Span** and **Free-Water Negative Event** in the following slices;
-- expose one independent `0–1` Amount control per negative class, all defaulting to `0.5`; Patch 4.2 now exposes the first two;
+- retain accepted Interior Pockets and Edge Cavities, implement **Connector Weak Span** in Patch 4.3, and add **Free-Water Negative Event** in Patch 4.4;
+- expose one independent `0–1` Amount control per negative class, all defaulting to `0.5`; Patch 4.2 exposes Interior Pocket and Edge Cavity Amount, and Patch 4.3 exposes Connector Weak Span Amount;
 - make each Amount activate a nested deterministic opportunity subset and control population only;
 - preserve subtype identity and future evolution metadata even when classes are packed into one aggregate negative field for diagnostics/output;
 - visually validate all four classes statically before runtime evolution begins.
 
 Not yet implemented or accepted:
 
-- Patch 4.2 visual acceptance for Interior Pocket Amount and Edge Cavities;
-- Patch 4.3 Connector Weak Spans;
+- Patch 4.3 Connector Weak Spans — implemented; visual acceptance pending;
 - Patch 4.4 Free-Water Negative Events;
 - Patch 4.5 complete static topology validation;
 - strictly downstream free-water topology movement and class-specific evolution;
@@ -910,7 +909,7 @@ Further performance work is now formally paused after the accepted profiler inst
 - The active generator may use candidate retries, connected-component cleanup, hole filling, distance transforms, endpoint clustering, bounded pathfinding, rejection, and composition scoring because those operations are necessary to prove the final visual model.
 - Active gameplay must not run those expensive topology-generation operations once the production pipeline exists. Gameplay should consume cached per-river/per-run fields, cached descriptors, or another accepted compact representation.
 - During the temporary proof path, generation runs only on initialization or queued topology rebuilds, never every frame as ordinary steady-state maintenance.
-- Connector Support and four-class Negative Aging Pressure are part of the integrated visual proof. Connector Support is accepted as a Major-to-Major relationship layer; its selection uses a soft degree-aware and longitudinal-distribution bias so wider participation is encouraged without mandatory first connections or section quotas. Interior Pocket is accepted as the initial negative baseline; Edge Cavity, Connector Weak Span, and Free-Water Negative Event remain the next separately validated slices.
+- Connector Support and four-class Negative Aging Pressure are part of the integrated visual proof. Connector Support is accepted as a Major-to-Major relationship layer; its selection uses a soft degree-aware and longitudinal-distribution bias so wider participation is encouraged without mandatory first connections or section quotas. Interior Pocket and Edge Cavity are accepted for feature progression with later coefficient tuning permitted. Connector Weak Span is implemented in Patch 4.3 and awaiting visual acceptance; Free-Water Negative Event remains the next separately validated slice.
 - The final runtime target remains bounded sampling/composition of accepted fields or compact descriptors. No final shader loop may scan candidate lists, shape libraries, path graphs, or growing structure collections.
 - Ordinary gameplay Obstacle Footprint updates must never rescan mesh triangles. The temporary development fallback may perform exact 3 × 3 interval preparation only during staged pre-gameplay initialization or a coalesced explicit geometry rebuild. Production must load the same compact prepared data from the procedural chunk build/link cache.
 - Static Pressure may retain its accepted contour source for now. Authoritative Obstacle Footprint must use exact prepared mesh intervals; the temporary Play-startup scan exists only until procedural chunk build/link preparation owns and caches that data.
@@ -947,14 +946,14 @@ The currently accepted normal Inspector controls are:
 - `Connector Amount` — range `0–1`; accepted relationship population and bounded overlap tolerance;
 - `Connector Directness` — range `0–1`; endpoint directness and one broad deterministic bend;
 - `Connector Length Preference` — range `0–1`; short-biased through neutral to long-biased ranking inside a fixed safe envelope;
-- `Interior Pocket Amount` — range `0–1`, default `0.5`; implemented in Patch 4.2 and awaiting visual acceptance;
-- `Edge Cavity Amount` — range `0–1`, default `0.5`; implemented in Patch 4.2 and awaiting visual acceptance;
+- `Interior Pocket Amount` — range `0–1`, default `0.5`; accepted for feature progression, with coefficient tuning deferred;
+- `Edge Cavity Amount` — range `0–1`, default `0.5`; accepted for feature progression, with coefficient tuning deferred;
 - `Foam Colour`.
 
-The following approved controls remain for Patches 4.3–4.4:
+The active/remaining negative controls are:
 
-- `Connector Weak Span Amount` — range `0–1`, default `0.5`;
-- `Free-Water Event Amount` — range `0–1`, default `0.5`.
+- `Connector Weak Span Amount` — range `0–1`, default `0.5`; implemented in Patch 4.3 and awaiting visual acceptance;
+- `Free-Water Event Amount` — range `0–1`, default `0.5`; reserved for Patch 4.4.
 
 For all four negative controls, `0` means none, `0.5` means a sensible category-specific baseline, and `1` means the maximum bounded population. Increasing Amount activates a nested deterministic subset and does not change size, negative strength, seed, or evolution speed.
 
@@ -978,12 +977,12 @@ The canonical topology-only rollout is maintained in `River_Foam_Topology_Implem
 6. Complete removal of obsolete topology grammar and obsolete broad Foam controls.
 7. Initial Interior Pocket proof hosted by broad Major interiors.
 8. Patch 4.1 exact transformed-mesh Obstacle Footprint and procedural chunk/run preparation handoff contract.
-9. Patch 4.2 implementation of nested Interior Pocket population and one-sided Edge Cavities; visual acceptance pending.
+9. Patch 4.2 Interior Pocket population and one-sided Edge Cavities accepted for feature progression; coefficient tuning deferred.
+10. Patch 4.3 Connector Weak Spans implemented; visual acceptance pending.
 
 ### Active negative-topology sequence
 
-1. Validate Patch 4.2 Interior Pockets and Edge Cavities separately and together.
-2. Patch 4.3 — add Connector Weak Spans.
+1. Patch 4.3 — Connector Weak Spans implemented; validate the retained accepted path geometry, endpoint clearance, local cut shape, and Amount behaviour.
 3. Patch 4.4 — add Free-Water Negative Events.
 4. Patch 4.5 — validate complete static positive and four-class negative topology.
 

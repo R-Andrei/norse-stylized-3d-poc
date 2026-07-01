@@ -36,7 +36,7 @@ Current progress:
 - **Step 2 — Per-river staged bootstrap:** implemented and validated. Initialization now advances one explicit phase per `LateUpdate`; Foam remains disabled until complete readiness. The observed early phases were generally below roughly `2.5 ms` instead of recreating the former combined burst.
 - **Step 3 — Dirty-event queue and obstacle rebuild coalescing:** implemented and accepted. Boundary and obstacle changes no longer execute a complete rebuild chain immediately.
 - **Performance pause:** active. Steady-state maintenance staggering, compute-asset splitting, striped dispatch, CPU jobs, and global cross-river scheduling are deferred until Major Support, Connector Support, all four Negative Aging Pressure classes, static combined topology, runtime evolution, rebuild crossfade, and cache/preparation packaging are implemented and validated.
-- **Current implementation milestone:** Patch 4.1 exact Obstacle Footprint is accepted together with the initial Interior Pocket proof. Patch 4.2 now implements nested Interior Pocket Amount and one-sided Edge Cavities and is awaiting visual acceptance. Connector Weak Spans and Free-Water Negative Events remain subsequent slices before static combined validation. Exact transformed-mesh interval preparation currently runs only in the staged pre-gameplay obstacle phase as a temporary fallback. Production ownership belongs to procedural chunk generation/building/linking after final object placement, with compact data cached for gameplay loading.
+- **Current implementation milestone:** Patch 4.1 exact Obstacle Footprint is accepted. Patch 4.2 Interior Pockets and Edge Cavities are accepted for feature progression with population coefficients still provisional. Patch 4.3 now implements Connector Weak Spans and is awaiting visual acceptance; Free-Water Negative Events remain the next slice before static combined validation. Exact transformed-mesh interval preparation currently runs only in the staged pre-gameplay obstacle phase as a temporary fallback. Production ownership belongs to procedural chunk generation/building/linking after final object placement, with compact data cached for gameplay loading.
 - **Global cross-river scheduling:** intentionally deferred. It will be designed only after the final one-river work categories, dependencies, interruption rules, and costs are known.
 
 The current sequencing rule is now: preserve the accepted performance foundation, prove each topology slice visually before building the next one, keep every expensive proof-stage operation profiled and named, then resume performance work against the real completed pipeline. Do not invent scheduler categories for features that are still provisional.
@@ -58,8 +58,8 @@ Further performance engineering is paused because the free-water topology pipeli
 1. accepted field-first Major candidate and whole-river Major distribution;
 2. accepted Connector Support;
 3. accepted initial Interior Pocket and exact Obstacle Footprint;
-4. Patch 4.2 Interior Pocket Amount and Edge Cavities — implemented; visual acceptance pending;
-5. Patch 4.3 Connector Weak Spans;
+4. Patch 4.2 Interior Pocket Amount and Edge Cavities — accepted for feature progression; coefficient tuning deferred;
+5. Patch 4.3 Connector Weak Spans — implemented; visual acceptance pending;
 6. Patch 4.4 Free-Water Negative Events;
 7. Patch 4.5 static combined topology validation;
 8. strictly downstream class-specific topology evolution;
@@ -1670,15 +1670,14 @@ Accepted topology work:
 
 Remaining topology slices:
 
-1. Patch 4.2 Interior Pocket Amount and Edge Cavities;
-2. Patch 4.3 Connector Weak Spans;
-3. Patch 4.4 Free-Water Negative Events;
-4. Patch 4.5 complete static topology validation;
-5. strictly downstream Major evolution;
-6. class-specific Connector and Negative Aging Pressure evolution;
-7. safe generated-topology rebuild crossfade;
-8. production procedural chunk/run cache and precompute packaging;
-9. handoff to separate Foam-material work.
+1. Patch 4.3 Connector Weak Span visual acceptance;
+2. Patch 4.4 Free-Water Negative Events;
+3. Patch 4.5 complete static topology validation;
+4. strictly downstream Major evolution;
+5. class-specific Connector and Negative Aging Pressure evolution;
+6. safe generated-topology rebuild crossfade;
+7. production procedural chunk/run cache and precompute packaging;
+8. handoff to separate Foam-material work.
 
 All four negative classes are preparation-time generators. Interior/edge host analysis, Connector span selection, and Free-Water opportunity curation may be expensive during the proof path, but ordinary gameplay may only perform bounded cached sampling, offsets, fades, strength changes, and recycling.
 
@@ -1733,8 +1732,8 @@ The scheduling architecture is successful when:
 
 ## 25. Immediate Next Step
 
-Major Support, Connector Support, the initial Interior Pocket proof, and Patch 4.1 exact transformed-mesh Obstacle Footprint are accepted. Patch 4.2 is implemented and awaiting visual acceptance.
+Major Support, Connector Support, Patch 4.1 exact transformed-mesh Obstacle Footprint, Interior Pockets, and Edge Cavities are accepted for feature progression. Patch 4.3 Connector Weak Spans is implemented and awaiting visual acceptance.
 
-Validate Patch 4.2 by isolating Interior Pockets and Edge Cavities with their independent Amount controls, testing `0`, `0.5`, and `1`, and checking several seeds. The accepted performance contract remains unchanged: all host assignment, distance analysis, boundary selection, cavity rasterization, and rejection work occurs only in staged preparation or an explicit dirty rebuild.
+Patch 4.3 retains each accepted Connector's simplified metric path during the existing Connector preparation pass. Weak-Span opportunity creation and rasterization then run only in the staged negative-topology preparation phase or an explicit dirty rebuild. No pathfinding, path reconstruction, candidate search, or negative rasterization runs during ordinary gameplay.
 
-After visual acceptance, Patch 4.3 adds Connector Weak Spans and Patch 4.4 adds Free-Water Negative Events. Patch 4.5 validates the complete static topology. Runtime evolution, rebuild crossfade, and cache/preparation packaging follow before any Foam-material implementation.
+Validate Patch 4.3 by isolating Connector Weak Spans, testing Amount `0`, `0.5`, and `1`, and checking endpoint clearance, path alignment, single-versus-secondary span behaviour, and several seeds. Patch 4.4 then adds Free-Water Negative Events. Patch 4.5 validates the complete static topology. Runtime evolution, rebuild crossfade, and cache/preparation packaging follow before any Foam-material implementation.

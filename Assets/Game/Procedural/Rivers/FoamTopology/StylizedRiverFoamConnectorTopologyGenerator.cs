@@ -149,6 +149,7 @@ namespace ProgrammaticStylized3D.Rivers
             DisjointSet relationships = new DisjointSet(components.Count);
             List<StylizedRiverFoamConnectorRelationship>
                 acceptedRelationships = new();
+            List<StylizedRiverFoamConnectorPath> acceptedPaths = new();
             int pathAttemptCount = 0;
             int maximumPairAttempts = Mathf.Max(
                 1,
@@ -376,6 +377,19 @@ namespace ProgrammaticStylized3D.Rivers
                         pair.EndComponentIndex);
                 }
 
+                Vector2[] acceptedMetricPath = new Vector2[
+                    simplifiedPath.Count];
+                for (int pointIndex = 0;
+                     pointIndex < simplifiedPath.Count;
+                     pointIndex++)
+                {
+                    acceptedMetricPath[pointIndex] =
+                        metricPositions[simplifiedPath[pointIndex]];
+                }
+                acceptedPaths.Add(new StylizedRiverFoamConnectorPath(
+                    relationshipId,
+                    acceptedMetricPath));
+
                 uint evolutionSeed = MixBits(relationshipId ^ 0xD1B54A35u);
                 int acceptedSection = ResolveLongitudinalSection(
                     pair,
@@ -433,6 +447,7 @@ namespace ProgrammaticStylized3D.Rivers
                 stopwatch.Elapsed.TotalMilliseconds,
                 connectorSupport,
                 acceptedRelationships.ToArray(),
+                acceptedPaths.ToArray(),
                 rejectionCounts);
         }
 
@@ -579,6 +594,7 @@ namespace ProgrammaticStylized3D.Rivers
                 milliseconds,
                 support,
                 Array.Empty<StylizedRiverFoamConnectorRelationship>(),
+                Array.Empty<StylizedRiverFoamConnectorPath>(),
                 rejectionCounts);
         }
 

@@ -86,6 +86,34 @@ namespace ProgrammaticStylized3D.Rivers
         public float FragilitySelector { get; }
     }
 
+
+    /// <summary>
+    /// Immutable prepared metric polyline for one accepted Connector
+    /// relationship. The Connector generator already computes this path for
+    /// rasterization; retaining it allows later topology slices and runtime
+    /// evolution to remain associated with the exact accepted relationship
+    /// without reconstructing or pathfinding again.
+    /// </summary>
+    public sealed class StylizedRiverFoamConnectorPath
+    {
+        private readonly Vector2[] metricPoints;
+
+        internal StylizedRiverFoamConnectorPath(
+            uint stableId,
+            Vector2[] metricPoints)
+        {
+            StableId = stableId;
+            this.metricPoints = metricPoints != null
+                ? (Vector2[])metricPoints.Clone()
+                : Array.Empty<Vector2>();
+        }
+
+        public uint StableId { get; }
+        public IReadOnlyList<Vector2> MetricPoints => metricPoints;
+
+        internal Vector2[] MetricPointData => metricPoints;
+    }
+
     /// <summary>
     /// Immutable result of one deterministic prepared Connector Support build.
     /// The result contains only the accepted scalar field, stable relationship
@@ -95,6 +123,7 @@ namespace ProgrammaticStylized3D.Rivers
     {
         private readonly float[] support;
         private readonly StylizedRiverFoamConnectorRelationship[] relationships;
+        private readonly StylizedRiverFoamConnectorPath[] paths;
         private readonly int[] rejectionCounts;
 
         internal StylizedRiverFoamConnectorTopology(
@@ -107,6 +136,7 @@ namespace ProgrammaticStylized3D.Rivers
             double generationMilliseconds,
             float[] support,
             StylizedRiverFoamConnectorRelationship[] relationships,
+            StylizedRiverFoamConnectorPath[] paths,
             int[] rejectionCounts)
         {
             Width = Mathf.Max(0, width);
@@ -119,6 +149,8 @@ namespace ProgrammaticStylized3D.Rivers
             this.support = support ?? Array.Empty<float>();
             this.relationships = relationships ??
                 Array.Empty<StylizedRiverFoamConnectorRelationship>();
+            this.paths = paths ??
+                Array.Empty<StylizedRiverFoamConnectorPath>();
             this.rejectionCounts = rejectionCounts ??
                 new int[Enum.GetValues(
                     typeof(StylizedRiverFoamConnectorRejectionReason)).Length];
@@ -133,6 +165,14 @@ namespace ProgrammaticStylized3D.Rivers
         public double GenerationMilliseconds { get; }
         public IReadOnlyList<StylizedRiverFoamConnectorRelationship>
             Relationships => relationships;
+        public IReadOnlyList<StylizedRiverFoamConnectorPath> Paths => paths;
+
+        // The accepted scalar field and path geometry remain immutable by
+        // convention and are exposed only inside prepared topology assembly.
+        // Weak Span generation consumes the retained accepted paths rather than
+        // inferring relationship geometry from the flattened support field.
+        internal IReadOnlyList<StylizedRiverFoamConnectorPath> PreparedPaths =>
+            paths;
 
         // The accepted scalar field remains immutable by convention and is
         // exposed only inside prepared topology assembly so Pocket generation

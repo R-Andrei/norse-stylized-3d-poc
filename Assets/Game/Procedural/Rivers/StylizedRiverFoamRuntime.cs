@@ -497,6 +497,16 @@ namespace ProgrammaticStylized3D.Rivers
         public int EdgeCavityAcceptedCount => pocketTopology != null
             ? pocketTopology.AcceptedEdgeCavityCount
             : 0;
+        public int ConnectorWeakSpanEligibleConnectorCount =>
+            pocketTopology != null
+                ? pocketTopology.WeakSpanEligibleConnectorCount
+                : 0;
+        public int ConnectorWeakSpanCandidateCount => pocketTopology != null
+            ? pocketTopology.WeakSpanCandidateCount
+            : 0;
+        public int ConnectorWeakSpanAcceptedCount => pocketTopology != null
+            ? pocketTopology.AcceptedConnectorWeakSpanCount
+            : 0;
         public string PocketTopRejectionReason => pocketTopology != null
             ? pocketTopology.GetTopRejectionSummary()
             : "None";
@@ -839,7 +849,7 @@ namespace ProgrammaticStylized3D.Rivers
                     if (topologyDebugActive &&
                         !topologyMaintenanceBlocked)
                     {
-                        // Patch 4.2 composes accepted static Major and
+                        // Patch 4.3 composes accepted static Major and
                         // Connector fields plus aggregate Major-hosted Negative
                         // Aging Pressure with the live anchored sources.
                         topologyMetricsAccumulator += stepDuration;
@@ -1457,7 +1467,7 @@ namespace ProgrammaticStylized3D.Rivers
                             "PS3D_RiverFoam_Topology");
                         topologySourcesTexture = CreateGuidanceTexture(
                             "PS3D_RiverFoam_TopologySources");
-                        // Patch 4.2 uploads deterministic prepared Major,
+                        // Patch 4.3 uploads deterministic prepared Major,
                         // Connector, and aggregate Major-hosted Negative Aging
                         // Pressure through separate channels of this input.
                         topologyGeneratedTexture = CreateGuidanceTexture(
@@ -2945,6 +2955,7 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamMajorSupportSeed,
                     river.FoamInteriorPocketAmount,
                     river.FoamEdgeCavityAmount,
+                    river.FoamConnectorWeakSpanAmount,
                     obstacleExclusionScalar,
                     majorTopology,
                     connectorTopology);
@@ -3081,9 +3092,11 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamInteriorPocketAmount * 10000f);
                 hash = hash * 31 + Mathf.RoundToInt(
                     river.FoamEdgeCavityAmount * 10000f);
-                // Patch 4.2: nested Interior Pocket activation plus one-sided
-                // Edge Cavity generation and host-preservation validation.
-                hash = hash * 31 + 2;
+                hash = hash * 31 + Mathf.RoundToInt(
+                    river.FoamConnectorWeakSpanAmount * 10000f);
+                // Patch 4.3: Major-hosted negative classes plus Connector-
+                // hosted Weak Spans using retained accepted path identity.
+                hash = hash * 31 + 3;
                 return hash;
             }
         }

@@ -7927,15 +7927,18 @@ MonoBehaviour:
     geometryContribution: 0.65
     normalContribution: 1
   foamEnabled: 1
-  foamMajorSupportAmount: 0.485
-  foamMajorSupportSize: 0.405
+  foamMajorSupportAmount: 0.472
+  foamMajorSupportSize: 0.392
   foamMajorSupportSizeVariation: 0.887
-  foamMajorSupportSeed: 55
+  foamMajorSupportSeed: 22
   foamConnectorAmount: 0.436
   foamConnectorDirectness: 0.4
-  foamConnectorLengthPreference: 0.407
+  foamConnectorLengthPreference: 0.352
+  foamInteriorPocketAmount: 0.5
+  foamEdgeCavityAmount: 0.5
+  foamConnectorWeakSpanAmount: 0.5
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}
-  foamDebugView: 7
+  foamDebugView: 6
   foamTestDistanceNormalized: 0.5
   foamTestAcrossNormalized: 0
   foamTestRadius: 0.8

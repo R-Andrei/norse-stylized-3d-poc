@@ -1471,7 +1471,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.2 adds independently controllable closed Interior Pockets and one-sided Edge Cavities while preserving Major and Connector behaviour.",
+                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.3 retains independently controllable closed Interior Pockets and one-sided Edge Cavities, and adds Connector-hosted Weak Spans while preserving Major and Connector behaviour.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1525,6 +1525,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent(
                     "Edge Cavity Amount",
                     "Controls the nested deterministic population of lopsided Major-hosted negative regions that deliberately breach one selected side while preserving a useful positive remainder. Zero disables them; 0.5 is the normal baseline; one permits the maximum bounded population."));
+            EditorGUILayout.PropertyField(
+                Find("foamConnectorWeakSpanAmount"),
+                new GUIContent(
+                    "Connector Weak Span Amount",
+                    "Controls the nested deterministic population of short Connector-hosted negative regions. Weak Spans remain associated with accepted Connector identities, stay away from endpoint gates, and locally weaken rather than delete the relationship. Zero disables them; 0.5 is the normal baseline; one permits the maximum bounded population."));
             EditorGUILayout.PropertyField(
                 Find("foamColour"),
                 new GUIContent(
@@ -1729,8 +1734,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Patch 4.2 generates and composes static whole-river Major Support, controllable sparse Major-to-Major Connector Support, closed Interior Pockets, and one-sided Edge Cavities. Stable class, region, relationship, host, and breach-side identity remain available for later evolution. Authoritative live Pressure, Lee, Shore, and Obstacle Footprint sources remain independently composed."),
-                new GUIContent("Major + Connector + Major-Hosted Negative Topology (Patch 4.2)"));
+                    "Patch 4.3 generates and composes static whole-river Major Support, controllable sparse Major-to-Major Connector Support, closed Interior Pockets, one-sided Edge Cavities, and Connector Weak Spans. Stable class, region, relationship, host, path, and breach-side identity remain available for later evolution. Authoritative live Pressure, Lee, Shore, and Obstacle Footprint sources remain independently composed."),
+                new GUIContent("Major + Connector + Prepared Negative Topology (Patch 4.3)"));
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
                 new GUIContent(
@@ -1748,7 +1753,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Topology Resolution",
-                    "Primary RGBAHalf topology field at the same structural resolution as persistent material: red is Major Support, green Connector Support, blue is aggregate Negative Aging Pressure from the implemented Interior Pocket and Edge Cavity classes, and alpha is the structural-grid copy of the water-level-aware Obstacle Footprint. The authoritative footprint diagnostic uses a dedicated point-sampled texture at that same resolution, reconstructed from one-time exact transformed-mesh solid intervals at the current Stage 3 water height. The companion anchored-source texture stores Pressure Support, Lee Support, and Shore Support separately; alpha is reserved zero. Support and negative influence remain separately available rather than being treated as hard occupancy permission."),
+                    "Primary RGBAHalf topology field at the same structural resolution as persistent material: red is Major Support, green Connector Support, blue is aggregate Negative Aging Pressure from the implemented Interior Pocket, Edge Cavity, and Connector Weak Span classes, and alpha is the structural-grid copy of the water-level-aware Obstacle Footprint. The authoritative footprint diagnostic uses a dedicated point-sampled texture at that same resolution, reconstructed from one-time exact transformed-mesh solid intervals at the current Stage 3 water height. The companion anchored-source texture stores Pressure Support, Lee Support, and Shore Support separately; alpha is reserved zero. Support and negative influence remain separately available rather than being treated as hard occupancy permission."),
                 new GUIContent(
                     runtime.ResourcesAllocated
                         ? $"{runtime.TopologyWidth} × {runtime.TopologyHeight}"
@@ -1824,8 +1829,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUILayout.LabelField(
                 new GUIContent(
-                    "Major-Hosted Negative Generation",
-                    "Deterministic prepared Negative Aging Pressure derived from broad accepted Major interiors after Connector generation. Interior Pockets preserve a closed positive rim. Edge Cavities bias toward and breach one deliberate side while retaining a useful positive remainder."),
+                    "Prepared Negative Generation",
+                    "Deterministic prepared Negative Aging Pressure. Interior Pockets preserve a closed Major rim, Edge Cavities breach one deliberate Major side, and Connector Weak Spans locally weaken accepted Connector paths away from endpoint gates."),
                 new GUIContent(
                     runtime.PocketTopologyAvailable
                         ? "Available"
@@ -1847,6 +1852,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Cavity Selected / Feasible",
                     $"{runtime.EdgeCavityAcceptedCount} / " +
                     runtime.EdgeCavityCandidateCount);
+                EditorGUILayout.LabelField(
+                    "Weak-Span Eligible Connectors",
+                    runtime.ConnectorWeakSpanEligibleConnectorCount.ToString());
+                EditorGUILayout.LabelField(
+                    "Weak-Span Selected / Feasible",
+                    $"{runtime.ConnectorWeakSpanAcceptedCount} / " +
+                    runtime.ConnectorWeakSpanCandidateCount);
                 EditorGUILayout.LabelField(
                     "Top Rejection Reasons",
                     runtime.PocketTopRejectionReason);
@@ -1914,7 +1926,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent("Subsystem Rates"),
                 new GUIContent(
-                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz · Major, Connector, Interior Pocket, and Edge Cavity topology are static in Patch 4.2"));
+                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz · Major, Connector, Interior Pocket, Edge Cavity, and Connector Weak Span topology are static in Patch 4.3"));
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Transport",
@@ -2516,7 +2528,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.NegativeInfluenceClasses:
                     return
-                        "Independent negative-influence inputs. Red = aggregate Major-hosted Negative Aging Pressure from closed Interior Pockets and one-sided Edge Cavities. Set either Amount to zero to inspect the other class alone. Connector cores, useful positive Major remainder, live Pressure/Lee/Shore cores, obstacles, and invalid water are protected. Blue = the exact current-water-level Obstacle Footprint. Magenta = overlap. Negative topology remains a soft future aging influence and does not cut immediate material holes.";
+                        "Independent negative-influence inputs. Red = aggregate Major-hosted Negative Aging Pressure from closed Interior Pockets, one-sided Edge Cavities, and Connector Weak Spans. Set the other Amount controls to zero to isolate one class. Connector cores, useful positive Major remainder, live Pressure/Lee/Shore cores, obstacles, and invalid water are protected. Blue = the exact current-water-level Obstacle Footprint. Magenta = overlap. Negative topology remains a soft future aging influence and does not cut immediate material holes.";
 
                 case StylizedRiverFoamDebugView.SupportAndNegativeInfluence:
                     return

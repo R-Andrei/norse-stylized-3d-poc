@@ -13,26 +13,32 @@ namespace ProgrammaticStylized3D.Rivers
         NoRasterCoverage,
         NoUsableBoundary,
         NoEdgeBreach,
-        HostWouldCollapse
+        HostWouldCollapse,
+        ConnectorTooShort,
+        NoUsableConnectorSpan,
+        ConnectorSpanSpacing
     }
 
     /// <summary>
-    /// The implemented Major-hosted Negative Aging Pressure classes. The
-    /// legacy Pocket type name remains the low-level aggregate container until
-    /// the later Connector Weak Span and Free-Water Event slices are added.
+    /// The implemented Negative Aging Pressure classes. The legacy Pocket type
+    /// name remains the low-level aggregate container until the later
+    /// Free-Water Event slice completes the static negative class set.
     /// </summary>
     public enum StylizedRiverFoamNegativeRegionClass
     {
         InteriorPocket,
-        EdgeCavity
+        EdgeCavity,
+        ConnectorWeakSpan
     }
 
     /// <summary>
     /// Stable host identity and cheap future-evolution metadata for one accepted
-    /// Major-hosted Negative Aging Pressure region. Patch 4.2 uses only the
-    /// static aggregate field; normalized selectors defer physical timing,
-    /// drift, growth, and respawn decisions to the later runtime-evolution gate.
-    /// Edge cavities additionally retain their deliberate breach direction.
+    /// Negative Aging Pressure region. Major-hosted classes use a Major region
+    /// identity; Connector Weak Spans use their accepted Connector identity.
+    /// Patch 4.3 uses only the static aggregate field; normalized selectors defer
+    /// physical timing, drift, growth, and respawn decisions to the later
+    /// runtime-evolution gate. Edge cavities additionally retain their deliberate
+    /// breach direction.
     /// </summary>
     public readonly struct StylizedRiverFoamPocketRegion
     {
@@ -99,8 +105,8 @@ namespace ProgrammaticStylized3D.Rivers
     }
 
     /// <summary>
-    /// Immutable result of one deterministic prepared Major-hosted Negative
-    /// Aging Pressure build. The aggregate field remains independent from
+    /// Immutable result of one deterministic prepared Negative Aging Pressure
+    /// build. The aggregate field remains independent from
     /// positive support and therefore never destructively edits Major or
     /// Connector topology.
     /// </summary>
@@ -119,6 +125,9 @@ namespace ProgrammaticStylized3D.Rivers
             int cavityEligibleHostCount,
             int cavityCandidateCount,
             int acceptedEdgeCavityCount,
+            int weakSpanEligibleConnectorCount,
+            int weakSpanCandidateCount,
+            int acceptedConnectorWeakSpanCount,
             int coveredCellCount,
             double generationMilliseconds,
             float[] pressure,
@@ -139,6 +148,13 @@ namespace ProgrammaticStylized3D.Rivers
             AcceptedEdgeCavityCount = Mathf.Max(
                 0,
                 acceptedEdgeCavityCount);
+            WeakSpanEligibleConnectorCount = Mathf.Max(
+                0,
+                weakSpanEligibleConnectorCount);
+            WeakSpanCandidateCount = Mathf.Max(0, weakSpanCandidateCount);
+            AcceptedConnectorWeakSpanCount = Mathf.Max(
+                0,
+                acceptedConnectorWeakSpanCount);
             CoveredCellCount = Mathf.Max(0, coveredCellCount);
             GenerationMilliseconds = Math.Max(0.0, generationMilliseconds);
             this.pressure = pressure ?? Array.Empty<float>();
@@ -157,18 +173,24 @@ namespace ProgrammaticStylized3D.Rivers
         public int CavityEligibleHostCount { get; }
         public int CavityCandidateCount { get; }
         public int AcceptedEdgeCavityCount { get; }
+        public int WeakSpanEligibleConnectorCount { get; }
+        public int WeakSpanCandidateCount { get; }
+        public int AcceptedConnectorWeakSpanCount { get; }
         public int CoveredCellCount { get; }
         public double GenerationMilliseconds { get; }
 
         // Compatibility totals retained for the existing concise runtime
-        // telemetry while the two implemented classes also remain inspectable
+        // telemetry while the implemented classes also remain inspectable
         // separately.
         public int EligibleHostCount =>
-            InteriorEligibleHostCount + CavityEligibleHostCount;
+            InteriorEligibleHostCount + CavityEligibleHostCount +
+            WeakSpanEligibleConnectorCount;
         public int CandidateCentreCount =>
-            InteriorCandidateCount + CavityCandidateCount;
+            InteriorCandidateCount + CavityCandidateCount +
+            WeakSpanCandidateCount;
         public int AcceptedPocketCount =>
-            AcceptedInteriorPocketCount + AcceptedEdgeCavityCount;
+            AcceptedInteriorPocketCount + AcceptedEdgeCavityCount +
+            AcceptedConnectorWeakSpanCount;
 
         public IReadOnlyList<StylizedRiverFoamPocketRegion> Regions => regions;
 

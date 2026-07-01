@@ -6,13 +6,13 @@ using UnityEngine;
 namespace ProgrammaticStylized3D.Rivers
 {
     /// <summary>
-    /// Deterministic CPU proof generator for the Major-hosted Negative Aging
-    /// Pressure classes. Interior Pockets preserve a closed positive rim. Edge
-    /// Cavities remain associated with a broad Major host but deliberately bias
-    /// toward and breach one selected side while preserving a useful positive
-    /// remainder. Both classes avoid important Connector cores and obstacle
-    /// context and remain independent from positive support. Authoritative live
-    /// Pressure, Lee, and Shore protection is applied during GPU composition.
+    /// Deterministic CPU proof generator for prepared Negative Aging Pressure.
+    /// Interior Pockets preserve a closed Major rim. Edge Cavities breach one
+    /// deliberate Major side while preserving a useful positive remainder.
+    /// Connector Weak Spans remain bound to accepted Connector identities and
+    /// locally weaken short path sections away from endpoint gates. All classes
+    /// remain independent from positive support. Authoritative live Pressure,
+    /// Lee, and Shore protection is applied during GPU composition.
     /// </summary>
     public static class StylizedRiverFoamPocketTopologyGenerator
     {
@@ -34,6 +34,13 @@ namespace ProgrammaticStylized3D.Rivers
         private const float PocketCoverageThreshold = 0.15f;
         private const int MaximumInteriorPocketsPerHost = 3;
         private const int MaximumCavitiesPerHost = 2;
+        private const float MinimumWeakSpanConnectorLengthMetres = 0.72f;
+        private const float MinimumWeakSpanUsableLengthMetres = 0.26f;
+        private const float WeakSpanEndpointClearanceMetres = 0.34f;
+        private const float SecondaryWeakSpanMinimumLengthMetres = 1.60f;
+        private const float MinimumWeakSpanSpacingMetres = 0.44f;
+        private const float WeakSpanConnectorThreshold = 0.045f;
+        private const float WeakSpanMajorProtectionThreshold = 0.30f;
         private const uint InvalidHostId = uint.MaxValue;
 
         public static StylizedRiverFoamPocketTopology Generate(
@@ -47,6 +54,7 @@ namespace ProgrammaticStylized3D.Rivers
             int seed,
             float interiorPocketAmount,
             float edgeCavityAmount,
+            float connectorWeakSpanAmount,
             float[] obstacleMask,
             StylizedRiverFoamMajorTopology majorTopology,
             StylizedRiverFoamConnectorTopology connectorTopology)
@@ -92,6 +100,8 @@ namespace ProgrammaticStylized3D.Rivers
             seed = Mathf.Max(0, seed);
             interiorPocketAmount = Mathf.Clamp01(interiorPocketAmount);
             edgeCavityAmount = Mathf.Clamp01(edgeCavityAmount);
+            connectorWeakSpanAmount = Mathf.Clamp01(
+                connectorWeakSpanAmount);
 
             float[] fluidCoverage = new float[cellCount];
             bool[] validCells = new bool[cellCount];
@@ -419,14 +429,34 @@ namespace ProgrammaticStylized3D.Rivers
                 }
             }
 
+            List<PreparedNegativeRegion> feasibleWeakSpanRegions = new();
+            int weakSpanEligibleConnectorCount = 0;
+            if (connectorWeakSpanAmount > 0.0001f)
+            {
+                feasibleWeakSpanRegions = BuildConnectorWeakSpanRegions(
+                    connectorTopology.PreparedPaths,
+                    domain,
+                    seed,
+                    validCells,
+                    majorSupport,
+                    connectorSupport,
+                    metricPositions,
+                    rejectionCounts,
+                    out weakSpanEligibleConnectorCount);
+            }
+
             int selectedInteriorCount = ResolveSelectedCount(
                 interiorPocketAmount,
                 feasibleInteriorRegions.Count);
             int selectedCavityCount = ResolveSelectedCount(
                 edgeCavityAmount,
                 feasibleCavityRegions.Count);
+            int selectedWeakSpanCount = ResolveSelectedCount(
+                connectorWeakSpanAmount,
+                feasibleWeakSpanRegions.Count);
             List<StylizedRiverFoamPocketRegion> regions = new(
-                selectedInteriorCount + selectedCavityCount);
+                selectedInteriorCount + selectedCavityCount +
+                selectedWeakSpanCount);
             ApplyPreparedPrefix(
                 feasibleInteriorRegions,
                 selectedInteriorCount,
@@ -436,6 +466,12 @@ namespace ProgrammaticStylized3D.Rivers
             ApplyPreparedPrefix(
                 feasibleCavityRegions,
                 selectedCavityCount,
+                domain,
+                pressure,
+                regions);
+            ApplyPreparedPrefix(
+                feasibleWeakSpanRegions,
+                selectedWeakSpanCount,
                 domain,
                 pressure,
                 regions);
@@ -464,6 +500,9 @@ namespace ProgrammaticStylized3D.Rivers
                 cavityEligibleHostCount,
                 feasibleCavityRegions.Count,
                 selectedCavityCount,
+                weakSpanEligibleConnectorCount,
+                feasibleWeakSpanRegions.Count,
+                selectedWeakSpanCount,
                 coveredCellCount,
                 stopwatch.Elapsed.TotalMilliseconds,
                 pressure,
@@ -488,10 +527,342 @@ namespace ProgrammaticStylized3D.Rivers
                 0,
                 0,
                 0,
+                0,
+                0,
+                0,
                 milliseconds,
                 pressure,
                 Array.Empty<StylizedRiverFoamPocketRegion>(),
                 rejectionCounts);
+        }
+
+        private static List<PreparedNegativeRegion>
+            BuildConnectorWeakSpanRegions(
+                IReadOnlyList<StylizedRiverFoamConnectorPath> paths,
+                RiverDomainSnapshot domain,
+                int seed,
+                bool[] validCells,
+                float[] majorSupport,
+                float[] connectorSupport,
+                Vector2[] metricPositions,
+                int[] rejectionCounts,
+                out int eligibleConnectorCount)
+        {
+            eligibleConnectorCount = 0;
+            List<WeakSpanOpportunity> primary = new();
+            List<WeakSpanOpportunity> secondary = new();
+            if (paths == null)
+            {
+                return new List<PreparedNegativeRegion>();
+            }
+
+            for (int pathIndex = 0; pathIndex < paths.Count; pathIndex++)
+            {
+                StylizedRiverFoamConnectorPath path = paths[pathIndex];
+                Vector2[] points = path?.MetricPointData;
+                float length = MeasurePolyline(points);
+                if (points == null || points.Length < 2 ||
+                    length < MinimumWeakSpanConnectorLengthMetres)
+                {
+                    rejectionCounts[(int)
+                        StylizedRiverFoamPocketRejectionReason
+                            .ConnectorTooShort]++;
+                    continue;
+                }
+
+                float endpointClearance = Mathf.Min(
+                    Mathf.Max(
+                        WeakSpanEndpointClearanceMetres,
+                        length * 0.16f),
+                    length * 0.34f);
+                float usableLength = length - endpointClearance * 2f;
+                if (usableLength < MinimumWeakSpanUsableLengthMetres)
+                {
+                    rejectionCounts[(int)
+                        StylizedRiverFoamPocketRejectionReason
+                            .NoUsableConnectorSpan]++;
+                    continue;
+                }
+
+                eligibleConnectorCount++;
+                uint primaryId = MixBits(
+                    path.StableId ^ (uint)seed ^ 0xA24BAED5u);
+                float primaryFraction = Mathf.Lerp(
+                    0.40f,
+                    0.60f,
+                    Hash01(primaryId, 61u));
+                primary.Add(new WeakSpanOpportunity(
+                    primaryId,
+                    path.StableId,
+                    points,
+                    length,
+                    endpointClearance + usableLength * primaryFraction,
+                    Hash01(primaryId, 62u)));
+
+                if (length >= SecondaryWeakSpanMinimumLengthMetres &&
+                    usableLength >= MinimumWeakSpanSpacingMetres * 2f)
+                {
+                    uint secondaryId = MixBits(
+                        path.StableId ^ (uint)seed ^ 0x9FB21C65u);
+                    bool placeUpstream = primaryFraction >= 0.5f;
+                    float secondaryFraction = placeUpstream
+                        ? Mathf.Lerp(0.16f, 0.31f, Hash01(secondaryId, 63u))
+                        : Mathf.Lerp(0.69f, 0.84f, Hash01(secondaryId, 63u));
+                    secondary.Add(new WeakSpanOpportunity(
+                        secondaryId,
+                        path.StableId,
+                        points,
+                        length,
+                        endpointClearance + usableLength * secondaryFraction,
+                        Hash01(secondaryId, 64u)));
+                }
+            }
+
+            primary.Sort(CompareWeakSpanOpportunity);
+            secondary.Sort(CompareWeakSpanOpportunity);
+            List<WeakSpanOpportunity> opportunities = new(
+                primary.Count + secondary.Count);
+            opportunities.AddRange(primary);
+            opportunities.AddRange(secondary);
+
+            List<PreparedNegativeRegion> prepared = new();
+            Dictionary<uint, List<AcceptedWeakSpan>> acceptedByConnector =
+                new();
+            float[] raster = new float[validCells.Length];
+            for (int opportunityIndex = 0;
+                 opportunityIndex < opportunities.Count;
+                 opportunityIndex++)
+            {
+                WeakSpanOpportunity opportunity =
+                    opportunities[opportunityIndex];
+                if (!SamplePolyline(
+                        opportunity.Points,
+                        opportunity.DistanceAlongPath,
+                        out Vector2 position,
+                        out Vector2 tangent))
+                {
+                    rejectionCounts[(int)
+                        StylizedRiverFoamPocketRejectionReason
+                            .NoUsableConnectorSpan]++;
+                    continue;
+                }
+
+                uint stableId = opportunity.StableId;
+                float cutSelector = Hash01(stableId, 65u);
+                float alongRadius = Mathf.Lerp(
+                    0.17f,
+                    0.34f,
+                    Hash01(stableId, 66u));
+                float acrossRadius = Mathf.Lerp(
+                    0.17f,
+                    0.29f,
+                    cutSelector);
+                float strength = Mathf.Lerp(0.52f, 1.0f, cutSelector);
+
+                if (!acceptedByConnector.TryGetValue(
+                        opportunity.ConnectorId,
+                        out List<AcceptedWeakSpan> accepted))
+                {
+                    accepted = new List<AcceptedWeakSpan>();
+                    acceptedByConnector.Add(
+                        opportunity.ConnectorId,
+                        accepted);
+                }
+
+                bool spacingViolation = false;
+                for (int acceptedIndex = 0;
+                     acceptedIndex < accepted.Count;
+                     acceptedIndex++)
+                {
+                    AcceptedWeakSpan other = accepted[acceptedIndex];
+                    float required = Mathf.Max(
+                        MinimumWeakSpanSpacingMetres,
+                        alongRadius + other.AlongRadius);
+                    if (Mathf.Abs(
+                            opportunity.DistanceAlongPath -
+                            other.DistanceAlongPath) < required)
+                    {
+                        spacingViolation = true;
+                        break;
+                    }
+                }
+                if (spacingViolation)
+                {
+                    rejectionCounts[(int)
+                        StylizedRiverFoamPocketRejectionReason
+                            .ConnectorSpanSpacing]++;
+                    continue;
+                }
+
+                Array.Clear(raster, 0, raster.Length);
+                int coverage = RasterizeConnectorWeakSpan(
+                    stableId,
+                    position,
+                    tangent,
+                    alongRadius,
+                    acrossRadius,
+                    strength,
+                    validCells,
+                    majorSupport,
+                    connectorSupport,
+                    metricPositions,
+                    raster);
+                if (coverage <= 0)
+                {
+                    rejectionCounts[(int)
+                        StylizedRiverFoamPocketRejectionReason
+                            .NoRasterCoverage]++;
+                    continue;
+                }
+
+                accepted.Add(new AcceptedWeakSpan(
+                    opportunity.DistanceAlongPath,
+                    alongRadius));
+                prepared.Add(new PreparedNegativeRegion(
+                    StylizedRiverFoamNegativeRegionClass.ConnectorWeakSpan,
+                    stableId,
+                    opportunity.ConnectorId,
+                    position,
+                    ResolveAcrossNormalized(domain, position),
+                    Mathf.Atan2(tangent.y, tangent.x),
+                    alongRadius,
+                    acrossRadius,
+                    Vector2.zero,
+                    CaptureRaster(raster)));
+            }
+
+            return prepared;
+        }
+
+        private static int CompareWeakSpanOpportunity(
+            WeakSpanOpportunity a,
+            WeakSpanOpportunity b)
+        {
+            int rank = a.ActivationRank.CompareTo(b.ActivationRank);
+            if (rank != 0)
+            {
+                return rank;
+            }
+            return a.StableId.CompareTo(b.StableId);
+        }
+
+        private static int RasterizeConnectorWeakSpan(
+            uint stableId,
+            Vector2 centre,
+            Vector2 tangent,
+            float alongRadius,
+            float acrossRadius,
+            float strength,
+            bool[] validCells,
+            float[] majorSupport,
+            float[] connectorSupport,
+            Vector2[] metricPositions,
+            float[] destination)
+        {
+            Vector2 normal = new Vector2(-tangent.y, tangent.x);
+            int covered = 0;
+            for (int index = 0; index < destination.Length; index++)
+            {
+                if (!validCells[index] ||
+                    majorSupport[index] >= WeakSpanMajorProtectionThreshold ||
+                    connectorSupport[index] < WeakSpanConnectorThreshold)
+                {
+                    continue;
+                }
+
+                Vector2 delta = metricPositions[index] - centre;
+                float along = Vector2.Dot(delta, tangent) /
+                    Mathf.Max(0.0001f, alongRadius);
+                float across = Vector2.Dot(delta, normal) /
+                    Mathf.Max(0.0001f, acrossRadius);
+                float radial = Mathf.Sqrt(along * along + across * across);
+                if (radial >= 1f)
+                {
+                    continue;
+                }
+
+                Vector2 noisePosition = metricPositions[index] * 4.2f;
+                float noise = ValueNoise(
+                    noisePosition.x,
+                    noisePosition.y,
+                    stableId ^ 0x6C8E9CF5u);
+                radial += (noise - 0.5f) * 0.16f;
+                float envelope = 1f - SmoothStep(0.54f, 1f, radial);
+                float connectorMask = SmoothStep(
+                    WeakSpanConnectorThreshold,
+                    0.20f,
+                    connectorSupport[index]);
+                float majorProtection = 1f - SmoothStep(
+                    0.10f,
+                    WeakSpanMajorProtectionThreshold,
+                    majorSupport[index]);
+                float value = envelope * strength * connectorMask *
+                    majorProtection;
+                if (value <= 0.0001f)
+                {
+                    continue;
+                }
+
+                destination[index] = Mathf.Max(destination[index], value);
+                if (value >= PocketCoverageThreshold)
+                {
+                    covered++;
+                }
+            }
+
+            return covered;
+        }
+
+        private static float MeasurePolyline(Vector2[] points)
+        {
+            if (points == null || points.Length < 2)
+            {
+                return 0f;
+            }
+
+            float length = 0f;
+            for (int index = 1; index < points.Length; index++)
+            {
+                length += Vector2.Distance(points[index - 1], points[index]);
+            }
+            return length;
+        }
+
+        private static bool SamplePolyline(
+            Vector2[] points,
+            float distance,
+            out Vector2 position,
+            out Vector2 tangent)
+        {
+            position = Vector2.zero;
+            tangent = Vector2.right;
+            if (points == null || points.Length < 2)
+            {
+                return false;
+            }
+
+            float remaining = Mathf.Max(0f, distance);
+            for (int index = 1; index < points.Length; index++)
+            {
+                Vector2 segment = points[index] - points[index - 1];
+                float length = segment.magnitude;
+                if (length <= 0.0001f)
+                {
+                    continue;
+                }
+
+                if (remaining <= length || index == points.Length - 1)
+                {
+                    float t = Mathf.Clamp01(remaining / length);
+                    position = Vector2.Lerp(points[index - 1], points[index], t);
+                    tangent = segment / length;
+                    return true;
+                }
+
+                remaining -= length;
+            }
+
+            return false;
         }
 
         private static List<HostMetric> BuildHostMetrics(
@@ -1624,6 +1995,47 @@ namespace ProgrammaticStylized3D.Rivers
             value *= 0x846CA68Bu;
             value ^= value >> 16;
             return value;
+        }
+
+        private readonly struct WeakSpanOpportunity
+        {
+            public WeakSpanOpportunity(
+                uint stableId,
+                uint connectorId,
+                Vector2[] points,
+                float pathLength,
+                float distanceAlongPath,
+                float activationRank)
+            {
+                StableId = stableId;
+                ConnectorId = connectorId;
+                Points = points;
+                DistanceAlongPath = Mathf.Clamp(
+                    distanceAlongPath,
+                    0f,
+                    pathLength);
+                ActivationRank = Mathf.Clamp01(activationRank);
+            }
+
+            public uint StableId { get; }
+            public uint ConnectorId { get; }
+            public Vector2[] Points { get; }
+            public float DistanceAlongPath { get; }
+            public float ActivationRank { get; }
+        }
+
+        private readonly struct AcceptedWeakSpan
+        {
+            public AcceptedWeakSpan(
+                float distanceAlongPath,
+                float alongRadius)
+            {
+                DistanceAlongPath = distanceAlongPath;
+                AlongRadius = alongRadius;
+            }
+
+            public float DistanceAlongPath { get; }
+            public float AlongRadius { get; }
         }
 
         private readonly struct HostMetric

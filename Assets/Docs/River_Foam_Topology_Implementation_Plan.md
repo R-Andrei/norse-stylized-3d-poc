@@ -4,7 +4,7 @@
 
 **Status:** Canonical step-by-step implementation plan for Stage 6 Foam topology only.
 
-**Patch status:** Patch 4.2 is implemented and awaiting visual acceptance. Major Support, Connector Support, the initial Interior Pocket proof, and exact transformed-mesh Obstacle Footprint remain the accepted static baseline. The new Interior Pocket Amount contract and Edge Cavity class are present for validation; Connector Weak Spans, Free-Water Negative Events, runtime evolution, rebuild crossfade, and production cache are not yet implemented.
+**Patch status:** Patch 4.2 is accepted for feature progression with Interior Pocket and Edge Cavity population coefficients still provisional for later tuning. Patch 4.3 now implements Connector Weak Spans and is awaiting visual acceptance. Major Support, Connector Support, exact transformed-mesh Obstacle Footprint, Interior Pockets, and Edge Cavities remain the accepted static baseline. Free-Water Negative Events, runtime evolution, rebuild crossfade, and production cache are not yet implemented.
 
 **Primary implementation target:**
 
@@ -709,7 +709,7 @@ The remaining work is intentionally split into small, inspectable subpatches.
 
 ### Patch 4.2 — Major-hosted negative topology
 
-**Implementation status:** Implemented; Unity visual acceptance pending.
+**Implementation status:** Accepted for feature progression. Population coefficients remain deliberately provisional and may be tuned after all topology classes are working.
 
 Implemented:
 
@@ -737,17 +737,21 @@ Edge Cavities derive from broad Major-hosted interior maxima, choose one determi
 
 ### Patch 4.3 — Connector Weak Spans
 
-Implement:
+**Implementation status:** Implemented; Unity visual acceptance pending.
+
+Implemented:
 
 - `Connector Weak Span Amount`, range `0–1`, default `0.5`;
+- retention of each already-computed accepted Connector simplified metric path so later slices do not reconstruct geometry or run pathfinding again;
 - stable association with one accepted Connector identity;
-- placement away from source and destination endpoint gates;
-- short negative spans aligned to the Connector path rather than generic circular pockets;
-- bounded variation between partial weakening and a near-complete local cut;
-- deterministic spacing when a sufficiently long Connector can host more than one span at high Amount;
-- stable span identity and future along-Connector evolution metadata.
+- placement inside the usable middle of the Connector and away from source and destination endpoint gates;
+- short irregular negative spans aligned to the Connector path rather than generic circular pockets;
+- deterministic variation between partial weakening and a near-complete local cut;
+- one primary opportunity per eligible Connector, plus one secondary opportunity only on sufficiently long Connectors; all primary opportunities precede secondary opportunities in the nested activation order, so additional spans appear only at higher Amount;
+- stable span identity, owning Connector identity, transform, and future along-Connector evolution metadata;
+- concise eligible-Connector and Selected/Feasible telemetry.
 
-A Weak Span does not delete or regenerate the Connector relationship. It remains independent negative pressure over positive Connector Support.
+A Weak Span does not delete, reroute, or regenerate the Connector relationship. It remains independent negative pressure over positive Connector Support and is clipped away from strong Major interiors, invalid water, and exact obstacles.
 
 ### Patch 4.4 — Free-Water Negative Events
 
@@ -1299,21 +1303,19 @@ A topology patch that cannot answer these questions is not ready.
 
 ## 13. Immediate Next Step
 
-Major Support and Connector Support are accepted. The initial Interior Pocket proof and Patch 4.1 exact transformed-mesh Obstacle Footprint are also accepted as the prior negative-topology baseline. Patch 4.2 is now implemented and must be visually validated before the next slice begins.
+Major Support, Connector Support, exact transformed-mesh Obstacle Footprint, Interior Pockets, and Edge Cavities are accepted for feature progression. Interior/Cavity population calibration remains provisional and may be revisited after the full topology feature set is visible. Patch 4.3 Connector Weak Spans is implemented and must now be visually validated.
 
 Immediate validation:
 
-1. inspect `Interior Pocket Amount` at `0`, `0.5`, and `1` with `Edge Cavity Amount = 0`;
-2. inspect `Edge Cavity Amount` at `0`, `0.5`, and `1` with `Interior Pocket Amount = 0`;
-3. inspect both classes together at their default `0.5` values across several seeds;
-4. reject Patch 4.2 if cavities fail to breach one deliberate side, destroy their host, target Connector holes instead of real Major boundaries, or reshuffle lower-Amount identities.
+1. set `Interior Pocket Amount = 0` and `Edge Cavity Amount = 0` to isolate Weak Spans;
+2. inspect `Connector Weak Span Amount` at `0`, `0.5`, and `1` across several Connector configurations and seeds;
+3. verify spans remain on their owning Connector, stay away from both endpoint gates, and align with the accepted path;
+4. verify short Connectors host at most one span and secondary spans appear only at higher Amount on sufficiently long Connectors;
+5. reject Patch 4.3 if spans read as free circular pockets, spill deeply into Major regions, appear on the wrong Connector, or delete/reroute positive Connector Support.
 
-After Patch 4.2 visual acceptance, continue:
+After Patch 4.3 visual acceptance, continue:
 
-1. **Patch 4.3 — Connector Weak Spans**
-   - add `Connector Weak Span Amount`;
-   - create local Connector-hosted negative sections away from endpoint gates.
-2. **Patch 4.4 — Free-Water Negative Events**
+1. **Patch 4.4 — Free-Water Negative Events**
    - add `Free-Water Event Amount`;
    - create sparse valid-water negative opportunities with future drift/fade/recycle metadata.
 3. **Patch 4.5 — Static combined topology validation**
