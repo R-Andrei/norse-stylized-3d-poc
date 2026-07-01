@@ -81,8 +81,9 @@ namespace ProgrammaticStylized3D.Rivers
 
     /// <summary>
     /// Immutable output from one bounded deterministic Major-candidate build.
-    /// The four retained stages exist solely so the current topology step is
-    /// immediately inspectable. Whole-river placement is deliberately absent.
+    /// The four retained stages keep the candidate generator immediately
+    /// inspectable. Whole-river placement consumes only the accepted support
+    /// mask and does not alter these candidate-local proof stages.
     /// </summary>
     public sealed class StylizedRiverFoamMajorCandidate
     {

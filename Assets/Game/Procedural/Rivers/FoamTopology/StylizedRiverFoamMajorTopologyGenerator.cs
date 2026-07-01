@@ -918,7 +918,7 @@ namespace ProgrammaticStylized3D.Rivers
             return false;
         }
 
-        private static int BuildFluidContext(
+        internal static int BuildFluidContext(
             RiverDomainSnapshot domain,
             int width,
             int height,

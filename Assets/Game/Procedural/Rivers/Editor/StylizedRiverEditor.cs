@@ -1471,7 +1471,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 2 now distributes deterministic field-first Major Support across the actual river. Connector Support and Pocket Aging Pressure remain intentionally absent until their own gated steps.",
+                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 3 adds sparse deterministic Connector Support between disconnected Major components. Pocket Aging Pressure remains intentionally absent until its own gated step.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1546,12 +1546,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("foamMajorSupportEvolutionRate"),
                 new GUIContent(
                     "Major Evolution Rate (Hz)",
-                    "Retained for the later runtime-evolution step. It has no effect on the static Patch 2 whole-river Major field."));
+                    "Retained for the later runtime-evolution step. It has no effect on the static Patch 3 Major/Connector topology."));
             EditorGUILayout.PropertyField(
                 Find("foamMajorSupportCleanupRate"),
                 new GUIContent(
                     "Major Cleanup Rate (Hz)",
-                    "Retained for the later runtime-evolution step. It has no effect on the static Patch 2 whole-river Major field."));
+                    "Retained for the later runtime-evolution step. It has no effect on the static Patch 3 Major/Connector topology."));
             EditorGUILayout.PropertyField(
                 Find("foamBreakupFrequency"),
                 new GUIContent(
@@ -1766,8 +1766,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Patch 2 generates and composes static whole-river Major Support while preserving stable region identity and future evolution metadata. Connector and Pocket channels remain empty until Steps 3 and 4. Anchored Support and Obstacle Footprint continue to use their accepted live sources."),
-                new GUIContent("Whole-River Major Distribution"));
+                    "Patch 3 generates and composes static whole-river Major Support plus sparse Major-to-Major Connector Support while preserving stable region and relationship identity for later evolution. Pocket remains empty until Step 4. Anchored Support and Obstacle Footprint continue to use their accepted live sources."),
+                new GUIContent("Major + Connector Static Topology"));
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
                 new GUIContent(
@@ -1832,6 +1832,35 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUILayout.LabelField(
                 new GUIContent(
+                    "Connector Generation",
+                    "Deterministic bounded preparation work performed immediately after Major generation. This first proof connects disconnected Major components only; it does not approximate live Pressure, Lee, or Shore sources on the CPU."),
+                new GUIContent(
+                    runtime.ConnectorTopologyAvailable
+                        ? "Available"
+                        : "Waiting for staged build"));
+            if (runtime.ConnectorTopologyAvailable)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField(
+                    "Eligible Endpoints",
+                    runtime.ConnectorEligibleEndpointCount.ToString());
+                EditorGUILayout.LabelField(
+                    "Path Attempts",
+                    runtime.ConnectorPathAttemptCount.ToString());
+                EditorGUILayout.LabelField(
+                    "Accepted Connectors",
+                    runtime.ConnectorAcceptedCount.ToString());
+                EditorGUILayout.LabelField(
+                    "Top Rejection Reason",
+                    runtime.ConnectorTopRejectionReason);
+                EditorGUILayout.LabelField(
+                    "Generation Time",
+                    $"{runtime.ConnectorGenerationMilliseconds:0.00} ms");
+                EditorGUI.indentLevel--;
+            }
+
+            EditorGUILayout.LabelField(
+                new GUIContent(
                     "Topology Metrics",
                     "Low-rate asynchronous GPU reduction over the valid river domain. Metrics do not stall the simulation and never include padded storage."),
                 new GUIContent(
@@ -1888,7 +1917,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent("Subsystem Rates"),
                 new GUIContent(
-                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz · Major topology is static in Patch 2"));
+                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz · Major and Connector topology are static in Patch 3"));
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Transport",
@@ -1945,7 +1974,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawMemoryDiagnostic(
                 "Allocated Foam Memory",
                 runtime.EstimatedMemoryBytes,
-                "Estimated material state, corrected-advection scratch textures, guidance, final topology, generated Major input and upload texture, anchored-source topology, fracture, boundary, population/topology metrics, and the local river metric buffer. Obsolete nucleus, Major ping-pong, Connector, Pocket, and fixture resources are absent.");
+                "Estimated material state, corrected-advection scratch textures, guidance, final topology, generated Major/Connector input and upload texture, anchored-source topology, fracture, boundary, population/topology metrics, and the local river metric buffer. Obsolete nucleus, Major ping-pong, disabled Connector stub, Pocket stub, and fixture resources are absent.");
 
             if (GUILayout.Button(
                     new GUIContent(
@@ -2486,7 +2515,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.SupportClasses:
                     return
-                        "Red = static whole-river Major Support generated from stable field-first candidates and actual river context. Green = Connector Support, intentionally black/zero until Step 3. Blue = the maximum of the accepted live Pressure, Lee, and Shore Support classes shown separately in Anchored Support. Overlaps mix. Black = no lifespan support. The compact preview above remains only an isolated candidate inspection.";
+                        "Red = static whole-river Major Support generated from stable field-first candidates and actual river context. Green = sparse prepared Connector Support between disconnected Major components. Blue = the maximum of the accepted live Pressure, Lee, and Shore Support classes shown separately in Anchored Support. Major/Connector overlaps mix near attachment edges; broad Major interiors are not repainted green. Black = no lifespan support. The compact preview above remains only an isolated candidate inspection.";
 
                 case StylizedRiverFoamDebugView.NegativeInfluenceClasses:
                     return

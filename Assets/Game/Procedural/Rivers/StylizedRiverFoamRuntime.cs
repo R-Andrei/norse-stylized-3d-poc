@@ -62,6 +62,7 @@ namespace ProgrammaticStylized3D.Rivers
             WaitForObstacleStability,
             BuildObstacleExclusion,
             BuildMajorTopology,
+            BuildConnectorTopology,
             ClearMaterial,
             ClearFracture,
             BuildGuidance,
@@ -80,11 +81,13 @@ namespace ProgrammaticStylized3D.Rivers
             WaitForObstacleStability,
             BuildObstacleExclusion,
             BuildMajorTopology,
+            BuildConnectorTopology,
             RefreshTopologySources
         }
 
-        // Step 1 profiler instrumentation is retained by Step 2. Initialization
-        // now advances through an explicit per-river phase machine, but each
+        // The accepted profiler instrumentation remains active throughout the
+        // topology proof. Initialization advances through an explicit per-river
+        // phase machine, but each
         // existing operation keeps its own marker so cold-start work remains
         // independently measurable while scheduling changes are validated.
         private static readonly ProfilerMarker LateUpdateProfilerMarker =
@@ -125,6 +128,8 @@ namespace ProgrammaticStylized3D.Rivers
             new ProfilerMarker("RiverFoam.Init.BuildGuidance");
         private static readonly ProfilerMarker TopologyBuildMajorProfilerMarker =
             new ProfilerMarker("RiverFoam.Topology.BuildMajor");
+        private static readonly ProfilerMarker TopologyBuildConnectorProfilerMarker =
+            new ProfilerMarker("RiverFoam.Topology.BuildConnector");
         private static readonly ProfilerMarker TopologyRefreshSourcesProfilerMarker =
             new ProfilerMarker("RiverFoam.Topology.RefreshSources");
         private static readonly ProfilerMarker TopologyComposeProfilerMarker =
@@ -143,6 +148,8 @@ namespace ProgrammaticStylized3D.Rivers
             new ProfilerMarker("RiverFoam.Rebuild.BuildObstacleExclusion");
         private static readonly ProfilerMarker RebuildBuildMajorProfilerMarker =
             new ProfilerMarker("RiverFoam.Rebuild.BuildMajor");
+        private static readonly ProfilerMarker RebuildBuildConnectorProfilerMarker =
+            new ProfilerMarker("RiverFoam.Rebuild.BuildConnector");
         private static readonly ProfilerMarker RebuildRefreshSourcesProfilerMarker =
             new ProfilerMarker("RiverFoam.Rebuild.RefreshTopologySources");
 
@@ -262,7 +269,7 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture guidanceTexture;
         private RenderTexture topologyTexture;
         private RenderTexture topologySourcesTexture;
-        private RenderTexture topologyMajorTexture;
+        private RenderTexture topologyGeneratedTexture;
         private RenderTexture currentShoreEdgesTexture;
         private RenderTexture obstacleExclusionTexture;
         private RenderTexture fractureA;
@@ -272,7 +279,7 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture neutralDisturbanceTexture;
         private Texture2D boundaryTexture;
         private Texture2D obstacleExclusionUploadTexture;
-        private Texture2D topologyMajorUploadTexture;
+        private Texture2D topologyGeneratedUploadTexture;
         private ComputeBuffer metricBuffer;
         private ComputeBuffer populationMetricsBuffer;
         private ComputeBuffer topologyMetricsBuffer;
@@ -284,6 +291,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool topologyMetricsAvailable;
         private int topologyMetricsGeneration;
         private StylizedRiverFoamMajorTopology majorTopology;
+        private StylizedRiverFoamConnectorTopology connectorTopology;
         private int majorTopologyInputSignature = int.MinValue;
 
         private readonly List<PendingInjection> pendingInjections = new();
@@ -293,7 +301,7 @@ namespace ProgrammaticStylized3D.Rivers
             new();
         private Color[] obstacleExclusionPixels = Array.Empty<Color>();
         private float[] obstacleExclusionScalar = Array.Empty<float>();
-        private Color[] topologyMajorUploadPixels = Array.Empty<Color>();
+        private Color[] topologyGeneratedUploadPixels = Array.Empty<Color>();
 
         private bool[] chunkActive = Array.Empty<bool>();
         private double[] chunkActiveUntil = Array.Empty<double>();
@@ -394,6 +402,23 @@ namespace ProgrammaticStylized3D.Rivers
         public string MajorTopRejectionReasons => majorTopology != null
             ? majorTopology.GetTopRejectionSummary()
             : "None";
+        public bool ConnectorTopologyAvailable => connectorTopology != null;
+        public int ConnectorEligibleEndpointCount => connectorTopology != null
+            ? connectorTopology.EligibleEndpointCount
+            : 0;
+        public int ConnectorPathAttemptCount => connectorTopology != null
+            ? connectorTopology.PathAttemptCount
+            : 0;
+        public int ConnectorAcceptedCount => connectorTopology != null
+            ? connectorTopology.AcceptedConnectorCount
+            : 0;
+        public string ConnectorTopRejectionReason => connectorTopology != null
+            ? connectorTopology.GetTopRejectionSummary()
+            : "None";
+        public double ConnectorGenerationMilliseconds =>
+            connectorTopology != null
+                ? connectorTopology.GenerationMilliseconds
+                : 0.0;
         public int DynamicShoreRowCount => currentShoreEdgesTexture != null
             ? currentShoreEdgesTexture.width
             : 0;
@@ -456,8 +481,8 @@ namespace ProgrammaticStylized3D.Rivers
             EstimateTextureBytes(guidanceTexture) +
             EstimateTextureBytes(topologyTexture) +
             EstimateTextureBytes(topologySourcesTexture) +
-            EstimateTextureBytes(topologyMajorTexture) +
-            EstimateTextureBytes(topologyMajorUploadTexture) +
+            EstimateTextureBytes(topologyGeneratedTexture) +
+            EstimateTextureBytes(topologyGeneratedUploadTexture) +
             EstimateTextureBytes(currentShoreEdgesTexture) +
             EstimateTextureBytes(obstacleExclusionTexture) +
             EstimateTextureBytes(fractureA) +
@@ -740,9 +765,9 @@ namespace ProgrammaticStylized3D.Rivers
                     if (topologyDebugActive &&
                         !topologyMaintenanceBlocked)
                     {
-                        // Patch 2 composes the accepted static whole-river
-                        // Major field with the live anchored sources. Connector
-                        // and Pocket remain empty until their gated steps.
+                        // Patch 3 composes the accepted static Major and
+                        // Connector fields with the live anchored sources.
+                        // Pocket remains empty until its gated step.
                         topologyMetricsAccumulator += stepDuration;
                         float topologyMetricsInterval = 1f /
                             TopologyMetricsUpdateRate;
@@ -1112,6 +1137,15 @@ namespace ProgrammaticStylized3D.Rivers
                     }
 
                     pendingMajorRebuild = false;
+                    rebuildPhase = RebuildPhase.BuildConnectorTopology;
+                    break;
+
+                case RebuildPhase.BuildConnectorTopology:
+                    using (RebuildBuildConnectorProfilerMarker.Auto())
+                    {
+                        BuildConnectorTopology();
+                    }
+
                     rebuildPhase = pendingTopologyRefresh
                         ? RebuildPhase.RefreshTopologySources
                         : RebuildPhase.Idle;
@@ -1175,8 +1209,9 @@ namespace ProgrammaticStylized3D.Rivers
                 guidanceTexture != null &&
                 topologyTexture != null &&
                 topologySourcesTexture != null &&
-                topologyMajorTexture != null &&
+                topologyGeneratedTexture != null &&
                 majorTopology != null &&
+                connectorTopology != null &&
                 currentShoreEdgesTexture != null &&
                 obstacleExclusionTexture != null &&
                 obstacleExclusionTexture.IsCreated() &&
@@ -1286,11 +1321,11 @@ namespace ProgrammaticStylized3D.Rivers
                             "PS3D_RiverFoam_Topology");
                         topologySourcesTexture = CreateGuidanceTexture(
                             "PS3D_RiverFoam_TopologySources");
-                        // Patch 2 uploads the deterministic static whole-river
-                        // Major field here. Connector and Pocket work resources
-                        // do not exist until their own gated steps.
-                        topologyMajorTexture = CreateGuidanceTexture(
-                            "PS3D_RiverFoam_TopologyMajorInput");
+                        // Patch 3 uploads deterministic prepared Major and
+                        // Connector fields through separate channels of this
+                        // generated-topology input. Pocket remains absent.
+                        topologyGeneratedTexture = CreateGuidanceTexture(
+                            "PS3D_RiverFoam_TopologyGeneratedInput");
                         currentShoreEdgesTexture = CreateShoreEdgesTexture(
                             "PS3D_RiverFoam_CurrentShoreEdges");
                         obstacleExclusionTexture =
@@ -1329,7 +1364,7 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         ClearRenderTexture(topologyTexture);
                         ClearRenderTexture(topologySourcesTexture);
-                        ClearRenderTexture(topologyMajorTexture);
+                        ClearRenderTexture(topologyGeneratedTexture);
                     }
 
                     initializationPhase = InitializationPhase.AllocateBuffers;
@@ -1406,6 +1441,12 @@ namespace ProgrammaticStylized3D.Rivers
 
                 case InitializationPhase.BuildMajorTopology:
                     BuildMajorTopology();
+                    initializationPhase =
+                        InitializationPhase.BuildConnectorTopology;
+                    break;
+
+                case InitializationPhase.BuildConnectorTopology:
+                    BuildConnectorTopology();
                     initializationPhase = InitializationPhase.ClearMaterial;
                     break;
 
@@ -2629,13 +2670,14 @@ namespace ProgrammaticStylized3D.Rivers
         {
             using var profilerScope = TopologyBuildMajorProfilerMarker.Auto();
             if (river == null || !river.Domain.IsValid ||
-                topologyMajorTexture == null ||
+                topologyGeneratedTexture == null ||
                 fieldWidth < 2 || fieldHeight < 2 ||
                 fieldLength <= 0.0001f || validFieldLength <= 0.0001f)
             {
                 majorTopology = null;
+                connectorTopology = null;
                 majorTopologyInputSignature = int.MinValue;
-                ClearRenderTexture(topologyMajorTexture);
+                ClearRenderTexture(topologyGeneratedTexture);
                 return;
             }
 
@@ -2667,40 +2709,95 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamMajorSupportSizeVariation,
                     river.FoamMajorSupportSeed,
                     obstacleExclusionScalar);
+            connectorTopology = null;
+            UploadGeneratedTopology();
+            majorTopologyInputSignature = ResolveMajorTopologyInputSignature();
+        }
 
-            if (topologyMajorUploadPixels.Length != cellCount)
+        private void BuildConnectorTopology()
+        {
+            using var profilerScope =
+                TopologyBuildConnectorProfilerMarker.Auto();
+            if (river == null || !river.Domain.IsValid ||
+                topologyGeneratedTexture == null ||
+                majorTopology == null ||
+                fieldWidth < 2 || fieldHeight < 2 ||
+                fieldLength <= 0.0001f || validFieldLength <= 0.0001f)
             {
-                topologyMajorUploadPixels = new Color[cellCount];
+                connectorTopology = null;
+                UploadGeneratedTopology();
+                return;
             }
 
-            majorTopology.FillUploadPixels(topologyMajorUploadPixels);
-            if (topologyMajorUploadTexture == null ||
-                topologyMajorUploadTexture.width != fieldWidth ||
-                topologyMajorUploadTexture.height != fieldHeight)
+            connectorTopology =
+                StylizedRiverFoamConnectorTopologyGenerator.Generate(
+                    river.Domain,
+                    fieldWidth,
+                    fieldHeight,
+                    fieldLength,
+                    validFieldLength,
+                    river.Quality,
+                    river.ShoreMotion,
+                    river.FoamMajorSupportSeed,
+                    obstacleExclusionScalar,
+                    majorTopology);
+            UploadGeneratedTopology();
+        }
+
+        private void UploadGeneratedTopology()
+        {
+            if (topologyGeneratedTexture == null ||
+                fieldWidth < 1 || fieldHeight < 1)
             {
-                if (topologyMajorUploadTexture != null)
+                return;
+            }
+
+            int cellCount = fieldWidth * fieldHeight;
+            if (topologyGeneratedUploadPixels.Length != cellCount)
+            {
+                topologyGeneratedUploadPixels = new Color[cellCount];
+            }
+            else
+            {
+                Array.Clear(
+                    topologyGeneratedUploadPixels,
+                    0,
+                    topologyGeneratedUploadPixels.Length);
+            }
+
+            majorTopology?.FillUploadPixels(topologyGeneratedUploadPixels);
+            connectorTopology?.AddToUploadPixels(
+                topologyGeneratedUploadPixels);
+
+            if (topologyGeneratedUploadTexture == null ||
+                topologyGeneratedUploadTexture.width != fieldWidth ||
+                topologyGeneratedUploadTexture.height != fieldHeight)
+            {
+                if (topologyGeneratedUploadTexture != null)
                 {
-                    DestroyUnityObject(topologyMajorUploadTexture);
+                    DestroyUnityObject(topologyGeneratedUploadTexture);
                 }
 
-                topologyMajorUploadTexture = new Texture2D(
+                topologyGeneratedUploadTexture = new Texture2D(
                     fieldWidth,
                     fieldHeight,
                     TextureFormat.RGBAHalf,
                     false,
                     true)
                 {
-                    name = "T_PS3D_RiverFoamMajorTopology_Upload",
+                    name = "T_PS3D_RiverFoamGeneratedTopology_Upload",
                     filterMode = FilterMode.Bilinear,
                     wrapMode = TextureWrapMode.Clamp,
                     hideFlags = HideFlags.DontSave
                 };
             }
 
-            topologyMajorUploadTexture.SetPixels(topologyMajorUploadPixels);
-            topologyMajorUploadTexture.Apply(false, false);
-            Graphics.Blit(topologyMajorUploadTexture, topologyMajorTexture);
-            majorTopologyInputSignature = ResolveMajorTopologyInputSignature();
+            topologyGeneratedUploadTexture.SetPixels(
+                topologyGeneratedUploadPixels);
+            topologyGeneratedUploadTexture.Apply(false, false);
+            Graphics.Blit(
+                topologyGeneratedUploadTexture,
+                topologyGeneratedTexture);
         }
 
         private int ResolveMajorTopologyInputSignature()
@@ -2816,7 +2913,7 @@ namespace ProgrammaticStylized3D.Rivers
             using var profilerScope = TopologyRefreshSourcesProfilerMarker.Auto();
             if (computeShader == null || topologyTexture == null ||
                 topologySourcesTexture == null ||
-                topologyMajorTexture == null ||
+                topologyGeneratedTexture == null ||
                 currentShoreEdgesTexture == null ||
                 obstacleExclusionTexture == null ||
                 boundaryTexture == null || metricBuffer == null ||
@@ -2899,8 +2996,8 @@ namespace ProgrammaticStylized3D.Rivers
                     obstacleExclusionTexture);
                 computeShader.SetTexture(
                     composeTopologyKernel,
-                    "_FoamTopologyMajorRead",
-                    topologyMajorTexture);
+                    "_FoamTopologyGeneratedRead",
+                    topologyGeneratedTexture);
                 computeShader.SetTexture(
                     composeTopologyKernel,
                     "_FoamStaticWakeField",
@@ -3626,7 +3723,7 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseTexture(ref guidanceTexture);
             ReleaseTexture(ref topologyTexture);
             ReleaseTexture(ref topologySourcesTexture);
-            ReleaseTexture(ref topologyMajorTexture);
+            ReleaseTexture(ref topologyGeneratedTexture);
             ReleaseTexture(ref currentShoreEdgesTexture);
             ReleaseTexture(ref obstacleExclusionTexture);
             ReleaseTexture(ref fractureA);
@@ -3644,10 +3741,10 @@ namespace ProgrammaticStylized3D.Rivers
                 boundaryTexture = null;
             }
 
-            if (topologyMajorUploadTexture != null)
+            if (topologyGeneratedUploadTexture != null)
             {
-                DestroyUnityObject(topologyMajorUploadTexture);
-                topologyMajorUploadTexture = null;
+                DestroyUnityObject(topologyGeneratedUploadTexture);
+                topologyGeneratedUploadTexture = null;
             }
 
             metricBuffer?.Release();
@@ -3656,8 +3753,9 @@ namespace ProgrammaticStylized3D.Rivers
             obstacleExclusionFootprints.Clear();
             obstacleExclusionPixels = Array.Empty<Color>();
             obstacleExclusionScalar = Array.Empty<float>();
-            topologyMajorUploadPixels = Array.Empty<Color>();
+            topologyGeneratedUploadPixels = Array.Empty<Color>();
             majorTopology = null;
+            connectorTopology = null;
             majorTopologyInputSignature = int.MinValue;
             obstacleGeometryVersion = -1;
             populationMetricsBuffer?.Release();

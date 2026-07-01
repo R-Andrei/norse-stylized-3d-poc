@@ -20,7 +20,8 @@ namespace ProgrammaticStylized3D.Rivers
 
     /// <summary>
     /// Stable identity and cheap future-evolution metadata for one accepted
-    /// whole-river Major Support region. Patch 2 uses only the static transform;
+    /// whole-river Major Support region. The current topology uses only the
+    /// static transform;
     /// the retained normalized selectors defer physical timing and speed
     /// decisions to their later gated runtime-evolution step.
     /// </summary>
@@ -139,6 +140,11 @@ namespace ProgrammaticStylized3D.Rivers
             ? CoveredCellCount / (float)ValidCellCount
             : 0f;
         public IReadOnlyList<StylizedRiverFoamMajorRegion> Regions => regions;
+
+        // The accepted scalar field remains immutable by convention and is
+        // exposed only inside the topology assembly so later prepared layers
+        // can derive relationships without reconstructing Major Support.
+        internal float[] SupportData => support;
 
         public int GetRejectionCount(
             StylizedRiverFoamMajorPlacementRejectionReason reason)

@@ -66,7 +66,7 @@ RWTexture2D<float> _FoamObstacleExclusionWrite;
 Texture2D<float> _FoamObstacleExclusionRead;
 RWTexture2D<float4> _FoamGuidanceWrite;
 Texture2D<float4> _FoamGuidanceRead;
-Texture2D<float4> _FoamTopologyMajorRead;
+Texture2D<float4> _FoamTopologyGeneratedRead;
 RWTexture2D<float4> _FoamTopologyWrite;
 RWTexture2D<float4> _FoamTopologySourcesWrite;
 RWTexture2D<float2> _FoamCurrentShoreEdgesWrite;
@@ -1511,14 +1511,14 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
         (int2)floor(uv * (float2)_FoamDimensions),
         int2(0, 0),
         _FoamDimensions - 1);
-    float4 majorWork = _FoamTopologyMajorRead.Load(
+    float4 generatedWork = _FoamTopologyGeneratedRead.Load(
         int3(outputCoordinate, 0));
 
-    // Patch 2 uploads deterministic static whole-river Major Support through
-    // this accepted input channel. Connector Support and Pocket Aging Pressure
-    // remain zero until their later gated topology steps.
-    float majorSupport = majorWork.r;
-    float connectorSupport = 0.0;
+    // Patch 3 uploads deterministic prepared Major and Connector Support
+    // through independent channels. Pocket Aging Pressure remains zero until
+    // its later gated topology step.
+    float majorSupport = generatedWork.r;
+    float connectorSupport = generatedWork.g;
     float pocketAgingPressure = 0.0;
 
     float4 staticPressure = 0.0.xxxx;
