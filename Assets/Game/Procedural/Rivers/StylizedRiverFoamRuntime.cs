@@ -507,6 +507,15 @@ namespace ProgrammaticStylized3D.Rivers
         public int ConnectorWeakSpanAcceptedCount => pocketTopology != null
             ? pocketTopology.AcceptedConnectorWeakSpanCount
             : 0;
+        public int FreeWaterEventOpportunityCount => pocketTopology != null
+            ? pocketTopology.FreeWaterOpportunityCount
+            : 0;
+        public int FreeWaterEventCandidateCount => pocketTopology != null
+            ? pocketTopology.FreeWaterCandidateCount
+            : 0;
+        public int FreeWaterEventAcceptedCount => pocketTopology != null
+            ? pocketTopology.AcceptedFreeWaterEventCount
+            : 0;
         public string PocketTopRejectionReason => pocketTopology != null
             ? pocketTopology.GetTopRejectionSummary()
             : "None";
@@ -2956,6 +2965,7 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamInteriorPocketAmount,
                     river.FoamEdgeCavityAmount,
                     river.FoamConnectorWeakSpanAmount,
+                    river.FoamFreeWaterEventAmount,
                     obstacleExclusionScalar,
                     majorTopology,
                     connectorTopology);
@@ -3094,9 +3104,11 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamEdgeCavityAmount * 10000f);
                 hash = hash * 31 + Mathf.RoundToInt(
                     river.FoamConnectorWeakSpanAmount * 10000f);
-                // Patch 4.3: Major-hosted negative classes plus Connector-
-                // hosted Weak Spans using retained accepted path identity.
-                hash = hash * 31 + 3;
+                hash = hash * 31 + Mathf.RoundToInt(
+                    river.FoamFreeWaterEventAmount * 10000f);
+                // Patch 4.4: four independent prepared negative classes,
+                // including sparse unhosted Free-Water Negative Events.
+                hash = hash * 31 + 4;
                 return hash;
             }
         }

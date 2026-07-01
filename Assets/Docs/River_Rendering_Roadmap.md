@@ -298,7 +298,9 @@ Accepted and retained:
 - Major-to-Major Connector Support with accepted Amount, Directness, Length Preference, endpoint gates, clearance halos, detour limits, and soft participation distribution;
 - initial Interior Pocket negative topology hosted by broad Major interiors;
 - Patch 4.2 Interior Pocket Amount and one-sided Edge Cavities accepted for feature progression, with coefficient tuning deferred;
-- Patch 4.3 Connector Weak Spans implemented and awaiting visual acceptance;
+- Patch 4.3 Connector Weak Spans accepted after visual validation;
+- Patch 4.4 Free-Water Negative Events accepted after visual tuning;
+- Patch 4.5 complete static topology accepted for feature progression, with coefficients intentionally left provisional;
 - exact transformed-mesh water-level-aware Obstacle Footprint, distinct from padded Pressure/Lee disturbance footprints;
 - persistent field, chunking, freezing, sleeping, and fixed-cost GPU infrastructure;
 - permanent Foam profiler instrumentation;
@@ -321,11 +323,11 @@ Each class receives an independent `0–1` Amount control with default `0.5`. Am
 
 Still unimplemented or unaccepted:
 
-- Patch 4.3 visual acceptance for Connector Weak Spans;
-- Patch 4.4 Free-Water Negative Events;
-- Patch 4.5 complete static topology validation;
-- strictly downstream class-specific runtime evolution;
-- safe topology rebuild crossfade;
+- Patch 4.6 lively single-instance Major movement and morphing;
+- Patch 4.7A hosted Interior Pocket and Edge Cavity evolution;
+- Patch 4.7B slower independent Free-Water Negative Event evolution;
+- Patch 4.7C Connector deformation/replacement and Weak Span following;
+- safe topology rebuild transition for explicit rebuilds;
 - procedural chunk/run cache/precompute packaging;
 - separate topology-to-material lifespan response;
 - final fragmentation, dissipation, and rendering behaviour.
@@ -363,23 +365,25 @@ The old destructive composition `Positive × (1 - Negative)` remains non-canonic
 
 The four negative classes retain class identity and evolution metadata even if the current output texture carries one aggregate negative field. They are not direct visible Foam and do not geometrically subtract positive topology.
 
-Current authoring retains Major `Amount`, `Size`, `Size Variation`, and `Seed`, plus Connector `Amount`, `Directness`, and `Length Preference`. Patch 4.2 adds `Interior Pocket Amount` and `Edge Cavity Amount`; both are accepted for feature progression with later coefficient tuning permitted. Patch 4.3 adds `Connector Weak Span Amount`, range `0–1`, default `0.5`, and is awaiting visual acceptance. Patch 4.4 adds `Free-Water Event Amount` with the same range/default contract.
+Current authoring retains Major `Amount`, `Size`, `Size Variation`, and `Seed`, plus Connector `Amount`, `Directness`, and `Length Preference`. Patch 4.2 adds `Interior Pocket Amount` and `Edge Cavity Amount`; Patch 4.3 adds `Connector Weak Span Amount`; Patch 4.4 adds `Free-Water Event Amount`. All four use range `0–1`, default `0.5`, and are accepted for feature progression with later coefficient tuning permitted.
 
-Runtime topology evolution remains cheap and metadata-driven. Major and Connector use separate downstream offsets and fades. Interior Pockets and Edge Cavities remain associated with Major hosts; Weak Spans move/fade along Connector identity; Free-Water Events drift downstream, fade, and recycle sparsely. Anchored Pressure, Lee, and Shore Support remain attached to authoritative live sources. No gameplay candidate generation, component cleanup, pathfinding, distance transforms, or rejection loops are permitted.
+Runtime topology evolution uses fixed logical slots with one active instance each. Majors dwell about `2–5 s`, then move and morph for roughly `1–2 s` with positive net downstream progress and bounded lateral/diagonal motion; they instantly recycle upstream at lifetime or egress without duplicate old/new support. Hosted Interior Pockets and Edge Cavities follow their Major with bounded independent variation. Free-Water Events use the same model more slowly, initially about `5–10 s` dwell and `2–4 s` movement. Connectors deform retained paths between moving endpoints and use bounded prevalidated replacement relationships when an endpoint recycles. Anchored Pressure, Lee, and Shore Support remain attached to authoritative live sources. No gameplay candidate generation, component cleanup, pathfinding, distance transforms, or rejection loops are permitted.
 
 ### Immediate continuation order
 
 1. Documentation expansion for four-class Negative Aging Pressure — complete.
 2. Patch 4.2 — Interior Pocket Amount and Edge Cavities — accepted for feature progression; coefficient tuning deferred.
-3. Patch 4.3 — Connector Weak Spans — implemented; visual acceptance pending.
-4. Patch 4.4 — Free-Water Negative Events.
-5. Patch 4.5 — static validation of Major, Connector, all four negative classes, Anchored Support, exact Obstacle Footprint, and valid water.
-6. Strictly downstream Major evolution.
-7. Class-specific Connector and Negative Aging Pressure evolution.
-8. Safe generated-topology rebuild crossfade.
-9. Procedural chunk/run cache and precompute packaging.
-10. Topology completion and handoff to separate Foam-material work.
-11. Resume deferred performance work against the completed topology pipeline.
+3. Patch 4.3 — Connector Weak Spans — accepted after visual validation.
+4. Patch 4.4 — Free-Water Negative Events — accepted after visual tuning.
+5. Patch 4.5 — complete static topology — accepted for feature progression; tuning remains provisional.
+6. Patch 4.6 — lively single-instance Major movement and morphing.
+7. Patch 4.7A — hosted Interior Pocket and Edge Cavity evolution.
+8. Patch 4.7B — slower independent Free-Water Negative Event evolution.
+9. Patch 4.7C — Connector deformation/replacement and Weak Span following.
+10. Patch 4.8 — safe generated-topology rebuild transition for explicit rebuilds.
+11. Patch 4.9 — procedural chunk/run cache and precompute packaging.
+12. Patch 4.10 — topology completion and handoff to separate Foam-material work.
+13. Resume deferred performance work against the completed topology pipeline.
 
 ### Terminology
 
@@ -436,12 +440,9 @@ Accepted normal Inspector controls:
 - `Connector Length Preference`;
 - `Interior Pocket Amount` — range `0–1`, default `0.5`, accepted for feature progression; coefficient tuning deferred;
 - `Edge Cavity Amount` — range `0–1`, default `0.5`, accepted for feature progression; coefficient tuning deferred;
+- `Connector Weak Span Amount` — range `0–1`, default `0.5`, accepted after Patch 4.3 visual validation;
+- `Free-Water Event Amount` — range `0–1`, default `0.5`, accepted after Patch 4.4 visual tuning;
 - `Foam Colour`.
-
-Approved additions remaining through Patches 4.3–4.4:
-
-- `Connector Weak Span Amount` — range `0–1`, default `0.5`, implemented in Patch 4.3 pending visual acceptance;
-- `Free-Water Event Amount` — range `0–1`, default `0.5`.
 
 For each negative class, `0` means none, `0.5` means a sensible category-specific baseline, and `1` means maximum bounded population. Amount changes nested stable activation only, not size, strength, seed, or evolution speed.
 
@@ -457,22 +458,25 @@ Separate material lifetime and topology-response authoring remains deferred unti
 4. Initial Interior Pocket proof — complete.
 5. Exact transformed-mesh Obstacle Footprint and procedural chunk/run preparation contract — complete.
 6. Patch 4.2 Interior Pocket Amount and Edge Cavities — accepted for feature progression; coefficient tuning deferred.
-7. Patch 4.3 Connector Weak Spans — implemented; visual acceptance pending.
-8. Patch 4.4 Free-Water Negative Events.
-9. Patch 4.5 complete static topology validation.
-10. Strictly downstream Major evolution.
-11. Class-specific Connector and Negative Aging Pressure evolution.
-12. Safe topology rebuild crossfade.
-13. Procedural chunk/run cache/precompute packaging.
-14. Topology completion handoff.
-15. Separate topology-to-material lifespan integration.
-16. End-of-life fragmentation/dissipation and final rendering.
-17. Resume deferred performance work and final PC-first profiling.
+7. Patch 4.3 Connector Weak Spans — accepted after visual validation.
+8. Patch 4.4 Free-Water Negative Events — accepted after visual tuning.
+9. Patch 4.5 complete static topology — accepted for feature progression; tuning remains provisional.
+10. Patch 4.6 lively single-instance Major movement and morphing.
+11. Patch 4.7A hosted Interior Pocket and Edge Cavity evolution.
+12. Patch 4.7B slower independent Free-Water Negative Event evolution.
+13. Patch 4.7C Connector deformation/replacement and Weak Span following.
+14. Patch 4.8 safe topology rebuild transition for explicit rebuilds.
+15. Patch 4.9 procedural chunk/run cache/precompute packaging.
+16. Patch 4.10 topology completion handoff.
+17. Separate topology-to-material lifespan integration.
+18. End-of-life fragmentation/dissipation and final rendering.
+19. Resume deferred performance work and final PC-first profiling.
 
 Every positive and negative topology class is implemented and accepted separately before the combined topology is judged. This is an explicit anti-regression rule.
 
 ### Performance constraints
 
+- prioritize CPU/GPU compute and runtime latency over modest memory use; retain compact masks, shape variants, anchors, and descriptors when they eliminate meaningful runtime work;
 - no continuously maintained topology graph;
 - no permanent node network or pathfinding;
 - no GameObjects, per-frame managed topology objects, or continuously maintained object records per foam patch; compact cached value records for stable topology identity and evolution metadata are allowed;

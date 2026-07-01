@@ -10,9 +10,11 @@ namespace ProgrammaticStylized3D.Rivers
     /// Interior Pockets preserve a closed Major rim. Edge Cavities breach one
     /// deliberate Major side while preserving a useful positive remainder.
     /// Connector Weak Spans remain bound to accepted Connector identities and
-    /// locally weaken short path sections away from endpoint gates. All classes
-    /// remain independent from positive support. Authoritative live Pressure,
-    /// Lee, and Shore protection is applied during GPU composition.
+    /// locally weaken short path sections away from endpoint gates. Free-Water
+    /// Negative Events use sparse metric-space opportunities without requiring a
+    /// positive host. All classes remain independent from positive support.
+    /// Authoritative live Pressure, Lee, and Shore protection is applied during
+    /// GPU composition.
     /// </summary>
     public static class StylizedRiverFoamPocketTopologyGenerator
     {
@@ -41,6 +43,22 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumWeakSpanSpacingMetres = 0.44f;
         private const float WeakSpanConnectorThreshold = 0.045f;
         private const float WeakSpanMajorProtectionThreshold = 0.30f;
+        private const float FreeWaterLatticeSpacingMetres = 1.24f;
+        private const float MinimumFreeWaterSpacingMetres = 0.96f;
+        private const float FreeWaterLongitudinalMarginMetres = 0.24f;
+        private const float FreeWaterLateralMarginMetres = 0.10f;
+        private const float FreeWaterNearestSampleRadiusMetres = 0.34f;
+        private const float MinimumFreeWaterAlongRadiusMetres = 0.30f;
+        private const float MaximumFreeWaterAlongRadiusMetres = 0.58f;
+        private const float MinimumFreeWaterAcrossRadiusMetres = 0.18f;
+        private const float MaximumFreeWaterAcrossRadiusMetres = 0.36f;
+        private const float FreeWaterSmallScaleMinimum = 0.58f;
+        private const float FreeWaterSmallScaleMaximum = 0.76f;
+        private const float FreeWaterMediumScaleMinimum = 0.90f;
+        private const float FreeWaterMediumScaleMaximum = 1.08f;
+        private const float FreeWaterLargeScaleMinimum = 1.26f;
+        private const float FreeWaterLargeScaleMaximum = 1.48f;
+        private const float MaximumFreeWaterOrientationRadians = 0.24f;
         private const uint InvalidHostId = uint.MaxValue;
 
         public static StylizedRiverFoamPocketTopology Generate(
@@ -55,6 +73,7 @@ namespace ProgrammaticStylized3D.Rivers
             float interiorPocketAmount,
             float edgeCavityAmount,
             float connectorWeakSpanAmount,
+            float freeWaterEventAmount,
             float[] obstacleMask,
             StylizedRiverFoamMajorTopology majorTopology,
             StylizedRiverFoamConnectorTopology connectorTopology)
@@ -102,6 +121,7 @@ namespace ProgrammaticStylized3D.Rivers
             edgeCavityAmount = Mathf.Clamp01(edgeCavityAmount);
             connectorWeakSpanAmount = Mathf.Clamp01(
                 connectorWeakSpanAmount);
+            freeWaterEventAmount = Mathf.Clamp01(freeWaterEventAmount);
 
             float[] fluidCoverage = new float[cellCount];
             bool[] validCells = new bool[cellCount];
@@ -445,6 +465,26 @@ namespace ProgrammaticStylized3D.Rivers
                     out weakSpanEligibleConnectorCount);
             }
 
+            List<PreparedNegativeRegion> feasibleFreeWaterRegions = new();
+            int freeWaterOpportunityCount = 0;
+            if (freeWaterEventAmount > 0.0001f)
+            {
+                feasibleFreeWaterRegions = BuildFreeWaterNegativeEventRegions(
+                    domain,
+                    width,
+                    height,
+                    fieldLength,
+                    validFieldLength,
+                    seed,
+                    validCells,
+                    fluidCoverage,
+                    majorSupport,
+                    connectorSupport,
+                    metricPositions,
+                    rejectionCounts,
+                    out freeWaterOpportunityCount);
+            }
+
             int selectedInteriorCount = ResolveSelectedCount(
                 interiorPocketAmount,
                 feasibleInteriorRegions.Count);
@@ -454,9 +494,12 @@ namespace ProgrammaticStylized3D.Rivers
             int selectedWeakSpanCount = ResolveSelectedCount(
                 connectorWeakSpanAmount,
                 feasibleWeakSpanRegions.Count);
+            int selectedFreeWaterCount = ResolveSelectedCount(
+                RemapFreeWaterAmount(freeWaterEventAmount),
+                feasibleFreeWaterRegions.Count);
             List<StylizedRiverFoamPocketRegion> regions = new(
                 selectedInteriorCount + selectedCavityCount +
-                selectedWeakSpanCount);
+                selectedWeakSpanCount + selectedFreeWaterCount);
             ApplyPreparedPrefix(
                 feasibleInteriorRegions,
                 selectedInteriorCount,
@@ -472,6 +515,12 @@ namespace ProgrammaticStylized3D.Rivers
             ApplyPreparedPrefix(
                 feasibleWeakSpanRegions,
                 selectedWeakSpanCount,
+                domain,
+                pressure,
+                regions);
+            ApplyPreparedPrefix(
+                feasibleFreeWaterRegions,
+                selectedFreeWaterCount,
                 domain,
                 pressure,
                 regions);
@@ -503,6 +552,9 @@ namespace ProgrammaticStylized3D.Rivers
                 weakSpanEligibleConnectorCount,
                 feasibleWeakSpanRegions.Count,
                 selectedWeakSpanCount,
+                freeWaterOpportunityCount,
+                feasibleFreeWaterRegions.Count,
+                selectedFreeWaterCount,
                 coveredCellCount,
                 stopwatch.Elapsed.TotalMilliseconds,
                 pressure,
@@ -520,6 +572,9 @@ namespace ProgrammaticStylized3D.Rivers
             return new StylizedRiverFoamPocketTopology(
                 width,
                 height,
+                0,
+                0,
+                0,
                 0,
                 0,
                 0,
@@ -732,6 +787,556 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             return prepared;
+        }
+
+        private static List<PreparedNegativeRegion>
+            BuildFreeWaterNegativeEventRegions(
+                RiverDomainSnapshot domain,
+                int width,
+                int height,
+                float fieldLength,
+                float validFieldLength,
+                int seed,
+                bool[] validCells,
+                float[] fluidCoverage,
+                float[] majorSupport,
+                float[] connectorSupport,
+                Vector2[] metricPositions,
+                int[] rejectionCounts,
+                out int opportunityCount)
+        {
+            List<FreeWaterOpportunity> opportunities =
+                BuildFreeWaterOpportunities(
+                    domain,
+                    width,
+                    height,
+                    fieldLength,
+                    validFieldLength,
+                    seed,
+                    validCells,
+                    fluidCoverage,
+                    majorSupport,
+                    connectorSupport,
+                    metricPositions,
+                    rejectionCounts);
+            opportunityCount = opportunities.Count;
+            opportunities.Sort(CompareFreeWaterOpportunity);
+
+            List<PreparedNegativeRegion> prepared = new();
+            List<AcceptedFreeWaterEvent> accepted = new();
+            float[] raster = new float[validCells.Length];
+            for (int opportunityIndex = 0;
+                 opportunityIndex < opportunities.Count;
+                 opportunityIndex++)
+            {
+                FreeWaterOpportunity opportunity =
+                    opportunities[opportunityIndex];
+                uint stableId = opportunity.StableId;
+                float sizeSelector = Hash01(stableId, 75u);
+                float sizeScale;
+                if (sizeSelector < 0.34f)
+                {
+                    sizeScale = Mathf.Lerp(
+                        FreeWaterSmallScaleMinimum,
+                        FreeWaterSmallScaleMaximum,
+                        sizeSelector / 0.34f);
+                }
+                else if (sizeSelector < 0.78f)
+                {
+                    sizeScale = Mathf.Lerp(
+                        FreeWaterMediumScaleMinimum,
+                        FreeWaterMediumScaleMaximum,
+                        (sizeSelector - 0.34f) / 0.44f);
+                }
+                else
+                {
+                    sizeScale = Mathf.Lerp(
+                        FreeWaterLargeScaleMinimum,
+                        FreeWaterLargeScaleMaximum,
+                        (sizeSelector - 0.78f) / 0.22f);
+                }
+
+                float alongRadius = Mathf.Lerp(
+                    MinimumFreeWaterAlongRadiusMetres,
+                    MaximumFreeWaterAlongRadiusMetres,
+                    Hash01(stableId, 76u)) * sizeScale;
+                float acrossRadius = Mathf.Lerp(
+                    MinimumFreeWaterAcrossRadiusMetres,
+                    MaximumFreeWaterAcrossRadiusMetres,
+                    Hash01(stableId, 77u)) * sizeScale;
+                float aspectSelector = Hash01(stableId, 78u);
+                alongRadius *= Mathf.Lerp(0.80f, 1.24f, aspectSelector);
+                acrossRadius *= Mathf.Lerp(1.18f, 0.72f, aspectSelector);
+                alongRadius = Mathf.Clamp(alongRadius, 0.18f, 0.92f);
+                acrossRadius = Mathf.Clamp(acrossRadius, 0.11f, 0.62f);
+                acrossRadius = Mathf.Min(acrossRadius, alongRadius * 0.86f);
+                float largestRadius = Mathf.Max(alongRadius, acrossRadius);
+
+                bool spacingViolation = false;
+                for (int acceptedIndex = 0;
+                     acceptedIndex < accepted.Count;
+                     acceptedIndex++)
+                {
+                    AcceptedFreeWaterEvent other = accepted[acceptedIndex];
+                    float required = Mathf.Max(
+                        MinimumFreeWaterSpacingMetres,
+                        (largestRadius + other.LargestRadius) * 0.72f);
+                    if (Vector2.Distance(
+                            opportunity.Position,
+                            other.Position) < required)
+                    {
+                        spacingViolation = true;
+                        break;
+                    }
+                }
+                if (spacingViolation)
+                {
+                    rejectionCounts[(int)
+                        StylizedRiverFoamPocketRejectionReason
+                            .FreeWaterSpacing]++;
+                    continue;
+                }
+
+                float orientation = Mathf.Lerp(
+                    -MaximumFreeWaterOrientationRadians,
+                    MaximumFreeWaterOrientationRadians,
+                    Hash01(stableId, 79u));
+                float strength = Mathf.Lerp(
+                    0.58f,
+                    0.92f,
+                    Hash01(stableId, 80u));
+                Array.Clear(raster, 0, raster.Length);
+                int coverage = RasterizeFreeWaterNegativeEvent(
+                    stableId,
+                    opportunity.Position,
+                    orientation,
+                    alongRadius,
+                    acrossRadius,
+                    strength,
+                    validCells,
+                    metricPositions,
+                    raster);
+                if (coverage <= 0)
+                {
+                    rejectionCounts[(int)
+                        StylizedRiverFoamPocketRejectionReason
+                            .NoRasterCoverage]++;
+                    continue;
+                }
+
+                accepted.Add(new AcceptedFreeWaterEvent(
+                    opportunity.Position,
+                    largestRadius));
+                prepared.Add(new PreparedNegativeRegion(
+                    StylizedRiverFoamNegativeRegionClass
+                        .FreeWaterNegativeEvent,
+                    stableId,
+                    InvalidHostId,
+                    opportunity.Position,
+                    ResolveAcrossNormalized(domain, opportunity.Position),
+                    orientation,
+                    alongRadius,
+                    acrossRadius,
+                    Vector2.zero,
+                    CaptureRaster(raster)));
+            }
+
+            return prepared;
+        }
+
+        private static List<FreeWaterOpportunity> BuildFreeWaterOpportunities(
+            RiverDomainSnapshot domain,
+            int width,
+            int height,
+            float fieldLength,
+            float validFieldLength,
+            int seed,
+            bool[] validCells,
+            float[] fluidCoverage,
+            float[] majorSupport,
+            float[] connectorSupport,
+            Vector2[] metricPositions,
+            int[] rejectionCounts)
+        {
+            List<FreeWaterOpportunity> opportunities = new();
+            if (domain == null || !domain.IsValid ||
+                width < 2 || height < 2 ||
+                fieldLength <= 0.0001f || validFieldLength <= 0.0001f)
+            {
+                return opportunities;
+            }
+
+            float minimumDistance = Mathf.Min(
+                FreeWaterLongitudinalMarginMetres,
+                validFieldLength * 0.20f);
+            float maximumDistance = Mathf.Max(
+                minimumDistance,
+                validFieldLength - minimumDistance);
+            float alongOffset = (
+                Hash01((uint)(seed + 1), 71u) - 0.5f) *
+                FreeWaterLatticeSpacingMetres * 0.36f;
+            List<float> alongDistances = new();
+            for (int alongSlot = 0; alongSlot < 4096; alongSlot++)
+            {
+                float distance = minimumDistance +
+                    FreeWaterLatticeSpacingMetres * 0.5f +
+                    alongOffset +
+                    alongSlot * FreeWaterLatticeSpacingMetres;
+                if (distance > maximumDistance + 0.0001f)
+                {
+                    break;
+                }
+
+                if (distance >= minimumDistance - 0.0001f)
+                {
+                    alongDistances.Add(distance);
+                }
+            }
+
+            if (alongDistances.Count == 0)
+            {
+                alongDistances.Add(validFieldLength * 0.5f);
+            }
+
+            for (int alongSlot = 0;
+                 alongSlot < alongDistances.Count;
+                 alongSlot++)
+            {
+                float distance = Mathf.Clamp(
+                    alongDistances[alongSlot],
+                    0f,
+                    validFieldLength);
+                StylizedRiverSplineSample sample =
+                    domain.SampleAtOrientedDistance(distance);
+                float leftWidth = Mathf.Max(
+                    0.05f,
+                    sample.LeftSurfaceHalfWidth);
+                float rightWidth = Mathf.Max(
+                    0.05f,
+                    sample.RightSurfaceHalfWidth);
+                float lateralMinimum = -leftWidth +
+                    FreeWaterLateralMarginMetres;
+                float lateralMaximum = rightWidth -
+                    FreeWaterLateralMarginMetres;
+                if (lateralMaximum < lateralMinimum)
+                {
+                    float centre = (rightWidth - leftWidth) * 0.5f;
+                    lateralMinimum = centre;
+                    lateralMaximum = centre;
+                }
+
+                uint rowId = MixBits(
+                    (uint)(seed + 1) * 0x9E3779B9u ^
+                    (uint)(alongSlot + 1) * 0x85EBCA6Bu);
+                float lateralOffset = (
+                    Hash01(rowId, 72u) - 0.5f) *
+                    FreeWaterLatticeSpacingMetres * 0.34f;
+                float firstLateral = lateralMinimum +
+                    FreeWaterLatticeSpacingMetres * 0.5f +
+                    lateralOffset;
+                int rowOpportunityCount = 0;
+                for (int acrossSlot = 0; acrossSlot < 1024; acrossSlot++)
+                {
+                    float lateral = firstLateral +
+                        acrossSlot * FreeWaterLatticeSpacingMetres;
+                    if (lateral > lateralMaximum + 0.0001f)
+                    {
+                        break;
+                    }
+
+                    TryAddFreeWaterOpportunity(
+                        opportunities,
+                        domain,
+                        width,
+                        height,
+                        fieldLength,
+                        seed,
+                        alongSlot,
+                        acrossSlot,
+                        new Vector2(distance, lateral),
+                        validCells,
+                        fluidCoverage,
+                        majorSupport,
+                        connectorSupport,
+                        metricPositions,
+                        rejectionCounts);
+                    rowOpportunityCount++;
+                }
+
+                if (rowOpportunityCount == 0)
+                {
+                    TryAddFreeWaterOpportunity(
+                        opportunities,
+                        domain,
+                        width,
+                        height,
+                        fieldLength,
+                        seed,
+                        alongSlot,
+                        0,
+                        new Vector2(
+                            distance,
+                            Mathf.Lerp(lateralMinimum, lateralMaximum, 0.5f)),
+                        validCells,
+                        fluidCoverage,
+                        majorSupport,
+                        connectorSupport,
+                        metricPositions,
+                        rejectionCounts);
+                }
+            }
+
+            return opportunities;
+        }
+
+        private static void TryAddFreeWaterOpportunity(
+            List<FreeWaterOpportunity> opportunities,
+            RiverDomainSnapshot domain,
+            int width,
+            int height,
+            float fieldLength,
+            int seed,
+            int alongSlot,
+            int acrossSlot,
+            Vector2 proposedPosition,
+            bool[] validCells,
+            float[] fluidCoverage,
+            float[] majorSupport,
+            float[] connectorSupport,
+            Vector2[] metricPositions,
+            int[] rejectionCounts)
+        {
+            uint stableId = MixBits(
+                (uint)(seed + 1) * 0xD1B54A35u ^
+                (uint)(alongSlot + 1) * 0x94D049BBu ^
+                (uint)(acrossSlot + 1) * 0x369DEA0Fu);
+            Vector2 jitter = new Vector2(
+                Hash01(stableId, 73u) - 0.5f,
+                Hash01(stableId, 74u) - 0.5f) *
+                (FreeWaterLatticeSpacingMetres * 0.30f);
+            proposedPosition += jitter;
+            proposedPosition.x = Mathf.Clamp(
+                proposedPosition.x,
+                0f,
+                domain.LocalLength);
+
+            StylizedRiverSplineSample sample =
+                domain.SampleAtOrientedDistance(proposedPosition.x);
+            float leftWidth = Mathf.Max(0.05f, sample.LeftSurfaceHalfWidth);
+            float rightWidth = Mathf.Max(0.05f, sample.RightSurfaceHalfWidth);
+            float lateralMinimum = -leftWidth +
+                FreeWaterLateralMarginMetres;
+            float lateralMaximum = rightWidth -
+                FreeWaterLateralMarginMetres;
+            if (lateralMaximum < lateralMinimum)
+            {
+                float centre = (rightWidth - leftWidth) * 0.5f;
+                lateralMinimum = centre;
+                lateralMaximum = centre;
+            }
+            proposedPosition.y = Mathf.Clamp(
+                proposedPosition.y,
+                lateralMinimum,
+                lateralMaximum);
+
+            if (!TryResolveFreeWaterCell(
+                    proposedPosition,
+                    width,
+                    height,
+                    fieldLength,
+                    leftWidth,
+                    rightWidth,
+                    validCells,
+                    fluidCoverage,
+                    metricPositions,
+                    out int cellIndex,
+                    out Vector2 resolvedPosition))
+            {
+                rejectionCounts[(int)
+                    StylizedRiverFoamPocketRejectionReason
+                        .NoUsableFreeWater]++;
+                return;
+            }
+
+            float positiveSupport = Mathf.Max(
+                majorSupport[cellIndex],
+                connectorSupport[cellIndex]);
+            float edgePenalty = 1f - Mathf.Clamp01(fluidCoverage[cellIndex]);
+            float stableTieBreak = Hash01(stableId, 79u);
+            float activationRank = Mathf.Clamp01(
+                positiveSupport * 0.58f +
+                edgePenalty * 0.24f +
+                stableTieBreak * 0.18f);
+            opportunities.Add(new FreeWaterOpportunity(
+                stableId,
+                resolvedPosition,
+                activationRank));
+        }
+
+        private static bool TryResolveFreeWaterCell(
+            Vector2 position,
+            int width,
+            int height,
+            float fieldLength,
+            float leftWidth,
+            float rightWidth,
+            bool[] validCells,
+            float[] fluidCoverage,
+            Vector2[] metricPositions,
+            out int cellIndex,
+            out Vector2 resolvedPosition)
+        {
+            cellIndex = -1;
+            resolvedPosition = position;
+            int approximateX = Mathf.Clamp(
+                Mathf.RoundToInt(
+                    position.x / Mathf.Max(0.0001f, fieldLength) *
+                    (width - 1)),
+                0,
+                width - 1);
+            float across01 = position.y < 0f
+                ? Mathf.Lerp(
+                    0.5f,
+                    0f,
+                    Mathf.Clamp01(-position.y / leftWidth))
+                : Mathf.Lerp(
+                    0.5f,
+                    1f,
+                    Mathf.Clamp01(position.y / rightWidth));
+            int approximateY = Mathf.Clamp(
+                Mathf.RoundToInt(across01 * (height - 1)),
+                0,
+                height - 1);
+            int approximateIndex = approximateX + approximateY * width;
+            if (validCells[approximateIndex])
+            {
+                cellIndex = approximateIndex;
+                resolvedPosition = metricPositions[approximateIndex];
+                return true;
+            }
+
+            // A fluid cell rejected at the nearest texel is inside the exact
+            // obstacle mask. Do not slide the event around that obstacle.
+            if (fluidCoverage[approximateIndex] > 0.001f)
+            {
+                return false;
+            }
+
+            float maximumDistanceSquared =
+                FreeWaterNearestSampleRadiusMetres *
+                FreeWaterNearestSampleRadiusMetres;
+            float bestDistanceSquared = float.PositiveInfinity;
+            const int searchRadius = 2;
+            for (int offsetY = -searchRadius;
+                 offsetY <= searchRadius;
+                 offsetY++)
+            {
+                int y = approximateY + offsetY;
+                if (y < 0 || y >= height)
+                {
+                    continue;
+                }
+
+                for (int offsetX = -searchRadius;
+                     offsetX <= searchRadius;
+                     offsetX++)
+                {
+                    int x = approximateX + offsetX;
+                    if (x < 0 || x >= width)
+                    {
+                        continue;
+                    }
+
+                    int index = x + y * width;
+                    if (!validCells[index])
+                    {
+                        continue;
+                    }
+
+                    float distanceSquared = (
+                        metricPositions[index] - position).sqrMagnitude;
+                    if (distanceSquared > maximumDistanceSquared ||
+                        distanceSquared >= bestDistanceSquared)
+                    {
+                        continue;
+                    }
+
+                    bestDistanceSquared = distanceSquared;
+                    cellIndex = index;
+                    resolvedPosition = metricPositions[index];
+                }
+            }
+
+            return cellIndex >= 0;
+        }
+
+        private static int CompareFreeWaterOpportunity(
+            FreeWaterOpportunity a,
+            FreeWaterOpportunity b)
+        {
+            int rank = a.ActivationRank.CompareTo(b.ActivationRank);
+            return rank != 0 ? rank : a.StableId.CompareTo(b.StableId);
+        }
+
+        private static int RasterizeFreeWaterNegativeEvent(
+            uint stableId,
+            Vector2 centre,
+            float orientation,
+            float alongRadius,
+            float acrossRadius,
+            float strength,
+            bool[] validCells,
+            Vector2[] metricPositions,
+            float[] destination)
+        {
+            float cos = Mathf.Cos(orientation);
+            float sin = Mathf.Sin(orientation);
+            float outerRadius = Mathf.Max(alongRadius, acrossRadius) * 1.45f;
+            float outerRadiusSquared = outerRadius * outerRadius;
+            uint noiseSeed = MixBits(stableId ^ 0xA6E8FEB9u);
+            int covered = 0;
+            for (int index = 0; index < destination.Length; index++)
+            {
+                if (!validCells[index])
+                {
+                    continue;
+                }
+
+                Vector2 delta = metricPositions[index] - centre;
+                if (delta.sqrMagnitude > outerRadiusSquared)
+                {
+                    continue;
+                }
+
+                float localX = cos * delta.x + sin * delta.y;
+                float localY = -sin * delta.x + cos * delta.y;
+                float normalizedX = localX /
+                    Mathf.Max(0.001f, alongRadius);
+                float normalizedY = localY /
+                    Mathf.Max(0.001f, acrossRadius);
+                float shape = EvaluateIrregularShape(
+                    normalizedX,
+                    normalizedY,
+                    noiseSeed);
+                if (shape <= 0.001f)
+                {
+                    continue;
+                }
+
+                float downstreamBias = Mathf.Lerp(
+                    0.84f,
+                    1f,
+                    SmoothStep(-0.9f, 0.9f, normalizedX));
+                float value = Mathf.Clamp01(
+                    shape * downstreamBias * strength);
+                destination[index] = Mathf.Max(destination[index], value);
+                if (value >= PocketCoverageThreshold)
+                {
+                    covered++;
+                }
+            }
+
+            return covered;
         }
 
         private static int CompareWeakSpanOpportunity(
@@ -1669,6 +2274,25 @@ namespace ProgrammaticStylized3D.Rivers
                 Hash01(evolutionSeed, 27u)));
         }
 
+        private static float RemapFreeWaterAmount(float amount)
+        {
+            amount = Mathf.Clamp01(amount);
+            if (amount <= 0.0001f)
+            {
+                return 0f;
+            }
+
+            if (amount >= 0.9999f)
+            {
+                return 1f;
+            }
+
+            // Free-Water Events should remain sparse and subordinate at the
+            // default midpoint. The steeper remap keeps the low-to-mid range
+            // restrained while preserving the full feasible population at 1.0.
+            return Mathf.Pow(amount, 2.85f);
+        }
+
         private static int ResolveSelectedCount(
             float amount,
             int feasibleCount)
@@ -1995,6 +2619,37 @@ namespace ProgrammaticStylized3D.Rivers
             value *= 0x846CA68Bu;
             value ^= value >> 16;
             return value;
+        }
+
+        private readonly struct FreeWaterOpportunity
+        {
+            public FreeWaterOpportunity(
+                uint stableId,
+                Vector2 position,
+                float activationRank)
+            {
+                StableId = stableId;
+                Position = position;
+                ActivationRank = Mathf.Clamp01(activationRank);
+            }
+
+            public uint StableId { get; }
+            public Vector2 Position { get; }
+            public float ActivationRank { get; }
+        }
+
+        private readonly struct AcceptedFreeWaterEvent
+        {
+            public AcceptedFreeWaterEvent(
+                Vector2 position,
+                float largestRadius)
+            {
+                Position = position;
+                LargestRadius = Mathf.Max(0f, largestRadius);
+            }
+
+            public Vector2 Position { get; }
+            public float LargestRadius { get; }
         }
 
         private readonly struct WeakSpanOpportunity

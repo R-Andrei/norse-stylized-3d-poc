@@ -16,29 +16,32 @@ namespace ProgrammaticStylized3D.Rivers
         HostWouldCollapse,
         ConnectorTooShort,
         NoUsableConnectorSpan,
-        ConnectorSpanSpacing
+        ConnectorSpanSpacing,
+        NoUsableFreeWater,
+        FreeWaterSpacing
     }
 
     /// <summary>
     /// The implemented Negative Aging Pressure classes. The legacy Pocket type
-    /// name remains the low-level aggregate container until the later
-    /// Free-Water Event slice completes the static negative class set.
+    /// name remains the low-level aggregate container for compatibility while
+    /// all four static negative classes share one prepared aggregate field.
     /// </summary>
     public enum StylizedRiverFoamNegativeRegionClass
     {
         InteriorPocket,
         EdgeCavity,
-        ConnectorWeakSpan
+        ConnectorWeakSpan,
+        FreeWaterNegativeEvent
     }
 
     /// <summary>
     /// Stable host identity and cheap future-evolution metadata for one accepted
     /// Negative Aging Pressure region. Major-hosted classes use a Major region
-    /// identity; Connector Weak Spans use their accepted Connector identity.
-    /// Patch 4.3 uses only the static aggregate field; normalized selectors defer
-    /// physical timing, drift, growth, and respawn decisions to the later
-    /// runtime-evolution gate. Edge cavities additionally retain their deliberate
-    /// breach direction.
+    /// identity; Connector Weak Spans use their accepted Connector identity;
+    /// Free-Water Negative Events use no positive host. Patch 4.4 still uses only
+    /// the static aggregate field; normalized selectors defer physical timing,
+    /// drift, growth, and respawn decisions to the later runtime-evolution gate.
+    /// Edge cavities additionally retain their deliberate breach direction.
     /// </summary>
     public readonly struct StylizedRiverFoamPocketRegion
     {
@@ -128,6 +131,9 @@ namespace ProgrammaticStylized3D.Rivers
             int weakSpanEligibleConnectorCount,
             int weakSpanCandidateCount,
             int acceptedConnectorWeakSpanCount,
+            int freeWaterOpportunityCount,
+            int freeWaterCandidateCount,
+            int acceptedFreeWaterEventCount,
             int coveredCellCount,
             double generationMilliseconds,
             float[] pressure,
@@ -155,6 +161,13 @@ namespace ProgrammaticStylized3D.Rivers
             AcceptedConnectorWeakSpanCount = Mathf.Max(
                 0,
                 acceptedConnectorWeakSpanCount);
+            FreeWaterOpportunityCount = Mathf.Max(
+                0,
+                freeWaterOpportunityCount);
+            FreeWaterCandidateCount = Mathf.Max(0, freeWaterCandidateCount);
+            AcceptedFreeWaterEventCount = Mathf.Max(
+                0,
+                acceptedFreeWaterEventCount);
             CoveredCellCount = Mathf.Max(0, coveredCellCount);
             GenerationMilliseconds = Math.Max(0.0, generationMilliseconds);
             this.pressure = pressure ?? Array.Empty<float>();
@@ -176,6 +189,9 @@ namespace ProgrammaticStylized3D.Rivers
         public int WeakSpanEligibleConnectorCount { get; }
         public int WeakSpanCandidateCount { get; }
         public int AcceptedConnectorWeakSpanCount { get; }
+        public int FreeWaterOpportunityCount { get; }
+        public int FreeWaterCandidateCount { get; }
+        public int AcceptedFreeWaterEventCount { get; }
         public int CoveredCellCount { get; }
         public double GenerationMilliseconds { get; }
 
@@ -184,13 +200,13 @@ namespace ProgrammaticStylized3D.Rivers
         // separately.
         public int EligibleHostCount =>
             InteriorEligibleHostCount + CavityEligibleHostCount +
-            WeakSpanEligibleConnectorCount;
+            WeakSpanEligibleConnectorCount + FreeWaterOpportunityCount;
         public int CandidateCentreCount =>
             InteriorCandidateCount + CavityCandidateCount +
-            WeakSpanCandidateCount;
+            WeakSpanCandidateCount + FreeWaterCandidateCount;
         public int AcceptedPocketCount =>
             AcceptedInteriorPocketCount + AcceptedEdgeCavityCount +
-            AcceptedConnectorWeakSpanCount;
+            AcceptedConnectorWeakSpanCount + AcceptedFreeWaterEventCount;
 
         public IReadOnlyList<StylizedRiverFoamPocketRegion> Regions => regions;
 

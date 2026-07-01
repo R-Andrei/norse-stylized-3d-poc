@@ -24,6 +24,8 @@ Accepted static topology foundation:
 - Connector endpoint gates, Major clearance halos, bounded detour rejection, and soft participation/distribution balancing;
 - the initial Interior Pocket proof hosted by broad Major interiors;
 - Patch 4.2 Interior Pocket and Edge Cavity classes accepted for feature progression, with population coefficients still provisional;
+- Patch 4.3 Connector Weak Spans accepted after visual validation;
+- Patch 4.4 Free-Water Negative Events accepted after visual tuning, including a sparser default population and broader deterministic size variation;
 - exact transformed-mesh Obstacle Footprint, distinct from padded Pressure/Lee disturbance footprints;
 - separate support and negative-influence diagnostics;
 - field-based GPU infrastructure, chunking, sleeping, freezing, and resource lifecycle support;
@@ -36,19 +38,19 @@ Approved negative-topology expansion before runtime evolution:
 
 - rename the aggregate negative output concept to **Negative Aging Pressure**;
 - retain the current closed Major-hosted class as **Interior Pocket**;
-- retain accepted Interior Pockets and Edge Cavities, implement **Connector Weak Span** in Patch 4.3, and add **Free-Water Negative Event** in Patch 4.4;
-- expose one independent `0–1` Amount control per negative class, all defaulting to `0.5`; Patch 4.2 exposes Interior Pocket and Edge Cavity Amount, and Patch 4.3 exposes Connector Weak Span Amount;
+- retain accepted Interior Pockets and Edge Cavities, accepted **Connector Weak Span** from Patch 4.3, and the implemented **Free-Water Negative Event** from Patch 4.4;
+- expose one independent `0–1` Amount control per negative class, all defaulting to `0.5`; Patch 4.2 exposes Interior Pocket and Edge Cavity Amount, Patch 4.3 exposes Connector Weak Span Amount, and Patch 4.4 exposes Free-Water Event Amount;
 - make each Amount activate a nested deterministic opportunity subset and control population only;
 - preserve subtype identity and future evolution metadata even when classes are packed into one aggregate negative field for diagnostics/output;
-- visually validate all four classes statically before runtime evolution begins.
+- Patch 4.5 combined static validation accepted for feature progression; all population and shape coefficients remain provisional until the final Foam material proves the complete visual result.
 
 Not yet implemented or accepted:
 
-- Patch 4.3 Connector Weak Spans — implemented; visual acceptance pending;
-- Patch 4.4 Free-Water Negative Events;
-- Patch 4.5 complete static topology validation;
-- strictly downstream free-water topology movement and class-specific evolution;
-- safe generated-topology rebuild crossfade;
+- Patch 4.6 lively single-instance Major Support movement and morphing;
+- Patch 4.7A hosted Interior Pocket and Edge Cavity evolution;
+- Patch 4.7B slower independent Free-Water Negative Event evolution;
+- Patch 4.7C Connector Support and Connector Weak Span evolution;
+- safe generated-topology rebuild replacement/crossfade for explicit domain or settings rebuilds;
 - procedural chunk/run cache packaging for generated topology and exact obstacle data;
 - topology-to-material lifespan response;
 - final fragmentation, dissipation, and rendering behaviour.
@@ -512,8 +514,10 @@ Negative Aging Pressure is generated after the positive support context exists, 
 - choose sparse deterministic opportunities in valid water;
 - prefer neutral or weakly supported water without making positive overlap categorically invalid;
 - avoid exact obstacles and strong Anchored Support cores;
-- retain stable phase, fade, downstream drift, allowed-span, and recycle metadata;
+- retain stable phase, downstream/lateral movement, allowed-span, recycle, growth, and shape-morph metadata; existing provisional fade selectors are not the approved ordinary-evolution mechanism;
 - remain visually subordinate at its default density.
+
+Patch 4.4 implements this through a deterministic metric-space lattice that is independent of structural-grid cell counts. Candidate activation prefers neutral, well-contained water first while preserving later positive-overlap opportunities. Exact obstacles and invalid water are rejected or clipped during preparation; strong live Pressure, Lee, and Shore cores remain protected by the existing composition pass. Accepted events retain stable class identity, transform, phase, drift, movement-span, recycle, growth, and current provisional fade selectors, but remain static until the runtime-evolution gate. Patch 4.7B supersedes duplicate-instance fading with the approved single-instance dwell/move/morph lifecycle.
 
 Each class exposes one independent `0–1` Amount control with default `0.5`. Amount activates a nested deterministic opportunity subset and changes population only. Class-specific maximums and spacing rules keep the defaults sensible without forcing equal counts or equal coverage.
 
@@ -651,42 +655,71 @@ The static generated topology pass is accepted only if:
 - warm runtime uses cached data and does not regenerate or validate library shapes;
 - cold and warm Play entry remain within the accepted staged-initialization behaviour.
 
-After static validation, strictly downstream movement is added using the same stable topology identity. Movement must remain positive downstream, independently paced, and recycle only outside the visible domain.
+After static validation, runtime evolution is added using the same stable topology identity. Every ordinary movement step must make positive net downstream progress, while bounded lateral or diagonal displacement is allowed and encouraged.
 
 #### Dynamic runtime topology evolution
 
-The new generator does not make topology static. It moves expensive topology **generation** out of active gameplay, but accepted topology may still evolve during runtime through cheap operations.
+The generator does not make topology static. It moves expensive topology **generation** out of active gameplay, while accepted topology evolves through cheap compact-state updates and batched low-resolution field reconstruction.
 
-The generator or future cache must emit enough identity and metadata for runtime evolution, including as applicable:
+The river must read as lively, chaotic, and forceful. A semi-static painting or synchronized conveyor is unacceptable. Different regions use independent deterministic rhythms, positions, shape targets, and lifetimes.
 
-- layer class: Major, Connector, Interior Pocket, Edge Cavity, Connector Weak Span, or Free-Water Negative Event;
-- base field or mask identity;
-- stable region or opportunity identity;
-- downstream drift speed;
-- phase offset;
-- fade-in and fade-out envelope;
-- allowed movement span or recycle interval;
-- anchoring strength to Pressure, Lee, Shore, obstacle, or bank context;
-- optional per-layer evolution rhythm.
+##### Single-instance slot rule
 
-Runtime evolution may use:
+Every accepted generated region owns one logical evolution slot. During ordinary evolution, that slot has exactly one active topology instance:
 
-- downstream coordinate offsets when sampling generated fields or cached masks;
-- low-rate field advection of topology support;
-- interpolation between generated or baked topology frames;
-- gradual fade-in, fade-out, strengthening, weakening, or replacement of regions;
-- separate drift rates and evolution rhythms for Major, Connector, and each negative class;
-- safe crossfade to newly generated topology during an explicit rebuild or preparation window.
+- no old/new duplicate pair;
+- no ordinary fade between two support placements;
+- no momentary double support that could inflate the later Foam population;
+- no unbounded birth/death counter;
+- no per-region GameObject or managed runtime object.
+
+A movement transition interpolates the **same instance's** position, orientation, scale, and soft shape from its current state to its target state. Only that one interpolated state is rasterized at each topology update.
+
+##### Major Support lifecycle
+
+The provisional Patch 4.6 lifecycle is:
+
+1. **Spawn/current state** — the Major is fully present at one valid placement.
+2. **Dwell** — it remains at that state for a deterministic `2–5 s`.
+3. **Move and morph** — over roughly `1–2 s`, the same Major moves to a new state.
+4. **Commit** — the target becomes current and receives a new independently selected dwell.
+5. **Repeat** — the slot continues through multiple hops until its allocated lifetime or downstream egress condition is reached.
+6. **Instant recycle** — the old occurrence is removed and the same slot reappears at one valid upstream ingress anchor in the same topology update. No fade or overlap is required.
+
+Each movement must:
+
+- advance a positive distance in canonical downstream coordinates;
+- permit bounded left/right displacement, so motion may be diagonal rather than axis-locked;
+- change shape every hop through cheap soft-mask warping, compatible retained shape variants, non-uniform scale, shear, and/or small rotation;
+- use a different deterministic rhythm from neighbouring Majors;
+- preserve broadly similar integrated support so size changes do not steadily inflate or collapse total support.
+
+The exact dwell, movement, hop-count, and lifetime ranges remain provisional implementation coefficients. The first proof should begin near `2–5 s` dwell, `1–2 s` movement, and roughly `5–12` hops or `20–45 s` total occurrence lifetime, then be judged through the later persistent Foam material.
+
+A Major initially generated close to the downstream end receives a shortened first occurrence. All normal recycle anchors are restricted to the upstream ingress region, so a slot cannot become trapped repeatedly disappearing and reappearing in the final part of the river.
+
+##### Retained evolution data
+
+The generator or future cache must retain enough compact data for cheap evolution, including as applicable:
+
+- class and stable slot identity;
+- one accepted soft local mask plus cheap compatible warp/variant data;
+- current and target river-distance, lateral position, orientation, and scale;
+- deterministic dwell, movement, hop-count, lifetime, and cycle selectors;
+- upstream ingress anchors and downstream egress limits;
+- Major-host-relative data for Interior Pockets and Edge Cavities;
+- accepted Connector polyline, endpoint identities, and normalized Weak Span positions;
+- bounded prevalidated spare Connector relationships where later testing proves they are required.
 
 Runtime evolution must not:
 
-- perform expensive shape generation, candidate search, connected-component cleanup, pathfinding, distance transforms, or rejection loops during ordinary gameplay;
-- move any free-water topology upstream;
-- pop a whole region in or out without a fade or later material-lifecycle response;
-- treat topology as direct visible foam;
+- perform shape generation, candidate search, connected-component cleanup, pathfinding, distance transforms, host search, or rejection loops during ordinary gameplay;
+- move a free-water region upstream in the longitudinal coordinate;
+- duplicate one logical support slot into simultaneous old and new support instances;
+- treat topology as direct visible Foam;
 - detach anchored Pressure, Lee, or Shore Support from their authoritative live sources.
 
-Qualitatively, Major Support should drift slowly and read as broad downstream-moving influence. Connector Support may be more fragile, with narrower fade or reconnect behaviour. Interior Pockets and Edge Cavities remain associated with their Major host and may move within bounded downstream-positive host-relative spans. Connector Weak Spans may move modestly along their owning Connector and fade to create apparent reconnection. Free-Water Negative Events drift downstream, fade, and recycle sparsely. Anchored Support remains attached to the live bank or object source and is not part of the free-water drift field.
+Anchored Support remains attached to the live bank or object source and is not part of generated free-water evolution.
 
 #### Prototype history and rejected directions
 
@@ -704,52 +737,74 @@ The active replacement is therefore the integrated field-first topology generato
 
 ### Connector Support Evolution
 
-Static Connector Support is implemented and accepted through Patch 3.5. The visual-proof generator connects meaningful disconnected Major components through bounded preparation-time search, compact endpoint gates, Major clearance halos, bounded detour rejection, and soft participation/distribution scoring. It does not use Shore Support as an easy universal endpoint, paint green bodies through broad Major interiors, create a maintained gameplay graph, or run pathfinding during ordinary gameplay.
+Static Connector Support is implemented and accepted through Patch 3.5. Ordinary endpoint movement must not trigger gameplay pathfinding.
 
-Production movement and caching must preserve the accepted endpoint and relationship identity contract. Connector runtime evolution remains a later gated step and may fade or reconnect only through cheap metadata-driven operations.
+During normal Major hops:
+
+- retain the accepted simplified Connector polyline;
+- move path points by a source-to-destination blend of the two endpoint Major transforms;
+- allow a small bounded transverse deformation so the Connector does not behave like a rigid straight elastic band;
+- rasterize the deformed path in the same batched topology update;
+- keep endpoint gates and Major-interior clearance behaviour intact.
+
+When a connected Major instantly recycles upstream, the old relationship must not stretch across the chunk. Patch 4.7C must therefore use bounded **prevalidated** alternatives prepared before gameplay:
+
+- retire the invalid old relationship in the recycle update;
+- assign a valid spare relationship immediately when one exists;
+- reassign the Connector Weak Span to a safe normalized position on the replacement path;
+- permit a temporary Connector population dip when no valid spare exists rather than running runtime pathfinding or drawing an invalid route.
+
+Connector replacement is a later gated proof. No ordinary runtime route search, graph maintenance, or candidate evaluation is authorized.
 
 ### Negative Aging Pressure Evolution
 
-Negative classes have different runtime contracts:
+Negative classes have distinct runtime contracts:
 
-- **Interior Pocket** remains associated with a valid Major host, moves only within bounded host-relative limits, and fades before replacement or respawn.
-- **Edge Cavity** remains associated with its Major host and breach side; it may strengthen, weaken, or shift within safe host-relative limits without visibly flipping sides.
-- **Connector Weak Span** remains on its owning Connector, away from endpoint gates, and may move modestly along the path while fading in or out.
-- **Free-Water Negative Event** requires valid water but no positive host; it drifts strictly downstream, remains sparse, fades, and recycles after its allowed span.
+- **Interior Pocket** inherits its Major host's full world-space translation, diagonal displacement, rotation, broad scale, and instant recycle. It may add a small bounded host-local offset, scale, orientation, or soft-shape change on selected host hops, but must remain inside the safe Major interior.
+- **Edge Cavity** inherits its Major host movement and recycle, remains attached to the same breach side, and may add smaller bounded local variation without crossing the host or destroying the positive remainder.
+- **Connector Weak Span** remains at a safe normalized position on its owning deformed Connector, away from endpoint gates, and is reassigned with the Connector when a prevalidated replacement relationship is used.
+- **Free-Water Negative Event** uses the same single-instance hop model independently, but more slowly: initially about `5–10 s` dwell and `2–4 s` movement/morph. It may move farther laterally, vary size more strongly, rotate modestly, and instantly recycle to an upstream valid-water anchor at lifetime or egress.
 
-No negative class directly cuts topology or material. No class performs distance transforms, host search, path search, or rejection during ordinary gameplay.
+Hosted classes should not be perfectly rigid copies of their Major. Deterministic per-hop participation may let an Interior Pocket change on some host hops and remain locally stable on others; Edge Cavities should vary less often and within tighter bounds. Every local state is chosen inside absolute host-safe limits rather than accumulated as an unbounded random walk.
 
-### Growth and Decay Drivers Are Not Extra Layers
+No negative class directly cuts topology or material. No class performs distance transforms, host search, path search, candidate generation, or rejection during ordinary gameplay.
 
-“Birth” and “death” refer to operations on persistent topology state, not separate textures.
+### Single-instance state is not a birth/death layer
 
-For each persistent class:
+Ordinary topology evolution requires no separate Birth texture and no separate Death texture.
+
+Each slot stores compact current and target descriptors:
 
 ```text
-CurrentState = previous persistent field
-Target or Driver = deterministic function of river position, time, and accepted context
-CurrentState gradually approaches the target through separate rise/fall rates
+Current transform + current shape state
+Target transform + target shape state
+Movement progress
 ```
 
-No dedicated Birth texture and no dedicated Death texture are required.
+During a move, the descriptor interpolates toward the target and one resulting mask is rasterized. At completion, target becomes current. At recycle, the descriptor is replaced immediately with a valid upstream state in the same topology update.
 
-A deterministic driver may be evaluated procedurally. It should only be cached if profiling proves that caching is cheaper than re-evaluation.
+This ordinary evolution model must not be confused with the later **explicit full-topology rebuild** path. A domain/settings/obstacle rebuild may still preserve old and replacement complete topology long enough to avoid a whole-river discontinuity. That separate rebuild transition is not used for routine per-region movement.
 
 ### Asynchronous and Staggered Scheduling
 
-Topology work runs more slowly than foam transport and is distributed across frames.
+Topology updates remain much slower than persistent Foam transport, but they must be frequent enough to keep the river lively.
 
-The current cadence contract is:
+The provisional evolution cadence is:
 
-- Major evolution defaults to `2 Hz` and is authorable from `0.5–10 Hz`;
-- Major cleanup defaults to `1 Hz` and is authorable from `0.5–10 Hz`;
-- Connector targets refresh less often;
-- Pocket targets refresh less often;
-- persistent fields continue gradual rise/fall between target refreshes where practical;
-- different chunks or regions may update on different frames;
-- sleeping, frozen, distant, or inactive chunks perform no unnecessary topology work.
+- Major dwell: independently selected `2–5 s`;
+- Major movement/morph: approximately `1–2 s`;
+- Free-Water dwell: independently selected `5–10 s`;
+- Free-Water movement/morph: approximately `2–4 s`;
+- hosted Interior Pockets and Edge Cavities follow Major movement, with bounded local changes on only some host hops;
+- Connector deformation follows endpoint Major movement; relationship reassignment happens only on invalidation/recycle and uses prevalidated alternatives;
+- while any region is moving, begin with approximately `5` low-resolution topology reconstruction ticks per second;
+- while every region in a class is dwelling, that class performs no unnecessary field reconstruction;
+- different regions and chunks use staggered phases;
+- sleeping, frozen, distant, or inactive chunks perform no evolution work.
 
-One compute dispatch may update many cells simultaneously without making their visual motion synchronized. Synchronization is prevented by local velocity, phase, growth, and decay variation—not by running cells on separate CPU timers.
+The `5 Hz` active-movement rate is a provisional proof value, not a public control. It should be reduced if the later Foam material hides coarser topology stepping, or raised only if profiling and visual testing prove it necessary.
+
+All changing regions of one class must be processed in a bounded batched operation. Do not dispatch once per region. One dispatch may update many cells simultaneously without synchronizing their behaviour because timing, target transforms, warp state, and lifetimes remain per-slot and deterministic.
 
 ## Accepted Anchored Inputs
 
@@ -900,6 +955,7 @@ Further performance work is now formally paused after the accepted profiler inst
 ## Performance Contract
 
 - Use shared fixed-cost fields.
+- Prioritize CPU/GPU compute cost, dispatch count, and runtime latency over modest additional memory; retain compact masks, variants, anchors, and descriptors when doing so removes meaningful runtime computation.
 - No continuously maintained topology graph.
 - No permanent node set or pathfinding network.
 - No GameObject or managed allocation per Major, Connector, negative region, or Foam patch.
@@ -909,7 +965,7 @@ Further performance work is now formally paused after the accepted profiler inst
 - The active generator may use candidate retries, connected-component cleanup, hole filling, distance transforms, endpoint clustering, bounded pathfinding, rejection, and composition scoring because those operations are necessary to prove the final visual model.
 - Active gameplay must not run those expensive topology-generation operations once the production pipeline exists. Gameplay should consume cached per-river/per-run fields, cached descriptors, or another accepted compact representation.
 - During the temporary proof path, generation runs only on initialization or queued topology rebuilds, never every frame as ordinary steady-state maintenance.
-- Connector Support and four-class Negative Aging Pressure are part of the integrated visual proof. Connector Support is accepted as a Major-to-Major relationship layer; its selection uses a soft degree-aware and longitudinal-distribution bias so wider participation is encouraged without mandatory first connections or section quotas. Interior Pocket and Edge Cavity are accepted for feature progression with later coefficient tuning permitted. Connector Weak Span is implemented in Patch 4.3 and awaiting visual acceptance; Free-Water Negative Event remains the next separately validated slice.
+- Connector Support and four-class Negative Aging Pressure are accepted as the static integrated baseline through Patch 4.5. Connector selection uses a soft degree-aware and longitudinal-distribution bias so wider participation is encouraged without mandatory first connections or section quotas. Interior Pocket, Edge Cavity, Connector Weak Span, and Free-Water Negative Event are accepted for feature progression; population and shape coefficients remain provisional until final Foam-material validation.
 - The final runtime target remains bounded sampling/composition of accepted fields or compact descriptors. No final shader loop may scan candidate lists, shape libraries, path graphs, or growing structure collections.
 - Ordinary gameplay Obstacle Footprint updates must never rescan mesh triangles. The temporary development fallback may perform exact 3 × 3 interval preparation only during staged pre-gameplay initialization or a coalesced explicit geometry rebuild. Production must load the same compact prepared data from the procedural chunk build/link cache.
 - Static Pressure may retain its accepted contour source for now. Authoritative Obstacle Footprint must use exact prepared mesh intervals; the temporary Play-startup scan exists only until procedural chunk build/link preparation owns and caches that data.
@@ -948,12 +1004,9 @@ The currently accepted normal Inspector controls are:
 - `Connector Length Preference` — range `0–1`; short-biased through neutral to long-biased ranking inside a fixed safe envelope;
 - `Interior Pocket Amount` — range `0–1`, default `0.5`; accepted for feature progression, with coefficient tuning deferred;
 - `Edge Cavity Amount` — range `0–1`, default `0.5`; accepted for feature progression, with coefficient tuning deferred;
+- `Connector Weak Span Amount` — range `0–1`, default `0.5`; accepted after Patch 4.3 visual validation;
+- `Free-Water Event Amount` — range `0–1`, default `0.5`; accepted after Patch 4.4 visual tuning;
 - `Foam Colour`.
-
-The active/remaining negative controls are:
-
-- `Connector Weak Span Amount` — range `0–1`, default `0.5`; implemented in Patch 4.3 and awaiting visual acceptance;
-- `Free-Water Event Amount` — range `0–1`, default `0.5`; reserved for Patch 4.4.
 
 For all four negative controls, `0` means none, `0.5` means a sensible category-specific baseline, and `1` means the maximum bounded population. Increasing Amount activates a nested deterministic subset and does not change size, negative strength, seed, or evolution speed.
 
@@ -978,21 +1031,19 @@ The canonical topology-only rollout is maintained in `River_Foam_Topology_Implem
 7. Initial Interior Pocket proof hosted by broad Major interiors.
 8. Patch 4.1 exact transformed-mesh Obstacle Footprint and procedural chunk/run preparation handoff contract.
 9. Patch 4.2 Interior Pocket population and one-sided Edge Cavities accepted for feature progression; coefficient tuning deferred.
-10. Patch 4.3 Connector Weak Spans implemented; visual acceptance pending.
+10. Patch 4.3 Connector Weak Spans accepted after visual validation.
+11. Patch 4.4 Free-Water Negative Events accepted after visual tuning.
+12. Patch 4.5 complete static topology accepted for feature progression; coefficients remain provisional.
 
-### Active negative-topology sequence
+### Active runtime-evolution sequence
 
-1. Patch 4.3 — Connector Weak Spans implemented; validate the retained accepted path geometry, endpoint clearance, local cut shape, and Amount behaviour.
-3. Patch 4.4 — add Free-Water Negative Events.
-4. Patch 4.5 — validate complete static positive and four-class negative topology.
-
-### Remaining topology sequence
-
-1. Strictly downstream Major evolution.
-2. Class-specific Connector and Negative Aging Pressure evolution.
-3. Safe generated-topology rebuild crossfade.
-4. Procedural chunk/run cache and precompute packaging.
-5. Topology completion and handoff to separate Foam-material work.
+1. Patch 4.6 — lively single-instance Major movement, morphing, finite occurrence lifetime, and instant upstream recycling.
+2. Patch 4.7A — Major-host-relative Interior Pocket and Edge Cavity evolution.
+3. Patch 4.7B — slower independent Free-Water Negative Event movement, morphing, and recycling.
+4. Patch 4.7C — retained-path Connector deformation, prevalidated relationship replacement, and Weak Span following.
+5. Patch 4.8 — safe generated-topology rebuild transition for explicit rebuilds.
+6. Patch 4.9 — procedural chunk/run cache and precompute packaging.
+7. Patch 4.10 — topology completion and handoff to separate Foam-material work.
 
 Material aging response, fragmentation, dissipation, and rendering are not topology implementation steps and must not begin before topology completion.
 
@@ -1015,7 +1066,7 @@ Pass only if the paused diagnostic and generator tooling show:
 - substantial neutral water remains between broad support regions;
 - temporary generation costs are profiled and clearly marked as future cache/precompute work;
 - generated masks do not reveal repeated primitive stamps, harmonic blobs, cellular damage, skeleton bias, toy path descriptors, or an ellipse-dominated family;
-- downstream movement, once added, remains strictly positive and does not produce visible upstream wrap;
+- every ordinary hop makes positive net downstream progress, while bounded lateral or diagonal movement does not produce longitudinal upstream motion;
 - scale remains stable across quality tiers, bends, width variation, chunks, and reverse flow.
 
 ### Connector Support
@@ -1025,7 +1076,7 @@ Pass only if connectors:
 - occur between real positive support on two sides;
 - do not begin or end in unsupported empty water;
 - remain sparse and subordinate;
-- evolve gradually rather than popping;
+- deform continuously during ordinary endpoint movement and replace invalid relationships only through bounded prevalidated alternatives;
 - avoid obvious obstacle and domain violations;
 - leave and enter Major regions only through compact endpoint gates;
 - do not orbit around Major perimeters to force unlikely endpoint relationships;
@@ -1044,7 +1095,7 @@ Pass only if:
 - Anchored Support cores and exact obstacle context remain protected;
 - positive and negative fields remain separate and may overlap;
 - subtype identity and future evolution metadata survive aggregate packing;
-- every class evolves gradually once runtime evolution is implemented;
+- every class follows its approved asynchronous single-instance movement/morph rhythm once runtime evolution is implemented;
 - no class acts as instant geometric subtraction.
 
 ### Batch 2 Material Response

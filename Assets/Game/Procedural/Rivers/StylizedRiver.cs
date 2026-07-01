@@ -704,6 +704,10 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamConnectorWeakSpanAmount = 0.5f;
 
+        [Tooltip("Controls the nested deterministic population of sparse Free-Water Negative Events. Events require valid water but no Major or Connector host, prefer neutral or weakly supported areas, and retain stable future drift, fade, span, and recycle metadata. Zero disables them; 0.5 is the normal sparse baseline; one permits the maximum bounded population.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterEventAmount = 0.5f;
+
         [Tooltip("Lit, non-emissive Foam tint. The alpha channel controls maximum Foam opacity, so no separate opacity control is required.")]
         [SerializeField] private Color foamColour =
             new Color(0.94f, 0.97f, 0.94f, 0.72f);
@@ -1152,6 +1156,8 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamEdgeCavityAmount);
         public float FoamConnectorWeakSpanAmount =>
             Mathf.Clamp01(foamConnectorWeakSpanAmount);
+        public float FoamFreeWaterEventAmount =>
+            Mathf.Clamp01(foamFreeWaterEventAmount);
         public Color FoamColour => foamColour;
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
         public float FoamTestDistanceNormalized =>
@@ -2785,6 +2791,8 @@ namespace ProgrammaticStylized3D.Rivers
                 foamEdgeCavityAmount);
             foamConnectorWeakSpanAmount = Mathf.Clamp01(
                 foamConnectorWeakSpanAmount);
+            foamFreeWaterEventAmount = Mathf.Clamp01(
+                foamFreeWaterEventAmount);
             foamColour.a = Mathf.Clamp01(foamColour.a);
             foamTestDistanceNormalized = Mathf.Clamp01(
                 foamTestDistanceNormalized);

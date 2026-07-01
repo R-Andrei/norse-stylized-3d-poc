@@ -36,7 +36,7 @@ Current progress:
 - **Step 2 — Per-river staged bootstrap:** implemented and validated. Initialization now advances one explicit phase per `LateUpdate`; Foam remains disabled until complete readiness. The observed early phases were generally below roughly `2.5 ms` instead of recreating the former combined burst.
 - **Step 3 — Dirty-event queue and obstacle rebuild coalescing:** implemented and accepted. Boundary and obstacle changes no longer execute a complete rebuild chain immediately.
 - **Performance pause:** active. Steady-state maintenance staggering, compute-asset splitting, striped dispatch, CPU jobs, and global cross-river scheduling are deferred until Major Support, Connector Support, all four Negative Aging Pressure classes, static combined topology, runtime evolution, rebuild crossfade, and cache/preparation packaging are implemented and validated.
-- **Current implementation milestone:** Patch 4.1 exact Obstacle Footprint is accepted. Patch 4.2 Interior Pockets and Edge Cavities are accepted for feature progression with population coefficients still provisional. Patch 4.3 now implements Connector Weak Spans and is awaiting visual acceptance; Free-Water Negative Events remain the next slice before static combined validation. Exact transformed-mesh interval preparation currently runs only in the staged pre-gameplay obstacle phase as a temporary fallback. Production ownership belongs to procedural chunk generation/building/linking after final object placement, with compact data cached for gameplay loading.
+- **Current implementation milestone:** Patch 4.1 exact Obstacle Footprint, Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, and Patch 4.5 complete static topology are accepted for feature progression. Coefficients remain provisional until the persistent Foam material proves the final result. Patch 4.6 lively Major evolution is next. Exact transformed-mesh interval preparation currently runs only in the staged pre-gameplay obstacle phase as a temporary fallback. Production ownership belongs to procedural chunk generation/building/linking after final object placement, with compact data cached for gameplay loading.
 - **Global cross-river scheduling:** intentionally deferred. It will be designed only after the final one-river work categories, dependencies, interruption rules, and costs are known.
 
 The current sequencing rule is now: preserve the accepted performance foundation, prove each topology slice visually before building the next one, keep every expensive proof-stage operation profiled and named, then resume performance work against the real completed pipeline. Do not invent scheduler categories for features that are still provisional.
@@ -59,12 +59,15 @@ Further performance engineering is paused because the free-water topology pipeli
 2. accepted Connector Support;
 3. accepted initial Interior Pocket and exact Obstacle Footprint;
 4. Patch 4.2 Interior Pocket Amount and Edge Cavities — accepted for feature progression; coefficient tuning deferred;
-5. Patch 4.3 Connector Weak Spans — implemented; visual acceptance pending;
-6. Patch 4.4 Free-Water Negative Events;
-7. Patch 4.5 static combined topology validation;
-8. strictly downstream class-specific topology evolution;
-9. safe replacement-topology crossfade;
-10. production procedural chunk/run cache and precompute packaging.
+5. Patch 4.3 Connector Weak Spans — accepted after visual validation;
+6. Patch 4.4 Free-Water Negative Events — accepted after visual tuning;
+7. Patch 4.5 static combined topology validation — accepted for feature progression;
+8. Patch 4.6 lively single-instance Major movement and morphing;
+9. Patch 4.7A hosted negative evolution;
+10. Patch 4.7B Free-Water negative evolution;
+11. Patch 4.7C Connector and Weak Span evolution;
+12. Patch 4.8 safe explicit replacement-topology transition;
+13. Patch 4.9 production procedural chunk/run cache and precompute packaging.
 
 Topology-to-material aging response and final material lifetime integration remain separate Stage 6 work only after topology completion.
 
@@ -76,6 +79,7 @@ The pause is not permission to ignore cost. Every topology patch must still pres
 - full-grid kernels do not reconstruct complex topology grammar during steady-state gameplay;
 - no unbounded candidate retries, path searches, or graph searches in gameplay; proof/bake searches must be bounded;
 - no immediate synchronous rebuild path is reintroduced;
+- modest additional cached masks, variants, anchors, or buffers are preferred when they remove CPU/GPU computation, dispatches, or latency;
 - cold-start profiling is mandatory after compute changes;
 - startup hitch regressions block acceptance.
 
@@ -94,8 +98,9 @@ The long-term architecture has four layers:
    - Repeated notifications coalesce, obstacle versions must settle, and only one queued rebuild phase executes per frame.
 
 3. **Staggered steady-state maintenance**
-   - Major, Connector, and class-specific negative evolution, composition, measurements, obstacle refreshes, and other periodic tasks are separated where dependencies permit.
-   - Slow topology features do not need to complete every dependent pass in a single frame.
+   - Major, Connector, and class-specific negative dwell/move/recycle work, composition, measurements, obstacle refreshes, and other tasks are separated where dependencies permit.
+   - Active movement may update at a small bounded cadence while dwell periods perform no unnecessary reconstruction.
+   - Different slots and chunks remain phase-staggered so lively topology does not create synchronized CPU/GPU spikes.
 
 4. **Compiler and dispatch isolation**
    - Expensive compute subsystems are eventually separated into smaller compute assets.
@@ -1299,36 +1304,38 @@ Revert the runtime file to Step 2 and restore the preceding document revision.
 
 ## Step 4 — Staggered Steady-State Topology Maintenance
 
-**Status:** deferred by the topology-first performance pause. Do not implement until Major, Connector, Pocket, and combined topology validation are complete.
+**Status:** Patch 4.5 has satisfied the static-validation prerequisite. Implement only the minimum maintenance scheduling required by Patch 4.6, and do not broaden this into the later global scheduler or unrelated optimization work.
 
 ### Purpose
 
-Spread periodic topology work across frames rather than grouping every dependent pass whenever Major evolution or cleanup becomes due.
+Schedule frequent but tiny asynchronous topology movement work without grouping all slot updates, composition, diagnostics, and dependent classes into the same frame.
 
 ### Files expected to change
 
 - `Game/Procedural/Rivers/StylizedRiverFoamRuntime.cs`
 
-No compute change should be necessary for the first version.
+The exact compute file boundary must be resolved from the Patch 4.5 baseline before implementation. Do not assume either a compute change or no compute change.
 
 ### Exact behaviour change
 
-- introduce an explicit topology maintenance queue;
-- separate source refresh, Major evolution, Major cleanup, dependent topology, composition, and diagnostics;
-- ensure Major evolution and cleanup do not automatically execute in the same frame;
-- run metrics only when needed.
+- add the smallest bounded maintenance state needed by Patch 4.6;
+- separate Major descriptor advancement, batched field reconstruction, composition, and diagnostics;
+- update only while at least one slot is moving; dwell-only classes do no reconstruction;
+- begin with about `5 Hz` reconstruction during active Major movement, not as a permanent always-on tick;
+- limit each river to a bounded dispatch group and stagger different rivers/chunks;
+- run metrics only when requested or when acceptance telemetry is enabled;
+- preserve zero managed allocations after readiness.
 
 ### Explicit exclusions
 
 - no new topology classes;
-- no Connector implementation;
-- no Major shape or motion work;
+- no Connector or negative-class motion work;
 - no stripe ranges.
 
 ### Test
 
-- long observation of Support Classes debug;
-- verify gradual updates remain visually acceptable;
+- long observation of Support Classes debug through repeated `2–5 s` dwell and `1–2 s` Major movement/morph cycles;
+- verify asynchronous movement stays lively without synchronized update spikes;
 - compare average and worst-frame timings;
 - confirm Final Foam debug-off path does not run unnecessary metrics;
 - confirm dirty dependencies interrupt or supersede maintenance safely.
@@ -1336,7 +1343,7 @@ No compute change should be necessary for the first version.
 ### Acceptance gate
 
 - no frame executes the entire topology chain by default;
-- visual topology remains stable and understandable;
+- visual topology remains lively, deterministic, and understandable;
 - metrics are no longer coupled to ordinary composition unless requested;
 - worst-frame topology maintenance cost is reduced.
 
@@ -1670,16 +1677,15 @@ Accepted topology work:
 
 Remaining topology slices:
 
-1. Patch 4.3 Connector Weak Span visual acceptance;
-2. Patch 4.4 Free-Water Negative Events;
-3. Patch 4.5 complete static topology validation;
-4. strictly downstream Major evolution;
-5. class-specific Connector and Negative Aging Pressure evolution;
-6. safe generated-topology rebuild crossfade;
-7. production procedural chunk/run cache and precompute packaging;
-8. handoff to separate Foam-material work.
+1. Patch 4.6 lively single-instance Major movement and morphing;
+2. Patch 4.7A hosted Interior Pocket and Edge Cavity evolution;
+3. Patch 4.7B slower independent Free-Water Negative Event evolution;
+4. Patch 4.7C Connector deformation/replacement and Weak Span following;
+5. Patch 4.8 safe generated-topology rebuild transition for explicit rebuilds;
+6. Patch 4.9 production procedural chunk/run cache and precompute packaging;
+7. Patch 4.10 topology completion and handoff to separate Foam-material work.
 
-All four negative classes are preparation-time generators. Interior/edge host analysis, Connector span selection, and Free-Water opportunity curation may be expensive during the proof path, but ordinary gameplay may only perform bounded cached sampling, offsets, fades, strength changes, and recycling.
+All four negative classes remain preparation-time generators. Interior/edge host analysis, Connector span selection, Free-Water opportunity curation, and spare Connector route preparation may be expensive during the proof path, but ordinary gameplay may only advance compact descriptors, morph retained masks, deform retained paths, perform batched low-resolution reconstruction, and instantly recycle slots. No ordinary movement fade or duplicate old/new support instance is permitted.
 
 Every slice must expose a real result immediately. Candidate-local work may use one compact preview; every river-dependent result must be shown on the actual river. Diagnostics remain minimal and must not force production-grade work in `Final Foam (Debug Off)`.
 
@@ -1732,8 +1738,19 @@ The scheduling architecture is successful when:
 
 ## 25. Immediate Next Step
 
-Major Support, Connector Support, Patch 4.1 exact transformed-mesh Obstacle Footprint, Interior Pockets, and Edge Cavities are accepted for feature progression. Patch 4.3 Connector Weak Spans is implemented and awaiting visual acceptance.
+Patch 4.4 Free-Water Negative Events and Patch 4.5 complete static topology are accepted for feature progression. Static coefficient tuning remains provisional.
 
-Patch 4.3 retains each accepted Connector's simplified metric path during the existing Connector preparation pass. Weak-Span opportunity creation and rasterization then run only in the staged negative-topology preparation phase or an explicit dirty rebuild. No pathfinding, path reconstruction, candidate search, or negative rasterization runs during ordinary gameplay.
+The next change is Patch 4.6's Major-only evolution and the minimum scheduling needed to support it:
 
-Validate Patch 4.3 by isolating Connector Weak Spans, testing Amount `0`, `0.5`, and `1`, and checking endpoint clearance, path alignment, single-versus-secondary span behaviour, and several seeds. Patch 4.4 then adds Free-Water Negative Events. Patch 4.5 validates the complete static topology. Runtime evolution, rebuild crossfade, and cache/preparation packaging follow before any Foam-material implementation.
+- one logical slot and one active instance per Major;
+- deterministic `2–5 s` dwell and `1–2 s` movement/morph;
+- positive net downstream progress plus bounded lateral/diagonal displacement;
+- visible shape change on every hop;
+- finite occurrence lifetime and instant upstream recycle;
+- no ordinary old/new support crossfade;
+- batched low-resolution reconstruction only while movement is active;
+- no runtime generation, search, pathfinding, CPU texture construction, or managed allocation;
+- named descriptor, reconstruction, composition, and diagnostic profiler markers;
+- no Connector or negative-class evolution in the same patch.
+
+Patch 4.6 must be judged as a computational proof as well as a visual proof. If its bounded active-movement ticks create unacceptable CPU/GPU latency or spikes, stop before extending the model to Patch 4.7.
