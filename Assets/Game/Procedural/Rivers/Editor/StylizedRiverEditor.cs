@@ -1471,7 +1471,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.6 adds lively single-instance Major movement and morphing. Patch 4.6.1 keeps recycled Majors distributed through per-slot local territories, and Patch 4.6.2 uses a combined elapsed-time and completed-hop lifetime budget to prevent unusually slow or unusually active occurrences from persisting too long. Connector and negative classes remain on the accepted static baseline.",
+                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.7 evolves Major Support, Major-hosted negative regions, and independent Free-Water Negative Events from prepared masks. Connector Support and Connector Weak Spans remain on the accepted static baseline.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1754,8 +1754,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Patch 4.6 evolves each accepted Major as one active instance with independent dwell, downstream/diagonal movement, shape morphing, a combined time-plus-hop occurrence budget, and instant local-territory recycling. Connector Support and all four negative classes remain static for this proof. Authoritative live Pressure, Lee, Shore, and Obstacle Footprint sources remain independently composed."),
-                new GUIContent("Evolving Major + Static Connector/Negative Topology (Patch 4.6.2)"));
+                    "Patch 4.7 evolves Major Support, Major-hosted negative regions, and independent Free-Water Negative Events through prepared masks. Connector Support and Connector Weak Spans remain static. Authoritative live Pressure, Lee, Shore, and Obstacle Footprint sources remain independently composed."),
+                new GUIContent("Evolving Major/Negative Topology (Patch 4.7B)"));
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
                 new GUIContent(
@@ -1818,7 +1818,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorGUILayout.LabelField(
                     "Evolution",
                     runtime.MajorEvolutionAvailable
-                        ? "Active (Patch 4.6)"
+                        ? "Active"
                         : "Waiting for prepared runtime data");
                 if (runtime.MajorEvolutionAvailable)
                 {
@@ -1942,6 +1942,71 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorGUILayout.LabelField(
                     "Generation Time",
                     $"{runtime.PocketGenerationMilliseconds:0.00} ms");
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Hosted Negative Evolution",
+                        "Interior Pockets and Edge Cavities reuse their Major host's movement/morph frame. Their prepared masks receive only bounded local variation; no runtime host search or containment generation is performed."),
+                    new GUIContent(
+                        runtime.HostedNegativeEvolutionAvailable
+                            ? "Available"
+                            : "Static fallback"));
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField(
+                    "Prepared / Accepted",
+                    $"{runtime.HostedNegativePreparedCount} / " +
+                    runtime.HostedNegativeAcceptedCount);
+                EditorGUILayout.LabelField(
+                    "Static Fallbacks",
+                    runtime.HostedNegativeFallbackCount.ToString());
+                if (runtime.HostedNegativeEvolutionAvailable)
+                {
+                    EditorGUILayout.LabelField(
+                        "Hosted Slots",
+                        runtime.HostedNegativeEvolutionSlotCount.ToString());
+                    EditorGUILayout.LabelField(
+                        "Interior / Cavity",
+                        $"{runtime.HostedNegativeInteriorCount} / " +
+                        runtime.HostedNegativeCavityCount);
+                    EditorGUILayout.LabelField(
+                        "Local Changes",
+                        runtime.HostedNegativeLocalChangeCount.ToString());
+                    string initialParity =
+                        runtime.HostedNegativeInitialParityAvailable
+                            ? $"Mean {runtime.HostedNegativeInitialParityMeanDifference:0.0000} · " +
+                              $"Max {runtime.HostedNegativeInitialParityMaximumDifference:0.0000}"
+                            : runtime.HostedNegativeInitialParityPending
+                                ? "Waiting for debug readback"
+                                : "Debug-only; rebuild with a topology debug view active";
+                    EditorGUILayout.LabelField(
+                        new GUIContent(
+                            "Initial Static Parity",
+                            "Editor/development diagnostic only. Before any hosted movement, compares the reconstructed hosted-negative field plus static fallbacks against the accepted static Pocket/Cavity field. Normal runs perform no readback or comparison."),
+                        initialParity);
+                }
+                EditorGUI.indentLevel--;
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Free-Water Evolution",
+                        "Independent Free-Water Negative Events use their own slowly moving local masks. No runtime search, retry, or preservation readback is performed."),
+                    new GUIContent(
+                        runtime.FreeWaterEvolutionAvailable
+                            ? "Available"
+                            : "Static"));
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField(
+                    "Prepared / Accepted",
+                    $"{runtime.FreeWaterPreparedCount} / " +
+                    runtime.FreeWaterEventAcceptedCount);
+                if (runtime.FreeWaterEvolutionAvailable)
+                {
+                    EditorGUILayout.LabelField(
+                        "Free-Water Slots",
+                        runtime.FreeWaterEvolutionSlotCount.ToString());
+                    EditorGUILayout.LabelField(
+                        "Completed Moves",
+                        runtime.FreeWaterMoveCount.ToString());
+                }
+                EditorGUI.indentLevel--;
                 EditorGUI.indentLevel--;
             }
 
@@ -2003,7 +2068,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent("Subsystem Rates"),
                 new GUIContent(
-                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz · Major reconstruction up to 5 Hz only while moving; Connector and negative classes remain static"));
+                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz · Major/hosted reconstruction while moving; Free-Water updates slowly; Connector Weak Spans remain static"));
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Transport",

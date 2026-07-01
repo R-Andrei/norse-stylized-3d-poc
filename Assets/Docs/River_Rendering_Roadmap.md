@@ -301,7 +301,8 @@ Accepted and retained:
 - Patch 4.3 Connector Weak Spans accepted after visual validation;
 - Patch 4.4 Free-Water Negative Events accepted after visual tuning;
 - Patch 4.5 complete static topology accepted for feature progression, with coefficients intentionally left provisional;
-- Patch 4.6 lively single-instance Major movement and morphing, Patch 4.6.1 local recycle territories, and Patch 4.6.2 combined lifetime units implemented, awaiting visual/performance acceptance;
+- Patch 4.6 lively single-instance Major movement and morphing through Patch 4.6.2 combined lifetime units accepted for feature progression, with tuning still provisional;
+- Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution implemented; Patch 4.7A.1 corrects initial footprint parity, Edge Cavity clipping, and per-region static fallback, awaiting visual/performance revalidation;
 - exact transformed-mesh water-level-aware Obstacle Footprint, distinct from padded Pressure/Lee disturbance footprints;
 - persistent field, chunking, freezing, sleeping, and fixed-cost GPU infrastructure;
 - permanent Foam profiler instrumentation;
@@ -323,7 +324,6 @@ Negative Aging Pressure now has four approved source classes:
 Each class receives an independent `0–1` Amount control with default `0.5`. Amount activates a nested deterministic opportunity subset and controls population only.
 
 Still unimplemented or unaccepted:
-- Patch 4.7A hosted Interior Pocket and Edge Cavity evolution;
 - Patch 4.7B slower independent Free-Water Negative Event evolution;
 - Patch 4.7C Connector deformation/replacement and Weak Span following;
 - safe topology rebuild transition for explicit rebuilds;
@@ -377,14 +377,15 @@ Runtime topology evolution uses fixed logical slots with one active instance eac
 5. Patch 4.5 — complete static topology — accepted for feature progression; tuning remains provisional.
 6. Patch 4.6 — lively single-instance Major movement and morphing — implemented.
 7. Patch 4.6.1 — distributed local recycle territories and deviation control — implemented.
-8. Patch 4.6.2 — combined elapsed-time and completed-hop lifetime units — implemented; visual/performance acceptance pending.
-9. Patch 4.7A — hosted Interior Pocket and Edge Cavity evolution.
-10. Patch 4.7B — slower independent Free-Water Negative Event evolution.
-11. Patch 4.7C — Connector deformation/replacement and Weak Span following.
-12. Patch 4.8 — safe generated-topology rebuild transition for explicit rebuilds.
-13. Patch 4.9 — procedural chunk/run cache and precompute packaging.
-14. Patch 4.10 — topology completion and handoff to separate Foam-material work.
-15. Resume deferred performance work against the completed topology pipeline.
+8. Patch 4.6.2 — combined elapsed-time and completed-hop lifetime units — accepted for feature progression; tuning remains provisional.
+9. Patch 4.7A — hosted Interior Pocket and Edge Cavity evolution — implemented.
+10. Patch 4.7A.1 — hosted-negative footprint/parity correction — implemented; visual/performance revalidation pending.
+11. Patch 4.7B — slower independent Free-Water Negative Event evolution.
+12. Patch 4.7C — Connector deformation/replacement and Weak Span following.
+13. Patch 4.8 — safe generated-topology rebuild transition for explicit rebuilds.
+14. Patch 4.9 — procedural chunk/run cache and precompute packaging.
+15. Patch 4.10 — topology completion and handoff to separate Foam-material work.
+16. Resume deferred performance work against the completed topology pipeline.
 
 ### Terminology
 
@@ -464,16 +465,17 @@ Separate material lifetime and topology-response authoring remains deferred unti
 9. Patch 4.5 complete static topology — accepted for feature progression; tuning remains provisional.
 10. Patch 4.6 lively single-instance Major movement and morphing — implemented.
 11. Patch 4.6.1 local recycle territories — implemented.
-12. Patch 4.6.2 combined lifetime units — implemented; visual/performance acceptance pending.
-13. Patch 4.7A hosted Interior Pocket and Edge Cavity evolution.
-14. Patch 4.7B slower independent Free-Water Negative Event evolution.
-15. Patch 4.7C Connector deformation/replacement and Weak Span following.
-16. Patch 4.8 safe topology rebuild transition for explicit rebuilds.
-17. Patch 4.9 procedural chunk/run cache/precompute packaging.
-18. Patch 4.10 topology completion handoff.
-19. Separate topology-to-material lifespan integration.
-20. End-of-life fragmentation/dissipation and final rendering.
-20. Resume deferred performance work and final PC-first profiling.
+12. Patch 4.6.2 combined lifetime units — accepted for feature progression; tuning remains provisional.
+13. Patch 4.7A hosted Interior Pocket and Edge Cavity evolution — implemented.
+14. Patch 4.7A.1 hosted-negative footprint/parity correction — implemented; visual/performance revalidation pending.
+15. Patch 4.7B slower independent Free-Water Negative Event evolution.
+16. Patch 4.7C Connector deformation/replacement and Weak Span following.
+17. Patch 4.8 safe topology rebuild transition for explicit rebuilds.
+18. Patch 4.9 procedural chunk/run cache/precompute packaging.
+19. Patch 4.10 topology completion handoff.
+20. Separate topology-to-material lifespan integration.
+21. End-of-life fragmentation/dissipation and final rendering.
+22. Resume deferred performance work and final PC-first profiling.
 
 Every positive and negative topology class is implemented and accepted separately before the combined topology is judged. This is an explicit anti-regression rule.
 

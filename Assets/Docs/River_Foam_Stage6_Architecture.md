@@ -43,10 +43,10 @@ Approved negative-topology expansion before runtime evolution:
 - make each Amount activate a nested deterministic opportunity subset and control population only;
 - preserve subtype identity and future evolution metadata even when classes are packed into one aggregate negative field for diagnostics/output;
 - Patch 4.5 combined static validation accepted for feature progression; all population and shape coefficients remain provisional until the final Foam material proves the complete visual result;
-- Patch 4.6 lively single-instance Major Support movement and morphing, Patch 4.6.1 local recycle territories, and Patch 4.6.2 combined lifetime units implemented and awaiting visual/performance acceptance.
+- Patch 4.6 lively single-instance Major Support movement and morphing, Patch 4.6.1 local recycle territories, and Patch 4.6.2 combined lifetime units accepted for feature progression; exact movement and lifetime tuning remains provisional;
+- Patch 4.7A hosted Interior Pocket and Edge Cavity evolution implemented; Patch 4.7A.1 corrects initial host-space parity, preserves edge-breaching cavity pressure beyond the Major silhouette, and retains static fallback only for hosted regions that cannot evolve. Visual/performance revalidation is pending.
 
 Not yet implemented or accepted:
-- Patch 4.7A hosted Interior Pocket and Edge Cavity evolution;
 - Patch 4.7B slower independent Free-Water Negative Event evolution;
 - Patch 4.7C Connector Support and Connector Weak Span evolution;
 - safe generated-topology rebuild replacement/crossfade for explicit domain or settings rebuilds;
@@ -764,7 +764,7 @@ Negative classes have distinct runtime contracts:
 - **Connector Weak Span** remains at a safe normalized position on its owning deformed Connector, away from endpoint gates, and is reassigned with the Connector when a prevalidated replacement relationship is used.
 - **Free-Water Negative Event** uses the same single-instance hop model independently, but more slowly: initially about `5–10 s` dwell and `2–4 s` movement/morph. It may move farther laterally, vary size more strongly, rotate modestly, and instantly recycle to an upstream valid-water anchor at lifetime or egress.
 
-Hosted classes should not be perfectly rigid copies of their Major. Deterministic per-hop participation may let an Interior Pocket change on some host hops and remain locally stable on others; Edge Cavities should vary less often and within tighter bounds. Every local state is chosen inside absolute host-safe limits rather than accumulated as an unbounded random walk.
+Hosted classes should not be perfectly rigid copies of their Major. Patch 4.7A retains each accepted Interior Pocket and Edge Cavity as a Major-local soft mask, carries it through the host transform and instant recycle, and applies bounded local scale, rotation, and offset changes only on selected host hops. Interior Pockets vary more often; Edge Cavities use tighter, boundary-tangent variation so the original breach side remains coherent. Patch 4.7A.1 requires the initial evolving field to preserve the accepted static footprint, including cavity influence beyond the Major support silhouette; any hosted region that cannot be prepared remains as a static fallback rather than disappearing. Weak Spans and Free-Water Events remain in the static independent-negative field until their later patches. Every local state is chosen inside absolute host-safe limits rather than accumulated as an unbounded random walk.
 
 No negative class directly cuts topology or material. No class performs distance transforms, host search, path search, candidate generation, or rejection during ordinary gameplay.
 
@@ -1033,19 +1033,20 @@ The canonical topology-only rollout is maintained in `River_Foam_Topology_Implem
 10. Patch 4.3 Connector Weak Spans accepted after visual validation.
 11. Patch 4.4 Free-Water Negative Events accepted after visual tuning.
 12. Patch 4.5 complete static topology accepted for feature progression; coefficients remain provisional.
-13. Patch 4.6 lively single-instance Major movement/morphing implemented.
-14. Patch 4.6.1 distributed local recycle territories implemented.
-15. Patch 4.6.2 combined elapsed-time and completed-hop lifetime units implemented; visual and performance acceptance pending.
+13. Patch 4.6 lively single-instance Major movement/morphing accepted for feature progression.
+14. Patch 4.6.1 distributed local recycle territories accepted for feature progression.
+15. Patch 4.6.2 combined elapsed-time and completed-hop lifetime units accepted for feature progression; tuning remains provisional.
+16. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution implemented.
+17. Patch 4.7A.1 hosted-negative footprint/parity correction implemented; visual and performance revalidation pending.
 
 ### Active runtime-evolution sequence
 
-1. Validate Patch 4.6.2 Major evolution, combined lifetime turnover, long-term spatial distribution, and computational cost.
-2. Patch 4.7A — Major-host-relative Interior Pocket and Edge Cavity evolution.
-3. Patch 4.7B — slower independent Free-Water Negative Event movement, morphing, and recycling.
-4. Patch 4.7C — retained-path Connector deformation, prevalidated relationship replacement, and Weak Span following.
-5. Patch 4.8 — safe generated-topology rebuild transition for explicit rebuilds.
-6. Patch 4.9 — procedural chunk/run cache and precompute packaging.
-7. Patch 4.10 — topology completion and handoff to separate Foam-material work.
+1. Revalidate Patch 4.7A.1 initial static parity, full cavity overlap, host attachment, breach-side stability, local variation, and computational cost.
+2. Patch 4.7B — slower independent Free-Water Negative Event movement, morphing, and recycling.
+3. Patch 4.7C — retained-path Connector deformation, prevalidated relationship replacement, and Weak Span following.
+4. Patch 4.8 — safe generated-topology rebuild transition for explicit rebuilds.
+5. Patch 4.9 — procedural chunk/run cache and precompute packaging.
+6. Patch 4.10 — topology completion and handoff to separate Foam-material work.
 
 Material aging response, fragmentation, dissipation, and rendering are not topology implementation steps and must not begin before topology completion.
 

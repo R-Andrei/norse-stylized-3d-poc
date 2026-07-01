@@ -23,8 +23,9 @@ namespace ProgrammaticStylized3D.Rivers
 
     /// <summary>
     /// The implemented Negative Aging Pressure classes. The legacy Pocket type
-    /// name remains the low-level aggregate container for compatibility while
-    /// all four static negative classes share one prepared aggregate field.
+    /// name remains the low-level aggregate container for compatibility. Patch
+    /// 4.7A retains Major-hosted classes separately from the still-static
+    /// Connector/Free-Water classes while preserving the aggregate field.
     /// </summary>
     public enum StylizedRiverFoamNegativeRegionClass
     {
@@ -38,10 +39,10 @@ namespace ProgrammaticStylized3D.Rivers
     /// Stable host identity and cheap future-evolution metadata for one accepted
     /// Negative Aging Pressure region. Major-hosted classes use a Major region
     /// identity; Connector Weak Spans use their accepted Connector identity;
-    /// Free-Water Negative Events use no positive host. Patch 4.4 still uses only
-    /// the static aggregate field; normalized selectors defer physical timing,
-    /// drift, growth, and respawn decisions to the later runtime-evolution gate.
-    /// Edge cavities additionally retain their deliberate breach direction.
+    /// Free-Water Negative Events use no positive host. Patch 4.7A evolves the
+    /// two Major-hosted classes through their host frame while Weak Spans and
+    /// Free-Water Events remain static for their later slices. Edge cavities
+    /// additionally retain their deliberate breach direction.
     /// </summary>
     public readonly struct StylizedRiverFoamPocketRegion
     {
@@ -107,6 +108,114 @@ namespace ProgrammaticStylized3D.Rivers
         public float GrowthSelector { get; }
     }
 
+
+    /// <summary>
+    /// One preparation-time validated local transform for a Major-hosted
+    /// negative mask. Runtime chooses only from these bounded states, avoiding
+    /// gameplay containment or boundary searches.
+    /// </summary>
+    internal readonly struct StylizedRiverFoamHostedNegativeVariant
+    {
+        public StylizedRiverFoamHostedNegativeVariant(
+            Vector2 offsetCells,
+            float rotationRadians,
+            float scaleAlong,
+            float scaleAcross)
+        {
+            OffsetCells = offsetCells;
+            RotationRadians = rotationRadians;
+            ScaleAlong = Mathf.Max(0.05f, scaleAlong);
+            ScaleAcross = Mathf.Max(0.05f, scaleAcross);
+        }
+
+        public Vector2 OffsetCells { get; }
+        public float RotationRadians { get; }
+        public float ScaleAlong { get; }
+        public float ScaleAcross { get; }
+    }
+
+    /// <summary>
+    /// One accepted Major-hosted negative mask retained in the host Major's
+    /// prepared candidate coordinate frame. Ordinary runtime evolution samples
+    /// this immutable mask through the host transform instead of searching for
+    /// or regenerating a valid Pocket/Cavity placement during gameplay.
+    /// </summary>
+    internal sealed class StylizedRiverFoamPreparedHostedNegativeRegion
+    {
+        private readonly float[] localPressure;
+        private readonly StylizedRiverFoamHostedNegativeVariant[] variants;
+
+        public StylizedRiverFoamPreparedHostedNegativeRegion(
+            StylizedRiverFoamNegativeRegionClass regionClass,
+            uint stableId,
+            uint hostRegionId,
+            int hostPreparedIndex,
+            int maskResolution,
+            float[] localPressure,
+            Vector2 centreCandidateCells,
+            StylizedRiverFoamHostedNegativeVariant[] variants)
+        {
+            RegionClass = regionClass;
+            StableId = stableId;
+            HostRegionId = hostRegionId;
+            HostPreparedIndex = Mathf.Max(0, hostPreparedIndex);
+            MaskResolution = Mathf.Max(1, maskResolution);
+            this.localPressure = localPressure ?? Array.Empty<float>();
+            CentreCandidateCells = centreCandidateCells;
+            this.variants = variants ??
+                Array.Empty<StylizedRiverFoamHostedNegativeVariant>();
+        }
+
+        public StylizedRiverFoamNegativeRegionClass RegionClass { get; }
+        public uint StableId { get; }
+        public uint HostRegionId { get; }
+        public int HostPreparedIndex { get; }
+        public int MaskResolution { get; }
+        public Vector2 CentreCandidateCells { get; }
+        public IReadOnlyList<StylizedRiverFoamHostedNegativeVariant>
+            Variants => variants;
+        internal float[] LocalPressureData => localPressure;
+    }
+
+    /// <summary>
+    /// One immutable Free-Water Negative Event mask retained in its own local
+    /// metric frame. Runtime evolution samples this mask through a slow bounded
+    /// pose instead of regenerating or searching for a new event during play.
+    /// </summary>
+    internal sealed class StylizedRiverFoamPreparedFreeWaterRegion
+    {
+        private readonly float[] localPressure;
+
+        public StylizedRiverFoamPreparedFreeWaterRegion(
+            uint stableId,
+            int maskResolution,
+            float[] localPressure,
+            float centreLocalDistance,
+            float centreAcrossNormalized,
+            float orientationRadians,
+            float metresPerCell)
+        {
+            StableId = stableId;
+            MaskResolution = Mathf.Max(1, maskResolution);
+            this.localPressure = localPressure ?? Array.Empty<float>();
+            CentreLocalDistance = Mathf.Max(0f, centreLocalDistance);
+            CentreAcrossNormalized = Mathf.Clamp(
+                centreAcrossNormalized,
+                -1f,
+                1f);
+            OrientationRadians = orientationRadians;
+            MetresPerCell = Mathf.Max(0.0001f, metresPerCell);
+        }
+
+        public uint StableId { get; }
+        public int MaskResolution { get; }
+        public float CentreLocalDistance { get; }
+        public float CentreAcrossNormalized { get; }
+        public float OrientationRadians { get; }
+        public float MetresPerCell { get; }
+        internal float[] LocalPressureData => localPressure;
+    }
+
     /// <summary>
     /// Immutable result of one deterministic prepared Negative Aging Pressure
     /// build. The aggregate field remains independent from
@@ -116,7 +225,16 @@ namespace ProgrammaticStylized3D.Rivers
     public sealed class StylizedRiverFoamPocketTopology
     {
         private readonly float[] pressure;
+        private readonly float[] hostedPressure;
+        private readonly float[] hostedFallbackPressure;
+        private readonly float[] independentPressure;
+        private readonly float[] staticIndependentPressure;
+        private readonly float[] freeWaterPressure;
         private readonly StylizedRiverFoamPocketRegion[] regions;
+        private readonly StylizedRiverFoamPreparedHostedNegativeRegion[]
+            preparedHostedRegions;
+        private readonly StylizedRiverFoamPreparedFreeWaterRegion[]
+            preparedFreeWaterRegions;
         private readonly int[] rejectionCounts;
 
         internal StylizedRiverFoamPocketTopology(
@@ -137,7 +255,16 @@ namespace ProgrammaticStylized3D.Rivers
             int coveredCellCount,
             double generationMilliseconds,
             float[] pressure,
+            float[] hostedPressure,
+            float[] hostedFallbackPressure,
+            float[] independentPressure,
+            float[] staticIndependentPressure,
+            float[] freeWaterPressure,
             StylizedRiverFoamPocketRegion[] regions,
+            StylizedRiverFoamPreparedHostedNegativeRegion[]
+                preparedHostedRegions,
+            StylizedRiverFoamPreparedFreeWaterRegion[]
+                preparedFreeWaterRegions,
             int[] rejectionCounts)
         {
             Width = Mathf.Max(0, width);
@@ -171,8 +298,19 @@ namespace ProgrammaticStylized3D.Rivers
             CoveredCellCount = Mathf.Max(0, coveredCellCount);
             GenerationMilliseconds = Math.Max(0.0, generationMilliseconds);
             this.pressure = pressure ?? Array.Empty<float>();
+            this.hostedPressure = hostedPressure ?? Array.Empty<float>();
+            this.hostedFallbackPressure = hostedFallbackPressure ??
+                Array.Empty<float>();
+            this.independentPressure = independentPressure ?? Array.Empty<float>();
+            this.staticIndependentPressure =
+                staticIndependentPressure ?? Array.Empty<float>();
+            this.freeWaterPressure = freeWaterPressure ?? Array.Empty<float>();
             this.regions = regions ??
                 Array.Empty<StylizedRiverFoamPocketRegion>();
+            this.preparedHostedRegions = preparedHostedRegions ??
+                Array.Empty<StylizedRiverFoamPreparedHostedNegativeRegion>();
+            this.preparedFreeWaterRegions = preparedFreeWaterRegions ??
+                Array.Empty<StylizedRiverFoamPreparedFreeWaterRegion>();
             this.rejectionCounts = rejectionCounts ??
                 new int[Enum.GetValues(
                     typeof(StylizedRiverFoamPocketRejectionReason)).Length];
@@ -192,6 +330,14 @@ namespace ProgrammaticStylized3D.Rivers
         public int FreeWaterOpportunityCount { get; }
         public int FreeWaterCandidateCount { get; }
         public int AcceptedFreeWaterEventCount { get; }
+        public int AcceptedHostedRegionCount =>
+            AcceptedInteriorPocketCount + AcceptedEdgeCavityCount;
+        public int PreparedHostedRegionCount => preparedHostedRegions.Length;
+        public int PreparedFreeWaterRegionCount =>
+            preparedFreeWaterRegions.Length;
+        public int HostedFallbackRegionCount => Mathf.Max(
+            0,
+            AcceptedHostedRegionCount - PreparedHostedRegionCount);
         public int CoveredCellCount { get; }
         public double GenerationMilliseconds { get; }
 
@@ -211,6 +357,16 @@ namespace ProgrammaticStylized3D.Rivers
         public IReadOnlyList<StylizedRiverFoamPocketRegion> Regions => regions;
 
         internal float[] PressureData => pressure;
+        internal float[] HostedPressureData => hostedPressure;
+        internal float[] HostedFallbackPressureData => hostedFallbackPressure;
+        internal float[] IndependentPressureData => independentPressure;
+        internal float[] StaticIndependentPressureData =>
+            staticIndependentPressure;
+        internal float[] FreeWaterPressureData => freeWaterPressure;
+        internal IReadOnlyList<StylizedRiverFoamPreparedHostedNegativeRegion>
+            PreparedHostedRegions => preparedHostedRegions;
+        internal IReadOnlyList<StylizedRiverFoamPreparedFreeWaterRegion>
+            PreparedFreeWaterRegions => preparedFreeWaterRegions;
 
         public int GetRejectionCount(
             StylizedRiverFoamPocketRejectionReason reason)
@@ -270,7 +426,10 @@ namespace ProgrammaticStylized3D.Rivers
             return builder.ToString();
         }
 
-        internal void AddToUploadPixels(Color[] destination)
+        internal void AddToUploadPixels(
+            Color[] destination,
+            bool hostedEvolutionAvailable,
+            bool freeWaterEvolutionAvailable)
         {
             int cellCount = Width * Height;
             if (destination == null || destination.Length < cellCount)
@@ -283,7 +442,18 @@ namespace ProgrammaticStylized3D.Rivers
             for (int index = 0; index < cellCount; index++)
             {
                 Color value = destination[index];
-                value.b = Mathf.Clamp01(pressure[index]);
+                // Blue remains the static independent-negative channel. While
+                // Free-Water evolution is active, Free-Water leaves this static
+                // channel and is supplied by the evolving runtime field instead;
+                // Connector Weak Spans remain static here.
+                value.b = Mathf.Clamp01(
+                    freeWaterEvolutionAvailable
+                        ? staticIndependentPressure[index]
+                        : independentPressure[index]);
+                value.a = Mathf.Clamp01(
+                    hostedEvolutionAvailable
+                        ? hostedFallbackPressure[index]
+                        : hostedPressure[index]);
                 destination[index] = value;
             }
         }

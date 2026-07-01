@@ -67,6 +67,29 @@ struct FoamMajorEvolutionData
     float4 warp;
 };
 
+struct FoamHostedNegativeEvolutionData
+{
+    // x = host Major slot, y = mask-array slice,
+    // z = pressure normalization, w = class flag.
+    float4 hostAndMask;
+    // x/y = immutable mask centre in host candidate cells,
+    // z/w = bounded local offset in the same frame.
+    float4 centreAndOffset;
+    // x/y = local scale, z = local rotation, w reserved.
+    float4 morph;
+};
+
+struct FoamFreeWaterEvolutionData
+{
+    // x = local river distance, y = normalized lateral centre,
+    // z = orientation, w = metres per local mask cell.
+    float4 centreAndPlacement;
+    // x/y = local mask centre, z = mask-array slice, w = pressure scale.
+    float4 maskAndStrength;
+    // x/y = bounded metric offset, z/w = along/across scale.
+    float4 morph;
+};
+
 
 
 // Shared Stage 6 material state:
@@ -87,7 +110,13 @@ Texture2D<float4> _FoamGuidanceRead;
 Texture2D<float4> _FoamTopologyGeneratedRead;
 Texture2D<float> _FoamEvolvingMajorRead;
 RWTexture2D<float> _FoamEvolvingMajorWrite;
+Texture2D<float> _FoamEvolvingHostedNegativeRead;
+RWTexture2D<float> _FoamEvolvingHostedNegativeWrite;
+Texture2D<float> _FoamEvolvingFreeWaterNegativeRead;
+RWTexture2D<float> _FoamEvolvingFreeWaterNegativeWrite;
 Texture2DArray<float4> _FoamMajorMasks;
+Texture2DArray<float4> _FoamHostedNegativeMasks;
+Texture2DArray<float4> _FoamFreeWaterNegativeMasks;
 RWTexture2D<float4> _FoamTopologyWrite;
 RWTexture2D<float4> _FoamTopologySourcesWrite;
 RWTexture2D<float2> _FoamCurrentShoreEdgesWrite;
@@ -104,6 +133,10 @@ StructuredBuffer<FoamMetricRow> _FoamMetricRows;
 StructuredBuffer<FoamObstacleSample> _FoamObstacleSamples;
 StructuredBuffer<FoamObstacleIntervalCell> _FoamObstacleCells;
 StructuredBuffer<FoamMajorEvolutionData> _FoamMajorEvolutionRecords;
+StructuredBuffer<FoamHostedNegativeEvolutionData>
+    _FoamHostedNegativeEvolutionRecords;
+StructuredBuffer<FoamFreeWaterEvolutionData>
+    _FoamFreeWaterEvolutionRecords;
 
 // Per chunk, two uint4 records are stored in one raw buffer:
 // record 0: x = quantised Amount sum, y = visible-cell count,
@@ -128,6 +161,8 @@ int2 _FoamDimensions;
 int2 _FoamGuidanceDimensions;
 int2 _FoamTopologyDimensions;
 int2 _FoamMajorMaskDimensions;
+int2 _FoamHostedNegativeMaskDimensions;
+int2 _FoamFreeWaterMaskDimensions;
 int2 _FoamWakeDimensions;
 int2 _FoamRippleDimensions;
 int2 _FoamStaticWakeDimensions;
@@ -139,6 +174,8 @@ int _FoamFractureRangeStart;
 int _FoamFractureRangeCount;
 int _FoamObstacleCellCount;
 int _FoamMajorEvolutionCount;
+int _FoamHostedNegativeEvolutionCount;
+int _FoamFreeWaterEvolutionCount;
 int _FoamResolutionPerChunk;
 int _FoamChunkCount;
 float _FoamDeltaTime;
@@ -187,6 +224,8 @@ float _FoamFreezeAmount;
 float _FoamShoreCaptureCoreWidth;
 float _FoamShoreCaptureFadeWidth;
 float _FoamMajorEvolutionEnabled;
+float _FoamHostedNegativeEvolutionEnabled;
+float _FoamFreeWaterNegativeEvolutionEnabled;
 
 float _FoamInjectionGlobalDistance;
 float _FoamInjectionAcrossNormalized;
@@ -1500,12 +1539,15 @@ void UpdateObstacleExclusion(uint3 dispatchId : SV_DispatchThreadID)
     _FoamObstacleExclusionWrite[coordinate] = 1.0;
 }
 
-float SampleMajorMaskBilinear(int sliceIndex, float2 cellPosition)
+float SampleMajorMaskBilinear(
+    int sliceIndex,
+    float2 cellPosition)
 {
+    int2 dimensions = _FoamMajorMaskDimensions;
     if (cellPosition.x < -0.5 ||
         cellPosition.y < -0.5 ||
-        cellPosition.x > _FoamMajorMaskDimensions.x - 0.5 ||
-        cellPosition.y > _FoamMajorMaskDimensions.y - 0.5)
+        cellPosition.x > dimensions.x - 0.5 ||
+        cellPosition.y > dimensions.y - 0.5)
     {
         return 0.0;
     }
@@ -1513,10 +1555,9 @@ float SampleMajorMaskBilinear(int sliceIndex, float2 cellPosition)
     float2 clamped = clamp(
         cellPosition - 0.5,
         float2(0.0, 0.0),
-        max(float2(0.0, 0.0),
-            (float2)_FoamMajorMaskDimensions - 1.0));
+        max(float2(0.0, 0.0), (float2)dimensions - 1.0));
     int2 p0 = (int2)floor(clamped);
-    int2 p1 = min(p0 + 1, _FoamMajorMaskDimensions - 1);
+    int2 p1 = min(p0 + 1, dimensions - 1);
     float2 blend = clamped - p0;
     float a = _FoamMajorMasks.Load(int4(p0, sliceIndex, 0)).r;
     float b = _FoamMajorMasks.Load(
@@ -1525,6 +1566,145 @@ float SampleMajorMaskBilinear(int sliceIndex, float2 cellPosition)
         int4(int2(p0.x, p1.y), sliceIndex, 0)).r;
     float d = _FoamMajorMasks.Load(int4(p1, sliceIndex, 0)).r;
     return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+float SampleHostedNegativeMaskBilinear(
+    int sliceIndex,
+    float2 cellPosition)
+{
+    int2 dimensions = _FoamHostedNegativeMaskDimensions;
+    if (cellPosition.x < -0.5 ||
+        cellPosition.y < -0.5 ||
+        cellPosition.x > dimensions.x - 0.5 ||
+        cellPosition.y > dimensions.y - 0.5)
+    {
+        return 0.0;
+    }
+
+    float2 clamped = clamp(
+        cellPosition - 0.5,
+        float2(0.0, 0.0),
+        max(float2(0.0, 0.0), (float2)dimensions - 1.0));
+    int2 p0 = (int2)floor(clamped);
+    int2 p1 = min(p0 + 1, dimensions - 1);
+    float2 blend = clamped - p0;
+    float a = _FoamHostedNegativeMasks.Load(
+        int4(p0, sliceIndex, 0)).r;
+    float b = _FoamHostedNegativeMasks.Load(
+        int4(int2(p1.x, p0.y), sliceIndex, 0)).r;
+    float c = _FoamHostedNegativeMasks.Load(
+        int4(int2(p0.x, p1.y), sliceIndex, 0)).r;
+    float d = _FoamHostedNegativeMasks.Load(
+        int4(p1, sliceIndex, 0)).r;
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+float SampleFreeWaterNegativeMaskBilinear(
+    int sliceIndex,
+    float2 cellPosition)
+{
+    int2 dimensions = _FoamFreeWaterMaskDimensions;
+    if (cellPosition.x < -0.5 ||
+        cellPosition.y < -0.5 ||
+        cellPosition.x > dimensions.x - 0.5 ||
+        cellPosition.y > dimensions.y - 0.5)
+    {
+        return 0.0;
+    }
+
+    float2 clamped = clamp(
+        cellPosition - 0.5,
+        float2(0.0, 0.0),
+        max(float2(0.0, 0.0), (float2)dimensions - 1.0));
+    int2 p0 = (int2)floor(clamped);
+    int2 p1 = min(p0 + 1, dimensions - 1);
+    float2 blend = clamped - p0;
+    float a = _FoamFreeWaterNegativeMasks.Load(
+        int4(p0, sliceIndex, 0)).r;
+    float b = _FoamFreeWaterNegativeMasks.Load(
+        int4(int2(p1.x, p0.y), sliceIndex, 0)).r;
+    float c = _FoamFreeWaterNegativeMasks.Load(
+        int4(int2(p0.x, p1.y), sliceIndex, 0)).r;
+    float d = _FoamFreeWaterNegativeMasks.Load(
+        int4(p1, sliceIndex, 0)).r;
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+bool ResolveMajorCandidatePosition(
+    FoamMajorEvolutionData region,
+    FoamMetricRow metric,
+    float localDistance,
+    float lateralMetres,
+    bool applyMajorSupportExtentCull,
+    out float2 candidatePosition)
+{
+    float centreAcrossNormalized = clamp(
+        region.centreAndPlacement.y,
+        -1.0,
+        1.0);
+    float centreLateralMetres = centreAcrossNormalized < 0.0
+        ? centreAcrossNormalized * max(0.01, metric.shoreData.x)
+        : centreAcrossNormalized * max(0.01, metric.shoreData.y);
+    float2 delta = float2(
+        localDistance - region.centreAndPlacement.x,
+        lateralMetres - centreLateralMetres);
+    float orientation = region.centreAndPlacement.z;
+    float orientationCosine = cos(orientation);
+    float orientationSine = sin(orientation);
+    float principalMajorMetres =
+        orientationCosine * delta.x +
+        orientationSine * delta.y;
+    float principalMinorMetres =
+        -orientationSine * delta.x +
+        orientationCosine * delta.y;
+
+    float metresPerCell = max(
+        0.0001,
+        region.centreAndPlacement.w);
+    float sourceMajor = principalMajorMetres /
+        max(0.0001, metresPerCell * region.morph.x);
+    float sourceMinor = principalMinorMetres /
+        max(0.0001, metresPerCell * region.morph.y);
+    sourceMajor -= sourceMinor * region.morph.z;
+
+    float majorExtent = max(0.5, region.candidateExtents.x);
+    float minorExtent = max(0.5, region.candidateExtents.y);
+    float conservativeMajorExtent = majorExtent *
+        (1.0 + abs(region.warp.x) * 1.55) + 3.0;
+    float conservativeMinorExtent = minorExtent *
+        (1.0 + abs(region.warp.y) * 1.55) + 3.0;
+    if (applyMajorSupportExtentCull &&
+        (abs(sourceMajor) > conservativeMajorExtent ||
+         abs(sourceMinor) > conservativeMinorExtent))
+    {
+        candidatePosition = 0.0.xx;
+        return false;
+    }
+
+    float normalMajor = sourceMajor / majorExtent;
+    float normalMinor = sourceMinor / minorExtent;
+    sourceMajor +=
+        sin(normalMinor * 3.35 + region.warp.z) *
+            region.warp.x * majorExtent +
+        sin((normalMajor + normalMinor) * 1.85 + region.warp.w) *
+            region.warp.x * majorExtent * 0.42;
+    sourceMinor +=
+        sin(normalMajor * 2.80 + region.warp.w) *
+            region.warp.y * minorExtent +
+        sin((normalMajor - normalMinor) * 2.10 + region.warp.z) *
+            region.warp.y * minorExtent * 0.36;
+
+    float principalAngle = region.candidateShape.z;
+    float principalCosine = cos(principalAngle);
+    float principalSine = sin(principalAngle);
+    candidatePosition = float2(
+        region.candidateShape.x +
+            principalCosine * sourceMajor -
+            principalSine * sourceMinor,
+        region.candidateShape.y +
+            principalSine * sourceMajor +
+            principalCosine * sourceMinor);
+    return true;
 }
 
 [numthreads(8, 8, 1)]
@@ -1542,6 +1722,8 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
     if (!IsFoamUInsideDomain(uv.x))
     {
         _FoamEvolvingMajorWrite[outputCoordinate] = 0.0;
+        _FoamEvolvingHostedNegativeWrite[outputCoordinate] = 0.0;
+        _FoamEvolvingFreeWaterNegativeWrite[outputCoordinate] = 0.0;
         return;
     }
 
@@ -1558,6 +1740,8 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
     if (fluidCoverage <= 0.0001 || obstacle >= 0.9999)
     {
         _FoamEvolvingMajorWrite[outputCoordinate] = 0.0;
+        _FoamEvolvingHostedNegativeWrite[outputCoordinate] = 0.0;
+        _FoamEvolvingFreeWaterNegativeWrite[outputCoordinate] = 0.0;
         return;
     }
 
@@ -1572,6 +1756,8 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
         metric.widthsAndSpacing.x,
         metric.widthsAndSpacing.y);
     float support = 0.0;
+    float hostedNegative = 0.0;
+    float freeWaterNegative = 0.0;
 
     [loop]
     for (int regionIndex = 0;
@@ -1580,83 +1766,133 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
     {
         FoamMajorEvolutionData region =
             _FoamMajorEvolutionRecords[regionIndex];
-        float centreAcrossNormalized = clamp(
-            region.centreAndPlacement.y,
-            -1.0,
-            1.0);
-        float centreLateralMetres = centreAcrossNormalized < 0.0
-            ? centreAcrossNormalized * max(0.01, metric.shoreData.x)
-            : centreAcrossNormalized * max(0.01, metric.shoreData.y);
-        float2 delta = float2(
-            localDistance - region.centreAndPlacement.x,
-            lateralMetres - centreLateralMetres);
-        float orientation = region.centreAndPlacement.z;
-        float orientationCosine = cos(orientation);
-        float orientationSine = sin(orientation);
-        float principalMajorMetres =
-            orientationCosine * delta.x +
-            orientationSine * delta.y;
-        float principalMinorMetres =
-            -orientationSine * delta.x +
-            orientationCosine * delta.y;
-
-        float metresPerCell = max(
-            0.0001,
-            region.centreAndPlacement.w);
-        float sourceMajor = principalMajorMetres /
-            max(0.0001, metresPerCell * region.morph.x);
-        float sourceMinor = principalMinorMetres /
-            max(0.0001, metresPerCell * region.morph.y);
-        sourceMajor -= sourceMinor * region.morph.z;
-
-        float majorExtent = max(0.5, region.candidateExtents.x);
-        float minorExtent = max(0.5, region.candidateExtents.y);
-        float conservativeMajorExtent = majorExtent *
-            (1.0 + abs(region.warp.x) * 1.55) + 3.0;
-        float conservativeMinorExtent = minorExtent *
-            (1.0 + abs(region.warp.y) * 1.55) + 3.0;
-        if (abs(sourceMajor) > conservativeMajorExtent ||
-            abs(sourceMinor) > conservativeMinorExtent)
+        float2 candidatePosition;
+        if (!ResolveMajorCandidatePosition(
+                region,
+                metric,
+                localDistance,
+                lateralMetres,
+                true,
+                candidatePosition))
         {
             continue;
         }
 
-        float normalMajor = sourceMajor / majorExtent;
-        float normalMinor = sourceMinor / minorExtent;
-        sourceMajor +=
-            sin(normalMinor * 3.35 + region.warp.z) *
-                region.warp.x * majorExtent +
-            sin((normalMajor + normalMinor) * 1.85 + region.warp.w) *
-                region.warp.x * majorExtent * 0.42;
-        sourceMinor +=
-            sin(normalMajor * 2.80 + region.warp.w) *
-                region.warp.y * minorExtent +
-            sin((normalMajor - normalMinor) * 2.10 + region.warp.z) *
-                region.warp.y * minorExtent * 0.36;
-
-        float principalAngle = region.candidateShape.z;
-        float principalCosine = cos(principalAngle);
-        float principalSine = sin(principalAngle);
-        float sourceX = region.candidateShape.x +
-            principalCosine * sourceMajor -
-            principalSine * sourceMinor;
-        float sourceY = region.candidateShape.y +
-            principalSine * sourceMajor +
-            principalCosine * sourceMinor;
         int sliceIndex = clamp(
             (int)round(region.candidateShape.w),
             0,
             max(0, _FoamMajorEvolutionCount - 1));
         float candidateSupport = SampleMajorMaskBilinear(
             sliceIndex,
-            float2(sourceX, sourceY));
+            candidatePosition);
         support = max(
             support,
             candidateSupport * region.candidateExtents.w);
     }
 
+    [loop]
+    for (int hostedNegativeIndex = 0;
+         hostedNegativeIndex < _FoamHostedNegativeEvolutionCount;
+         hostedNegativeIndex++)
+    {
+        FoamHostedNegativeEvolutionData hostedRecord =
+            _FoamHostedNegativeEvolutionRecords[hostedNegativeIndex];
+        int hostIndex = clamp(
+            (int)round(hostedRecord.hostAndMask.x),
+            0,
+            max(0, _FoamMajorEvolutionCount - 1));
+        FoamMajorEvolutionData host =
+            _FoamMajorEvolutionRecords[hostIndex];
+        float2 candidatePosition;
+        if (!ResolveMajorCandidatePosition(
+                host,
+                metric,
+                localDistance,
+                lateralMetres,
+                false,
+                candidatePosition))
+        {
+            continue;
+        }
+
+        float2 centre = hostedRecord.centreAndOffset.xy;
+        float2 relative = candidatePosition -
+            centre - hostedRecord.centreAndOffset.zw;
+        float rotation = hostedRecord.morph.z;
+        float rotationCosine = cos(rotation);
+        float rotationSine = sin(rotation);
+        float2 local = float2(
+            rotationCosine * relative.x +
+                rotationSine * relative.y,
+            -rotationSine * relative.x +
+                rotationCosine * relative.y);
+        local.x /= max(0.05, hostedRecord.morph.x);
+        local.y /= max(0.05, hostedRecord.morph.y);
+        float2 samplePosition = centre + local;
+        int sliceIndex = clamp(
+            (int)round(hostedRecord.hostAndMask.y),
+            0,
+            max(0, _FoamHostedNegativeEvolutionCount - 1));
+        float pressure = SampleHostedNegativeMaskBilinear(
+            sliceIndex,
+            samplePosition);
+        hostedNegative = max(
+            hostedNegative,
+            pressure * hostedRecord.hostAndMask.z);
+    }
+
+    [loop]
+    for (int freeWaterIndex = 0;
+         freeWaterIndex < _FoamFreeWaterEvolutionCount;
+         freeWaterIndex++)
+    {
+        FoamFreeWaterEvolutionData freeWaterRecord =
+            _FoamFreeWaterEvolutionRecords[freeWaterIndex];
+        float centreAcrossNormalized = clamp(
+            freeWaterRecord.centreAndPlacement.y,
+            -1.0,
+            1.0);
+        float centreLateralMetres = centreAcrossNormalized < 0.0
+            ? centreAcrossNormalized * max(0.01, metric.widthsAndSpacing.x)
+            : centreAcrossNormalized * max(0.01, metric.widthsAndSpacing.y);
+        float2 delta = float2(
+            localDistance -
+                (freeWaterRecord.centreAndPlacement.x +
+                    freeWaterRecord.morph.x),
+            lateralMetres -
+                (centreLateralMetres + freeWaterRecord.morph.y));
+        float rotation = freeWaterRecord.centreAndPlacement.z;
+        float rotationCosine = cos(rotation);
+        float rotationSine = sin(rotation);
+        float2 local = float2(
+            rotationCosine * delta.x + rotationSine * delta.y,
+            -rotationSine * delta.x + rotationCosine * delta.y);
+        local.x /= max(0.05, freeWaterRecord.morph.z);
+        local.y /= max(0.05, freeWaterRecord.morph.w);
+        float metresPerCell = max(
+            0.0001,
+            freeWaterRecord.centreAndPlacement.w);
+        float2 samplePosition = freeWaterRecord.maskAndStrength.xy +
+            local / metresPerCell;
+        int sliceIndex = clamp(
+            (int)round(freeWaterRecord.maskAndStrength.z),
+            0,
+            max(0, _FoamFreeWaterEvolutionCount - 1));
+        float pressure = SampleFreeWaterNegativeMaskBilinear(
+            sliceIndex,
+            samplePosition);
+        freeWaterNegative = max(
+            freeWaterNegative,
+            pressure * freeWaterRecord.maskAndStrength.w);
+    }
+
+    float validMask = fluidCoverage * (1.0 - obstacle);
     _FoamEvolvingMajorWrite[outputCoordinate] = saturate(
-        support * fluidCoverage * (1.0 - obstacle));
+        support * validMask);
+    _FoamEvolvingHostedNegativeWrite[outputCoordinate] = saturate(
+        hostedNegative * validMask);
+    _FoamEvolvingFreeWaterNegativeWrite[outputCoordinate] = saturate(
+        freeWaterNegative * validMask);
 }
 
 [numthreads(8, 8, 1)]
@@ -1698,8 +1934,10 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
     float4 generatedWork = _FoamTopologyGeneratedRead.Load(
         int3(outputCoordinate, 0));
 
-    // Patch 4 uploads deterministic prepared Major Support, Connector
-    // Support, and Pocket Aging Pressure through independent channels.
+    // Generated input keeps static Connector Support and independent negative
+    // classes. Alpha is the complete static hosted field when host-relative
+    // evolution is unavailable; otherwise it contains only accepted hosted
+    // regions that could not be prepared for evolution.
     float evolvingMajorSupport = _FoamEvolvingMajorRead.Load(
         int3(outputCoordinate, 0));
     float majorSupport = lerp(
@@ -1707,7 +1945,24 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
         evolvingMajorSupport,
         saturate(_FoamMajorEvolutionEnabled));
     float connectorSupport = generatedWork.g;
-    float pocketAgingPressure = generatedWork.b;
+    float evolvingFreeWaterAgingPressure =
+        _FoamEvolvingFreeWaterNegativeRead.Load(
+            int3(outputCoordinate, 0));
+    float independentAgingPressure = lerp(
+        generatedWork.b,
+        max(generatedWork.b, evolvingFreeWaterAgingPressure),
+        saturate(_FoamFreeWaterNegativeEvolutionEnabled));
+    float staticHostedAgingPressure = generatedWork.a;
+    float evolvingHostedAgingPressure =
+        _FoamEvolvingHostedNegativeRead.Load(
+            int3(outputCoordinate, 0));
+    float hostedAgingPressure = lerp(
+        staticHostedAgingPressure,
+        max(staticHostedAgingPressure, evolvingHostedAgingPressure),
+        saturate(_FoamHostedNegativeEvolutionEnabled));
+    float pocketAgingPressure = max(
+        independentAgingPressure,
+        hostedAgingPressure);
 
     float4 staticPressure = 0.0.xxxx;
     float4 staticWake = 0.0.xxxx;

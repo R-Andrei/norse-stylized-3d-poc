@@ -4,7 +4,7 @@
 
 **Status:** Canonical step-by-step implementation plan for Stage 6 Foam topology only.
 
-**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, and Patch 4.5 complete static topology are accepted for feature progression. Patch 4.6 Major evolution, Patch 4.6.1 local recycle territories, and Patch 4.6.2 combined lifetime units are implemented and awaiting visual/performance acceptance. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Explicit rebuild transition and production cache packaging are not yet implemented.
+**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution is implemented. Patch 4.7A.1 corrects initial hosted-field parity, prevents Major-bound clipping of Edge Cavities, and preserves static fallback for any hosted region that cannot evolve; visual/performance revalidation is pending. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Explicit rebuild transition and production cache packaging are not yet implemented.
 
 **Primary implementation target:**
 
@@ -1013,7 +1013,9 @@ Patch 4.7 is deliberately split so each relationship problem is proven separatel
 
 ### Patch 4.7A — Hosted Interior Pocket and Edge Cavity evolution
 
-Interior Pockets and Edge Cavities are stored in Major-host-local space.
+**Implementation status:** implemented; Patch 4.7A.1 correctness correction applied; visual/performance revalidation pending.
+
+Interior Pockets and Edge Cavities are stored in Major-host-local space. The accepted static negative field is separated into evolving hosted negatives and still-static independent negatives, so Weak Spans and Free-Water Events remain unchanged.
 
 They inherit:
 
@@ -1030,6 +1032,8 @@ They may add bounded independent variation:
 - deterministic participation on only some host hops.
 
 Interior Pockets must remain inside the safe Major interior. Edge Cavities must remain attached to the original breach side and preserve a viable positive host remainder. Local variation uses absolute bounded targets, not an accumulating random walk.
+
+The evolving field must initially reproduce the accepted static hosted-negative footprint closely. Edge Cavities retain pressure outside the Major support silhouette, and any accepted hosted region that cannot be prepared for evolution remains present through a static fallback. Initial parity measurement is Editor/development-diagnostic only and adds no normal-run readback step.
 
 **Acceptance:** hosted negatives never detach, switch hosts, flip breach sides, escape safe bounds, duplicate during movement, or require runtime host search.
 
@@ -1367,7 +1371,7 @@ A topology patch that cannot answer these questions is not ready.
 
 ## 13. Immediate Next Step
 
-Patch 4.6 Major evolution, Patch 4.6.1 local recycle territories, and Patch 4.6.2 combined lifetime units are implemented and now require visual and computational acceptance. Static and movement coefficients remain provisional until the persistent Foam material proves the final visual result.
+Patch 4.6 Major evolution through Patch 4.6.2 combined lifetime units is accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution plus the Patch 4.7A.1 footprint/parity correction are implemented and now require visual and computational revalidation. Static and movement coefficients remain provisional until the persistent Foam material proves the final visual result.
 
 Validate that:
 
@@ -1379,6 +1383,6 @@ Validate that:
 6. slot population remains constant;
 7. active reconstruction is low cost and produces no ready-state managed allocation or runtime generation work.
 
-After Patch 4.6.2 passes, continue with Patch 4.7A hosted negatives, Patch 4.7B Free-Water Events, and Patch 4.7C Connectors/Weak Spans. Patch 4.8 explicit rebuild transition and Patch 4.9 procedural cache packaging follow before Patch 4.10 topology completion and any Foam-material implementation.
+After Patch 4.7A passes, continue with Patch 4.7B Free-Water Events and Patch 4.7C Connectors/Weak Spans. Patch 4.8 explicit rebuild transition and Patch 4.9 procedural cache packaging follow before Patch 4.10 topology completion and any Foam-material implementation.
 
 Topology is not considered implemented until runtime evolution, explicit rebuild handling, and cache/preparation handoff pass. Only then may the separate Foam material-lifecycle implementation begin.

@@ -36,6 +36,15 @@ namespace ProgrammaticStylized3D.Rivers
         private const float PocketCoverageThreshold = 0.15f;
         private const int MaximumInteriorPocketsPerHost = 3;
         private const int MaximumCavitiesPerHost = 2;
+        private const int InteriorHostedVariantCount = 4;
+        private const int CavityHostedVariantCount = 3;
+        private const int HostedVariantAttemptMultiplier = 3;
+        private const float HostedVariantPressureThreshold = 0.12f;
+        private const float HostedInteriorMinimumContainment = 0.70f;
+        private const float HostedInteriorContainmentTolerance = 0.02f;
+        private const float HostedCavityOverlapTolerance = 0.10f;
+        private const int FreeWaterEvolutionMaskResolution = 32;
+        private const float FreeWaterEvolutionPadding = 1.55f;
         private const float MinimumWeakSpanConnectorLengthMetres = 0.72f;
         private const float MinimumWeakSpanUsableLengthMetres = 0.26f;
         private const float WeakSpanEndpointClearanceMetres = 0.34f;
@@ -497,6 +506,62 @@ namespace ProgrammaticStylized3D.Rivers
             int selectedFreeWaterCount = ResolveSelectedCount(
                 RemapFreeWaterAmount(freeWaterEventAmount),
                 feasibleFreeWaterRegions.Count);
+
+            float[] hostedPressure = new float[cellCount];
+            float[] staticIndependentPressure = new float[cellCount];
+            float[] freeWaterPressure = new float[cellCount];
+            float[] independentPressure = new float[cellCount];
+            MergePreparedPrefix(
+                feasibleInteriorRegions,
+                selectedInteriorCount,
+                hostedPressure);
+            MergePreparedPrefix(
+                feasibleCavityRegions,
+                selectedCavityCount,
+                hostedPressure);
+            MergePreparedPrefix(
+                feasibleWeakSpanRegions,
+                selectedWeakSpanCount,
+                staticIndependentPressure);
+            MergePreparedPrefix(
+                feasibleFreeWaterRegions,
+                selectedFreeWaterCount,
+                freeWaterPressure);
+            MergeMaximum(independentPressure, staticIndependentPressure);
+            MergeMaximum(independentPressure, freeWaterPressure);
+            StylizedRiverFoamPreparedHostedNegativeRegion[]
+                preparedHostedRegions = BuildPreparedHostedRegions(
+                    feasibleInteriorRegions,
+                    selectedInteriorCount,
+                    feasibleCavityRegions,
+                    selectedCavityCount,
+                    width,
+                    height,
+                    fieldLength,
+                    validFieldLength,
+                    domain,
+                    majorTopology);
+            StylizedRiverFoamPreparedFreeWaterRegion[]
+                preparedFreeWaterRegions = BuildPreparedFreeWaterRegions(
+                    feasibleFreeWaterRegions,
+                    selectedFreeWaterCount,
+                    width,
+                    height,
+                    fieldLength,
+                    validFieldLength,
+                    domain);
+            float[] hostedFallbackPressure = new float[cellCount];
+            MergeUnpreparedHostedPrefix(
+                feasibleInteriorRegions,
+                selectedInteriorCount,
+                preparedHostedRegions,
+                hostedFallbackPressure);
+            MergeUnpreparedHostedPrefix(
+                feasibleCavityRegions,
+                selectedCavityCount,
+                preparedHostedRegions,
+                hostedFallbackPressure);
+
             List<StylizedRiverFoamPocketRegion> regions = new(
                 selectedInteriorCount + selectedCavityCount +
                 selectedWeakSpanCount + selectedFreeWaterCount);
@@ -558,7 +623,14 @@ namespace ProgrammaticStylized3D.Rivers
                 coveredCellCount,
                 stopwatch.Elapsed.TotalMilliseconds,
                 pressure,
+                hostedPressure,
+                hostedFallbackPressure,
+                independentPressure,
+                staticIndependentPressure,
+                freeWaterPressure,
                 regions.ToArray(),
+                preparedHostedRegions,
+                preparedFreeWaterRegions,
                 rejectionCounts);
         }
 
@@ -587,7 +659,15 @@ namespace ProgrammaticStylized3D.Rivers
                 0,
                 milliseconds,
                 pressure,
+                new float[pressure != null ? pressure.Length : 0],
+                new float[pressure != null ? pressure.Length : 0],
+                new float[pressure != null ? pressure.Length : 0],
+                new float[pressure != null ? pressure.Length : 0],
+                new float[pressure != null ? pressure.Length : 0],
                 Array.Empty<StylizedRiverFoamPocketRegion>(),
+                Array.Empty<
+                    StylizedRiverFoamPreparedHostedNegativeRegion>(),
+                Array.Empty<StylizedRiverFoamPreparedFreeWaterRegion>(),
                 rejectionCounts);
         }
 
@@ -2368,6 +2448,922 @@ namespace ProgrammaticStylized3D.Rivers
                     region.AcrossRadius,
                     region.BreachDirection);
             }
+        }
+
+        private static void MergePreparedPrefix(
+            List<PreparedNegativeRegion> prepared,
+            int selectedCount,
+            float[] destination)
+        {
+            selectedCount = Mathf.Clamp(
+                selectedCount,
+                0,
+                prepared != null ? prepared.Count : 0);
+            if (destination == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < selectedCount; index++)
+            {
+                RasterSample[] samples = prepared[index].Samples;
+                for (int sampleIndex = 0;
+                     sampleIndex < samples.Length;
+                     sampleIndex++)
+                {
+                    RasterSample sample = samples[sampleIndex];
+                    if (sample.Index < 0 || sample.Index >= destination.Length)
+                    {
+                        continue;
+                    }
+
+                    destination[sample.Index] = Mathf.Max(
+                        destination[sample.Index],
+                        sample.Value);
+                }
+            }
+        }
+
+        private static void MergePreparedRegion(
+            PreparedNegativeRegion region,
+            float[] destination)
+        {
+            if (destination == null)
+            {
+                return;
+            }
+
+            RasterSample[] samples = region.Samples;
+            for (int sampleIndex = 0;
+                 sampleIndex < samples.Length;
+                 sampleIndex++)
+            {
+                RasterSample sample = samples[sampleIndex];
+                if (sample.Index < 0 || sample.Index >= destination.Length)
+                {
+                    continue;
+                }
+
+                destination[sample.Index] = Mathf.Max(
+                    destination[sample.Index],
+                    sample.Value);
+            }
+        }
+
+        private static StylizedRiverFoamPreparedHostedNegativeRegion[]
+            BuildPreparedHostedRegions(
+                List<PreparedNegativeRegion> interiorRegions,
+                int selectedInteriorCount,
+                List<PreparedNegativeRegion> cavityRegions,
+                int selectedCavityCount,
+                int width,
+                int height,
+                float fieldLength,
+                float validFieldLength,
+                RiverDomainSnapshot domain,
+                StylizedRiverFoamMajorTopology majorTopology)
+        {
+            List<StylizedRiverFoamPreparedHostedNegativeRegion> result = new();
+            if (majorTopology == null)
+            {
+                return result.ToArray();
+            }
+
+            AppendPreparedHostedRegions(
+                result,
+                interiorRegions,
+                selectedInteriorCount,
+                width,
+                height,
+                fieldLength,
+                validFieldLength,
+                domain,
+                majorTopology);
+            AppendPreparedHostedRegions(
+                result,
+                cavityRegions,
+                selectedCavityCount,
+                width,
+                height,
+                fieldLength,
+                validFieldLength,
+                domain,
+                majorTopology);
+            return result.ToArray();
+        }
+
+        private static void MergeUnpreparedHostedPrefix(
+            List<PreparedNegativeRegion> prepared,
+            int selectedCount,
+            IReadOnlyList<StylizedRiverFoamPreparedHostedNegativeRegion>
+                preparedHostedRegions,
+            float[] destination)
+        {
+            selectedCount = Mathf.Clamp(
+                selectedCount,
+                0,
+                prepared != null ? prepared.Count : 0);
+            if (destination == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < selectedCount; index++)
+            {
+                PreparedNegativeRegion region = prepared[index];
+                bool hasPreparedRuntimeRegion = false;
+                if (preparedHostedRegions != null)
+                {
+                    for (int preparedIndex = 0;
+                         preparedIndex < preparedHostedRegions.Count;
+                         preparedIndex++)
+                    {
+                        StylizedRiverFoamPreparedHostedNegativeRegion candidate =
+                            preparedHostedRegions[preparedIndex];
+                        if (candidate.StableId == region.StableId &&
+                            candidate.RegionClass == region.RegionClass)
+                        {
+                            hasPreparedRuntimeRegion = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!hasPreparedRuntimeRegion)
+                {
+                    MergePreparedRegion(region, destination);
+                }
+            }
+        }
+
+        private static StylizedRiverFoamPreparedFreeWaterRegion[]
+            BuildPreparedFreeWaterRegions(
+                List<PreparedNegativeRegion> prepared,
+                int selectedCount,
+                int width,
+                int height,
+                float fieldLength,
+                float validFieldLength,
+                RiverDomainSnapshot domain)
+        {
+            selectedCount = Mathf.Clamp(
+                selectedCount,
+                0,
+                prepared != null ? prepared.Count : 0);
+            List<StylizedRiverFoamPreparedFreeWaterRegion> result = new();
+            if (selectedCount == 0 || width <= 1 || height <= 1 ||
+                fieldLength <= 0.0001f || domain == null || !domain.IsValid)
+            {
+                return result.ToArray();
+            }
+
+            for (int index = 0; index < selectedCount; index++)
+            {
+                PreparedNegativeRegion region = prepared[index];
+                if (region.RegionClass !=
+                    StylizedRiverFoamNegativeRegionClass.FreeWaterNegativeEvent)
+                {
+                    continue;
+                }
+
+                int resolution = FreeWaterEvolutionMaskResolution;
+                float[] localPressure = new float[resolution * resolution];
+                float outerRadius = Mathf.Max(
+                    region.AlongRadius,
+                    region.AcrossRadius) * FreeWaterEvolutionPadding;
+                float metresPerCell = Mathf.Max(
+                    0.001f,
+                    outerRadius * 2f / resolution);
+                ResampleFreeWaterRegionToLocalMask(
+                    region,
+                    localPressure,
+                    resolution,
+                    metresPerCell,
+                    width,
+                    height,
+                    fieldLength,
+                    validFieldLength,
+                    domain);
+                if (!ContainsPreparedPressure(localPressure))
+                {
+                    continue;
+                }
+
+                result.Add(new StylizedRiverFoamPreparedFreeWaterRegion(
+                    region.StableId,
+                    resolution,
+                    localPressure,
+                    region.Position.x,
+                    region.AcrossNormalized,
+                    region.Orientation,
+                    metresPerCell));
+            }
+
+            return result.ToArray();
+        }
+
+        private static void AppendPreparedHostedRegions(
+            List<StylizedRiverFoamPreparedHostedNegativeRegion> destination,
+            List<PreparedNegativeRegion> prepared,
+            int selectedCount,
+            int width,
+            int height,
+            float fieldLength,
+            float validFieldLength,
+            RiverDomainSnapshot domain,
+            StylizedRiverFoamMajorTopology majorTopology)
+        {
+            selectedCount = Mathf.Clamp(
+                selectedCount,
+                0,
+                prepared != null ? prepared.Count : 0);
+            IReadOnlyList<StylizedRiverFoamMajorRegion> majorRegions =
+                majorTopology.Regions;
+            IReadOnlyList<StylizedRiverFoamPreparedMajorRegion> majorPrepared =
+                majorTopology.PreparedRegions;
+
+            for (int index = 0; index < selectedCount; index++)
+            {
+                PreparedNegativeRegion region = prepared[index];
+                int hostIndex = FindMajorHostIndex(
+                    region.HostRegionId,
+                    majorRegions,
+                    majorPrepared);
+                if (hostIndex < 0)
+                {
+                    continue;
+                }
+
+                StylizedRiverFoamMajorRegion hostRegion = majorRegions[hostIndex];
+                StylizedRiverFoamPreparedMajorRegion hostPrepared =
+                    majorPrepared[hostIndex];
+                int resolution = hostPrepared.MaskResolution;
+                float[] localPressure = new float[resolution * resolution];
+                ResampleHostedRegionToLocalMask(
+                    region,
+                    localPressure,
+                    resolution,
+                    width,
+                    height,
+                    fieldLength,
+                    validFieldLength,
+                    domain,
+                    hostRegion,
+                    hostPrepared);
+
+                if (!ContainsPreparedPressure(localPressure))
+                {
+                    continue;
+                }
+
+                Vector2 centreCandidate = MapMetricToMajorCandidate(
+                    region.Position,
+                    hostRegion,
+                    hostPrepared,
+                    domain);
+                Vector2 tangentCandidate = Vector2.zero;
+                if (region.RegionClass ==
+                    StylizedRiverFoamNegativeRegionClass.EdgeCavity)
+                {
+                    Vector2 tangentMetric = new Vector2(
+                        -region.BreachDirection.y,
+                        region.BreachDirection.x);
+                    tangentCandidate = MapMetricDirectionToMajorCandidate(
+                        tangentMetric,
+                        hostRegion,
+                        hostPrepared);
+                }
+
+                StylizedRiverFoamHostedNegativeVariant[] variants =
+                    BuildHostedNegativeVariants(
+                        region,
+                        localPressure,
+                        centreCandidate,
+                        tangentCandidate,
+                        hostPrepared);
+                destination.Add(
+                    new StylizedRiverFoamPreparedHostedNegativeRegion(
+                        region.RegionClass,
+                        region.StableId,
+                        region.HostRegionId,
+                        hostIndex,
+                        resolution,
+                        localPressure,
+                        centreCandidate,
+                        variants));
+            }
+        }
+
+        private static StylizedRiverFoamHostedNegativeVariant[]
+            BuildHostedNegativeVariants(
+                PreparedNegativeRegion region,
+                float[] localPressure,
+                Vector2 centreCandidate,
+                Vector2 cavityTangentCandidate,
+                StylizedRiverFoamPreparedMajorRegion hostPrepared)
+        {
+            List<StylizedRiverFoamHostedNegativeVariant> variants = new();
+            StylizedRiverFoamHostedNegativeVariant identity =
+                new StylizedRiverFoamHostedNegativeVariant(
+                    Vector2.zero,
+                    0f,
+                    1f,
+                    1f);
+            variants.Add(identity);
+
+            int targetCount = region.RegionClass ==
+                StylizedRiverFoamNegativeRegionClass.EdgeCavity
+                ? CavityHostedVariantCount
+                : InteriorHostedVariantCount;
+            float baselineOverlap = ResolveHostedHostOverlap(
+                localPressure,
+                centreCandidate,
+                identity,
+                hostPrepared);
+            int maximumAttempts = targetCount * HostedVariantAttemptMultiplier;
+            for (int attempt = 0;
+                 attempt < maximumAttempts && variants.Count < targetCount;
+                 attempt++)
+            {
+                uint seed = MixBits(
+                    region.StableId ^
+                    ((uint)(attempt + 1) * 0x9E3779B9u) ^
+                    0xA24BAED5u);
+                StylizedRiverFoamHostedNegativeVariant candidate =
+                    region.RegionClass ==
+                        StylizedRiverFoamNegativeRegionClass.EdgeCavity
+                        ? BuildCavityHostedVariant(
+                            cavityTangentCandidate,
+                            seed)
+                        : BuildInteriorHostedVariant(seed);
+                if (!IsHostedVariantDistinct(candidate, variants) ||
+                    !IsHostedVariantValid(
+                        region.RegionClass,
+                        localPressure,
+                        centreCandidate,
+                        candidate,
+                        hostPrepared,
+                        baselineOverlap))
+                {
+                    continue;
+                }
+
+                variants.Add(candidate);
+            }
+
+            return variants.ToArray();
+        }
+
+        private static StylizedRiverFoamHostedNegativeVariant
+            BuildInteriorHostedVariant(uint seed)
+        {
+            float angle = Hash01(seed, 1u) * Mathf.PI * 2f;
+            float radius = Mathf.Sqrt(Hash01(seed, 2u)) * 0.72f;
+            return new StylizedRiverFoamHostedNegativeVariant(
+                new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius,
+                Mathf.Lerp(-0.14f, 0.14f, Hash01(seed, 3u)),
+                Mathf.Lerp(0.88f, 1.12f, Hash01(seed, 4u)),
+                Mathf.Lerp(0.88f, 1.12f, Hash01(seed, 5u)));
+        }
+
+        private static StylizedRiverFoamHostedNegativeVariant
+            BuildCavityHostedVariant(
+                Vector2 tangentCandidate,
+                uint seed)
+        {
+            float tangentOffset = Mathf.Lerp(
+                -0.55f,
+                0.55f,
+                Hash01(seed, 1u));
+            return new StylizedRiverFoamHostedNegativeVariant(
+                tangentCandidate * tangentOffset,
+                Mathf.Lerp(-0.07f, 0.07f, Hash01(seed, 2u)),
+                Mathf.Lerp(0.90f, 1.12f, Hash01(seed, 3u)),
+                Mathf.Lerp(0.94f, 1.08f, Hash01(seed, 4u)));
+        }
+
+        private static bool IsHostedVariantDistinct(
+            StylizedRiverFoamHostedNegativeVariant candidate,
+            List<StylizedRiverFoamHostedNegativeVariant> existing)
+        {
+            for (int index = 0; index < existing.Count; index++)
+            {
+                StylizedRiverFoamHostedNegativeVariant other = existing[index];
+                if (Vector2.Distance(
+                        candidate.OffsetCells,
+                        other.OffsetCells) < 0.12f &&
+                    Mathf.Abs(candidate.RotationRadians -
+                        other.RotationRadians) < 0.025f &&
+                    Mathf.Abs(candidate.ScaleAlong - other.ScaleAlong) < 0.03f &&
+                    Mathf.Abs(candidate.ScaleAcross - other.ScaleAcross) < 0.03f)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool IsHostedVariantValid(
+            StylizedRiverFoamNegativeRegionClass regionClass,
+            float[] localPressure,
+            Vector2 centreCandidate,
+            StylizedRiverFoamHostedNegativeVariant candidate,
+            StylizedRiverFoamPreparedMajorRegion hostPrepared,
+            float baselineOverlap)
+        {
+            if (!TryResolveHostedHostOverlap(
+                    localPressure,
+                    centreCandidate,
+                    candidate,
+                    hostPrepared,
+                    out float overlap))
+            {
+                return false;
+            }
+
+            if (regionClass ==
+                StylizedRiverFoamNegativeRegionClass.InteriorPocket)
+            {
+                float minimumContainment = Mathf.Max(
+                    HostedInteriorMinimumContainment,
+                    baselineOverlap - HostedInteriorContainmentTolerance);
+                return overlap >= minimumContainment;
+            }
+
+            return Mathf.Abs(overlap - baselineOverlap) <=
+                HostedCavityOverlapTolerance;
+        }
+
+        private static float ResolveHostedHostOverlap(
+            float[] localPressure,
+            Vector2 centreCandidate,
+            StylizedRiverFoamHostedNegativeVariant variant,
+            StylizedRiverFoamPreparedMajorRegion hostPrepared)
+        {
+            return TryResolveHostedHostOverlap(
+                localPressure,
+                centreCandidate,
+                variant,
+                hostPrepared,
+                out float overlap)
+                ? overlap
+                : 0f;
+        }
+
+        private static bool TryResolveHostedHostOverlap(
+            float[] localPressure,
+            Vector2 centreCandidate,
+            StylizedRiverFoamHostedNegativeVariant variant,
+            StylizedRiverFoamPreparedMajorRegion hostPrepared,
+            out float overlap)
+        {
+            float[] hostSupport = hostPrepared.LocalSupportData;
+            int resolution = hostPrepared.MaskResolution;
+            float cosine = Mathf.Cos(variant.RotationRadians);
+            float sine = Mathf.Sin(variant.RotationRadians);
+            float totalWeight = 0f;
+            float insideWeight = 0f;
+            for (int index = 0; index < localPressure.Length; index++)
+            {
+                float pressure = localPressure[index];
+                if (pressure < HostedVariantPressureThreshold)
+                {
+                    continue;
+                }
+
+                Vector2 source = new Vector2(
+                    index % resolution + 0.5f,
+                    index / resolution + 0.5f);
+                Vector2 relative = source - centreCandidate;
+                relative = new Vector2(
+                    relative.x * variant.ScaleAlong,
+                    relative.y * variant.ScaleAcross);
+                Vector2 transformed = centreCandidate +
+                    variant.OffsetCells +
+                    new Vector2(
+                        cosine * relative.x - sine * relative.y,
+                        sine * relative.x + cosine * relative.y);
+                if (transformed.x < 0.5f || transformed.y < 0.5f ||
+                    transformed.x > resolution - 0.5f ||
+                    transformed.y > resolution - 0.5f)
+                {
+                    overlap = 0f;
+                    return false;
+                }
+
+                float hostValue = SamplePreparedFieldBilinear(
+                    hostSupport,
+                    resolution,
+                    transformed);
+                totalWeight += pressure;
+                if (hostValue >= MajorInteriorThreshold)
+                {
+                    insideWeight += pressure;
+                }
+            }
+
+            overlap = totalWeight > 0.0001f
+                ? insideWeight / totalWeight
+                : 0f;
+            return totalWeight > 0.0001f;
+        }
+
+        private static float SamplePreparedFieldBilinear(
+            float[] source,
+            int resolution,
+            Vector2 position)
+        {
+            float x = Mathf.Clamp(position.x - 0.5f, 0f, resolution - 1f);
+            float y = Mathf.Clamp(position.y - 0.5f, 0f, resolution - 1f);
+            int x0 = Mathf.FloorToInt(x);
+            int y0 = Mathf.FloorToInt(y);
+            int x1 = Mathf.Min(x0 + 1, resolution - 1);
+            int y1 = Mathf.Min(y0 + 1, resolution - 1);
+            float tx = x - x0;
+            float ty = y - y0;
+            float a = source[x0 + y0 * resolution];
+            float b = source[x1 + y0 * resolution];
+            float c = source[x0 + y1 * resolution];
+            float d = source[x1 + y1 * resolution];
+            return Mathf.Lerp(
+                Mathf.Lerp(a, b, tx),
+                Mathf.Lerp(c, d, tx),
+                ty);
+        }
+
+        private static int FindMajorHostIndex(
+            uint hostId,
+            IReadOnlyList<StylizedRiverFoamMajorRegion> regions,
+            IReadOnlyList<StylizedRiverFoamPreparedMajorRegion> prepared)
+        {
+            int count = Mathf.Min(
+                regions != null ? regions.Count : 0,
+                prepared != null ? prepared.Count : 0);
+            for (int index = 0; index < count; index++)
+            {
+                if (regions[index].StableId == hostId &&
+                    prepared[index].StableId == hostId)
+                {
+                    return index;
+                }
+            }
+
+            return -1;
+        }
+
+        private static Vector2 MapMetricToMajorCandidate(
+            Vector2 metricPosition,
+            StylizedRiverFoamMajorRegion hostRegion,
+            StylizedRiverFoamPreparedMajorRegion hostPrepared,
+            RiverDomainSnapshot domain)
+        {
+            float hostLocalDistance = hostRegion.CentreGlobalDistance -
+                domain.GlobalDistanceMinimum;
+            // Match the runtime Major transform exactly: a normalized host
+            // centre is converted with the river widths at the sampled row,
+            // not only with the widths at the original host centre. This keeps
+            // the retained Pocket/Cavity mask attached on tapered bends.
+            StylizedRiverSplineSample metricSample =
+                domain.SampleAtOrientedDistance(metricPosition.x);
+            float hostLateralMetres = SignedNormalizedToMetres(
+                ResolveRuntimeMajorAcrossNormalized(hostRegion),
+                Mathf.Max(0.05f, metricSample.LeftHalfWidth),
+                Mathf.Max(0.05f, metricSample.RightHalfWidth));
+            Vector2 delta = new Vector2(
+                metricPosition.x - hostLocalDistance,
+                metricPosition.y - hostLateralMetres);
+            float orientationCosine = Mathf.Cos(hostRegion.OrientationRadians);
+            float orientationSine = Mathf.Sin(hostRegion.OrientationRadians);
+            float sourceMajor = (
+                orientationCosine * delta.x +
+                orientationSine * delta.y) /
+                Mathf.Max(0.0001f, hostRegion.MetresPerCandidateCell);
+            float sourceMinor = (
+                -orientationSine * delta.x +
+                orientationCosine * delta.y) /
+                Mathf.Max(0.0001f, hostRegion.MetresPerCandidateCell);
+            float principalCosine = Mathf.Cos(
+                hostPrepared.PrincipalAngleRadians);
+            float principalSine = Mathf.Sin(
+                hostPrepared.PrincipalAngleRadians);
+            return new Vector2(
+                hostPrepared.CentroidCells.x +
+                    principalCosine * sourceMajor -
+                    principalSine * sourceMinor,
+                hostPrepared.CentroidCells.y +
+                    principalSine * sourceMajor +
+                    principalCosine * sourceMinor);
+        }
+
+        private static Vector2 MapMetricDirectionToMajorCandidate(
+            Vector2 metricDirection,
+            StylizedRiverFoamMajorRegion hostRegion,
+            StylizedRiverFoamPreparedMajorRegion hostPrepared)
+        {
+            float orientationCosine = Mathf.Cos(hostRegion.OrientationRadians);
+            float orientationSine = Mathf.Sin(hostRegion.OrientationRadians);
+            float sourceMajor =
+                orientationCosine * metricDirection.x +
+                orientationSine * metricDirection.y;
+            float sourceMinor =
+                -orientationSine * metricDirection.x +
+                orientationCosine * metricDirection.y;
+            float principalCosine = Mathf.Cos(
+                hostPrepared.PrincipalAngleRadians);
+            float principalSine = Mathf.Sin(
+                hostPrepared.PrincipalAngleRadians);
+            Vector2 candidateDirection = new Vector2(
+                principalCosine * sourceMajor -
+                    principalSine * sourceMinor,
+                principalSine * sourceMajor +
+                    principalCosine * sourceMinor);
+            return candidateDirection.sqrMagnitude > 0.000001f
+                ? candidateDirection.normalized
+                : Vector2.zero;
+        }
+
+        private static void ResampleHostedRegionToLocalMask(
+            PreparedNegativeRegion region,
+            float[] localPressure,
+            int resolution,
+            int width,
+            int height,
+            float fieldLength,
+            float validFieldLength,
+            RiverDomainSnapshot domain,
+            StylizedRiverFoamMajorRegion hostRegion,
+            StylizedRiverFoamPreparedMajorRegion hostPrepared)
+        {
+            if (localPressure == null || localPressure.Length == 0 ||
+                resolution <= 0 || width <= 1 || height <= 1 ||
+                fieldLength <= 0.0001f || domain == null || !domain.IsValid)
+            {
+                return;
+            }
+
+            float[] sourcePressure = BuildRegionSourcePressure(
+                region,
+                width,
+                height);
+            for (int y = 0; y < resolution; y++)
+            {
+                for (int x = 0; x < resolution; x++)
+                {
+                    Vector2 candidatePosition = new Vector2(
+                        x + 0.5f,
+                        y + 0.5f);
+                    Vector2 metricPosition = MapMajorCandidateToMetric(
+                        candidatePosition,
+                        hostRegion,
+                        hostPrepared,
+                        validFieldLength,
+                        domain);
+                    float value = SampleRegionSourcePressure(
+                        sourcePressure,
+                        width,
+                        height,
+                        fieldLength,
+                        validFieldLength,
+                        metricPosition,
+                        domain);
+                    localPressure[x + y * resolution] = value;
+                }
+            }
+        }
+
+        private static float[] BuildRegionSourcePressure(
+            PreparedNegativeRegion region,
+            int width,
+            int height)
+        {
+            float[] source = new float[Mathf.Max(0, width * height)];
+            RasterSample[] samples = region.Samples;
+            for (int index = 0; index < samples.Length; index++)
+            {
+                RasterSample sample = samples[index];
+                if (sample.Index < 0 || sample.Index >= source.Length)
+                {
+                    continue;
+                }
+
+                source[sample.Index] = Mathf.Max(
+                    source[sample.Index],
+                    sample.Value);
+            }
+
+            return source;
+        }
+
+        private static void ResampleFreeWaterRegionToLocalMask(
+            PreparedNegativeRegion region,
+            float[] localPressure,
+            int resolution,
+            float metresPerCell,
+            int width,
+            int height,
+            float fieldLength,
+            float validFieldLength,
+            RiverDomainSnapshot domain)
+        {
+            if (localPressure == null || localPressure.Length == 0 ||
+                resolution <= 0 || metresPerCell <= 0.0001f ||
+                width <= 1 || height <= 1 ||
+                fieldLength <= 0.0001f || domain == null || !domain.IsValid)
+            {
+                return;
+            }
+
+            float[] sourcePressure = BuildRegionSourcePressure(
+                region,
+                width,
+                height);
+            float centre = resolution * 0.5f;
+            float cosine = Mathf.Cos(region.Orientation);
+            float sine = Mathf.Sin(region.Orientation);
+            for (int y = 0; y < resolution; y++)
+            {
+                for (int x = 0; x < resolution; x++)
+                {
+                    float localX = (x + 0.5f - centre) * metresPerCell;
+                    float localY = (y + 0.5f - centre) * metresPerCell;
+                    Vector2 metricPosition = region.Position + new Vector2(
+                        cosine * localX - sine * localY,
+                        sine * localX + cosine * localY);
+                    float value = SampleRegionSourcePressure(
+                        sourcePressure,
+                        width,
+                        height,
+                        fieldLength,
+                        validFieldLength,
+                        metricPosition,
+                        domain);
+                    localPressure[x + y * resolution] = value;
+                }
+            }
+        }
+
+        private static Vector2 MapMajorCandidateToMetric(
+            Vector2 candidatePosition,
+            StylizedRiverFoamMajorRegion hostRegion,
+            StylizedRiverFoamPreparedMajorRegion hostPrepared,
+            float validFieldLength,
+            RiverDomainSnapshot domain)
+        {
+            Vector2 relative = candidatePosition - hostPrepared.CentroidCells;
+            float principalCosine = Mathf.Cos(
+                hostPrepared.PrincipalAngleRadians);
+            float principalSine = Mathf.Sin(
+                hostPrepared.PrincipalAngleRadians);
+            float sourceMajor =
+                principalCosine * relative.x + principalSine * relative.y;
+            float sourceMinor =
+                -principalSine * relative.x + principalCosine * relative.y;
+            float majorMetres = sourceMajor *
+                Mathf.Max(0.0001f, hostRegion.MetresPerCandidateCell);
+            float minorMetres = sourceMinor *
+                Mathf.Max(0.0001f, hostRegion.MetresPerCandidateCell);
+
+            float orientationCosine = Mathf.Cos(hostRegion.OrientationRadians);
+            float orientationSine = Mathf.Sin(hostRegion.OrientationRadians);
+            float deltaAlong =
+                orientationCosine * majorMetres -
+                orientationSine * minorMetres;
+            float deltaAcross =
+                orientationSine * majorMetres +
+                orientationCosine * minorMetres;
+
+            float hostLocalDistance = hostRegion.CentreGlobalDistance -
+                domain.GlobalDistanceMinimum;
+            float localDistance = hostLocalDistance + deltaAlong;
+            float widthSampleDistance = Mathf.Clamp(
+                localDistance,
+                0f,
+                Mathf.Min(domain.LocalLength, validFieldLength));
+            StylizedRiverSplineSample sample =
+                domain.SampleAtOrientedDistance(widthSampleDistance);
+            float hostLateralMetres = SignedNormalizedToMetres(
+                ResolveRuntimeMajorAcrossNormalized(hostRegion),
+                Mathf.Max(0.05f, sample.LeftHalfWidth),
+                Mathf.Max(0.05f, sample.RightHalfWidth));
+            return new Vector2(
+                localDistance,
+                hostLateralMetres + deltaAcross);
+        }
+
+        private static float ResolveRuntimeMajorAcrossNormalized(
+            StylizedRiverFoamMajorRegion hostRegion)
+        {
+            return Mathf.Clamp(
+                hostRegion.CentreAcrossNormalized,
+                -0.82f,
+                0.82f);
+        }
+
+        private static float SampleRegionSourcePressure(
+            float[] source,
+            int width,
+            int height,
+            float fieldLength,
+            float validFieldLength,
+            Vector2 metricPosition,
+            RiverDomainSnapshot domain)
+        {
+            if (source == null || source.Length < width * height ||
+                metricPosition.x < 0f ||
+                metricPosition.x > fieldLength + 0.0001f)
+            {
+                return 0f;
+            }
+
+            float clampedDistance = Mathf.Clamp(
+                metricPosition.x,
+                0f,
+                Mathf.Min(domain.LocalLength, validFieldLength));
+            StylizedRiverSplineSample sample =
+                domain.SampleAtOrientedDistance(clampedDistance);
+            float leftSurface = Mathf.Max(
+                0.05f,
+                sample.LeftSurfaceHalfWidth);
+            float rightSurface = Mathf.Max(
+                0.05f,
+                sample.RightSurfaceHalfWidth);
+            float across01 = AcrossMetresTo01(
+                metricPosition.y,
+                leftSurface,
+                rightSurface);
+            if (across01 < 0f || across01 > 1f)
+            {
+                return 0f;
+            }
+
+            float sourceX = metricPosition.x /
+                Mathf.Max(0.0001f, fieldLength) *
+                Mathf.Max(1, width - 1);
+            float sourceY = across01 * Mathf.Max(1, height - 1);
+            return SampleSourceFieldBilinear(
+                source,
+                width,
+                height,
+                sourceX,
+                sourceY);
+        }
+
+        private static float SampleSourceFieldBilinear(
+            float[] source,
+            int width,
+            int height,
+            float x,
+            float y)
+        {
+            if (x < 0f || y < 0f ||
+                x > width - 1f || y > height - 1f)
+            {
+                return 0f;
+            }
+
+            int x0 = Mathf.FloorToInt(x);
+            int y0 = Mathf.FloorToInt(y);
+            int x1 = Mathf.Min(x0 + 1, width - 1);
+            int y1 = Mathf.Min(y0 + 1, height - 1);
+            float tx = x - x0;
+            float ty = y - y0;
+            float a = source[x0 + y0 * width];
+            float b = source[x1 + y0 * width];
+            float c = source[x0 + y1 * width];
+            float d = source[x1 + y1 * width];
+            return Mathf.Clamp01(Mathf.Lerp(
+                Mathf.Lerp(a, b, tx),
+                Mathf.Lerp(c, d, tx),
+                ty));
+        }
+
+        private static float AcrossMetresTo01(
+            float metres,
+            float leftWidth,
+            float rightWidth)
+        {
+            return metres < 0f
+                ? 0.5f + metres / Mathf.Max(0.0001f, leftWidth) * 0.5f
+                : 0.5f + metres / Mathf.Max(0.0001f, rightWidth) * 0.5f;
+        }
+
+        private static bool ContainsPreparedPressure(float[] pressure)
+        {
+            if (pressure == null)
+            {
+                return false;
+            }
+
+            for (int index = 0; index < pressure.Length; index++)
+            {
+                if (pressure[index] > 0.0001f)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static int CountPreparedHosts(

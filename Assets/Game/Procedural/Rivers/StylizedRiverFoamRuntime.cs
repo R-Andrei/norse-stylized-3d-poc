@@ -66,6 +66,19 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MajorLifetimeHopWeight = 0.40f;
         private const float MajorLifetimeSafetyMultiplier = 1.25f;
 
+        // Patch 4.7A local variation remains deliberately subordinate to the
+        // host transform. Interior Pockets vary more often; Edge Cavities use
+        // tighter boundary-tangent changes so their breach side stays coherent.
+        private const float HostedInteriorChangeProbability = 0.60f;
+        private const float HostedCavityChangeProbability = 0.38f;
+        private const float FreeWaterMinimumDwellSeconds = 5f;
+        private const float FreeWaterMaximumDwellSeconds = 10f;
+        private const float FreeWaterMinimumMoveSeconds = 2f;
+        private const float FreeWaterMaximumMoveSeconds = 4f;
+        private const float FreeWaterMaximumAlongOffsetMetres = 0.72f;
+        private const float FreeWaterMaximumAcrossOffsetMetres = 0.26f;
+        private const float FreeWaterEvolutionTickRate = 2f;
+
         // The old broad Foam authoring controls were removed in Patch 3.4.
         // Persistent material behaviour remains on one fixed provisional
         // baseline matching the supplied project state until the dedicated
@@ -334,6 +347,22 @@ namespace ProgrammaticStylized3D.Rivers
             public Vector4 Warp;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FoamHostedNegativeEvolutionData
+        {
+            public Vector4 HostAndMask;
+            public Vector4 CentreAndOffset;
+            public Vector4 Morph;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FoamFreeWaterEvolutionData
+        {
+            public Vector4 CentreAndPlacement;
+            public Vector4 MaskAndStrength;
+            public Vector4 Morph;
+        }
+
         private struct MajorEvolutionPose
         {
             public float LocalDistance;
@@ -371,6 +400,52 @@ namespace ProgrammaticStylized3D.Rivers
             public bool IsMoving;
         }
 
+        private struct HostedNegativeEvolutionPose
+        {
+            public Vector2 OffsetCells;
+            public float RotationRadians;
+            public float ScaleAlong;
+            public float ScaleAcross;
+            public float StrengthScale;
+        }
+
+        private struct HostedNegativeEvolutionSlot
+        {
+            public uint StableId;
+            public int PreparedIndex;
+            public int HostSlotIndex;
+            public StylizedRiverFoamNegativeRegionClass RegionClass;
+            public int CurrentVariantIndex;
+            public int TargetVariantIndex;
+            public HostedNegativeEvolutionPose Current;
+            public HostedNegativeEvolutionPose Start;
+            public HostedNegativeEvolutionPose Target;
+        }
+
+        private struct FreeWaterEvolutionPose
+        {
+            public Vector2 OffsetMetres;
+            public float RotationRadians;
+            public float ScaleAlong;
+            public float ScaleAcross;
+            public float StrengthScale;
+        }
+
+        private struct FreeWaterEvolutionSlot
+        {
+            public uint StableId;
+            public int PreparedIndex;
+            public FreeWaterEvolutionPose Current;
+            public FreeWaterEvolutionPose Start;
+            public FreeWaterEvolutionPose Target;
+            public float DwellRemaining;
+            public float LastDwellDuration;
+            public float MoveElapsed;
+            public float MoveDuration;
+            public int MoveCount;
+            public bool IsMoving;
+        }
+
         private StylizedRiver river;
         private MeshRenderer surfaceRenderer;
         private MaterialPropertyBlock propertyBlock;
@@ -387,6 +462,8 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture topologySourcesTexture;
         private RenderTexture topologyGeneratedTexture;
         private RenderTexture evolvingMajorTexture;
+        private RenderTexture evolvingHostedNegativeTexture;
+        private RenderTexture evolvingFreeWaterNegativeTexture;
         private RenderTexture currentShoreEdgesTexture;
         private RenderTexture obstacleExclusionTexture;
         private RenderTexture fractureA;
@@ -398,12 +475,16 @@ namespace ProgrammaticStylized3D.Rivers
         private Texture2D obstacleExclusionReadbackTexture;
         private Texture2D topologyGeneratedUploadTexture;
         private Texture2DArray majorMaskTextureArray;
+        private Texture2DArray hostedNegativeMaskTextureArray;
+        private Texture2DArray freeWaterNegativeMaskTextureArray;
         private ComputeBuffer metricBuffer;
         private ComputeBuffer obstacleExclusionCellBuffer;
         private ComputeBuffer obstacleExclusionSampleBuffer;
         private ComputeBuffer populationMetricsBuffer;
         private ComputeBuffer topologyMetricsBuffer;
         private ComputeBuffer majorEvolutionBuffer;
+        private ComputeBuffer hostedNegativeEvolutionBuffer;
+        private ComputeBuffer freeWaterEvolutionBuffer;
         private StylizedRiverDisturbanceRuntime disturbanceRuntime;
         private FoamMetricRow[] metricRows = Array.Empty<FoamMetricRow>();
         private readonly uint[] latestTopologyMetrics =
@@ -431,13 +512,37 @@ namespace ProgrammaticStylized3D.Rivers
         private float[] obstacleExclusionScalar = Array.Empty<float>();
         private Color[] topologyGeneratedUploadPixels = Array.Empty<Color>();
         private Color[] majorMaskUploadPixels = Array.Empty<Color>();
+        private Color[] hostedNegativeMaskUploadPixels = Array.Empty<Color>();
+        private Color[] freeWaterNegativeMaskUploadPixels = Array.Empty<Color>();
         private MajorEvolutionSlot[] majorEvolutionSlots =
             Array.Empty<MajorEvolutionSlot>();
         private FoamMajorEvolutionData[] majorEvolutionGpuData =
             Array.Empty<FoamMajorEvolutionData>();
+        private HostedNegativeEvolutionSlot[] hostedNegativeEvolutionSlots =
+            Array.Empty<HostedNegativeEvolutionSlot>();
+        private FoamHostedNegativeEvolutionData[]
+            hostedNegativeEvolutionGpuData =
+                Array.Empty<FoamHostedNegativeEvolutionData>();
+        private FreeWaterEvolutionSlot[] freeWaterEvolutionSlots =
+            Array.Empty<FreeWaterEvolutionSlot>();
+        private FoamFreeWaterEvolutionData[] freeWaterEvolutionGpuData =
+            Array.Empty<FoamFreeWaterEvolutionData>();
         private float majorEvolutionAccumulator;
+        private float freeWaterEvolutionAccumulator;
         private bool majorEvolutionReady;
+        private bool hostedNegativeEvolutionReady;
+        private bool freeWaterEvolutionReady;
         private int majorEvolutionReconstructionTicks;
+        private int hostedNegativeLocalChangeCount;
+        private int freeWaterMoveCount;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private bool hostedNegativeInitialParityPending;
+        private bool hostedNegativeInitialParityReadbackPending;
+        private bool hostedNegativeInitialParityAvailable;
+        private float hostedNegativeInitialParityMeanDifference;
+        private float hostedNegativeInitialParityMaximumDifference;
+        private int hostedNegativeInitialParityGeneration;
+#endif
         private int majorEvolutionRecycleCount;
         private int majorEvolutionCrowdedRecycleFallbackCount;
         private int majorEvolutionUpstreamViolations;
@@ -582,6 +687,45 @@ namespace ProgrammaticStylized3D.Rivers
             majorEvolutionLastCpuMilliseconds;
         public long MajorEvolutionLastAllocatedBytes =>
             majorEvolutionLastAllocatedBytes;
+        public bool HostedNegativeEvolutionAvailable =>
+            hostedNegativeEvolutionReady;
+        public int HostedNegativeEvolutionSlotCount =>
+            hostedNegativeEvolutionSlots.Length;
+        public int HostedNegativeInteriorCount =>
+            CountHostedNegativeSlots(
+                StylizedRiverFoamNegativeRegionClass.InteriorPocket);
+        public int HostedNegativeCavityCount =>
+            CountHostedNegativeSlots(
+                StylizedRiverFoamNegativeRegionClass.EdgeCavity);
+        public int HostedNegativeLocalChangeCount =>
+            hostedNegativeLocalChangeCount;
+        public int HostedNegativeAcceptedCount => pocketTopology != null
+            ? pocketTopology.AcceptedHostedRegionCount
+            : 0;
+        public int HostedNegativePreparedCount => pocketTopology != null
+            ? pocketTopology.PreparedHostedRegionCount
+            : 0;
+        public int HostedNegativeFallbackCount => pocketTopology != null
+            ? pocketTopology.HostedFallbackRegionCount
+            : 0;
+        public bool FreeWaterEvolutionAvailable => freeWaterEvolutionReady;
+        public int FreeWaterEvolutionSlotCount =>
+            freeWaterEvolutionSlots.Length;
+        public int FreeWaterPreparedCount => pocketTopology != null
+            ? pocketTopology.PreparedFreeWaterRegionCount
+            : 0;
+        public int FreeWaterMoveCount => freeWaterMoveCount;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        public bool HostedNegativeInitialParityAvailable =>
+            hostedNegativeInitialParityAvailable;
+        public bool HostedNegativeInitialParityPending =>
+            hostedNegativeInitialParityPending ||
+            hostedNegativeInitialParityReadbackPending;
+        public float HostedNegativeInitialParityMeanDifference =>
+            hostedNegativeInitialParityMeanDifference;
+        public float HostedNegativeInitialParityMaximumDifference =>
+            hostedNegativeInitialParityMaximumDifference;
+#endif
         public bool ConnectorTopologyAvailable => connectorTopology != null;
         public int ConnectorEligibleEndpointCount => connectorTopology != null
             ? connectorTopology.EligibleEndpointCount
@@ -716,8 +860,12 @@ namespace ProgrammaticStylized3D.Rivers
             EstimateTextureBytes(topologySourcesTexture) +
             EstimateTextureBytes(topologyGeneratedTexture) +
             EstimateTextureBytes(evolvingMajorTexture) +
+            EstimateTextureBytes(evolvingHostedNegativeTexture) +
+            EstimateTextureBytes(evolvingFreeWaterNegativeTexture) +
             EstimateTextureBytes(topologyGeneratedUploadTexture) +
             EstimateTextureBytes(majorMaskTextureArray) +
+            EstimateTextureBytes(hostedNegativeMaskTextureArray) +
+            EstimateTextureBytes(freeWaterNegativeMaskTextureArray) +
             EstimateTextureBytes(currentShoreEdgesTexture) +
             EstimateTextureBytes(obstacleExclusionTexture) +
             EstimateTextureBytes(fractureA) +
@@ -744,6 +892,14 @@ namespace ProgrammaticStylized3D.Rivers
                 : 0L) +
             (majorEvolutionBuffer != null
                 ? (long)majorEvolutionBuffer.count * majorEvolutionBuffer.stride
+                : 0L) +
+            (hostedNegativeEvolutionBuffer != null
+                ? (long)hostedNegativeEvolutionBuffer.count *
+                    hostedNegativeEvolutionBuffer.stride
+                : 0L) +
+            (freeWaterEvolutionBuffer != null
+                ? (long)freeWaterEvolutionBuffer.count *
+                    freeWaterEvolutionBuffer.stride
                 : 0L);
 
         private bool IsAutomaticMaterialSupplyActive =>
@@ -935,7 +1091,11 @@ namespace ProgrammaticStylized3D.Rivers
             bool majorEvolutionRebuilt = false;
             if (!topologyMaintenanceBlocked)
             {
-                majorEvolutionRebuilt = AdvanceMajorEvolution(deltaTime);
+                majorEvolutionRebuilt =
+                    AdvanceFreeWaterEvolution(deltaTime);
+                majorEvolutionRebuilt =
+                    AdvanceMajorEvolution(deltaTime) ||
+                    majorEvolutionRebuilt;
                 if (majorEvolutionRebuilt)
                 {
                     RefreshDynamicTopologySources(false, false);
@@ -1522,6 +1682,9 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyTexture != null &&
                 topologySourcesTexture != null &&
                 topologyGeneratedTexture != null &&
+                evolvingMajorTexture != null &&
+                evolvingHostedNegativeTexture != null &&
+                evolvingFreeWaterNegativeTexture != null &&
                 majorTopology != null &&
                 connectorTopology != null &&
                 pocketTopology != null &&
@@ -1641,6 +1804,12 @@ namespace ProgrammaticStylized3D.Rivers
                             "PS3D_RiverFoam_TopologyGeneratedInput");
                         evolvingMajorTexture = CreateMajorEvolutionTexture(
                             "PS3D_RiverFoam_EvolvingMajorSupport");
+                        evolvingHostedNegativeTexture =
+                            CreateMajorEvolutionTexture(
+                                "PS3D_RiverFoam_EvolvingHostedNegative");
+                        evolvingFreeWaterNegativeTexture =
+                            CreateMajorEvolutionTexture(
+                                "PS3D_RiverFoam_EvolvingFreeWaterNegative");
                         currentShoreEdgesTexture = CreateShoreEdgesTexture(
                             "PS3D_RiverFoam_CurrentShoreEdges");
                         obstacleExclusionTexture =
@@ -1681,6 +1850,8 @@ namespace ProgrammaticStylized3D.Rivers
                         ClearRenderTexture(topologySourcesTexture);
                         ClearRenderTexture(topologyGeneratedTexture);
                         ClearRenderTexture(evolvingMajorTexture);
+                        ClearRenderTexture(evolvingHostedNegativeTexture);
+                        ClearRenderTexture(evolvingFreeWaterNegativeTexture);
                     }
 
                     initializationPhase = InitializationPhase.AllocateBuffers;
@@ -3053,6 +3224,8 @@ namespace ProgrammaticStylized3D.Rivers
                 ReleaseMajorEvolutionResources();
                 ClearRenderTexture(topologyGeneratedTexture);
                 ClearRenderTexture(evolvingMajorTexture);
+                ClearRenderTexture(evolvingHostedNegativeTexture);
+                ClearRenderTexture(evolvingFreeWaterNegativeTexture);
                 return;
             }
 
@@ -3100,7 +3273,10 @@ namespace ProgrammaticStylized3D.Rivers
                 pocketTopology = null;
                 connectorTopologyInputSignature = int.MinValue;
                 pocketTopologyInputSignature = int.MinValue;
+                InitializeHostedNegativeEvolution(false);
+                InitializeFreeWaterEvolution(false);
                 UploadGeneratedTopology();
+                BuildEvolvingMajorField();
                 return;
             }
 
@@ -3123,7 +3299,10 @@ namespace ProgrammaticStylized3D.Rivers
                 ResolveConnectorTopologyInputSignature();
             pocketTopology = null;
             pocketTopologyInputSignature = int.MinValue;
+            InitializeHostedNegativeEvolution(false);
+            InitializeFreeWaterEvolution(false);
             UploadGeneratedTopology();
+            BuildEvolvingMajorField();
         }
 
         private void BuildPocketTopology()
@@ -3137,7 +3316,10 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 pocketTopology = null;
                 pocketTopologyInputSignature = int.MinValue;
+                InitializeHostedNegativeEvolution(false);
+                InitializeFreeWaterEvolution(false);
                 UploadGeneratedTopology();
+                BuildEvolvingMajorField();
                 return;
             }
 
@@ -3160,7 +3342,10 @@ namespace ProgrammaticStylized3D.Rivers
                     connectorTopology);
             pocketTopologyInputSignature =
                 ResolvePocketTopologyInputSignature();
+            InitializeHostedNegativeEvolution(false);
+            InitializeFreeWaterEvolution(false);
             UploadGeneratedTopology();
+            BuildEvolvingMajorField();
         }
 
         private void UploadGeneratedTopology()
@@ -3188,7 +3373,9 @@ namespace ProgrammaticStylized3D.Rivers
             connectorTopology?.AddToUploadPixels(
                 topologyGeneratedUploadPixels);
             pocketTopology?.AddToUploadPixels(
-                topologyGeneratedUploadPixels);
+                topologyGeneratedUploadPixels,
+                hostedNegativeEvolutionReady,
+                freeWaterEvolutionReady);
 
             if (topologyGeneratedUploadTexture == null ||
                 topologyGeneratedUploadTexture.width != fieldWidth ||
@@ -3230,6 +3417,8 @@ namespace ProgrammaticStylized3D.Rivers
                 buildEvolvingMajorSupportKernel < 0)
             {
                 ClearRenderTexture(evolvingMajorTexture);
+                ClearRenderTexture(evolvingHostedNegativeTexture);
+                ClearRenderTexture(evolvingFreeWaterNegativeTexture);
                 return;
             }
 
@@ -3241,6 +3430,8 @@ namespace ProgrammaticStylized3D.Rivers
             if (slotCount <= 0)
             {
                 ClearRenderTexture(evolvingMajorTexture);
+                ClearRenderTexture(evolvingHostedNegativeTexture);
+                ClearRenderTexture(evolvingFreeWaterNegativeTexture);
                 return;
             }
 
@@ -3250,6 +3441,8 @@ namespace ProgrammaticStylized3D.Rivers
                 if (prepared[index].MaskResolution != maskResolution)
                 {
                     ClearRenderTexture(evolvingMajorTexture);
+                    ClearRenderTexture(evolvingHostedNegativeTexture);
+                    ClearRenderTexture(evolvingFreeWaterNegativeTexture);
                     return;
                 }
             }
@@ -3368,11 +3561,329 @@ namespace ProgrammaticStylized3D.Rivers
             majorEvolutionAccumulator = 0f;
             majorEvolutionLifetimeInputSignature =
                 ResolveMajorEvolutionLifetimeInputSignature();
+            InitializeHostedNegativeEvolution(false);
+            InitializeFreeWaterEvolution(false);
             BuildEvolvingMajorField();
+        }
+
+        private void InitializeHostedNegativeEvolution(
+            bool rebuildField = true)
+        {
+            ReleaseHostedNegativeEvolutionResources();
+            if (!majorEvolutionReady || majorMaskTextureArray == null ||
+                evolvingHostedNegativeTexture == null)
+            {
+                ClearRenderTexture(evolvingHostedNegativeTexture);
+                return;
+            }
+
+            int maskResolution = majorMaskTextureArray.width;
+            IReadOnlyList<StylizedRiverFoamPreparedHostedNegativeRegion>
+                prepared = pocketTopology != null
+                    ? pocketTopology.PreparedHostedRegions
+                    : Array.Empty<
+                        StylizedRiverFoamPreparedHostedNegativeRegion>();
+            int validCount = 0;
+            for (int index = 0; index < prepared.Count; index++)
+            {
+                if (prepared[index].MaskResolution == maskResolution &&
+                    prepared[index].HostPreparedIndex >= 0 &&
+                    prepared[index].HostPreparedIndex <
+                        majorEvolutionSlots.Length)
+                {
+                    validCount++;
+                }
+            }
+
+            int sliceCount = Mathf.Max(1, validCount);
+            hostedNegativeMaskUploadPixels = new Color[
+                maskResolution * maskResolution];
+            hostedNegativeMaskTextureArray = new Texture2DArray(
+                maskResolution,
+                maskResolution,
+                sliceCount,
+                TextureFormat.RGBAHalf,
+                false,
+                true)
+            {
+                name = "T_PS3D_RiverFoamHostedNegativeMasks",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+
+            hostedNegativeEvolutionSlots =
+                new HostedNegativeEvolutionSlot[validCount];
+            hostedNegativeEvolutionGpuData =
+                new FoamHostedNegativeEvolutionData[Mathf.Max(1, validCount)];
+            int writeIndex = 0;
+            for (int index = 0; index < prepared.Count; index++)
+            {
+                StylizedRiverFoamPreparedHostedNegativeRegion region =
+                    prepared[index];
+                if (region.MaskResolution != maskResolution ||
+                    region.HostPreparedIndex < 0 ||
+                    region.HostPreparedIndex >= majorEvolutionSlots.Length)
+                {
+                    continue;
+                }
+
+                float[] source = region.LocalPressureData;
+                for (int pixel = 0;
+                     pixel < hostedNegativeMaskUploadPixels.Length;
+                     pixel++)
+                {
+                    float value = pixel < source.Length
+                        ? Mathf.Clamp01(source[pixel])
+                        : 0f;
+                    hostedNegativeMaskUploadPixels[pixel] = new Color(
+                        value,
+                        0f,
+                        0f,
+                        0f);
+                }
+
+                hostedNegativeMaskTextureArray.SetPixels(
+                    hostedNegativeMaskUploadPixels,
+                    writeIndex,
+                    0);
+                HostedNegativeEvolutionPose initialPose =
+                    CreateIdentityHostedNegativePose();
+                hostedNegativeEvolutionSlots[writeIndex] =
+                    new HostedNegativeEvolutionSlot
+                    {
+                        StableId = region.StableId,
+                        PreparedIndex = index,
+                        HostSlotIndex = region.HostPreparedIndex,
+                        RegionClass = region.RegionClass,
+                        CurrentVariantIndex = 0,
+                        TargetVariantIndex = 0,
+                        Current = initialPose,
+                        Start = initialPose,
+                        Target = initialPose
+                    };
+                writeIndex++;
+            }
+
+            if (validCount == 0)
+            {
+                hostedNegativeMaskTextureArray.SetPixels(
+                    hostedNegativeMaskUploadPixels,
+                    0,
+                    0);
+            }
+            hostedNegativeMaskTextureArray.Apply(false, true);
+            hostedNegativeEvolutionBuffer = new ComputeBuffer(
+                Mathf.Max(1, validCount),
+                sizeof(float) * 12,
+                ComputeBufferType.Structured);
+            if (validCount == 0)
+            {
+                hostedNegativeEvolutionBuffer.SetData(
+                    hostedNegativeEvolutionGpuData);
+            }
+            hostedNegativeEvolutionReady = validCount > 0;
+            hostedNegativeLocalChangeCount = 0;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            hostedNegativeInitialParityPending =
+                hostedNegativeEvolutionReady &&
+                IsTopologyDebugActive &&
+                SystemInfo.supportsAsyncGPUReadback;
+            hostedNegativeInitialParityReadbackPending = false;
+            hostedNegativeInitialParityAvailable = false;
+            hostedNegativeInitialParityMeanDifference = 0f;
+            hostedNegativeInitialParityMaximumDifference = 0f;
+#endif
+            if (rebuildField)
+            {
+                BuildEvolvingMajorField();
+            }
+        }
+
+        private void ReleaseHostedNegativeEvolutionResources()
+        {
+            hostedNegativeEvolutionBuffer?.Release();
+            hostedNegativeEvolutionBuffer = null;
+            if (hostedNegativeMaskTextureArray != null)
+            {
+                DestroyUnityObject(hostedNegativeMaskTextureArray);
+                hostedNegativeMaskTextureArray = null;
+            }
+
+            hostedNegativeEvolutionSlots =
+                Array.Empty<HostedNegativeEvolutionSlot>();
+            hostedNegativeEvolutionGpuData =
+                Array.Empty<FoamHostedNegativeEvolutionData>();
+            hostedNegativeMaskUploadPixels = Array.Empty<Color>();
+            hostedNegativeEvolutionReady = false;
+            hostedNegativeLocalChangeCount = 0;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            hostedNegativeInitialParityGeneration++;
+            hostedNegativeInitialParityPending = false;
+            hostedNegativeInitialParityReadbackPending = false;
+            hostedNegativeInitialParityAvailable = false;
+            hostedNegativeInitialParityMeanDifference = 0f;
+            hostedNegativeInitialParityMaximumDifference = 0f;
+#endif
+        }
+
+        private void InitializeFreeWaterEvolution(bool rebuildField = true)
+        {
+            ReleaseFreeWaterEvolutionResources();
+            if (!majorEvolutionReady || evolvingFreeWaterNegativeTexture == null)
+            {
+                ClearRenderTexture(evolvingFreeWaterNegativeTexture);
+                return;
+            }
+
+            IReadOnlyList<StylizedRiverFoamPreparedFreeWaterRegion> prepared =
+                pocketTopology != null
+                    ? pocketTopology.PreparedFreeWaterRegions
+                    : Array.Empty<StylizedRiverFoamPreparedFreeWaterRegion>();
+            int acceptedCount = pocketTopology != null
+                ? pocketTopology.AcceptedFreeWaterEventCount
+                : 0;
+            bool allAcceptedPrepared = acceptedCount > 0 &&
+                prepared.Count == acceptedCount;
+            int maskResolution = allAcceptedPrepared && prepared.Count > 0
+                ? prepared[0].MaskResolution
+                : 1;
+            bool consistentMasks = allAcceptedPrepared;
+            for (int index = 1; index < prepared.Count; index++)
+            {
+                if (prepared[index].MaskResolution != maskResolution)
+                {
+                    consistentMasks = false;
+                    break;
+                }
+            }
+
+            int validCount = consistentMasks ? prepared.Count : 0;
+            int sliceCount = Mathf.Max(1, validCount);
+            freeWaterNegativeMaskUploadPixels = new Color[
+                maskResolution * maskResolution];
+            freeWaterNegativeMaskTextureArray = new Texture2DArray(
+                maskResolution,
+                maskResolution,
+                sliceCount,
+                TextureFormat.RGBAHalf,
+                false,
+                true)
+            {
+                name = "T_PS3D_RiverFoamFreeWaterNegativeMasks",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+
+            freeWaterEvolutionSlots =
+                new FreeWaterEvolutionSlot[validCount];
+            freeWaterEvolutionGpuData =
+                new FoamFreeWaterEvolutionData[Mathf.Max(1, validCount)];
+            for (int index = 0; index < validCount; index++)
+            {
+                StylizedRiverFoamPreparedFreeWaterRegion region =
+                    prepared[index];
+                float[] source = region.LocalPressureData;
+                for (int pixel = 0;
+                     pixel < freeWaterNegativeMaskUploadPixels.Length;
+                     pixel++)
+                {
+                    float value = pixel < source.Length
+                        ? Mathf.Clamp01(source[pixel])
+                        : 0f;
+                    freeWaterNegativeMaskUploadPixels[pixel] = new Color(
+                        value,
+                        0f,
+                        0f,
+                        0f);
+                }
+
+                freeWaterNegativeMaskTextureArray.SetPixels(
+                    freeWaterNegativeMaskUploadPixels,
+                    index,
+                    0);
+                FreeWaterEvolutionPose initialPose =
+                    CreateIdentityFreeWaterPose();
+                float dwell = ResolveFreeWaterDwell(region.StableId, 0u);
+                freeWaterEvolutionSlots[index] =
+                    new FreeWaterEvolutionSlot
+                    {
+                        StableId = region.StableId,
+                        PreparedIndex = index,
+                        Current = initialPose,
+                        Start = initialPose,
+                        Target = initialPose,
+                        DwellRemaining = dwell,
+                        LastDwellDuration = dwell,
+                        MoveElapsed = 0f,
+                        MoveDuration = 0f,
+                        MoveCount = 0,
+                        IsMoving = false
+                    };
+            }
+
+            if (validCount == 0)
+            {
+                freeWaterNegativeMaskTextureArray.SetPixels(
+                    freeWaterNegativeMaskUploadPixels,
+                    0,
+                    0);
+            }
+            freeWaterNegativeMaskTextureArray.Apply(false, true);
+            freeWaterEvolutionBuffer = new ComputeBuffer(
+                Mathf.Max(1, validCount),
+                sizeof(float) * 12,
+                ComputeBufferType.Structured);
+            if (validCount == 0)
+            {
+                freeWaterEvolutionBuffer.SetData(freeWaterEvolutionGpuData);
+            }
+            freeWaterEvolutionReady = validCount > 0;
+            freeWaterEvolutionAccumulator = 0f;
+            freeWaterMoveCount = 0;
+            if (rebuildField)
+            {
+                BuildEvolvingMajorField();
+            }
+        }
+
+        private void ReleaseFreeWaterEvolutionResources()
+        {
+            freeWaterEvolutionBuffer?.Release();
+            freeWaterEvolutionBuffer = null;
+            if (freeWaterNegativeMaskTextureArray != null)
+            {
+                DestroyUnityObject(freeWaterNegativeMaskTextureArray);
+                freeWaterNegativeMaskTextureArray = null;
+            }
+
+            freeWaterEvolutionSlots = Array.Empty<FreeWaterEvolutionSlot>();
+            freeWaterEvolutionGpuData =
+                Array.Empty<FoamFreeWaterEvolutionData>();
+            freeWaterNegativeMaskUploadPixels = Array.Empty<Color>();
+            freeWaterEvolutionReady = false;
+            freeWaterEvolutionAccumulator = 0f;
+            freeWaterMoveCount = 0;
+        }
+
+        private static HostedNegativeEvolutionPose
+            CreateIdentityHostedNegativePose()
+        {
+            return new HostedNegativeEvolutionPose
+            {
+                OffsetCells = Vector2.zero,
+                RotationRadians = 0f,
+                ScaleAlong = 1f,
+                ScaleAcross = 1f,
+                StrengthScale = 1f
+            };
         }
 
         private void ReleaseMajorEvolutionResources()
         {
+            ReleaseHostedNegativeEvolutionResources();
+            ReleaseFreeWaterEvolutionResources();
             majorEvolutionBuffer?.Release();
             majorEvolutionBuffer = null;
             if (majorMaskTextureArray != null)
@@ -3438,13 +3949,14 @@ namespace ProgrammaticStylized3D.Rivers
                         slot.IsMoving = false;
                         slot.MoveElapsed = slot.MoveDuration;
                         slot.HopIndex++;
+                        CompleteHostedNegativeMove(index);
                         immediateRebuild = true;
 
                         if (ShouldRecycleMajor(slot) ||
                             IsInMajorEgress(
                                 slot.Current.LocalDistance))
                         {
-                            RecycleMajor(ref slot);
+                            RecycleMajor(index, ref slot);
                         }
                         else
                         {
@@ -3464,7 +3976,7 @@ namespace ProgrammaticStylized3D.Rivers
                 // allowing the remaining dwell to create a persistent clump.
                 if (ShouldRecycleMajor(slot))
                 {
-                    RecycleMajor(ref slot);
+                    RecycleMajor(index, ref slot);
                     immediateRebuild = true;
                     continue;
                 }
@@ -3475,7 +3987,7 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
-                if (BeginMajorMove(ref slot))
+                if (BeginMajorMove(index, ref slot))
                 {
                     anyMoving = true;
                 }
@@ -3516,7 +4028,9 @@ namespace ProgrammaticStylized3D.Rivers
             return rebuilt;
         }
 
-        private bool BeginMajorMove(ref MajorEvolutionSlot slot)
+        private bool BeginMajorMove(
+            int slotIndex,
+            ref MajorEvolutionSlot slot)
         {
             uint cycleSeed = ResolveMajorCycleSeed(slot, 30u);
             float flowScale = Mathf.Lerp(
@@ -3532,7 +4046,7 @@ namespace ProgrammaticStylized3D.Rivers
                 downstreamStep;
             if (targetDistance >= ResolveMajorEgressStart())
             {
-                RecycleMajor(ref slot);
+                RecycleMajor(slotIndex, ref slot);
                 return false;
             }
 
@@ -3634,10 +4148,219 @@ namespace ProgrammaticStylized3D.Rivers
             majorEvolutionObservedMaximumMove = Mathf.Max(
                 majorEvolutionObservedMaximumMove,
                 slot.MoveDuration);
+            BeginHostedNegativeMove(slotIndex, cycleSeed);
             return true;
         }
 
-        private void RecycleMajor(ref MajorEvolutionSlot slot)
+        private bool AdvanceFreeWaterEvolution(float deltaTime)
+        {
+            if (!freeWaterEvolutionReady || deltaTime <= 0f ||
+                freeWaterEvolutionSlots.Length == 0)
+            {
+                return false;
+            }
+
+            bool immediateRebuild = false;
+            bool anyMoving = false;
+            for (int index = 0;
+                 index < freeWaterEvolutionSlots.Length;
+                 index++)
+            {
+                ref FreeWaterEvolutionSlot slot =
+                    ref freeWaterEvolutionSlots[index];
+                if (slot.IsMoving)
+                {
+                    slot.MoveElapsed += deltaTime;
+                    if (slot.MoveElapsed >= slot.MoveDuration)
+                    {
+                        slot.Current = slot.Target;
+                        slot.Start = slot.Target;
+                        slot.IsMoving = false;
+                        slot.MoveElapsed = slot.MoveDuration;
+                        slot.MoveCount++;
+                        slot.DwellRemaining = ResolveFreeWaterDwell(
+                            slot.StableId,
+                            (uint)(slot.MoveCount + 1));
+                        slot.LastDwellDuration = slot.DwellRemaining;
+                        freeWaterMoveCount++;
+                        immediateRebuild = true;
+                    }
+                    else
+                    {
+                        anyMoving = true;
+                    }
+
+                    continue;
+                }
+
+                slot.DwellRemaining -= deltaTime;
+                if (slot.DwellRemaining > 0f)
+                {
+                    continue;
+                }
+
+                BeginFreeWaterMove(ref slot);
+                anyMoving = true;
+            }
+
+            if (immediateRebuild || anyMoving)
+            {
+                if (anyMoving)
+                {
+                    freeWaterEvolutionAccumulator += deltaTime;
+                }
+                else
+                {
+                    freeWaterEvolutionAccumulator = 0f;
+                }
+
+                float tickInterval = 1f / FreeWaterEvolutionTickRate;
+                bool scheduledRebuild =
+                    freeWaterEvolutionAccumulator >= tickInterval;
+                if (scheduledRebuild)
+                {
+                    freeWaterEvolutionAccumulator %= tickInterval;
+                }
+
+                if (immediateRebuild || scheduledRebuild)
+                {
+                    return BuildEvolvingMajorField();
+                }
+            }
+
+            return false;
+        }
+
+        private void BeginFreeWaterMove(ref FreeWaterEvolutionSlot slot)
+        {
+            slot.Start = slot.Current;
+            uint seed = EvolutionMixBits(
+                slot.StableId ^
+                ((uint)(slot.MoveCount + 1) * 0x9E3779B9u) ^
+                0x7F4A7C15u);
+            FreeWaterEvolutionPose target =
+                ResolveFreeWaterTarget(slot, seed);
+            slot.Target = target;
+            slot.MoveDuration = Mathf.Lerp(
+                FreeWaterMinimumMoveSeconds,
+                FreeWaterMaximumMoveSeconds,
+                HashMajorEvolution(seed, 7u));
+            slot.MoveElapsed = 0f;
+            slot.IsMoving = true;
+        }
+
+        private FreeWaterEvolutionPose ResolveFreeWaterTarget(
+            FreeWaterEvolutionSlot slot,
+            uint seed)
+        {
+            IReadOnlyList<StylizedRiverFoamPreparedFreeWaterRegion> prepared =
+                pocketTopology != null
+                    ? pocketTopology.PreparedFreeWaterRegions
+                    : Array.Empty<StylizedRiverFoamPreparedFreeWaterRegion>();
+            float alongOffset = Mathf.Lerp(
+                -FreeWaterMaximumAlongOffsetMetres,
+                FreeWaterMaximumAlongOffsetMetres,
+                HashMajorEvolution(seed, 1u));
+            if (slot.PreparedIndex >= 0 && slot.PreparedIndex < prepared.Count)
+            {
+                StylizedRiverFoamPreparedFreeWaterRegion region =
+                    prepared[slot.PreparedIndex];
+                float targetCentre = Mathf.Clamp(
+                    region.CentreLocalDistance + alongOffset,
+                    0f,
+                    Mathf.Max(0f, validFieldLength));
+                alongOffset = targetCentre - region.CentreLocalDistance;
+            }
+
+            float acrossOffset = Mathf.Lerp(
+                -FreeWaterMaximumAcrossOffsetMetres,
+                FreeWaterMaximumAcrossOffsetMetres,
+                HashMajorEvolution(seed, 2u));
+            float scaleAlong = Mathf.Lerp(
+                0.90f,
+                1.10f,
+                HashMajorEvolution(seed, 3u));
+            float scaleAcross = Mathf.Lerp(
+                0.90f,
+                1.10f,
+                HashMajorEvolution(seed, 4u));
+            float areaScale = Mathf.Max(0.25f, scaleAlong * scaleAcross);
+            return new FreeWaterEvolutionPose
+            {
+                OffsetMetres = new Vector2(alongOffset, acrossOffset),
+                RotationRadians = Mathf.Lerp(
+                    -0.16f,
+                    0.16f,
+                    HashMajorEvolution(seed, 5u)),
+                ScaleAlong = scaleAlong,
+                ScaleAcross = scaleAcross,
+                StrengthScale = Mathf.Clamp(
+                    1f / Mathf.Sqrt(areaScale),
+                    0.92f,
+                    1.08f)
+            };
+        }
+
+        private FreeWaterEvolutionPose ResolveFreeWaterPose(
+            FreeWaterEvolutionSlot slot)
+        {
+            if (!slot.IsMoving || slot.MoveDuration <= 0.0001f)
+            {
+                return slot.Current;
+            }
+
+            float t = Mathf.Clamp01(slot.MoveElapsed / slot.MoveDuration);
+            t = t * t * (3f - 2f * t);
+            return new FreeWaterEvolutionPose
+            {
+                OffsetMetres = Vector2.Lerp(
+                    slot.Start.OffsetMetres,
+                    slot.Target.OffsetMetres,
+                    t),
+                RotationRadians = Mathf.Lerp(
+                    slot.Start.RotationRadians,
+                    slot.Target.RotationRadians,
+                    t),
+                ScaleAlong = Mathf.Lerp(
+                    slot.Start.ScaleAlong,
+                    slot.Target.ScaleAlong,
+                    t),
+                ScaleAcross = Mathf.Lerp(
+                    slot.Start.ScaleAcross,
+                    slot.Target.ScaleAcross,
+                    t),
+                StrengthScale = Mathf.Lerp(
+                    slot.Start.StrengthScale,
+                    slot.Target.StrengthScale,
+                    t)
+            };
+        }
+
+        private static FreeWaterEvolutionPose CreateIdentityFreeWaterPose()
+        {
+            return new FreeWaterEvolutionPose
+            {
+                OffsetMetres = Vector2.zero,
+                RotationRadians = 0f,
+                ScaleAlong = 1f,
+                ScaleAcross = 1f,
+                StrengthScale = 1f
+            };
+        }
+
+        private static float ResolveFreeWaterDwell(uint stableId, uint stream)
+        {
+            uint seed = EvolutionMixBits(
+                stableId ^ 0xB5297A4Du ^ (stream * 0x68E31DA4u));
+            return Mathf.Lerp(
+                FreeWaterMinimumDwellSeconds,
+                FreeWaterMaximumDwellSeconds,
+                HashMajorEvolution(seed, 1u));
+        }
+
+        private void RecycleMajor(
+            int slotIndex,
+            ref MajorEvolutionSlot slot)
         {
             IReadOnlyList<StylizedRiverFoamPreparedMajorRegion> prepared =
                 majorTopology.PreparedRegions;
@@ -3737,6 +4460,210 @@ namespace ProgrammaticStylized3D.Rivers
             slot.HopIndex = 0;
             ResolveMajorOccurrenceBudget(ref slot);
             ResolveMajorDwell(ref slot, 60u);
+            RecycleHostedNegativeSlots(slotIndex, recycleSeed);
+        }
+
+        private void BeginHostedNegativeMove(
+            int hostSlotIndex,
+            uint hostCycleSeed)
+        {
+            if (!hostedNegativeEvolutionReady)
+            {
+                return;
+            }
+
+            IReadOnlyList<StylizedRiverFoamPreparedHostedNegativeRegion>
+                prepared = pocketTopology.PreparedHostedRegions;
+            for (int index = 0;
+                 index < hostedNegativeEvolutionSlots.Length;
+                 index++)
+            {
+                ref HostedNegativeEvolutionSlot slot =
+                    ref hostedNegativeEvolutionSlots[index];
+                if (slot.HostSlotIndex != hostSlotIndex ||
+                    slot.PreparedIndex < 0 ||
+                    slot.PreparedIndex >= prepared.Count)
+                {
+                    continue;
+                }
+
+                uint seed = EvolutionMixBits(
+                    slot.StableId ^ hostCycleSeed ^
+                    ((uint)(majorEvolutionSlots[hostSlotIndex].HopIndex + 1) *
+                        0x27D4EB2Fu));
+                float changeProbability = slot.RegionClass ==
+                    StylizedRiverFoamNegativeRegionClass.InteriorPocket
+                    ? HostedInteriorChangeProbability
+                    : HostedCavityChangeProbability;
+                slot.Start = slot.Current;
+                if (HashMajorEvolution(seed, 1u) > changeProbability)
+                {
+                    slot.Target = slot.Current;
+                    slot.TargetVariantIndex = slot.CurrentVariantIndex;
+                    continue;
+                }
+
+                slot.Target = ResolveHostedNegativeTarget(
+                    prepared[slot.PreparedIndex],
+                    seed,
+                    slot.CurrentVariantIndex,
+                    out int targetVariantIndex);
+                slot.TargetVariantIndex = targetVariantIndex;
+                if (targetVariantIndex != slot.CurrentVariantIndex)
+                {
+                    hostedNegativeLocalChangeCount++;
+                }
+            }
+        }
+
+        private void CompleteHostedNegativeMove(int hostSlotIndex)
+        {
+            for (int index = 0;
+                 index < hostedNegativeEvolutionSlots.Length;
+                 index++)
+            {
+                ref HostedNegativeEvolutionSlot slot =
+                    ref hostedNegativeEvolutionSlots[index];
+                if (slot.HostSlotIndex != hostSlotIndex)
+                {
+                    continue;
+                }
+
+                slot.Current = slot.Target;
+                slot.Start = slot.Target;
+                slot.CurrentVariantIndex = slot.TargetVariantIndex;
+            }
+        }
+
+        private void RecycleHostedNegativeSlots(
+            int hostSlotIndex,
+            uint recycleSeed)
+        {
+            if (!hostedNegativeEvolutionReady)
+            {
+                return;
+            }
+
+            IReadOnlyList<StylizedRiverFoamPreparedHostedNegativeRegion>
+                prepared = pocketTopology.PreparedHostedRegions;
+            for (int index = 0;
+                 index < hostedNegativeEvolutionSlots.Length;
+                 index++)
+            {
+                ref HostedNegativeEvolutionSlot slot =
+                    ref hostedNegativeEvolutionSlots[index];
+                if (slot.HostSlotIndex != hostSlotIndex ||
+                    slot.PreparedIndex < 0 ||
+                    slot.PreparedIndex >= prepared.Count)
+                {
+                    continue;
+                }
+
+                uint seed = EvolutionMixBits(
+                    slot.StableId ^ recycleSeed ^ 0xA24BAED5u);
+                HostedNegativeEvolutionPose pose =
+                    ResolveHostedNegativeTarget(
+                        prepared[slot.PreparedIndex],
+                        seed,
+                        slot.CurrentVariantIndex,
+                        out int targetVariantIndex);
+                if (targetVariantIndex != slot.CurrentVariantIndex)
+                {
+                    hostedNegativeLocalChangeCount++;
+                }
+                slot.CurrentVariantIndex = targetVariantIndex;
+                slot.TargetVariantIndex = targetVariantIndex;
+                slot.Current = pose;
+                slot.Start = pose;
+                slot.Target = pose;
+            }
+        }
+
+        private static HostedNegativeEvolutionPose
+            ResolveHostedNegativeTarget(
+                StylizedRiverFoamPreparedHostedNegativeRegion prepared,
+                uint seed,
+                int currentVariantIndex,
+                out int targetVariantIndex)
+        {
+            IReadOnlyList<StylizedRiverFoamHostedNegativeVariant> variants =
+                prepared.Variants;
+            if (variants == null || variants.Count == 0)
+            {
+                targetVariantIndex = 0;
+                return CreateIdentityHostedNegativePose();
+            }
+
+            int count = variants.Count;
+            targetVariantIndex = Mathf.Clamp(currentVariantIndex, 0, count - 1);
+            if (count > 1)
+            {
+                int offset = 1 + Mathf.FloorToInt(
+                    HashMajorEvolution(seed, 2u) * (count - 1));
+                targetVariantIndex = (targetVariantIndex + offset) % count;
+            }
+
+            StylizedRiverFoamHostedNegativeVariant variant =
+                variants[targetVariantIndex];
+            HostedNegativeEvolutionPose pose = new HostedNegativeEvolutionPose
+            {
+                OffsetCells = variant.OffsetCells,
+                RotationRadians = variant.RotationRadians,
+                ScaleAlong = variant.ScaleAlong,
+                ScaleAcross = variant.ScaleAcross,
+                StrengthScale = 1f
+            };
+            float areaScale = Mathf.Max(
+                0.25f,
+                pose.ScaleAlong * pose.ScaleAcross);
+            pose.StrengthScale = Mathf.Clamp(
+                1f / Mathf.Sqrt(areaScale),
+                0.90f,
+                1.10f);
+            return pose;
+        }
+
+        private HostedNegativeEvolutionPose ResolveHostedNegativePose(
+            HostedNegativeEvolutionSlot slot)
+        {
+            if (slot.HostSlotIndex < 0 ||
+                slot.HostSlotIndex >= majorEvolutionSlots.Length)
+            {
+                return slot.Current;
+            }
+
+            MajorEvolutionSlot host =
+                majorEvolutionSlots[slot.HostSlotIndex];
+            if (!host.IsMoving || host.MoveDuration <= 0.0001f)
+            {
+                return slot.Current;
+            }
+
+            float t = Mathf.Clamp01(host.MoveElapsed / host.MoveDuration);
+            t = t * t * (3f - 2f * t);
+            return new HostedNegativeEvolutionPose
+            {
+                OffsetCells = Vector2.Lerp(
+                    slot.Start.OffsetCells,
+                    slot.Target.OffsetCells,
+                    t),
+                RotationRadians = Mathf.Lerp(
+                    slot.Start.RotationRadians,
+                    slot.Target.RotationRadians,
+                    t),
+                ScaleAlong = Mathf.Lerp(
+                    slot.Start.ScaleAlong,
+                    slot.Target.ScaleAlong,
+                    t),
+                ScaleAcross = Mathf.Lerp(
+                    slot.Start.ScaleAcross,
+                    slot.Target.ScaleAcross,
+                    t),
+                StrengthScale = Mathf.Lerp(
+                    slot.Start.StrengthScale,
+                    slot.Target.StrengthScale,
+                    t)
+            };
         }
 
         private int ResolveMajorRecycleAnchorIndex(
@@ -3980,7 +4907,13 @@ namespace ProgrammaticStylized3D.Rivers
             if (!majorEvolutionReady || computeShader == null ||
                 majorEvolutionBuffer == null ||
                 majorMaskTextureArray == null ||
+                hostedNegativeEvolutionBuffer == null ||
+                hostedNegativeMaskTextureArray == null ||
+                freeWaterEvolutionBuffer == null ||
+                freeWaterNegativeMaskTextureArray == null ||
                 evolvingMajorTexture == null ||
+                evolvingHostedNegativeTexture == null ||
+                evolvingFreeWaterNegativeTexture == null ||
                 boundaryTexture == null ||
                 obstacleExclusionTexture == null ||
                 metricBuffer == null ||
@@ -4031,9 +4964,99 @@ namespace ProgrammaticStylized3D.Rivers
                     };
             }
 
+            IReadOnlyList<StylizedRiverFoamPreparedHostedNegativeRegion>
+                hostedPrepared = pocketTopology != null
+                    ? pocketTopology.PreparedHostedRegions
+                    : Array.Empty<
+                        StylizedRiverFoamPreparedHostedNegativeRegion>();
+            for (int index = 0;
+                 index < hostedNegativeEvolutionSlots.Length;
+                 index++)
+            {
+                HostedNegativeEvolutionSlot slot =
+                    hostedNegativeEvolutionSlots[index];
+                HostedNegativeEvolutionPose pose =
+                    ResolveHostedNegativePose(slot);
+                StylizedRiverFoamPreparedHostedNegativeRegion preparedRegion =
+                    hostedPrepared[slot.PreparedIndex];
+                hostedNegativeEvolutionGpuData[index] =
+                    new FoamHostedNegativeEvolutionData
+                    {
+                        HostAndMask = new Vector4(
+                            slot.HostSlotIndex,
+                            index,
+                            pose.StrengthScale,
+                            slot.RegionClass ==
+                                StylizedRiverFoamNegativeRegionClass
+                                    .EdgeCavity
+                                ? 1f
+                                : 0f),
+                        CentreAndOffset = new Vector4(
+                            preparedRegion.CentreCandidateCells.x,
+                            preparedRegion.CentreCandidateCells.y,
+                            pose.OffsetCells.x,
+                            pose.OffsetCells.y),
+                        Morph = new Vector4(
+                            pose.ScaleAlong,
+                            pose.ScaleAcross,
+                            pose.RotationRadians,
+                            0f)
+                    };
+            }
+
+            IReadOnlyList<StylizedRiverFoamPreparedFreeWaterRegion>
+                freeWaterPrepared = pocketTopology != null
+                    ? pocketTopology.PreparedFreeWaterRegions
+                    : Array.Empty<StylizedRiverFoamPreparedFreeWaterRegion>();
+            for (int index = 0;
+                 index < freeWaterEvolutionSlots.Length;
+                 index++)
+            {
+                FreeWaterEvolutionSlot slot = freeWaterEvolutionSlots[index];
+                FreeWaterEvolutionPose pose = ResolveFreeWaterPose(slot);
+                StylizedRiverFoamPreparedFreeWaterRegion preparedRegion =
+                    freeWaterPrepared[slot.PreparedIndex];
+                freeWaterEvolutionGpuData[index] =
+                    new FoamFreeWaterEvolutionData
+                    {
+                        CentreAndPlacement = new Vector4(
+                            preparedRegion.CentreLocalDistance,
+                            preparedRegion.CentreAcrossNormalized,
+                            preparedRegion.OrientationRadians +
+                                pose.RotationRadians,
+                            preparedRegion.MetresPerCell),
+                        MaskAndStrength = new Vector4(
+                            preparedRegion.MaskResolution * 0.5f,
+                            preparedRegion.MaskResolution * 0.5f,
+                            index,
+                            pose.StrengthScale),
+                        Morph = new Vector4(
+                            pose.OffsetMetres.x,
+                            pose.OffsetMetres.y,
+                            pose.ScaleAlong,
+                            pose.ScaleAcross)
+                    };
+            }
+
             using (MajorEvolutionUploadProfilerMarker.Auto())
             {
                 majorEvolutionBuffer.SetData(majorEvolutionGpuData);
+                if (hostedNegativeEvolutionSlots.Length > 0)
+                {
+                    hostedNegativeEvolutionBuffer.SetData(
+                        hostedNegativeEvolutionGpuData,
+                        0,
+                        0,
+                        hostedNegativeEvolutionSlots.Length);
+                }
+                if (freeWaterEvolutionSlots.Length > 0)
+                {
+                    freeWaterEvolutionBuffer.SetData(
+                        freeWaterEvolutionGpuData,
+                        0,
+                        0,
+                        freeWaterEvolutionSlots.Length);
+                }
             }
 
             using (MajorEvolutionBuildProfilerMarker.Auto())
@@ -4042,10 +5065,24 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.SetInt(
                     "_FoamMajorEvolutionCount",
                     majorEvolutionSlots.Length);
+                computeShader.SetInt(
+                    "_FoamHostedNegativeEvolutionCount",
+                    hostedNegativeEvolutionSlots.Length);
+                computeShader.SetInt(
+                    "_FoamFreeWaterEvolutionCount",
+                    freeWaterEvolutionSlots.Length);
                 computeShader.SetInts(
                     "_FoamMajorMaskDimensions",
                     majorMaskTextureArray.width,
                     majorMaskTextureArray.height);
+                computeShader.SetInts(
+                    "_FoamHostedNegativeMaskDimensions",
+                    hostedNegativeMaskTextureArray.width,
+                    hostedNegativeMaskTextureArray.height);
+                computeShader.SetInts(
+                    "_FoamFreeWaterMaskDimensions",
+                    freeWaterNegativeMaskTextureArray.width,
+                    freeWaterNegativeMaskTextureArray.height);
                 computeShader.SetBuffer(
                     buildEvolvingMajorSupportKernel,
                     "_FoamMajorEvolutionRecords",
@@ -4054,10 +5091,26 @@ namespace ProgrammaticStylized3D.Rivers
                     buildEvolvingMajorSupportKernel,
                     "_FoamMetricRows",
                     metricBuffer);
+                computeShader.SetBuffer(
+                    buildEvolvingMajorSupportKernel,
+                    "_FoamHostedNegativeEvolutionRecords",
+                    hostedNegativeEvolutionBuffer);
+                computeShader.SetBuffer(
+                    buildEvolvingMajorSupportKernel,
+                    "_FoamFreeWaterEvolutionRecords",
+                    freeWaterEvolutionBuffer);
                 computeShader.SetTexture(
                     buildEvolvingMajorSupportKernel,
                     "_FoamMajorMasks",
                     majorMaskTextureArray);
+                computeShader.SetTexture(
+                    buildEvolvingMajorSupportKernel,
+                    "_FoamHostedNegativeMasks",
+                    hostedNegativeMaskTextureArray);
+                computeShader.SetTexture(
+                    buildEvolvingMajorSupportKernel,
+                    "_FoamFreeWaterNegativeMasks",
+                    freeWaterNegativeMaskTextureArray);
                 computeShader.SetTexture(
                     buildEvolvingMajorSupportKernel,
                     "_FoamBoundary",
@@ -4070,6 +5123,14 @@ namespace ProgrammaticStylized3D.Rivers
                     buildEvolvingMajorSupportKernel,
                     "_FoamEvolvingMajorWrite",
                     evolvingMajorTexture);
+                computeShader.SetTexture(
+                    buildEvolvingMajorSupportKernel,
+                    "_FoamEvolvingHostedNegativeWrite",
+                    evolvingHostedNegativeTexture);
+                computeShader.SetTexture(
+                    buildEvolvingMajorSupportKernel,
+                    "_FoamEvolvingFreeWaterNegativeWrite",
+                    evolvingFreeWaterNegativeTexture);
                 Dispatch(
                     buildEvolvingMajorSupportKernel,
                     guidanceWidth,
@@ -4077,8 +5138,96 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             majorEvolutionReconstructionTicks++;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            RequestHostedNegativeInitialParityIfNeeded();
+#endif
             return true;
         }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private void RequestHostedNegativeInitialParityIfNeeded()
+        {
+            // This comparison is intentionally restricted to Editor and
+            // development diagnostics. Normal runs do not read the evolving
+            // field back or pay any parity-validation cost.
+            if (!hostedNegativeInitialParityPending ||
+                hostedNegativeInitialParityReadbackPending ||
+                !IsTopologyDebugActive ||
+                !SystemInfo.supportsAsyncGPUReadback ||
+                evolvingHostedNegativeTexture == null ||
+                pocketTopology == null)
+            {
+                return;
+            }
+
+            hostedNegativeInitialParityPending = false;
+            hostedNegativeInitialParityReadbackPending = true;
+            int generation = hostedNegativeInitialParityGeneration;
+            StylizedRiverFoamPocketTopology requestedTopology = pocketTopology;
+            AsyncGPUReadback.Request(
+                evolvingHostedNegativeTexture,
+                0,
+                TextureFormat.RFloat,
+                request =>
+                {
+                    if (this == null ||
+                        generation != hostedNegativeInitialParityGeneration ||
+                        requestedTopology != pocketTopology)
+                    {
+                        return;
+                    }
+
+                    hostedNegativeInitialParityReadbackPending = false;
+                    if (request.hasError)
+                    {
+                        hostedNegativeInitialParityAvailable = false;
+                        return;
+                    }
+
+                    var data = request.GetData<float>();
+                    float[] expected = requestedTopology.HostedPressureData;
+                    float[] fallback =
+                        requestedTopology.HostedFallbackPressureData;
+                    int count = Mathf.Min(
+                        data.Length,
+                        Mathf.Min(expected.Length, fallback.Length));
+                    if (count <= 0)
+                    {
+                        hostedNegativeInitialParityAvailable = false;
+                        return;
+                    }
+
+                    double totalDifference = 0.0;
+                    int relevantCount = 0;
+                    float maximumDifference = 0f;
+                    for (int index = 0; index < count; index++)
+                    {
+                        float reconstructed = Mathf.Max(
+                            Mathf.Clamp01(data[index]),
+                            Mathf.Clamp01(fallback[index]));
+                        float expectedValue = Mathf.Clamp01(expected[index]);
+                        float difference = Mathf.Abs(
+                            reconstructed - expectedValue);
+                        if (Mathf.Max(reconstructed, expectedValue) > 0.01f)
+                        {
+                            totalDifference += difference;
+                            relevantCount++;
+                        }
+                        maximumDifference = Mathf.Max(
+                            maximumDifference,
+                            difference);
+                    }
+
+                    hostedNegativeInitialParityMeanDifference =
+                        relevantCount > 0
+                            ? (float)(totalDifference / relevantCount)
+                            : 0f;
+                    hostedNegativeInitialParityMaximumDifference =
+                        maximumDifference;
+                    hostedNegativeInitialParityAvailable = true;
+                });
+        }
+#endif
 
         private MajorEvolutionPose ResolveMajorPose(
             MajorEvolutionSlot slot)
@@ -4152,6 +5301,24 @@ namespace ProgrammaticStylized3D.Rivers
                  index++)
             {
                 if (majorEvolutionSlots[index].IsMoving)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private int CountHostedNegativeSlots(
+            StylizedRiverFoamNegativeRegionClass regionClass)
+        {
+            int count = 0;
+            for (int index = 0;
+                 index < hostedNegativeEvolutionSlots.Length;
+                 index++)
+            {
+                if (hostedNegativeEvolutionSlots[index].RegionClass ==
+                    regionClass)
                 {
                     count++;
                 }
@@ -4399,6 +5566,8 @@ namespace ProgrammaticStylized3D.Rivers
                 topologySourcesTexture == null ||
                 topologyGeneratedTexture == null ||
                 evolvingMajorTexture == null ||
+                evolvingHostedNegativeTexture == null ||
+                evolvingFreeWaterNegativeTexture == null ||
                 currentShoreEdgesTexture == null ||
                 obstacleExclusionTexture == null ||
                 boundaryTexture == null || metricBuffer == null ||
@@ -4489,10 +5658,24 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.SetFloat(
                     "_FoamMajorEvolutionEnabled",
                     majorEvolutionReady ? 1f : 0f);
+                computeShader.SetFloat(
+                    "_FoamHostedNegativeEvolutionEnabled",
+                    hostedNegativeEvolutionReady ? 1f : 0f);
+                computeShader.SetFloat(
+                    "_FoamFreeWaterNegativeEvolutionEnabled",
+                    freeWaterEvolutionReady ? 1f : 0f);
                 computeShader.SetTexture(
                     composeTopologyKernel,
                     "_FoamEvolvingMajorRead",
                     evolvingMajorTexture);
+                computeShader.SetTexture(
+                    composeTopologyKernel,
+                    "_FoamEvolvingHostedNegativeRead",
+                    evolvingHostedNegativeTexture);
+                computeShader.SetTexture(
+                    composeTopologyKernel,
+                    "_FoamEvolvingFreeWaterNegativeRead",
+                    evolvingFreeWaterNegativeTexture);
                 computeShader.SetTexture(
                     composeTopologyKernel,
                     "_FoamStaticWakeField",
@@ -5232,6 +6415,8 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseTexture(ref topologySourcesTexture);
             ReleaseTexture(ref topologyGeneratedTexture);
             ReleaseTexture(ref evolvingMajorTexture);
+            ReleaseTexture(ref evolvingHostedNegativeTexture);
+            ReleaseTexture(ref evolvingFreeWaterNegativeTexture);
             ReleaseTexture(ref currentShoreEdgesTexture);
             ReleaseTexture(ref obstacleExclusionTexture);
             ReleaseTexture(ref fractureA);
