@@ -5,38 +5,30 @@ using UnityEngine;
 
 namespace ProgrammaticStylized3D.Rivers
 {
-    public enum StylizedRiverFoamConnectorRejectionReason
+    public enum StylizedRiverFoamPocketRejectionReason
     {
         None,
-        TooClose,
-        TooFar,
-        SearchExhausted,
-        PathTooLong,
-        CrossesOtherMajor,
-        InsufficientUnsupportedSpan,
-        ExistingConnectorOverlap,
+        HostTooNarrow,
+        Spacing,
         NoRasterCoverage
     }
 
     /// <summary>
-    /// Stable relationship identity and cheap future-evolution metadata for one
-    /// accepted Connector Support path. Patch 3 uses only the static path field;
-    /// normalized selectors intentionally defer physical timing decisions to the
-    /// later runtime-evolution gate.
+    /// Stable host identity and cheap future-evolution metadata for one accepted
+    /// Pocket Aging Pressure region. Patch 4 uses only the static negative field;
+    /// normalized selectors defer physical timing, drift, growth, and respawn
+    /// decisions to the later runtime-evolution gate.
     /// </summary>
-    public readonly struct StylizedRiverFoamConnectorRelationship
+    public readonly struct StylizedRiverFoamPocketRegion
     {
-        public StylizedRiverFoamConnectorRelationship(
+        public StylizedRiverFoamPocketRegion(
             uint stableId,
-            uint startComponentId,
-            uint endComponentId,
-            uint startEndpointId,
-            uint endEndpointId,
-            float startGlobalDistance,
-            float startAcrossNormalized,
-            float endGlobalDistance,
-            float endAcrossNormalized,
-            float pathLengthMetres,
+            uint hostRegionId,
+            float centreGlobalDistance,
+            float centreAcrossNormalized,
+            float orientationRadians,
+            float alongRadiusMetres,
+            float acrossRadiusMetres,
             uint evolutionSeed,
             float driftRateSelector,
             float phaseOffset,
@@ -44,18 +36,18 @@ namespace ProgrammaticStylized3D.Rivers
             float fadeOutSelector,
             float movementSpanSelector,
             float recycleSelector,
-            float fragilitySelector)
+            float growthSelector)
         {
             StableId = stableId;
-            StartComponentId = startComponentId;
-            EndComponentId = endComponentId;
-            StartEndpointId = startEndpointId;
-            EndEndpointId = endEndpointId;
-            StartGlobalDistance = startGlobalDistance;
-            StartAcrossNormalized = Mathf.Clamp(startAcrossNormalized, -1f, 1f);
-            EndGlobalDistance = endGlobalDistance;
-            EndAcrossNormalized = Mathf.Clamp(endAcrossNormalized, -1f, 1f);
-            PathLengthMetres = Mathf.Max(0f, pathLengthMetres);
+            HostRegionId = hostRegionId;
+            CentreGlobalDistance = centreGlobalDistance;
+            CentreAcrossNormalized = Mathf.Clamp(
+                centreAcrossNormalized,
+                -1f,
+                1f);
+            OrientationRadians = orientationRadians;
+            AlongRadiusMetres = Mathf.Max(0f, alongRadiusMetres);
+            AcrossRadiusMetres = Mathf.Max(0f, acrossRadiusMetres);
             EvolutionSeed = evolutionSeed;
             DriftRateSelector = Mathf.Clamp01(driftRateSelector);
             PhaseOffset = Mathf.Repeat(phaseOffset, 1f);
@@ -63,19 +55,16 @@ namespace ProgrammaticStylized3D.Rivers
             FadeOutSelector = Mathf.Clamp01(fadeOutSelector);
             MovementSpanSelector = Mathf.Clamp01(movementSpanSelector);
             RecycleSelector = Mathf.Clamp01(recycleSelector);
-            FragilitySelector = Mathf.Clamp01(fragilitySelector);
+            GrowthSelector = Mathf.Clamp01(growthSelector);
         }
 
         public uint StableId { get; }
-        public uint StartComponentId { get; }
-        public uint EndComponentId { get; }
-        public uint StartEndpointId { get; }
-        public uint EndEndpointId { get; }
-        public float StartGlobalDistance { get; }
-        public float StartAcrossNormalized { get; }
-        public float EndGlobalDistance { get; }
-        public float EndAcrossNormalized { get; }
-        public float PathLengthMetres { get; }
+        public uint HostRegionId { get; }
+        public float CentreGlobalDistance { get; }
+        public float CentreAcrossNormalized { get; }
+        public float OrientationRadians { get; }
+        public float AlongRadiusMetres { get; }
+        public float AcrossRadiusMetres { get; }
         public uint EvolutionSeed { get; }
         public float DriftRateSelector { get; }
         public float PhaseOffset { get; }
@@ -83,64 +72,60 @@ namespace ProgrammaticStylized3D.Rivers
         public float FadeOutSelector { get; }
         public float MovementSpanSelector { get; }
         public float RecycleSelector { get; }
-        public float FragilitySelector { get; }
+        public float GrowthSelector { get; }
     }
 
     /// <summary>
-    /// Immutable result of one deterministic prepared Connector Support build.
-    /// The result contains only the accepted scalar field, stable relationship
-    /// metadata, and the concise diagnostics required by the topology plan.
+    /// Immutable result of one deterministic prepared Pocket Aging Pressure
+    /// build. The negative field remains independent from positive support and
+    /// therefore never destructively edits Major or Connector topology.
     /// </summary>
-    public sealed class StylizedRiverFoamConnectorTopology
+    public sealed class StylizedRiverFoamPocketTopology
     {
-        private readonly float[] support;
-        private readonly StylizedRiverFoamConnectorRelationship[] relationships;
+        private readonly float[] pressure;
+        private readonly StylizedRiverFoamPocketRegion[] regions;
         private readonly int[] rejectionCounts;
 
-        internal StylizedRiverFoamConnectorTopology(
+        internal StylizedRiverFoamPocketTopology(
             int width,
             int height,
-            int eligibleEndpointCount,
-            int pathAttemptCount,
-            int acceptedConnectorCount,
+            int eligibleHostCount,
+            int candidateCentreCount,
+            int acceptedPocketCount,
             int coveredCellCount,
             double generationMilliseconds,
-            float[] support,
-            StylizedRiverFoamConnectorRelationship[] relationships,
+            float[] pressure,
+            StylizedRiverFoamPocketRegion[] regions,
             int[] rejectionCounts)
         {
             Width = Mathf.Max(0, width);
             Height = Mathf.Max(0, height);
-            EligibleEndpointCount = Mathf.Max(0, eligibleEndpointCount);
-            PathAttemptCount = Mathf.Max(0, pathAttemptCount);
-            AcceptedConnectorCount = Mathf.Max(0, acceptedConnectorCount);
+            EligibleHostCount = Mathf.Max(0, eligibleHostCount);
+            CandidateCentreCount = Mathf.Max(0, candidateCentreCount);
+            AcceptedPocketCount = Mathf.Max(0, acceptedPocketCount);
             CoveredCellCount = Mathf.Max(0, coveredCellCount);
             GenerationMilliseconds = Math.Max(0.0, generationMilliseconds);
-            this.support = support ?? Array.Empty<float>();
-            this.relationships = relationships ??
-                Array.Empty<StylizedRiverFoamConnectorRelationship>();
+            this.pressure = pressure ?? Array.Empty<float>();
+            this.regions = regions ??
+                Array.Empty<StylizedRiverFoamPocketRegion>();
             this.rejectionCounts = rejectionCounts ??
                 new int[Enum.GetValues(
-                    typeof(StylizedRiverFoamConnectorRejectionReason)).Length];
+                    typeof(StylizedRiverFoamPocketRejectionReason)).Length];
         }
 
         public int Width { get; }
         public int Height { get; }
-        public int EligibleEndpointCount { get; }
-        public int PathAttemptCount { get; }
-        public int AcceptedConnectorCount { get; }
+        public int EligibleHostCount { get; }
+        public int CandidateCentreCount { get; }
+        public int AcceptedPocketCount { get; }
         public int CoveredCellCount { get; }
         public double GenerationMilliseconds { get; }
-        public IReadOnlyList<StylizedRiverFoamConnectorRelationship>
-            Relationships => relationships;
+        public IReadOnlyList<StylizedRiverFoamPocketRegion> Regions => regions;
 
-        // The accepted scalar field remains immutable by convention and is
-        // exposed only inside prepared topology assembly so Pocket generation
-        // can protect important Connector cores without reconstructing paths.
-        internal float[] SupportData => support;
+        internal float[] PressureData => pressure;
 
         public int GetRejectionCount(
-            StylizedRiverFoamConnectorRejectionReason reason)
+            StylizedRiverFoamPocketRejectionReason reason)
         {
             int index = (int)reason;
             return index >= 0 && index < rejectionCounts.Length
@@ -151,7 +136,7 @@ namespace ProgrammaticStylized3D.Rivers
         public string GetTopRejectionSummary(int maximumReasons = 1)
         {
             maximumReasons = Mathf.Clamp(maximumReasons, 1, 4);
-            List<(StylizedRiverFoamConnectorRejectionReason reason,
+            List<(StylizedRiverFoamPocketRejectionReason reason,
                 int count)> ranked = new();
 
             for (int index = 1; index < rejectionCounts.Length; index++)
@@ -163,7 +148,7 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 ranked.Add((
-                    (StylizedRiverFoamConnectorRejectionReason)index,
+                    (StylizedRiverFoamPocketRejectionReason)index,
                     count));
             }
 
@@ -203,14 +188,14 @@ namespace ProgrammaticStylized3D.Rivers
             if (destination == null || destination.Length < cellCount)
             {
                 throw new ArgumentException(
-                    $"Connector topology upload requires at least {cellCount} pixels.",
+                    $"Pocket topology upload requires at least {cellCount} pixels.",
                     nameof(destination));
             }
 
             for (int index = 0; index < cellCount; index++)
             {
                 Color value = destination[index];
-                value.g = Mathf.Clamp01(support[index]);
+                value.b = Mathf.Clamp01(pressure[index]);
                 destination[index] = value;
             }
         }

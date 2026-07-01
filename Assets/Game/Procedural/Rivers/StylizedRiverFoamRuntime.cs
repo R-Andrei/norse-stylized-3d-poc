@@ -93,6 +93,7 @@ namespace ProgrammaticStylized3D.Rivers
             BuildObstacleExclusion,
             BuildMajorTopology,
             BuildConnectorTopology,
+            BuildPocketTopology,
             ClearMaterial,
             ClearFracture,
             BuildGuidance,
@@ -112,6 +113,7 @@ namespace ProgrammaticStylized3D.Rivers
             BuildObstacleExclusion,
             BuildMajorTopology,
             BuildConnectorTopology,
+            BuildPocketTopology,
             RefreshTopologySources
         }
 
@@ -160,6 +162,8 @@ namespace ProgrammaticStylized3D.Rivers
             new ProfilerMarker("RiverFoam.Topology.BuildMajor");
         private static readonly ProfilerMarker TopologyBuildConnectorProfilerMarker =
             new ProfilerMarker("RiverFoam.Topology.BuildConnector");
+        private static readonly ProfilerMarker TopologyBuildPocketProfilerMarker =
+            new ProfilerMarker("RiverFoam.Topology.BuildPocket");
         private static readonly ProfilerMarker TopologyRefreshSourcesProfilerMarker =
             new ProfilerMarker("RiverFoam.Topology.RefreshSources");
         private static readonly ProfilerMarker TopologyComposeProfilerMarker =
@@ -180,6 +184,8 @@ namespace ProgrammaticStylized3D.Rivers
             new ProfilerMarker("RiverFoam.Rebuild.BuildMajor");
         private static readonly ProfilerMarker RebuildBuildConnectorProfilerMarker =
             new ProfilerMarker("RiverFoam.Rebuild.BuildConnector");
+        private static readonly ProfilerMarker RebuildBuildPocketProfilerMarker =
+            new ProfilerMarker("RiverFoam.Rebuild.BuildPocket");
         private static readonly ProfilerMarker RebuildRefreshSourcesProfilerMarker =
             new ProfilerMarker("RiverFoam.Rebuild.RefreshTopologySources");
 
@@ -285,6 +291,12 @@ namespace ProgrammaticStylized3D.Rivers
             public Vector4 ShoreData;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FoamObstacleIntervalCellData
+        {
+            public Vector4 CoordinateAndOffset;
+        }
+
         private StylizedRiver river;
         private MeshRenderer surfaceRenderer;
         private MaterialPropertyBlock propertyBlock;
@@ -308,9 +320,11 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture writeFracture;
         private RenderTexture neutralDisturbanceTexture;
         private Texture2D boundaryTexture;
-        private Texture2D obstacleExclusionUploadTexture;
+        private Texture2D obstacleExclusionReadbackTexture;
         private Texture2D topologyGeneratedUploadTexture;
         private ComputeBuffer metricBuffer;
+        private ComputeBuffer obstacleExclusionCellBuffer;
+        private ComputeBuffer obstacleExclusionSampleBuffer;
         private ComputeBuffer populationMetricsBuffer;
         private ComputeBuffer topologyMetricsBuffer;
         private StylizedRiverDisturbanceRuntime disturbanceRuntime;
@@ -322,15 +336,20 @@ namespace ProgrammaticStylized3D.Rivers
         private int topologyMetricsGeneration;
         private StylizedRiverFoamMajorTopology majorTopology;
         private StylizedRiverFoamConnectorTopology connectorTopology;
+        private StylizedRiverFoamPocketTopology pocketTopology;
         private int majorTopologyInputSignature = int.MinValue;
         private int connectorTopologyInputSignature = int.MinValue;
+        private int pocketTopologyInputSignature = int.MinValue;
 
         private readonly List<PendingInjection> pendingInjections = new();
         private readonly List<FoamReservation> reservations = new();
-        private readonly List<RiverObstacleExclusionFootprint>
-            obstacleExclusionFootprints =
-            new();
-        private Color[] obstacleExclusionPixels = Array.Empty<Color>();
+        private readonly List<MeshFilter> obstacleExclusionMeshFilters = new();
+        private readonly List<RiverObstacleExclusionCell>
+            obstacleExclusionCells = new();
+        private readonly List<RiverObstacleExclusionSample>
+            obstacleExclusionSamples = new();
+        private FoamObstacleIntervalCellData[] obstacleExclusionGpuCells =
+            Array.Empty<FoamObstacleIntervalCellData>();
         private float[] obstacleExclusionScalar = Array.Empty<float>();
         private Color[] topologyGeneratedUploadPixels = Array.Empty<Color>();
 
@@ -345,6 +364,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool pendingObstacleRebuild;
         private bool pendingMajorRebuild;
         private bool pendingConnectorRebuild;
+        private bool pendingPocketRebuild;
         private bool pendingTopologyRefresh;
         private int pendingObstacleObservedVersion = int.MinValue;
         private int pendingObstacleStableFrameCount;
@@ -449,6 +469,22 @@ namespace ProgrammaticStylized3D.Rivers
             connectorTopology != null
                 ? connectorTopology.GenerationMilliseconds
                 : 0.0;
+        public bool PocketTopologyAvailable => pocketTopology != null;
+        public int PocketEligibleHostCount => pocketTopology != null
+            ? pocketTopology.EligibleHostCount
+            : 0;
+        public int PocketCandidateCentreCount => pocketTopology != null
+            ? pocketTopology.CandidateCentreCount
+            : 0;
+        public int PocketAcceptedCount => pocketTopology != null
+            ? pocketTopology.AcceptedPocketCount
+            : 0;
+        public string PocketTopRejectionReason => pocketTopology != null
+            ? pocketTopology.GetTopRejectionSummary()
+            : "None";
+        public double PocketGenerationMilliseconds => pocketTopology != null
+            ? pocketTopology.GenerationMilliseconds
+            : 0.0;
         public int DynamicShoreRowCount => currentShoreEdgesTexture != null
             ? currentShoreEdgesTexture.width
             : 0;
@@ -519,7 +555,15 @@ namespace ProgrammaticStylized3D.Rivers
             EstimateTextureBytes(fractureB) +
             EstimateTextureBytes(neutralDisturbanceTexture) +
             EstimateTextureBytes(boundaryTexture) +
-            EstimateTextureBytes(obstacleExclusionUploadTexture) +
+            EstimateTextureBytes(obstacleExclusionReadbackTexture) +
+            (obstacleExclusionCellBuffer != null
+                ? (long)obstacleExclusionCellBuffer.count *
+                    obstacleExclusionCellBuffer.stride
+                : 0L) +
+            (obstacleExclusionSampleBuffer != null
+                ? (long)obstacleExclusionSampleBuffer.count *
+                    obstacleExclusionSampleBuffer.stride
+                : 0L) +
             (metricBuffer != null
                 ? (long)metricBuffer.count * metricBuffer.stride
                 : 0L) +
@@ -580,6 +624,7 @@ namespace ProgrammaticStylized3D.Rivers
             pendingObstacleRebuild = false;
             pendingMajorRebuild = false;
             pendingConnectorRebuild = false;
+            pendingPocketRebuild = false;
             pendingTopologyRefresh = false;
             pendingObstacleObservedVersion = int.MinValue;
             pendingObstacleStableFrameCount = 0;
@@ -776,9 +821,8 @@ namespace ProgrammaticStylized3D.Rivers
                     if (topologyDebugActive &&
                         !topologyMaintenanceBlocked)
                     {
-                        // Patch 3 composes the accepted static Major and
-                        // Connector fields with the live anchored sources.
-                        // Pocket remains empty until its gated step.
+                        // Patch 4 composes accepted static Major, Connector,
+                        // and Pocket fields with the live anchored sources.
                         topologyMetricsAccumulator += stepDuration;
                         float topologyMetricsInterval = 1f /
                             TopologyMetricsUpdateRate;
@@ -1018,12 +1062,15 @@ namespace ProgrammaticStylized3D.Rivers
             pendingObstacleRebuild ||
             pendingMajorRebuild ||
             pendingConnectorRebuild ||
+            pendingPocketRebuild ||
             pendingTopologyRefresh;
 
         private void RequestBoundaryRebuild()
         {
             pendingBoundaryRebuild = true;
             pendingMajorRebuild = true;
+            pendingConnectorRebuild = true;
+            pendingPocketRebuild = true;
             pendingTopologyRefresh = true;
         }
 
@@ -1031,6 +1078,8 @@ namespace ProgrammaticStylized3D.Rivers
         {
             pendingObstacleRebuild = true;
             pendingMajorRebuild = true;
+            pendingConnectorRebuild = true;
+            pendingPocketRebuild = true;
             pendingTopologyRefresh = true;
 
             if (pendingObstacleObservedVersion != currentObstacleVersion)
@@ -1061,17 +1110,27 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 pendingMajorRebuild = true;
                 pendingConnectorRebuild = true;
+                pendingPocketRebuild = true;
                 pendingTopologyRefresh = true;
                 return;
             }
 
-            if (connectorTopologyInputSignature ==
+            if (connectorTopologyInputSignature !=
                 ResolveConnectorTopologyInputSignature())
+            {
+                pendingConnectorRebuild = true;
+                pendingPocketRebuild = true;
+                pendingTopologyRefresh = true;
+                return;
+            }
+
+            if (pocketTopologyInputSignature ==
+                ResolvePocketTopologyInputSignature())
             {
                 return;
             }
 
-            pendingConnectorRebuild = true;
+            pendingPocketRebuild = true;
             pendingTopologyRefresh = true;
         }
 
@@ -1108,7 +1167,9 @@ namespace ProgrammaticStylized3D.Rivers
                             ? RebuildPhase.BuildMajorTopology
                             : pendingConnectorRebuild
                                 ? RebuildPhase.BuildConnectorTopology
-                                : RebuildPhase.RefreshTopologySources;
+                                : pendingPocketRebuild
+                                    ? RebuildPhase.BuildPocketTopology
+                                    : RebuildPhase.RefreshTopologySources;
                     break;
 
                 case RebuildPhase.WaitForObstacleStability:
@@ -1161,6 +1222,7 @@ namespace ProgrammaticStylized3D.Rivers
 
                     pendingMajorRebuild = false;
                     pendingConnectorRebuild = true;
+                    pendingPocketRebuild = true;
                     rebuildPhase = RebuildPhase.BuildConnectorTopology;
                     break;
 
@@ -1171,6 +1233,17 @@ namespace ProgrammaticStylized3D.Rivers
                     }
 
                     pendingConnectorRebuild = false;
+                    pendingPocketRebuild = true;
+                    rebuildPhase = RebuildPhase.BuildPocketTopology;
+                    break;
+
+                case RebuildPhase.BuildPocketTopology:
+                    using (RebuildBuildPocketProfilerMarker.Auto())
+                    {
+                        BuildPocketTopology();
+                    }
+
+                    pendingPocketRebuild = false;
                     rebuildPhase = pendingTopologyRefresh
                         ? RebuildPhase.RefreshTopologySources
                         : RebuildPhase.Idle;
@@ -1227,6 +1300,15 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            if (pendingPocketRebuild &&
+                (rebuildPhase == RebuildPhase.Idle ||
+                 (int)rebuildPhase >
+                    (int)RebuildPhase.BuildPocketTopology))
+            {
+                rebuildPhase = RebuildPhase.BuildPocketTopology;
+                return;
+            }
+
             if (pendingTopologyRefresh &&
                 rebuildPhase == RebuildPhase.Idle)
             {
@@ -1246,6 +1328,7 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyGeneratedTexture != null &&
                 majorTopology != null &&
                 connectorTopology != null &&
+                pocketTopology != null &&
                 currentShoreEdgesTexture != null &&
                 obstacleExclusionTexture != null &&
                 obstacleExclusionTexture.IsCreated() &&
@@ -1355,9 +1438,9 @@ namespace ProgrammaticStylized3D.Rivers
                             "PS3D_RiverFoam_Topology");
                         topologySourcesTexture = CreateGuidanceTexture(
                             "PS3D_RiverFoam_TopologySources");
-                        // Patch 3 uploads deterministic prepared Major and
-                        // Connector fields through separate channels of this
-                        // generated-topology input. Pocket remains absent.
+                        // Patch 4 uploads deterministic prepared Major,
+                        // Connector, and Pocket fields through separate
+                        // channels of this generated-topology input.
                         topologyGeneratedTexture = CreateGuidanceTexture(
                             "PS3D_RiverFoam_TopologyGeneratedInput");
                         currentShoreEdgesTexture = CreateShoreEdgesTexture(
@@ -1481,6 +1564,12 @@ namespace ProgrammaticStylized3D.Rivers
 
                 case InitializationPhase.BuildConnectorTopology:
                     BuildConnectorTopology();
+                    initializationPhase =
+                        InitializationPhase.BuildPocketTopology;
+                    break;
+
+                case InitializationPhase.BuildPocketTopology:
+                    BuildPocketTopology();
                     initializationPhase = InitializationPhase.ClearMaterial;
                     break;
 
@@ -1685,6 +1774,14 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            if (pocketTopologyInputSignature !=
+                ResolvePocketTopologyInputSignature())
+            {
+                initializationPhase =
+                    InitializationPhase.BuildPocketTopology;
+                return;
+            }
+
             resourcesDirty = false;
             simulationAccumulator = 0f;
             guidanceAccumulator = 0f;
@@ -1698,6 +1795,7 @@ namespace ProgrammaticStylized3D.Rivers
             pendingObstacleRebuild = false;
             pendingMajorRebuild = false;
             pendingConnectorRebuild = false;
+            pendingPocketRebuild = false;
             pendingTopologyRefresh = false;
             pendingObstacleObservedVersion = int.MinValue;
             pendingObstacleStableFrameCount = 0;
@@ -2099,7 +2197,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             // Registered solid geometry is no longer rasterised into this
             // static boundary texture. Obstacle Footprint is reconstructed
-            // from mesh-derived waterline contours in a dedicated
+            // from cached exact transformed-mesh solid intervals in a dedicated
             // point-sampled mask.
 
             if (boundaryTexture == null ||
@@ -2140,19 +2238,21 @@ namespace ProgrammaticStylized3D.Rivers
         {
             using var profilerScope = InitBuildObstacleExclusionProfilerMarker.Auto();
             ReleaseObstacleExclusionBuffers();
-            obstacleExclusionFootprints.Clear();
+            obstacleExclusionMeshFilters.Clear();
+            obstacleExclusionCells.Clear();
+            obstacleExclusionSamples.Clear();
 
-            int pixelCount = Mathf.Max(0, fieldWidth * fieldHeight);
-            if (obstacleExclusionPixels.Length != pixelCount)
+            int cellCount = Mathf.Max(0, fieldWidth * fieldHeight);
+            if (obstacleExclusionScalar.Length != cellCount)
             {
-                obstacleExclusionPixels = new Color[pixelCount];
+                obstacleExclusionScalar = new float[cellCount];
             }
             else
             {
                 Array.Clear(
-                    obstacleExclusionPixels,
+                    obstacleExclusionScalar,
                     0,
-                    obstacleExclusionPixels.Length);
+                    obstacleExclusionScalar.Length);
             }
 
             disturbanceRuntime ??=
@@ -2170,202 +2270,171 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
-            disturbanceRuntime.CopyObstacleExclusionFootprintsTo(
-                obstacleExclusionFootprints);
-            if (obstacleExclusionFootprints.Count == 0)
+            disturbanceRuntime.CopyObstacleExclusionMeshFiltersTo(
+                obstacleExclusionMeshFilters);
+            if (obstacleExclusionMeshFilters.Count == 0)
             {
                 ClearObstacleExclusionMask();
                 return;
             }
 
-            for (int index = 0; index < obstacleExclusionFootprints.Count; index++)
+            // TODO(PROCEDURAL-CHUNK-BUILD): this exact triangle preparation is
+            // the temporary development fallback. Move it into the future map
+            // chunk generation/building/linking phase after procedural objects
+            // have their final transforms, then load the cached compact cells
+            // and intervals here instead of rescanning meshes during startup.
+            for (int index = 0;
+                 index < obstacleExclusionMeshFilters.Count;
+                 index++)
             {
-                RasterizeObstacleFootprint(
-                    obstacleExclusionFootprints[index],
-                    obstacleExclusionPixels);
-            }
-
-            UploadObstacleExclusionPixels(obstacleExclusionPixels);
-        }
-
-        private void RasterizeObstacleFootprint(
-            RiverObstacleExclusionFootprint footprint,
-            Color[] pixels)
-        {
-            if (pixels == null ||
-                footprint.Contour == null ||
-                footprint.Contour.Length < 3)
-            {
-                return;
-            }
-
-            float globalStart = river.Domain.GlobalDistanceMinimum;
-            int minimumX = Mathf.Clamp(
-                Mathf.FloorToInt(
-                    (footprint.GlobalDistance -
-                     footprint.AlongHalfLength -
-                     globalStart) /
-                    fieldLength * fieldWidth) - 1,
-                0,
-                fieldWidth - 1);
-            int maximumX = Mathf.Clamp(
-                Mathf.CeilToInt(
-                    (footprint.GlobalDistance +
-                     footprint.AlongHalfLength -
-                     globalStart) /
-                    fieldLength * fieldWidth) + 1,
-                0,
-                fieldWidth - 1);
-
-            for (int x = minimumX; x <= maximumX; x++)
-            {
-                float centreU = (x + 0.5f) / Mathf.Max(1f, fieldWidth);
-                float centreGlobalDistance = globalStart + centreU * fieldLength;
-                if (centreGlobalDistance <
-                        river.Domain.GlobalDistanceMinimum - 0.0001f ||
-                    centreGlobalDistance >
-                        river.Domain.GlobalDistanceMaximum + 0.0001f)
-                {
-                    continue;
-                }
-
-                StylizedRiverSplineSample centreSample =
-                    river.Domain.SampleAtGlobalDistance(
-                        Mathf.Clamp(
-                            centreGlobalDistance,
-                            river.Domain.GlobalDistanceMinimum,
-                            river.Domain.GlobalDistanceMaximum));
-                float minimumAcross = footprint.AcrossMetres -
-                    footprint.AcrossHalfWidth;
-                float maximumAcross = footprint.AcrossMetres +
-                    footprint.AcrossHalfWidth;
-                float minimumAcross01 = AcrossMetresTo01(
-                    minimumAcross,
-                    centreSample.LeftSurfaceHalfWidth,
-                    centreSample.RightSurfaceHalfWidth);
-                float maximumAcross01 = AcrossMetresTo01(
-                    maximumAcross,
-                    centreSample.LeftSurfaceHalfWidth,
-                    centreSample.RightSurfaceHalfWidth);
-                int minimumY = Mathf.Clamp(
-                    Mathf.FloorToInt(
-                        Mathf.Min(minimumAcross01, maximumAcross01) *
-                        fieldHeight) - 1,
-                    0,
-                    fieldHeight - 1);
-                int maximumY = Mathf.Clamp(
-                    Mathf.CeilToInt(
-                        Mathf.Max(minimumAcross01, maximumAcross01) *
-                        fieldHeight) + 1,
-                    0,
-                    fieldHeight - 1);
-
-                for (int y = minimumY; y <= maximumY; y++)
-                {
-                    float v = (y + 0.5f) / Mathf.Max(1f, fieldHeight);
-                    float acrossMetres = Across01ToMetres(
-                        v,
-                        centreSample.LeftSurfaceHalfWidth,
-                        centreSample.RightSurfaceHalfWidth);
-                    Vector2 localPoint = new Vector2(
-                        centreGlobalDistance - footprint.GlobalDistance,
-                        acrossMetres - footprint.AcrossMetres);
-                    if (IsPointInsidePolygon(localPoint, footprint.Contour))
-                    {
-                        pixels[y * fieldWidth + x] = Color.white;
-                    }
-                }
-            }
-        }
-
-        private static bool IsPointInsidePolygon(
-            Vector2 point,
-            IReadOnlyList<Vector2> polygon)
-        {
-            if (polygon == null || polygon.Count < 3)
-            {
-                return false;
-            }
-
-            bool inside = false;
-            int previous = polygon.Count - 1;
-            for (int current = 0; current < polygon.Count; current++)
-            {
-                Vector2 a = polygon[current];
-                Vector2 b = polygon[previous];
-                bool crosses =
-                    (a.y > point.y) != (b.y > point.y);
-                if (crosses)
-                {
-                    float deltaY = b.y - a.y;
-                    if (Mathf.Abs(deltaY) <= 0.000001f)
-                    {
-                        previous = current;
-                        continue;
-                    }
-
-                    float xAtY = (b.x - a.x) *
-                        (point.y - a.y) /
-                        deltaY +
-                        a.x;
-                    if (point.x < xAtY)
-                    {
-                        inside = !inside;
-                    }
-                }
-
-                previous = current;
-            }
-
-            return inside;
-        }
-
-        private void UploadObstacleExclusionPixels(Color[] pixels)
-        {
-            if (obstacleExclusionTexture == null ||
-                pixels == null ||
-                pixels.Length != fieldWidth * fieldHeight)
-            {
-                ClearObstacleExclusionMask();
-                return;
-            }
-
-            if (obstacleExclusionUploadTexture == null ||
-                obstacleExclusionUploadTexture.width != fieldWidth ||
-                obstacleExclusionUploadTexture.height != fieldHeight)
-            {
-                if (obstacleExclusionUploadTexture != null)
-                {
-                    DestroyUnityObject(obstacleExclusionUploadTexture);
-                }
-
-                obstacleExclusionUploadTexture = new Texture2D(
+                RiverObstacleExclusionResolver.TryBake(
+                    river,
+                    obstacleExclusionMeshFilters[index],
                     fieldWidth,
                     fieldHeight,
-                    TextureFormat.RGBAHalf,
+                    fieldLength,
+                    obstacleExclusionCells,
+                    obstacleExclusionSamples,
+                    out _);
+            }
+
+            if (obstacleExclusionCells.Count == 0 ||
+                obstacleExclusionSamples.Count == 0)
+            {
+                ClearObstacleExclusionMask();
+                return;
+            }
+
+            if (obstacleExclusionGpuCells.Length !=
+                obstacleExclusionCells.Count)
+            {
+                obstacleExclusionGpuCells =
+                    new FoamObstacleIntervalCellData[
+                        obstacleExclusionCells.Count];
+            }
+
+            for (int index = 0;
+                 index < obstacleExclusionCells.Count;
+                 index++)
+            {
+                RiverObstacleExclusionCell cell =
+                    obstacleExclusionCells[index];
+                obstacleExclusionGpuCells[index] =
+                    new FoamObstacleIntervalCellData
+                    {
+                        CoordinateAndOffset = new Vector4(
+                            cell.Coordinate.x,
+                            cell.Coordinate.y,
+                            cell.IntervalOffset,
+                            0f)
+                    };
+            }
+
+            obstacleExclusionCellBuffer = new ComputeBuffer(
+                obstacleExclusionGpuCells.Length,
+                sizeof(float) * 4,
+                ComputeBufferType.Structured);
+            obstacleExclusionCellBuffer.SetData(obstacleExclusionGpuCells);
+
+            obstacleExclusionSampleBuffer = new ComputeBuffer(
+                obstacleExclusionSamples.Count,
+                sizeof(float) * 8,
+                ComputeBufferType.Structured);
+            obstacleExclusionSampleBuffer.SetData(obstacleExclusionSamples);
+
+            ConfigureTopologyParameters(0f);
+            UpdateObstacleExclusionMask();
+            ReadBackObstacleExclusionScalar();
+        }
+
+        private void ReadBackObstacleExclusionScalar()
+        {
+            if (obstacleExclusionTexture == null ||
+                obstacleExclusionScalar.Length != fieldWidth * fieldHeight)
+            {
+                return;
+            }
+
+            if (SystemInfo.supportsAsyncGPUReadback)
+            {
+                AsyncGPUReadbackRequest request = AsyncGPUReadback.Request(
+                    obstacleExclusionTexture,
+                    0,
+                    TextureFormat.RFloat,
+                    null);
+                request.WaitForCompletion();
+                if (!request.hasError)
+                {
+                    var data = request.GetData<float>();
+                    int count = Mathf.Min(
+                        data.Length,
+                        obstacleExclusionScalar.Length);
+                    for (int index = 0; index < count; index++)
+                    {
+                        obstacleExclusionScalar[index] =
+                            Mathf.Clamp01(data[index]);
+                    }
+
+                    return;
+                }
+            }
+
+            if (obstacleExclusionReadbackTexture == null ||
+                obstacleExclusionReadbackTexture.width != fieldWidth ||
+                obstacleExclusionReadbackTexture.height != fieldHeight)
+            {
+                if (obstacleExclusionReadbackTexture != null)
+                {
+                    DestroyUnityObject(obstacleExclusionReadbackTexture);
+                }
+
+                obstacleExclusionReadbackTexture = new Texture2D(
+                    fieldWidth,
+                    fieldHeight,
+                    TextureFormat.RFloat,
                     false,
                     true)
                 {
-                    name = "T_PS3D_RiverFoamObstacleFootprint_Upload",
+                    name = "T_PS3D_RiverFoamObstacleFootprint_Readback",
                     filterMode = FilterMode.Point,
                     wrapMode = TextureWrapMode.Clamp,
                     hideFlags = HideFlags.DontSave
                 };
             }
 
-            obstacleExclusionUploadTexture.SetPixels(pixels);
-            obstacleExclusionUploadTexture.Apply(false, false);
-            Graphics.Blit(
-                obstacleExclusionUploadTexture,
-                obstacleExclusionTexture);
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture.active = obstacleExclusionTexture;
+            obstacleExclusionReadbackTexture.ReadPixels(
+                new Rect(0f, 0f, fieldWidth, fieldHeight),
+                0,
+                0,
+                false);
+            obstacleExclusionReadbackTexture.Apply(false, false);
+            RenderTexture.active = previous;
+
+            var fallbackData =
+                obstacleExclusionReadbackTexture.GetPixelData<float>(0);
+            int fallbackCount = Mathf.Min(
+                fallbackData.Length,
+                obstacleExclusionScalar.Length);
+            for (int index = 0; index < fallbackCount; index++)
+            {
+                obstacleExclusionScalar[index] =
+                    Mathf.Clamp01(fallbackData[index]);
+            }
         }
 
         private void ReleaseObstacleExclusionBuffers()
         {
-            if (obstacleExclusionUploadTexture != null)
+            obstacleExclusionCellBuffer?.Release();
+            obstacleExclusionCellBuffer = null;
+            obstacleExclusionSampleBuffer?.Release();
+            obstacleExclusionSampleBuffer = null;
+
+            if (obstacleExclusionReadbackTexture != null)
             {
-                DestroyUnityObject(obstacleExclusionUploadTexture);
-                obstacleExclusionUploadTexture = null;
+                DestroyUnityObject(obstacleExclusionReadbackTexture);
+                obstacleExclusionReadbackTexture = null;
             }
         }
 
@@ -2394,10 +2463,36 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void UpdateObstacleExclusionMask()
         {
-            // Obstacle Footprint is now a high-resolution waterline-contour
-            // raster uploaded when the generated-geometry version changes.
-            // This per-topology refresh hook is retained so call sites do not
-            // accidentally clear the cached mask.
+            ClearObstacleExclusionMask();
+            if (computeShader == null ||
+                updateObstacleExclusionKernel < 0 ||
+                obstacleExclusionTexture == null ||
+                obstacleExclusionCellBuffer == null ||
+                obstacleExclusionSampleBuffer == null ||
+                obstacleExclusionCells.Count == 0)
+            {
+                return;
+            }
+
+            computeShader.SetInt(
+                "_FoamObstacleCellCount",
+                obstacleExclusionCells.Count);
+            computeShader.SetBuffer(
+                updateObstacleExclusionKernel,
+                "_FoamObstacleCells",
+                obstacleExclusionCellBuffer);
+            computeShader.SetBuffer(
+                updateObstacleExclusionKernel,
+                "_FoamObstacleSamples",
+                obstacleExclusionSampleBuffer);
+            computeShader.SetTexture(
+                updateObstacleExclusionKernel,
+                "_FoamObstacleExclusionWrite",
+                obstacleExclusionTexture);
+            DispatchOneDimensional(
+                updateObstacleExclusionKernel,
+                obstacleExclusionCells.Count,
+                64);
         }
 
         private void ResetManualInjectionSequence()
@@ -2728,8 +2823,10 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 majorTopology = null;
                 connectorTopology = null;
+                pocketTopology = null;
                 majorTopologyInputSignature = int.MinValue;
                 connectorTopologyInputSignature = int.MinValue;
+                pocketTopologyInputSignature = int.MinValue;
                 ClearRenderTexture(topologyGeneratedTexture);
                 return;
             }
@@ -2738,14 +2835,6 @@ namespace ProgrammaticStylized3D.Rivers
             if (obstacleExclusionScalar.Length != cellCount)
             {
                 obstacleExclusionScalar = new float[cellCount];
-            }
-
-            for (int index = 0; index < cellCount; index++)
-            {
-                obstacleExclusionScalar[index] =
-                    index < obstacleExclusionPixels.Length
-                        ? Mathf.Clamp01(obstacleExclusionPixels[index].r)
-                        : 0f;
             }
 
             majorTopology =
@@ -2763,7 +2852,9 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamMajorSupportSeed,
                     obstacleExclusionScalar);
             connectorTopology = null;
+            pocketTopology = null;
             connectorTopologyInputSignature = int.MinValue;
+            pocketTopologyInputSignature = int.MinValue;
             UploadGeneratedTopology();
             majorTopologyInputSignature = ResolveMajorTopologyInputSignature();
         }
@@ -2779,7 +2870,9 @@ namespace ProgrammaticStylized3D.Rivers
                 fieldLength <= 0.0001f || validFieldLength <= 0.0001f)
             {
                 connectorTopology = null;
+                pocketTopology = null;
                 connectorTopologyInputSignature = int.MinValue;
+                pocketTopologyInputSignature = int.MinValue;
                 UploadGeneratedTopology();
                 return;
             }
@@ -2801,6 +2894,41 @@ namespace ProgrammaticStylized3D.Rivers
                     majorTopology);
             connectorTopologyInputSignature =
                 ResolveConnectorTopologyInputSignature();
+            pocketTopology = null;
+            pocketTopologyInputSignature = int.MinValue;
+            UploadGeneratedTopology();
+        }
+
+        private void BuildPocketTopology()
+        {
+            using var profilerScope = TopologyBuildPocketProfilerMarker.Auto();
+            if (
+                topologyGeneratedTexture == null ||
+                majorTopology == null ||
+                connectorTopology == null ||
+                river == null || !river.Domain.IsValid)
+            {
+                pocketTopology = null;
+                pocketTopologyInputSignature = int.MinValue;
+                UploadGeneratedTopology();
+                return;
+            }
+
+            pocketTopology =
+                StylizedRiverFoamPocketTopologyGenerator.Generate(
+                    river.Domain,
+                    fieldWidth,
+                    fieldHeight,
+                    fieldLength,
+                    validFieldLength,
+                    river.Quality,
+                    river.ShoreMotion,
+                    river.FoamMajorSupportSeed,
+                    obstacleExclusionScalar,
+                    majorTopology,
+                    connectorTopology);
+            pocketTopologyInputSignature =
+                ResolvePocketTopologyInputSignature();
             UploadGeneratedTopology();
         }
 
@@ -2827,6 +2955,8 @@ namespace ProgrammaticStylized3D.Rivers
 
             majorTopology?.FillUploadPixels(topologyGeneratedUploadPixels);
             connectorTopology?.AddToUploadPixels(
+                topologyGeneratedUploadPixels);
+            pocketTopology?.AddToUploadPixels(
                 topologyGeneratedUploadPixels);
 
             if (topologyGeneratedUploadTexture == null ||
@@ -2908,6 +3038,27 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamConnectorDirectness * 10000f);
                 hash = hash * 31 + Mathf.RoundToInt(
                     river.FoamConnectorLengthPreference * 10000f);
+                return hash;
+            }
+        }
+
+        private int ResolvePocketTopologyInputSignature()
+        {
+            if (river == null || !river.Domain.IsValid ||
+                fieldWidth < 2 || fieldHeight < 2 ||
+                majorTopology == null || connectorTopology == null)
+            {
+                return int.MinValue + 3;
+            }
+
+            unchecked
+            {
+                int hash = 29;
+                hash = hash * 31 + majorTopologyInputSignature;
+                hash = hash * 31 + connectorTopologyInputSignature;
+                // Version the fixed proof rules so later Pocket algorithm
+                // changes invalidate prepared output without fake controls.
+                hash = hash * 31 + 1;
                 return hash;
             }
         }
@@ -3845,14 +3996,19 @@ namespace ProgrammaticStylized3D.Rivers
             metricBuffer?.Release();
             metricBuffer = null;
             ReleaseObstacleExclusionBuffers();
-            obstacleExclusionFootprints.Clear();
-            obstacleExclusionPixels = Array.Empty<Color>();
+            obstacleExclusionMeshFilters.Clear();
+            obstacleExclusionCells.Clear();
+            obstacleExclusionSamples.Clear();
+            obstacleExclusionGpuCells =
+                Array.Empty<FoamObstacleIntervalCellData>();
             obstacleExclusionScalar = Array.Empty<float>();
             topologyGeneratedUploadPixels = Array.Empty<Color>();
             majorTopology = null;
             connectorTopology = null;
+            pocketTopology = null;
             majorTopologyInputSignature = int.MinValue;
             connectorTopologyInputSignature = int.MinValue;
+            pocketTopologyInputSignature = int.MinValue;
             obstacleGeometryVersion = -1;
             populationMetricsBuffer?.Release();
             populationMetricsBuffer = null;
@@ -3915,6 +4071,7 @@ namespace ProgrammaticStylized3D.Rivers
             pendingObstacleRebuild = false;
             pendingMajorRebuild = false;
             pendingConnectorRebuild = false;
+            pendingPocketRebuild = false;
             pendingTopologyRefresh = false;
             pendingObstacleObservedVersion = int.MinValue;
             pendingObstacleStableFrameCount = 0;

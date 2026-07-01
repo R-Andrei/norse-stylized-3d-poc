@@ -1471,7 +1471,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 3.4 keeps controllable sparse deterministic Connector Support between disconnected Major components, now with endpoint gates, Major clearance halos, and detour rejection. Pocket Aging Pressure remains intentionally absent until its own gated step.",
+                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4 adds deterministic hosted Pocket Aging Pressure inside broad Major interiors while preserving positive rims and protecting Connector, anchored-support, and obstacle cores. Major and Connector behaviour remain frozen.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1719,8 +1719,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Patch 3.4 generates and composes static whole-river Major Support plus controllable sparse Major-to-Major Connector Support with endpoint gates, Major clearance halos, and bounded detour rejection. Stable region and relationship identity remain available for later evolution. Pocket remains empty until Step 4. Anchored Support and Obstacle Footprint continue to use their accepted live sources."),
-                new GUIContent("Major + Connector Static Topology (Patch 3.4)"));
+                    "Patch 4 generates and composes static whole-river Major Support, controllable sparse Major-to-Major Connector Support, and hosted Pocket Aging Pressure. Stable region, relationship, host, and Pocket identity remain available for later evolution. Authoritative live Pressure, Lee, Shore, and Obstacle Footprint sources remain independently composed."),
+                new GUIContent("Major + Connector + Pocket Static Topology (Patch 4)"));
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
                 new GUIContent(
@@ -1814,6 +1814,35 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUILayout.LabelField(
                 new GUIContent(
+                    "Pocket Generation",
+                    "Deterministic prepared negative topology derived from broad accepted Major interiors after Connector generation. It preserves a positive rim, protects important positive cores, and remains future cache/precompute work rather than steady gameplay cost."),
+                new GUIContent(
+                    runtime.PocketTopologyAvailable
+                        ? "Available"
+                        : "Waiting for staged build"));
+            if (runtime.PocketTopologyAvailable)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField(
+                    "Eligible Major Hosts",
+                    runtime.PocketEligibleHostCount.ToString());
+                EditorGUILayout.LabelField(
+                    "Candidate Centres",
+                    runtime.PocketCandidateCentreCount.ToString());
+                EditorGUILayout.LabelField(
+                    "Accepted Pockets",
+                    runtime.PocketAcceptedCount.ToString());
+                EditorGUILayout.LabelField(
+                    "Top Rejection Reason",
+                    runtime.PocketTopRejectionReason);
+                EditorGUILayout.LabelField(
+                    "Generation Time",
+                    $"{runtime.PocketGenerationMilliseconds:0.00} ms");
+                EditorGUI.indentLevel--;
+            }
+
+            EditorGUILayout.LabelField(
+                new GUIContent(
                     "Topology Metrics",
                     "Low-rate asynchronous GPU reduction over the valid river domain. Metrics do not stall the simulation and never include padded storage."),
                 new GUIContent(
@@ -1870,7 +1899,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent("Subsystem Rates"),
                 new GUIContent(
-                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz · Major and Connector topology are static in Patch 3.4"));
+                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz · Major, Connector, and Pocket topology are static in Patch 4"));
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Transport",
@@ -1927,7 +1956,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawMemoryDiagnostic(
                 "Allocated Foam Memory",
                 runtime.EstimatedMemoryBytes,
-                "Estimated material state, corrected-advection scratch textures, guidance, final topology, generated Major/Connector input and upload texture, anchored-source topology, fracture, boundary, population/topology metrics, and the local river metric buffer. Obsolete nucleus, Major ping-pong, disabled Connector stub, Pocket stub, and fixture resources are absent.");
+                "Estimated material state, corrected-advection scratch textures, guidance, final topology, generated Major/Connector/Pocket input and upload texture, anchored-source topology, fracture, boundary, population/topology metrics, and the local river metric buffer. Obsolete nucleus, Major ping-pong, disabled Connector stub, Pocket stub, and fixture resources are absent.");
 
             if (GUILayout.Button(
                     new GUIContent(
@@ -2472,7 +2501,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.NegativeInfluenceClasses:
                     return
-                        "Independent negative-influence inputs. Red = Pocket Aging Pressure, intentionally black/zero until Step 4. Blue = Obstacle Footprint from the conservative current-water-level solid cross-section. Magenta = overlap. The footprint is point-sampled; each retained texel must pass the conservative exact-mesh solid-interval tests across its displayed rectangle, and it is never expanded into a surrounding halo.";
+                        "Independent negative-influence inputs. Red = hosted Pocket Aging Pressure generated only inside broad Major interiors. Connector cores, positive Major rims, live Pressure/Lee/Shore cores, obstacles, and invalid water are protected. Blue = Obstacle Footprint from the conservative current-water-level solid cross-section. Magenta = overlap. Pocket remains a soft aging influence and does not cut an immediate material hole.";
 
                 case StylizedRiverFoamDebugView.SupportAndNegativeInfluence:
                     return

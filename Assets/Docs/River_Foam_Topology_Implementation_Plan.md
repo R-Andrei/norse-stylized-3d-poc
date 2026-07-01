@@ -4,7 +4,7 @@
 
 **Status:** Canonical step-by-step implementation plan for Stage 6 Foam topology only.
 
-**Patch status:** Patch 0 — documentation baseline.
+**Patch status:** Documentation revision before Patch 4.2. Major Support, Connector Support, the initial Interior Pocket proof, and exact transformed-mesh Obstacle Footprint are accepted as the current static baseline. The remaining negative-topology classes, runtime evolution, rebuild crossfade, and production cache are not yet implemented.
 
 **Primary implementation target:**
 
@@ -55,7 +55,7 @@ The inspection rule is contextual:
 
 The intended production architecture remains:
 
-1. expensive topology generation during an editor bake, loading/preparation window, or equivalent controlled phase;
+1. expensive topology generation during the procedural chunk generation/building/linking phase, a loading/preparation window, an editor tool where applicable, or another equivalent controlled pre-gameplay phase;
 2. cached topology fields and compact identity/evolution metadata;
 3. cheap runtime sampling, downstream movement, fading, and crossfading;
 4. no expensive candidate generation, connected-component cleanup, pathfinding, distance transforms, or rejection loops during ordinary gameplay.
@@ -73,7 +73,7 @@ This plan covers:
 - deterministic Major opportunity identity;
 - whole-river Major placement and composition;
 - Connector Support generation;
-- Pocket Aging Pressure generation;
+- four-class Negative Aging Pressure generation;
 - static topology composition;
 - topology identity and evolution metadata;
 - strictly downstream runtime topology movement;
@@ -98,7 +98,7 @@ This plan does not cover:
 
 ## 3. Canonical Topology Outputs
 
-The topology pipeline produces three independent logical outputs:
+The topology pipeline produces three independent logical output groups:
 
 1. **Major Support**
    - broad positive lifespan-support regions;
@@ -111,22 +111,43 @@ The topology pipeline produces three independent logical outputs:
    - generated between meaningful positive regions or approved anchored endpoints;
    - subordinate to Major and Anchored Support.
 
-3. **Pocket Aging Pressure**
-   - negative lifespan influence hosted primarily by broad Major interiors;
-   - preserves a positive rim;
-   - does not directly subtract topology or material.
+3. **Negative Aging Pressure**
+   - aggregate negative lifespan influence;
+   - remains logically separate from positive support;
+   - consists of four independently generated and independently paced source classes:
+     - **Interior Pocket** — closed negative area hosted firmly inside broad Major Support while preserving a positive rim;
+     - **Edge Cavity** — lopsided Major-hosted negative area that may breach one deliberate side and create a bite, bay, crescent, or open cavity;
+     - **Connector Weak Span** — short negative section hosted by one accepted Connector relationship, away from its endpoint gates;
+     - **Free-Water Negative Event** — sparse valid-water negative area that does not require a positive-support host and is intended to affect stray material later.
+
+The four negative classes retain separate class identity, stable opportunity identity, and evolution metadata. They may be packed into one aggregate negative field for the current diagnostic/output contract, but implementation must not flatten away the metadata required for class-specific runtime evolution.
 
 The pipeline also preserves live non-generated context:
 
 - Pressure Support;
 - Lee Support;
 - Shore Support;
-- Obstacle Footprint;
+- exact water-level-aware Obstacle Footprint;
 - valid-water coverage.
 
 Anchored Support remains attached to its authoritative live source. It is not baked into the free-water drift field in a way that causes it to detach from banks or objects.
 
----
+### Negative amount-control contract
+
+Each negative class has one independent normal authoring control:
+
+- `Interior Pocket Amount`;
+- `Edge Cavity Amount`;
+- `Connector Weak Span Amount`;
+- `Free-Water Event Amount`.
+
+Every control uses range `0–1` and default `0.5`:
+
+- `0` activates none of that class;
+- `0.5` reproduces a sensible category-specific baseline;
+- `1` activates the maximum bounded population for that class.
+
+Increasing one Amount activates a nested deterministic subset of stable opportunities. It must not reshuffle already-active opportunities. Amount controls population only; it does not silently alter shape size, negative strength, seed, or evolution speed. A value of `0.5` does not imply equal counts or equal coverage across the four classes: each class has its own bounded opportunity pool and visual density budget.
 
 ## 4. Current Baseline and Replacement Boundary
 
@@ -145,7 +166,7 @@ The following existing work remains useful unless implementation proves otherwis
 - queued and coalesced rebuild scheduling;
 - resource lifecycle, sleeping, freezing, and chunk ownership;
 - existing profiler infrastructure;
-- deterministic Major `Amount`, `Size`, `Size Variation`, and `Seed` authoring contracts, plus the accepted Connector `Amount`, `Directness`, and `Length Preference` contracts.
+- deterministic Major `Amount`, `Size`, `Size Variation`, and `Seed` authoring contracts, plus the accepted Connector `Amount`, `Directness`, and `Length Preference` contracts; the four approved negative Amount controls are introduced only in their respective implementation subpatches.
 
 ### 4.2 Known obsolete topology implementation
 
@@ -229,11 +250,11 @@ The permanent topology views should remain small in number and reuse the accepte
 
 - Major Support;
 - Connector Support;
-- Pocket Aging Pressure / Negative Influence;
+- aggregate Negative Aging Pressure;
 - combined topology;
 - accepted Anchored Support and Obstacle Footprint views.
 
-A temporary overlay may show items such as connector endpoints, one attempted path, or selected pocket centres while that step is being implemented. Such overlays are implementation aids, not promised permanent authoring tools.
+A temporary overlay may show items such as Connector endpoints, one attempted path, or selected negative-region centres while that step is being implemented. Such overlays are implementation aids, not promised permanent authoring tools.
 
 ### 5.4 Minimal telemetry
 
@@ -260,7 +281,7 @@ For Pockets, retain only:
 
 - eligible Major hosts;
 - candidate centres;
-- accepted pockets;
+- accepted negative regions by active class;
 - most common rejection reason if useful;
 - generation time.
 
@@ -383,7 +404,7 @@ None. Documentation only.
 - candidate-local and river-dependent inspection are separated correctly;
 - stale-code removal is exhaustive rather than limited to the named examples;
 - runtime evolution metadata and rules are recorded before implementation;
-- the broader documents no longer imply that Major, Connector, and Pocket must be built invisibly as one large patch.
+- the broader documents no longer imply that Major, Connector, and Negative Aging Pressure must be built invisibly as one large patch.
 
 ### Rollback
 
@@ -544,7 +565,7 @@ A temporary accepted/rejected opportunity overlay may be used only if the actual
 ### Explicit exclusions
 
 - no Connector Support;
-- no Pocket Aging Pressure;
+- no Negative Aging Pressure;
 - no topology-to-material response;
 - no runtime drift;
 - no production cache;
@@ -671,76 +692,106 @@ Remove Connector generation, metadata, and temporary overlays while retaining ac
 
 ---
 
-## Step 4 — Pocket Aging Pressure
+## Step 4 — Four-Class Negative Aging Pressure
 
 ### Purpose
 
-Generate hosted negative topology only after the positive topology is accepted.
+Complete the negative-topology vocabulary before any runtime evolution or Foam-material work begins.
 
-### Exact behaviour change
+Patch 4 and Patch 4.1 established the accepted starting baseline:
+
+- deterministic Interior Pockets hosted by broad Major interiors;
+- positive-rim, Connector-core, Anchored-core, valid-water, and obstacle protection;
+- exact transformed-mesh Obstacle Footprint prepared and cached during staged pre-gameplay preparation;
+- no material response and no runtime evolution.
+
+The remaining work is intentionally split into small, inspectable subpatches.
+
+### Patch 4.2 — Major-hosted negative topology
 
 Implement:
 
-- interior distance analysis of accepted Major Support;
-- eligible broad-host detection;
-- deterministic spaced local maxima selection;
-- protection of Major rims;
-- protection of important Connector cores;
-- protection of Anchored Support and obstacle context;
-- irregular soft Pocket mask generation;
-- stable Pocket host identity and evolution metadata.
+- `Interior Pocket Amount`, range `0–1`, default `0.5`, with the existing accepted Interior Pocket population preserved approximately at the default;
+- `Edge Cavity Amount`, range `0–1`, default `0.5`;
+- stable nested activation for both classes;
+- Edge Cavity candidates derived from valid broad Major hosts but biased toward one selected side;
+- one deliberate permitted breach direction rather than removal of the rim in every direction;
+- rejection when the surviving positive host becomes a useless sliver, loses meaningful area, or is fragmented into an implausible remainder;
+- separate subtype and host identity plus future evolution metadata.
 
-Pocket Aging Pressure remains independent negative influence. It does not destructively subtract Major Support.
+Immediate inspection remains on the actual river through the existing negative-influence views. Setting one Amount to zero must isolate the other class without requiring a new generic debugger.
 
-### Immediate inspection
+Minimal telemetry per class:
 
-Show Pocket Aging Pressure on the actual river through the existing negative-influence diagnostic.
-
-A temporary selected-centre overlay may be used while tuning host selection.
-
-Permanent telemetry is limited to:
-
-- eligible Major hosts;
-- candidate centres;
-- accepted pockets;
-- top rejection reason if needed;
+- eligible hosts;
+- attempted opportunities;
+- accepted regions;
+- dominant rejection reason;
 - generation time.
 
-### Explicit exclusions
+### Patch 4.3 — Connector Weak Spans
 
-- no instant geometric hole cutting;
-- no pockets in unrelated neutral water;
+Implement:
+
+- `Connector Weak Span Amount`, range `0–1`, default `0.5`;
+- stable association with one accepted Connector identity;
+- placement away from source and destination endpoint gates;
+- short negative spans aligned to the Connector path rather than generic circular pockets;
+- bounded variation between partial weakening and a near-complete local cut;
+- deterministic spacing when a sufficiently long Connector can host more than one span at high Amount;
+- stable span identity and future along-Connector evolution metadata.
+
+A Weak Span does not delete or regenerate the Connector relationship. It remains independent negative pressure over positive Connector Support.
+
+### Patch 4.4 — Free-Water Negative Events
+
+Implement:
+
+- `Free-Water Event Amount`, range `0–1`, default `0.5`;
+- sparse deterministic opportunities in valid water without requiring a Major or Connector host;
+- a soft preference for neutral or weakly supported water, without treating positive overlap as categorically invalid;
+- exclusion of exact obstacles and strong Anchored Support cores;
+- bounded spacing, coverage, and category-specific density so the default remains sparse;
+- stable event identity, downstream drift metadata, phase, fade envelope, allowed span, and recycle interval for later evolution.
+
+Free-Water Negative Events are topology only. They do not erase anything directly and they remain static until the runtime-evolution steps.
+
+### Patch 4.5 — Static negative and combined topology validation
+
+Validate all four negative classes together with:
+
+- Major Support;
+- Connector Support;
+- live Pressure, Lee, and Shore Support;
+- exact Obstacle Footprint;
+- valid-water constraints.
+
+Every negative class must also be isolatable by setting the other three Amount controls to zero. No class may hide another class's failure.
+
+### Shared explicit exclusions
+
 - no material aging response;
-- no Pocket movement or respawn yet;
-- no extra negative topology class.
+- no direct geometric subtraction from Major or Connector Support;
+- no runtime movement, fading, respawn, or recycling yet;
+- no gameplay distance transforms, candidate search, path search, or rejection loops;
+- no additional negative class without a separate approved plan.
 
-### Test
-
-Test:
-
-- broad Major hosts;
-- narrow Major hosts;
-- Major regions crossed by Connectors;
-- Major near Pressure, Lee, Shore, and obstacles;
-- low and high Major coverage;
-- multiple seeds;
-- repeated identical generation.
-
-### Acceptance gate
+### Shared acceptance gate
 
 Pass only if:
 
-- pockets substantially overlap valid broad Major interiors;
-- a positive rim remains;
-- narrow hosts are rejected;
-- important Connector and Anchored Support cores are protected;
-- neutral water does not receive unrelated random pockets;
-- Pocket identity is deterministic;
-- the Pocket field remains separately available from positive support.
+- Interior Pockets remain firmly hosted and preserve a useful positive rim;
+- Edge Cavities create deliberate open-sided negative structure without destroying their host;
+- Connector Weak Spans read as local fragility rather than invalid Connector generation;
+- Free-Water Negative Events remain sparse, valid-water-bound, obstacle-safe, and visually subordinate;
+- every Amount control is deterministic, nested, and produces a sensible default at `0.5`;
+- the aggregate negative field remains separately available from positive support;
+- subtype identity and future evolution metadata remain available after aggregate packing;
+- generation occurs only in staged preparation or explicit dirty rebuilds.
 
 ### Rollback
 
-Remove Pocket generation, metadata, and temporary overlays while retaining accepted Major and Connector topology.
+Each subpatch must be removable independently while retaining all previously accepted positive and negative classes.
 
 ---
 
@@ -748,7 +799,7 @@ Remove Pocket generation, metadata, and temporary overlays while retaining accep
 
 ### Purpose
 
-Validate the complete static topology relationship without introducing material behaviour or runtime movement.
+Validate the complete static topology relationship without introducing Foam material behaviour or runtime movement. This step corresponds to Patch 4.5 after all four negative classes exist.
 
 ### Exact behaviour change
 
@@ -756,16 +807,16 @@ Compose and upload:
 
 - Major Support;
 - Connector Support;
-- Pocket Aging Pressure;
+- aggregate Negative Aging Pressure from Interior Pockets, Edge Cavities, Connector Weak Spans, and Free-Water Negative Events;
 - live Pressure Support;
 - live Lee Support;
 - live Shore Support;
-- Obstacle Footprint;
+- exact Obstacle Footprint;
 - valid-water constraints.
 
 Preserve independent positive and negative channels. Do not use destructive positive-times-one-minus-negative composition.
 
-All generated layers retain stable identity and their future evolution metadata even though phase remains static in this step.
+All generated classes retain stable class identity, region/opportunity identity, and future evolution metadata even though phase remains static in this step.
 
 ### Immediate inspection
 
@@ -777,7 +828,7 @@ Use the existing on-river views:
 - Anchored Support;
 - Obstacle Footprint.
 
-No new generic combined debugger is added.
+No new generic combined debugger is added. Isolate each negative class by setting the other three negative Amount controls to zero.
 
 ### Test
 
@@ -785,7 +836,10 @@ Run the complete static matrix:
 
 - several river shapes and widths;
 - no, few, and many obstacles;
-- low/medium/high Amount and Size;
+- low/medium/high Major and Connector controls;
+- `0`, `0.5`, and `1` for every negative Amount control;
+- each negative class in isolation;
+- all four negative classes at their defaults;
 - multiple seeds;
 - reverse flow;
 - quality tiers;
@@ -797,12 +851,14 @@ Run the complete static matrix:
 
 Pass only if:
 
-- Major, Connector, and Pocket each pass their own gates;
+- Major and Connector retain their accepted gates;
+- all four negative classes pass the Step 4 shared gate;
 - the combined composition preserves substantial neutral water;
 - anchored support remains attached to authoritative sources;
-- obstacle and valid-water constraints remain correct;
+- exact obstacle and valid-water constraints remain correct;
 - positive and negative overlap remains visible and non-destructive;
-- no layer hides another layer’s failure;
+- no layer hides another layer's failure;
+- default `0.5` negative settings produce a sensible aggregate rather than overwhelming the river;
 - generation costs are named and profiled;
 - no ordinary ready-state frame regenerates topology.
 
@@ -849,7 +905,7 @@ The only required runtime telemetry is:
 ### Explicit exclusions
 
 - no Connector evolution;
-- no Pocket evolution;
+- no Negative Aging Pressure evolution;
 - no regeneration, cleanup, component analysis, or rejection during gameplay;
 - no whole-field upstream wrap;
 - no movement of Anchored Support.
@@ -860,7 +916,7 @@ Observe:
 
 - ordinary forward flow;
 - reverse flow;
-- slow and fast Foam speed;
+- slow and fast resolved Major evolution pacing during development tests;
 - short and long rivers;
 - regions entering and leaving visibility;
 - chunk sleeping/freezing;
@@ -885,11 +941,11 @@ Disable Major runtime phase evaluation and return to the accepted static generat
 
 ---
 
-## Step 7 — Connector and Pocket Runtime Evolution
+## Step 7 — Connector and Negative Aging Pressure Runtime Evolution
 
 ### Purpose
 
-Add layer-specific cheap evolution without treating all topology classes as the same moving mask.
+Add class-specific cheap evolution without treating all topology as one moving mask and without running any expensive generator operation during ordinary gameplay.
 
 ### Exact behaviour change
 
@@ -901,25 +957,45 @@ Connector Support may:
 - disappear only through a gradual envelope;
 - reconnect only through precomputed alternatives or an explicit preparation rebuild, not gameplay pathfinding.
 
-Pocket Aging Pressure may:
+Interior Pockets may:
 
-- drift within its host bounds;
-- use its own phase and speed;
-- grow, weaken, or fade;
-- respawn only after the prior pocket has faded;
-- remain associated with a valid host identity;
-- avoid becoming an unrelated negative mask in neutral water.
+- remain associated with their Major host identity;
+- move within the host through downstream-positive host-local offsets;
+- strengthen, weaken, fade, and respawn after the prior instance has faded;
+- preserve the accepted closed-pocket character.
+
+Edge Cavities may:
+
+- remain associated with their Major host and breach side;
+- move or change strength within bounded host-relative limits;
+- fade or replace gradually without switching sides through a visible pop;
+- retain a viable positive host remainder.
+
+Connector Weak Spans may:
+
+- move modestly along their owning Connector away from endpoint gates;
+- fade in and out;
+- strengthen or weaken locally;
+- create temporary fragility and apparent reconnection without gameplay pathfinding.
+
+Free-Water Negative Events may:
+
+- drift strictly downstream;
+- fade in and out;
+- recycle only after leaving their allowed span or completing a fade;
+- remain sparse and independently paced;
+- never attach Anchored Support to the free-water drift field.
 
 ### Immediate inspection
 
-Inspect Connector and Pocket evolution separately on the actual river using their existing class views.
+Inspect Connector and each negative class separately on the actual river by isolating class Amounts and using existing support/negative diagnostics.
 
-The required telemetry is limited to:
+Required telemetry is limited to:
 
-- active evolving Connector count;
-- active evolving Pocket count;
-- fade/replacement count;
+- active evolving count per class;
+- fade/replacement/recycle count per class;
 - host-loss or invalid-relationship count;
+- minimum and maximum resolved downstream displacement;
 - any upstream displacement violation.
 
 ### Acceptance gate
@@ -927,15 +1003,17 @@ The required telemetry is limited to:
 Pass only if:
 
 - Connector remains subordinate and more fragile than Major;
-- Pocket remains hosted by valid positive structure;
-- all free-water movement is downstream;
-- no layer pops;
-- no gameplay pathfinding, component cleanup, or distance transform occurs;
+- Interior Pockets and Edge Cavities remain valid relative to their Major hosts;
+- Weak Spans remain on their owning Connectors and away from endpoint gates;
+- Free-Water Events remain sparse and transient;
+- every free-water displacement is downstream;
+- no class pops as a whole region;
+- no gameplay pathfinding, component cleanup, distance transform, candidate search, or rejection loop occurs;
 - Anchored Support remains live and stationary relative to its source.
 
 ### Rollback
 
-Return Connector and Pocket to their accepted static fields while retaining Major evolution.
+Return Connector and all negative classes to their accepted static fields while retaining Major evolution.
 
 ---
 
@@ -999,7 +1077,7 @@ The first production cache should store the integrated per-river or per-run topo
 
 The cache should contain as applicable:
 
-- Major, Connector, and Pocket fields or masks;
+- Major, Connector, and four-class Negative Aging Pressure fields or masks;
 - compact region identities;
 - per-layer evolution metadata;
 - river-space mapping and dimensions;
@@ -1062,7 +1140,7 @@ Declare the topology pipeline stable and expose a clean contract to later Foam-m
 
 - accepted Major Support field;
 - accepted Connector Support field;
-- accepted Pocket Aging Pressure field;
+- accepted aggregate Negative Aging Pressure field and retained subtype identity for Interior Pockets, Edge Cavities, Connector Weak Spans, and Free-Water Negative Events;
 - accepted Anchored Support inputs;
 - accepted Obstacle Footprint and valid-water constraints;
 - compact stable identity and evolution metadata;
@@ -1077,7 +1155,7 @@ Declare the topology pipeline stable and expose a clean contract to later Foam-m
 Later Foam-material work may sample:
 
 - positive support classes independently or combined;
-- Pocket Aging Pressure independently;
+- aggregate Negative Aging Pressure and its four source classes independently where required;
 - Anchored Support independently;
 - topology motion/evolution state where required.
 
@@ -1131,8 +1209,14 @@ Every relevant step should select from this matrix rather than inventing an unre
 
 ### Authoring
 
-- low, medium, high Amount;
-- low, medium, high Size;
+- low, medium, high Major Amount;
+- low, medium, high Major Size and Size Variation;
+- low, medium, high Connector Amount, Directness, and Length Preference;
+- `0`, `0.5`, and `1` for Interior Pocket Amount;
+- `0`, `0.5`, and `1` for Edge Cavity Amount;
+- `0`, `0.5`, and `1` for Connector Weak Span Amount;
+- `0`, `0.5`, and `1` for Free-Water Event Amount;
+- each negative class isolated;
 - several ordinary seeds;
 - repeated identical seed;
 - reverse flow;
@@ -1168,8 +1252,10 @@ When topology fails, diagnose in this order:
 4. **Connector rules**
    - Are endpoints absent, pair selection wrong, or traversal costs invalid?
 
-5. **Pocket rules**
-   - Are hosts too narrow, distance fields wrong, or protection masks excessive?
+5. **Negative Aging Pressure rules**
+   - Are Interior Pocket or Edge Cavity hosts invalid, distance fields wrong, or protection masks excessive?
+   - Are Weak Spans associated with the wrong Connector or too close to endpoint gates?
+   - Are Free-Water opportunities too dense, outside valid water, or blocked by exact obstacle/anchored-core rules?
 
 6. **Composition/upload**
    - Are correct CPU/generated fields packed or sampled incorrectly?
@@ -1207,16 +1293,22 @@ A topology patch that cannot answer these questions is not ready.
 
 ## 13. Immediate Next Step
 
-Patches 1 through 3.5 have accepted:
+Major Support and Connector Support are accepted. The initial Interior Pocket proof and Patch 4.1 exact transformed-mesh Obstacle Footprint are also accepted as the current negative-topology baseline.
 
-- the field-first Major candidate family and compact preview;
-- whole-river Major distribution, size hierarchy, and stable identity;
-- sparse Major-to-Major Connector Support;
-- Connector `Amount`, `Directness`, and `Length Preference` controls;
-- endpoint gates, Major clearance halos, strong-Major raster suppression, and bounded detour rejection;
-- soft degree-aware relationship ranking and a mild longitudinal load bias, so disconnected regions are encouraged without forcing weak links or forbidding attractive repeated connections;
-- removal of obsolete topology paths and obsolete broad Foam authoring controls.
+This documentation revision expands the remaining topology work before any Foam-material implementation:
 
-Proceed with **Step 4 — Pocket Aging Pressure**.
+1. **Patch 4.2 — Major-hosted negative topology**
+   - add `Interior Pocket Amount` and preserve the current accepted population at default `0.5`;
+   - add `Edge Cavity Amount` and lopsided one-sided cavities;
+   - retain nested deterministic activation and subtype/host metadata.
+2. **Patch 4.3 — Connector Weak Spans**
+   - add `Connector Weak Span Amount`;
+   - create local Connector-hosted negative sections away from endpoint gates.
+3. **Patch 4.4 — Free-Water Negative Events**
+   - add `Free-Water Event Amount`;
+   - create sparse valid-water negative opportunities with future drift/fade/recycle metadata.
+4. **Patch 4.5 — Static combined topology validation**
+   - validate Major, Connector, all four negative classes, Anchored Support, exact Obstacle Footprint, and valid water together.
+5. Continue with Major evolution, class-specific Connector/negative evolution, safe rebuild crossfade, and procedural chunk/run cache packaging.
 
-That patch must derive hosted negative influence from broad accepted Major interiors, expose the result immediately on the actual river, retain concise Pocket telemetry, and leave material response, runtime evolution, rebuild crossfade, and cache packaging untouched.
+Topology is not considered implemented until static topology, runtime evolution, rebuild crossfade, and cache/preparation handoff pass. Only then may the separate Foam material-lifecycle implementation begin.

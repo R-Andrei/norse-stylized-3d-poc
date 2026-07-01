@@ -255,35 +255,6 @@ namespace ProgrammaticStylized3D.Rivers
         public string Status { get; }
     }
 
-    public readonly struct RiverObstacleExclusionFootprint
-    {
-        public RiverObstacleExclusionFootprint(
-            EntityId sourceId,
-            float globalDistance,
-            float acrossMetres,
-            float surfaceHalfWidth,
-            float alongHalfLength,
-            float acrossHalfWidth,
-            Vector2[] contour)
-        {
-            SourceId = sourceId;
-            GlobalDistance = globalDistance;
-            AcrossMetres = acrossMetres;
-            SurfaceHalfWidth = surfaceHalfWidth;
-            AlongHalfLength = alongHalfLength;
-            AcrossHalfWidth = acrossHalfWidth;
-            Contour = contour ?? Array.Empty<Vector2>();
-        }
-
-        public EntityId SourceId { get; }
-        public float GlobalDistance { get; }
-        public float AcrossMetres { get; }
-        public float SurfaceHalfWidth { get; }
-        public float AlongHalfLength { get; }
-        public float AcrossHalfWidth { get; }
-        public Vector2[] Contour { get; }
-    }
-
 #if UNITY_EDITOR
     public readonly struct GeneratedRiverPressureProfileDebugData
     {
@@ -993,10 +964,10 @@ namespace ProgrammaticStylized3D.Rivers
             public Vector2[] StaticPressureContour;
             public RiverDisturbancePressureBakeProfile StaticPressureProfile;
             public RiverDisturbancePressureBakeProfile StaticPressureBaseProfile;
-            // Exact generated mesh retained for future editor-time solid data.
-            // Runtime Foam consumes StaticContour; Static Pressure still has
-            // its older independent scan and is explicitly marked for a future
-            // shared-data refactor.
+            // Exact generated mesh retained for staged pre-gameplay obstacle
+            // preparation. Foam consumes cached exact solid intervals; Static
+            // Pressure still has its older independent contour path and is
+            // explicitly marked for a future shared-data refactor.
             public MeshFilter ObstacleExclusionMeshFilter;
             public float[] StaticPressureCurrentMultipliers;
             public float[] StaticPressureTransitionStartMultipliers;
@@ -2202,8 +2173,14 @@ namespace ProgrammaticStylized3D.Rivers
 
         /// <summary>
         /// Copies the exact generated meshes currently registered as static
-        /// river obstructions. Retained for future editor-time exact interval
-        /// baking; runtime Foam now consumes waterline contour footprints.
+        /// river obstructions. Foam prepares and caches exact solid intervals
+        /// from these meshes during its staged pre-gameplay build.
+        ///
+        /// TODO(PROCEDURAL-CHUNK-BUILD): transfer ownership of this preparation
+        /// to the future chunk generation/building/linking phase after all
+        /// generated objects have received their final transforms. The runtime
+        /// method remains the temporary development fallback until that phase
+        /// exists.
         /// </summary>
         public void CopyObstacleExclusionMeshFiltersTo(
             List<MeshFilter> output)
@@ -2238,64 +2215,6 @@ namespace ProgrammaticStylized3D.Rivers
 
             output.Sort((left, right) =>
                 left.GetEntityId().CompareTo(right.GetEntityId()));
-        }
-
-        /// <summary>
-        /// Copies mesh-derived waterline contours for the Stage 6 Foam
-        /// Obstacle Footprint. Runtime Foam uses this surface silhouette
-        /// instead of rescanning full triangle meshes on Play startup.
-        /// </summary>
-        public void CopyObstacleExclusionFootprintsTo(
-            List<RiverObstacleExclusionFootprint> output)
-        {
-            if (output == null)
-            {
-                throw new ArgumentNullException(nameof(output));
-            }
-
-            output.Clear();
-            if (river == null || !river.Domain.IsValid)
-            {
-                return;
-            }
-
-            foreach (KeyValuePair<EntityId, ContinuousSource> pair in
-                     continuousSources)
-            {
-                ContinuousSource source = pair.Value;
-                MeshFilter meshFilter = source.ObstacleExclusionMeshFilter;
-                if (!source.IsStatic ||
-                    source.StaticContour == null ||
-                    source.StaticContour.Length < 3 ||
-                    meshFilter == null ||
-                    meshFilter.sharedMesh == null ||
-                    !meshFilter.gameObject.activeInHierarchy ||
-                    !river.TryProjectWorldPoint(
-                        source.WorldPosition,
-                        out StylizedRiverProjection projection) ||
-                    !projection.IsInside)
-                {
-                    continue;
-                }
-
-                StylizedRiverSplineSample sample =
-                    river.SampleAtLocalDistance(projection.LocalDistance);
-                float surfaceHalfWidth = Mathf.Max(
-                    0.05f,
-                    sample.GetSurfaceHalfWidth(projection.AcrossMetres));
-                output.Add(
-                    new RiverObstacleExclusionFootprint(
-                        pair.Key,
-                        projection.GlobalDistance,
-                        projection.AcrossMetres,
-                        surfaceHalfWidth,
-                        source.AlongHalfLength,
-                        source.AcrossHalfWidth,
-                        CopyStaticContour(source.StaticContour)));
-            }
-
-            output.Sort((left, right) =>
-                left.SourceId.CompareTo(right.SourceId));
         }
 
         public void RemoveContinuousSource(EntityId sourceId)

@@ -36,13 +36,18 @@ namespace ProgrammaticStylized3D.Rivers
     }
 
     /// <summary>
-    /// One-time exact-mesh baker for Stage 6 Obstacle Footprint.
+    /// Exact-mesh preparation baker for the Stage 6 Obstacle Footprint.
+    ///
+    /// The current development fallback runs during staged pre-gameplay Foam
+    /// preparation. The production owner should be the future procedural chunk
+    /// generation/building/linking phase, after generated objects have their
+    /// final placement, with the compact result cached beside the chunk/run.
     ///
     /// For every conservative sample inside a candidate Foam texel, the baker
     /// intersects a line through the actual transformed generated mesh along
     /// the local river Up direction. The resulting solid height intervals are
-    /// cached relative to that sample's base water surface. Gameplay updates
-    /// never scan triangles; they only compare the current Stage 3 displacement
+    /// cached relative to that sample's base water surface. Ordinary gameplay
+    /// never scans triangles; it only compares the current Stage 3 displacement
     /// against these cached intervals.
     ///
     /// IMPORTANT FUTURE REFACTOR: Static Pressure still performs its own

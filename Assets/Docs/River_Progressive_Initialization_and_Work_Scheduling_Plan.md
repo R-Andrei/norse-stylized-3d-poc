@@ -26,7 +26,7 @@ The objective is not merely to fix one particular Major Support version. The obj
 
 The implementation must proceed slowly. Each step below is intentionally narrow, independently testable, and reversible. No later step should be started until the previous step passes its acceptance gate.
 
-## Implementation Status Update — 30 June 2026
+## Implementation Status Update — 1 July 2026
 
 The rollout order has been deliberately revised after profiling the first working staged bootstrap. The single-river pipeline is not mature enough to justify a global cross-river scheduler yet. Multi-river arbitration is therefore deferred until the complete per-river initialization, dirty rebuild, steady-state topology, and feature-readiness pipeline is understood and accepted.
 
@@ -35,8 +35,8 @@ Current progress:
 - **Step 1 — Instrumentation:** implemented and validated. The original hitch-free baseline showed approximately `29.5 ms` inside `RiverFoam.EnsureResources.Total` in one startup frame, with the individual boundary, obstacle, topology, clear, guidance, and diagnostic phases exposed separately.
 - **Step 2 — Per-river staged bootstrap:** implemented and validated. Initialization now advances one explicit phase per `LateUpdate`; Foam remains disabled until complete readiness. The observed early phases were generally below roughly `2.5 ms` instead of recreating the former combined burst.
 - **Step 3 — Dirty-event queue and obstacle rebuild coalescing:** implemented and accepted. Boundary and obstacle changes no longer execute a complete rebuild chain immediately.
-- **Performance pause:** active. Steady-state maintenance staggering, compute-asset splitting, striped dispatch, CPU jobs, and global cross-river scheduling are deferred until Major Support, Connector Support, Pocket Aging Pressure, their combined topology behaviour, and the topology-to-material aging response are implemented and validated.
-- **Current implementation milestone:** topology Step 1 — field-first Major candidate vertical slice plus exhaustive obsolete-topology cleanup. This milestone may temporarily run expensive generation during Foam initialization or explicit pre-gameplay preparation while retaining the completed Steps 1–3 scheduling foundation. The expensive work is explicitly future cache/precompute work, not accepted steady-state gameplay runtime.
+- **Performance pause:** active. Steady-state maintenance staggering, compute-asset splitting, striped dispatch, CPU jobs, and global cross-river scheduling are deferred until Major Support, Connector Support, all four Negative Aging Pressure classes, static combined topology, runtime evolution, rebuild crossfade, and cache/preparation packaging are implemented and validated.
+- **Current implementation milestone:** Patch 4.1 exact Obstacle Footprint is accepted together with the initial Interior Pocket proof. The approved next sequence adds Edge Cavities, Connector Weak Spans, and Free-Water Negative Events before static combined validation. Exact transformed-mesh interval preparation currently runs only in the staged pre-gameplay obstacle phase as a temporary fallback. Production ownership belongs to procedural chunk generation/building/linking after final object placement, with compact data cached for gameplay loading.
 - **Global cross-river scheduling:** intentionally deferred. It will be designed only after the final one-river work categories, dependencies, interruption rules, and costs are known.
 
 The current sequencing rule is now: preserve the accepted performance foundation, prove each topology slice visually before building the next one, keep every expensive proof-stage operation profiled and named, then resume performance work against the real completed pipeline. Do not invent scheduler categories for features that are still provisional.
@@ -55,14 +55,18 @@ Those protections remain permanent. They are not being reverted or bypassed.
 
 Further performance engineering is paused because the free-water topology pipeline is not yet complete. The topology-only implementation now proceeds through the canonical slices in `River_Foam_Topology_Implementation_Plan.md`:
 
-1. field-first Major candidate proof plus complete stale-topology cleanup;
-2. whole-river Major distribution and stable identity/evolution metadata;
-3. Connector Support;
-4. Pocket Aging Pressure;
-5. static combined topology validation;
-6. strictly downstream layer-specific topology evolution;
-7. safe replacement-topology crossfade;
-8. production cache/precompute packaging for the accepted generator/output.
+1. accepted field-first Major candidate and whole-river Major distribution;
+2. accepted Connector Support;
+3. accepted initial Interior Pocket and exact Obstacle Footprint;
+4. Patch 4.2 Interior Pocket Amount and Edge Cavities;
+5. Patch 4.3 Connector Weak Spans;
+6. Patch 4.4 Free-Water Negative Events;
+7. Patch 4.5 static combined topology validation;
+8. strictly downstream class-specific topology evolution;
+9. safe replacement-topology crossfade;
+10. production procedural chunk/run cache and precompute packaging.
+
+Topology-to-material aging response and final material lifetime integration remain separate Stage 6 work only after topology completion.
 
 Topology-to-material aging response and final material lifetime integration remain separate Stage 6 work after the relevant topology outputs are accepted.
 
@@ -92,7 +96,7 @@ The long-term architecture has four layers:
    - Repeated notifications coalesce, obstacle versions must settle, and only one queued rebuild phase executes per frame.
 
 3. **Staggered steady-state maintenance**
-   - Major evolution, cleanup, Pocket work, Connector work, composition, measurements, obstacle refreshes, and other periodic tasks are separated where dependencies permit.
+   - Major, Connector, and class-specific negative evolution, composition, measurements, obstacle refreshes, and other periodic tasks are separated where dependencies permit.
    - Slow topology features do not need to complete every dependent pass in a single frame.
 
 4. **Compiler and dispatch isolation**
@@ -143,13 +147,12 @@ The topology bootstrap invoked from this path is itself composite. `BuildTopolog
 1. refresh current shoreline and anchored topology sources;
 2. update the obstacle mask;
 3. compose source topology;
-4. build Major descriptors;
-5. rasterize Major Support;
-6. clean Major Support;
-7. build dependent Pocket work;
-8. refresh shoreline and sources again;
-9. compose the final topology field;
-10. optionally measure topology diagnostics.
+4. build or load Major Support;
+5. build or load Connector Support;
+6. build or load the active Negative Aging Pressure classes;
+7. refresh shoreline and sources again;
+8. compose the final topology field;
+9. optionally measure topology diagnostics.
 
 Even if each individual operation appears acceptable in isolation, concentrating all of them into the same frame creates a large worst-case spike.
 
@@ -230,7 +233,7 @@ The initial scheduling work will not:
 - redesign Major Support shapes;
 - add Major Support motion;
 - enable Connector Support;
-- rewrite Pocket Aging Pressure;
+- redesign Negative Aging Pressure classes;
 - integrate topology into material lifespan;
 - change Foam rendering;
 - change public Inspector controls;
@@ -466,24 +469,23 @@ Not every state must consume a separate frame forever. The key is that the state
 | Resolve kernels | Resolve all kernel indices | Compute asset | Valid kernel table | Potential cold/medium |
 | Resolve dimensions | Calculate chunks, resolutions, lengths | Valid domain | Field dimensions | Light |
 | Allocate material textures | Create state A/B, advected, reverse | Dimensions | Material textures | Heavy allocation |
-| Allocate guidance/topology textures | Create guidance, topology, sources, Major A/B, Pocket, Connector | Dimensions | Topology textures | Heavy allocation |
+| Allocate guidance/topology textures | Create guidance, topology, sources, generated positive fields, aggregate negative field, and required class working resources | Dimensions | Topology textures | Heavy allocation |
 | Allocate auxiliary textures | Create shore edges, obstacle, fracture A/B | Dimensions | Auxiliary textures | Heavy allocation |
 | Initialize neutral resources | Create neutral disturbance fallback | Texture support | Safe fallback texture | Light/medium |
-| Allocate buffers | Metrics and Major descriptor buffers | Capacities | GPU buffers | Medium allocation |
+| Allocate buffers | Metrics, exact obstacle intervals, and accepted topology metadata buffers | Capacities | GPU/CPU buffers | Medium allocation |
 | Build metric buffer | Build and upload river metric rows | Domain/dimensions | Metric buffer contents | CPU/upload heavy |
 | Build boundary data | Build and upload valid-water mask | Domain/metric data | Boundary texture contents | CPU/upload heavy |
 | Wait for obstacle settle | Observe disturbance geometry version stability | Disturbance runtime | Stable-enough version | No heavy work |
-| Build obstacle exclusion | Rasterize cached contours/bounds and upload/update mask | Stable sources, boundary | Obstacle texture | CPU/upload heavy |
-| Clear topology resources | Clear topology/source/Major/Pocket/Connector textures | Allocated textures | Known zero topology | Heavy group; may split |
+| Build obstacle exclusion | Prepare exact transformed-mesh solid intervals, evaluate current-water mask, and capture the topology-generation snapshot | Stable final placed sources, boundary | Cached interval buffers, obstacle texture, CPU scalar snapshot | Temporary CPU-heavy pre-gameplay preparation |
+| Clear topology resources | Clear topology/source/generated positive/aggregate negative textures | Allocated textures | Known zero topology | Heavy group; may split |
 | Clear material states | Clear each material-state texture | Allocated material textures | Known empty material | GPU dispatch per field |
 | Clear fracture fields | Clear fracture A/B | Fracture textures | Known neutral fracture | GPU dispatch per field |
 | Build guidance | Dispatch guidance kernel | Metric/boundary resources | Guidance field | Full-grid heavy |
 | Build current shore edges | Dispatch shoreline evaluator | Metric data | Current shore-edge texture | Medium/full-width |
 | Compose anchored sources | Update obstacle mask and compose shore/Pressure/Lee sources | Shore, disturbance, obstacle | Topology source field | Full-grid heavy |
-| Build Major descriptors | Dispatch sparse descriptor kernel | Metrics, boundary, sources | Major descriptor buffer | Sparse; possible cold kernel |
-| Rasterize Major | Dispatch Major field kernel | Descriptors and inputs | Major state | Full-grid heavy; possible cold kernel |
-| Cleanup Major | Dispatch Major cleanup | Major state | Clean Major state | Full-grid heavy |
-| Build Pocket | Dispatch Pocket work | Major state | Pocket field | Full-grid heavy |
+| Build Major topology | Run accepted preparation generator or load cached result, then upload | Metrics, boundary, sources | Major Support and metadata | Temporary CPU-heavy proof work / cached production load |
+| Build Connector topology | Run bounded relationship preparation or load cached result, then upload | Major, boundary, obstacles | Connector Support and metadata | Temporary CPU-heavy proof work / cached production load |
+| Build Negative Aging Pressure | Run active class generators or load cached result, then upload aggregate field and subtype metadata | Major, Connector, anchored cores, obstacles | Aggregate negative field and class metadata | Temporary CPU-heavy proof work / cached production load |
 | Compose final topology | Compose all current topology classes | All topology inputs | Final topology field | Full-grid heavy |
 | Initialize metrics | Reset and optionally measure diagnostics/population | Ready fields | Initial counters | Optional/deferred |
 | Ready | Mark complete and enter normal scheduling | Required phases complete | Runtime active | Light |
@@ -509,7 +511,7 @@ After the state machine is proven, readiness-aware binding may allow:
 2. material Foam with neutral topology;
 3. anchored topology becoming visible;
 4. Major Support becoming visible;
-5. Pocket and Connector work becoming visible;
+5. Connector and Negative Aging Pressure work becoming visible;
 6. diagnostics becoming available last.
 
 Before that is implemented, the material contract must define neutral values for every not-yet-ready texture. The runtime must never sample uninitialized allocation contents.
@@ -742,7 +744,7 @@ It should schedule:
 3. guidance rebuild;
 4. current-shore rebuild;
 5. anchored-source composition;
-6. Major descriptor/field validation or rebuild;
+6. generated topology validation or rebuild;
 7. dependent topology rebuild;
 8. final composition;
 9. optional diagnostics.
@@ -771,7 +773,7 @@ A dependency-aware queue should spread slow topology work across frames:
 
 ```text
 Frame N:     refresh current shore and anchored inputs
-Frame N + 1: build Major descriptors and evolve/rasterize Major
+Frame N + 1: prepare or load Major Support
 Frame N + 2: clean Major
 Frame N + 3: build Pocket and, later, Connector targets
 Frame N + 4: compose final topology
@@ -848,7 +850,7 @@ After the scheduler exists, first-use dispatches may be ordered deliberately:
 - clear kernel;
 - guidance kernel;
 - shoreline/source kernels;
-- Major descriptor kernel;
+- any remaining generated-topology upload/composition kernel;
 - Major raster kernel;
 - cleanup;
 - dependent topology;
@@ -882,7 +884,7 @@ CS_RiverFoam_TopologySources.compute
     topology diagnostics
 
 CS_RiverFoam_Major.compute
-    Major descriptor generation
+    generated topology preparation/upload
     Major rasterization
     Major cleanup
 
@@ -971,7 +973,7 @@ The first striped implementation should keep the old complete field bound until 
 
 ### 16.1 Boundary and obstacle work
 
-`RebuildBoundaryTexture()` and `RebuildObstacleExclusionCache()` include CPU-side construction and texture upload work. They are candidates for later optimization.
+`RebuildBoundaryTexture()` includes CPU-side construction and upload work. `RebuildObstacleExclusionCache()` temporarily includes exact transformed-mesh interval preparation plus one current-water mask readback for CPU topology generation. The latter is intentionally pre-gameplay proof plumbing and must move into procedural chunk generation/building/linking with cached compact output.
 
 The order should be:
 
@@ -982,17 +984,9 @@ The order should be:
 
 ### 16.2 Pixel-buffer reuse
 
-The existing Foam architecture document already notes that obstacle rasterization should reuse its structural-grid pixel buffer rather than allocating a new `Color[]` each rebuild.
+Patch 4.1 removes the old contour `Color[]` raster/upload path. The temporary fallback retains reusable compact interval buffers plus one structural float snapshot used by CPU topology generation.
 
-A reusable buffer should:
-
-- be resized only when structural dimensions change;
-- remain owned by the river runtime;
-- be cleared or overwritten deterministically;
-- be released with other runtime resources;
-- not be shared unsafely across rivers.
-
-This is a narrow optimization and should be implemented in its own patch after scheduling behaviour is stable.
+Production should serialize or otherwise cache the compact prepared cells/intervals per generated chunk or run after final object placement. Gameplay may evaluate the current water height against those intervals, but it must not reconstruct them from triangles.
 
 ### 16.3 Jobs and Burst
 
@@ -1263,9 +1257,9 @@ Build boundary data
 → wait for pending obstacle stability when required
 → rebuild obstacle exclusion when required
 → refresh anchored/source topology into scratch
-→ rebuild/constrain Major Support
-→ clean Major Support
-→ rebuild Pocket work
+→ rebuild/load Major Support
+→ rebuild/load Connector Support
+→ rebuild/load affected Negative Aging Pressure classes
 → compose and measure final topology
 ```
 
@@ -1655,7 +1649,7 @@ A visual topology change and a scheduling/performance change must not be introdu
 
 ### 21.3 Mandatory bounded hot kernels
 
-The full-grid kernel must not reconstruct complex topology data that can be generated in the proof/bake path and consumed later as accepted fields, compact descriptors, or other bounded cached data. This rule applies especially to Major, Connector, and Pocket topology.
+The full-grid kernel must not reconstruct complex topology data that can be generated in the proof/bake path and consumed later as accepted fields, compact descriptors, or other bounded cached data. This rule applies especially to Major, Connector, Interior Pocket, Edge Cavity, Connector Weak Span, and Free-Water Negative Event topology.
 
 ---
 
@@ -1663,37 +1657,43 @@ The full-grid kernel must not reconstruct complex topology data that can be gene
 
 `River_Foam_Topology_Implementation_Plan.md` is the canonical topology-only patch sequence. This scheduling document constrains how those patches execute; it does not redefine their visual or implementation order.
 
-The accepted scheduling foundation now supports topology development rather than preceding every topology feature.
-
-Completed and retained:
+The accepted scheduling foundation now supports topology development:
 
 1. profiler instrumentation;
 2. per-river staged initialization;
 3. queued/coalesced dirty rebuilds.
 
-Topology implementation now proceeds in separately inspectable slices:
+Accepted topology work:
 
-1. remove the complete obsolete topology path and prove one field-first Major candidate;
-2. place Major regions in the real river and validate distribution;
-3. add Connector Support;
-4. add Pocket Aging Pressure;
-5. validate the complete static topology through existing diagnostics;
-6. add strictly downstream Major evolution;
-7. add layer-specific Connector and Pocket evolution;
-8. add safe generated-topology rebuild crossfade;
-9. package accepted topology and evolution metadata into the production cache/precompute path;
-10. hand the stable topology contract to the separate material-lifecycle work.
+1. field-first Major candidate and whole-river Major distribution;
+2. Connector Support and its authoring/distribution refinements;
+3. initial Interior Pocket proof;
+4. exact transformed-mesh Obstacle Footprint with temporary staged preparation and future procedural chunk/run ownership.
+
+Remaining topology slices:
+
+1. Patch 4.2 Interior Pocket Amount and Edge Cavities;
+2. Patch 4.3 Connector Weak Spans;
+3. Patch 4.4 Free-Water Negative Events;
+4. Patch 4.5 complete static topology validation;
+5. strictly downstream Major evolution;
+6. class-specific Connector and Negative Aging Pressure evolution;
+7. safe generated-topology rebuild crossfade;
+8. production procedural chunk/run cache and precompute packaging;
+9. handoff to separate Foam-material work.
+
+All four negative classes are preparation-time generators. Interior/edge host analysis, Connector span selection, and Free-Water opportunity curation may be expensive during the proof path, but ordinary gameplay may only perform bounded cached sampling, offsets, fades, strength changes, and recycling.
 
 Every slice must expose a real result immediately. Candidate-local work may use one compact preview; every river-dependent result must be shown on the actual river. Diagnostics remain minimal and must not force production-grade work in `Final Foam (Debug Off)`.
 
-Only after that topology sequence is stable does the deferred performance roadmap resume:
+Only after the topology sequence is stable does the deferred performance roadmap resume:
 
-1. stagger ordinary steady-state topology maintenance where profiling still justifies it;
+1. stagger ordinary steady-state topology evolution where profiling still justifies it;
 2. isolate compute assets where cold first-use compilation remains a problem;
 3. add striped full-grid processing where completed long-river workloads require it;
 4. design global cross-river scheduling from the accepted final per-river work graph.
 
-No performance task may be used as a reason to combine Major, Connector, and Pocket into one opaque rewrite. The topology plan requires separate implementation and acceptance before combined validation.
+No performance task may be used as a reason to combine the positive and four negative classes into one opaque rewrite.
 
 ## 23. Deferred Decisions
 
@@ -1726,7 +1726,7 @@ The scheduling architecture is successful when:
 - each river’s initialization progress is observable;
 - no resource is sampled before it is valid;
 - domain and obstacle changes queue bounded rebuild work instead of performing complete synchronous rebuilds;
-- Major evolution, cleanup, dependent topology, composition, and metrics are not routinely concentrated in one frame;
+- Major, Connector, class-specific negative evolution, composition, and metrics are not routinely concentrated in one frame;
 - long rivers can later be striped without changing results;
 - future visual topology work has explicit cost markers and a cold-start regression gate;
 - the final fully ready river matches the approved visual baseline unless a separate visual patch intentionally changes it.
@@ -1735,16 +1735,14 @@ The scheduling architecture is successful when:
 
 ## 25. Immediate Next Step
 
-Topology Patches 1 through 3.5 are accepted:
+Major Support, Connector Support, the initial Interior Pocket proof, and Patch 4.1 exact transformed-mesh Obstacle Footprint are accepted.
 
-- field-first Major candidate generation and inspectable cleanup stages;
-- whole-river Major distribution and stable metadata;
-- Major-to-Major Connector Support with bounded pathfinding;
-- Connector Amount, Directness, and Length Preference;
-- endpoint gates, Major clearance halos, strong-Major suppression, and bounded detour rejection;
-- soft dynamic re-ranking that mildly favours unconnected Major regions and underrepresented longitudinal sections without imposing quotas;
-- removal of obsolete topology paths and obsolete broad Foam authoring controls.
+The next implementation is **Patch 4.2 — Major-hosted negative topology**:
 
-The active implementation step is **Topology Step 4 — Pocket Aging Pressure**.
+- introduce `Interior Pocket Amount` and preserve the accepted current Interior Pocket population at default `0.5`;
+- introduce `Edge Cavity Amount`, default `0.5`;
+- generate deterministic lopsided cavities that may breach one Major edge while preserving a viable positive remainder;
+- retain subtype, host, and future evolution metadata;
+- run all expensive host analysis and candidate selection only in staged preparation or explicit dirty rebuilds.
 
-The scheduling contract remains unchanged: Pocket generation may use bounded preparation-time distance analysis and candidate selection during the temporary visual-proof path, but it must not become ordinary per-frame gameplay work. The result must be immediately inspectable on the actual river and remain separately measurable before static combined-topology validation begins.
+Patches 4.3 and 4.4 then add Connector Weak Spans and Free-Water Negative Events. Patch 4.5 validates the complete static topology. Runtime evolution, rebuild crossfade, and cache/preparation packaging follow before any Foam-material implementation.

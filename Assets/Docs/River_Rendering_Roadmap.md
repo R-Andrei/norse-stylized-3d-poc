@@ -294,45 +294,42 @@ Accepted and retained:
 
 - shared `64 / 96 / 128` structural tiers, with `96` as standard/default;
 - Shore, Lee, and geometry-supported Pressure Support;
-- water-level-aware Obstacle Footprint;
+- field-first Major Support generation, whole-river distribution, accepted Major controls, and stable identity;
+- Major-to-Major Connector Support with accepted Amount, Directness, Length Preference, endpoint gates, clearance halos, detour limits, and soft participation distribution;
+- initial Interior Pocket negative topology hosted by broad Major interiors;
+- exact transformed-mesh water-level-aware Obstacle Footprint, distinct from padded Pressure/Lee disturbance footprints;
 - persistent field, chunking, freezing, sleeping, and fixed-cost GPU infrastructure;
 - permanent Foam profiler instrumentation;
 - staged per-river initialization;
-- queued/coalesced post-ready boundary and obstacle rebuilds.
+- queued/coalesced post-ready boundary and obstacle rebuilds;
+- removal of superseded lobe/nucleus topology, stale old Pocket/Connector paths, the unused fixture, and obsolete broad Foam controls.
 
-Current Major Support code is a superseded visual baseline, not the accepted final representation. Its deterministic opportunity identity, seed control, useful lateral distribution, and full-range orientation remain valuable contracts, but the three-lobe/one-bite shape representation did not provide enough silhouette variety. The replacement begins with a complete reference-driven removal of obsolete topology code, including the old Major grammar, its nucleus descriptors and kernels, the provisional Pocket path, the disabled Connector path, the unused fixture, and any additional dead resources, states, metrics, or editor text discovered during tracing.
+The canonical topology direction remains:
 
-The new canonical topology direction is:
+> **Build final-quality topology as small inspectable vertical slices, allow expensive generation only in staged pre-gameplay proof preparation, preserve identity/evolution metadata, and later move accepted generation into procedural chunk/run cache preparation.**
 
-> **Build the final-quality field-first topology pipeline as small inspectable vertical slices, let expensive proof generation run only during initialization or explicit preparation, and later move the accepted generator/output into a cached per-river/per-run bake.**
+Negative Aging Pressure now has four approved source classes:
 
-The topology-only rollout is:
+1. Interior Pocket;
+2. Edge Cavity;
+3. Connector Weak Span;
+4. Free-Water Negative Event.
 
-1. prove one deterministic field-first Major candidate through a compact local preview;
-2. place accepted Major regions in the actual river and inspect their real distribution there;
-3. generate Connector Support only after Major placement is accepted;
-4. generate Pocket Aging Pressure only after positive topology is accepted;
-5. validate the static combined topology through the existing river diagnostics;
-6. add cheap strictly downstream per-layer evolution using stable identity and fade metadata;
-7. add safe rebuild crossfades;
-8. package the accepted output into a production cache/precompute path.
-
-The completed generator remains field-first rather than ellipse-, skeleton-, cellular-, primitive-, or toy path-descriptor-first. Each step exposes its result immediately; no large invisible integrated generator is built before the first visual validation.
-
-The temporary proof path may perform expensive generation during initialization or pre-gameplay preparation. This cost must be profiled and labelled as future cache/precompute work. Active gameplay should ultimately consume cached/baked topology data and perform only cheap sampling, composition, motion, and material-lifecycle operations.
+Each class receives an independent `0–1` Amount control with default `0.5`. Amount activates a nested deterministic opportunity subset and controls population only.
 
 Still unimplemented or unaccepted:
 
-- the field-first Major candidate generator;
-- final Major whole-river composition scoring and selection;
-- Connector Support;
-- Pocket Aging Pressure;
-- static combined topology validation;
-- stable runtime evolution metadata and strictly downstream movement;
+- Patch 4.2 Interior Pocket Amount and Edge Cavities;
+- Patch 4.3 Connector Weak Spans;
+- Patch 4.4 Free-Water Negative Events;
+- Patch 4.5 complete static topology validation;
+- strictly downstream class-specific runtime evolution;
 - safe topology rebuild crossfade;
-- production topology cache/precompute packaging;
-- topology-to-material lifespan response;
+- procedural chunk/run cache/precompute packaging;
+- separate topology-to-material lifespan response;
 - final fragmentation, dissipation, and rendering behaviour.
+
+Topology must be completed through static validation, runtime evolution, rebuild crossfade, and cache/preparation handoff before the separate Foam-material implementation begins.
 
 ### Current performance scheduling status
 
@@ -355,40 +352,45 @@ The old destructive composition `Positive × (1 - Negative)` remains non-canonic
 
 ### Remaining topology architecture
 
-- **Major Support:** broad positive support regions generated as field-first soft topology from actual river context. Static placement stays deterministic and seedable. Accepted regions must be connected, filled, broad enough to host material, and varied through low-frequency contour structure rather than pixel damage, toy path descriptors, or repeated primitive stamps.
-- **Connector Support:** currently generated between meaningful disconnected Major components using bounded relational rules. It remains sparse and subordinate, uses endpoint gates plus Major clearance halos, rejects excessive detours, does not paint connector bodies through broad Major interiors, and softly favours regions and longitudinal sections with less existing Connector participation without forcing quotas. Anchored endpoints remain an optional later extension rather than a CPU approximation requirement.
-- **Pocket Aging Pressure:** generated after positive support from sufficiently broad Major interiors. It provides negative lifespan influence hosted by positive structure and must avoid connector cores, important anchored support, obstacles, and unrelated neutral water.
+- **Major Support:** accepted broad positive support generated as field-first soft topology from actual river context.
+- **Connector Support:** accepted sparse relational positive support between meaningful disconnected Major components, with bounded preparation-time search and no gameplay graph/pathfinding.
+- **Negative Aging Pressure:** aggregate negative influence with four logical source classes:
+  - **Interior Pocket:** closed Major-hosted negative area preserving a positive rim;
+  - **Edge Cavity:** lopsided Major-hosted negative area permitted to breach one deliberate side;
+  - **Connector Weak Span:** short Connector-hosted negative section away from endpoint gates;
+  - **Free-Water Negative Event:** sparse valid-water negative area requiring no positive host.
 
-Active topology authoring retains Major `Amount`, `Size`, `Size Variation`, and `Seed`, plus Connector `Amount`, `Directness`, and `Length Preference`. Patch 3.4 removed the obsolete broad Foam controls and the inert Major evolution/cleanup cadence fields. Generator coefficients for field scale, warp, scoring, path cost, endpoint gates, clearance halos, detour limits, and pocket spacing remain implementation details until the visual result is accepted and cache/bake packaging is chosen.
+The four negative classes retain class identity and evolution metadata even if the current output texture carries one aggregate negative field. They are not direct visible Foam and do not geometrically subtract positive topology.
 
-Runtime topology evolution remains cheap and metadata-driven. Major, Connector, and Pocket may use separate downstream offsets, phases, fades, strengthening/weakening, and recycle intervals. Free-water topology never moves upstream or pops as a whole region. Anchored Pressure, Lee, and Shore Support remain attached to their authoritative live sources. No gameplay candidate generation, component cleanup, pathfinding, distance transforms, or rejection loops are permitted.
+Current accepted authoring retains Major `Amount`, `Size`, `Size Variation`, and `Seed`, plus Connector `Amount`, `Directness`, and `Length Preference`. Patches 4.2–4.4 add `Interior Pocket Amount`, `Edge Cavity Amount`, `Connector Weak Span Amount`, and `Free-Water Event Amount`, all range `0–1`, default `0.5`.
+
+Runtime topology evolution remains cheap and metadata-driven. Major and Connector use separate downstream offsets and fades. Interior Pockets and Edge Cavities remain associated with Major hosts; Weak Spans move/fade along Connector identity; Free-Water Events drift downstream, fade, and recycle sparsely. Anchored Pressure, Lee, and Shore Support remain attached to authoritative live sources. No gameplay candidate generation, component cleanup, pathfinding, distance transforms, or rejection loops are permitted.
 
 ### Immediate continuation order
 
-1. Patch 0 documentation alignment — complete.
-2. Field-first Major candidate generation and stale-topology removal — complete.
-3. Whole-river Major distribution, size hierarchy, and stable identity — complete.
-4. Major-to-Major Connector Support with Amount, Directness, and Length Preference — complete.
-5. Connector endpoint gates, Major clearance halos, bounded detour rejection, and obsolete Foam-control cleanup — complete in Patch 3.4.
-6. Soft degree-aware and longitudinally distributed Connector selection — complete in Patch 3.5.
-7. Implement Pocket Aging Pressure and inspect it on the actual river.
-8. Validate the complete static topology through the existing support and negative-influence views.
-9. Add cheap strictly downstream Major, Connector, and Pocket evolution using stable identity, separate pacing, and fades.
-10. Add safe generated-topology rebuild crossfade.
-11. Move expensive generation into the accepted cache/precompute path.
-12. Hand the accepted topology contract to the separate material-lifecycle work.
-13. Resume deferred performance work against the completed topology pipeline.
+1. Documentation expansion for four-class Negative Aging Pressure — complete.
+2. Patch 4.2 — Interior Pocket Amount and Edge Cavities.
+3. Patch 4.3 — Connector Weak Spans.
+4. Patch 4.4 — Free-Water Negative Events.
+5. Patch 4.5 — static validation of Major, Connector, all four negative classes, Anchored Support, exact Obstacle Footprint, and valid water.
+6. Strictly downstream Major evolution.
+7. Class-specific Connector and Negative Aging Pressure evolution.
+8. Safe generated-topology rebuild crossfade.
+9. Procedural chunk/run cache and precompute packaging.
+10. Topology completion and handoff to separate Foam-material work.
+11. Resume deferred performance work against the completed topology pipeline.
 
 ### Terminology
 
-The canonical Stage 6 names now describe lifecycle influence rather than hard occupancy:
+The canonical Stage 6 names describe lifecycle influence rather than hard occupancy:
 
 - `Pressure Support`, `Lee Support`, and `Shore Support` form `Anchored Support`;
 - `Major Support` and `Connector Support` are evolving positive lifespan support;
-- `Pocket Aging Pressure` is evolving negative lifespan influence;
-- `Obstacle Footprint` is water-level-aware object geometry, not a promise of an expensive hard simulation barrier.
+- `Negative Aging Pressure` is the aggregate evolving negative lifespan influence;
+- its four classes are `Interior Pocket`, `Edge Cavity`, `Connector Weak Span`, and `Free-Water Negative Event`;
+- `Obstacle Footprint` is authoritative water-level-aware exact object geometry prepared from final transformed meshes before gameplay and is distinct from padded Pressure/Lee disturbance footprints.
 
-Retained debug enum numeric values and texture channel packing are unchanged. Low-level compatibility resource identifiers may keep older internal names where changing them would add risk without improving user-facing clarity.
+Retained debug enum numeric values and existing texture channel packing are unchanged. Low-level compatibility identifiers may keep older `Pocket` names where changing them would add risk, but user-facing terminology and subtype metadata follow the canonical names.
 
 ### Diagnostics
 
@@ -396,7 +398,7 @@ Retain:
 
 - `Anchored Support` — Pressure Support, Lee Support, Shore Support;
 - `Support Classes` — Major Support, Connector Support, combined Anchored Support;
-- `Negative Influence Classes` — Pocket Aging Pressure and Obstacle Footprint;
+- `Negative Influence Classes` — aggregate Negative Aging Pressure and Obstacle Footprint; each negative class is isolated during implementation by setting the other three Amount controls to zero;
 - `Support and Negative Influence` — combined support and combined negative influence shown together without destructive subtraction;
 - `Final Foam (Debug Off)` — normal rendered material.
 
@@ -421,7 +423,7 @@ Multi-chunk rivers extend the longitudinal dimension by chunk count. Physical to
 
 ### Public controls
 
-The accepted normal Inspector controls are:
+Accepted normal Inspector controls:
 
 - `Foam Enabled`;
 - `Major Support Amount`;
@@ -433,32 +435,40 @@ The accepted normal Inspector controls are:
 - `Connector Length Preference`;
 - `Foam Colour`.
 
-Patch 3.4 removed `Foam Preset`, the old broad `Amount`, `Web Granularity`, `Network Evolution`, `Breakup Frequency`, `Foam Speed`, `Major Evolution Rate`, and `Major Cleanup Rate`, together with their obsolete preset, migration, compatibility, and resolver code. The current material simulation uses a fixed internal provisional baseline until the separate lifecycle-authoring pass introduces controls justified by accepted behaviour.
+Approved additions through Patches 4.2–4.4:
 
-Base lifetime and support/aging-pressure response still require future authoring, but their names, ranges, grouping, and defaults remain deferred to that lifecycle pass.
+- `Interior Pocket Amount` — range `0–1`, default `0.5`;
+- `Edge Cavity Amount` — range `0–1`, default `0.5`;
+- `Connector Weak Span Amount` — range `0–1`, default `0.5`;
+- `Free-Water Event Amount` — range `0–1`, default `0.5`.
+
+For each negative class, `0` means none, `0.5` means a sensible category-specific baseline, and `1` means maximum bounded population. Amount changes nested stable activation only, not size, strength, seed, or evolution speed.
+
+Patch 3.4 removed `Foam Preset`, the old broad `Amount`, `Web Granularity`, `Network Evolution`, `Breakup Frequency`, `Foam Speed`, `Major Evolution Rate`, and `Major Cleanup Rate`, together with their obsolete support code.
+
+Separate material lifetime and topology-response authoring remains deferred until topology completion.
 
 ### Implementation order
 
-1. Documentation cleanup and canonical terminology — complete.
-2. Profiler instrumentation — complete and retained.
-3. Per-river staged initialization — complete and retained.
-4. Queued/coalesced dirty rebuilds — complete and retained.
-5. Topology Patch 0 implementation plan and cross-document alignment — complete.
-6. Major candidate vertical slice plus exhaustive stale-topology cleanup — complete.
-7. Whole-river Major distribution, size hierarchy, and stable identity/evolution metadata — complete.
-8. Connector Support with Amount, Directness, and Length Preference — complete.
-9. Connector endpoint gates, Major clearance halos, and bounded detour rejection — complete.
-10. Obsolete broad Foam control and migration cleanup — complete.
-11. Pocket Aging Pressure — active next slice.
-12. Static combined topology validation.
-13. Strictly downstream per-layer topology evolution.
-14. Safe topology rebuild crossfade.
-15. Production cache/precompute packaging.
-16. Separate topology-to-material lifespan integration.
-17. End-of-life fragmentation/dissipation.
-18. Resume deferred performance work and final PC-first profiling.
+1. Documentation, terminology, profiler instrumentation, staged initialization, and dirty-rebuild scheduling — complete.
+2. Major candidate generation and whole-river distribution — complete.
+3. Connector Support and refinements — complete.
+4. Initial Interior Pocket proof — complete.
+5. Exact transformed-mesh Obstacle Footprint and procedural chunk/run preparation contract — complete.
+6. Patch 4.2 Interior Pocket Amount and Edge Cavities.
+7. Patch 4.3 Connector Weak Spans.
+8. Patch 4.4 Free-Water Negative Events.
+9. Patch 4.5 complete static topology validation.
+10. Strictly downstream Major evolution.
+11. Class-specific Connector and Negative Aging Pressure evolution.
+12. Safe topology rebuild crossfade.
+13. Procedural chunk/run cache/precompute packaging.
+14. Topology completion handoff.
+15. Separate topology-to-material lifespan integration.
+16. End-of-life fragmentation/dissipation and final rendering.
+17. Resume deferred performance work and final PC-first profiling.
 
-Major, Connector, and Pocket are implemented and accepted separately before the combined topology is judged. This is an explicit anti-regression rule, not merely a debugging preference.
+Every positive and negative topology class is implemented and accepted separately before the combined topology is judged. This is an explicit anti-regression rule.
 
 ### Performance constraints
 
@@ -473,19 +483,19 @@ Major, Connector, and Pocket are implemented and accepted separately before the 
 - the final runtime target is bounded sampling/composition of accepted fields or compact descriptors, with no final shader loops over candidate lists, path graphs, shape libraries, or growing structure collections;
 - inactive, sleeping, frozen, and distant chunks perform no unnecessary work;
 - profile update spikes as well as average cost.
-- further scheduling optimisation remains paused until Major, Connector, Pocket, and combined topology validation are complete.
+- further scheduling optimisation remains paused until Major, Connector, all four negative classes, runtime evolution, rebuild crossfade, and cache/preparation packaging are complete.
 
 Deferred optimization notes:
 
-- Automatic generated-source Static Pressure support now consumes bounds-derived/cached footprint contours under the hard performance cap. It must not perform a generated-mesh height-slice scan during Play startup. Future fidelity work should use editor-time/cached compact geometry or remove equal or greater runtime cost elsewhere.
+- Static Pressure retains its accepted contour source for now. Patch 4.1 restores exact transformed-mesh intervals for authoritative Foam Obstacle Footprint during staged pre-gameplay preparation. The future procedural chunk generation/building/linking phase must own and cache that compact data after final object placement; this is not restricted to editor baking.
 - Foam Obstacle Footprint may rebuild once before generated-source refresh has completed and again after `ObstacleGeometryVersion` settles. Defer Foam obstacle rebuilds until the disturbance refresh is complete enough to avoid redundant startup work.
-- Foam Obstacle Footprint rasterization should reuse its pixel buffer instead of allocating a fresh structural-grid `Color[]` per rebuild.
+- The old Foam contour pixel-raster path is removed. Reuse compact exact interval buffers and the prepared structural scalar snapshot; ordinary gameplay must not rescan triangles.
 - Audit topology/debug work so `Final Foam (Debug Off)` does not accidentally force diagnostic-grade topology composition or metric refreshes.
 - Tighten Static Pressure, Static Wake, and ripple-boundary dirty flags so source/profile changes rebuild only the affected textures and passes.
 
 ### Failure rule
 
-If a topology slice fails, stop at the smallest inspectable stage: candidate generation, source context, Major placement, Connector rules, Pocket rules, composition/upload, runtime evolution, or cache/rebuild integration. Do not automatically revert to the lobe grammar, toy path descriptors, a graph conveyor, per-texel procedural reconstruction, or another unmeasured primitive grammar. Any representation change requires measured evidence and explicit approval.
+If a topology slice fails, stop at the smallest inspectable stage: candidate generation, source context, Major placement, Connector rules, negative-class rules, composition/upload, runtime evolution, or cache/rebuild integration. Do not automatically revert to the lobe grammar, toy path descriptors, a graph conveyor, per-texel procedural reconstruction, or another unmeasured primitive grammar. Any representation change requires measured evidence and explicit approval.
 
 ## 7. Secondary Water Effects
 

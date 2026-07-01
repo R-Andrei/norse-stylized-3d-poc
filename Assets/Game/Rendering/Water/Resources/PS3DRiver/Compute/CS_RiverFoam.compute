@@ -1514,12 +1514,11 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
     float4 generatedWork = _FoamTopologyGeneratedRead.Load(
         int3(outputCoordinate, 0));
 
-    // Patch 3 uploads deterministic prepared Major and Connector Support
-    // through independent channels. Pocket Aging Pressure remains zero until
-    // its later gated topology step.
+    // Patch 4 uploads deterministic prepared Major Support, Connector
+    // Support, and Pocket Aging Pressure through independent channels.
     float majorSupport = generatedWork.r;
     float connectorSupport = generatedWork.g;
-    float pocketAgingPressure = 0.0;
+    float pocketAgingPressure = generatedWork.b;
 
     float4 staticPressure = 0.0.xxxx;
     float4 staticWake = 0.0.xxxx;
@@ -1632,6 +1631,22 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
     float staticFluidMask = fluidCoverage * validDomainMask;
     float dynamicShoreMask = shoreSupport * validDomainMask *
         (1.0 - obstacleFootprint);
+
+    // Pocket remains an independent negative field, so weak and transitional
+    // positive influence may still overlap it and later compete through the
+    // material-lifecycle response. Only authoritative strong anchored cores
+    // are protected here, together with the exact obstacle footprint.
+    float anchoredCore = max(
+        max(pressureSupport, leeSupport),
+        shoreSupport);
+    float anchoredCoreProtection = smoothstep(
+        0.72,
+        0.92,
+        anchoredCore);
+    pocketAgingPressure *=
+        (1.0 - anchoredCoreProtection) *
+        (1.0 - obstacleFootprint);
+
     // Topology RGBA = Major, Connector, Pocket Aging Pressure, and the derived
     // guidance-resolution copy of the conservative current-water solid mask.
     // Anchored source RGBA = Pressure Support, Lee Support, Shore Support, zero.
