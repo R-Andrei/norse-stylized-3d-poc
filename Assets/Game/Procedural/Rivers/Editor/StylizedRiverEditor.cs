@@ -1471,7 +1471,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.4 retains the accepted Interior Pocket, Edge Cavity, and Connector Weak Span classes and adds sparse unhosted Free-Water Negative Events while preserving Major and Connector behaviour.",
+                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.6 adds lively single-instance Major movement and morphing. Patch 4.6.1 keeps recycled Majors distributed through per-slot local territories, and Patch 4.6.2 uses a combined elapsed-time and completed-hop lifetime budget to prevent unusually slow or unusually active occurrences from persisting too long. Connector and negative classes remain on the accepted static baseline.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1495,6 +1495,21 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent(
                     "Major Support Size Variation",
                     "Controls the relative size spread between stable Major opportunities. Zero makes their scale multipliers uniform, 0.5 preserves the Patch 2 distribution, and one strongly separates the smallest and largest regions without overriding river-width or placement limits."));
+            EditorGUILayout.PropertyField(
+                Find("foamMajorRecycleTerritoryDeviationPercent"),
+                new GUIContent(
+                    "Major Recycle Territory Deviation (%)",
+                    "Maximum longitudinal deviation from each Major's original accepted river position when it recycles. A value of 3 permits respawn within approximately original position ±3% of valid river length. Near-egress originals are shifted upstream enough to retain a useful movement runway."));
+            EditorGUILayout.PropertyField(
+                Find("foamMajorLifetimeUnits"),
+                new GUIContent(
+                    "Major Lifetime Units",
+                    "Average combined lifetime budget for one Major occurrence. Approximately one normal five-second dwell-plus-move cycle consumes one unit through both elapsed time and completed hops. Higher values delay local recycling."));
+            EditorGUILayout.PropertyField(
+                Find("foamMajorLifetimeUnitDeviation"),
+                new GUIContent(
+                    "Major Lifetime Unit Deviation",
+                    "Deterministic plus-or-minus variation around Major Lifetime Units for each occurrence. A base of 6 and deviation of 2 produces approximately 4–8 allocated units, with a minimum of one."));
             EditorGUILayout.PropertyField(
                 Find("foamMajorSupportSeed"),
                 new GUIContent(
@@ -1739,8 +1754,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Patch 4.4 generates and composes static whole-river Major Support, controllable sparse Major-to-Major Connector Support, closed Interior Pockets, one-sided Edge Cavities, Connector Weak Spans, and sparse Free-Water Negative Events. Stable class, region, relationship, host, path, phase, fade, drift, allowed-span, and recycle metadata remain available for later evolution. Authoritative live Pressure, Lee, Shore, and Obstacle Footprint sources remain independently composed."),
-                new GUIContent("Major + Connector + Prepared Negative Topology (Patch 4.4)"));
+                    "Patch 4.6 evolves each accepted Major as one active instance with independent dwell, downstream/diagonal movement, shape morphing, a combined time-plus-hop occurrence budget, and instant local-territory recycling. Connector Support and all four negative classes remain static for this proof. Authoritative live Pressure, Lee, Shore, and Obstacle Footprint sources remain independently composed."),
+                new GUIContent("Evolving Major + Static Connector/Negative Topology (Patch 4.6.2)"));
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
                 new GUIContent(
@@ -1800,6 +1815,56 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorGUILayout.LabelField(
                     "Generation Time",
                     $"{runtime.MajorGenerationMilliseconds:0.00} ms");
+                EditorGUILayout.LabelField(
+                    "Evolution",
+                    runtime.MajorEvolutionAvailable
+                        ? "Active (Patch 4.6)"
+                        : "Waiting for prepared runtime data");
+                if (runtime.MajorEvolutionAvailable)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.LabelField(
+                        "Slots",
+                        runtime.MajorEvolutionSlotCount.ToString());
+                    EditorGUILayout.LabelField(
+                        "Dwelling / Moving",
+                        $"{runtime.MajorEvolutionDwellingCount} / " +
+                        runtime.MajorEvolutionMovingCount);
+                    EditorGUILayout.LabelField(
+                        "Observed Dwell Range",
+                        $"{runtime.MajorEvolutionMinimumDwell:0.00}–" +
+                        $"{runtime.MajorEvolutionMaximumDwell:0.00} s");
+                    EditorGUILayout.LabelField(
+                        "Observed Move Range",
+                        $"{runtime.MajorEvolutionMinimumMove:0.00}–" +
+                        $"{runtime.MajorEvolutionMaximumMove:0.00} s");
+                    EditorGUILayout.LabelField(
+                        "Reconstruction Ticks",
+                        runtime.MajorEvolutionReconstructionTicks.ToString());
+                    EditorGUILayout.LabelField(
+                        "Recycles",
+                        runtime.MajorEvolutionRecycleCount.ToString());
+                    EditorGUILayout.LabelField(
+                        "Prepared Recycle Anchors",
+                        runtime.MajorPreparedRecycleAnchorCount.ToString());
+                    EditorGUILayout.LabelField(
+                        "Recycle Anchor Fallbacks",
+                        runtime.MajorRecycleFallbackCount.ToString());
+                    EditorGUILayout.LabelField(
+                        "Crowded Recycle Fallbacks",
+                        runtime.MajorEvolutionCrowdedRecycleFallbackCount
+                            .ToString());
+                    EditorGUILayout.LabelField(
+                        "Upstream Violations",
+                        runtime.MajorEvolutionUpstreamViolations.ToString());
+                    EditorGUILayout.LabelField(
+                        "Last Evolution CPU",
+                        $"{runtime.MajorEvolutionLastCpuMilliseconds:0.000} ms");
+                    EditorGUILayout.LabelField(
+                        "Last Tick Allocations",
+                        $"{runtime.MajorEvolutionLastAllocatedBytes} B");
+                    EditorGUI.indentLevel--;
+                }
                 EditorGUI.indentLevel--;
             }
 
@@ -1938,7 +2003,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent("Subsystem Rates"),
                 new GUIContent(
-                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz · Major, Connector, Interior Pocket, Edge Cavity, Connector Weak Span, and Free-Water Negative Event topology are static in Patch 4.4"));
+                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz · Major reconstruction up to 5 Hz only while moving; Connector and negative classes remain static"));
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Transport",
@@ -2536,7 +2601,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.SupportClasses:
                     return
-                        "Red = static whole-river Major Support generated from stable field-first candidates and actual river context. Green = sparse prepared Connector Support between disconnected Major components. Blue = the maximum of the accepted live Pressure, Lee, and Shore Support classes shown separately in Anchored Support. Major/Connector overlaps mix near attachment edges; broad Major interiors are not repainted green. Black = no lifespan support. The compact preview above remains only an isolated candidate inspection.";
+                        "Red = evolving whole-river Major Support generated from stable field-first candidates and moved/morphed as one active instance per slot. Green = currently static prepared Connector Support between disconnected Major components. Blue = the maximum of the accepted live Pressure, Lee, and Shore Support classes shown separately in Anchored Support. Major/Connector overlaps mix near attachment edges; broad Major interiors are not repainted green. Black = no lifespan support. The compact preview above remains only an isolated candidate inspection.";
 
                 case StylizedRiverFoamDebugView.NegativeInfluenceClasses:
                     return

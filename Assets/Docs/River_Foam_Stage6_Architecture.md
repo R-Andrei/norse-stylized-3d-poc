@@ -42,11 +42,10 @@ Approved negative-topology expansion before runtime evolution:
 - expose one independent `0–1` Amount control per negative class, all defaulting to `0.5`; Patch 4.2 exposes Interior Pocket and Edge Cavity Amount, Patch 4.3 exposes Connector Weak Span Amount, and Patch 4.4 exposes Free-Water Event Amount;
 - make each Amount activate a nested deterministic opportunity subset and control population only;
 - preserve subtype identity and future evolution metadata even when classes are packed into one aggregate negative field for diagnostics/output;
-- Patch 4.5 combined static validation accepted for feature progression; all population and shape coefficients remain provisional until the final Foam material proves the complete visual result.
+- Patch 4.5 combined static validation accepted for feature progression; all population and shape coefficients remain provisional until the final Foam material proves the complete visual result;
+- Patch 4.6 lively single-instance Major Support movement and morphing, Patch 4.6.1 local recycle territories, and Patch 4.6.2 combined lifetime units implemented and awaiting visual/performance acceptance.
 
 Not yet implemented or accepted:
-
-- Patch 4.6 lively single-instance Major Support movement and morphing;
 - Patch 4.7A hosted Interior Pocket and Edge Cavity evolution;
 - Patch 4.7B slower independent Free-Water Negative Event evolution;
 - Patch 4.7C Connector Support and Connector Weak Span evolution;
@@ -683,8 +682,8 @@ The provisional Patch 4.6 lifecycle is:
 2. **Dwell** — it remains at that state for a deterministic `2–5 s`.
 3. **Move and morph** — over roughly `1–2 s`, the same Major moves to a new state.
 4. **Commit** — the target becomes current and receives a new independently selected dwell.
-5. **Repeat** — the slot continues through multiple hops until its allocated lifetime or downstream egress condition is reached.
-6. **Instant recycle** — the old occurrence is removed and the same slot reappears at one valid upstream ingress anchor in the same topology update. No fade or overlap is required.
+5. **Repeat** — elapsed time and completed hops both consume one combined occurrence-lifetime budget until that budget or downstream egress is reached.
+6. **Instant recycle** — the old occurrence is removed and the same slot reappears at one valid anchor inside its persistent local recycle territory in the same topology update. No fade or overlap is required.
 
 Each movement must:
 
@@ -694,9 +693,9 @@ Each movement must:
 - use a different deterministic rhythm from neighbouring Majors;
 - preserve broadly similar integrated support so size changes do not steadily inflate or collapse total support.
 
-The exact dwell, movement, hop-count, and lifetime ranges remain provisional implementation coefficients. The first proof should begin near `2–5 s` dwell, `1–2 s` movement, and roughly `5–12` hops or `20–45 s` total occurrence lifetime, then be judged through the later persistent Foam material.
+The exact dwell, movement, and lifetime coefficients remain provisional. Patch 4.6.2 replaces independent hop and second limits with `Major Lifetime Units` and `Major Lifetime Unit Deviation`. Both elapsed time and completed hops consume the same budget, so unusually slow occurrences cannot remain locally persistent merely by completing few hops and unusually active occurrences cannot pass through excessive topology states before recycling. The controls default to `6` units with `±2` deterministic variation; one normal dwell-plus-move cycle of about five seconds consumes approximately one unit. A derived maximum-duration safeguard remains internal.
 
-A Major initially generated close to the downstream end receives a shortened first occurrence. All normal recycle anchors are restricted to the upstream ingress region, so a slot cannot become trapped repeatedly disappearing and reappearing in the final part of the river.
+Each Major retains a local recycle territory centred on its original accepted longitudinal position. `Major Recycle Territory Deviation (%)` controls the permitted offset on either side, with range `0–10` and default `3`. Near-egress originals shift their effective territory upstream enough to retain a useful movement runway, preventing repeated recycling inside the final part of the river.
 
 ##### Retained evolution data
 
@@ -705,8 +704,8 @@ The generator or future cache must retain enough compact data for cheap evolutio
 - class and stable slot identity;
 - one accepted soft local mask plus cheap compatible warp/variant data;
 - current and target river-distance, lateral position, orientation, and scale;
-- deterministic dwell, movement, hop-count, lifetime, and cycle selectors;
-- upstream ingress anchors and downstream egress limits;
+- deterministic dwell, movement, combined lifetime-unit budget, and cycle selectors;
+- local recycle anchors, original longitudinal home territory, and downstream egress limits;
 - Major-host-relative data for Interior Pockets and Edge Cavities;
 - accepted Connector polyline, endpoint identities, and normalized Weak Span positions;
 - bounded prevalidated spare Connector relationships where later testing proves they are required.
@@ -781,7 +780,7 @@ Target transform + target shape state
 Movement progress
 ```
 
-During a move, the descriptor interpolates toward the target and one resulting mask is rasterized. At completion, target becomes current. At recycle, the descriptor is replaced immediately with a valid upstream state in the same topology update.
+During a move, the descriptor interpolates toward the target and one resulting mask is rasterized. At completion, target becomes current. At recycle, the descriptor is replaced immediately with a valid state from that slot's local recycle territory in the same topology update.
 
 This ordinary evolution model must not be confused with the later **explicit full-topology rebuild** path. A domain/settings/obstacle rebuild may still preserve old and replacement complete topology long enough to avoid a whole-river discontinuity. That separate rebuild transition is not used for routine per-region movement.
 
@@ -1034,10 +1033,13 @@ The canonical topology-only rollout is maintained in `River_Foam_Topology_Implem
 10. Patch 4.3 Connector Weak Spans accepted after visual validation.
 11. Patch 4.4 Free-Water Negative Events accepted after visual tuning.
 12. Patch 4.5 complete static topology accepted for feature progression; coefficients remain provisional.
+13. Patch 4.6 lively single-instance Major movement/morphing implemented.
+14. Patch 4.6.1 distributed local recycle territories implemented.
+15. Patch 4.6.2 combined elapsed-time and completed-hop lifetime units implemented; visual and performance acceptance pending.
 
 ### Active runtime-evolution sequence
 
-1. Patch 4.6 — lively single-instance Major movement, morphing, finite occurrence lifetime, and instant upstream recycling.
+1. Validate Patch 4.6.2 Major evolution, combined lifetime turnover, long-term spatial distribution, and computational cost.
 2. Patch 4.7A — Major-host-relative Interior Pocket and Edge Cavity evolution.
 3. Patch 4.7B — slower independent Free-Water Negative Event movement, morphing, and recycling.
 4. Patch 4.7C — retained-path Connector deformation, prevalidated relationship replacement, and Weak Span following.

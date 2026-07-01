@@ -155,6 +155,23 @@ namespace ProgrammaticStylized3D.Rivers
                 cleanedMask.Length);
         }
 
+        internal void CopyFinalSupportTo(float[] destination)
+        {
+            if (destination == null || destination.Length < finalSupport.Length)
+            {
+                throw new ArgumentException(
+                    $"Major candidate support copy requires at least {finalSupport.Length} cells.",
+                    nameof(destination));
+            }
+
+            Buffer.BlockCopy(
+                finalSupport,
+                0,
+                destination,
+                0,
+                finalSupport.Length * sizeof(float));
+        }
+
         internal float SampleFinalSupportBilinear(float x, float y)
         {
             if (x < -0.5f || x > Resolution - 0.5f ||

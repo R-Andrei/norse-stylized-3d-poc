@@ -18,6 +18,12 @@ namespace ProgrammaticStylized3D.Rivers
         private const int PlacementVariantCount = 3;
         private const float MajorCoverageThreshold = 0.15f;
         private const float GoldenRatioConjugate = 0.61803398875f;
+        private const int MaximumRecycleAnchorCount = 6;
+        private const int RecycleAnchorAttemptCount = 15;
+        private const float MinimumRecycleRunwayMetres = 3f;
+        private const float MinimumRecycleRunwayFraction = 0.15f;
+        private static readonly float[] RecycleLateralOffsets =
+            { 0f, -0.22f, 0.22f };
 
         public static StylizedRiverFoamMajorTopology Generate(
             RiverDomainSnapshot domain,
@@ -30,6 +36,7 @@ namespace ProgrammaticStylized3D.Rivers
             float amount,
             float size,
             float sizeVariation,
+            float recycleTerritoryDeviationPercent,
             int seed,
             float[] obstacleMask)
         {
@@ -56,12 +63,19 @@ namespace ProgrammaticStylized3D.Rivers
                     stopwatch.Elapsed.TotalMilliseconds,
                     support,
                     Array.Empty<StylizedRiverFoamMajorRegion>(),
+                    Array.Empty<StylizedRiverFoamPreparedMajorRegion>(),
+                    0,
+                    0,
                     rejectionCounts);
             }
 
             amount = Mathf.Clamp01(amount);
             size = Mathf.Clamp01(size);
             sizeVariation = Mathf.Clamp01(sizeVariation);
+            recycleTerritoryDeviationPercent = Mathf.Clamp(
+                recycleTerritoryDeviationPercent,
+                0f,
+                10f);
             seed = Mathf.Max(0, seed);
             float[] fluidCoverage = new float[cellCount];
             bool[] validCells = new bool[cellCount];
@@ -101,7 +115,10 @@ namespace ProgrammaticStylized3D.Rivers
             float averageVisibleWidth = ResolveAverageVisibleWidth(domain);
 
             List<StylizedRiverFoamMajorRegion> regions = new();
+            List<StylizedRiverFoamPreparedMajorRegion> preparedRegions = new();
             List<AcceptedPlacement> acceptedPlacements = new();
+            int preparedRecycleAnchorCount = 0;
+            int recycleFallbackCount = 0;
             int[] lateralPopulation = new int[3];
             float[] variantField = new float[cellCount];
             float[] bestField = new float[cellCount];
@@ -262,6 +279,41 @@ namespace ProgrammaticStylized3D.Rivers
                 float movementSpanSelector = Hash01(evolutionSeed, 74u);
                 float recycleSelector = Hash01(evolutionSeed, 75u);
 
+                float[] localSupport = new float[
+                    candidate.Resolution * candidate.Resolution];
+                candidate.CopyFinalSupportTo(localSupport);
+                StylizedRiverFoamMajorRecycleAnchor[] recycleAnchors =
+                    BuildRecycleAnchors(
+                        candidate,
+                        shape,
+                        bestEvaluation,
+                        opportunity.StableId,
+                        domain,
+                        width,
+                        height,
+                        fieldLength,
+                        validFieldLength,
+                        recycleTerritoryDeviationPercent,
+                        fluidCoverage,
+                        obstacleMask,
+                        out bool usedFallbackAnchor);
+                preparedRecycleAnchorCount += recycleAnchors.Length;
+                if (usedFallbackAnchor)
+                {
+                    recycleFallbackCount++;
+                }
+
+                preparedRegions.Add(
+                    new StylizedRiverFoamPreparedMajorRegion(
+                        opportunity.StableId,
+                        candidate.Resolution,
+                        localSupport,
+                        shape.Centroid,
+                        shape.PrincipalAngleRadians,
+                        shape.MajorHalfExtentCells,
+                        shape.MinorHalfExtentCells,
+                        recycleAnchors));
+
                 regions.Add(new StylizedRiverFoamMajorRegion(
                     opportunity.StableId,
                     opportunity.LongitudinalIndex,
@@ -304,7 +356,334 @@ namespace ProgrammaticStylized3D.Rivers
                 stopwatch.Elapsed.TotalMilliseconds,
                 support,
                 regions.ToArray(),
+                preparedRegions.ToArray(),
+                preparedRecycleAnchorCount,
+                recycleFallbackCount,
                 rejectionCounts);
+        }
+
+        private static StylizedRiverFoamMajorRecycleAnchor[]
+            BuildRecycleAnchors(
+                StylizedRiverFoamMajorCandidate candidate,
+                CandidateShape shape,
+                CandidateEvaluation acceptedPlacement,
+                uint stableId,
+                RiverDomainSnapshot domain,
+                int width,
+                int height,
+                float fieldLength,
+                float validFieldLength,
+                float recycleTerritoryDeviationPercent,
+                float[] fluidCoverage,
+                float[] obstacleMask,
+                out bool usedFallback)
+        {
+            usedFallback = false;
+            List<StylizedRiverFoamMajorRecycleAnchor> anchors = new(
+                MaximumRecycleAnchorCount);
+            float deviationMetres = validFieldLength *
+                Mathf.Clamp(recycleTerritoryDeviationPercent, 0f, 10f) *
+                0.01f;
+            float minimumRunway = Mathf.Min(
+                validFieldLength,
+                Mathf.Max(
+                    MinimumRecycleRunwayMetres,
+                    validFieldLength * MinimumRecycleRunwayFraction));
+            float egressStart =
+                StylizedRiverFoamMajorTopology
+                    .ResolveEvolutionEgressStart(validFieldLength);
+            float maximumSafeHomeDistance = Mathf.Max(
+                0f,
+                egressStart - minimumRunway);
+            float homeDistance = Mathf.Min(
+                acceptedPlacement.CentreLocalDistance,
+                maximumSafeHomeDistance);
+            float territoryStart = Mathf.Clamp(
+                homeDistance - deviationMetres,
+                0f,
+                maximumSafeHomeDistance);
+            float territoryEnd = Mathf.Clamp(
+                homeDistance + deviationMetres,
+                territoryStart,
+                maximumSafeHomeDistance);
+            for (int attempt = 0;
+                 attempt < RecycleAnchorAttemptCount &&
+                 anchors.Count < MaximumRecycleAnchorCount;
+                 attempt++)
+            {
+                uint attemptSeed = MixBits(
+                    stableId ^
+                    ((uint)(attempt + 1) * 0x9E3779B9u) ^
+                    0xA511E9B3u);
+                float alongSelector = Fractional(
+                    Hash01(attemptSeed, 1u) +
+                    attempt * GoldenRatioConjugate);
+                float centreLocalDistance = Mathf.Lerp(
+                    territoryStart,
+                    territoryEnd,
+                    alongSelector);
+                int laneIndex = attempt % RecycleLateralOffsets.Length;
+                float laneJitter = Mathf.Lerp(
+                    -0.08f,
+                    0.08f,
+                    Hash01(attemptSeed, 2u));
+                float centreAcrossNormalized = Mathf.Clamp(
+                    acceptedPlacement.CentreAcrossNormalized +
+                        RecycleLateralOffsets[laneIndex] + laneJitter,
+                    -0.76f,
+                    0.76f);
+                float orientation = WrapHalfTurn(
+                    acceptedPlacement.OrientationRadians +
+                    Mathf.Lerp(-0.24f, 0.24f, Hash01(attemptSeed, 3u)));
+                float metresPerCell =
+                    acceptedPlacement.MetresPerCandidateCell *
+                    Mathf.Lerp(0.82f, 1.00f, Hash01(attemptSeed, 4u));
+
+                EvolutionAnchorEvaluation evaluation =
+                    EvaluateRecycleAnchor(
+                        candidate,
+                        shape,
+                        centreLocalDistance,
+                        centreAcrossNormalized,
+                        orientation,
+                        metresPerCell,
+                        domain,
+                        width,
+                        height,
+                        fieldLength,
+                        validFieldLength,
+                        fluidCoverage,
+                        obstacleMask);
+                if (!evaluation.Accepted ||
+                    IsNearExistingRecycleAnchor(
+                        anchors,
+                        centreLocalDistance,
+                        centreAcrossNormalized))
+                {
+                    continue;
+                }
+
+                anchors.Add(new StylizedRiverFoamMajorRecycleAnchor(
+                    centreLocalDistance,
+                    centreAcrossNormalized,
+                    orientation,
+                    metresPerCell,
+                    false));
+            }
+
+            if (anchors.Count > 0)
+            {
+                return anchors.ToArray();
+            }
+
+            usedFallback = true;
+            float fallbackAcross = Mathf.Clamp(
+                acceptedPlacement.CentreAcrossNormalized,
+                -0.76f,
+                0.76f);
+            float fallbackScale =
+                acceptedPlacement.MetresPerCandidateCell * 0.72f;
+            EvolutionAnchorEvaluation safeHomeFallback =
+                EvaluateRecycleAnchor(
+                    candidate,
+                    shape,
+                    homeDistance,
+                    fallbackAcross,
+                    acceptedPlacement.OrientationRadians,
+                    fallbackScale,
+                    domain,
+                    width,
+                    height,
+                    fieldLength,
+                    validFieldLength,
+                    fluidCoverage,
+                    obstacleMask);
+            if (safeHomeFallback.Accepted)
+            {
+                return new[]
+                {
+                    new StylizedRiverFoamMajorRecycleAnchor(
+                        homeDistance,
+                        fallbackAcross,
+                        acceptedPlacement.OrientationRadians,
+                        fallbackScale,
+                        true)
+                };
+            }
+
+            // The original accepted placement is the final fail-safe because
+            // it has already passed the authoritative static placement gates.
+            return new[]
+            {
+                new StylizedRiverFoamMajorRecycleAnchor(
+                    acceptedPlacement.CentreLocalDistance,
+                    acceptedPlacement.CentreAcrossNormalized,
+                    acceptedPlacement.OrientationRadians,
+                    acceptedPlacement.MetresPerCandidateCell,
+                    true)
+            };
+        }
+
+        private static bool IsNearExistingRecycleAnchor(
+            List<StylizedRiverFoamMajorRecycleAnchor> anchors,
+            float localDistance,
+            float acrossNormalized)
+        {
+            for (int index = 0; index < anchors.Count; index++)
+            {
+                StylizedRiverFoamMajorRecycleAnchor anchor = anchors[index];
+                if (Mathf.Abs(anchor.CentreLocalDistance - localDistance) <
+                        0.34f &&
+                    Mathf.Abs(
+                        anchor.CentreAcrossNormalized - acrossNormalized) <
+                        0.16f)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static EvolutionAnchorEvaluation EvaluateRecycleAnchor(
+            StylizedRiverFoamMajorCandidate candidate,
+            CandidateShape shape,
+            float centreLocalDistance,
+            float centreAcrossNormalized,
+            float orientationRadians,
+            float metresPerCandidateCell,
+            RiverDomainSnapshot domain,
+            int width,
+            int height,
+            float fieldLength,
+            float validFieldLength,
+            float[] fluidCoverage,
+            float[] obstacleMask)
+        {
+            float cosineOrientation = Mathf.Cos(orientationRadians);
+            float sineOrientation = Mathf.Sin(orientationRadians);
+            float alongRadius = metresPerCandidateCell * (
+                Mathf.Abs(cosineOrientation) * shape.MajorHalfExtentCells +
+                Mathf.Abs(sineOrientation) * shape.MinorHalfExtentCells);
+            int minimumX = Mathf.Clamp(
+                Mathf.FloorToInt(
+                    (centreLocalDistance - alongRadius) /
+                    Mathf.Max(0.0001f, fieldLength) * width) - 1,
+                0,
+                width - 1);
+            int maximumX = Mathf.Clamp(
+                Mathf.CeilToInt(
+                    (centreLocalDistance + alongRadius) /
+                    Mathf.Max(0.0001f, fieldLength) * width) + 1,
+                0,
+                width - 1);
+
+            float totalWeight = 0f;
+            float effectiveWeight = 0f;
+            float bankClippedWeight = 0f;
+            float obstacleWeight = 0f;
+            float outsideDomainWeight = 0f;
+            float candidatePrincipalCosine = Mathf.Cos(
+                shape.PrincipalAngleRadians);
+            float candidatePrincipalSine = Mathf.Sin(
+                shape.PrincipalAngleRadians);
+
+            for (int x = minimumX; x <= maximumX; x++)
+            {
+                float localDistance = (x + 0.5f) /
+                    Mathf.Max(1f, width) * fieldLength;
+                float clampedDistance = Mathf.Clamp(
+                    localDistance,
+                    0f,
+                    validFieldLength);
+                StylizedRiverSplineSample sample =
+                    domain.SampleAtOrientedDistance(clampedDistance);
+                float centreAcrossMetres = SignedNormalizedToMetres(
+                    centreAcrossNormalized,
+                    sample.LeftHalfWidth,
+                    sample.RightHalfWidth);
+                float deltaAlong = localDistance - centreLocalDistance;
+
+                for (int y = 0; y < height; y++)
+                {
+                    float across01 = (y + 0.5f) /
+                        Mathf.Max(1f, height);
+                    float acrossMetres = Across01ToMetres(
+                        across01,
+                        sample.LeftSurfaceHalfWidth,
+                        sample.RightSurfaceHalfWidth);
+                    float deltaAcross = acrossMetres - centreAcrossMetres;
+                    float principalMajorMetres =
+                        cosineOrientation * deltaAlong +
+                        sineOrientation * deltaAcross;
+                    float principalMinorMetres =
+                        -sineOrientation * deltaAlong +
+                        cosineOrientation * deltaAcross;
+                    float sourceMajor = principalMajorMetres /
+                        Mathf.Max(0.0001f, metresPerCandidateCell);
+                    float sourceMinor = principalMinorMetres /
+                        Mathf.Max(0.0001f, metresPerCandidateCell);
+                    float sourceX = shape.Centroid.x +
+                        candidatePrincipalCosine * sourceMajor -
+                        candidatePrincipalSine * sourceMinor;
+                    float sourceY = shape.Centroid.y +
+                        candidatePrincipalSine * sourceMajor +
+                        candidatePrincipalCosine * sourceMinor;
+                    float support = candidate.SampleFinalSupportBilinear(
+                        sourceX,
+                        sourceY);
+                    if (support <= 0.001f)
+                    {
+                        continue;
+                    }
+
+                    int cellIndex = x + y * width;
+                    float fluid = fluidCoverage[cellIndex];
+                    float obstacle = SampleObstacle(
+                        obstacleMask,
+                        cellIndex);
+                    totalWeight += support;
+                    effectiveWeight += support * fluid * (1f - obstacle);
+                    bankClippedWeight += support * (1f - fluid);
+                    obstacleWeight += support * obstacle;
+                    if (localDistance < 0f ||
+                        localDistance > validFieldLength)
+                    {
+                        outsideDomainWeight += support;
+                    }
+                }
+            }
+
+            if (totalWeight <= 0.001f)
+            {
+                return new EvolutionAnchorEvaluation(
+                    false,
+                    float.NegativeInfinity,
+                    centreLocalDistance,
+                    centreAcrossNormalized,
+                    orientationRadians,
+                    metresPerCandidateCell);
+            }
+
+            float bankRatio = bankClippedWeight / totalWeight;
+            float obstacleRatio = obstacleWeight / totalWeight;
+            float outsideRatio = outsideDomainWeight / totalWeight;
+            float effectiveRatio = effectiveWeight / totalWeight;
+            bool accepted = outsideRatio <= 0.10f &&
+                obstacleRatio <= 0.055f &&
+                bankRatio <= 0.22f &&
+                effectiveRatio >= 0.68f;
+            float score = effectiveRatio -
+                bankRatio * 0.7f -
+                obstacleRatio * 2.2f -
+                outsideRatio * 3f;
+            return new EvolutionAnchorEvaluation(
+                accepted,
+                score,
+                centreLocalDistance,
+                centreAcrossNormalized,
+                orientationRadians,
+                metresPerCandidateCell);
         }
 
         private static List<MajorOpportunity> BuildOpportunities(
@@ -1129,6 +1508,32 @@ namespace ProgrammaticStylized3D.Rivers
             value *= 0x846CA68Bu;
             value ^= value >> 16;
             return value;
+        }
+
+        private readonly struct EvolutionAnchorEvaluation
+        {
+            public EvolutionAnchorEvaluation(
+                bool accepted,
+                float score,
+                float centreLocalDistance,
+                float centreAcrossNormalized,
+                float orientationRadians,
+                float metresPerCandidateCell)
+            {
+                Accepted = accepted;
+                Score = score;
+                CentreLocalDistance = centreLocalDistance;
+                CentreAcrossNormalized = centreAcrossNormalized;
+                OrientationRadians = orientationRadians;
+                MetresPerCandidateCell = metresPerCandidateCell;
+            }
+
+            public bool Accepted { get; }
+            public float Score { get; }
+            public float CentreLocalDistance { get; }
+            public float CentreAcrossNormalized { get; }
+            public float OrientationRadians { get; }
+            public float MetresPerCandidateCell { get; }
         }
 
         private readonly struct MajorOpportunity

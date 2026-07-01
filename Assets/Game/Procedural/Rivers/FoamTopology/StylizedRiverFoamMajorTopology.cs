@@ -19,11 +19,8 @@ namespace ProgrammaticStylized3D.Rivers
     }
 
     /// <summary>
-    /// Stable identity and cheap future-evolution metadata for one accepted
-    /// whole-river Major Support region. The current topology uses only the
-    /// static transform;
-    /// the retained normalized selectors defer physical timing and speed
-    /// decisions to their later gated runtime-evolution step.
+    /// Stable identity and cheap evolution metadata for one accepted
+    /// whole-river Major Support region.
     /// </summary>
     public readonly struct StylizedRiverFoamMajorRegion
     {
@@ -88,14 +85,109 @@ namespace ProgrammaticStylized3D.Rivers
     }
 
     /// <summary>
+    /// One prevalidated local-territory placement used when an evolving Major recycles.
+    /// Coordinates remain in the canonical local river domain.
+    /// </summary>
+    internal readonly struct StylizedRiverFoamMajorRecycleAnchor
+    {
+        public StylizedRiverFoamMajorRecycleAnchor(
+            float centreLocalDistance,
+            float centreAcrossNormalized,
+            float orientationRadians,
+            float metresPerCandidateCell,
+            bool isFallback)
+        {
+            CentreLocalDistance = Mathf.Max(0f, centreLocalDistance);
+            CentreAcrossNormalized = Mathf.Clamp(
+                centreAcrossNormalized,
+                -0.82f,
+                0.82f);
+            OrientationRadians = orientationRadians;
+            MetresPerCandidateCell = Mathf.Max(
+                0.0001f,
+                metresPerCandidateCell);
+            IsFallback = isFallback;
+        }
+
+        public float CentreLocalDistance { get; }
+        public float CentreAcrossNormalized { get; }
+        public float OrientationRadians { get; }
+        public float MetresPerCandidateCell { get; }
+        public bool IsFallback { get; }
+    }
+
+    /// <summary>
+    /// Immutable local mask and geometry retained for the cheap Patch 4.6
+    /// movement/morph path. It is prepared once and never regenerated during
+    /// ordinary gameplay.
+    /// </summary>
+    internal sealed class StylizedRiverFoamPreparedMajorRegion
+    {
+        private readonly float[] localSupport;
+        private readonly StylizedRiverFoamMajorRecycleAnchor[] recycleAnchors;
+
+        public StylizedRiverFoamPreparedMajorRegion(
+            uint stableId,
+            int maskResolution,
+            float[] localSupport,
+            Vector2 centroidCells,
+            float principalAngleRadians,
+            float majorHalfExtentCells,
+            float minorHalfExtentCells,
+            StylizedRiverFoamMajorRecycleAnchor[] recycleAnchors)
+        {
+            StableId = stableId;
+            MaskResolution = Mathf.Max(1, maskResolution);
+            this.localSupport = localSupport ?? Array.Empty<float>();
+            CentroidCells = centroidCells;
+            PrincipalAngleRadians = principalAngleRadians;
+            MajorHalfExtentCells = Mathf.Max(0.5f, majorHalfExtentCells);
+            MinorHalfExtentCells = Mathf.Max(0.5f, minorHalfExtentCells);
+            this.recycleAnchors = recycleAnchors ??
+                Array.Empty<StylizedRiverFoamMajorRecycleAnchor>();
+        }
+
+        public uint StableId { get; }
+        public int MaskResolution { get; }
+        public Vector2 CentroidCells { get; }
+        public float PrincipalAngleRadians { get; }
+        public float MajorHalfExtentCells { get; }
+        public float MinorHalfExtentCells { get; }
+        public IReadOnlyList<StylizedRiverFoamMajorRecycleAnchor>
+            RecycleAnchors => recycleAnchors;
+        internal float[] LocalSupportData => localSupport;
+    }
+
+    /// <summary>
     /// Immutable output of one deterministic whole-river Major Support build.
-    /// It contains the uploaded scalar field, accepted stable identities, and
-    /// only the concise telemetry required by the topology implementation plan.
+    /// It contains the accepted scalar field, stable identities, and prepared
+    /// local data required by the low-cost runtime evolution proof.
     /// </summary>
     public sealed class StylizedRiverFoamMajorTopology
     {
+        internal const float EvolutionEgressFraction = 0.10f;
+        internal const float EvolutionMinimumEgressMetres = 0.75f;
+        internal const float EvolutionMaximumEgressMetres = 3.0f;
+
+        internal static float ResolveEvolutionEgressStart(
+            float validFieldLength)
+        {
+            validFieldLength = Mathf.Max(0f, validFieldLength);
+            float egressSpan = Mathf.Clamp(
+                validFieldLength * EvolutionEgressFraction,
+                EvolutionMinimumEgressMetres,
+                EvolutionMaximumEgressMetres);
+            egressSpan = Mathf.Min(
+                egressSpan,
+                validFieldLength * 0.35f);
+            return Mathf.Max(
+                validFieldLength * 0.55f,
+                validFieldLength - egressSpan);
+        }
+
         private readonly float[] support;
         private readonly StylizedRiverFoamMajorRegion[] regions;
+        private readonly StylizedRiverFoamPreparedMajorRegion[] preparedRegions;
         private readonly int[] rejectionCounts;
 
         internal StylizedRiverFoamMajorTopology(
@@ -109,6 +201,9 @@ namespace ProgrammaticStylized3D.Rivers
             double generationMilliseconds,
             float[] support,
             StylizedRiverFoamMajorRegion[] regions,
+            StylizedRiverFoamPreparedMajorRegion[] preparedRegions,
+            int preparedRecycleAnchorCount,
+            int recycleFallbackCount,
             int[] rejectionCounts)
         {
             Width = Mathf.Max(0, width);
@@ -121,8 +216,14 @@ namespace ProgrammaticStylized3D.Rivers
             ValidCellCount = Mathf.Max(0, validCellCount);
             CoveredCellCount = Mathf.Max(0, coveredCellCount);
             GenerationMilliseconds = Math.Max(0.0, generationMilliseconds);
+            PreparedRecycleAnchorCount = Mathf.Max(
+                0,
+                preparedRecycleAnchorCount);
+            RecycleFallbackCount = Mathf.Max(0, recycleFallbackCount);
             this.support = support ?? Array.Empty<float>();
             this.regions = regions ?? Array.Empty<StylizedRiverFoamMajorRegion>();
+            this.preparedRegions = preparedRegions ??
+                Array.Empty<StylizedRiverFoamPreparedMajorRegion>();
             this.rejectionCounts = rejectionCounts ??
                 new int[Enum.GetValues(
                     typeof(StylizedRiverFoamMajorPlacementRejectionReason)).Length];
@@ -135,16 +236,17 @@ namespace ProgrammaticStylized3D.Rivers
         public int RejectedRegionCount { get; }
         public int ValidCellCount { get; }
         public int CoveredCellCount { get; }
+        public int PreparedRecycleAnchorCount { get; }
+        public int RecycleFallbackCount { get; }
         public double GenerationMilliseconds { get; }
         public float Coverage => ValidCellCount > 0
             ? CoveredCellCount / (float)ValidCellCount
             : 0f;
         public IReadOnlyList<StylizedRiverFoamMajorRegion> Regions => regions;
 
-        // The accepted scalar field remains immutable by convention and is
-        // exposed only inside the topology assembly so later prepared layers
-        // can derive relationships without reconstructing Major Support.
         internal float[] SupportData => support;
+        internal IReadOnlyList<StylizedRiverFoamPreparedMajorRegion>
+            PreparedRegions => preparedRegions;
 
         public int GetRejectionCount(
             StylizedRiverFoamMajorPlacementRejectionReason reason)

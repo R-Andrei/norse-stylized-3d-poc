@@ -4,7 +4,7 @@
 
 **Status:** Canonical step-by-step implementation plan for Stage 6 Foam topology only.
 
-**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, and Patch 4.5 complete static topology are accepted for feature progression. Static population and shape coefficients remain provisional until the final Foam material proves the complete visual result. Runtime evolution begins with Patch 4.6; explicit rebuild transition and production cache packaging are not yet implemented.
+**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, and Patch 4.5 complete static topology are accepted for feature progression. Patch 4.6 Major evolution, Patch 4.6.1 local recycle territories, and Patch 4.6.2 combined lifetime units are implemented and awaiting visual/performance acceptance. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Explicit rebuild transition and production cache packaging are not yet implemented.
 
 **Primary implementation target:**
 
@@ -891,9 +891,11 @@ Restore the previous composition/upload integration while retaining separately a
 
 ## Patch 4.6 — Lively Single-Instance Major Evolution
 
+**Status:** Implemented; visual and performance acceptance pending. The accepted soft Major masks and bounded per-slot local recycle anchors are retained during preparation, while gameplay advances one active instance per slot and reconstructs the low-resolution Major field only during movement. No runtime generation or pathfinding was added.
+
 ### Purpose
 
-Prove the runtime evolution foundation with Major Support only: frequent asynchronous movement, visible shape change, stable population, instant upstream recycling, and no expensive generation during gameplay.
+Prove the runtime evolution foundation with Major Support only: frequent asynchronous movement, visible shape change, stable population, spatially distributed instant recycling, and no expensive generation during gameplay.
 
 ### Core invariant
 
@@ -907,10 +909,10 @@ Each Major occurrence follows this provisional lifecycle:
 2. select a target state with positive downstream displacement and bounded lateral/diagonal displacement;
 3. over roughly `1–2 s`, move and morph the same instance to that target;
 4. commit the target and select a new independent dwell;
-5. repeat until the occurrence reaches its allocated hop/lifetime limit or downstream egress;
-6. remove that occurrence and place the same slot immediately at a valid upstream ingress anchor in the same topology update.
+5. repeat while elapsed time and completed hops consume one combined lifetime-unit budget, until that budget or downstream egress is reached;
+6. remove that occurrence and place the same slot immediately at a valid anchor inside its persistent local recycle territory in the same topology update.
 
-The first proof should begin near `5–12` hops or `20–45 s` total occurrence lifetime, but those values remain provisional.
+Patch 4.6.2 exposes `Major Lifetime Units` (`1–20`, default `6`) and `Major Lifetime Unit Deviation` (`0–10`, default `2`). Each occurrence receives the base budget plus deterministic `±` variation, with a minimum of one unit. Elapsed time and completed hops both spend that budget; a normal five-second dwell-plus-move cycle consumes approximately one unit. This replaces the independent time-or-hop limits because either factor alone could allow locally persistent clumps or excessive state churn. An internal maximum-duration safeguard remains as a pathological-case ceiling.
 
 Every hop must change the Major's shape. Use retained soft local masks plus cheap deterministic warp/variant parameters, non-uniform scale, shear, and small rotation. Preparation may retain several compatible shape variants when spending modest memory eliminates runtime generation. The summed support of variants should remain broadly comparable so morphing does not steadily change total support population.
 
@@ -920,8 +922,9 @@ Movement rules:
 - lateral displacement may be left or right;
 - diagonal movement is encouraged;
 - no whole-field wrap is permitted;
-- recycle anchors are upstream-only and exclude the egress region;
-- slots initially near the downstream edge receive a shortened first occurrence and thereafter use normal upstream recycling;
+- each slot recycles around its original accepted longitudinal percentage;
+- `Major Recycle Territory Deviation (%)` exposes the permitted `±` deviation with range `0–10` and default `3`;
+- near-egress original positions shift upstream enough to preserve a useful movement runway;
 - identical input state and elapsed time reproduce identical slot behaviour.
 
 ### Runtime representation
@@ -931,8 +934,8 @@ Retain or add only compact value data:
 - stable slot identity;
 - accepted local sparse mask and compatible warp/variant data;
 - current and target transform/shape descriptors;
-- dwell, move, hop, lifetime, and cycle selectors;
-- upstream ingress anchor catalogue and downstream egress limit.
+- dwell, move, combined lifetime-unit, and cycle selectors;
+- per-slot local recycle-anchor catalogue, original home territory, and downstream egress limit.
 
 During movement, interpolate the descriptor and rasterize one current state. Do not blend two complete support placements.
 
@@ -955,7 +958,7 @@ Required telemetry:
 - dwelling and moving counts;
 - minimum/maximum resolved dwell and move durations;
 - topology reconstruction tick count;
-- recycle count;
+- recycle count and crowded-anchor fallbacks;
 - longitudinal upstream-displacement violations;
 - per-tick CPU/GPU profiler markers and runtime allocation count.
 
@@ -964,7 +967,7 @@ Required telemetry:
 - no Connector evolution;
 - no Interior Pocket, Edge Cavity, Weak Span, or Free-Water evolution;
 - no Anchored Support movement;
-- no new public evolution controls;
+- no additional public evolution controls beyond the Patch 4.6.1 recycle-territory deviation control and Patch 4.6.2 lifetime-unit controls;
 - no explicit full-topology rebuild transition;
 - no cache packaging redesign.
 
@@ -992,7 +995,7 @@ Pass only if:
 - lateral/diagonal movement is present without bank leakage;
 - every hop visibly changes shape;
 - there is exactly one active instance per slot;
-- recycling is instantaneous, upstream-only, and cannot loop near the downstream edge;
+- recycling is instantaneous, remains near each slot's original longitudinal territory, avoids crowded anchors when possible, and cannot collapse the population into one shared river section;
 - long-term slot count remains constant;
 - no synchronized conveyor dominates;
 - no expensive generation operation or managed allocation appears during ordinary gameplay;
@@ -1364,20 +1367,18 @@ A topology patch that cannot answer these questions is not ready.
 
 ## 13. Immediate Next Step
 
-Patch 4.4 Free-Water Negative Events and Patch 4.5 complete static topology are accepted for feature progression. Static population and shape tuning remains provisional until the persistent Foam material proves the final visual result.
+Patch 4.6 Major evolution, Patch 4.6.1 local recycle territories, and Patch 4.6.2 combined lifetime units are implemented and now require visual and computational acceptance. Static and movement coefficients remain provisional until the persistent Foam material proves the final visual result.
 
-The next implementation is **Patch 4.6 — Lively Single-Instance Major Evolution**.
+Validate that:
 
-Before editing code:
+1. Majors use independent `2–5 s` dwell and `1–2 s` move/morph rhythms;
+2. every ordinary hop is net-downstream with bounded lateral/diagonal motion;
+3. one logical slot never becomes two simultaneous support instances;
+4. shape change is visible on every hop;
+5. lifetime/egress recycling is instantaneous and distributed through per-slot local territories;
+6. slot population remains constant;
+7. active reconstruction is low cost and produces no ready-state managed allocation or runtime generation work.
 
-1. inspect the Patch 4.5 baseline and identify the exact accepted Major raster data currently discarded after aggregate composition;
-2. define the smallest retained mask/variant representation that permits cheap shape morphing without gameplay generation;
-3. define upstream ingress anchors and downstream egress rules from existing valid prepared opportunities;
-4. specify the exact runtime field/buffer handoff and batched update path;
-5. preserve one active instance per slot, `2–5 s` dwell, `1–2 s` movement/morph, net-downstream plus bounded lateral movement, finite occurrence lifetime, and instant upstream recycling;
-6. state the exact file set and profiler markers before modification;
-7. implement Major only and leave all Connector and negative fields static.
-
-After Patch 4.6 passes visually and computationally, continue with Patch 4.7A hosted negatives, Patch 4.7B Free-Water Events, and Patch 4.7C Connectors/Weak Spans. Patch 4.8 explicit rebuild transition and Patch 4.9 procedural cache packaging follow before Patch 4.10 topology completion and any Foam-material implementation.
+After Patch 4.6.2 passes, continue with Patch 4.7A hosted negatives, Patch 4.7B Free-Water Events, and Patch 4.7C Connectors/Weak Spans. Patch 4.8 explicit rebuild transition and Patch 4.9 procedural cache packaging follow before Patch 4.10 topology completion and any Foam-material implementation.
 
 Topology is not considered implemented until runtime evolution, explicit rebuild handling, and cache/preparation handoff pass. Only then may the separate Foam material-lifecycle implementation begin.

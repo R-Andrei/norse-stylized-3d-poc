@@ -675,6 +675,19 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamMajorSupportSizeVariation = 0.5f;
 
+        [Tooltip("Controls how far a Major may respawn longitudinally from its original accepted river position when its occurrence recycles. The value is a percentage of valid river length applied in both directions. Near-egress originals retain an upstream runway safeguard so they cannot become trapped at the chunk end.")]
+        [Range(0f, 10f)]
+        [SerializeField]
+        private float foamMajorRecycleTerritoryDeviationPercent = 3f;
+
+        [Tooltip("Average combined lifetime budget for one evolving Major occurrence. Approximately one normal dwell-plus-move cycle consumes one unit through both elapsed time and completed hops. Higher values keep an occurrence alive longer before it recycles inside its local territory.")]
+        [Range(1f, 20f)]
+        [SerializeField] private float foamMajorLifetimeUnits = 6f;
+
+        [Tooltip("Deterministic plus-or-minus variation applied to Major Lifetime Units for each recycled occurrence. A base of 6 and deviation of 2 allocates approximately 4–8 units, with an enforced minimum of one unit.")]
+        [Range(0f, 10f)]
+        [SerializeField] private float foamMajorLifetimeUnitDeviation = 2f;
+
         [Tooltip("Deterministic seed for both the field-first candidate proof and stable whole-river opportunity identity, candidate assignment, transforms, and future evolution metadata. The same inputs reproduce the same static Major topology.")]
         [Min(0)]
         [SerializeField] private int foamMajorSupportSeed = 1;
@@ -1142,6 +1155,15 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamMajorSupportSize);
         public float FoamMajorSupportSizeVariation =>
             Mathf.Clamp01(foamMajorSupportSizeVariation);
+        public float FoamMajorRecycleTerritoryDeviationPercent =>
+            Mathf.Clamp(
+                foamMajorRecycleTerritoryDeviationPercent,
+                0f,
+                10f);
+        public float FoamMajorLifetimeUnits =>
+            Mathf.Clamp(foamMajorLifetimeUnits, 1f, 20f);
+        public float FoamMajorLifetimeUnitDeviation =>
+            Mathf.Clamp(foamMajorLifetimeUnitDeviation, 0f, 10f);
         public int FoamMajorSupportSeed =>
             Mathf.Max(0, foamMajorSupportSeed);
         public float FoamConnectorAmount =>
@@ -2779,6 +2801,18 @@ namespace ProgrammaticStylized3D.Rivers
             foamMajorSupportSize = Mathf.Clamp01(foamMajorSupportSize);
             foamMajorSupportSizeVariation = Mathf.Clamp01(
                 foamMajorSupportSizeVariation);
+            foamMajorRecycleTerritoryDeviationPercent = Mathf.Clamp(
+                foamMajorRecycleTerritoryDeviationPercent,
+                0f,
+                10f);
+            foamMajorLifetimeUnits = Mathf.Clamp(
+                foamMajorLifetimeUnits,
+                1f,
+                20f);
+            foamMajorLifetimeUnitDeviation = Mathf.Clamp(
+                foamMajorLifetimeUnitDeviation,
+                0f,
+                10f);
             foamMajorSupportSeed = Mathf.Max(0, foamMajorSupportSeed);
             foamConnectorAmount = Mathf.Clamp01(foamConnectorAmount);
             foamConnectorDirectness = Mathf.Clamp01(
