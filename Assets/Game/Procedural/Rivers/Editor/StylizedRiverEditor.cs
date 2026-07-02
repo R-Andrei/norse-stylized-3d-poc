@@ -1981,13 +1981,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         new GUIContent(
                             "Initial Static Parity",
                             "Editor/development diagnostic only. Before any hosted movement, compares the reconstructed hosted-negative field plus static fallbacks against the accepted static Pocket/Cavity field. Normal runs perform no readback or comparison."),
-                        initialParity);
+                        new GUIContent(initialParity));
                 }
                 EditorGUI.indentLevel--;
                 EditorGUILayout.LabelField(
                     new GUIContent(
                         "Free-Water Evolution",
-                        "Independent Free-Water Negative Events use their own slowly moving local masks. No runtime search, retry, or preservation readback is performed."),
+                        "Independent Free-Water Negative Events use one active prepared mask each. They dwell for 5–10 seconds, move and morph downstream for 2–4 seconds, consume a finite occurrence budget, and instantly recycle through preparation-time validated upstream anchors at lifetime or egress. No runtime placement search, retry, or preservation readback is performed."),
                     new GUIContent(
                         runtime.FreeWaterEvolutionAvailable
                             ? "Available"
@@ -2003,8 +2003,32 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Free-Water Slots",
                         runtime.FreeWaterEvolutionSlotCount.ToString());
                     EditorGUILayout.LabelField(
+                        "Dwelling / Moving",
+                        $"{runtime.FreeWaterEvolutionDwellingCount} / " +
+                        runtime.FreeWaterEvolutionMovingCount);
+                    EditorGUILayout.LabelField(
+                        "Observed Dwell Range",
+                        $"{runtime.FreeWaterEvolutionMinimumDwell:0.00}–" +
+                        $"{runtime.FreeWaterEvolutionMaximumDwell:0.00} s");
+                    EditorGUILayout.LabelField(
+                        "Observed Move Range",
+                        $"{runtime.FreeWaterEvolutionMinimumMove:0.00}–" +
+                        $"{runtime.FreeWaterEvolutionMaximumMove:0.00} s");
+                    EditorGUILayout.LabelField(
                         "Completed Moves",
                         runtime.FreeWaterMoveCount.ToString());
+                    EditorGUILayout.LabelField(
+                        "Recycles",
+                        runtime.FreeWaterRecycleCount.ToString());
+                    EditorGUILayout.LabelField(
+                        "Prepared Recycle Anchors",
+                        runtime.FreeWaterPreparedRecycleAnchorCount.ToString());
+                    EditorGUILayout.LabelField(
+                        "Recycle Anchor Fallbacks",
+                        runtime.FreeWaterRecycleFallbackCount.ToString());
+                    EditorGUILayout.LabelField(
+                        "Upstream Violations",
+                        runtime.FreeWaterUpstreamViolationCount.ToString());
                 }
                 EditorGUI.indentLevel--;
                 EditorGUI.indentLevel--;

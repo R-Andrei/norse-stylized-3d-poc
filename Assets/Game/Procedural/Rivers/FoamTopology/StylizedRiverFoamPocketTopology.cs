@@ -24,8 +24,9 @@ namespace ProgrammaticStylized3D.Rivers
     /// <summary>
     /// The implemented Negative Aging Pressure classes. The legacy Pocket type
     /// name remains the low-level aggregate container for compatibility. Patch
-    /// 4.7A retains Major-hosted classes separately from the still-static
-    /// Connector/Free-Water classes while preserving the aggregate field.
+    /// 4.7A retains Major-hosted classes separately; Patch 4.7B/4.7B.1 retains
+    /// independently evolving Free-Water masks while Connector Weak Spans stay
+    /// on the accepted static field until Patch 4.7C.2.
     /// </summary>
     public enum StylizedRiverFoamNegativeRegionClass
     {
@@ -40,9 +41,10 @@ namespace ProgrammaticStylized3D.Rivers
     /// Negative Aging Pressure region. Major-hosted classes use a Major region
     /// identity; Connector Weak Spans use their accepted Connector identity;
     /// Free-Water Negative Events use no positive host. Patch 4.7A evolves the
-    /// two Major-hosted classes through their host frame while Weak Spans and
-    /// Free-Water Events remain static for their later slices. Edge cavities
-    /// additionally retain their deliberate breach direction.
+    /// two Major-hosted classes through their host frame; Patch 4.7B/4.7B.1
+    /// evolves Free-Water Events independently, while Weak Spans remain static
+    /// until their Connector-owned runtime slice. Edge cavities additionally
+    /// retain their deliberate breach direction.
     /// </summary>
     public readonly struct StylizedRiverFoamPocketRegion
     {
@@ -178,13 +180,45 @@ namespace ProgrammaticStylized3D.Rivers
     }
 
     /// <summary>
+    /// One preparation-time validated upstream placement used when an
+    /// independently evolving Free-Water Negative Event reaches its finite
+    /// lifetime or downstream egress. Runtime selects only from these bounded
+    /// anchors and never searches for a replacement placement during play.
+    /// </summary>
+    internal readonly struct StylizedRiverFoamFreeWaterRecycleAnchor
+    {
+        public StylizedRiverFoamFreeWaterRecycleAnchor(
+            float centreLocalDistance,
+            float centreAcrossNormalized,
+            float orientationRadians,
+            bool isFallback)
+        {
+            CentreLocalDistance = Mathf.Max(0f, centreLocalDistance);
+            CentreAcrossNormalized = Mathf.Clamp(
+                centreAcrossNormalized,
+                -0.88f,
+                0.88f);
+            OrientationRadians = orientationRadians;
+            IsFallback = isFallback;
+        }
+
+        public float CentreLocalDistance { get; }
+        public float CentreAcrossNormalized { get; }
+        public float OrientationRadians { get; }
+        public bool IsFallback { get; }
+    }
+
+    /// <summary>
     /// One immutable Free-Water Negative Event mask retained in its own local
     /// metric frame. Runtime evolution samples this mask through a slow bounded
-    /// pose instead of regenerating or searching for a new event during play.
+    /// single-instance pose and instantly recycles it through a preparation-time
+    /// validated upstream anchor at lifetime or downstream egress.
     /// </summary>
     internal sealed class StylizedRiverFoamPreparedFreeWaterRegion
     {
         private readonly float[] localPressure;
+        private readonly StylizedRiverFoamFreeWaterRecycleAnchor[]
+            recycleAnchors;
 
         public StylizedRiverFoamPreparedFreeWaterRegion(
             uint stableId,
@@ -193,7 +227,8 @@ namespace ProgrammaticStylized3D.Rivers
             float centreLocalDistance,
             float centreAcrossNormalized,
             float orientationRadians,
-            float metresPerCell)
+            float metresPerCell,
+            StylizedRiverFoamFreeWaterRecycleAnchor[] recycleAnchors)
         {
             StableId = stableId;
             MaskResolution = Mathf.Max(1, maskResolution);
@@ -205,6 +240,8 @@ namespace ProgrammaticStylized3D.Rivers
                 1f);
             OrientationRadians = orientationRadians;
             MetresPerCell = Mathf.Max(0.0001f, metresPerCell);
+            this.recycleAnchors = recycleAnchors ??
+                Array.Empty<StylizedRiverFoamFreeWaterRecycleAnchor>();
         }
 
         public uint StableId { get; }
@@ -213,6 +250,8 @@ namespace ProgrammaticStylized3D.Rivers
         public float CentreAcrossNormalized { get; }
         public float OrientationRadians { get; }
         public float MetresPerCell { get; }
+        public IReadOnlyList<StylizedRiverFoamFreeWaterRecycleAnchor>
+            RecycleAnchors => recycleAnchors;
         internal float[] LocalPressureData => localPressure;
     }
 
@@ -335,6 +374,48 @@ namespace ProgrammaticStylized3D.Rivers
         public int PreparedHostedRegionCount => preparedHostedRegions.Length;
         public int PreparedFreeWaterRegionCount =>
             preparedFreeWaterRegions.Length;
+        public int PreparedFreeWaterRecycleAnchorCount
+        {
+            get
+            {
+                int count = 0;
+                for (int regionIndex = 0;
+                     regionIndex < preparedFreeWaterRegions.Length;
+                     regionIndex++)
+                {
+                    count += preparedFreeWaterRegions[regionIndex]
+                        .RecycleAnchors.Count;
+                }
+
+                return count;
+            }
+        }
+        public int FreeWaterRecycleFallbackCount
+        {
+            get
+            {
+                int count = 0;
+                for (int regionIndex = 0;
+                     regionIndex < preparedFreeWaterRegions.Length;
+                     regionIndex++)
+                {
+                    IReadOnlyList<StylizedRiverFoamFreeWaterRecycleAnchor>
+                        anchors = preparedFreeWaterRegions[regionIndex]
+                            .RecycleAnchors;
+                    for (int anchorIndex = 0;
+                         anchorIndex < anchors.Count;
+                         anchorIndex++)
+                    {
+                        if (anchors[anchorIndex].IsFallback)
+                        {
+                            count++;
+                        }
+                    }
+                }
+
+                return count;
+            }
+        }
         public int HostedFallbackRegionCount => Mathf.Max(
             0,
             AcceptedHostedRegionCount - PreparedHostedRegionCount);

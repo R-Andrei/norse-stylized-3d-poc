@@ -71,12 +71,24 @@ namespace ProgrammaticStylized3D.Rivers
         // tighter boundary-tangent changes so their breach side stays coherent.
         private const float HostedInteriorChangeProbability = 0.60f;
         private const float HostedCavityChangeProbability = 0.38f;
+
+        // Patch 4.7B.1 gives every independent Free-Water event the same
+        // single-instance downstream/lifetime/recycle state pattern as Major
+        // Support, with deliberately slower timings and no public controls.
         private const float FreeWaterMinimumDwellSeconds = 5f;
         private const float FreeWaterMaximumDwellSeconds = 10f;
         private const float FreeWaterMinimumMoveSeconds = 2f;
         private const float FreeWaterMaximumMoveSeconds = 4f;
-        private const float FreeWaterMaximumAlongOffsetMetres = 0.72f;
-        private const float FreeWaterMaximumAcrossOffsetMetres = 0.26f;
+        private const float FreeWaterMinimumHopMetres = 0.28f;
+        private const float FreeWaterMaximumHopMetres = 0.90f;
+        private const float FreeWaterMinimumLateralHop = 0.07f;
+        private const float FreeWaterMaximumLateralHop = 0.28f;
+        private const float FreeWaterLifetimeSecondsPerUnit = 10f;
+        private const float FreeWaterLifetimeTimeWeight = 0.60f;
+        private const float FreeWaterLifetimeHopWeight = 0.40f;
+        private const float FreeWaterLifetimeSafetyMultiplier = 1.25f;
+        private const float FreeWaterMinimumLifetimeUnits = 2.5f;
+        private const float FreeWaterMaximumLifetimeUnits = 4.5f;
         private const float FreeWaterEvolutionTickRate = 2f;
 
         // The old broad Foam authoring controls were removed in Patch 3.4.
@@ -424,8 +436,9 @@ namespace ProgrammaticStylized3D.Rivers
 
         private struct FreeWaterEvolutionPose
         {
-            public Vector2 OffsetMetres;
-            public float RotationRadians;
+            public float LocalDistance;
+            public float AcrossNormalized;
+            public float OrientationRadians;
             public float ScaleAlong;
             public float ScaleAcross;
             public float StrengthScale;
@@ -442,7 +455,12 @@ namespace ProgrammaticStylized3D.Rivers
             public float LastDwellDuration;
             public float MoveElapsed;
             public float MoveDuration;
-            public int MoveCount;
+            public float OccurrenceElapsed;
+            public float LifetimeUnitBudget;
+            public float MaximumOccurrenceSeconds;
+            public int HopIndex;
+            public int RecycleCount;
+            public int LastAnchorIndex;
             public bool IsMoving;
         }
 
@@ -535,6 +553,12 @@ namespace ProgrammaticStylized3D.Rivers
         private int majorEvolutionReconstructionTicks;
         private int hostedNegativeLocalChangeCount;
         private int freeWaterMoveCount;
+        private int freeWaterRecycleCount;
+        private int freeWaterUpstreamViolationCount;
+        private float freeWaterObservedMinimumDwell = float.PositiveInfinity;
+        private float freeWaterObservedMaximumDwell;
+        private float freeWaterObservedMinimumMove = float.PositiveInfinity;
+        private float freeWaterObservedMaximumMove;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private bool hostedNegativeInitialParityPending;
         private bool hostedNegativeInitialParityReadbackPending;
@@ -714,7 +738,34 @@ namespace ProgrammaticStylized3D.Rivers
         public int FreeWaterPreparedCount => pocketTopology != null
             ? pocketTopology.PreparedFreeWaterRegionCount
             : 0;
+        public int FreeWaterPreparedRecycleAnchorCount =>
+            pocketTopology != null
+                ? pocketTopology.PreparedFreeWaterRecycleAnchorCount
+                : 0;
+        public int FreeWaterRecycleFallbackCount => pocketTopology != null
+            ? pocketTopology.FreeWaterRecycleFallbackCount
+            : 0;
+        public int FreeWaterEvolutionMovingCount =>
+            CountMovingFreeWaterSlots();
+        public int FreeWaterEvolutionDwellingCount =>
+            Mathf.Max(0, freeWaterEvolutionSlots.Length -
+                CountMovingFreeWaterSlots());
+        public float FreeWaterEvolutionMinimumDwell =>
+            float.IsPositiveInfinity(freeWaterObservedMinimumDwell)
+                ? 0f
+                : freeWaterObservedMinimumDwell;
+        public float FreeWaterEvolutionMaximumDwell =>
+            freeWaterObservedMaximumDwell;
+        public float FreeWaterEvolutionMinimumMove =>
+            float.IsPositiveInfinity(freeWaterObservedMinimumMove)
+                ? 0f
+                : freeWaterObservedMinimumMove;
+        public float FreeWaterEvolutionMaximumMove =>
+            freeWaterObservedMaximumMove;
         public int FreeWaterMoveCount => freeWaterMoveCount;
+        public int FreeWaterRecycleCount => freeWaterRecycleCount;
+        public int FreeWaterUpstreamViolationCount =>
+            freeWaterUpstreamViolationCount;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         public bool HostedNegativeInitialParityAvailable =>
             hostedNegativeInitialParityAvailable;
@@ -3804,9 +3855,8 @@ namespace ProgrammaticStylized3D.Rivers
                     index,
                     0);
                 FreeWaterEvolutionPose initialPose =
-                    CreateIdentityFreeWaterPose();
-                float dwell = ResolveFreeWaterDwell(region.StableId, 0u);
-                freeWaterEvolutionSlots[index] =
+                    CreateInitialFreeWaterPose(region);
+                FreeWaterEvolutionSlot slot =
                     new FreeWaterEvolutionSlot
                     {
                         StableId = region.StableId,
@@ -3814,13 +3864,29 @@ namespace ProgrammaticStylized3D.Rivers
                         Current = initialPose,
                         Start = initialPose,
                         Target = initialPose,
-                        DwellRemaining = dwell,
-                        LastDwellDuration = dwell,
                         MoveElapsed = 0f,
                         MoveDuration = 0f,
-                        MoveCount = 0,
+                        OccurrenceElapsed = 0f,
+                        HopIndex = 0,
+                        RecycleCount = 0,
+                        LastAnchorIndex = -1,
                         IsMoving = false
                     };
+                ResolveFreeWaterOccurrenceBudget(ref slot);
+                ResolveFreeWaterDwell(ref slot, 0u);
+                if (IsInFreeWaterEgress(initialPose.LocalDistance))
+                {
+                    slot.DwellRemaining = Mathf.Min(
+                        slot.DwellRemaining,
+                        Mathf.Lerp(
+                            0.5f,
+                            1.5f,
+                            HashMajorEvolution(
+                                slot.StableId,
+                                1u)));
+                }
+
+                freeWaterEvolutionSlots[index] = slot;
             }
 
             if (validCount == 0)
@@ -3842,6 +3908,23 @@ namespace ProgrammaticStylized3D.Rivers
             freeWaterEvolutionReady = validCount > 0;
             freeWaterEvolutionAccumulator = 0f;
             freeWaterMoveCount = 0;
+            freeWaterRecycleCount = 0;
+            freeWaterUpstreamViolationCount = 0;
+            freeWaterObservedMinimumDwell = float.PositiveInfinity;
+            freeWaterObservedMaximumDwell = 0f;
+            freeWaterObservedMinimumMove = float.PositiveInfinity;
+            freeWaterObservedMaximumMove = 0f;
+            for (int index = 0; index < freeWaterEvolutionSlots.Length; index++)
+            {
+                float dwell = freeWaterEvolutionSlots[index]
+                    .LastDwellDuration;
+                freeWaterObservedMinimumDwell = Mathf.Min(
+                    freeWaterObservedMinimumDwell,
+                    dwell);
+                freeWaterObservedMaximumDwell = Mathf.Max(
+                    freeWaterObservedMaximumDwell,
+                    dwell);
+            }
             if (rebuildField)
             {
                 BuildEvolvingMajorField();
@@ -3865,6 +3948,12 @@ namespace ProgrammaticStylized3D.Rivers
             freeWaterEvolutionReady = false;
             freeWaterEvolutionAccumulator = 0f;
             freeWaterMoveCount = 0;
+            freeWaterRecycleCount = 0;
+            freeWaterUpstreamViolationCount = 0;
+            freeWaterObservedMinimumDwell = float.PositiveInfinity;
+            freeWaterObservedMaximumDwell = 0f;
+            freeWaterObservedMinimumMove = float.PositiveInfinity;
+            freeWaterObservedMaximumMove = 0f;
         }
 
         private static HostedNegativeEvolutionPose
@@ -4168,22 +4257,37 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 ref FreeWaterEvolutionSlot slot =
                     ref freeWaterEvolutionSlots[index];
+                slot.OccurrenceElapsed += deltaTime;
+
                 if (slot.IsMoving)
                 {
                     slot.MoveElapsed += deltaTime;
                     if (slot.MoveElapsed >= slot.MoveDuration)
                     {
+                        if (slot.Target.LocalDistance + 0.0001f <
+                            slot.Start.LocalDistance)
+                        {
+                            freeWaterUpstreamViolationCount++;
+                        }
+
                         slot.Current = slot.Target;
                         slot.Start = slot.Target;
                         slot.IsMoving = false;
                         slot.MoveElapsed = slot.MoveDuration;
-                        slot.MoveCount++;
-                        slot.DwellRemaining = ResolveFreeWaterDwell(
-                            slot.StableId,
-                            (uint)(slot.MoveCount + 1));
-                        slot.LastDwellDuration = slot.DwellRemaining;
+                        slot.HopIndex++;
                         freeWaterMoveCount++;
                         immediateRebuild = true;
+
+                        if (ShouldRecycleFreeWater(slot) ||
+                            IsInFreeWaterEgress(
+                                slot.Current.LocalDistance))
+                        {
+                            RecycleFreeWater(ref slot);
+                        }
+                        else
+                        {
+                            ResolveFreeWaterDwell(ref slot, 20u);
+                        }
                     }
                     else
                     {
@@ -4193,112 +4297,147 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
+                if (ShouldRecycleFreeWater(slot))
+                {
+                    RecycleFreeWater(ref slot);
+                    immediateRebuild = true;
+                    continue;
+                }
+
                 slot.DwellRemaining -= deltaTime;
                 if (slot.DwellRemaining > 0f)
                 {
                     continue;
                 }
 
-                BeginFreeWaterMove(ref slot);
-                anyMoving = true;
-            }
-
-            if (immediateRebuild || anyMoving)
-            {
-                if (anyMoving)
+                if (BeginFreeWaterMove(ref slot))
                 {
-                    freeWaterEvolutionAccumulator += deltaTime;
+                    anyMoving = true;
                 }
                 else
                 {
-                    freeWaterEvolutionAccumulator = 0f;
+                    immediateRebuild = true;
                 }
+            }
 
-                float tickInterval = 1f / FreeWaterEvolutionTickRate;
-                bool scheduledRebuild =
-                    freeWaterEvolutionAccumulator >= tickInterval;
-                if (scheduledRebuild)
-                {
-                    freeWaterEvolutionAccumulator %= tickInterval;
-                }
+            if (anyMoving)
+            {
+                freeWaterEvolutionAccumulator += deltaTime;
+            }
+            else
+            {
+                freeWaterEvolutionAccumulator = 0f;
+            }
 
-                if (immediateRebuild || scheduledRebuild)
-                {
-                    return BuildEvolvingMajorField();
-                }
+            float tickInterval = 1f / FreeWaterEvolutionTickRate;
+            bool scheduledRebuild = anyMoving &&
+                freeWaterEvolutionAccumulator >= tickInterval;
+            if (scheduledRebuild)
+            {
+                freeWaterEvolutionAccumulator %= tickInterval;
+            }
+
+            if (immediateRebuild || scheduledRebuild)
+            {
+                return BuildEvolvingMajorField();
             }
 
             return false;
         }
 
-        private void BeginFreeWaterMove(ref FreeWaterEvolutionSlot slot)
+        private bool BeginFreeWaterMove(ref FreeWaterEvolutionSlot slot)
         {
-            slot.Start = slot.Current;
-            uint seed = EvolutionMixBits(
-                slot.StableId ^
-                ((uint)(slot.MoveCount + 1) * 0x9E3779B9u) ^
-                0x7F4A7C15u);
-            FreeWaterEvolutionPose target =
-                ResolveFreeWaterTarget(slot, seed);
-            slot.Target = target;
-            slot.MoveDuration = Mathf.Lerp(
-                FreeWaterMinimumMoveSeconds,
-                FreeWaterMaximumMoveSeconds,
-                HashMajorEvolution(seed, 7u));
-            slot.MoveElapsed = 0f;
-            slot.IsMoving = true;
-        }
-
-        private FreeWaterEvolutionPose ResolveFreeWaterTarget(
-            FreeWaterEvolutionSlot slot,
-            uint seed)
-        {
-            IReadOnlyList<StylizedRiverFoamPreparedFreeWaterRegion> prepared =
-                pocketTopology != null
-                    ? pocketTopology.PreparedFreeWaterRegions
-                    : Array.Empty<StylizedRiverFoamPreparedFreeWaterRegion>();
-            float alongOffset = Mathf.Lerp(
-                -FreeWaterMaximumAlongOffsetMetres,
-                FreeWaterMaximumAlongOffsetMetres,
-                HashMajorEvolution(seed, 1u));
-            if (slot.PreparedIndex >= 0 && slot.PreparedIndex < prepared.Count)
+            uint cycleSeed = ResolveFreeWaterCycleSeed(slot, 30u);
+            float flowScale = Mathf.Lerp(
+                0.72f,
+                1.22f,
+                Mathf.Clamp01(
+                    river.FlowSpeedMetresPerSecond / 4.5f));
+            float downstreamStep = Mathf.Lerp(
+                FreeWaterMinimumHopMetres,
+                FreeWaterMaximumHopMetres,
+                HashMajorEvolution(cycleSeed, 1u)) * flowScale;
+            float targetDistance = slot.Current.LocalDistance +
+                downstreamStep;
+            if (targetDistance >= ResolveFreeWaterEgressStart())
             {
-                StylizedRiverFoamPreparedFreeWaterRegion region =
-                    prepared[slot.PreparedIndex];
-                float targetCentre = Mathf.Clamp(
-                    region.CentreLocalDistance + alongOffset,
-                    0f,
-                    Mathf.Max(0f, validFieldLength));
-                alongOffset = targetCentre - region.CentreLocalDistance;
+                RecycleFreeWater(ref slot);
+                return false;
             }
 
-            float acrossOffset = Mathf.Lerp(
-                -FreeWaterMaximumAcrossOffsetMetres,
-                FreeWaterMaximumAcrossOffsetMetres,
-                HashMajorEvolution(seed, 2u));
-            float scaleAlong = Mathf.Lerp(
-                0.90f,
-                1.10f,
-                HashMajorEvolution(seed, 3u));
-            float scaleAcross = Mathf.Lerp(
-                0.90f,
-                1.10f,
-                HashMajorEvolution(seed, 4u));
-            float areaScale = Mathf.Max(0.25f, scaleAlong * scaleAcross);
-            return new FreeWaterEvolutionPose
+            float lateralMagnitude = Mathf.Lerp(
+                FreeWaterMinimumLateralHop,
+                FreeWaterMaximumLateralHop,
+                HashMajorEvolution(cycleSeed, 2u));
+            float lateralSign = HashMajorEvolution(cycleSeed, 3u) < 0.5f
+                ? -1f
+                : 1f;
+            float targetAcross = Mathf.Clamp(
+                slot.Current.AcrossNormalized +
+                    lateralMagnitude * lateralSign,
+                -0.84f,
+                0.84f);
+            if (Mathf.Abs(
+                    targetAcross - slot.Current.AcrossNormalized) < 0.025f)
             {
-                OffsetMetres = new Vector2(alongOffset, acrossOffset),
-                RotationRadians = Mathf.Lerp(
-                    -0.16f,
-                    0.16f,
-                    HashMajorEvolution(seed, 5u)),
+                targetAcross = Mathf.Clamp(
+                    slot.Current.AcrossNormalized -
+                        lateralMagnitude * lateralSign,
+                    -0.84f,
+                    0.84f);
+            }
+
+            float scaleAlong = Mathf.Lerp(
+                0.82f,
+                1.22f,
+                HashMajorEvolution(cycleSeed, 4u));
+            float scaleAcross = Mathf.Lerp(
+                0.82f,
+                1.22f,
+                HashMajorEvolution(cycleSeed, 5u));
+            float areaScale = Mathf.Max(
+                0.25f,
+                scaleAlong * scaleAcross);
+            slot.Start = slot.Current;
+            slot.Target = new FreeWaterEvolutionPose
+            {
+                LocalDistance = targetDistance,
+                AcrossNormalized = targetAcross,
+                OrientationRadians = WrapMajorAngle(
+                    slot.Current.OrientationRadians +
+                    Mathf.Lerp(
+                        -0.22f,
+                        0.22f,
+                        HashMajorEvolution(cycleSeed, 6u))),
                 ScaleAlong = scaleAlong,
                 ScaleAcross = scaleAcross,
                 StrengthScale = Mathf.Clamp(
                     1f / Mathf.Sqrt(areaScale),
-                    0.92f,
-                    1.08f)
+                    0.88f,
+                    1.12f)
             };
+
+            float dwellProgress = Mathf.InverseLerp(
+                FreeWaterMinimumDwellSeconds,
+                FreeWaterMaximumDwellSeconds,
+                slot.LastDwellDuration);
+            slot.MoveDuration = Mathf.Clamp(
+                Mathf.Lerp(
+                    FreeWaterMinimumMoveSeconds,
+                    FreeWaterMaximumMoveSeconds,
+                    dwellProgress * 0.72f +
+                    HashMajorEvolution(cycleSeed, 7u) * 0.28f),
+                FreeWaterMinimumMoveSeconds,
+                FreeWaterMaximumMoveSeconds);
+            slot.MoveElapsed = 0f;
+            slot.IsMoving = true;
+            freeWaterObservedMinimumMove = Mathf.Min(
+                freeWaterObservedMinimumMove,
+                slot.MoveDuration);
+            freeWaterObservedMaximumMove = Mathf.Max(
+                freeWaterObservedMaximumMove,
+                slot.MoveDuration);
+            return true;
         }
 
         private FreeWaterEvolutionPose ResolveFreeWaterPose(
@@ -4313,13 +4452,17 @@ namespace ProgrammaticStylized3D.Rivers
             t = t * t * (3f - 2f * t);
             return new FreeWaterEvolutionPose
             {
-                OffsetMetres = Vector2.Lerp(
-                    slot.Start.OffsetMetres,
-                    slot.Target.OffsetMetres,
+                LocalDistance = Mathf.Lerp(
+                    slot.Start.LocalDistance,
+                    slot.Target.LocalDistance,
                     t),
-                RotationRadians = Mathf.Lerp(
-                    slot.Start.RotationRadians,
-                    slot.Target.RotationRadians,
+                AcrossNormalized = Mathf.Lerp(
+                    slot.Start.AcrossNormalized,
+                    slot.Target.AcrossNormalized,
+                    t),
+                OrientationRadians = LerpMajorAngle(
+                    slot.Start.OrientationRadians,
+                    slot.Target.OrientationRadians,
                     t),
                 ScaleAlong = Mathf.Lerp(
                     slot.Start.ScaleAlong,
@@ -4336,26 +4479,149 @@ namespace ProgrammaticStylized3D.Rivers
             };
         }
 
-        private static FreeWaterEvolutionPose CreateIdentityFreeWaterPose()
+        private static FreeWaterEvolutionPose CreateInitialFreeWaterPose(
+            StylizedRiverFoamPreparedFreeWaterRegion prepared)
         {
             return new FreeWaterEvolutionPose
             {
-                OffsetMetres = Vector2.zero,
-                RotationRadians = 0f,
+                LocalDistance = prepared.CentreLocalDistance,
+                AcrossNormalized = prepared.CentreAcrossNormalized,
+                OrientationRadians = prepared.OrientationRadians,
                 ScaleAlong = 1f,
                 ScaleAcross = 1f,
                 StrengthScale = 1f
             };
         }
 
-        private static float ResolveFreeWaterDwell(uint stableId, uint stream)
+        private void ResolveFreeWaterDwell(
+            ref FreeWaterEvolutionSlot slot,
+            uint stream)
         {
-            uint seed = EvolutionMixBits(
-                stableId ^ 0xB5297A4Du ^ (stream * 0x68E31DA4u));
-            return Mathf.Lerp(
+            uint seed = ResolveFreeWaterCycleSeed(slot, stream);
+            float dwell = Mathf.Lerp(
                 FreeWaterMinimumDwellSeconds,
                 FreeWaterMaximumDwellSeconds,
                 HashMajorEvolution(seed, 1u));
+            slot.DwellRemaining = dwell;
+            slot.LastDwellDuration = dwell;
+            freeWaterObservedMinimumDwell = Mathf.Min(
+                freeWaterObservedMinimumDwell,
+                dwell);
+            freeWaterObservedMaximumDwell = Mathf.Max(
+                freeWaterObservedMaximumDwell,
+                dwell);
+        }
+
+        private void ResolveFreeWaterOccurrenceBudget(
+            ref FreeWaterEvolutionSlot slot)
+        {
+            uint seed = ResolveFreeWaterOccurrenceSeed(slot, 70u);
+            slot.LifetimeUnitBudget = Mathf.Lerp(
+                FreeWaterMinimumLifetimeUnits,
+                FreeWaterMaximumLifetimeUnits,
+                HashMajorEvolution(seed, 1u));
+            slot.MaximumOccurrenceSeconds =
+                slot.LifetimeUnitBudget *
+                FreeWaterLifetimeSecondsPerUnit *
+                FreeWaterLifetimeSafetyMultiplier;
+        }
+
+        private bool ShouldRecycleFreeWater(FreeWaterEvolutionSlot slot)
+        {
+            float usedUnits =
+                FreeWaterLifetimeTimeWeight *
+                    (slot.OccurrenceElapsed /
+                        FreeWaterLifetimeSecondsPerUnit) +
+                FreeWaterLifetimeHopWeight * slot.HopIndex;
+            return usedUnits >= slot.LifetimeUnitBudget ||
+                slot.OccurrenceElapsed >= slot.MaximumOccurrenceSeconds;
+        }
+
+        private float ResolveFreeWaterEgressStart()
+        {
+            return StylizedRiverFoamMajorTopology
+                .ResolveEvolutionEgressStart(validFieldLength);
+        }
+
+        private bool IsInFreeWaterEgress(float localDistance)
+        {
+            return localDistance >= ResolveFreeWaterEgressStart();
+        }
+
+        private void RecycleFreeWater(ref FreeWaterEvolutionSlot slot)
+        {
+            IReadOnlyList<StylizedRiverFoamPreparedFreeWaterRegion> prepared =
+                pocketTopology != null
+                    ? pocketTopology.PreparedFreeWaterRegions
+                    : Array.Empty<StylizedRiverFoamPreparedFreeWaterRegion>();
+            if (slot.PreparedIndex < 0 ||
+                slot.PreparedIndex >= prepared.Count)
+            {
+                return;
+            }
+
+            StylizedRiverFoamPreparedFreeWaterRegion preparedRegion =
+                prepared[slot.PreparedIndex];
+            IReadOnlyList<StylizedRiverFoamFreeWaterRecycleAnchor> anchors =
+                preparedRegion.RecycleAnchors;
+            if (anchors.Count == 0)
+            {
+                return;
+            }
+
+            slot.RecycleCount++;
+            freeWaterRecycleCount++;
+            uint recycleSeed = ResolveFreeWaterCycleSeed(slot, 50u);
+            int anchorIndex = (int)(EvolutionMixBits(recycleSeed) %
+                (uint)anchors.Count);
+            if (anchors.Count > 1 && anchorIndex == slot.LastAnchorIndex)
+            {
+                anchorIndex = (anchorIndex + 1) % anchors.Count;
+            }
+
+            StylizedRiverFoamFreeWaterRecycleAnchor anchor =
+                anchors[anchorIndex];
+            slot.LastAnchorIndex = anchorIndex;
+            float scaleAlong = Mathf.Lerp(
+                0.86f,
+                1.18f,
+                HashMajorEvolution(recycleSeed, 1u));
+            float scaleAcross = Mathf.Lerp(
+                0.86f,
+                1.18f,
+                HashMajorEvolution(recycleSeed, 2u));
+            float areaScale = Mathf.Max(
+                0.25f,
+                scaleAlong * scaleAcross);
+            FreeWaterEvolutionPose recycledPose =
+                new FreeWaterEvolutionPose
+                {
+                    LocalDistance = anchor.CentreLocalDistance,
+                    AcrossNormalized = anchor.CentreAcrossNormalized,
+                    OrientationRadians = WrapMajorAngle(
+                        anchor.OrientationRadians +
+                        Mathf.Lerp(
+                            -0.12f,
+                            0.12f,
+                            HashMajorEvolution(recycleSeed, 3u))),
+                    ScaleAlong = scaleAlong,
+                    ScaleAcross = scaleAcross,
+                    StrengthScale = Mathf.Clamp(
+                        1f / Mathf.Sqrt(areaScale),
+                        0.90f,
+                        1.10f)
+                };
+
+            slot.Current = recycledPose;
+            slot.Start = recycledPose;
+            slot.Target = recycledPose;
+            slot.MoveElapsed = 0f;
+            slot.MoveDuration = 0f;
+            slot.IsMoving = false;
+            slot.OccurrenceElapsed = 0f;
+            slot.HopIndex = 0;
+            ResolveFreeWaterOccurrenceBudget(ref slot);
+            ResolveFreeWaterDwell(ref slot, 60u);
         }
 
         private void RecycleMajor(
@@ -5020,10 +5286,9 @@ namespace ProgrammaticStylized3D.Rivers
                     new FoamFreeWaterEvolutionData
                     {
                         CentreAndPlacement = new Vector4(
-                            preparedRegion.CentreLocalDistance,
-                            preparedRegion.CentreAcrossNormalized,
-                            preparedRegion.OrientationRadians +
-                                pose.RotationRadians,
+                            pose.LocalDistance,
+                            pose.AcrossNormalized,
+                            pose.OrientationRadians,
                             preparedRegion.MetresPerCell),
                         MaskAndStrength = new Vector4(
                             preparedRegion.MaskResolution * 0.5f,
@@ -5031,8 +5296,8 @@ namespace ProgrammaticStylized3D.Rivers
                             index,
                             pose.StrengthScale),
                         Morph = new Vector4(
-                            pose.OffsetMetres.x,
-                            pose.OffsetMetres.y,
+                            0f,
+                            0f,
                             pose.ScaleAlong,
                             pose.ScaleAcross)
                     };
@@ -5309,6 +5574,22 @@ namespace ProgrammaticStylized3D.Rivers
             return count;
         }
 
+        private int CountMovingFreeWaterSlots()
+        {
+            int count = 0;
+            for (int index = 0;
+                 index < freeWaterEvolutionSlots.Length;
+                 index++)
+            {
+                if (freeWaterEvolutionSlots[index].IsMoving)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
         private int CountHostedNegativeSlots(
             StylizedRiverFoamNegativeRegionClass regionClass)
         {
@@ -5349,6 +5630,27 @@ namespace ProgrammaticStylized3D.Rivers
                 slot.StableId ^
                 ((uint)(slot.RecycleCount + 1) * 0x9E3779B9u) ^
                 EvolutionMixBits(stream + 0xC2B2AE35u));
+        }
+
+        private uint ResolveFreeWaterCycleSeed(
+            FreeWaterEvolutionSlot slot,
+            uint stream)
+        {
+            return EvolutionMixBits(
+                slot.StableId ^
+                ((uint)(slot.RecycleCount + 1) * 0x9E3779B9u) ^
+                ((uint)(slot.HopIndex + 1) * 0x85EBCA6Bu) ^
+                EvolutionMixBits(stream + 0x7F4A7C15u));
+        }
+
+        private uint ResolveFreeWaterOccurrenceSeed(
+            FreeWaterEvolutionSlot slot,
+            uint stream)
+        {
+            return EvolutionMixBits(
+                slot.StableId ^
+                ((uint)(slot.RecycleCount + 1) * 0x9E3779B9u) ^
+                EvolutionMixBits(stream + 0x7F4A7C15u));
         }
 
         private static float HashMajorEvolution(uint seed, uint stream)

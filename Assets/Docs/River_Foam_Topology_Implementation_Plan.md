@@ -4,7 +4,7 @@
 
 **Status:** Canonical step-by-step implementation plan for Stage 6 Foam topology only.
 
-**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution is implemented. Patch 4.7A.1 corrects initial hosted-field parity, prevents Major-bound clipping of Edge Cavities, and preserves static fallback for any hosted region that cannot evolve; visual/performance revalidation is pending. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Explicit rebuild transition and production cache packaging are not yet implemented.
+**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-footprint/parity correction are implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution is implemented; Patch 4.7B.1 now corrects it to the canonical positive-downstream, finite-lifetime, upstream-recycle contract and requires Unity visual/performance revalidation. The next phase is split into Patch 4.7C.0 canonical field-space consolidation, Patch 4.7C.1 Connector/Weak Span preparation data, Patch 4.7C.2 identity reconstruction/parity, and Patch 4.7C.3 runtime evolution. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Explicit rebuild transition and production cache packaging are not yet implemented.
 
 **Primary implementation target:**
 
@@ -771,7 +771,7 @@ Implemented:
 - immediate visibility through the existing `Negative Influence Classes` and `Support and Negative Influence` diagnostics;
 - no new compute kernel, material pass, pathfinding pass, runtime maintenance pass, or scheduling phase.
 
-Free-Water Negative Events are topology only. They do not erase anything directly and they remain static until the runtime-evolution steps.
+Free-Water Negative Events are topology only. They do not erase anything directly. Patch 4.7B/4.7B.1 now evolves their retained local masks through the approved single-instance downstream/lifetime/recycle lifecycle.
 
 ### Patch 4.5 — Static negative and combined topology validation
 
@@ -1013,9 +1013,9 @@ Patch 4.7 is deliberately split so each relationship problem is proven separatel
 
 ### Patch 4.7A — Hosted Interior Pocket and Edge Cavity evolution
 
-**Implementation status:** implemented; Patch 4.7A.1 correctness correction applied; visual/performance revalidation pending.
+**Implementation status:** implemented; Patch 4.7A.1 correctness correction applied and visually accepted.
 
-Interior Pockets and Edge Cavities are stored in Major-host-local space. The accepted static negative field is separated into evolving hosted negatives and still-static independent negatives, so Weak Spans and Free-Water Events remain unchanged.
+Interior Pockets and Edge Cavities are stored in Major-host-local space. At the Patch 4.7A boundary, the accepted static negative field was separated into evolving hosted negatives and independent negatives, leaving Weak Spans and Free-Water Events unchanged until their own later slices. Free-Water Events are now handled by Patch 4.7B.1; Weak Spans remain static until Patch 4.7C.2.
 
 They inherit:
 
@@ -1039,42 +1039,103 @@ The evolving field must initially reproduce the accepted static hosted-negative 
 
 ### Patch 4.7B — Slower Free-Water Negative Event evolution
 
-Each Free-Water Event remains one slot with one active instance.
+**Implementation status:** Patch 4.7B independent local-mask evolution is implemented and its original visual path was accepted. Patch 4.7B.1 corrects the movement contract and requires Unity visual/performance revalidation.
 
-Provisional behaviour:
+Each Free-Water Event remains one logical slot with one active instance. The corrected runtime state follows the same single-instance lifecycle pattern as Major Support, with slower independent timings and no host relationship:
 
-- `5–10 s` independent dwell;
+- `5–10 s` independently selected dwell;
 - `2–4 s` movement/morph;
-- positive net downstream movement;
-- larger bounded lateral movement than Major;
-- stronger grow/shrink, mild rotation, and shape change;
-- finite occurrence lifetime;
-- instant upstream valid-water recycle at lifetime or egress;
-- no overlap duplicate and no fade requirement.
+- every ordinary hop has positive longitudinal displacement;
+- bounded lateral/diagonal motion may vary direction without producing longitudinal upstream travel;
+- stronger grow/shrink and modest orientation variation than Major Support;
+- one deterministic occurrence budget consumed by both elapsed time and completed hops;
+- downstream egress and exhausted lifetime both trigger an instant recycle;
+- recycle selects from a strictly bounded set of preparation-time validated upstream valid-water anchors retained with that event;
+- the original and recycled poses use one mask instance only, with no overlapping old/new copy and no ordinary fade requirement;
+- active movement reconstructs at the existing slow `2 Hz` proof cadence; dwelling-only Free-Water state performs no unnecessary reconstruction.
 
-**Acceptance:** events remain sparse, obstacle-safe, valid-water-bound, visibly slower than Majors, differently paced, shape-changing, and incapable of downstream-edge recycle loops.
+Preparation now retains per-event recycle anchors in canonical local river coordinates. Anchor validation uses the accepted local pressure mask against fluid coverage, domain bounds, and exact obstacle exclusion during preparation. Normal gameplay only advances compact descriptors and selects among retained anchors; it performs no placement search, rejection loop, retry, readback, or preservation test. The Inspector distinguishes ordinary prepared anchors from the validated safe-home fallback anchor. If any accepted event cannot prepare at least one valid anchor, Free-Water evolution remains unavailable for that build and the complete accepted static Free-Water field stays authoritative; the `Prepared / Accepted` mismatch exposes that unavailable state rather than losing an event.
 
-### Patch 4.7C — Connector Support and Weak Span evolution
+**Acceptance:** events remain sparse, obstacle-safe, valid-water-bound, visibly slower than Majors, differently paced, shape-changing, incapable of ordinary upstream hops, and incapable of downstream-edge recycle loops. Recycle count, prepared-anchor count, anchor fallbacks, observed timing ranges, and upstream violations are shown in the existing Inspector diagnostics.
+
+### Patch 4.7C.0 — Canonical topology field-space contract
+
+Introduce one deliberately small CPU utility and matching HLSL formulas for the coordinate operations currently duplicated across Major, hosted-negative, Free-Water, and Connector preparation/runtime code:
+
+- canonical texel-centre coordinates;
+- topology UV and field bounds;
+- longitudinal river distance;
+- normalized and metric lateral coordinates;
+- inverse river-to-field mapping;
+- scalar-field bilinear sampling and clamping conventions.
+
+Migrate existing implementations without redesigning feature-specific shape generation. Connector paths remain path-specific and Major/negative masks remain mask-specific; only their common river/field coordinate contract is shared. This is a behaviour-preserving refactor. Any visible change or parity difference is treated as evidence of an old convention disagreement and investigated explicitly. Debug-only diagnostics are permitted; normal gameplay gains no validation, readback, retry, or additional search work.
+
+**Acceptance:** existing Major, hosted-negative, and Free-Water identity poses reconstruct unchanged within the accepted diagnostic tolerance, and all migrated code uses one texel-centre and inverse-mapping convention.
+
+### Patch 4.7C.1 — Connector and Weak Span preparation data
+
+Extend immutable preparation data without enabling movement yet.
+
+Connector preparation must retain:
+
+- individual source and destination Major-slot ownership rather than only merged static component identity;
+- each endpoint gate in its owning Major's local prepared frame;
+- the accepted bounded/resampled path points;
+- normalized cumulative arc length along that path;
+- a strictly bounded set of prevalidated path alternatives for relevant endpoint recycle-anchor combinations;
+- an explicit unavailable state for endpoint/path combinations that cannot be prepared correctly.
+
+Endpoint ownership is resolved during preparation by the individual Major contribution at the accepted gate. Ordinary gameplay must not infer ownership, search hosts, or rebuild relationships.
+
+Weak Span preparation must retain:
+
+- owning Connector stable identity;
+- normalized distance along the accepted path;
+- longitudinal and lateral physical radii;
+- strength, seed, orientation/tangent requirements, and any shape parameters needed for exact reconstruction;
+- endpoint-clearance limits required to remain gate-safe after deformation or replacement.
+
+**Acceptance:** every accepted Connector endpoint and Weak Span either has complete immutable runtime data or is reported explicitly as unavailable. No runtime raster path changes in this subpatch.
+
+### Patch 4.7C.2 — Identity reconstruction and parity
+
+Move Connector Support and Connector Weak Span rasterization into the prepared runtime reconstruction path while evaluating every record at its accepted identity/static pose.
+
+The identity result must reproduce:
+
+- the accepted static Connector Support field;
+- the accepted static Connector Weak Span field;
+- their existing composition with Major Support, all negative classes, Anchored Support, and Obstacle Footprint.
+
+Editor/development-only parity compares reconstructed identity fields against the accepted static source fields. Normal gameplay performs no readback or comparison. When prepared identity reconstruction is available, the old static Connector/Weak Span channel stops being authoritative; unavailable records remain explicit rather than silently disappearing.
+
+Descriptor advancement for Major, hosted-negative, Free-Water, Connector, and Weak Span state should be collected before reconstruction so one applicable topology tick performs at most one combined upload/rebuild instead of duplicate full-field reconstruction.
+
+**Acceptance:** identity parity passes before any Connector movement is enabled, and the runtime path introduces no per-Connector dispatch, allocation, search, or validation loop.
+
+### Patch 4.7C.3 — Connector Support and Weak Span evolution
 
 Ordinary endpoint motion uses the accepted simplified Connector polyline:
 
-- path points near the source follow the source Major;
-- path points near the destination follow the destination Major;
-- middle points blend endpoint transforms;
+- source-near points follow the source Major gate;
+- destination-near points follow the destination Major gate;
+- middle points blend the two endpoint transforms through normalized cumulative arc length;
 - a small bounded transverse deformation prevents rigid-band motion;
-- endpoint gates and Major clearance rules remain valid;
-- no gameplay pathfinding occurs.
+- endpoint gates and Major-clearance rules remain valid;
+- the Weak Span samples its normalized path position and follows the deformed path tangent;
+- no gameplay pathfinding or ownership search occurs.
 
-When an endpoint Major instantly recycles:
+When either endpoint Major instantly recycles:
 
-- the invalid old relationship is retired in that topology update;
-- a prevalidated spare relationship is assigned immediately when available;
-- the Weak Span follows its owning path by normalized distance and is reassigned safely with a replacement Connector;
-- if no valid spare exists, a temporary Connector population dip is allowed rather than runtime pathfinding or an invalid cross-chunk stretch.
+- the Connector switches in the same topology update to the prevalidated path variant associated with the active endpoint recycle-anchor combination;
+- the Weak Span follows its owning replacement path by normalized distance;
+- an unavailable combination produces temporary Connector/Weak Span absence rather than an invalid long stretch, emergency bridge, runtime route search, or retry;
+- the relationship becomes eligible to reappear when a valid prepared combination is active.
 
-Preparation-time spare-path count must be strictly bounded and profiled. Connector relation replacement is not allowed to turn into a continuously maintained graph.
+Preparation-time path alternatives remain strictly bounded and profiled. Cross-Major replacement relationships are not introduced unless testing proves same-slot endpoint-anchor variants insufficient. Connector evolution must not become a continuously maintained graph.
 
-**Acceptance:** ordinary deformation stays attached, replacement never stretches across a recycled endpoint, Weak Spans remain gate-safe, no runtime route search occurs, and Connector cost remains subordinate.
+**Acceptance:** ordinary deformation stays attached, recycle switching never stretches across a relocated endpoint, Weak Spans remain gate-safe and tangent-aligned, unavailable combinations disappear cleanly, no runtime route search occurs, and Connector cost remains subordinate.
 
 ### Shared inspection and telemetry
 
@@ -1371,18 +1432,26 @@ A topology patch that cannot answer these questions is not ready.
 
 ## 13. Immediate Next Step
 
-Patch 4.6 Major evolution through Patch 4.6.2 combined lifetime units is accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution plus the Patch 4.7A.1 footprint/parity correction are implemented and now require visual and computational revalidation. Static and movement coefficients remain provisional until the persistent Foam material proves the final visual result.
+Patch 4.7A/4.7A.1 hosted-negative evolution is implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution is implemented, and Patch 4.7B.1 now corrects its lifecycle to the canonical positive-downstream, finite-lifetime, preparation-time-anchor recycle contract. Unity must revalidate the corrected behaviour and its preparation/runtime cost before Connector work begins.
 
-Validate that:
+Validate Patch 4.7B.1 on the actual river:
 
-1. Majors use independent `2–5 s` dwell and `1–2 s` move/morph rhythms;
-2. every ordinary hop is net-downstream with bounded lateral/diagonal motion;
-3. one logical slot never becomes two simultaneous support instances;
-4. shape change is visible on every hop;
-5. lifetime/egress recycling is instantaneous and distributed through per-slot local territories;
-6. slot population remains constant;
-7. active reconstruction is low cost and produces no ready-state managed allocation or runtime generation work.
+1. each slot independently dwells for `5–10 s` and moves/morphs for `2–4 s`;
+2. every ordinary hop has positive net downstream movement with bounded lateral/diagonal displacement;
+3. occurrence turnover is finite and visibly recycles rather than wandering forever around one home;
+4. egress recycle relocates immediately to an upstream prepared anchor without a duplicate old/new instance;
+5. prepared-anchor fallback count is normally zero or explainable on genuinely constrained geometry;
+6. Inspector upstream-violation count remains zero;
+7. active `2 Hz` reconstruction and preparation-time anchor generation remain acceptably cheap and allocate nothing during ordinary ready-state evolution.
 
-After Patch 4.7A passes, continue with Patch 4.7B Free-Water Events and Patch 4.7C Connectors/Weak Spans. Patch 4.8 explicit rebuild transition and Patch 4.9 procedural cache packaging follow before Patch 4.10 topology completion and any Foam-material implementation.
+After that validation, proceed in this exact order:
+
+1. Patch 4.7C.0 — canonical topology field-space contract;
+2. Patch 4.7C.1 — Connector endpoint ownership, retained paths/arc length, recycle variants, and Weak Span attachment data;
+3. Patch 4.7C.2 — identity reconstruction plus Editor/development-only parity;
+4. Patch 4.7C.3 — ordinary Connector deformation, Weak Span following, recycle-variant switching, and temporary absence for unavailable combinations;
+5. Patch 4.8 — explicit full-topology rebuild transition;
+6. Patch 4.9 — procedural chunk/run cache and precompute packaging;
+7. Patch 4.10 — topology completion and handoff to separate Foam-material work.
 
 Topology is not considered implemented until runtime evolution, explicit rebuild handling, and cache/preparation handoff pass. Only then may the separate Foam material-lifecycle implementation begin.

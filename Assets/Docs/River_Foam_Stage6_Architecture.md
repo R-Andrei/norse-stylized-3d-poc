@@ -44,11 +44,14 @@ Approved negative-topology expansion before runtime evolution:
 - preserve subtype identity and future evolution metadata even when classes are packed into one aggregate negative field for diagnostics/output;
 - Patch 4.5 combined static validation accepted for feature progression; all population and shape coefficients remain provisional until the final Foam material proves the complete visual result;
 - Patch 4.6 lively single-instance Major Support movement and morphing, Patch 4.6.1 local recycle territories, and Patch 4.6.2 combined lifetime units accepted for feature progression; exact movement and lifetime tuning remains provisional;
-- Patch 4.7A hosted Interior Pocket and Edge Cavity evolution implemented; Patch 4.7A.1 corrects initial host-space parity, preserves edge-breaching cavity pressure beyond the Major silhouette, and retains static fallback only for hosted regions that cannot evolve. Visual/performance revalidation is pending.
+- Patch 4.7A hosted Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 host-space footprint/parity correction are implemented and visually accepted;
+- Patch 4.7B independent Free-Water local-mask evolution is implemented; Patch 4.7B.1 corrects it to positive net downstream hops, finite combined time/hop lifetime, and instant preparation-time-anchor recycle at lifetime or egress. Unity visual/performance revalidation is pending.
 
 Not yet implemented or accepted:
-- Patch 4.7B slower independent Free-Water Negative Event evolution;
-- Patch 4.7C Connector Support and Connector Weak Span evolution;
+- Patch 4.7C.0 canonical topology field-space consolidation;
+- Patch 4.7C.1 Connector endpoint ownership/path data and Weak Span attachment preparation;
+- Patch 4.7C.2 identity reconstruction and Editor/development-only parity;
+- Patch 4.7C.3 Connector deformation, recycle-variant switching, and Weak Span following;
 - safe generated-topology rebuild replacement/crossfade for explicit domain or settings rebuilds;
 - procedural chunk/run cache packaging for generated topology and exact obstacle data;
 - topology-to-material lifespan response;
@@ -516,7 +519,7 @@ Negative Aging Pressure is generated after the positive support context exists, 
 - retain stable phase, downstream/lateral movement, allowed-span, recycle, growth, and shape-morph metadata; existing provisional fade selectors are not the approved ordinary-evolution mechanism;
 - remain visually subordinate at its default density.
 
-Patch 4.4 implements this through a deterministic metric-space lattice that is independent of structural-grid cell counts. Candidate activation prefers neutral, well-contained water first while preserving later positive-overlap opportunities. Exact obstacles and invalid water are rejected or clipped during preparation; strong live Pressure, Lee, and Shore cores remain protected by the existing composition pass. Accepted events retain stable class identity, transform, phase, drift, movement-span, recycle, growth, and current provisional fade selectors, but remain static until the runtime-evolution gate. Patch 4.7B supersedes duplicate-instance fading with the approved single-instance dwell/move/morph lifecycle.
+Patch 4.4 implements this through a deterministic metric-space lattice that is independent of structural-grid cell counts. Candidate activation prefers neutral, well-contained water first while preserving later positive-overlap opportunities. Exact obstacles and invalid water are rejected or clipped during preparation; strong live Pressure, Lee, and Shore cores remain protected by the existing composition pass. Accepted events retain stable class identity, transform, phase, drift, movement-span, recycle, growth, and current provisional fade selectors. They were initially static; Patch 4.7B replaces that state with one active local-mask instance, and Patch 4.7B.1 applies the approved downstream hop, finite lifetime, and preparation-time-anchor recycle lifecycle.
 
 Each class exposes one independent `0–1` Amount control with default `0.5`. Amount activates a nested deterministic opportunity subset and changes population only. Class-specific maximums and spacing rules keep the defaults sensible without forcing equal counts or equal coverage.
 
@@ -762,9 +765,9 @@ Negative classes have distinct runtime contracts:
 - **Interior Pocket** inherits its Major host's full world-space translation, diagonal displacement, rotation, broad scale, and instant recycle. It may add a small bounded host-local offset, scale, orientation, or soft-shape change on selected host hops, but must remain inside the safe Major interior.
 - **Edge Cavity** inherits its Major host movement and recycle, remains attached to the same breach side, and may add smaller bounded local variation without crossing the host or destroying the positive remainder.
 - **Connector Weak Span** remains at a safe normalized position on its owning deformed Connector, away from endpoint gates, and is reassigned with the Connector when a prevalidated replacement relationship is used.
-- **Free-Water Negative Event** uses the same single-instance hop model independently, but more slowly: initially about `5–10 s` dwell and `2–4 s` movement/morph. It may move farther laterally, vary size more strongly, rotate modestly, and instantly recycle to an upstream valid-water anchor at lifetime or egress.
+- **Free-Water Negative Event** uses the same single-instance hop model independently, but more slowly: `5–10 s` dwell and `2–4 s` movement/morph. Every ordinary hop is net-downstream with bounded lateral displacement. A combined elapsed-time/completed-hop budget gives each occurrence a finite lifetime, and lifetime or downstream egress instantly selects one of that event's preparation-time validated upstream valid-water anchors. It may vary size more strongly and rotate modestly, but never creates a duplicate old/new instance or runs a gameplay placement search.
 
-Hosted classes should not be perfectly rigid copies of their Major. Patch 4.7A retains each accepted Interior Pocket and Edge Cavity as a Major-local soft mask, carries it through the host transform and instant recycle, and applies bounded local scale, rotation, and offset changes only on selected host hops. Interior Pockets vary more often; Edge Cavities use tighter, boundary-tangent variation so the original breach side remains coherent. Patch 4.7A.1 requires the initial evolving field to preserve the accepted static footprint, including cavity influence beyond the Major support silhouette; any hosted region that cannot be prepared remains as a static fallback rather than disappearing. Weak Spans and Free-Water Events remain in the static independent-negative field until their later patches. Every local state is chosen inside absolute host-safe limits rather than accumulated as an unbounded random walk.
+Hosted classes should not be perfectly rigid copies of their Major. Patch 4.7A retains each accepted Interior Pocket and Edge Cavity as a Major-local soft mask, carries it through the host transform and instant recycle, and applies bounded local scale, rotation, and offset changes only on selected host hops. Interior Pockets vary more often; Edge Cavities use tighter, boundary-tangent variation so the original breach side remains coherent. Patch 4.7A.1 requires the initial evolving field to preserve the accepted static footprint, including cavity influence beyond the Major support silhouette; any hosted region that cannot be prepared remains as a static fallback rather than disappearing. Connector Weak Spans remain in the static independent-negative field until Patch 4.7C.2; Free-Water Events now use their independent Patch 4.7B.1 lifecycle. Every local state is chosen inside absolute bounded limits rather than accumulated as an unbounded random walk.
 
 No negative class directly cuts topology or material. No class performs distance transforms, host search, path search, candidate generation, or rejection during ordinary gameplay.
 
@@ -1037,16 +1040,20 @@ The canonical topology-only rollout is maintained in `River_Foam_Topology_Implem
 14. Patch 4.6.1 distributed local recycle territories accepted for feature progression.
 15. Patch 4.6.2 combined elapsed-time and completed-hop lifetime units accepted for feature progression; tuning remains provisional.
 16. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution implemented.
-17. Patch 4.7A.1 hosted-negative footprint/parity correction implemented; visual and performance revalidation pending.
+17. Patch 4.7A.1 hosted-negative footprint/parity correction implemented and visually accepted.
+18. Patch 4.7B independent Free-Water evolution implemented.
+19. Patch 4.7B.1 positive-downstream/lifetime/recycle contract correction implemented; Unity revalidation pending.
 
 ### Active runtime-evolution sequence
 
-1. Revalidate Patch 4.7A.1 initial static parity, full cavity overlap, host attachment, breach-side stability, local variation, and computational cost.
-2. Patch 4.7B — slower independent Free-Water Negative Event movement, morphing, and recycling.
-3. Patch 4.7C — retained-path Connector deformation, prevalidated relationship replacement, and Weak Span following.
-4. Patch 4.8 — safe generated-topology rebuild transition for explicit rebuilds.
-5. Patch 4.9 — procedural chunk/run cache and precompute packaging.
-6. Patch 4.10 — topology completion and handoff to separate Foam-material work.
+1. Revalidate Patch 4.7B.1 Free-Water downstream motion, finite occurrence turnover, upstream prepared-anchor recycle, zero upstream violations, and preparation/runtime cost.
+2. Patch 4.7C.0 — consolidate the shared CPU/HLSL topology field-space contract without changing feature-specific geometry or adding normal-runtime validation.
+3. Patch 4.7C.1 — retain individual endpoint Major ownership, host-local endpoint gates, bounded/resampled Connector paths, normalized cumulative arc length, bounded recycle-anchor path variants, and complete Weak Span path attachment data.
+4. Patch 4.7C.2 — reconstruct Connector Support and Weak Spans at identity poses, compare against accepted static fields in Editor/development diagnostics only, and batch descriptor advancement into at most one applicable topology reconstruction tick.
+5. Patch 4.7C.3 — enable endpoint-driven path deformation, Weak Span tangent following, immediate prevalidated recycle-variant switching, and temporary absence for unavailable endpoint combinations.
+6. Patch 4.8 — safe generated-topology rebuild transition for explicit rebuilds.
+7. Patch 4.9 — procedural chunk/run cache and precompute packaging.
+8. Patch 4.10 — topology completion and handoff to separate Foam-material work.
 
 Material aging response, fragmentation, dissipation, and rendering are not topology implementation steps and must not begin before topology completion.
 

@@ -45,6 +45,16 @@ namespace ProgrammaticStylized3D.Rivers
         private const float HostedCavityOverlapTolerance = 0.10f;
         private const int FreeWaterEvolutionMaskResolution = 32;
         private const float FreeWaterEvolutionPadding = 1.55f;
+        private const int FreeWaterRecycleAnchorAttemptCount = 18;
+        private const int MaximumFreeWaterRecycleAnchorCount = 4;
+        private const float FreeWaterRecycleTerritoryMetres = 0.48f;
+        private const float FreeWaterMinimumRecycleRunwayMetres = 0.85f;
+        private const float FreeWaterAnchorPressureThreshold = 0.01f;
+        private const float GoldenRatioConjugate = 0.61803398875f;
+        private static readonly float[] FreeWaterRecycleLateralOffsets =
+        {
+            0f, -0.14f, 0.14f, -0.27f, 0.27f
+        };
         private const float MinimumWeakSpanConnectorLengthMetres = 0.72f;
         private const float MinimumWeakSpanUsableLengthMetres = 0.26f;
         private const float WeakSpanEndpointClearanceMetres = 0.34f;
@@ -549,7 +559,9 @@ namespace ProgrammaticStylized3D.Rivers
                     height,
                     fieldLength,
                     validFieldLength,
-                    domain);
+                    domain,
+                    fluidCoverage,
+                    obstacleMask);
             float[] hostedFallbackPressure = new float[cellCount];
             MergeUnpreparedHostedPrefix(
                 feasibleInteriorRegions,
@@ -2604,7 +2616,9 @@ namespace ProgrammaticStylized3D.Rivers
                 int height,
                 float fieldLength,
                 float validFieldLength,
-                RiverDomainSnapshot domain)
+                RiverDomainSnapshot domain,
+                float[] fluidCoverage,
+                float[] obstacleMask)
         {
             selectedCount = Mathf.Clamp(
                 selectedCount,
@@ -2649,6 +2663,24 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
+                StylizedRiverFoamFreeWaterRecycleAnchor[] recycleAnchors =
+                    BuildFreeWaterRecycleAnchors(
+                        region,
+                        localPressure,
+                        resolution,
+                        metresPerCell,
+                        width,
+                        height,
+                        fieldLength,
+                        validFieldLength,
+                        domain,
+                        fluidCoverage,
+                        obstacleMask);
+                if (recycleAnchors.Length == 0)
+                {
+                    continue;
+                }
+
                 result.Add(new StylizedRiverFoamPreparedFreeWaterRegion(
                     region.StableId,
                     resolution,
@@ -2656,10 +2688,279 @@ namespace ProgrammaticStylized3D.Rivers
                     region.Position.x,
                     region.AcrossNormalized,
                     region.Orientation,
-                    metresPerCell));
+                    metresPerCell,
+                    recycleAnchors));
             }
 
             return result.ToArray();
+        }
+
+        private static StylizedRiverFoamFreeWaterRecycleAnchor[]
+            BuildFreeWaterRecycleAnchors(
+                PreparedNegativeRegion region,
+                float[] localPressure,
+                int resolution,
+                float metresPerCell,
+                int width,
+                int height,
+                float fieldLength,
+                float validFieldLength,
+                RiverDomainSnapshot domain,
+                float[] fluidCoverage,
+                float[] obstacleMask)
+        {
+            List<StylizedRiverFoamFreeWaterRecycleAnchor> anchors = new(
+                MaximumFreeWaterRecycleAnchorCount);
+            float egressStart = StylizedRiverFoamMajorTopology
+                .ResolveEvolutionEgressStart(validFieldLength);
+            float minimumRunway = Mathf.Min(
+                FreeWaterMinimumRecycleRunwayMetres,
+                Mathf.Max(0.20f, egressStart * 0.30f));
+            float maximumSafeDistance = Mathf.Max(
+                0f,
+                egressStart - minimumRunway);
+            float homeDistance = Mathf.Min(
+                region.Position.x,
+                maximumSafeDistance);
+            float territoryStart = Mathf.Clamp(
+                homeDistance - FreeWaterRecycleTerritoryMetres,
+                0f,
+                maximumSafeDistance);
+            float territoryEnd = Mathf.Clamp(
+                homeDistance + FreeWaterRecycleTerritoryMetres * 0.35f,
+                territoryStart,
+                maximumSafeDistance);
+
+            for (int attempt = 0;
+                 attempt < FreeWaterRecycleAnchorAttemptCount &&
+                 anchors.Count < MaximumFreeWaterRecycleAnchorCount;
+                 attempt++)
+            {
+                uint attemptSeed = MixBits(
+                    region.StableId ^
+                    ((uint)(attempt + 1) * 0x9E3779B9u) ^
+                    0xD1B54A35u);
+                float alongSelector = Mathf.Repeat(
+                    Hash01(attemptSeed, 1u) +
+                    attempt * GoldenRatioConjugate,
+                    1f);
+                float centreLocalDistance = Mathf.Lerp(
+                    territoryStart,
+                    territoryEnd,
+                    alongSelector);
+                int laneIndex = attempt %
+                    FreeWaterRecycleLateralOffsets.Length;
+                float centreAcrossNormalized = Mathf.Clamp(
+                    region.AcrossNormalized +
+                    FreeWaterRecycleLateralOffsets[laneIndex] +
+                    Mathf.Lerp(
+                        -0.055f,
+                        0.055f,
+                        Hash01(attemptSeed, 2u)),
+                    -0.84f,
+                    0.84f);
+                float orientation = Mathf.Repeat(
+                    region.Orientation +
+                    Mathf.Lerp(
+                        -0.18f,
+                        0.18f,
+                        Hash01(attemptSeed, 3u)) +
+                    Mathf.PI * 0.5f,
+                    Mathf.PI) - Mathf.PI * 0.5f;
+                if (!IsFreeWaterRecycleAnchorValid(
+                        localPressure,
+                        resolution,
+                        metresPerCell,
+                        centreLocalDistance,
+                        centreAcrossNormalized,
+                        orientation,
+                        width,
+                        height,
+                        fieldLength,
+                        validFieldLength,
+                        domain,
+                        fluidCoverage,
+                        obstacleMask) ||
+                    IsNearExistingFreeWaterRecycleAnchor(
+                        anchors,
+                        centreLocalDistance,
+                        centreAcrossNormalized))
+                {
+                    continue;
+                }
+
+                anchors.Add(new StylizedRiverFoamFreeWaterRecycleAnchor(
+                    centreLocalDistance,
+                    centreAcrossNormalized,
+                    orientation,
+                    false));
+            }
+
+            if (anchors.Count > 0)
+            {
+                return anchors.ToArray();
+            }
+
+            if (IsFreeWaterRecycleAnchorValid(
+                    localPressure,
+                    resolution,
+                    metresPerCell,
+                    homeDistance,
+                    region.AcrossNormalized,
+                    region.Orientation,
+                    width,
+                    height,
+                    fieldLength,
+                    validFieldLength,
+                    domain,
+                    fluidCoverage,
+                    obstacleMask))
+            {
+                return new[]
+                {
+                    new StylizedRiverFoamFreeWaterRecycleAnchor(
+                        homeDistance,
+                        region.AcrossNormalized,
+                        region.Orientation,
+                        true)
+                };
+            }
+
+            // Do not invent an unvalidated shifted fallback. The accepted
+            // static event remains available through the existing unavailable-
+            // evolution path when no safe upstream recycle anchor can be
+            // prepared. Normal gameplay still performs no search or retry.
+            return Array.Empty<
+                StylizedRiverFoamFreeWaterRecycleAnchor>();
+        }
+
+        private static bool IsNearExistingFreeWaterRecycleAnchor(
+            List<StylizedRiverFoamFreeWaterRecycleAnchor> anchors,
+            float localDistance,
+            float acrossNormalized)
+        {
+            for (int index = 0; index < anchors.Count; index++)
+            {
+                StylizedRiverFoamFreeWaterRecycleAnchor anchor =
+                    anchors[index];
+                if (Mathf.Abs(
+                        anchor.CentreLocalDistance - localDistance) < 0.26f &&
+                    Mathf.Abs(
+                        anchor.CentreAcrossNormalized - acrossNormalized) <
+                        0.12f)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsFreeWaterRecycleAnchorValid(
+            float[] localPressure,
+            int resolution,
+            float metresPerCell,
+            float centreLocalDistance,
+            float centreAcrossNormalized,
+            float orientationRadians,
+            int width,
+            int height,
+            float fieldLength,
+            float validFieldLength,
+            RiverDomainSnapshot domain,
+            float[] fluidCoverage,
+            float[] obstacleMask)
+        {
+            if (localPressure == null ||
+                localPressure.Length < resolution * resolution ||
+                resolution <= 0 || metresPerCell <= 0.0001f ||
+                domain == null || !domain.IsValid ||
+                fluidCoverage == null ||
+                fluidCoverage.Length < width * height)
+            {
+                return false;
+            }
+
+            float centre = resolution * 0.5f;
+            float cosine = Mathf.Cos(orientationRadians);
+            float sine = Mathf.Sin(orientationRadians);
+            float totalWeight = 0f;
+            float effectiveWeight = 0f;
+            float bankWeight = 0f;
+            float obstacleWeight = 0f;
+            float outsideWeight = 0f;
+            for (int y = 0; y < resolution; y++)
+            {
+                for (int x = 0; x < resolution; x++)
+                {
+                    float pressure = localPressure[x + y * resolution];
+                    if (pressure <= FreeWaterAnchorPressureThreshold)
+                    {
+                        continue;
+                    }
+
+                    float localX = (x + 0.5f - centre) * metresPerCell;
+                    float localY = (y + 0.5f - centre) * metresPerCell;
+                    float deltaAlong =
+                        cosine * localX - sine * localY;
+                    float deltaAcross =
+                        sine * localX + cosine * localY;
+                    float localDistance = centreLocalDistance + deltaAlong;
+                    totalWeight += pressure;
+                    if (localDistance < 0f ||
+                        localDistance > validFieldLength)
+                    {
+                        outsideWeight += pressure;
+                        continue;
+                    }
+
+                    StylizedRiverSplineSample sample =
+                        domain.SampleAtOrientedDistance(localDistance);
+                    float centreAcrossMetres = SignedNormalizedToMetres(
+                        centreAcrossNormalized,
+                        Mathf.Max(0.05f, sample.LeftSurfaceHalfWidth),
+                        Mathf.Max(0.05f, sample.RightSurfaceHalfWidth));
+                    Vector2 metricPosition = new Vector2(
+                        localDistance,
+                        centreAcrossMetres + deltaAcross);
+                    float fluid = SampleRegionSourcePressure(
+                        fluidCoverage,
+                        width,
+                        height,
+                        fieldLength,
+                        validFieldLength,
+                        metricPosition,
+                        domain);
+                    float obstacle = obstacleMask != null &&
+                        obstacleMask.Length >= width * height
+                        ? SampleRegionSourcePressure(
+                            obstacleMask,
+                            width,
+                            height,
+                            fieldLength,
+                            validFieldLength,
+                            metricPosition,
+                            domain)
+                        : 0f;
+                    effectiveWeight += pressure * fluid * (1f - obstacle);
+                    bankWeight += pressure * (1f - fluid);
+                    obstacleWeight += pressure * obstacle;
+                }
+            }
+
+            if (totalWeight <= 0.0001f)
+            {
+                return false;
+            }
+
+            float effectiveRatio = effectiveWeight / totalWeight;
+            float bankRatio = bankWeight / totalWeight;
+            float obstacleRatio = obstacleWeight / totalWeight;
+            float outsideRatio = outsideWeight / totalWeight;
+            return effectiveRatio >= 0.70f &&
+                bankRatio <= 0.22f &&
+                obstacleRatio <= 0.055f &&
+                outsideRatio <= 0.08f;
         }
 
         private static void AppendPreparedHostedRegions(
