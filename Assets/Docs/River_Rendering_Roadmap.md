@@ -312,7 +312,8 @@ Accepted and retained:
 - Patch 4.7C.3.2 ratio-based stretch breaking plus deterministic recycle relationship turnover implemented; concentration defect found;
 - Patch 4.7C.3.3 deterministic soft endpoint-load distribution implemented and visually/long-run validated;
 - Patch 4.8A staged same-grid replacement preparation and atomic activation implemented and Unity-verified;
-- Patch 4.8B safe old/new generated-topology crossfade, superseding-transition flattening, and differently mapped domain/quality hold/remap transition implemented; Unity validation pending;
+- Patch 4.8B safe old/new generated-topology crossfade, superseding-transition flattening, and differently mapped domain/quality hold/remap transition implemented and Unity-verified;
+- Patch 4.9A versioned exact-value cache contract and deterministic round-trip proof implemented; Unity validation pending;
 - exact transformed-mesh water-level-aware Obstacle Footprint, distinct from padded Pressure/Lee disturbance footprints;
 - persistent field, chunking, freezing, sleeping, and fixed-cost GPU infrastructure;
 - permanent Foam profiler instrumentation;
@@ -377,6 +378,8 @@ Runtime topology evolution uses fixed logical slots with one active instance eac
 
 Patch 4.8A changes explicit replacement ownership without changing topology shape rules. A replacement request captures immutable domain/settings/obstacle inputs, builds Major, Connector, Pocket, and a separate generated-topology texture over several frames, and leaves the accepted active topology evolving throughout. A superseding target cancels only replacement work. Complete replacements activate atomically; incomplete class combinations are never bound. The identical-preparation diagnostic runs the full replacement pipeline and discards the result without activation so preparation can be verified as visually side-effect free. Patch 4.8B captures the current fully resolved generated field immediately before complete activation, then linearly crossfades that immutable old snapshot into the new complete generated target for one bounded internal second. Live Pressure, Lee, Shore, and exact Obstacle Footprint remain outside the generated blend. Superseding activations flatten the current visible blend into one new source snapshot. Domain or quality changes keep the old complete renderer bindings visible during staged initialization, then remap old generated topology by global distance and physical lateral metres into the new field before fading.
 
+Patch 4.9 is split into four gates. 4.9A proves a storage-provider-agnostic versioned binary payload for the complete prepared object graph—not merely the flattened topology texture—and the exact obstacle scalar mask. The explicit Inspector proof requires deterministic bytes, exact reconstructed channels, corruption rejection, and no activation or startup change. 4.9B adds stable cross-session domain/obstacle fingerprints and explicit cache building. 4.9C makes staged initialization cache-first and removes expensive proof generation from valid ordinary startup. 4.9D validates cold/warm startup, stale reasons, generator-marker absence, staged load cost, and memory before topology handoff.
+
 ### Immediate continuation order
 
 1. Documentation expansion for four-class Negative Aging Pressure — complete.
@@ -399,10 +402,13 @@ Patch 4.8A changes explicit replacement ownership without changing topology shap
 18. Patch 4.7C.3.2 — ratio-based breaking and deterministic recycle turnover — implemented; concentration defect found.
 19. Patch 4.7C.3.3 — deterministic soft Connector distribution bias — implemented and visually/long-run validated.
 20. Patch 4.8A — staged replacement preparation and atomic activation — implemented and Unity-verified.
-21. Patch 4.8B — safe old/new generated-topology crossfade, superseding flattening, and differently mapped domain/quality hold/remap transition — implemented; Unity validation pending.
-22. Patch 4.9 — procedural chunk/run cache and precompute packaging.
-23. Patch 4.10 — topology completion and handoff to separate Foam-material work.
-24. Resume deferred performance work against the completed topology pipeline.
+21. Patch 4.8B — safe old/new generated-topology crossfade, superseding flattening, and differently mapped domain/quality hold/remap transition — implemented and Unity-verified.
+22. Patch 4.9A — versioned cache contract and deterministic round-trip proof — implemented; Unity validation pending.
+23. Patch 4.9B — stable content fingerprints and explicit cache building.
+24. Patch 4.9C — cache-first runtime initialization.
+25. Patch 4.9D — production and cold-start validation.
+26. Patch 4.10 — topology completion and handoff to separate Foam-material work.
+27. Resume deferred performance work against the completed topology pipeline.
 
 ### Terminology
 
@@ -495,12 +501,15 @@ Separate material lifetime and topology-response authoring remains deferred unti
 22. Patch 4.7C.3.2 ratio-based breaking and deterministic recycle turnover — implemented; concentration defect found.
 23. Patch 4.7C.3.3 soft Connector distribution bias — implemented and visually/long-run validated.
 24. Patch 4.8A staged replacement preparation and atomic activation — implemented and Unity-verified.
-25. Patch 4.8B safe old/new generated-topology crossfade, superseding flattening, and domain/quality hold/remap transition — implemented; Unity validation pending.
-26. Patch 4.9 procedural chunk/run cache/precompute packaging.
-27. Patch 4.10 topology completion handoff.
-28. Separate topology-to-material lifespan integration.
-29. End-of-life fragmentation/dissipation and final rendering.
-30. Resume deferred performance work and final PC-first profiling.
+25. Patch 4.8B safe old/new generated-topology crossfade, superseding flattening, and domain/quality hold/remap transition — implemented and Unity-verified.
+26. Patch 4.9A versioned cache contract and deterministic round-trip proof — implemented; Unity validation pending.
+27. Patch 4.9B stable fingerprints and explicit cache building.
+28. Patch 4.9C cache-first runtime initialization.
+29. Patch 4.9D production/cold-start validation.
+30. Patch 4.10 topology completion handoff.
+31. Separate topology-to-material lifespan integration.
+32. End-of-life fragmentation/dissipation and final rendering.
+33. Resume deferred performance work and final PC-first profiling.
 
 Every positive and negative topology class is implemented and accepted separately before the combined topology is judged. This is an explicit anti-regression rule.
 

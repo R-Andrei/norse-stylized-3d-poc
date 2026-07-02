@@ -701,6 +701,20 @@ namespace ProgrammaticStylized3D.Rivers
         private int pocketTopologyInputSignature = int.MinValue;
         private int majorEvolutionLifetimeInputSignature = int.MinValue;
 
+        // Patch 4.9A keeps its proof telemetry entirely separate from the
+        // active topology lifecycle. The explicit Inspector action serializes
+        // immutable prepared data only and never replaces renderer bindings.
+        private string topologyCacheRoundTripState = "Not Run";
+        private string topologyCacheRoundTripSummary =
+            "Run the explicit cache round-trip proof after initialization.";
+        private int topologyCacheRoundTripPayloadBytes;
+        private ulong topologyCacheRoundTripPayloadHash;
+        private double topologyCacheRoundTripSerializationMilliseconds;
+        private double topologyCacheRoundTripLoadMilliseconds;
+        private double topologyCacheRoundTripVerificationMilliseconds;
+        private int topologyCacheRoundTripRunCount;
+        private int topologyCacheRoundTripPassCount;
+
         private readonly List<PendingInjection> pendingInjections = new();
         private readonly List<FoamReservation> reservations = new();
         private readonly List<MeshFilter> obstacleExclusionMeshFilters = new();
@@ -1276,6 +1290,33 @@ namespace ProgrammaticStylized3D.Rivers
             topologyTransitionRemappedCount;
         public int TopologyTransitionFlattenedCount =>
             topologyTransitionFlattenedCount;
+        public string TopologyCacheRoundTripState =>
+            topologyCacheRoundTripState;
+        public string TopologyCacheRoundTripSummary =>
+            topologyCacheRoundTripSummary;
+        public int TopologyCacheRoundTripPayloadBytes =>
+            topologyCacheRoundTripPayloadBytes;
+        public string TopologyCacheRoundTripPayloadHash =>
+            topologyCacheRoundTripPayloadHash > 0ul
+                ? topologyCacheRoundTripPayloadHash.ToString("X16")
+                : "—";
+        public double TopologyCacheRoundTripSerializationMilliseconds =>
+            topologyCacheRoundTripSerializationMilliseconds;
+        public double TopologyCacheRoundTripLoadMilliseconds =>
+            topologyCacheRoundTripLoadMilliseconds;
+        public double TopologyCacheRoundTripVerificationMilliseconds =>
+            topologyCacheRoundTripVerificationMilliseconds;
+        public int TopologyCacheRoundTripRunCount =>
+            topologyCacheRoundTripRunCount;
+        public int TopologyCacheRoundTripPassCount =>
+            topologyCacheRoundTripPassCount;
+        public bool TopologyCacheRoundTripReady =>
+            initializationPhase == InitializationPhase.Ready &&
+            AreResourcesCompleteAndCurrent() &&
+            majorTopology != null &&
+            connectorTopology != null &&
+            pocketTopology != null &&
+            obstacleExclusionScalar.Length == fieldWidth * fieldHeight;
         public int DynamicShoreRowCount => currentShoreEdgesTexture != null
             ? currentShoreEdgesTexture.width
             : 0;
@@ -2026,6 +2067,107 @@ namespace ProgrammaticStylized3D.Rivers
                 TopologyReplacementReason.IdenticalValidation,
                 true);
             return topologyReplacementBuild != null;
+        }
+
+        public bool RunTopologyCacheRoundTripValidation()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            topologyCacheRoundTripRunCount++;
+            topologyCacheRoundTripState = "Running";
+            topologyCacheRoundTripSummary =
+                "Capturing the immutable prepared topology graph.";
+
+            if (!Application.isPlaying ||
+                !TopologyCacheRoundTripReady ||
+                river == null ||
+                !river.Domain.IsValid ||
+                TopologyReplacementInProgress)
+            {
+                topologyCacheRoundTripState = "Unavailable";
+                topologyCacheRoundTripSummary =
+                    "The proof requires a fully initialized Play-mode topology " +
+                    "with no replacement build in progress.";
+                return false;
+            }
+
+            try
+            {
+                RiverDomainSnapshot domain = river.Domain;
+                StylizedRiverFoamTopologyCachePackage package =
+                    new StylizedRiverFoamTopologyCachePackage(
+                        fieldWidth,
+                        fieldHeight,
+                        fieldLength,
+                        validFieldLength,
+                        domain.GlobalDistanceMinimum,
+                        domain.GlobalDistanceMaximum,
+                        domain.LocalLength,
+                        domain.RequestedSampleSpacing,
+                        domain.ReverseFlow,
+                        domain.SampleCount,
+                        river.Quality,
+                        river.ShoreMotion,
+                        river.FoamMajorSupportSeed,
+                        river.FoamMajorSupportAmount,
+                        river.FoamMajorSupportSize,
+                        river.FoamMajorSupportSizeVariation,
+                        river.FoamMajorRecycleTerritoryDeviationPercent,
+                        river.FoamConnectorAmount,
+                        river.FoamConnectorDirectness,
+                        river.FoamConnectorLengthPreference,
+                        river.FoamInteriorPocketAmount,
+                        river.FoamEdgeCavityAmount,
+                        river.FoamConnectorWeakSpanAmount,
+                        river.FoamFreeWaterEventAmount,
+                        obstacleExclusionScalar,
+                        majorTopology,
+                        connectorTopology,
+                        pocketTopology);
+
+                StylizedRiverFoamTopologyCacheRoundTripResult result =
+                    StylizedRiverFoamTopologyCacheCodec.ValidateRoundTrip(
+                        package);
+                topologyCacheRoundTripPayloadBytes = result.PayloadByteCount;
+                topologyCacheRoundTripPayloadHash = result.PayloadHash;
+                topologyCacheRoundTripSerializationMilliseconds =
+                    result.SerializationMilliseconds;
+                topologyCacheRoundTripLoadMilliseconds =
+                    result.LoadMilliseconds;
+                topologyCacheRoundTripVerificationMilliseconds =
+                    result.VerificationMilliseconds;
+                topologyCacheRoundTripSummary = result.Summary;
+                topologyCacheRoundTripState = result.Passed
+                    ? "Passed"
+                    : "Failed";
+                if (result.Passed)
+                {
+                    topologyCacheRoundTripPassCount++;
+                    Debug.Log(
+                        $"[River Foam 4.9A] Cache round-trip passed for " +
+                        $"'{river.name}': {result.PayloadByteCount:N0} bytes, " +
+                        $"hash {result.PayloadHash:X16}.",
+                        river);
+                }
+                else
+                {
+                    Debug.LogError(
+                        $"[River Foam 4.9A] Cache round-trip failed for " +
+                        $"'{river.name}': {result.Summary}",
+                        river);
+                }
+
+                return result.Passed;
+            }
+            catch (Exception exception)
+            {
+                topologyCacheRoundTripState = "Failed";
+                topologyCacheRoundTripSummary = exception.Message;
+                Debug.LogException(exception, river);
+                return false;
+            }
+#else
+            return false;
+#endif
         }
 
         private void RequestTopologyReplacement(

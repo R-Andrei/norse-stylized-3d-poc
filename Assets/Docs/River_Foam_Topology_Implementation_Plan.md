@@ -4,7 +4,7 @@
 
 **Status:** Canonical step-by-step implementation plan for Stage 6 Foam topology only.
 
-**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-footprint/parity correction are implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector/Weak Span immutable preparation data is implemented and Unity preparation diagnostics are accepted: all accepted Connectors and Weak Span attachments prepared successfully with zero unresolved endpoints or unavailable attachments in the validation scene. Patch 4.7C.2 identity reconstruction, debug-only parity, and combined reconstruction scheduling are implemented and visually accepted. Patch 4.7C.3 endpoint-driven Connector deformation and Weak Span current-path/tangent following are implemented, but long-run validation exposed permanent Connector population drain because only a subset of same-host anchor states was prepared and relationships could not rebind to different Major targets. Patch 4.7C.3.1 completes anchor-state coverage and adds bounded preparation-time replacement relationships. Long-run validation then exposed two remaining lifecycle defects: valid relationships could stretch indefinitely during ordinary host motion, and runtime preserved the same viable pair after every recycle. Patch 4.7C.3.2 adds ratio-based stretch breaking plus deterministic recycle relationship turnover; validation exposed strong relationship concentration. Patch 4.7C.3.3 deterministic soft endpoint-load distribution is implemented and visually/long-run validated. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Patch 4.8A staged same-grid replacement preparation and atomic activation are implemented and Unity-verified. Patch 4.8B safe old/new generated-topology crossfade, superseding-transition flattening, and differently mapped domain/quality hold/remap transition are implemented and await Unity validation. Production cache packaging is not yet implemented.
+**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-footprint/parity correction are implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector/Weak Span immutable preparation data is implemented and Unity preparation diagnostics are accepted: all accepted Connectors and Weak Span attachments prepared successfully with zero unresolved endpoints or unavailable attachments in the validation scene. Patch 4.7C.2 identity reconstruction, debug-only parity, and combined reconstruction scheduling are implemented and visually accepted. Patch 4.7C.3 endpoint-driven Connector deformation and Weak Span current-path/tangent following are implemented, but long-run validation exposed permanent Connector population drain because only a subset of same-host anchor states was prepared and relationships could not rebind to different Major targets. Patch 4.7C.3.1 completes anchor-state coverage and adds bounded preparation-time replacement relationships. Long-run validation then exposed two remaining lifecycle defects: valid relationships could stretch indefinitely during ordinary host motion, and runtime preserved the same viable pair after every recycle. Patch 4.7C.3.2 adds ratio-based stretch breaking plus deterministic recycle relationship turnover; validation exposed strong relationship concentration. Patch 4.7C.3.3 deterministic soft endpoint-load distribution is implemented and visually/long-run validated. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Patch 4.8A staged same-grid replacement preparation and atomic activation are implemented and Unity-verified. Patch 4.8B safe old/new generated-topology crossfade, superseding-transition flattening, and differently mapped domain/quality hold/remap transition are implemented and Unity-verified. Patch 4.9A versioned cache contract and deterministic round-trip proof are implemented and await Unity validation. Persistent cache ownership, stable cross-session fingerprints, cache-first startup, and production cold-start validation remain 4.9B–4.9D.
 
 **Primary implementation target:**
 
@@ -1294,7 +1294,7 @@ Patch 4.8A passes only if:
 
 ### Patch 4.8B — safe old/new generated-topology transition
 
-**Status:** implemented; Unity validation pending.
+**Status:** implemented and Unity-verified.
 
 Patch 4.8B retains one fully resolved old generated-topology snapshot when a complete 4.8A replacement activates. The snapshot is not merely the static upload: one dedicated compute pass resolves the currently visible Major, hosted-negative, Free-Water, Connector, and Weak Span generated classes, including any active ordinary evolution, into one immutable RGB generated-topology texture.
 
@@ -1343,66 +1343,96 @@ Disable staged replacement and return same-grid topology changes to the last acc
 
 ## Patch 4.9 — Production Cache and Precompute Packaging
 
-### Purpose
+Patch 4.9 is deliberately split so serialization correctness is proven before startup ownership changes.
 
-Move expensive accepted generation out of ordinary Play startup and active gameplay.
+### Patch 4.9A — versioned cache contract and deterministic round-trip proof
 
-### Initial packaging decision
+**Status:** implemented; Unity validation pending.
 
-The first production cache should store the integrated per-river or per-run topology result rather than prematurely building a large generic shape library.
+#### Purpose
 
-The cache should contain as applicable:
+Prove that the complete accepted prepared topology can survive exact deterministic binary serialization before any asset ownership or normal-startup behaviour changes.
 
-- Major, Connector, and four-class Negative Aging Pressure fields or masks;
-- compact region identities;
-- per-layer evolution metadata;
-- river-space mapping and dimensions;
-- generator version;
-- river/domain version or checksum;
-- obstacle/source checksum;
-- authored settings and seed;
-- diagnostics needed to detect stale or invalid data.
+#### Implemented payload contract
 
-A reusable shape library or hybrid descriptor system remains a later optimization only if memory, variation, or movement requirements justify it.
+The versioned payload stores exact 32-bit values for:
 
-### Exact behaviour change
+- field width, height, field length, valid field length, global river interval, local length, requested sample spacing, reverse-flow state, sample count, quality, topology-generation settings, and seed;
+- the exact scalar Obstacle Footprint mask consumed by generation;
+- complete Major support fields, accepted region identities/selectors, local masks, shape metrics, and every prepared recycle anchor;
+- complete Connector support fields, accepted relationships, endpoint ownership, accepted/prepared paths, normalized cumulative lengths, every same-host anchor-state path variant, and the bounded replacement-relationship catalogue;
+- all six retained Negative Aging Pressure scalar fields, all four accepted region classes, hosted masks and variants, Free-Water masks and recycle anchors, and Weak Span Connector attachment/path metadata;
+- deterministic counters and rejection tables required to reconstruct the existing diagnostics.
 
-Implement:
+Volatile generation timings are intentionally excluded from payload identity. Format version and generator-contract version are written explicitly, every collection is length-bounded, and an end-of-payload checksum rejects corrupt or truncated data neutrally.
 
-- deterministic cache serialization;
-- stale-cache detection;
-- load and validation during preparation;
-- neutral failure behaviour when no valid cache exists;
-- explicit development regeneration path;
-- equivalence checks between freshly generated and loaded topology;
-- production avoidance of candidate generation and relational searches during gameplay.
+Two internal raw reconstruction paths preserve already-canonical normalized Pocket breach vectors and Weak Span tangents bit-for-bit rather than normalizing accepted data a second time.
 
-### Immediate inspection
+#### Explicit proof behaviour
 
-Load the cached topology and inspect the same river diagnostics used for generated topology.
+The Play-mode Inspector exposes `Validate Topology Cache Round Trip`. The proof:
 
-Required telemetry:
+1. captures the active immutable prepared topology and obstacle scalar field;
+2. serializes the same source twice and requires byte-identical output;
+3. deserializes into fresh topology objects;
+4. serializes the reconstructed graph again and requires exact payload equality;
+5. reconstructs initial generated topology channels and compares them bit-for-bit;
+6. compares every obstacle scalar value bit-for-bit;
+7. corrupts one payload byte and requires neutral rejection;
+8. reports state, run/pass counts, payload size/hash, serialization time, load time, verification time, and the exact failure reason.
 
-- cache hit/miss/stale reason;
-- load time;
-- generated-versus-loaded checksum;
-- cache memory size;
-- whether any expensive generation path executed.
+The reconstructed topology is never activated. Patch 4.9A changes no normal startup phase, renderer binding, replacement transition, evolution cadence, or visible topology.
 
-### Acceptance gate
+#### Acceptance gate
 
 Pass only if:
 
-- valid cached output matches the accepted generated output within the defined representation tolerance;
-- runtime evolution preserves the same identities and phases;
-- stale inputs invalidate the cache deterministically;
-- ordinary gameplay performs no expensive topology generation;
-- cache loading does not reintroduce a startup freeze;
-- development regeneration remains explicit and inspectable.
+- the explicit proof reports `Passed` on the validated river;
+- repeated proof runs on unchanged active topology produce the same payload byte count and hash;
+- every stable identity, mask value, path, variant, anchor, attachment, and evolution selector survives exact reconstruction;
+- reconstructed initial generated channels match the active prepared topology exactly;
+- a corrupt payload fails without replacing or clearing active topology;
+- no topology generation, renderer activation, resource replacement, or startup-path change occurs because the proof ran.
+
+### Patch 4.9B — stable fingerprints and explicit cache building
+
+After 4.9A is accepted:
+
+- define a stable content checksum for the complete resampled river-domain contract rather than using session-local `RiverDomainSnapshot.Version`;
+- define a stable exact-obstacle/source checksum rather than using `ObstacleGeometryVersion`;
+- associate the versioned payload with authored river/chunk/run storage without coupling the binary format to one Editor-only asset type;
+- provide an explicit development build/regeneration command;
+- report cache build success, size, input fingerprints, generator version, and stale reason.
+
+No ordinary Play startup should consume the cache yet.
+
+### Patch 4.9C — cache-first runtime initialization
+
+Only after 4.9B fingerprints and ownership are accepted:
+
+- validate and load the prepared topology payload during staged initialization;
+- upload the cached obstacle scalar field directly;
+- reconstruct the existing immutable topology objects and reuse the accepted evolution/upload paths;
+- skip transformed-mesh rescanning, forced obstacle readback, candidate generation, cleanup, pathfinding, and negative-region searches on a valid cache hit;
+- allow expensive generation only through an explicit development regeneration path;
+- never hide a production cache miss behind a silent synchronous full-generation fallback.
+
+Patch 4.8A/4.8B remain the sole complete-topology activation and transition system. Cache loading supplies another complete prepared target; it does not introduce a competing activation path.
+
+### Patch 4.9D — production and cold-start validation
+
+Finally:
+
+- compare cold and warm Play startup on several rivers and quality tiers;
+- prove that no expensive generator marker executes on a valid cache hit;
+- test stale domain, settings, quality, generator-version, and obstacle fingerprints independently;
+- verify load/upload work remains staged and does not create a new single-frame freeze;
+- verify cache memory remains reasonable while prioritizing lower startup CPU/GPU work;
+- remove only proof-generation plumbing that is genuinely obsolete after cache-first startup is accepted.
 
 ### Rollback
 
-Return to the accepted staged proof-generation path while retaining the cache format files for diagnosis.
+4.9A can be rolled back by removing the codec, raw reconstruction helpers, Inspector proof, and proof telemetry; active topology behaviour is otherwise untouched. Later 4.9 slices may return to the accepted staged proof-generation path while retaining the versioned payload files for diagnosis.
 
 ---
 
@@ -1569,23 +1599,23 @@ A topology patch that cannot answer these questions is not ready.
 
 ## 13. Immediate Next Step
 
-Patch 4.7C.3.3 soft weighted Connector distribution is visually/long-run validated. Patch 4.8A staged replacement preparation and atomic activation are implemented and Unity-verified. Patch 4.8B safe topology transition is implemented.
+Patch 4.8B is Unity-verified. Patch 4.9A is implemented without changing normal startup or active renderer ownership.
 
-Validate Patch 4.8B on the actual river:
+Validate Patch 4.9A on the actual river:
 
-1. let the active topology evolve, change Major Seed once, and confirm `Transition State` becomes `Crossfading`, progress advances from `0%` to `100%`, and `Transitions Started / Completed` advances without a black/neutral frame or an additive bright spike;
-2. inspect Major, Connector, hosted-negative, Free-Water, and Weak Span diagnostics during the fade; the old complete generated result must dissolve while the complete replacement appears, with no mixed partial-generation phase;
-3. change a topology setting again before the first fade finishes; confirm `Flattened Transitions` increases and the visible blend continues smoothly rather than jumping or forcing the first fade to complete;
-4. alter an authoritative live source or obstacle during a generated fade; Pressure, Lee, Shore, and exact Obstacle Footprint must respond once, remain current, and not inherit the old/new generated blend;
-5. change quality or rebuild the river domain; confirm `Transition State` first reports `Holding Previous Mapping`, the previous complete rendered result remains visible throughout staged initialization, then `Remapped Transitions` increases and a crossfade begins after the new resources become ready;
-6. inspect newly exposed or removed river extents during a remapped transition; out-of-overlap old coverage must fade from zero rather than smear from an old edge texel;
-7. rapidly supersede requests and repeat domain/quality changes; old transition textures, metric buffers, and held renderer resources must retire after completion without memory growth, missing bindings, or stale topology;
-8. disabling, freezing, destroying, or forcing another initialization during either hold or crossfade must release retained resources safely;
-9. no normal-runtime readback, topology search, retry loop, additive old/new composition, or per-region transition dispatch may appear.
+1. enter Play mode, wait for the full topology to initialize, open `Foam Topology and Runtime Diagnostics`, and press `Validate Topology Cache Round Trip`;
+2. confirm `Round-Trip State` becomes `Passed`, `Proof Runs / Passed` advances equally, and payload size/hash plus serialize/load/verification timings are populated;
+3. press the proof button again without changing topology; payload byte count and hash must remain identical;
+4. inspect Final Foam and all topology diagnostics before and after the proof; no visible topology, evolution phase, transition state, renderer binding, or material state may change;
+5. trigger an ordinary 4.8B replacement, let it complete, then run the proof again; the new accepted topology should produce a valid but appropriately different payload hash;
+6. confirm the Console reports one concise pass line and no exception, corrupt-payload acceptance, collection-bound, checksum, or reconstruction mismatch;
+7. profile the explicit proof only; its serialization/load work may be synchronous because it is a development command, but no proof work may run during ordinary startup or gameplay updates.
 
 After validation, proceed in this exact order:
 
-1. Patch 4.9 — procedural chunk/run cache and precompute packaging;
-2. Patch 4.10 — topology completion and handoff to separate Foam-material work.
+1. Patch 4.9B — stable domain/obstacle fingerprints and explicit cache building;
+2. Patch 4.9C — cache-first runtime initialization;
+3. Patch 4.9D — production and cold-start validation;
+4. Patch 4.10 — topology completion and handoff to separate Foam-material work.
 
-Topology is not considered implemented until runtime evolution, explicit rebuild handling, and cache/preparation handoff pass. Only then may the separate Foam material-lifecycle implementation begin.
+Topology is not considered implemented until the full 4.9 cache/preparation handoff passes. Only then may the separate Foam material-lifecycle implementation begin.

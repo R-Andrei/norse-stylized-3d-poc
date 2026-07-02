@@ -91,6 +91,85 @@ namespace ProgrammaticStylized3D.Rivers
             GrowthSelector = Mathf.Clamp01(growthSelector);
         }
 
+        internal static StylizedRiverFoamPocketRegion FromSerialized(
+            StylizedRiverFoamNegativeRegionClass regionClass,
+            uint stableId,
+            uint hostRegionId,
+            float centreGlobalDistance,
+            float centreAcrossNormalized,
+            float orientationRadians,
+            float alongRadiusMetres,
+            float acrossRadiusMetres,
+            Vector2 breachDirection,
+            uint evolutionSeed,
+            float driftRateSelector,
+            float phaseOffset,
+            float fadeInSelector,
+            float fadeOutSelector,
+            float movementSpanSelector,
+            float recycleSelector,
+            float growthSelector)
+        {
+            return new StylizedRiverFoamPocketRegion(
+                regionClass,
+                stableId,
+                hostRegionId,
+                centreGlobalDistance,
+                centreAcrossNormalized,
+                orientationRadians,
+                alongRadiusMetres,
+                acrossRadiusMetres,
+                breachDirection,
+                evolutionSeed,
+                driftRateSelector,
+                phaseOffset,
+                fadeInSelector,
+                fadeOutSelector,
+                movementSpanSelector,
+                recycleSelector,
+                growthSelector,
+                true);
+        }
+
+        private StylizedRiverFoamPocketRegion(
+            StylizedRiverFoamNegativeRegionClass regionClass,
+            uint stableId,
+            uint hostRegionId,
+            float centreGlobalDistance,
+            float centreAcrossNormalized,
+            float orientationRadians,
+            float alongRadiusMetres,
+            float acrossRadiusMetres,
+            Vector2 breachDirection,
+            uint evolutionSeed,
+            float driftRateSelector,
+            float phaseOffset,
+            float fadeInSelector,
+            float fadeOutSelector,
+            float movementSpanSelector,
+            float recycleSelector,
+            float growthSelector,
+            bool preserveSerializedValues)
+        {
+            RegionClass = regionClass;
+            StableId = stableId;
+            HostRegionId = hostRegionId;
+            CentreGlobalDistance = centreGlobalDistance;
+            CentreAcrossNormalized = centreAcrossNormalized;
+            OrientationRadians = orientationRadians;
+            AlongRadiusMetres = alongRadiusMetres;
+            AcrossRadiusMetres = acrossRadiusMetres;
+            BreachDirection = breachDirection;
+            EvolutionSeed = evolutionSeed;
+            DriftRateSelector = driftRateSelector;
+            PhaseOffset = phaseOffset;
+            FadeInSelector = fadeInSelector;
+            FadeOutSelector = fadeOutSelector;
+            MovementSpanSelector = movementSpanSelector;
+            RecycleSelector = recycleSelector;
+            GrowthSelector = growthSelector;
+        }
+
         public StylizedRiverFoamNegativeRegionClass RegionClass { get; }
         public uint StableId { get; }
         public uint HostRegionId { get; }
@@ -300,6 +379,65 @@ namespace ProgrammaticStylized3D.Rivers
             AcceptedTangent = acceptedTangent.sqrMagnitude > 0.000001f
                 ? acceptedTangent.normalized
                 : Vector2.right;
+            AcceptedOrientationRadians = acceptedOrientationRadians;
+        }
+
+        internal static StylizedRiverFoamPreparedWeakSpanRegion FromSerialized(
+            uint stableId,
+            uint connectorStableId,
+            StylizedRiverFoamPreparedWeakSpanAvailability availability,
+            float normalizedPathDistance,
+            float minimumNormalizedPathDistance,
+            float maximumNormalizedPathDistance,
+            float alongRadiusMetres,
+            float acrossRadiusMetres,
+            float strength,
+            uint evolutionSeed,
+            Vector2 acceptedTangent,
+            float acceptedOrientationRadians)
+        {
+            return new StylizedRiverFoamPreparedWeakSpanRegion(
+                stableId,
+                connectorStableId,
+                availability,
+                normalizedPathDistance,
+                minimumNormalizedPathDistance,
+                maximumNormalizedPathDistance,
+                alongRadiusMetres,
+                acrossRadiusMetres,
+                strength,
+                evolutionSeed,
+                acceptedTangent,
+                acceptedOrientationRadians,
+                true);
+        }
+
+        private StylizedRiverFoamPreparedWeakSpanRegion(
+            uint stableId,
+            uint connectorStableId,
+            StylizedRiverFoamPreparedWeakSpanAvailability availability,
+            float normalizedPathDistance,
+            float minimumNormalizedPathDistance,
+            float maximumNormalizedPathDistance,
+            float alongRadiusMetres,
+            float acrossRadiusMetres,
+            float strength,
+            uint evolutionSeed,
+            Vector2 acceptedTangent,
+            float acceptedOrientationRadians,
+            bool preserveSerializedValues)
+        {
+            StableId = stableId;
+            ConnectorStableId = connectorStableId;
+            Availability = availability;
+            NormalizedPathDistance = normalizedPathDistance;
+            MinimumNormalizedPathDistance = minimumNormalizedPathDistance;
+            MaximumNormalizedPathDistance = maximumNormalizedPathDistance;
+            AlongRadiusMetres = alongRadiusMetres;
+            AcrossRadiusMetres = acrossRadiusMetres;
+            Strength = strength;
+            EvolutionSeed = evolutionSeed;
+            AcceptedTangent = acceptedTangent;
             AcceptedOrientationRadians = acceptedOrientationRadians;
         }
 

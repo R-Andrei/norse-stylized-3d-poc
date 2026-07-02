@@ -1471,7 +1471,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.7 evolves Major Support, Major-hosted negative regions, independent Free-Water Negative Events, Connector Support, and attached Connector Weak Spans from bounded prepared data. Patch 4.7C.3.3 keeps the ratio-based break and recycle-turnover lifecycle while replacing per-Major degree ceilings with a strong deterministic soft distribution bias, so unused support patches are favoured without making occasional hubs impossible.",
+                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.7 evolves every generated topology class from bounded prepared data, Patch 4.8 replaces complete topology safely, and Patch 4.9A now proves a deterministic versioned binary cache contract without changing normal startup or renderer bindings.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1759,9 +1759,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Patch 4.7 evolves Major Support, Major-hosted negative regions, independent Free-Water Negative Events, Connector Support, and Connector Weak Spans through bounded prepared records. Patch 4.7C.3.3 deforms current paths between live Major gates, breaks paths that exceed their assignment-relative stretch ratio, and selects prepared relationships through a strong but non-zero endpoint-load bias. Patch 4.8A prepares complete replacement topology without mutating the accepted active set. Patch 4.8B captures the fully resolved generated topology, crossfades old to new without double strength or a neutral frame, keeps Pressure, Lee, Shore, and Obstacle Footprint live and authoritative, and holds the previous complete renderer bindings while a differently mapped domain or quality resource set initializes."),
+                    "Patch 4.8B safely transitions complete generated topology while live Pressure, Lee, Shore, and Obstacle Footprint remain authoritative. Patch 4.9A adds a versioned exact-value codec and explicit round-trip equivalence proof for the complete prepared Major, Connector, and Negative topology graph plus the obstacle scalar field. It does not yet persist assets, validate cross-session fingerprints, or alter normal initialization."),
                 new GUIContent(
-                    "Safe Topology Transition (Patch 4.8B)"));
+                    "Cache Round-Trip Proof (Patch 4.9A)"));
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Replacement Build State",
@@ -1803,6 +1803,55 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Remapped / Flattened Transitions",
                 $"{runtime.TopologyTransitionRemappedCount} / " +
                 runtime.TopologyTransitionFlattenedCount);
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Patch 4.9A Cache Contract",
+                EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Round-Trip State",
+                    "The explicit proof serializes the complete immutable prepared topology graph and exact obstacle scalar field, deserializes them into fresh topology objects, verifies identical bytes and initial generated channels, and rejects a deliberately corrupted copy. It never activates the reconstructed result."),
+                runtime.TopologyCacheRoundTripState);
+            EditorGUILayout.LabelField(
+                "Proof Runs / Passed",
+                $"{runtime.TopologyCacheRoundTripRunCount} / " +
+                runtime.TopologyCacheRoundTripPassCount);
+            EditorGUILayout.LabelField(
+                "Payload Size",
+                runtime.TopologyCacheRoundTripPayloadBytes > 0
+                    ? $"{runtime.TopologyCacheRoundTripPayloadBytes / 1024f:0.0} KiB " +
+                      $"({runtime.TopologyCacheRoundTripPayloadBytes:N0} bytes)"
+                    : "—");
+            EditorGUILayout.LabelField(
+                "Payload Hash",
+                runtime.TopologyCacheRoundTripPayloadHash);
+            EditorGUILayout.LabelField(
+                "Serialize / Load",
+                $"{runtime.TopologyCacheRoundTripSerializationMilliseconds:0.000} / " +
+                $"{runtime.TopologyCacheRoundTripLoadMilliseconds:0.000} ms");
+            EditorGUILayout.LabelField(
+                "Verification",
+                $"{runtime.TopologyCacheRoundTripVerificationMilliseconds:0.000} ms");
+            if (runtime.TopologyCacheRoundTripRunCount > 0)
+            {
+                EditorGUILayout.HelpBox(
+                    runtime.TopologyCacheRoundTripSummary,
+                    runtime.TopologyCacheRoundTripState == "Passed"
+                        ? MessageType.Info
+                        : MessageType.Warning);
+            }
+            using (new EditorGUI.DisabledScope(
+                       !Application.isPlaying ||
+                       !runtime.TopologyCacheRoundTripReady ||
+                       runtime.TopologyReplacementInProgress))
+            {
+                if (GUILayout.Button("Validate Topology Cache Round Trip"))
+                {
+                    runtime.RunTopologyCacheRoundTripValidation();
+                }
+            }
+
             using (new EditorGUI.DisabledScope(
                        !Application.isPlaying ||
                        !runtime.ResourcesAllocated ||
