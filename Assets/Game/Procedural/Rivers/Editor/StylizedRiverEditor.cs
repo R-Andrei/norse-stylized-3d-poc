@@ -1471,7 +1471,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.7 evolves Major Support, Major-hosted negative regions, and independent Free-Water Negative Events from prepared masks. Patch 4.7C.1 now retains individual Connector endpoint ownership, bounded path data, recycle variants, and Weak Span attachments, while Connector Support and Connector Weak Spans remain on the accepted static baseline until identity reconstruction.",
+                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.7 evolves Major Support, Major-hosted negative regions, independent Free-Water Negative Events, Connector Support, and attached Connector Weak Spans from bounded prepared data. Patch 4.7C.3.2 adds ratio-based stretch breaking and deterministic recycle turnover so viable Connectors do not stretch indefinitely or preserve the same Major pair after every host recycle.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1530,6 +1530,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent(
                     "Connector Length Preference",
                     "Controls which valid connection lengths are favoured inside one fixed safe envelope. Zero strongly favours short connections, 0.5 is neutral, and one strongly favours long connections. Safety, obstacle, path-length, and amount limits remain authoritative."));
+            EditorGUILayout.PropertyField(
+                Find("foamConnectorBreakStretchRatio"),
+                new GUIContent(
+                    "Connector Break Stretch Ratio",
+                    "Maximum live length relative to the reference captured when a relationship or recycle variant becomes active. The default 1.45 permits 45% growth. Exceeding the ratio breaks the relationship and attempts an immediate prepared rebind to a different Major pair."));
             EditorGUILayout.PropertyField(
                 Find("foamInteriorPocketAmount"),
                 new GUIContent(
@@ -1754,8 +1759,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Patch 4.7 evolves Major Support, Major-hosted negative regions, and independent Free-Water Negative Events through prepared masks. Patch 4.7C.1 prepares Connector endpoint/path ownership and Weak Span attachment data without changing their static raster. Authoritative live Pressure, Lee, Shore, and Obstacle Footprint sources remain independently composed."),
-                new GUIContent("Evolving Major/Negative Topology (Patch 4.7B)"));
+                    "Patch 4.7 evolves Major Support, Major-hosted negative regions, independent Free-Water Negative Events, Connector Support, and Connector Weak Spans through bounded prepared records. Patch 4.7C.3.2 deforms current paths between live Major gates, breaks paths that exceed their assignment-relative stretch ratio, and makes one deterministic approximately 50/50 keep-versus-new-pair decision when either host begins a recycled occurrence. Authoritative live Pressure, Lee, Shore, and Obstacle Footprint sources remain independently composed."),
+                new GUIContent(
+                    "Breaking/Rebinding Connector Topology (Patch 4.7C.3.2)"));
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
                 new GUIContent(
@@ -1839,8 +1845,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         $"{runtime.MajorEvolutionMinimumMove:0.00}–" +
                         $"{runtime.MajorEvolutionMaximumMove:0.00} s");
                     EditorGUILayout.LabelField(
-                        "Reconstruction Ticks",
-                        runtime.MajorEvolutionReconstructionTicks.ToString());
+                        new GUIContent(
+                            "Combined Reconstruction Ticks",
+                            "One shared GPU reconstruction stamps evolving Majors, hosted negatives, Free-Water negatives, current Connector paths, and attached Weak Span pressure. CPU evolution descriptors and prepared-variant selection are advanced first so at most one combined reconstruction is dispatched per applicable update tick."),
+                        new GUIContent(
+                            runtime.MajorEvolutionReconstructionTicks.ToString()));
                     EditorGUILayout.LabelField(
                         "Recycles",
                         runtime.MajorEvolutionRecycleCount.ToString());
@@ -1891,7 +1900,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorGUILayout.LabelField(
                     new GUIContent(
                         "4.7C.1 Preparation",
-                        "Preparation-only retained data. Complete means every accepted Connector has two individual Major owners, a bounded path with normalized cumulative arc length, and explicit bounded recycle alternatives. Connector rasterization remains static in this patch."),
+                        "Retained Connector preparation. Complete means every accepted Connector has two individual Major owners, a bounded path with normalized cumulative arc length, and explicit alternatives for every prepared recycle-anchor combination. Patch 4.7C.3.1 also retains a bounded catalogue of additional prepared Major relationships for deterministic rebinding."),
                     new GUIContent(
                         runtime.ConnectorPreparedCount ==
                             runtime.ConnectorAcceptedCount
@@ -1913,6 +1922,94 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Recycle Variants Available / Unavailable",
                     $"{runtime.ConnectorPreparedPathVariantCount} / " +
                     runtime.ConnectorUnavailablePathVariantCount);
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Relationship Catalogue Accepted / Replacement",
+                        "Accepted relationships remain the initial static population. Replacement relationships are additional preparation-only paths between different individual Major slots and can be assigned only when a current Connector relationship becomes unavailable."),
+                    new GUIContent(
+                        $"{runtime.ConnectorPreparedCount} / " +
+                        runtime.ConnectorPreparedReplacementRelationshipCount));
+                EditorGUILayout.LabelField(
+                    "Catalogue Retained Path Points",
+                    runtime.ConnectorPreparedRelationshipCataloguePathPointCount
+                        .ToString());
+                EditorGUILayout.LabelField(
+                    "Replacement Variants Available / Unavailable",
+                    $"{runtime.ConnectorPreparedReplacementPathVariantCount} / " +
+                    runtime.ConnectorUnavailableReplacementPathVariantCount);
+                EditorGUI.indentLevel--;
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "4.7C.2 Identity Reconstruction",
+                        "Complete-only runtime reconstruction foundation for accepted Connector Support from retained metric paths. Patch 4.7C.3.1 updates those same fixed GPU slots from current Major gates, full anchor-state variants, and prepared replacement relationships. Static Connector Support remains authoritative only when complete runtime data or reconstruction resources are unavailable."),
+                    new GUIContent(
+                        runtime.ConnectorIdentityReconstructionAvailable
+                            ? "Available"
+                            : "Static fallback"));
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Records / Path Points",
+                        "GPU identity Connector records and flattened metric path points used by the combined topology reconstruction pass."),
+                    new GUIContent(
+                        $"{runtime.ConnectorIdentityRecordCount} / " +
+                        runtime.ConnectorIdentityPathPointCount));
+                string connectorIdentityParity =
+                    runtime.ConnectorIdentityParityAvailable
+                        ? $"Mean {runtime.ConnectorIdentityParityMeanDifference:0.0000} · " +
+                          $"Max {runtime.ConnectorIdentityParityMaximumDifference:0.0000}"
+                        : runtime.ConnectorIdentityParityPending
+                            ? "Waiting for debug readback"
+                            : "Debug-only; rebuild with a topology debug view active";
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Initial Static Parity",
+                        "Editor/development diagnostic only. Compares the initial identity-reconstructed Connector Support against the complete accepted static Connector field before live deformation begins. Normal runs perform no readback or comparison."),
+                    new GUIContent(connectorIdentityParity));
+                EditorGUI.indentLevel--;
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "4.7C.3.2 Break and Relationship Turnover",
+                        "Connector slots use exact prevalidated endpoint-anchor variants, break when their current live length exceeds the exposed assignment-relative stretch ratio, and make a deterministic approximately 50/50 retain-versus-different-pair decision when either host recycles. Runtime performs bounded catalogue selection only; no pathfinding, geometry validation, retry loop, or GPU readback is introduced."),
+                    new GUIContent(
+                        runtime.ConnectorEvolutionAvailable
+                            ? "Available"
+                            : "Static fallback"));
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField(
+                    "Active / Temporarily Absent",
+                    $"{runtime.ConnectorEvolutionActiveCount} / " +
+                    runtime.ConnectorEvolutionTemporaryAbsenceCount);
+                EditorGUILayout.LabelField(
+                    "Identity / Recycle-Variant Paths",
+                    $"{runtime.ConnectorEvolutionIdentityPathCount} / " +
+                    runtime.ConnectorEvolutionRecycleVariantCount);
+                EditorGUILayout.LabelField(
+                    "Original / Replacement Relationships",
+                    $"{runtime.ConnectorEvolutionOriginalRelationshipCount} / " +
+                    runtime.ConnectorEvolutionReplacementRelationshipCount);
+                EditorGUILayout.LabelField(
+                    "Relationship Rebinds",
+                    runtime.ConnectorEvolutionRelationshipRebindCount
+                        .ToString());
+                EditorGUILayout.LabelField(
+                    "Variant Switches",
+                    runtime.ConnectorEvolutionVariantSwitchCount.ToString());
+                EditorGUILayout.LabelField(
+                    "Stretch Breaks",
+                    runtime.ConnectorEvolutionStretchBreakCount.ToString());
+                EditorGUILayout.LabelField(
+                    "Recycle Retains / Turnover Requests",
+                    $"{runtime.ConnectorEvolutionRetainDecisionCount} / " +
+                    runtime.ConnectorEvolutionTurnoverRequestCount);
+                EditorGUILayout.LabelField(
+                    "Successful Turnovers / No-Alternative Retains",
+                    $"{runtime.ConnectorEvolutionSuccessfulTurnoverCount} / " +
+                    runtime.ConnectorEvolutionNoAlternativeFallbackCount);
+                EditorGUILayout.LabelField(
+                    "Absence / Reappearance Events",
+                    $"{runtime.ConnectorEvolutionAbsenceEventCount} / " +
+                    runtime.ConnectorEvolutionReappearanceCount);
                 EditorGUI.indentLevel--;
                 EditorGUILayout.LabelField(
                     "Top Rejection Reason",
@@ -1958,13 +2055,42 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorGUILayout.LabelField(
                     new GUIContent(
                         "Weak-Span Attachments Prepared / Accepted",
-                        "Each prepared Weak Span retains its Connector identity, normalized path position, endpoint-safe interval, physical radii, strength, seed, and accepted tangent. The static accepted pressure field remains authoritative until Patch 4.7C.2."),
+                        "Each prepared Weak Span retains its Connector identity, normalized path position, endpoint-safe interval, physical radii, strength, seed, and accepted tangent. Patch 4.7C.3.2 samples the Connector slot's current original or replacement path and follows its live tangent after stretch breaks and recycle turnover; static pressure is retained only as a complete-only fallback."),
                     new GUIContent(
                         $"{runtime.ConnectorWeakSpanPreparedCount} / " +
                         runtime.ConnectorWeakSpanAcceptedCount));
                 EditorGUILayout.LabelField(
                     "Weak-Span Attachments Unavailable",
                     runtime.ConnectorWeakSpanUnavailableCount.ToString());
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Weak-Span Runtime Reconstruction",
+                        "Complete-only reconstruction of Connector Weak Span pressure from normalized path attachment and physical shape data. Patch 4.7C.3.2 samples the current deformed original or replacement path and live tangent after stretch breaks and recycle turnover. A Weak Span is temporarily absent only while its Connector slot has no valid prepared relationship assignment."),
+                    new GUIContent(
+                        runtime.WeakSpanIdentityReconstructionAvailable
+                            ? "Available"
+                            : "Static fallback"));
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField(
+                    "Runtime Records",
+                    runtime.WeakSpanIdentityRecordCount.ToString());
+                string weakSpanIdentityParity =
+                    runtime.WeakSpanIdentityParityAvailable
+                        ? $"Mean {runtime.WeakSpanIdentityParityMeanDifference:0.0000} · " +
+                          $"Max {runtime.WeakSpanIdentityParityMaximumDifference:0.0000}"
+                        : runtime.WeakSpanIdentityParityPending
+                            ? "Waiting for debug readback"
+                            : "Debug-only; rebuild with a topology debug view active";
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Initial Static Parity",
+                        "Editor/development diagnostic only. Compares the initial identity-reconstructed Connector Weak Span pressure against the accepted static Weak Span field before live path following begins. Normal runs perform no readback or comparison."),
+                    new GUIContent(weakSpanIdentityParity));
+                EditorGUILayout.LabelField(
+                    "Active / Temporarily Absent",
+                    $"{runtime.WeakSpanEvolutionActiveCount} / " +
+                    runtime.WeakSpanEvolutionTemporaryAbsenceCount);
+                EditorGUI.indentLevel--;
                 EditorGUILayout.LabelField(
                     "Free-Water Opportunities",
                     runtime.FreeWaterEventOpportunityCount.ToString());

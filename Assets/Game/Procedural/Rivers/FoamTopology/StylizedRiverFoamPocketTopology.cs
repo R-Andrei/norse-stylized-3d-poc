@@ -603,7 +603,8 @@ namespace ProgrammaticStylized3D.Rivers
         internal void AddToUploadPixels(
             Color[] destination,
             bool hostedEvolutionAvailable,
-            bool freeWaterEvolutionAvailable)
+            bool freeWaterEvolutionAvailable,
+            bool weakSpanIdentityReconstructionAvailable)
         {
             int cellCount = Width * Height;
             if (destination == null || destination.Length < cellCount)
@@ -616,14 +617,25 @@ namespace ProgrammaticStylized3D.Rivers
             for (int index = 0; index < cellCount; index++)
             {
                 Color value = destination[index];
-                // Blue remains the static independent-negative channel. While
-                // Free-Water evolution is active, Free-Water leaves this static
-                // channel and is supplied by the evolving runtime field instead;
-                // Connector Weak Spans remain static here.
-                value.b = Mathf.Clamp01(
-                    freeWaterEvolutionAvailable
-                        ? staticIndependentPressure[index]
-                        : independentPressure[index]);
+                // Blue remains the static independent-negative fallback
+                // channel. Free-Water and Connector Weak Spans leave it only
+                // when their complete prepared runtime reconstruction is
+                // available; either class can independently retain its accepted
+                // static field if preparation or GPU resources are unavailable.
+                float staticIndependent = 0f;
+                if (!weakSpanIdentityReconstructionAvailable)
+                {
+                    staticIndependent = Mathf.Max(
+                        staticIndependent,
+                        staticIndependentPressure[index]);
+                }
+                if (!freeWaterEvolutionAvailable)
+                {
+                    staticIndependent = Mathf.Max(
+                        staticIndependent,
+                        freeWaterPressure[index]);
+                }
+                value.b = Mathf.Clamp01(staticIndependent);
                 value.a = Mathf.Clamp01(
                     hostedEvolutionAvailable
                         ? hostedFallbackPressure[index]

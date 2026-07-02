@@ -4,7 +4,7 @@
 
 **Status:** Canonical step-by-step implementation plan for Stage 6 Foam topology only.
 
-**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-footprint/parity correction are implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector/Weak Span immutable preparation data is implemented and awaits Unity preparation-diagnostic validation. The next implementation phase is Patch 4.7C.2 identity reconstruction/parity, followed by Patch 4.7C.3 runtime evolution. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Explicit rebuild transition and production cache packaging are not yet implemented.
+**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-footprint/parity correction are implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector/Weak Span immutable preparation data is implemented and Unity preparation diagnostics are accepted: all accepted Connectors and Weak Span attachments prepared successfully with zero unresolved endpoints or unavailable attachments in the validation scene. Patch 4.7C.2 identity reconstruction, debug-only parity, and combined reconstruction scheduling are implemented and visually accepted. Patch 4.7C.3 endpoint-driven Connector deformation and Weak Span current-path/tangent following are implemented, but long-run validation exposed permanent Connector population drain because only a subset of same-host anchor states was prepared and relationships could not rebind to different Major targets. Patch 4.7C.3.1 completes anchor-state coverage and adds bounded preparation-time replacement relationships. Long-run validation then exposed two remaining lifecycle defects: valid relationships could stretch indefinitely during ordinary host motion, and runtime preserved the same viable pair after every recycle. Patch 4.7C.3.2 adds ratio-based stretch breaking plus deterministic recycle relationship turnover and awaits Unity visual/long-run validation. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Explicit rebuild transition and production cache packaging are not yet implemented.
 
 **Primary implementation target:**
 
@@ -1015,7 +1015,7 @@ Patch 4.7 is deliberately split so each relationship problem is proven separatel
 
 **Implementation status:** implemented; Patch 4.7A.1 correctness correction applied and visually accepted.
 
-Interior Pockets and Edge Cavities are stored in Major-host-local space. At the Patch 4.7A boundary, the accepted static negative field was separated into evolving hosted negatives and independent negatives, leaving Weak Spans and Free-Water Events unchanged until their own later slices. Free-Water Events are now handled by Patch 4.7B.1; Weak Spans remain static until Patch 4.7C.2.
+Interior Pockets and Edge Cavities are stored in Major-host-local space. At the Patch 4.7A boundary, the accepted static negative field was separated into evolving hosted negatives and independent negatives, leaving Weak Spans and Free-Water Events unchanged until their own later slices. Free-Water Events are now handled by Patch 4.7B.1. Weak Spans use the Patch 4.7C.2 reconstruction foundation and Patch 4.7C.3.1 current-or-replacement-path/tangent following when complete prepared data is available, and retain the complete accepted static fallback otherwise.
 
 They inherit:
 
@@ -1098,11 +1098,11 @@ Weak Span preparation must retain:
 - strength, seed, orientation/tangent requirements, and any shape parameters needed for exact reconstruction;
 - endpoint-clearance limits required to remain gate-safe after deformation or replacement.
 
-**Implementation status:** implemented. Each accepted Connector now retains its unchanged authoritative static polyline plus a bounded runtime polyline of at most `48` points, normalized cumulative arc length, and two preparation-time endpoint bindings selected from the strongest individual Major-mask contribution at each accepted gate. Gate offsets are stored in the owning Major candidate's principal-axis cell frame. Up to `12` deterministic recycle alternatives are prepared from at most `3` anchors per endpoint; each alternative is a prewarped accepted path and is retained either as available or with an explicit failure reason after bounded valid-water, exact-obstacle, and stretch checks. No alternative pathfinding or runtime search was added.
+**Implementation status:** implemented. Each accepted Connector now retains its unchanged authoritative static polyline plus a bounded runtime polyline of at most `48` points, normalized cumulative arc length, and two preparation-time endpoint bindings selected from the strongest individual Major-mask contribution at each accepted gate. Gate offsets are stored in the owning Major candidate's principal-axis cell frame. Patch 4.7C.1 initially retained a deliberately small subset of deterministic recycle alternatives. Patch 4.7C.3.1 corrects that limitation by retaining every Cartesian combination of the identity state and all actual prepared recycle anchors for both endpoints. Each alternative is a prewarped accepted path and is retained either as available or with an explicit failure reason after bounded valid-water, exact-obstacle, and stretch checks. No gameplay pathfinding or runtime geometry validation is added.
 
 Each accepted Connector Weak Span now retains its Connector identity, normalized path distance, normalized endpoint-safe interval, physical along/across radii, strength, deterministic evolution seed, accepted tangent, and accepted orientation. Records remain explicit when their owning Connector preparation is unavailable or their path position is invalid. Inspector diagnostics report prepared/accepted Connectors, owned/unresolved endpoints, retained point count, available/unavailable recycle variants, and prepared/unavailable Weak Span attachments. The static Connector and Weak Span fields remain authoritative in this subpatch.
 
-**Acceptance:** every accepted Connector endpoint and Weak Span either has complete immutable runtime data or is reported explicitly as unavailable. No runtime raster path changes in this subpatch. Unity preparation-diagnostic validation is pending.
+**Acceptance:** every accepted Connector endpoint and Weak Span either has complete immutable runtime data or is reported explicitly as unavailable. No runtime raster path changes in this subpatch. Unity preparation diagnostics passed in the validation scene: `11 / 11` Connectors prepared, `22 / 0` endpoints owned/unresolved, `11 / 11` Weak Span attachments prepared, and zero unavailable attachments. Bounded recycle alternatives included both available and explicitly unavailable combinations as designed.
 
 ### Patch 4.7C.2 — Identity reconstruction and parity
 
@@ -1117,6 +1117,8 @@ The identity result must reproduce:
 Editor/development-only parity compares reconstructed identity fields against the accepted static source fields. Normal gameplay performs no readback or comparison. When prepared identity reconstruction is available, the old static Connector/Weak Span channel stops being authoritative; unavailable records remain explicit rather than silently disappearing.
 
 Descriptor advancement for Major, hosted-negative, Free-Water, Connector, and Weak Span state should be collected before reconstruction so one applicable topology tick performs at most one combined upload/rebuild instead of duplicate full-field reconstruction.
+
+**Implementation status:** implemented and visually accepted. Connector identity records and flattened retained metric paths are uploaded once after preparation. The shared evolving-topology compute pass reconstructs complete Connector Support from those identity paths and reconstructs Weak Span pressure from normalized path attachment, physical radii, accepted strength, and deterministic boundary noise. Static Connector/Weak Span channels are omitted only when the corresponding complete identity reconstruction is available; otherwise the accepted static fields remain authoritative as a complete-only fallback. Separate Editor/development-only asynchronous parity readbacks compare Connector Support and Weak Span pressure against their accepted static source fields. Normal runs perform no readback or comparison. Major and Free-Water descriptors now advance first and request at most one combined evolving-field reconstruction per applicable update tick.
 
 **Acceptance:** identity parity passes before any Connector movement is enabled, and the runtime path introduces no per-Connector dispatch, allocation, search, or validation loop.
 
@@ -1141,7 +1143,66 @@ When either endpoint Major instantly recycles:
 
 Preparation-time path alternatives remain strictly bounded and profiled. Cross-Major replacement relationships are not introduced unless testing proves same-slot endpoint-anchor variants insufficient. Connector evolution must not become a continuously maintained graph.
 
-**Acceptance:** ordinary deformation stays attached, recycle switching never stretches across a relocated endpoint, Weak Spans remain gate-safe and tangent-aligned, unavailable combinations disappear cleanly, no runtime route search occurs, and Connector cost remains subordinate.
+**Implementation status:** implemented; Unity visual validation pending. Each Connector stores direct indices to its two resolved Major evolution slots. On every applicable combined topology rebuild, the runtime resolves each endpoint gate from the current interpolated Major pose and the retained Major-local gate coordinate. The accepted path remains active while both hosts remain in their identity occurrences. After either host recycles, the runtime selects only the exact prevalidated path variant matching the two hosts' retained recycle-anchor indices. Missing or rejected combinations set the Connector record's point count to zero, producing temporary Connector and Weak Span absence without route search, retry, stretching, or a duplicate instance.
+
+For active relationships, the selected bounded polyline is deformed between the two current endpoint gates by normalized cumulative arc length. A small deterministic transverse displacement is enveloped away from the gates so the interior does not behave as a rigid band. The flattened path buffer is updated in place, cumulative arc length is renormalized, and attached Weak Spans sample their retained normalized path positions and the current segment tangent. Connector and Weak Span descriptors upload inside the existing shared topology reconstruction; no per-Connector compute dispatch or managed runtime collection is added. Inspector telemetry reports active/temporarily absent relationships, identity/recycle-variant use, variant switches, absence/reappearance events, and active/absent Weak Spans. Normal gameplay performs no relationship validation readback.
+
+**Acceptance:** ordinary deformation stays attached, recycle switching never stretches across a relocated endpoint, Weak Spans remain gate-safe and tangent-aligned, unavailable combinations disappear cleanly and later reappear when a valid prepared combination returns, no runtime route search occurs, and Connector cost remains subordinate.
+
+**Long-run finding:** the first 4.7C.3 implementation did not satisfy the complete recycle contract. It retained at most three of up to six Major recycle anchors per endpoint and at most twelve combinations, while runtime Majors could select any prepared anchor. A Connector whose host entered an unprepared combination became absent. Because each Connector remained permanently tied to its original pair, repeated recycle cycles caused the visible Connector population to monotonically drain.
+
+### Patch 4.7C.3.1 — Connector relationship recycle correction
+
+Preparation now performs two bounded additions:
+
+- every accepted relationship retains all combinations of identity plus every actual prepared recycle anchor at both endpoints; with the current maximum of six anchors per Major this is at most `48` non-identity variants per relationship;
+- a bounded catalogue of additional prevalidated relationships between different individual Major slots is prepared from valid Connector opportunities that were not selected into the initial static population. These catalogue entries retain the same bounded path, endpoint ownership, complete anchor-state matrix, valid-water, exact-obstacle, and stretch checks as accepted relationships.
+
+Runtime keeps the fixed logical Connector/Weak Span slot population. During each applicable combined topology update it:
+
+1. retains every currently valid relationship assignment first;
+2. releases only assignments whose exact current anchor-state variant is unavailable;
+3. scans the bounded prepared catalogue in deterministic slot-specific order;
+4. assigns only unclaimed relationships between unclaimed Major pairs;
+5. enforces the prepared per-Major Connector degree for replacement assignments;
+6. skips the just-released relationship during the immediate replacement selection;
+7. updates the existing fixed GPU path record in place and lets the slot's Weak Span follow the newly assigned path;
+8. remains temporarily absent only when no currently applicable prepared catalogue entry exists.
+
+This is bounded catalogue selection, not gameplay routing. No pathfinding, component search, geometry validation, rejection retry, graph expansion, managed collection construction, per-Connector dispatch, or GPU readback occurs during ordinary runtime.
+
+**Implementation status:** implemented; Unity long-run validation pending. Inspector telemetry reports prepared accepted/replacement relationship counts, accepted and replacement anchor variants, original/replacement active assignments, relationship rebinds, anchor-variant switches, temporary absence/reappearance, and active/absent Weak Spans.
+
+**Acceptance:** after every Major slot has recycled repeatedly, Connector population remains statistically stable rather than collapsing to zero; visible rebinds connect different current Major targets without duplicates, excessive per-Major concentration, stretched emergency bridges, detached remnants, or old/new overlap. Weak Spans follow the replacement paths. Temporary absence is bounded and recovers when a prepared assignment is available.
+
+### Patch 4.7C.3.2 — Connector break and relationship turnover
+
+Long-run validation of Patch 4.7C.3.1 showed that complete prepared relationship coverage alone was insufficient:
+
+- a currently valid relationship was preserved regardless of how far ordinary Major motion stretched its live deformed path;
+- a host recycle changed only the prepared anchor-state variant when the same Major pair remained valid, creating a hard preservation bias rather than visible relationship turnover.
+
+Patch 4.7C.3.2 adds one exposed runtime control:
+
+- **Connector Break Stretch Ratio** ranges from `1.10` to `2.00` and defaults to `1.45`;
+- the reference length is captured whenever a Connector receives a relationship or enters a different prepared endpoint-anchor variant;
+- the Connector breaks when its current live deformed length exceeds `reference length × ratio`;
+- the rule is deliberately relative-only: there is no additional absolute-metre allowance or prepared-safe-minimum clamp.
+
+A stretch break releases the old relationship immediately and performs one bounded deterministic catalogue selection in the same topology update. The released Major pair is excluded. The old stretched relationship is never used as a fallback; its Major pair remains blocked for that Connector slot until either blocked host begins a different occurrence, and temporary absence remains valid when no different prepared pair is available.
+
+Whenever either endpoint Major begins a recycled occurrence while the current relationship remains valid, the Connector makes one deterministic pseudorandom decision derived from stable slot identity and the new occurrence counts:
+
+- approximately half retain the current Major pair and use its exact prepared anchor-state variant;
+- approximately half request a different currently valid prepared Major pair;
+- a requested turnover excludes the previous pair and preserves unique-pair and per-Major-degree limits;
+- when no different relationship is available, the still-viable previous relationship is retained rather than deleting the Connector needlessly.
+
+Weak Spans remain attached to their logical Connector slots, so a stretch break or successful recycle turnover moves the Weak Span to the replacement path and current tangent without creating a second instance. Runtime work remains bounded prepared-catalogue selection plus the path-length calculation already required for cumulative arc-length output. No pathfinding, geometry validation, retry loop, candidate generation, GPU readback, or managed runtime collection is added.
+
+**Implementation status:** implemented; Unity visual and long-run validation pending. Inspector telemetry reports the exposed ratio, stretch breaks, recycle retain decisions, turnover requests, successful turnovers, no-alternative retains, relationship rebinds, and temporary absence/reappearance.
+
+**Acceptance:** over repeated recycle cycles, retain decisions and turnover requests approach an approximately even distribution subject to deterministic sampling; successful turnovers visibly connect different Major pairs when alternatives exist; a relationship cannot exceed the configured relative stretch envelope; stretch-broken paths never reclaim the same pair as an emergency fallback; Weak Spans follow every replacement; and the Connector population remains stable without stretched bridges, duplicate pairs, uncontrolled Major degree, old/new overlap, runtime search, or readback.
 
 ### Shared inspection and telemetry
 
@@ -1438,24 +1499,26 @@ A topology patch that cannot answer these questions is not ready.
 
 ## 13. Immediate Next Step
 
-Patch 4.7C.0 is implemented and visually revalidated. Patch 4.7C.1 immutable Connector/Weak Span preparation data is implemented and now requires Unity preparation-diagnostic validation before identity reconstruction is added.
+Patch 4.7C.0 is implemented and visually revalidated. Patch 4.7C.1 immutable Connector/Weak Span preparation data is implemented and its Unity diagnostics are accepted. Patch 4.7C.2 identity reconstruction, separate debug-only parity, and combined reconstruction scheduling are implemented and visually accepted. Patch 4.7C.3 proved live endpoint-driven deformation but failed long-run population persistence. Patch 4.7C.3.1 complete anchor-state coverage and bounded relationship rebinding are implemented. Long-run validation exposed unbounded live stretch and a hard same-pair preservation bias. Patch 4.7C.3.2 ratio-based stretch breaking and deterministic recycle turnover are implemented and require Unity visual/long-run validation before the topology sequence advances to explicit rebuild handling.
 
-Validate Patch 4.7C.1 on the actual river:
+Validate Patch 4.7C.3.2 on the actual river for long enough that every Major recycles multiple times:
 
-1. Connector `Prepared / Accepted` matches, or any unavailable Connector is explicit rather than silently omitted;
-2. every accepted Connector reports two individually owned Major endpoints, or the unresolved-endpoint counter exposes the exact deficit;
-3. retained path-point totals remain bounded and plausible for the river's accepted Connector population;
-4. available and unavailable recycle-variant counts remain bounded, deterministic, and non-negative;
-5. prepared Weak Span attachments match accepted Weak Spans, or explicit unavailable records account for the difference;
-6. Connector Support and Connector Weak Spans remain visually identical to the accepted static result because no runtime raster path changed;
-7. staged preparation cost is profiled as temporary cache/precompute work, while normal gameplay adds no search, retry, readback, dispatch, validation, or managed allocation.
+1. `Connector Break Stretch Ratio` appears with range `1.10–2.00`, default `1.45`, and changing it affects only the live break envelope rather than regenerating static topology;
+2. Connectors break and rebind before producing visibly implausible long bridges, and the `Stretch Breaks` counter matches visible events;
+3. a stretch-broken Connector never immediately reclaims the same Major pair as a fallback;
+4. every valid host recycle produces exactly one deterministic retain-or-turnover decision for each affected active Connector;
+5. recycle retain decisions and turnover requests trend toward an approximately even distribution across repeated events;
+6. successful turnovers visibly connect different current Major pairs, while `No-Alternative Retains` increases only when no different valid unclaimed prepared relationship exists;
+7. unique Major pairs and bounded per-Major degree remain enforced after simultaneous turnover events;
+8. Weak Spans follow the replacement path and live tangent after both stretch breaks and recycle turnovers;
+9. temporary absence remains bounded, recovers when a valid relationship becomes available, and total Connector population does not collapse;
+10. no stretched emergency bridge, detached remnant, duplicate old/new relationship, runtime pathfinding, geometry validation, retry, GPU readback, per-Connector dispatch, or managed allocation is introduced;
+11. Major, hosted-negative, Free-Water, Connector, and Weak Span descriptors still feed at most one combined evolving-topology reconstruction per applicable tick.
 
 After validation, proceed in this exact order:
 
-1. Patch 4.7C.2 — identity reconstruction plus Editor/development-only parity and combined reconstruction scheduling;
-2. Patch 4.7C.3 — ordinary Connector deformation, Weak Span following, recycle-variant switching, and temporary absence for unavailable combinations;
-3. Patch 4.8 — explicit full-topology rebuild transition;
-4. Patch 4.9 — procedural chunk/run cache and precompute packaging;
-5. Patch 4.10 — topology completion and handoff to separate Foam-material work.
+1. Patch 4.8 — explicit full-topology rebuild transition;
+2. Patch 4.9 — procedural chunk/run cache and precompute packaging;
+3. Patch 4.10 — topology completion and handoff to separate Foam-material work.
 
 Topology is not considered implemented until runtime evolution, explicit rebuild handling, and cache/preparation handoff pass. Only then may the separate Foam material-lifecycle implementation begin.

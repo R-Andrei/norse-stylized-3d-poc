@@ -91,6 +91,14 @@ namespace ProgrammaticStylized3D.Rivers
         private const float FreeWaterMaximumLifetimeUnits = 4.5f;
         private const float FreeWaterEvolutionTickRate = 2f;
 
+        // Patch 4.7C.3 keeps Connector evolution subordinate to its two Major
+        // hosts. The accepted or prevalidated replacement polyline is warped
+        // only by endpoint motion plus a small bounded interior displacement.
+        // These are internal proof coefficients, not authoring controls.
+        private const float ConnectorMinimumInteriorDeformationMetres = 0.018f;
+        private const float ConnectorMaximumInteriorDeformationMetres = 0.085f;
+        private const int ConnectorEndpointWarpSolveIterations = 4;
+
         // The old broad Foam authoring controls were removed in Patch 3.4.
         // Persistent material behaviour remains on one fixed provisional
         // baseline matching the supplied project state until the dedicated
@@ -375,6 +383,74 @@ namespace ProgrammaticStylized3D.Rivers
             public Vector4 Morph;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FoamConnectorIdentityData
+        {
+            // x = first flattened path point, y = point count,
+            // z = outer radius, w = core radius.
+            public Vector4 PointRangeAndRadii;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FoamWeakSpanIdentityData
+        {
+            // x = Connector record index, y = normalized path distance,
+            // z/w = gate-safe normalized interval.
+            public Vector4 ConnectorAndPath;
+            // x/y = physical along/across radii, z = pressure strength,
+            // w = accepted identity orientation.
+            public Vector4 Shape;
+            // x = static irregular-boundary noise seed; remaining lanes reserved.
+            public uint NoiseSeed;
+            public uint Reserved0;
+            public uint Reserved1;
+            public uint Reserved2;
+        }
+
+        private enum ConnectorReleaseReason
+        {
+            None,
+            Unavailable,
+            Turnover,
+            StretchBreak
+        }
+
+        private struct ConnectorRelationshipCandidate
+        {
+            public StylizedRiverFoamConnectorPath Path;
+            public int StartHostSlotIndex;
+            public int EndHostSlotIndex;
+        }
+
+        private struct ConnectorEvolutionSlot
+        {
+            public uint StableId;
+            public int OriginalCandidateIndex;
+            public int AssignedCandidateIndex;
+            public int ActiveCandidateIndex;
+            public int LastReleasedCandidateIndex;
+            public int ReleaseCooldownTicks;
+            public int RelationshipRevision;
+            public int PointOffset;
+            public int PointCapacity;
+            public int PointCount;
+            public int ActiveStartAnchorIndex;
+            public int ActiveEndAnchorIndex;
+            public ConnectorReleaseReason PendingReleaseReason;
+            public int TurnoverFallbackCandidateIndex;
+            public float ReferenceLengthMetres;
+            public int ReferenceCandidateIndex;
+            public int ReferenceStartAnchorIndex;
+            public int ReferenceEndAnchorIndex;
+            public int ObservedStartRecycleCount;
+            public int ObservedEndRecycleCount;
+            public int StretchBlockedCandidateIndex;
+            public int StretchBlockedStartRecycleCount;
+            public int StretchBlockedEndRecycleCount;
+            public bool IsActive;
+            public bool HasRuntimeState;
+        }
+
         private struct MajorEvolutionPose
         {
             public float LocalDistance;
@@ -482,6 +558,8 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture evolvingMajorTexture;
         private RenderTexture evolvingHostedNegativeTexture;
         private RenderTexture evolvingFreeWaterNegativeTexture;
+        private RenderTexture evolvingConnectorTexture;
+        private RenderTexture evolvingWeakSpanNegativeTexture;
         private RenderTexture currentShoreEdgesTexture;
         private RenderTexture obstacleExclusionTexture;
         private RenderTexture fractureA;
@@ -503,6 +581,9 @@ namespace ProgrammaticStylized3D.Rivers
         private ComputeBuffer majorEvolutionBuffer;
         private ComputeBuffer hostedNegativeEvolutionBuffer;
         private ComputeBuffer freeWaterEvolutionBuffer;
+        private ComputeBuffer connectorIdentityBuffer;
+        private ComputeBuffer connectorPathPointBuffer;
+        private ComputeBuffer weakSpanIdentityBuffer;
         private StylizedRiverDisturbanceRuntime disturbanceRuntime;
         private FoamMetricRow[] metricRows = Array.Empty<FoamMetricRow>();
         private readonly uint[] latestTopologyMetrics =
@@ -545,11 +626,41 @@ namespace ProgrammaticStylized3D.Rivers
             Array.Empty<FreeWaterEvolutionSlot>();
         private FoamFreeWaterEvolutionData[] freeWaterEvolutionGpuData =
             Array.Empty<FoamFreeWaterEvolutionData>();
+        private FoamConnectorIdentityData[] connectorIdentityGpuData =
+            Array.Empty<FoamConnectorIdentityData>();
+        private Vector4[] connectorPathPointGpuData = Array.Empty<Vector4>();
+        private FoamWeakSpanIdentityData[] weakSpanIdentityGpuData =
+            Array.Empty<FoamWeakSpanIdentityData>();
+        private ConnectorEvolutionSlot[] connectorEvolutionSlots =
+            Array.Empty<ConnectorEvolutionSlot>();
+        private ConnectorRelationshipCandidate[] connectorRelationshipCandidates =
+            Array.Empty<ConnectorRelationshipCandidate>();
+        private bool[] connectorCandidateClaimed = Array.Empty<bool>();
+        private bool[] connectorMajorPairClaimed = Array.Empty<bool>();
+        private int[] connectorMajorDegree = Array.Empty<int>();
+        private int connectorEvolutionActiveCount;
+        private int connectorEvolutionTemporaryAbsenceCount;
+        private int connectorEvolutionIdentityPathCount;
+        private int connectorEvolutionRecycleVariantCount;
+        private int connectorEvolutionOriginalRelationshipCount;
+        private int connectorEvolutionReplacementRelationshipCount;
+        private int connectorEvolutionRelationshipRebindCount;
+        private int connectorEvolutionVariantSwitchCount;
+        private int connectorEvolutionStretchBreakCount;
+        private int connectorEvolutionRetainDecisionCount;
+        private int connectorEvolutionTurnoverRequestCount;
+        private int connectorEvolutionSuccessfulTurnoverCount;
+        private int connectorEvolutionNoAlternativeFallbackCount;
+        private int connectorEvolutionAbsenceEventCount;
+        private int connectorEvolutionReappearanceCount;
+        private int weakSpanEvolutionActiveCount;
         private float majorEvolutionAccumulator;
         private float freeWaterEvolutionAccumulator;
         private bool majorEvolutionReady;
         private bool hostedNegativeEvolutionReady;
         private bool freeWaterEvolutionReady;
+        private bool connectorIdentityReconstructionReady;
+        private bool weakSpanIdentityReconstructionReady;
         private int majorEvolutionReconstructionTicks;
         private int hostedNegativeLocalChangeCount;
         private int freeWaterMoveCount;
@@ -566,6 +677,18 @@ namespace ProgrammaticStylized3D.Rivers
         private float hostedNegativeInitialParityMeanDifference;
         private float hostedNegativeInitialParityMaximumDifference;
         private int hostedNegativeInitialParityGeneration;
+        private bool connectorIdentityParityPending;
+        private bool connectorIdentityParityReadbackPending;
+        private bool connectorIdentityParityAvailable;
+        private float connectorIdentityParityMeanDifference;
+        private float connectorIdentityParityMaximumDifference;
+        private int connectorIdentityParityGeneration;
+        private bool weakSpanIdentityParityPending;
+        private bool weakSpanIdentityParityReadbackPending;
+        private bool weakSpanIdentityParityAvailable;
+        private float weakSpanIdentityParityMeanDifference;
+        private float weakSpanIdentityParityMaximumDifference;
+        private int weakSpanIdentityParityGeneration;
 #endif
         private int majorEvolutionRecycleCount;
         private int majorEvolutionCrowdedRecycleFallbackCount;
@@ -777,6 +900,75 @@ namespace ProgrammaticStylized3D.Rivers
         public float HostedNegativeInitialParityMaximumDifference =>
             hostedNegativeInitialParityMaximumDifference;
 #endif
+        public bool ConnectorIdentityReconstructionAvailable =>
+            connectorIdentityReconstructionReady;
+        public bool WeakSpanIdentityReconstructionAvailable =>
+            weakSpanIdentityReconstructionReady;
+        public bool ConnectorEvolutionAvailable =>
+            majorEvolutionReady &&
+            connectorIdentityReconstructionReady &&
+            connectorEvolutionSlots.Length == connectorIdentityGpuData.Length &&
+            connectorRelationshipCandidates.Length >=
+                connectorEvolutionSlots.Length;
+        public int ConnectorEvolutionActiveCount =>
+            connectorEvolutionActiveCount;
+        public int ConnectorEvolutionTemporaryAbsenceCount =>
+            connectorEvolutionTemporaryAbsenceCount;
+        public int ConnectorEvolutionIdentityPathCount =>
+            connectorEvolutionIdentityPathCount;
+        public int ConnectorEvolutionRecycleVariantCount =>
+            connectorEvolutionRecycleVariantCount;
+        public int ConnectorEvolutionOriginalRelationshipCount =>
+            connectorEvolutionOriginalRelationshipCount;
+        public int ConnectorEvolutionReplacementRelationshipCount =>
+            connectorEvolutionReplacementRelationshipCount;
+        public int ConnectorEvolutionRelationshipRebindCount =>
+            connectorEvolutionRelationshipRebindCount;
+        public int ConnectorEvolutionVariantSwitchCount =>
+            connectorEvolutionVariantSwitchCount;
+        public int ConnectorEvolutionStretchBreakCount =>
+            connectorEvolutionStretchBreakCount;
+        public int ConnectorEvolutionRetainDecisionCount =>
+            connectorEvolutionRetainDecisionCount;
+        public int ConnectorEvolutionTurnoverRequestCount =>
+            connectorEvolutionTurnoverRequestCount;
+        public int ConnectorEvolutionSuccessfulTurnoverCount =>
+            connectorEvolutionSuccessfulTurnoverCount;
+        public int ConnectorEvolutionNoAlternativeFallbackCount =>
+            connectorEvolutionNoAlternativeFallbackCount;
+        public int ConnectorEvolutionAbsenceEventCount =>
+            connectorEvolutionAbsenceEventCount;
+        public int ConnectorEvolutionReappearanceCount =>
+            connectorEvolutionReappearanceCount;
+        public int WeakSpanEvolutionActiveCount =>
+            weakSpanEvolutionActiveCount;
+        public int WeakSpanEvolutionTemporaryAbsenceCount => Mathf.Max(
+            0,
+            weakSpanIdentityGpuData.Length - weakSpanEvolutionActiveCount);
+        public int ConnectorIdentityRecordCount => connectorIdentityGpuData.Length;
+        public int ConnectorIdentityPathPointCount =>
+            connectorPathPointGpuData.Length;
+        public int WeakSpanIdentityRecordCount => weakSpanIdentityGpuData.Length;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        public bool ConnectorIdentityParityAvailable =>
+            connectorIdentityParityAvailable;
+        public bool ConnectorIdentityParityPending =>
+            connectorIdentityParityPending ||
+            connectorIdentityParityReadbackPending;
+        public float ConnectorIdentityParityMeanDifference =>
+            connectorIdentityParityMeanDifference;
+        public float ConnectorIdentityParityMaximumDifference =>
+            connectorIdentityParityMaximumDifference;
+        public bool WeakSpanIdentityParityAvailable =>
+            weakSpanIdentityParityAvailable;
+        public bool WeakSpanIdentityParityPending =>
+            weakSpanIdentityParityPending ||
+            weakSpanIdentityParityReadbackPending;
+        public float WeakSpanIdentityParityMeanDifference =>
+            weakSpanIdentityParityMeanDifference;
+        public float WeakSpanIdentityParityMaximumDifference =>
+            weakSpanIdentityParityMaximumDifference;
+#endif
         public bool ConnectorTopologyAvailable => connectorTopology != null;
         public int ConnectorEligibleEndpointCount => connectorTopology != null
             ? connectorTopology.EligibleEndpointCount
@@ -811,6 +1003,26 @@ namespace ProgrammaticStylized3D.Rivers
         public int ConnectorUnavailablePathVariantCount =>
             connectorTopology != null
                 ? connectorTopology.UnavailablePathVariantCount
+                : 0;
+        public int ConnectorPreparedRelationshipCatalogueCount =>
+            connectorTopology != null
+                ? connectorTopology.PreparedRelationshipCatalogueCount
+                : 0;
+        public int ConnectorPreparedReplacementRelationshipCount =>
+            connectorTopology != null
+                ? connectorTopology.PreparedReplacementRelationshipCount
+                : 0;
+        public int ConnectorPreparedRelationshipCataloguePathPointCount =>
+            connectorTopology != null
+                ? connectorTopology.PreparedRelationshipCataloguePathPointCount
+                : 0;
+        public int ConnectorPreparedReplacementPathVariantCount =>
+            connectorTopology != null
+                ? connectorTopology.PreparedReplacementPathVariantCount
+                : 0;
+        public int ConnectorUnavailableReplacementPathVariantCount =>
+            connectorTopology != null
+                ? connectorTopology.UnavailableReplacementPathVariantCount
                 : 0;
         public string ConnectorTopRejectionReason => connectorTopology != null
             ? connectorTopology.GetTopRejectionSummary()
@@ -944,6 +1156,8 @@ namespace ProgrammaticStylized3D.Rivers
             EstimateTextureBytes(evolvingMajorTexture) +
             EstimateTextureBytes(evolvingHostedNegativeTexture) +
             EstimateTextureBytes(evolvingFreeWaterNegativeTexture) +
+            EstimateTextureBytes(evolvingConnectorTexture) +
+            EstimateTextureBytes(evolvingWeakSpanNegativeTexture) +
             EstimateTextureBytes(topologyGeneratedUploadTexture) +
             EstimateTextureBytes(majorMaskTextureArray) +
             EstimateTextureBytes(hostedNegativeMaskTextureArray) +
@@ -982,6 +1196,18 @@ namespace ProgrammaticStylized3D.Rivers
             (freeWaterEvolutionBuffer != null
                 ? (long)freeWaterEvolutionBuffer.count *
                     freeWaterEvolutionBuffer.stride
+                : 0L) +
+            (connectorIdentityBuffer != null
+                ? (long)connectorIdentityBuffer.count *
+                    connectorIdentityBuffer.stride
+                : 0L) +
+            (connectorPathPointBuffer != null
+                ? (long)connectorPathPointBuffer.count *
+                    connectorPathPointBuffer.stride
+                : 0L) +
+            (weakSpanIdentityBuffer != null
+                ? (long)weakSpanIdentityBuffer.count *
+                    weakSpanIdentityBuffer.stride
                 : 0L);
 
         private bool IsAutomaticMaterialSupplyActive =>
@@ -1170,16 +1396,17 @@ namespace ProgrammaticStylized3D.Rivers
             float deltaTime = Mathf.Clamp(now - lastRuntimeTime, 0f, 0.1f);
             lastRuntimeTime = now;
 
-            bool majorEvolutionRebuilt = false;
+            bool evolvingTopologyRebuilt = false;
             if (!topologyMaintenanceBlocked)
             {
-                majorEvolutionRebuilt =
+                bool evolvingTopologyDirty =
                     AdvanceFreeWaterEvolution(deltaTime);
-                majorEvolutionRebuilt =
+                evolvingTopologyDirty =
                     AdvanceMajorEvolution(deltaTime) ||
-                    majorEvolutionRebuilt;
-                if (majorEvolutionRebuilt)
+                    evolvingTopologyDirty;
+                if (evolvingTopologyDirty && BuildEvolvingMajorField())
                 {
+                    evolvingTopologyRebuilt = true;
                     RefreshDynamicTopologySources(false, false);
                 }
             }
@@ -1257,7 +1484,7 @@ namespace ProgrammaticStylized3D.Rivers
                             topologyMetricsInterval;
                         if (measureTopology)
                         {
-                            if (majorEvolutionRebuilt)
+                            if (evolvingTopologyRebuilt)
                             {
                                 MeasureTopologyMetrics();
                             }
@@ -1269,7 +1496,7 @@ namespace ProgrammaticStylized3D.Rivers
                             topologyMetricsAccumulator %=
                                 topologyMetricsInterval;
                         }
-                        else if (!majorEvolutionRebuilt)
+                        else if (!evolvingTopologyRebuilt)
                         {
                             RefreshDynamicTopologySources(false);
                         }
@@ -1767,6 +1994,8 @@ namespace ProgrammaticStylized3D.Rivers
                 evolvingMajorTexture != null &&
                 evolvingHostedNegativeTexture != null &&
                 evolvingFreeWaterNegativeTexture != null &&
+                evolvingConnectorTexture != null &&
+                evolvingWeakSpanNegativeTexture != null &&
                 majorTopology != null &&
                 connectorTopology != null &&
                 pocketTopology != null &&
@@ -1879,9 +2108,10 @@ namespace ProgrammaticStylized3D.Rivers
                             "PS3D_RiverFoam_Topology");
                         topologySourcesTexture = CreateGuidanceTexture(
                             "PS3D_RiverFoam_TopologySources");
-                        // Patch 4.3 uploads deterministic prepared Major,
-                        // Connector, and aggregate Major-hosted Negative Aging
-                        // Pressure through separate channels of this input.
+                        // Deterministic prepared topology is uploaded here.
+                        // Connector and independent-negative classes remain only
+                        // as complete static fallbacks when their prepared
+                        // runtime reconstruction is unavailable.
                         topologyGeneratedTexture = CreateGuidanceTexture(
                             "PS3D_RiverFoam_TopologyGeneratedInput");
                         evolvingMajorTexture = CreateMajorEvolutionTexture(
@@ -1892,6 +2122,11 @@ namespace ProgrammaticStylized3D.Rivers
                         evolvingFreeWaterNegativeTexture =
                             CreateMajorEvolutionTexture(
                                 "PS3D_RiverFoam_EvolvingFreeWaterNegative");
+                        evolvingConnectorTexture = CreateMajorEvolutionTexture(
+                            "PS3D_RiverFoam_EvolvingConnectorSupport");
+                        evolvingWeakSpanNegativeTexture =
+                            CreateMajorEvolutionTexture(
+                                "PS3D_RiverFoam_EvolvingWeakSpanNegative");
                         currentShoreEdgesTexture = CreateShoreEdgesTexture(
                             "PS3D_RiverFoam_CurrentShoreEdges");
                         obstacleExclusionTexture =
@@ -1934,6 +2169,8 @@ namespace ProgrammaticStylized3D.Rivers
                         ClearRenderTexture(evolvingMajorTexture);
                         ClearRenderTexture(evolvingHostedNegativeTexture);
                         ClearRenderTexture(evolvingFreeWaterNegativeTexture);
+                        ClearRenderTexture(evolvingConnectorTexture);
+                        ClearRenderTexture(evolvingWeakSpanNegativeTexture);
                     }
 
                     initializationPhase = InitializationPhase.AllocateBuffers;
@@ -3327,6 +3564,8 @@ namespace ProgrammaticStylized3D.Rivers
                 ClearRenderTexture(evolvingMajorTexture);
                 ClearRenderTexture(evolvingHostedNegativeTexture);
                 ClearRenderTexture(evolvingFreeWaterNegativeTexture);
+                ClearRenderTexture(evolvingConnectorTexture);
+                ClearRenderTexture(evolvingWeakSpanNegativeTexture);
                 return;
             }
 
@@ -3370,6 +3609,7 @@ namespace ProgrammaticStylized3D.Rivers
                 fieldWidth < 2 || fieldHeight < 2 ||
                 fieldLength <= 0.0001f || validFieldLength <= 0.0001f)
             {
+                ReleaseConnectorIdentityReconstructionResources();
                 connectorTopology = null;
                 pocketTopology = null;
                 connectorTopologyInputSignature = int.MinValue;
@@ -3381,6 +3621,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            ReleaseConnectorIdentityReconstructionResources();
             connectorTopology =
                 StylizedRiverFoamConnectorTopologyGenerator.Generate(
                     river.Domain,
@@ -3415,6 +3656,7 @@ namespace ProgrammaticStylized3D.Rivers
                 connectorTopology == null ||
                 river == null || !river.Domain.IsValid)
             {
+                ReleaseConnectorIdentityReconstructionResources();
                 pocketTopology = null;
                 pocketTopologyInputSignature = int.MinValue;
                 InitializeHostedNegativeEvolution(false);
@@ -3445,6 +3687,7 @@ namespace ProgrammaticStylized3D.Rivers
                 ResolvePocketTopologyInputSignature();
             InitializeHostedNegativeEvolution(false);
             InitializeFreeWaterEvolution(false);
+            InitializeConnectorIdentityReconstruction(false);
             UploadGeneratedTopology();
             BuildEvolvingMajorField();
         }
@@ -3472,11 +3715,13 @@ namespace ProgrammaticStylized3D.Rivers
 
             majorTopology?.FillUploadPixels(topologyGeneratedUploadPixels);
             connectorTopology?.AddToUploadPixels(
-                topologyGeneratedUploadPixels);
+                topologyGeneratedUploadPixels,
+                connectorIdentityReconstructionReady);
             pocketTopology?.AddToUploadPixels(
                 topologyGeneratedUploadPixels,
                 hostedNegativeEvolutionReady,
-                freeWaterEvolutionReady);
+                freeWaterEvolutionReady,
+                weakSpanIdentityReconstructionReady);
 
             if (topologyGeneratedUploadTexture == null ||
                 topologyGeneratedUploadTexture.width != fieldWidth ||
@@ -3520,6 +3765,8 @@ namespace ProgrammaticStylized3D.Rivers
                 ClearRenderTexture(evolvingMajorTexture);
                 ClearRenderTexture(evolvingHostedNegativeTexture);
                 ClearRenderTexture(evolvingFreeWaterNegativeTexture);
+                ClearRenderTexture(evolvingConnectorTexture);
+                ClearRenderTexture(evolvingWeakSpanNegativeTexture);
                 return;
             }
 
@@ -3533,6 +3780,8 @@ namespace ProgrammaticStylized3D.Rivers
                 ClearRenderTexture(evolvingMajorTexture);
                 ClearRenderTexture(evolvingHostedNegativeTexture);
                 ClearRenderTexture(evolvingFreeWaterNegativeTexture);
+                ClearRenderTexture(evolvingConnectorTexture);
+                ClearRenderTexture(evolvingWeakSpanNegativeTexture);
                 return;
             }
 
@@ -3544,6 +3793,8 @@ namespace ProgrammaticStylized3D.Rivers
                     ClearRenderTexture(evolvingMajorTexture);
                     ClearRenderTexture(evolvingHostedNegativeTexture);
                     ClearRenderTexture(evolvingFreeWaterNegativeTexture);
+                    ClearRenderTexture(evolvingConnectorTexture);
+                    ClearRenderTexture(evolvingWeakSpanNegativeTexture);
                     return;
                 }
             }
@@ -3834,6 +4085,8 @@ namespace ProgrammaticStylized3D.Rivers
             if (!majorEvolutionReady || evolvingFreeWaterNegativeTexture == null)
             {
                 ClearRenderTexture(evolvingFreeWaterNegativeTexture);
+                ClearRenderTexture(evolvingConnectorTexture);
+                ClearRenderTexture(evolvingWeakSpanNegativeTexture);
                 return;
             }
 
@@ -4006,6 +4259,1549 @@ namespace ProgrammaticStylized3D.Rivers
             freeWaterObservedMaximumMove = 0f;
         }
 
+        private void InitializeConnectorIdentityReconstruction(
+            bool rebuildField = true)
+        {
+            ReleaseConnectorIdentityReconstructionResources();
+            if (!majorEvolutionReady ||
+                connectorTopology == null || pocketTopology == null ||
+                computeShader == null ||
+                majorEvolutionBuffer == null ||
+                majorMaskTextureArray == null ||
+                hostedNegativeEvolutionBuffer == null ||
+                hostedNegativeMaskTextureArray == null ||
+                freeWaterEvolutionBuffer == null ||
+                freeWaterNegativeMaskTextureArray == null ||
+                topologyGeneratedTexture == null ||
+                boundaryTexture == null ||
+                obstacleExclusionTexture == null ||
+                metricBuffer == null ||
+                evolvingConnectorTexture == null ||
+                evolvingWeakSpanNegativeTexture == null ||
+                buildEvolvingMajorSupportKernel < 0)
+            {
+                ClearRenderTexture(evolvingConnectorTexture);
+                ClearRenderTexture(evolvingWeakSpanNegativeTexture);
+                return;
+            }
+
+            int acceptedConnectorCount =
+                connectorTopology.AcceptedConnectorCount;
+            IReadOnlyList<StylizedRiverFoamConnectorPath> acceptedPaths =
+                connectorTopology.PreparedPaths;
+            IReadOnlyList<StylizedRiverFoamConnectorPath> cataloguePaths =
+                connectorTopology.PreparedRelationshipCataloguePaths;
+            bool allConnectorsPrepared = acceptedConnectorCount > 0 &&
+                connectorTopology.PreparedConnectorCount ==
+                    acceptedConnectorCount &&
+                acceptedPaths.Count == acceptedConnectorCount &&
+                cataloguePaths.Count >= acceptedConnectorCount &&
+                connectorTopology.PreparedRelationshipCatalogueCount ==
+                    cataloguePaths.Count;
+
+            List<FoamConnectorIdentityData> connectorRecords = new(
+                acceptedConnectorCount);
+            List<ConnectorEvolutionSlot> evolutionSlots = new(
+                acceptedConnectorCount);
+            List<ConnectorRelationshipCandidate> relationshipCandidates = new(
+                cataloguePaths.Count);
+            Dictionary<uint, int> candidateIndexByStableId = new(
+                cataloguePaths.Count);
+            Dictionary<uint, int> connectorIndexByStableId = new(
+                acceptedConnectorCount);
+            int maximumPathPointCount = 0;
+
+            if (allConnectorsPrepared)
+            {
+                for (int pathIndex = 0;
+                     pathIndex < cataloguePaths.Count;
+                     pathIndex++)
+                {
+                    StylizedRiverFoamConnectorPath path =
+                        cataloguePaths[pathIndex];
+                    Vector2[] points = path?.PreparedMetricPointData;
+                    float[] cumulative = path?.NormalizedCumulativeLengthData;
+                    if (path == null || !path.PreparationAvailable ||
+                        points == null || points.Length < 2 ||
+                        points.Length >
+                            StylizedRiverFoamConnectorTopologyGenerator
+                                .MaximumPreparedPathPointCount ||
+                        cumulative == null ||
+                        cumulative.Length != points.Length ||
+                        candidateIndexByStableId.ContainsKey(path.StableId) ||
+                        !TryResolveMajorEvolutionSlot(
+                            path.StartEndpointBinding,
+                            out int startHostSlotIndex) ||
+                        !TryResolveMajorEvolutionSlot(
+                            path.EndEndpointBinding,
+                            out int endHostSlotIndex) ||
+                        startHostSlotIndex == endHostSlotIndex)
+                    {
+                        allConnectorsPrepared = false;
+                        break;
+                    }
+
+                    candidateIndexByStableId.Add(
+                        path.StableId,
+                        relationshipCandidates.Count);
+                    relationshipCandidates.Add(
+                        new ConnectorRelationshipCandidate
+                        {
+                            Path = path,
+                            StartHostSlotIndex = startHostSlotIndex,
+                            EndHostSlotIndex = endHostSlotIndex
+                        });
+                    maximumPathPointCount = Mathf.Max(
+                        maximumPathPointCount,
+                        points.Length);
+                }
+            }
+
+            Vector4[] flattenedPoints = allConnectorsPrepared
+                ? new Vector4[
+                    acceptedConnectorCount * maximumPathPointCount]
+                : Array.Empty<Vector4>();
+            if (allConnectorsPrepared)
+            {
+                for (int pathIndex = 0;
+                     pathIndex < acceptedPaths.Count;
+                     pathIndex++)
+                {
+                    StylizedRiverFoamConnectorPath path =
+                        acceptedPaths[pathIndex];
+                    Vector2[] points = path?.PreparedMetricPointData;
+                    float[] cumulative = path?.NormalizedCumulativeLengthData;
+                    if (path == null ||
+                        !candidateIndexByStableId.TryGetValue(
+                            path.StableId,
+                            out int candidateIndex) ||
+                        connectorIndexByStableId.ContainsKey(path.StableId) ||
+                        points == null || points.Length < 2 ||
+                        cumulative == null || cumulative.Length != points.Length)
+                    {
+                        allConnectorsPrepared = false;
+                        break;
+                    }
+
+                    int pointOffset = pathIndex * maximumPathPointCount;
+                    for (int pointIndex = 0;
+                         pointIndex < points.Length;
+                         pointIndex++)
+                    {
+                        flattenedPoints[pointOffset + pointIndex] =
+                            new Vector4(
+                                points[pointIndex].x,
+                                points[pointIndex].y,
+                                Mathf.Clamp01(cumulative[pointIndex]),
+                                0f);
+                    }
+
+                    float outerRadius = Mathf.Lerp(
+                        0.17f,
+                        0.27f,
+                        HashConnectorIdentity(path.StableId, 31u));
+                    float coreRadius = outerRadius * Mathf.Lerp(
+                        0.20f,
+                        0.36f,
+                        HashConnectorIdentity(path.StableId, 32u));
+                    connectorIndexByStableId.Add(
+                        path.StableId,
+                        connectorRecords.Count);
+                    connectorRecords.Add(new FoamConnectorIdentityData
+                    {
+                        PointRangeAndRadii = new Vector4(
+                            pointOffset,
+                            points.Length,
+                            outerRadius,
+                            coreRadius)
+                    });
+                    evolutionSlots.Add(new ConnectorEvolutionSlot
+                    {
+                        StableId = path.StableId,
+                        OriginalCandidateIndex = candidateIndex,
+                        AssignedCandidateIndex = candidateIndex,
+                        ActiveCandidateIndex = candidateIndex,
+                        LastReleasedCandidateIndex = -1,
+                        ReleaseCooldownTicks = 0,
+                        RelationshipRevision = 0,
+                        PointOffset = pointOffset,
+                        PointCapacity = maximumPathPointCount,
+                        PointCount = points.Length,
+                        ActiveStartAnchorIndex = -1,
+                        ActiveEndAnchorIndex = -1,
+                        PendingReleaseReason = ConnectorReleaseReason.None,
+                        TurnoverFallbackCandidateIndex = -1,
+                        ReferenceLengthMetres = 0f,
+                        ReferenceCandidateIndex = -1,
+                        ReferenceStartAnchorIndex = -2,
+                        ReferenceEndAnchorIndex = -2,
+                        ObservedStartRecycleCount = -1,
+                        ObservedEndRecycleCount = -1,
+                        StretchBlockedCandidateIndex = -1,
+                        StretchBlockedStartRecycleCount = -1,
+                        StretchBlockedEndRecycleCount = -1,
+                        IsActive = true,
+                        HasRuntimeState = false
+                    });
+                }
+            }
+
+            if (!allConnectorsPrepared ||
+                connectorRecords.Count != acceptedConnectorCount ||
+                evolutionSlots.Count != acceptedConnectorCount ||
+                relationshipCandidates.Count != cataloguePaths.Count)
+            {
+                connectorRecords.Clear();
+                evolutionSlots.Clear();
+                relationshipCandidates.Clear();
+                connectorIndexByStableId.Clear();
+                flattenedPoints = Array.Empty<Vector4>();
+            }
+
+            connectorIdentityGpuData = connectorRecords.ToArray();
+            connectorPathPointGpuData = flattenedPoints;
+            connectorEvolutionSlots = evolutionSlots.ToArray();
+            connectorRelationshipCandidates = relationshipCandidates.ToArray();
+            connectorCandidateClaimed = new bool[
+                connectorRelationshipCandidates.Length];
+            connectorMajorDegree = new int[majorEvolutionSlots.Length];
+            connectorMajorPairClaimed = new bool[
+                majorEvolutionSlots.Length * majorEvolutionSlots.Length];
+            connectorIdentityReconstructionReady =
+                acceptedConnectorCount > 0 &&
+                connectorIdentityGpuData.Length == acceptedConnectorCount &&
+                connectorEvolutionSlots.Length == acceptedConnectorCount &&
+                connectorRelationshipCandidates.Length >=
+                    acceptedConnectorCount &&
+                maximumPathPointCount >= 2 &&
+                connectorPathPointGpuData.Length ==
+                    acceptedConnectorCount * maximumPathPointCount;
+
+            IReadOnlyList<StylizedRiverFoamPreparedWeakSpanRegion> weakSpans =
+                pocketTopology.PreparedWeakSpanRegions;
+            int acceptedWeakSpanCount =
+                pocketTopology.AcceptedConnectorWeakSpanCount;
+            bool allWeakSpansPrepared =
+                connectorIdentityReconstructionReady &&
+                acceptedWeakSpanCount > 0 &&
+                pocketTopology.PreparedWeakSpanRegionCount ==
+                    acceptedWeakSpanCount &&
+                weakSpans.Count == acceptedWeakSpanCount;
+            List<FoamWeakSpanIdentityData> weakSpanRecords = new(
+                acceptedWeakSpanCount);
+            if (allWeakSpansPrepared)
+            {
+                for (int weakSpanIndex = 0;
+                     weakSpanIndex < weakSpans.Count;
+                     weakSpanIndex++)
+                {
+                    StylizedRiverFoamPreparedWeakSpanRegion weakSpan =
+                        weakSpans[weakSpanIndex];
+                    if (weakSpan == null || !weakSpan.IsAvailable ||
+                        !connectorIndexByStableId.TryGetValue(
+                            weakSpan.ConnectorStableId,
+                            out int connectorIndex))
+                    {
+                        allWeakSpansPrepared = false;
+                        break;
+                    }
+
+                    weakSpanRecords.Add(new FoamWeakSpanIdentityData
+                    {
+                        ConnectorAndPath = new Vector4(
+                            connectorIndex,
+                            weakSpan.NormalizedPathDistance,
+                            weakSpan.MinimumNormalizedPathDistance,
+                            weakSpan.MaximumNormalizedPathDistance),
+                        Shape = new Vector4(
+                            weakSpan.AlongRadiusMetres,
+                            weakSpan.AcrossRadiusMetres,
+                            weakSpan.Strength,
+                            weakSpan.AcceptedOrientationRadians),
+                        NoiseSeed = weakSpan.StableId ^ 0x6C8E9CF5u,
+                        Reserved0 = 0u,
+                        Reserved1 = 0u,
+                        Reserved2 = 0u
+                    });
+                }
+            }
+
+            if (!allWeakSpansPrepared ||
+                weakSpanRecords.Count != acceptedWeakSpanCount)
+            {
+                weakSpanRecords.Clear();
+            }
+
+            weakSpanIdentityGpuData = weakSpanRecords.ToArray();
+            weakSpanIdentityReconstructionReady =
+                weakSpanIdentityGpuData.Length == acceptedWeakSpanCount &&
+                acceptedWeakSpanCount > 0;
+
+            UpdateConnectorEvolutionDescriptors(false);
+            EnsureConnectorIdentityBuffers();
+            if (connectorIdentityReconstructionReady)
+            {
+                connectorIdentityBuffer.SetData(connectorIdentityGpuData);
+                connectorPathPointBuffer.SetData(connectorPathPointGpuData);
+            }
+            if (weakSpanIdentityReconstructionReady)
+            {
+                weakSpanIdentityBuffer.SetData(weakSpanIdentityGpuData);
+            }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            connectorIdentityParityPending =
+                connectorIdentityReconstructionReady &&
+                IsTopologyDebugActive &&
+                SystemInfo.supportsAsyncGPUReadback;
+            connectorIdentityParityReadbackPending = false;
+            connectorIdentityParityAvailable = false;
+            connectorIdentityParityMeanDifference = 0f;
+            connectorIdentityParityMaximumDifference = 0f;
+            weakSpanIdentityParityPending =
+                weakSpanIdentityReconstructionReady &&
+                IsTopologyDebugActive &&
+                SystemInfo.supportsAsyncGPUReadback;
+            weakSpanIdentityParityReadbackPending = false;
+            weakSpanIdentityParityAvailable = false;
+            weakSpanIdentityParityMeanDifference = 0f;
+            weakSpanIdentityParityMaximumDifference = 0f;
+#endif
+
+            if (rebuildField)
+            {
+                BuildEvolvingMajorField();
+            }
+        }
+
+        private bool TryResolveMajorEvolutionSlot(
+            StylizedRiverFoamConnectorEndpointBinding binding,
+            out int slotIndex)
+        {
+            slotIndex = -1;
+            if (!binding.IsAvailable)
+            {
+                return false;
+            }
+
+            int preferredIndex = binding.MajorPreparedIndex;
+            if (preferredIndex >= 0 &&
+                preferredIndex < majorEvolutionSlots.Length)
+            {
+                MajorEvolutionSlot preferred =
+                    majorEvolutionSlots[preferredIndex];
+                if (preferred.PreparedIndex == binding.MajorPreparedIndex &&
+                    preferred.StableId == binding.MajorStableId)
+                {
+                    slotIndex = preferredIndex;
+                    return true;
+                }
+            }
+
+            // Preparation-only fallback for defensive index drift. Runtime
+            // evolution stores the resolved slot and performs no host search.
+            for (int index = 0;
+                 index < majorEvolutionSlots.Length;
+                 index++)
+            {
+                MajorEvolutionSlot candidate = majorEvolutionSlots[index];
+                if (candidate.PreparedIndex == binding.MajorPreparedIndex &&
+                    candidate.StableId == binding.MajorStableId)
+                {
+                    slotIndex = index;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void UpdateConnectorEvolutionDescriptors(
+            bool trackTransitions)
+        {
+            connectorEvolutionActiveCount = 0;
+            connectorEvolutionTemporaryAbsenceCount = 0;
+            connectorEvolutionIdentityPathCount = 0;
+            connectorEvolutionRecycleVariantCount = 0;
+            connectorEvolutionOriginalRelationshipCount = 0;
+            connectorEvolutionReplacementRelationshipCount = 0;
+            weakSpanEvolutionActiveCount = 0;
+
+            if (!connectorIdentityReconstructionReady ||
+                connectorEvolutionSlots.Length !=
+                    connectorIdentityGpuData.Length ||
+                connectorRelationshipCandidates.Length == 0 ||
+                connectorCandidateClaimed.Length !=
+                    connectorRelationshipCandidates.Length ||
+                connectorMajorDegree.Length != majorEvolutionSlots.Length ||
+                connectorMajorPairClaimed.Length !=
+                    majorEvolutionSlots.Length * majorEvolutionSlots.Length ||
+                majorTopology == null || river == null ||
+                !river.Domain.IsValid)
+            {
+                return;
+            }
+
+            Array.Clear(
+                connectorCandidateClaimed,
+                0,
+                connectorCandidateClaimed.Length);
+            Array.Clear(
+                connectorMajorDegree,
+                0,
+                connectorMajorDegree.Length);
+            Array.Clear(
+                connectorMajorPairClaimed,
+                0,
+                connectorMajorPairClaimed.Length);
+
+            for (int connectorIndex = 0;
+                 connectorIndex < connectorEvolutionSlots.Length;
+                 connectorIndex++)
+            {
+                ref ConnectorEvolutionSlot slot =
+                    ref connectorEvolutionSlots[connectorIndex];
+                slot.PendingReleaseReason = ConnectorReleaseReason.None;
+                slot.TurnoverFallbackCandidateIndex = -1;
+                RefreshConnectorStretchBlock(ref slot);
+            }
+
+            // Preserve valid current relationships first, except when a host
+            // recycle makes the deterministic turnover decision request a new
+            // pair or the live path exceeds its assignment-relative stretch
+            // limit. Those releases are handled in a dedicated second pass so
+            // retained relationships cannot be stolen by replacement slots.
+            for (int connectorIndex = 0;
+                 connectorIndex < connectorEvolutionSlots.Length;
+                 connectorIndex++)
+            {
+                ref ConnectorEvolutionSlot slot =
+                    ref connectorEvolutionSlots[connectorIndex];
+                int candidateIndex = slot.AssignedCandidateIndex;
+                if (candidateIndex < 0)
+                {
+                    continue;
+                }
+
+                bool stateAvailable = TryResolveConnectorCandidateState(
+                    candidateIndex,
+                    out int startAnchorIndex,
+                    out int endAnchorIndex,
+                    out Vector2[] basePoints,
+                    out float[] baseCumulative,
+                    out Vector2 startGate,
+                    out Vector2 endGate);
+                if (!stateAvailable)
+                {
+                    ReleaseConnectorSlotForRebind(
+                        ref slot,
+                        candidateIndex,
+                        ConnectorReleaseReason.Unavailable,
+                        false);
+                    continue;
+                }
+
+                ConnectorRelationshipCandidate candidate =
+                    connectorRelationshipCandidates[candidateIndex];
+                bool referenceMatchesCurrentState =
+                    slot.ReferenceLengthMetres > 0.0001f &&
+                    slot.ReferenceCandidateIndex == candidateIndex &&
+                    slot.ReferenceStartAnchorIndex == startAnchorIndex &&
+                    slot.ReferenceEndAnchorIndex == endAnchorIndex;
+                if (referenceMatchesCurrentState)
+                {
+                    bool measured = TryMeasureConnectorDeformedPath(
+                        slot,
+                        candidate,
+                        basePoints,
+                        baseCumulative,
+                        startGate,
+                        endGate,
+                        out float currentLengthMetres);
+                    float stretchLimit = slot.ReferenceLengthMetres *
+                        river.FoamConnectorBreakStretchRatio;
+                    if (!measured ||
+                        currentLengthMetres > stretchLimit + 0.0001f)
+                    {
+                        if (measured)
+                        {
+                            RecordConnectorStretchBlock(
+                                ref slot,
+                                candidateIndex);
+                            if (trackTransitions)
+                            {
+                                connectorEvolutionStretchBreakCount++;
+                            }
+                        }
+                        ReleaseConnectorSlotForRebind(
+                            ref slot,
+                            candidateIndex,
+                            measured
+                                ? ConnectorReleaseReason.StretchBreak
+                                : ConnectorReleaseReason.Unavailable,
+                            false);
+                        continue;
+                    }
+                }
+
+                int startRecycleCount = majorEvolutionSlots[
+                    candidate.StartHostSlotIndex].RecycleCount;
+                int endRecycleCount = majorEvolutionSlots[
+                    candidate.EndHostSlotIndex].RecycleCount;
+                bool sameObservedRelationship = slot.HasRuntimeState &&
+                    slot.ActiveCandidateIndex == candidateIndex &&
+                    slot.ObservedStartRecycleCount >= 0 &&
+                    slot.ObservedEndRecycleCount >= 0;
+                bool hostRecycled = sameObservedRelationship &&
+                    (slot.ObservedStartRecycleCount != startRecycleCount ||
+                     slot.ObservedEndRecycleCount != endRecycleCount);
+                if (hostRecycled)
+                {
+                    bool requestTurnover =
+                        ShouldRequestConnectorRelationshipTurnover(
+                            slot,
+                            candidateIndex,
+                            startRecycleCount,
+                            endRecycleCount);
+                    if (requestTurnover)
+                    {
+                        if (trackTransitions)
+                        {
+                            connectorEvolutionTurnoverRequestCount++;
+                        }
+                        ReleaseConnectorSlotForRebind(
+                            ref slot,
+                            candidateIndex,
+                            ConnectorReleaseReason.Turnover,
+                            true);
+                        continue;
+                    }
+
+                    if (trackTransitions)
+                    {
+                        connectorEvolutionRetainDecisionCount++;
+                    }
+                }
+
+                if (!TryClaimConnectorCandidate(candidateIndex, false))
+                {
+                    ReleaseConnectorSlotForRebind(
+                        ref slot,
+                        candidateIndex,
+                        ConnectorReleaseReason.Unavailable,
+                        false);
+                }
+            }
+
+            // Turnover requests and stretch breaks explicitly exclude the old
+            // Major pair. A requested turnover may retain its old relationship
+            // only when no different prepared pair is currently available and
+            // the old state remains valid. Stretch-broken relationships never
+            // fall back to the path that just exceeded its limit.
+            for (int connectorIndex = 0;
+                 connectorIndex < connectorEvolutionSlots.Length;
+                 connectorIndex++)
+            {
+                ref ConnectorEvolutionSlot slot =
+                    ref connectorEvolutionSlots[connectorIndex];
+                bool turnoverRequested = slot.PendingReleaseReason ==
+                    ConnectorReleaseReason.Turnover;
+                bool stretchBroken = slot.PendingReleaseReason ==
+                    ConnectorReleaseReason.StretchBreak;
+                if (!turnoverRequested && !stretchBroken)
+                {
+                    continue;
+                }
+
+                int releasedCandidateIndex =
+                    slot.TurnoverFallbackCandidateIndex >= 0
+                        ? slot.TurnoverFallbackCandidateIndex
+                        : slot.LastReleasedCandidateIndex;
+                int selectedCandidate = SelectConnectorReplacementCandidate(
+                    slot,
+                    releasedCandidateIndex,
+                    true);
+                if (selectedCandidate >= 0)
+                {
+                    slot.AssignedCandidateIndex = selectedCandidate;
+                    slot.RelationshipRevision++;
+                    continue;
+                }
+
+                if (turnoverRequested && releasedCandidateIndex >= 0 &&
+                    TryResolveConnectorCandidateState(
+                        releasedCandidateIndex,
+                        out _,
+                        out _,
+                        out _,
+                        out _,
+                        out _,
+                        out _) &&
+                    TryClaimConnectorCandidate(
+                        releasedCandidateIndex,
+                        false))
+                {
+                    slot.AssignedCandidateIndex = releasedCandidateIndex;
+                }
+            }
+
+            // Slots released because their previous state became unavailable,
+            // plus slots that were already absent, may claim any currently
+            // valid prepared relationship. Directed turnover/stretch releases
+            // have already had their one bounded selection attempt above.
+            for (int connectorIndex = 0;
+                 connectorIndex < connectorEvolutionSlots.Length;
+                 connectorIndex++)
+            {
+                ref ConnectorEvolutionSlot slot =
+                    ref connectorEvolutionSlots[connectorIndex];
+                if (slot.AssignedCandidateIndex >= 0)
+                {
+                    continue;
+                }
+                if (slot.PendingReleaseReason ==
+                        ConnectorReleaseReason.Turnover ||
+                    slot.PendingReleaseReason ==
+                        ConnectorReleaseReason.StretchBreak)
+                {
+                    continue;
+                }
+
+                int selectedCandidate =
+                    SelectConnectorReplacementCandidate(
+                        slot,
+                        -1,
+                        false);
+                if (selectedCandidate >= 0)
+                {
+                    slot.AssignedCandidateIndex = selectedCandidate;
+                    slot.RelationshipRevision++;
+                }
+            }
+
+            for (int connectorIndex = 0;
+                 connectorIndex < connectorEvolutionSlots.Length;
+                 connectorIndex++)
+            {
+                ref ConnectorEvolutionSlot slot =
+                    ref connectorEvolutionSlots[connectorIndex];
+                if (slot.ReleaseCooldownTicks > 0)
+                {
+                    slot.ReleaseCooldownTicks--;
+                }
+
+                bool previousActive = slot.IsActive;
+                int previousCandidateIndex = slot.ActiveCandidateIndex;
+                int previousStartAnchorIndex =
+                    slot.ActiveStartAnchorIndex;
+                int previousEndAnchorIndex = slot.ActiveEndAnchorIndex;
+
+                int assignedCandidateIndex =
+                    slot.AssignedCandidateIndex;
+                int startAnchorIndex = -1;
+                int endAnchorIndex = -1;
+                Vector2[] basePoints = null;
+                float[] baseCumulative = null;
+                Vector2 startGate = Vector2.zero;
+                Vector2 endGate = Vector2.zero;
+                float currentLengthMetres = 0f;
+                bool active = assignedCandidateIndex >= 0 &&
+                    TryResolveConnectorCandidateState(
+                        assignedCandidateIndex,
+                        out startAnchorIndex,
+                        out endAnchorIndex,
+                        out basePoints,
+                        out baseCumulative,
+                        out startGate,
+                        out endGate) &&
+                    basePoints.Length <= slot.PointCapacity &&
+                    WriteConnectorDeformedPath(
+                        slot,
+                        connectorRelationshipCandidates[
+                            assignedCandidateIndex],
+                        basePoints,
+                        baseCumulative,
+                        startGate,
+                        endGate,
+                        out currentLengthMetres);
+
+                if (!active)
+                {
+                    startAnchorIndex = -1;
+                    endAnchorIndex = -1;
+                    if (assignedCandidateIndex >= 0)
+                    {
+                        ReleaseConnectorSlotForRebind(
+                            ref slot,
+                            assignedCandidateIndex,
+                            ConnectorReleaseReason.Unavailable,
+                            false);
+                    }
+                }
+                else
+                {
+                    slot.PointCount = basePoints.Length;
+                    bool referenceStateChanged =
+                        slot.ReferenceLengthMetres <= 0.0001f ||
+                        slot.ReferenceCandidateIndex !=
+                            assignedCandidateIndex ||
+                        slot.ReferenceStartAnchorIndex !=
+                            startAnchorIndex ||
+                        slot.ReferenceEndAnchorIndex != endAnchorIndex;
+                    if (referenceStateChanged)
+                    {
+                        slot.ReferenceLengthMetres = currentLengthMetres;
+                        slot.ReferenceCandidateIndex =
+                            assignedCandidateIndex;
+                        slot.ReferenceStartAnchorIndex = startAnchorIndex;
+                        slot.ReferenceEndAnchorIndex = endAnchorIndex;
+                    }
+                }
+
+                if (trackTransitions && active &&
+                    slot.PendingReleaseReason ==
+                        ConnectorReleaseReason.Turnover)
+                {
+                    if (assignedCandidateIndex ==
+                        slot.TurnoverFallbackCandidateIndex)
+                    {
+                        connectorEvolutionNoAlternativeFallbackCount++;
+                    }
+                    else
+                    {
+                        connectorEvolutionSuccessfulTurnoverCount++;
+                    }
+                }
+
+                FoamConnectorIdentityData record =
+                    connectorIdentityGpuData[connectorIndex];
+                record.PointRangeAndRadii.y = active
+                    ? slot.PointCount
+                    : 0f;
+                connectorIdentityGpuData[connectorIndex] = record;
+
+                if (trackTransitions && slot.HasRuntimeState)
+                {
+                    bool relationshipChanged = active &&
+                        previousCandidateIndex >= 0 &&
+                        previousCandidateIndex != assignedCandidateIndex;
+                    bool anchorCombinationChanged = active &&
+                        previousCandidateIndex == assignedCandidateIndex &&
+                        (previousStartAnchorIndex != startAnchorIndex ||
+                         previousEndAnchorIndex != endAnchorIndex);
+                    if (relationshipChanged)
+                    {
+                        connectorEvolutionRelationshipRebindCount++;
+                    }
+                    if (anchorCombinationChanged)
+                    {
+                        connectorEvolutionVariantSwitchCount++;
+                    }
+                    if (previousActive && !active)
+                    {
+                        connectorEvolutionAbsenceEventCount++;
+                    }
+                    else if (!previousActive && active)
+                    {
+                        connectorEvolutionReappearanceCount++;
+                    }
+                }
+
+                if (active)
+                {
+                    slot.ActiveCandidateIndex = assignedCandidateIndex;
+                    slot.ActiveStartAnchorIndex = startAnchorIndex;
+                    slot.ActiveEndAnchorIndex = endAnchorIndex;
+                    ConnectorRelationshipCandidate activeCandidate =
+                        connectorRelationshipCandidates[
+                            assignedCandidateIndex];
+                    slot.ObservedStartRecycleCount = majorEvolutionSlots[
+                        activeCandidate.StartHostSlotIndex].RecycleCount;
+                    slot.ObservedEndRecycleCount = majorEvolutionSlots[
+                        activeCandidate.EndHostSlotIndex].RecycleCount;
+                }
+                slot.IsActive = active;
+                slot.HasRuntimeState = true;
+
+                if (active)
+                {
+                    connectorEvolutionActiveCount++;
+                    bool usesRecycleVariant =
+                        startAnchorIndex >= 0 || endAnchorIndex >= 0;
+                    if (usesRecycleVariant)
+                    {
+                        connectorEvolutionRecycleVariantCount++;
+                    }
+                    else
+                    {
+                        connectorEvolutionIdentityPathCount++;
+                    }
+
+                    if (assignedCandidateIndex ==
+                        slot.OriginalCandidateIndex)
+                    {
+                        connectorEvolutionOriginalRelationshipCount++;
+                    }
+                    else
+                    {
+                        connectorEvolutionReplacementRelationshipCount++;
+                    }
+                }
+                else
+                {
+                    connectorEvolutionTemporaryAbsenceCount++;
+                }
+            }
+
+            if (!weakSpanIdentityReconstructionReady)
+            {
+                return;
+            }
+
+            for (int weakSpanIndex = 0;
+                 weakSpanIndex < weakSpanIdentityGpuData.Length;
+                 weakSpanIndex++)
+            {
+                int connectorIndex = Mathf.RoundToInt(
+                    weakSpanIdentityGpuData[weakSpanIndex]
+                        .ConnectorAndPath.x);
+                if (connectorIndex >= 0 &&
+                    connectorIndex < connectorEvolutionSlots.Length &&
+                    connectorEvolutionSlots[connectorIndex].IsActive)
+                {
+                    weakSpanEvolutionActiveCount++;
+                }
+            }
+        }
+
+        private void RefreshConnectorStretchBlock(
+            ref ConnectorEvolutionSlot slot)
+        {
+            int candidateIndex = slot.StretchBlockedCandidateIndex;
+            if (candidateIndex < 0 ||
+                candidateIndex >= connectorRelationshipCandidates.Length)
+            {
+                ClearConnectorStretchBlock(ref slot);
+                return;
+            }
+
+            ConnectorRelationshipCandidate candidate =
+                connectorRelationshipCandidates[candidateIndex];
+            if (candidate.StartHostSlotIndex < 0 ||
+                candidate.StartHostSlotIndex >= majorEvolutionSlots.Length ||
+                candidate.EndHostSlotIndex < 0 ||
+                candidate.EndHostSlotIndex >= majorEvolutionSlots.Length ||
+                majorEvolutionSlots[candidate.StartHostSlotIndex]
+                    .RecycleCount !=
+                    slot.StretchBlockedStartRecycleCount ||
+                majorEvolutionSlots[candidate.EndHostSlotIndex]
+                    .RecycleCount !=
+                    slot.StretchBlockedEndRecycleCount)
+            {
+                ClearConnectorStretchBlock(ref slot);
+            }
+        }
+
+        private void RecordConnectorStretchBlock(
+            ref ConnectorEvolutionSlot slot,
+            int candidateIndex)
+        {
+            if (candidateIndex < 0 ||
+                candidateIndex >= connectorRelationshipCandidates.Length)
+            {
+                ClearConnectorStretchBlock(ref slot);
+                return;
+            }
+
+            ConnectorRelationshipCandidate candidate =
+                connectorRelationshipCandidates[candidateIndex];
+            if (candidate.StartHostSlotIndex < 0 ||
+                candidate.StartHostSlotIndex >= majorEvolutionSlots.Length ||
+                candidate.EndHostSlotIndex < 0 ||
+                candidate.EndHostSlotIndex >= majorEvolutionSlots.Length)
+            {
+                ClearConnectorStretchBlock(ref slot);
+                return;
+            }
+
+            slot.StretchBlockedCandidateIndex = candidateIndex;
+            slot.StretchBlockedStartRecycleCount = majorEvolutionSlots[
+                candidate.StartHostSlotIndex].RecycleCount;
+            slot.StretchBlockedEndRecycleCount = majorEvolutionSlots[
+                candidate.EndHostSlotIndex].RecycleCount;
+        }
+
+        private static void ClearConnectorStretchBlock(
+            ref ConnectorEvolutionSlot slot)
+        {
+            slot.StretchBlockedCandidateIndex = -1;
+            slot.StretchBlockedStartRecycleCount = -1;
+            slot.StretchBlockedEndRecycleCount = -1;
+        }
+
+        private static void ReleaseConnectorSlotForRebind(
+            ref ConnectorEvolutionSlot slot,
+            int candidateIndex,
+            ConnectorReleaseReason releaseReason,
+            bool allowTurnoverFallback)
+        {
+            if (candidateIndex >= 0)
+            {
+                slot.LastReleasedCandidateIndex = candidateIndex;
+                slot.ReleaseCooldownTicks = 1;
+            }
+            slot.AssignedCandidateIndex = -1;
+            slot.PendingReleaseReason = releaseReason;
+            slot.TurnoverFallbackCandidateIndex =
+                allowTurnoverFallback ? candidateIndex : -1;
+            ClearConnectorReferenceLength(ref slot);
+        }
+
+        private static void ClearConnectorReferenceLength(
+            ref ConnectorEvolutionSlot slot)
+        {
+            slot.ReferenceLengthMetres = 0f;
+            slot.ReferenceCandidateIndex = -1;
+            slot.ReferenceStartAnchorIndex = -2;
+            slot.ReferenceEndAnchorIndex = -2;
+        }
+
+        private static bool ShouldRequestConnectorRelationshipTurnover(
+            ConnectorEvolutionSlot slot,
+            int candidateIndex,
+            int startRecycleCount,
+            int endRecycleCount)
+        {
+            uint stream;
+            unchecked
+            {
+                stream = 151u ^
+                    ((uint)(candidateIndex + 1) * 0x9E3779B9u) ^
+                    ((uint)(startRecycleCount + 1) * 0x85EBCA6Bu) ^
+                    ((uint)(endRecycleCount + 1) * 0xC2B2AE35u) ^
+                    ((uint)(slot.RelationshipRevision + 1) * 0x27D4EB2Du);
+            }
+            return HashConnectorIdentity(slot.StableId, stream) < 0.5f;
+        }
+
+        private int SelectConnectorReplacementCandidate(
+            ConnectorEvolutionSlot slot,
+            int excludedCandidateIndex,
+            bool excludeSameMajorPair)
+        {
+            int candidateCount = connectorRelationshipCandidates.Length;
+            if (candidateCount <= 0)
+            {
+                return -1;
+            }
+
+            int scanStart = Mathf.Min(
+                candidateCount - 1,
+                Mathf.FloorToInt(
+                    HashConnectorIdentity(
+                        slot.StableId,
+                        (uint)(97 + slot.RelationshipRevision)) *
+                    candidateCount));
+            for (int offset = 0; offset < candidateCount; offset++)
+            {
+                int candidateIndex = (scanStart + offset) % candidateCount;
+                if (candidateIndex == excludedCandidateIndex ||
+                    (slot.StretchBlockedCandidateIndex >= 0 &&
+                     IsSameConnectorMajorPair(
+                         candidateIndex,
+                         slot.StretchBlockedCandidateIndex)) ||
+                    (excludeSameMajorPair &&
+                     IsSameConnectorMajorPair(
+                         candidateIndex,
+                         excludedCandidateIndex)) ||
+                    (slot.ReleaseCooldownTicks > 0 &&
+                     candidateIndex == slot.LastReleasedCandidateIndex))
+                {
+                    continue;
+                }
+                if (!TryResolveConnectorCandidateState(
+                        candidateIndex,
+                        out _,
+                        out _,
+                        out _,
+                        out _,
+                        out _,
+                        out _))
+                {
+                    continue;
+                }
+                if (TryClaimConnectorCandidate(
+                        candidateIndex,
+                        true))
+                {
+                    return candidateIndex;
+                }
+            }
+
+            return -1;
+        }
+
+        private bool IsSameConnectorMajorPair(
+            int firstCandidateIndex,
+            int secondCandidateIndex)
+        {
+            if (firstCandidateIndex < 0 ||
+                firstCandidateIndex >=
+                    connectorRelationshipCandidates.Length ||
+                secondCandidateIndex < 0 ||
+                secondCandidateIndex >=
+                    connectorRelationshipCandidates.Length)
+            {
+                return false;
+            }
+
+            ConnectorRelationshipCandidate first =
+                connectorRelationshipCandidates[firstCandidateIndex];
+            ConnectorRelationshipCandidate second =
+                connectorRelationshipCandidates[secondCandidateIndex];
+            int firstLow = Mathf.Min(
+                first.StartHostSlotIndex,
+                first.EndHostSlotIndex);
+            int firstHigh = Mathf.Max(
+                first.StartHostSlotIndex,
+                first.EndHostSlotIndex);
+            int secondLow = Mathf.Min(
+                second.StartHostSlotIndex,
+                second.EndHostSlotIndex);
+            int secondHigh = Mathf.Max(
+                second.StartHostSlotIndex,
+                second.EndHostSlotIndex);
+            return firstLow == secondLow && firstHigh == secondHigh;
+        }
+
+        private bool TryClaimConnectorCandidate(
+            int candidateIndex,
+            bool enforceDensityLimit)
+        {
+            if (candidateIndex < 0 ||
+                candidateIndex >= connectorRelationshipCandidates.Length ||
+                connectorCandidateClaimed[candidateIndex])
+            {
+                return false;
+            }
+
+            ConnectorRelationshipCandidate candidate =
+                connectorRelationshipCandidates[candidateIndex];
+            int startHost = candidate.StartHostSlotIndex;
+            int endHost = candidate.EndHostSlotIndex;
+            if (startHost < 0 || startHost >= connectorMajorDegree.Length ||
+                endHost < 0 || endHost >= connectorMajorDegree.Length ||
+                startHost == endHost)
+            {
+                return false;
+            }
+
+            int lowHost = Mathf.Min(startHost, endHost);
+            int highHost = Mathf.Max(startHost, endHost);
+            int pairIndex = lowHost * connectorMajorDegree.Length + highHost;
+            if (pairIndex < 0 ||
+                pairIndex >= connectorMajorPairClaimed.Length ||
+                connectorMajorPairClaimed[pairIndex])
+            {
+                return false;
+            }
+
+            int maximumDegree = connectorTopology != null
+                ? connectorTopology.RuntimeMaximumMajorDegree
+                : 3;
+            if (enforceDensityLimit &&
+                (connectorMajorDegree[startHost] >= maximumDegree ||
+                 connectorMajorDegree[endHost] >= maximumDegree))
+            {
+                return false;
+            }
+
+            connectorCandidateClaimed[candidateIndex] = true;
+            connectorMajorPairClaimed[pairIndex] = true;
+            connectorMajorDegree[startHost]++;
+            connectorMajorDegree[endHost]++;
+            return true;
+        }
+
+        private bool TryResolveConnectorCandidateState(
+            int candidateIndex,
+            out int startAnchorIndex,
+            out int endAnchorIndex,
+            out Vector2[] metricPoints,
+            out float[] normalizedCumulativeLength,
+            out Vector2 startGate,
+            out Vector2 endGate)
+        {
+            startAnchorIndex = -1;
+            endAnchorIndex = -1;
+            metricPoints = null;
+            normalizedCumulativeLength = null;
+            startGate = Vector2.zero;
+            endGate = Vector2.zero;
+            if (candidateIndex < 0 ||
+                candidateIndex >= connectorRelationshipCandidates.Length)
+            {
+                return false;
+            }
+
+            ConnectorRelationshipCandidate candidate =
+                connectorRelationshipCandidates[candidateIndex];
+            if (candidate.Path == null ||
+                candidate.StartHostSlotIndex < 0 ||
+                candidate.StartHostSlotIndex >= majorEvolutionSlots.Length ||
+                candidate.EndHostSlotIndex < 0 ||
+                candidate.EndHostSlotIndex >= majorEvolutionSlots.Length)
+            {
+                return false;
+            }
+
+            startAnchorIndex = majorEvolutionSlots[
+                candidate.StartHostSlotIndex].LastAnchorIndex;
+            endAnchorIndex = majorEvolutionSlots[
+                candidate.EndHostSlotIndex].LastAnchorIndex;
+            return TryResolveConnectorBasePath(
+                    candidate.Path,
+                    startAnchorIndex,
+                    endAnchorIndex,
+                    out metricPoints,
+                    out normalizedCumulativeLength) &&
+                TryResolveConnectorEndpointGate(
+                    candidate.Path.StartEndpointBinding,
+                    candidate.StartHostSlotIndex,
+                    out startGate) &&
+                TryResolveConnectorEndpointGate(
+                    candidate.Path.EndEndpointBinding,
+                    candidate.EndHostSlotIndex,
+                    out endGate);
+        }
+
+        private static bool TryResolveConnectorBasePath(
+            StylizedRiverFoamConnectorPath path,
+            int startAnchorIndex,
+            int endAnchorIndex,
+            out Vector2[] metricPoints,
+            out float[] normalizedCumulativeLength)
+        {
+            if (path == null)
+            {
+                metricPoints = null;
+                normalizedCumulativeLength = null;
+                return false;
+            }
+
+            return path.TryResolvePreparedPath(
+                startAnchorIndex,
+                endAnchorIndex,
+                out metricPoints,
+                out normalizedCumulativeLength);
+        }
+
+        private bool TryResolveConnectorEndpointGate(
+            StylizedRiverFoamConnectorEndpointBinding binding,
+            int hostSlotIndex,
+            out Vector2 metricPosition)
+        {
+            metricPosition = binding.AcceptedMetricPosition;
+            if (!binding.IsAvailable || hostSlotIndex < 0 ||
+                hostSlotIndex >= majorEvolutionSlots.Length ||
+                majorTopology == null || river == null ||
+                !river.Domain.IsValid)
+            {
+                return false;
+            }
+
+            MajorEvolutionSlot host = majorEvolutionSlots[hostSlotIndex];
+            if (host.StableId != binding.MajorStableId ||
+                host.PreparedIndex != binding.MajorPreparedIndex ||
+                host.PreparedIndex < 0 ||
+                host.PreparedIndex >= majorTopology.PreparedRegions.Count)
+            {
+                return false;
+            }
+
+            StylizedRiverFoamPreparedMajorRegion prepared =
+                majorTopology.PreparedRegions[host.PreparedIndex];
+            MajorEvolutionPose pose = ResolveMajorPose(host);
+            Vector2 sourceOffset = ResolveConnectorPreWarpLocalOffset(
+                binding.MajorLocalOffsetCells,
+                pose,
+                prepared);
+
+            float principalMinorMetres = sourceOffset.y *
+                pose.MetresPerCandidateCell * pose.ScaleAcross;
+            float principalMajorMetres =
+                (sourceOffset.x + sourceOffset.y * pose.Shear) *
+                pose.MetresPerCandidateCell * pose.ScaleAlong;
+            float orientationCosine = Mathf.Cos(pose.OrientationRadians);
+            float orientationSine = Mathf.Sin(pose.OrientationRadians);
+            float deltaAlong =
+                orientationCosine * principalMajorMetres -
+                orientationSine * principalMinorMetres;
+            float deltaAcross =
+                orientationSine * principalMajorMetres +
+                orientationCosine * principalMinorMetres;
+            float localDistance = pose.LocalDistance + deltaAlong;
+            if (localDistance < 0f || localDistance > validFieldLength)
+            {
+                return false;
+            }
+
+            StylizedRiverSplineSample sample =
+                river.Domain.SampleAtOrientedDistance(Mathf.Clamp(
+                    localDistance,
+                    0f,
+                    river.Domain.LocalLength));
+            float centreAcrossMetres =
+                StylizedRiverFoamTopologyFieldSpace.SignedNormalizedToMetres(
+                    pose.AcrossNormalized,
+                    Mathf.Max(0.05f, sample.LeftHalfWidth),
+                    Mathf.Max(0.05f, sample.RightHalfWidth));
+            metricPosition = new Vector2(
+                localDistance,
+                centreAcrossMetres + deltaAcross);
+            return true;
+        }
+
+        private static Vector2 ResolveConnectorPreWarpLocalOffset(
+            Vector2 desiredLocalOffset,
+            MajorEvolutionPose pose,
+            StylizedRiverFoamPreparedMajorRegion prepared)
+        {
+            Vector2 source = desiredLocalOffset;
+            float majorExtent = Mathf.Max(
+                0.5f,
+                prepared.MajorHalfExtentCells);
+            float minorExtent = Mathf.Max(
+                0.5f,
+                prepared.MinorHalfExtentCells);
+            for (int iteration = 0;
+                 iteration < ConnectorEndpointWarpSolveIterations;
+                 iteration++)
+            {
+                float normalMajor = source.x / majorExtent;
+                float normalMinor = source.y / minorExtent;
+                float majorWarp =
+                    Mathf.Sin(normalMinor * 3.35f + pose.WarpPhaseA) *
+                        pose.WarpAlong * majorExtent +
+                    Mathf.Sin(
+                        (normalMajor + normalMinor) * 1.85f +
+                        pose.WarpPhaseB) *
+                        pose.WarpAlong * majorExtent * 0.42f;
+                float minorWarp =
+                    Mathf.Sin(normalMajor * 2.80f + pose.WarpPhaseB) *
+                        pose.WarpAcross * minorExtent +
+                    Mathf.Sin(
+                        (normalMajor - normalMinor) * 2.10f +
+                        pose.WarpPhaseA) *
+                        pose.WarpAcross * minorExtent * 0.36f;
+                source = desiredLocalOffset -
+                    new Vector2(majorWarp, minorWarp);
+            }
+
+            return source;
+        }
+
+        private bool WriteConnectorDeformedPath(
+            ConnectorEvolutionSlot slot,
+            ConnectorRelationshipCandidate candidate,
+            Vector2[] basePoints,
+            float[] baseCumulative,
+            Vector2 startGate,
+            Vector2 endGate,
+            out float pathLengthMetres)
+        {
+            return EvaluateConnectorDeformedPath(
+                slot,
+                candidate,
+                basePoints,
+                baseCumulative,
+                startGate,
+                endGate,
+                true,
+                out pathLengthMetres);
+        }
+
+        private bool TryMeasureConnectorDeformedPath(
+            ConnectorEvolutionSlot slot,
+            ConnectorRelationshipCandidate candidate,
+            Vector2[] basePoints,
+            float[] baseCumulative,
+            Vector2 startGate,
+            Vector2 endGate,
+            out float pathLengthMetres)
+        {
+            return EvaluateConnectorDeformedPath(
+                slot,
+                candidate,
+                basePoints,
+                baseCumulative,
+                startGate,
+                endGate,
+                false,
+                out pathLengthMetres);
+        }
+
+        private bool EvaluateConnectorDeformedPath(
+            ConnectorEvolutionSlot slot,
+            ConnectorRelationshipCandidate candidate,
+            Vector2[] basePoints,
+            float[] baseCumulative,
+            Vector2 startGate,
+            Vector2 endGate,
+            bool writePoints,
+            out float pathLengthMetres)
+        {
+            pathLengthMetres = 0f;
+            int pointCount = basePoints != null
+                ? basePoints.Length
+                : 0;
+            if (basePoints == null || baseCumulative == null ||
+                baseCumulative.Length != pointCount ||
+                pointCount < 2 || pointCount > slot.PointCapacity ||
+                slot.PointOffset < 0 ||
+                slot.PointOffset + pointCount >
+                    connectorPathPointGpuData.Length ||
+                candidate.StartHostSlotIndex < 0 ||
+                candidate.StartHostSlotIndex >= majorEvolutionSlots.Length ||
+                candidate.EndHostSlotIndex < 0 ||
+                candidate.EndHostSlotIndex >= majorEvolutionSlots.Length)
+            {
+                return false;
+            }
+
+            MajorEvolutionSlot startHost =
+                majorEvolutionSlots[candidate.StartHostSlotIndex];
+            MajorEvolutionSlot endHost =
+                majorEvolutionSlots[candidate.EndHostSlotIndex];
+            MajorEvolutionPose startPose = ResolveMajorPose(startHost);
+            MajorEvolutionPose endPose = ResolveMajorPose(endHost);
+            Vector2 startDelta = startGate - basePoints[0];
+            Vector2 endDelta = endGate -
+                basePoints[basePoints.Length - 1];
+            float endpointMotion =
+                (startDelta.magnitude + endDelta.magnitude) * 0.5f;
+            float deformationActivity = Mathf.Clamp01(
+                endpointMotion / 0.65f);
+            if (startHost.IsMoving || endHost.IsMoving)
+            {
+                deformationActivity = Mathf.Max(
+                    deformationActivity,
+                    0.30f);
+            }
+
+            float amplitude = Mathf.Lerp(
+                ConnectorMinimumInteriorDeformationMetres,
+                ConnectorMaximumInteriorDeformationMetres,
+                HashConnectorIdentity(slot.StableId, 41u)) *
+                deformationActivity;
+            float frequency = Mathf.Lerp(
+                1.20f,
+                2.25f,
+                HashConnectorIdentity(slot.StableId, 42u));
+            float phase =
+                HashConnectorIdentity(slot.StableId, 43u) *
+                    Mathf.PI * 2f +
+                (startPose.LocalDistance + endPose.LocalDistance) * 0.31f +
+                (startPose.AcrossNormalized -
+                    endPose.AcrossNormalized) * 1.70f +
+                (startHost.HopIndex + endHost.HopIndex) * 0.37f +
+                (startHost.RecycleCount + endHost.RecycleCount) * 0.83f;
+
+            float cumulativeLength = 0f;
+            Vector2 previousPosition = startGate;
+            for (int pointIndex = 0;
+                 pointIndex < pointCount;
+                 pointIndex++)
+            {
+                float pathFraction = Mathf.Clamp01(
+                    baseCumulative[pointIndex]);
+                Vector2 endpointWarp = Vector2.Lerp(
+                    startDelta,
+                    endDelta,
+                    pathFraction);
+                Vector2 position = basePoints[pointIndex] + endpointWarp;
+
+                if (pointIndex > 0 &&
+                    pointIndex < pointCount - 1 &&
+                    amplitude > 0.0001f)
+                {
+                    int previousIndex = Mathf.Max(0, pointIndex - 1);
+                    int nextIndex = Mathf.Min(
+                        pointCount - 1,
+                        pointIndex + 1);
+                    Vector2 previousReference =
+                        basePoints[previousIndex] + Vector2.Lerp(
+                            startDelta,
+                            endDelta,
+                            Mathf.Clamp01(
+                                baseCumulative[previousIndex]));
+                    Vector2 nextReference =
+                        basePoints[nextIndex] + Vector2.Lerp(
+                            startDelta,
+                            endDelta,
+                            Mathf.Clamp01(baseCumulative[nextIndex]));
+                    Vector2 tangent = nextReference - previousReference;
+                    if (tangent.sqrMagnitude > 0.000001f)
+                    {
+                        tangent.Normalize();
+                        Vector2 normal = new Vector2(
+                            -tangent.y,
+                            tangent.x);
+                        float envelope = Mathf.Sin(
+                            pathFraction * Mathf.PI);
+                        envelope *= envelope;
+                        float wave = Mathf.Sin(
+                            pathFraction * frequency *
+                                Mathf.PI * 2f + phase);
+                        position += normal *
+                            (amplitude * envelope * wave);
+                    }
+                }
+
+                if (pointIndex == 0)
+                {
+                    position = startGate;
+                }
+                else if (pointIndex == pointCount - 1)
+                {
+                    position = endGate;
+                }
+
+                if (pointIndex > 0)
+                {
+                    cumulativeLength += Vector2.Distance(
+                        previousPosition,
+                        position);
+                }
+                if (writePoints)
+                {
+                    connectorPathPointGpuData[
+                        slot.PointOffset + pointIndex] = new Vector4(
+                            position.x,
+                            position.y,
+                            cumulativeLength,
+                            0f);
+                }
+                previousPosition = position;
+            }
+
+            if (cumulativeLength <= 0.0001f)
+            {
+                return false;
+            }
+
+            pathLengthMetres = cumulativeLength;
+            if (!writePoints)
+            {
+                return true;
+            }
+
+            float inverseLength = 1f / cumulativeLength;
+            for (int pointIndex = 0;
+                 pointIndex < pointCount;
+                 pointIndex++)
+            {
+                int flattenedIndex = slot.PointOffset + pointIndex;
+                Vector4 point = connectorPathPointGpuData[flattenedIndex];
+                point.z = Mathf.Clamp01(point.z * inverseLength);
+                connectorPathPointGpuData[flattenedIndex] = point;
+            }
+
+            return true;
+        }
+
+        private void EnsureConnectorIdentityBuffers()
+        {
+            if (connectorIdentityBuffer == null)
+            {
+                connectorIdentityBuffer = new ComputeBuffer(
+                    Mathf.Max(1, connectorIdentityGpuData.Length),
+                    sizeof(float) * 4,
+                    ComputeBufferType.Structured);
+                if (connectorIdentityGpuData.Length == 0)
+                {
+                    connectorIdentityBuffer.SetData(
+                        new FoamConnectorIdentityData[1]);
+                }
+            }
+            if (connectorPathPointBuffer == null)
+            {
+                connectorPathPointBuffer = new ComputeBuffer(
+                    Mathf.Max(1, connectorPathPointGpuData.Length),
+                    sizeof(float) * 4,
+                    ComputeBufferType.Structured);
+                if (connectorPathPointGpuData.Length == 0)
+                {
+                    connectorPathPointBuffer.SetData(new Vector4[1]);
+                }
+            }
+            if (weakSpanIdentityBuffer == null)
+            {
+                weakSpanIdentityBuffer = new ComputeBuffer(
+                    Mathf.Max(1, weakSpanIdentityGpuData.Length),
+                    sizeof(float) * 12,
+                    ComputeBufferType.Structured);
+                if (weakSpanIdentityGpuData.Length == 0)
+                {
+                    weakSpanIdentityBuffer.SetData(
+                        new FoamWeakSpanIdentityData[1]);
+                }
+            }
+        }
+
+        private void ReleaseConnectorIdentityReconstructionResources()
+        {
+            connectorIdentityBuffer?.Release();
+            connectorIdentityBuffer = null;
+            connectorPathPointBuffer?.Release();
+            connectorPathPointBuffer = null;
+            weakSpanIdentityBuffer?.Release();
+            weakSpanIdentityBuffer = null;
+            connectorIdentityGpuData =
+                Array.Empty<FoamConnectorIdentityData>();
+            connectorPathPointGpuData = Array.Empty<Vector4>();
+            weakSpanIdentityGpuData =
+                Array.Empty<FoamWeakSpanIdentityData>();
+            connectorEvolutionSlots = Array.Empty<ConnectorEvolutionSlot>();
+            connectorRelationshipCandidates =
+                Array.Empty<ConnectorRelationshipCandidate>();
+            connectorCandidateClaimed = Array.Empty<bool>();
+            connectorMajorPairClaimed = Array.Empty<bool>();
+            connectorMajorDegree = Array.Empty<int>();
+            connectorEvolutionActiveCount = 0;
+            connectorEvolutionTemporaryAbsenceCount = 0;
+            connectorEvolutionIdentityPathCount = 0;
+            connectorEvolutionRecycleVariantCount = 0;
+            connectorEvolutionOriginalRelationshipCount = 0;
+            connectorEvolutionReplacementRelationshipCount = 0;
+            connectorEvolutionRelationshipRebindCount = 0;
+            connectorEvolutionVariantSwitchCount = 0;
+            connectorEvolutionStretchBreakCount = 0;
+            connectorEvolutionRetainDecisionCount = 0;
+            connectorEvolutionTurnoverRequestCount = 0;
+            connectorEvolutionSuccessfulTurnoverCount = 0;
+            connectorEvolutionNoAlternativeFallbackCount = 0;
+            connectorEvolutionAbsenceEventCount = 0;
+            connectorEvolutionReappearanceCount = 0;
+            weakSpanEvolutionActiveCount = 0;
+            connectorIdentityReconstructionReady = false;
+            weakSpanIdentityReconstructionReady = false;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            connectorIdentityParityGeneration++;
+            connectorIdentityParityPending = false;
+            connectorIdentityParityReadbackPending = false;
+            connectorIdentityParityAvailable = false;
+            connectorIdentityParityMeanDifference = 0f;
+            connectorIdentityParityMaximumDifference = 0f;
+            weakSpanIdentityParityGeneration++;
+            weakSpanIdentityParityPending = false;
+            weakSpanIdentityParityReadbackPending = false;
+            weakSpanIdentityParityAvailable = false;
+            weakSpanIdentityParityMeanDifference = 0f;
+            weakSpanIdentityParityMaximumDifference = 0f;
+#endif
+        }
+
         private static HostedNegativeEvolutionPose
             CreateIdentityHostedNegativePose()
         {
@@ -4023,6 +5819,7 @@ namespace ProgrammaticStylized3D.Rivers
         {
             ReleaseHostedNegativeEvolutionResources();
             ReleaseFreeWaterEvolutionResources();
+            ReleaseConnectorIdentityReconstructionResources();
             majorEvolutionBuffer?.Release();
             majorEvolutionBuffer = null;
             if (majorMaskTextureArray != null)
@@ -4153,18 +5950,15 @@ namespace ProgrammaticStylized3D.Rivers
                 majorEvolutionAccumulator %= tickInterval;
             }
 
-            bool rebuilt = false;
-            if (immediateRebuild || scheduledRebuild)
-            {
-                rebuilt = BuildEvolvingMajorField();
-            }
+            bool reconstructionRequired =
+                immediateRebuild || scheduledRebuild;
 
             majorEvolutionLastCpuMilliseconds =
                 (Time.realtimeSinceStartupAsDouble - startTime) * 1000.0;
             majorEvolutionLastAllocatedBytes = Math.Max(
                 0L,
                 GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
-            return rebuilt;
+            return reconstructionRequired;
         }
 
         private bool BeginMajorMove(
@@ -4387,12 +6181,7 @@ namespace ProgrammaticStylized3D.Rivers
                 freeWaterEvolutionAccumulator %= tickInterval;
             }
 
-            if (immediateRebuild || scheduledRebuild)
-            {
-                return BuildEvolvingMajorField();
-            }
-
-            return false;
+            return immediateRebuild || scheduledRebuild;
         }
 
         private bool BeginFreeWaterMove(ref FreeWaterEvolutionSlot slot)
@@ -5228,6 +7017,9 @@ namespace ProgrammaticStylized3D.Rivers
                 evolvingMajorTexture == null ||
                 evolvingHostedNegativeTexture == null ||
                 evolvingFreeWaterNegativeTexture == null ||
+                evolvingConnectorTexture == null ||
+                evolvingWeakSpanNegativeTexture == null ||
+                topologyGeneratedTexture == null ||
                 boundaryTexture == null ||
                 obstacleExclusionTexture == null ||
                 metricBuffer == null ||
@@ -5351,6 +7143,9 @@ namespace ProgrammaticStylized3D.Rivers
                     };
             }
 
+            UpdateConnectorEvolutionDescriptors(true);
+            EnsureConnectorIdentityBuffers();
+
             using (MajorEvolutionUploadProfilerMarker.Auto())
             {
                 majorEvolutionBuffer.SetData(majorEvolutionGpuData);
@@ -5370,6 +7165,13 @@ namespace ProgrammaticStylized3D.Rivers
                         0,
                         freeWaterEvolutionSlots.Length);
                 }
+                if (connectorIdentityReconstructionReady)
+                {
+                    connectorIdentityBuffer.SetData(
+                        connectorIdentityGpuData);
+                    connectorPathPointBuffer.SetData(
+                        connectorPathPointGpuData);
+                }
             }
 
             using (MajorEvolutionBuildProfilerMarker.Auto())
@@ -5384,6 +7186,16 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.SetInt(
                     "_FoamFreeWaterEvolutionCount",
                     freeWaterEvolutionSlots.Length);
+                computeShader.SetInt(
+                    "_FoamConnectorIdentityCount",
+                    connectorIdentityReconstructionReady
+                        ? connectorIdentityGpuData.Length
+                        : 0);
+                computeShader.SetInt(
+                    "_FoamWeakSpanIdentityCount",
+                    weakSpanIdentityReconstructionReady
+                        ? weakSpanIdentityGpuData.Length
+                        : 0);
                 computeShader.SetInts(
                     "_FoamMajorMaskDimensions",
                     majorMaskTextureArray.width,
@@ -5412,6 +7224,18 @@ namespace ProgrammaticStylized3D.Rivers
                     buildEvolvingMajorSupportKernel,
                     "_FoamFreeWaterEvolutionRecords",
                     freeWaterEvolutionBuffer);
+                computeShader.SetBuffer(
+                    buildEvolvingMajorSupportKernel,
+                    "_FoamConnectorIdentityRecords",
+                    connectorIdentityBuffer);
+                computeShader.SetBuffer(
+                    buildEvolvingMajorSupportKernel,
+                    "_FoamConnectorPathPoints",
+                    connectorPathPointBuffer);
+                computeShader.SetBuffer(
+                    buildEvolvingMajorSupportKernel,
+                    "_FoamWeakSpanIdentityRecords",
+                    weakSpanIdentityBuffer);
                 computeShader.SetTexture(
                     buildEvolvingMajorSupportKernel,
                     "_FoamMajorMasks",
@@ -5424,6 +7248,10 @@ namespace ProgrammaticStylized3D.Rivers
                     buildEvolvingMajorSupportKernel,
                     "_FoamFreeWaterNegativeMasks",
                     freeWaterNegativeMaskTextureArray);
+                computeShader.SetTexture(
+                    buildEvolvingMajorSupportKernel,
+                    "_FoamTopologyGeneratedRead",
+                    topologyGeneratedTexture);
                 computeShader.SetTexture(
                     buildEvolvingMajorSupportKernel,
                     "_FoamBoundary",
@@ -5444,6 +7272,14 @@ namespace ProgrammaticStylized3D.Rivers
                     buildEvolvingMajorSupportKernel,
                     "_FoamEvolvingFreeWaterNegativeWrite",
                     evolvingFreeWaterNegativeTexture);
+                computeShader.SetTexture(
+                    buildEvolvingMajorSupportKernel,
+                    "_FoamEvolvingConnectorWrite",
+                    evolvingConnectorTexture);
+                computeShader.SetTexture(
+                    buildEvolvingMajorSupportKernel,
+                    "_FoamEvolvingWeakSpanNegativeWrite",
+                    evolvingWeakSpanNegativeTexture);
                 Dispatch(
                     buildEvolvingMajorSupportKernel,
                     guidanceWidth,
@@ -5453,6 +7289,8 @@ namespace ProgrammaticStylized3D.Rivers
             majorEvolutionReconstructionTicks++;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             RequestHostedNegativeInitialParityIfNeeded();
+            RequestConnectorIdentityParityIfNeeded();
+            RequestWeakSpanIdentityParityIfNeeded();
 #endif
             return true;
         }
@@ -5538,6 +7376,160 @@ namespace ProgrammaticStylized3D.Rivers
                     hostedNegativeInitialParityMaximumDifference =
                         maximumDifference;
                     hostedNegativeInitialParityAvailable = true;
+                });
+        }
+
+        private void RequestConnectorIdentityParityIfNeeded()
+        {
+            // Identity parity is development-only proof that the retained
+            // Connector path records reconstruct the accepted static field.
+            if (!connectorIdentityParityPending ||
+                connectorIdentityParityReadbackPending ||
+                !IsTopologyDebugActive ||
+                !SystemInfo.supportsAsyncGPUReadback ||
+                evolvingConnectorTexture == null ||
+                connectorTopology == null)
+            {
+                return;
+            }
+
+            connectorIdentityParityPending = false;
+            connectorIdentityParityReadbackPending = true;
+            int generation = connectorIdentityParityGeneration;
+            StylizedRiverFoamConnectorTopology requestedTopology =
+                connectorTopology;
+            AsyncGPUReadback.Request(
+                evolvingConnectorTexture,
+                0,
+                TextureFormat.RFloat,
+                request =>
+                {
+                    if (this == null ||
+                        generation != connectorIdentityParityGeneration ||
+                        requestedTopology != connectorTopology)
+                    {
+                        return;
+                    }
+
+                    connectorIdentityParityReadbackPending = false;
+                    if (request.hasError)
+                    {
+                        connectorIdentityParityAvailable = false;
+                        return;
+                    }
+
+                    var data = request.GetData<float>();
+                    float[] expected = requestedTopology.SupportData;
+                    int count = Mathf.Min(data.Length, expected.Length);
+                    if (count <= 0)
+                    {
+                        connectorIdentityParityAvailable = false;
+                        return;
+                    }
+
+                    double totalDifference = 0.0;
+                    int relevantCount = 0;
+                    float maximumDifference = 0f;
+                    for (int index = 0; index < count; index++)
+                    {
+                        float reconstructed = Mathf.Clamp01(data[index]);
+                        float expectedValue = Mathf.Clamp01(expected[index]);
+                        float difference = Mathf.Abs(
+                            reconstructed - expectedValue);
+                        if (Mathf.Max(reconstructed, expectedValue) > 0.01f)
+                        {
+                            totalDifference += difference;
+                            relevantCount++;
+                        }
+                        maximumDifference = Mathf.Max(
+                            maximumDifference,
+                            difference);
+                    }
+
+                    connectorIdentityParityMeanDifference =
+                        relevantCount > 0
+                            ? (float)(totalDifference / relevantCount)
+                            : 0f;
+                    connectorIdentityParityMaximumDifference =
+                        maximumDifference;
+                    connectorIdentityParityAvailable = true;
+                });
+        }
+
+        private void RequestWeakSpanIdentityParityIfNeeded()
+        {
+            // Weak-Span identity parity remains debug-only. Normal gameplay
+            // never reads the reconstructed pressure field back.
+            if (!weakSpanIdentityParityPending ||
+                weakSpanIdentityParityReadbackPending ||
+                !IsTopologyDebugActive ||
+                !SystemInfo.supportsAsyncGPUReadback ||
+                evolvingWeakSpanNegativeTexture == null ||
+                pocketTopology == null)
+            {
+                return;
+            }
+
+            weakSpanIdentityParityPending = false;
+            weakSpanIdentityParityReadbackPending = true;
+            int generation = weakSpanIdentityParityGeneration;
+            StylizedRiverFoamPocketTopology requestedTopology = pocketTopology;
+            AsyncGPUReadback.Request(
+                evolvingWeakSpanNegativeTexture,
+                0,
+                TextureFormat.RFloat,
+                request =>
+                {
+                    if (this == null ||
+                        generation != weakSpanIdentityParityGeneration ||
+                        requestedTopology != pocketTopology)
+                    {
+                        return;
+                    }
+
+                    weakSpanIdentityParityReadbackPending = false;
+                    if (request.hasError)
+                    {
+                        weakSpanIdentityParityAvailable = false;
+                        return;
+                    }
+
+                    var data = request.GetData<float>();
+                    float[] expected =
+                        requestedTopology.StaticIndependentPressureData;
+                    int count = Mathf.Min(data.Length, expected.Length);
+                    if (count <= 0)
+                    {
+                        weakSpanIdentityParityAvailable = false;
+                        return;
+                    }
+
+                    double totalDifference = 0.0;
+                    int relevantCount = 0;
+                    float maximumDifference = 0f;
+                    for (int index = 0; index < count; index++)
+                    {
+                        float reconstructed = Mathf.Clamp01(data[index]);
+                        float expectedValue = Mathf.Clamp01(expected[index]);
+                        float difference = Mathf.Abs(
+                            reconstructed - expectedValue);
+                        if (Mathf.Max(reconstructed, expectedValue) > 0.01f)
+                        {
+                            totalDifference += difference;
+                            relevantCount++;
+                        }
+                        maximumDifference = Mathf.Max(
+                            maximumDifference,
+                            difference);
+                    }
+
+                    weakSpanIdentityParityMeanDifference =
+                        relevantCount > 0
+                            ? (float)(totalDifference / relevantCount)
+                            : 0f;
+                    weakSpanIdentityParityMaximumDifference =
+                        maximumDifference;
+                    weakSpanIdentityParityAvailable = true;
                 });
         }
 #endif
@@ -5716,6 +7708,15 @@ namespace ProgrammaticStylized3D.Rivers
             value *= 0x846CA68Bu;
             value ^= value >> 16;
             return value;
+        }
+
+        private static float HashConnectorIdentity(
+            uint stableId,
+            uint stream)
+        {
+            return (EvolutionMixBits(
+                stableId ^ EvolutionMixBits(stream + 0xC2B2AE35u)) &
+                0x00FFFFFFu) / 16777216f;
         }
 
         private static float WrapMajorAngle(float angle)
@@ -5918,6 +7919,8 @@ namespace ProgrammaticStylized3D.Rivers
                 evolvingMajorTexture == null ||
                 evolvingHostedNegativeTexture == null ||
                 evolvingFreeWaterNegativeTexture == null ||
+                evolvingConnectorTexture == null ||
+                evolvingWeakSpanNegativeTexture == null ||
                 currentShoreEdgesTexture == null ||
                 obstacleExclusionTexture == null ||
                 boundaryTexture == null || metricBuffer == null ||
@@ -6014,6 +8017,12 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.SetFloat(
                     "_FoamFreeWaterNegativeEvolutionEnabled",
                     freeWaterEvolutionReady ? 1f : 0f);
+                computeShader.SetFloat(
+                    "_FoamConnectorIdentityReconstructionEnabled",
+                    connectorIdentityReconstructionReady ? 1f : 0f);
+                computeShader.SetFloat(
+                    "_FoamWeakSpanIdentityReconstructionEnabled",
+                    weakSpanIdentityReconstructionReady ? 1f : 0f);
                 computeShader.SetTexture(
                     composeTopologyKernel,
                     "_FoamEvolvingMajorRead",
@@ -6026,6 +8035,14 @@ namespace ProgrammaticStylized3D.Rivers
                     composeTopologyKernel,
                     "_FoamEvolvingFreeWaterNegativeRead",
                     evolvingFreeWaterNegativeTexture);
+                computeShader.SetTexture(
+                    composeTopologyKernel,
+                    "_FoamEvolvingConnectorRead",
+                    evolvingConnectorTexture);
+                computeShader.SetTexture(
+                    composeTopologyKernel,
+                    "_FoamEvolvingWeakSpanNegativeRead",
+                    evolvingWeakSpanNegativeTexture);
                 computeShader.SetTexture(
                     composeTopologyKernel,
                     "_FoamStaticWakeField",
@@ -6767,6 +8784,8 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseTexture(ref evolvingMajorTexture);
             ReleaseTexture(ref evolvingHostedNegativeTexture);
             ReleaseTexture(ref evolvingFreeWaterNegativeTexture);
+            ReleaseTexture(ref evolvingConnectorTexture);
+            ReleaseTexture(ref evolvingWeakSpanNegativeTexture);
             ReleaseTexture(ref currentShoreEdgesTexture);
             ReleaseTexture(ref obstacleExclusionTexture);
             ReleaseTexture(ref fractureA);

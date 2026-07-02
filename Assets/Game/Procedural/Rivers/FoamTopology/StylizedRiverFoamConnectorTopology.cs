@@ -185,9 +185,10 @@ namespace ProgrammaticStylized3D.Rivers
     /// <summary>
     /// Immutable prepared metric polyline for one accepted Connector
     /// relationship. The original accepted points remain authoritative for the
-    /// current static raster. Patch 4.7C.1 additionally retains a bounded runtime
-    /// polyline, normalized cumulative arc length, individual endpoint ownership,
-    /// and bounded recycle-anchor alternatives without enabling movement yet.
+    /// accepted static raster. Patch 4.7C.1 retains the bounded runtime
+    /// polyline, normalized cumulative arc length, and individual endpoint
+    /// ownership. Patch 4.7C.3.1 retains the complete bounded recycle-anchor
+    /// state matrix needed for direct runtime lookup.
     /// </summary>
     public sealed class StylizedRiverFoamConnectorPath
     {
@@ -195,6 +196,8 @@ namespace ProgrammaticStylized3D.Rivers
         private readonly Vector2[] preparedMetricPoints;
         private readonly float[] normalizedCumulativeLength;
         private readonly StylizedRiverFoamConnectorPathVariant[] pathVariants;
+        private readonly int startRecycleAnchorCount;
+        private readonly int endRecycleAnchorCount;
 
         internal StylizedRiverFoamConnectorPath(
             uint stableId,
@@ -203,6 +206,8 @@ namespace ProgrammaticStylized3D.Rivers
             float[] normalizedCumulativeLength,
             StylizedRiverFoamConnectorEndpointBinding startEndpointBinding,
             StylizedRiverFoamConnectorEndpointBinding endEndpointBinding,
+            int startRecycleAnchorCount,
+            int endRecycleAnchorCount,
             StylizedRiverFoamConnectorPathVariant[] pathVariants)
         {
             StableId = stableId;
@@ -217,6 +222,12 @@ namespace ProgrammaticStylized3D.Rivers
                 : Array.Empty<float>();
             StartEndpointBinding = startEndpointBinding;
             EndEndpointBinding = endEndpointBinding;
+            this.startRecycleAnchorCount = Mathf.Max(
+                0,
+                startRecycleAnchorCount);
+            this.endRecycleAnchorCount = Mathf.Max(
+                0,
+                endRecycleAnchorCount);
             this.pathVariants = pathVariants != null
                 ? (StylizedRiverFoamConnectorPathVariant[])pathVariants.Clone()
                 : Array.Empty<StylizedRiverFoamConnectorPathVariant>();
@@ -239,19 +250,73 @@ namespace ProgrammaticStylized3D.Rivers
             normalizedCumulativeLength;
         internal IReadOnlyList<StylizedRiverFoamConnectorPathVariant>
             PathVariants => pathVariants;
+        internal int StartRecycleAnchorCount => startRecycleAnchorCount;
+        internal int EndRecycleAnchorCount => endRecycleAnchorCount;
+
+        internal bool TryResolvePreparedPath(
+            int startAnchorIndex,
+            int endAnchorIndex,
+            out Vector2[] points,
+            out float[] cumulativeLength)
+        {
+            points = null;
+            cumulativeLength = null;
+            if (startAnchorIndex < -1 ||
+                startAnchorIndex >= startRecycleAnchorCount ||
+                endAnchorIndex < -1 ||
+                endAnchorIndex >= endRecycleAnchorCount)
+            {
+                return false;
+            }
+
+            if (startAnchorIndex < 0 && endAnchorIndex < 0)
+            {
+                points = preparedMetricPoints;
+                cumulativeLength = normalizedCumulativeLength;
+                return points.Length >= 2 &&
+                    cumulativeLength.Length == points.Length;
+            }
+
+            int endStateCount = endRecycleAnchorCount + 1;
+            int flatStateIndex =
+                (startAnchorIndex + 1) * endStateCount +
+                (endAnchorIndex + 1);
+            int variantIndex = flatStateIndex - 1;
+            if (variantIndex < 0 || variantIndex >= pathVariants.Length)
+            {
+                return false;
+            }
+
+            StylizedRiverFoamConnectorPathVariant variant =
+                pathVariants[variantIndex];
+            if (variant.StartAnchorIndex != startAnchorIndex ||
+                variant.EndAnchorIndex != endAnchorIndex ||
+                !variant.IsAvailable)
+            {
+                return false;
+            }
+
+            points = variant.MetricPointData;
+            cumulativeLength = variant.NormalizedCumulativeLengthData;
+            return points.Length >= 2 &&
+                cumulativeLength.Length == points.Length;
+        }
     }
 
     /// <summary>
     /// Immutable result of one deterministic prepared Connector Support build.
     /// The result contains the accepted scalar field, stable relationship
-    /// metadata, and concise preparation diagnostics. Patch 4.7C.1 does not
-    /// change the authoritative static raster or enable Connector movement.
+    /// metadata, the bounded prepared replacement-relationship catalogue, and
+    /// concise preparation diagnostics. Runtime evolution consumes only this
+    /// immutable data and performs no pathfinding or geometry validation.
     /// </summary>
     public sealed class StylizedRiverFoamConnectorTopology
     {
         private readonly float[] support;
         private readonly StylizedRiverFoamConnectorRelationship[] relationships;
         private readonly StylizedRiverFoamConnectorPath[] paths;
+        private readonly StylizedRiverFoamConnectorPath[]
+            relationshipCataloguePaths;
         private readonly int[] rejectionCounts;
 
         internal StylizedRiverFoamConnectorTopology(
@@ -262,9 +327,11 @@ namespace ProgrammaticStylized3D.Rivers
             int acceptedConnectorCount,
             int coveredCellCount,
             double generationMilliseconds,
+            int runtimeMaximumMajorDegree,
             float[] support,
             StylizedRiverFoamConnectorRelationship[] relationships,
             StylizedRiverFoamConnectorPath[] paths,
+            StylizedRiverFoamConnectorPath[] relationshipCataloguePaths,
             int[] rejectionCounts)
         {
             Width = Mathf.Max(0, width);
@@ -274,11 +341,17 @@ namespace ProgrammaticStylized3D.Rivers
             AcceptedConnectorCount = Mathf.Max(0, acceptedConnectorCount);
             CoveredCellCount = Mathf.Max(0, coveredCellCount);
             GenerationMilliseconds = Math.Max(0.0, generationMilliseconds);
+            RuntimeMaximumMajorDegree = Mathf.Clamp(
+                runtimeMaximumMajorDegree,
+                1,
+                3);
             this.support = support ?? Array.Empty<float>();
             this.relationships = relationships ??
                 Array.Empty<StylizedRiverFoamConnectorRelationship>();
             this.paths = paths ??
                 Array.Empty<StylizedRiverFoamConnectorPath>();
+            this.relationshipCataloguePaths = relationshipCataloguePaths ??
+                this.paths;
             this.rejectionCounts = rejectionCounts ??
                 new int[Enum.GetValues(
                     typeof(StylizedRiverFoamConnectorRejectionReason)).Length];
@@ -328,11 +401,58 @@ namespace ProgrammaticStylized3D.Rivers
                 }
             }
 
+            int preparedCatalogueCount = 0;
+            int cataloguePathPointCount = 0;
+            int catalogueAvailableVariantCount = 0;
+            int catalogueUnavailableVariantCount = 0;
+            for (int pathIndex = 0;
+                 pathIndex < this.relationshipCataloguePaths.Length;
+                 pathIndex++)
+            {
+                StylizedRiverFoamConnectorPath path =
+                    this.relationshipCataloguePaths[pathIndex];
+                if (path == null || !path.PreparationAvailable)
+                {
+                    continue;
+                }
+
+                preparedCatalogueCount++;
+                cataloguePathPointCount +=
+                    path.PreparedMetricPointData.Length;
+                IReadOnlyList<StylizedRiverFoamConnectorPathVariant> variants =
+                    path.PathVariants;
+                for (int variantIndex = 0;
+                     variantIndex < variants.Count;
+                     variantIndex++)
+                {
+                    if (variants[variantIndex].IsAvailable)
+                    {
+                        catalogueAvailableVariantCount++;
+                    }
+                    else
+                    {
+                        catalogueUnavailableVariantCount++;
+                    }
+                }
+            }
+
             PreparedConnectorCount = preparedConnectorCount;
             PreparedEndpointCount = preparedEndpointCount;
             PreparedPathPointCount = preparedPathPointCount;
             PreparedPathVariantCount = availableVariantCount;
             UnavailablePathVariantCount = unavailableVariantCount;
+            PreparedRelationshipCatalogueCount = preparedCatalogueCount;
+            PreparedReplacementRelationshipCount = Mathf.Max(
+                0,
+                preparedCatalogueCount - preparedConnectorCount);
+            PreparedRelationshipCataloguePathPointCount =
+                cataloguePathPointCount;
+            PreparedReplacementPathVariantCount = Mathf.Max(
+                0,
+                catalogueAvailableVariantCount - availableVariantCount);
+            UnavailableReplacementPathVariantCount = Mathf.Max(
+                0,
+                catalogueUnavailableVariantCount - unavailableVariantCount);
         }
 
         public int Width { get; }
@@ -341,6 +461,7 @@ namespace ProgrammaticStylized3D.Rivers
         public int PathAttemptCount { get; }
         public int AcceptedConnectorCount { get; }
         public int CoveredCellCount { get; }
+        public int RuntimeMaximumMajorDegree { get; }
         public int PreparedConnectorCount { get; }
         public int UnavailableConnectorCount => Mathf.Max(
             0,
@@ -352,6 +473,11 @@ namespace ProgrammaticStylized3D.Rivers
         public int PreparedPathPointCount { get; }
         public int PreparedPathVariantCount { get; }
         public int UnavailablePathVariantCount { get; }
+        public int PreparedRelationshipCatalogueCount { get; }
+        public int PreparedReplacementRelationshipCount { get; }
+        public int PreparedRelationshipCataloguePathPointCount { get; }
+        public int PreparedReplacementPathVariantCount { get; }
+        public int UnavailableReplacementPathVariantCount { get; }
         public double GenerationMilliseconds { get; }
         public IReadOnlyList<StylizedRiverFoamConnectorRelationship>
             Relationships => relationships;
@@ -363,6 +489,8 @@ namespace ProgrammaticStylized3D.Rivers
         // inferring relationship geometry from the flattened support field.
         internal IReadOnlyList<StylizedRiverFoamConnectorPath> PreparedPaths =>
             paths;
+        internal IReadOnlyList<StylizedRiverFoamConnectorPath>
+            PreparedRelationshipCataloguePaths => relationshipCataloguePaths;
 
         // The accepted scalar field remains immutable by convention and is
         // exposed only inside prepared topology assembly so Pocket generation
@@ -427,7 +555,9 @@ namespace ProgrammaticStylized3D.Rivers
             return builder.ToString();
         }
 
-        internal void AddToUploadPixels(Color[] destination)
+        internal void AddToUploadPixels(
+            Color[] destination,
+            bool identityReconstructionAvailable)
         {
             int cellCount = Width * Height;
             if (destination == null || destination.Length < cellCount)
@@ -440,7 +570,13 @@ namespace ProgrammaticStylized3D.Rivers
             for (int index = 0; index < cellCount; index++)
             {
                 Color value = destination[index];
-                value.g = Mathf.Clamp01(support[index]);
+                // Patch 4.7C.2 removes the static Connector channel only after
+                // every accepted relationship has a complete prepared identity
+                // reconstruction. Otherwise the accepted static field remains
+                // authoritative without partial loss.
+                value.g = identityReconstructionAvailable
+                    ? 0f
+                    : Mathf.Clamp01(support[index]);
                 destination[index] = value;
             }
         }

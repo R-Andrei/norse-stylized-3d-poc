@@ -90,7 +90,24 @@ struct FoamFreeWaterEvolutionData
     float4 morph;
 };
 
+struct FoamConnectorIdentityData
+{
+    // x = first flattened path point, y = point count,
+    // z = outer radius, w = core radius.
+    float4 pointRangeAndRadii;
+};
 
+struct FoamWeakSpanIdentityData
+{
+    // x = Connector record index, y = normalized path distance,
+    // z/w = gate-safe normalized interval.
+    float4 connectorAndPath;
+    // x/y = physical along/across radii, z = pressure strength,
+    // w = accepted identity orientation.
+    float4 shape;
+    // x = deterministic irregular-boundary noise seed.
+    uint4 noiseAndFlags;
+};
 
 // Shared Stage 6 material state:
 // R = persistent Amount
@@ -114,6 +131,10 @@ Texture2D<float> _FoamEvolvingHostedNegativeRead;
 RWTexture2D<float> _FoamEvolvingHostedNegativeWrite;
 Texture2D<float> _FoamEvolvingFreeWaterNegativeRead;
 RWTexture2D<float> _FoamEvolvingFreeWaterNegativeWrite;
+Texture2D<float> _FoamEvolvingConnectorRead;
+RWTexture2D<float> _FoamEvolvingConnectorWrite;
+Texture2D<float> _FoamEvolvingWeakSpanNegativeRead;
+RWTexture2D<float> _FoamEvolvingWeakSpanNegativeWrite;
 Texture2DArray<float4> _FoamMajorMasks;
 Texture2DArray<float4> _FoamHostedNegativeMasks;
 Texture2DArray<float4> _FoamFreeWaterNegativeMasks;
@@ -137,6 +158,11 @@ StructuredBuffer<FoamHostedNegativeEvolutionData>
     _FoamHostedNegativeEvolutionRecords;
 StructuredBuffer<FoamFreeWaterEvolutionData>
     _FoamFreeWaterEvolutionRecords;
+StructuredBuffer<FoamConnectorIdentityData>
+    _FoamConnectorIdentityRecords;
+StructuredBuffer<float4> _FoamConnectorPathPoints;
+StructuredBuffer<FoamWeakSpanIdentityData>
+    _FoamWeakSpanIdentityRecords;
 
 // Per chunk, two uint4 records are stored in one raw buffer:
 // record 0: x = quantised Amount sum, y = visible-cell count,
@@ -176,6 +202,8 @@ int _FoamObstacleCellCount;
 int _FoamMajorEvolutionCount;
 int _FoamHostedNegativeEvolutionCount;
 int _FoamFreeWaterEvolutionCount;
+int _FoamConnectorIdentityCount;
+int _FoamWeakSpanIdentityCount;
 int _FoamResolutionPerChunk;
 int _FoamChunkCount;
 float _FoamDeltaTime;
@@ -226,6 +254,8 @@ float _FoamShoreCaptureFadeWidth;
 float _FoamMajorEvolutionEnabled;
 float _FoamHostedNegativeEvolutionEnabled;
 float _FoamFreeWaterNegativeEvolutionEnabled;
+float _FoamConnectorIdentityReconstructionEnabled;
+float _FoamWeakSpanIdentityReconstructionEnabled;
 
 float _FoamInjectionGlobalDistance;
 float _FoamInjectionAcrossNormalized;
@@ -1760,6 +1790,286 @@ bool ResolveMajorCandidatePosition(
     return true;
 }
 
+float FoamUnitySmoothStep(float fromValue, float toValue, float t)
+{
+    t = saturate(t);
+    t = t * t * (3.0 - 2.0 * t);
+    return lerp(fromValue, toValue, t);
+}
+
+float FoamEdgeSmoothStep(float edge0, float edge1, float value)
+{
+    if (edge1 <= edge0 + 0.000001)
+    {
+        return value >= edge1 ? 1.0 : 0.0;
+    }
+
+    float t = saturate((value - edge0) / (edge1 - edge0));
+    return t * t * (3.0 - 2.0 * t);
+}
+
+float FoamDistancePointToSegment(
+    float2 samplePosition,
+    float2 segmentStart,
+    float2 segmentEnd)
+{
+    float2 segment = segmentEnd - segmentStart;
+    float denominator = dot(segment, segment);
+    if (denominator <= 0.000001)
+    {
+        return length(samplePosition - segmentStart);
+    }
+
+    float t = saturate(
+        dot(samplePosition - segmentStart, segment) / denominator);
+    return length(samplePosition - (segmentStart + segment * t));
+}
+
+uint FoamIdentityMixBits(uint value)
+{
+    value ^= value >> 16;
+    value *= 0x7FEB352Du;
+    value ^= value >> 15;
+    value *= 0x846CA68Bu;
+    value ^= value >> 16;
+    return value;
+}
+
+float FoamPocketHash01(uint value, uint salt)
+{
+    uint mixed = FoamIdentityMixBits(value ^ salt * 0x9E3779B9u);
+    return (float)(mixed & 0x00FFFFFFu) / 16777215.0;
+}
+
+float FoamWeakSpanHashLattice(int x, int y, uint seed)
+{
+    uint value = seed ^
+        (uint)x * 0x8DA6B343u ^
+        (uint)y * 0xD8163841u;
+    return FoamPocketHash01(
+        FoamIdentityMixBits(value),
+        0xCB1AB31Fu);
+}
+
+float FoamWeakSpanValueNoise(float2 position, uint seed)
+{
+    int2 baseCell = (int2)floor(position);
+    float2 fraction = position - (float2)baseCell;
+    fraction = saturate(fraction);
+    fraction = fraction * fraction * (3.0 - 2.0 * fraction);
+    float a = FoamWeakSpanHashLattice(baseCell.x, baseCell.y, seed);
+    float b = FoamWeakSpanHashLattice(baseCell.x + 1, baseCell.y, seed);
+    float c = FoamWeakSpanHashLattice(baseCell.x, baseCell.y + 1, seed);
+    float d = FoamWeakSpanHashLattice(
+        baseCell.x + 1,
+        baseCell.y + 1,
+        seed);
+    return lerp(lerp(a, b, fraction.x), lerp(c, d, fraction.x), fraction.y);
+}
+
+float EvaluateConnectorIdentitySupport(
+    float2 metricPosition,
+    float currentMajorSupport)
+{
+    float support = 0.0;
+    [loop]
+    for (int connectorIndex = 0;
+         connectorIndex < _FoamConnectorIdentityCount;
+         connectorIndex++)
+    {
+        FoamConnectorIdentityData connector =
+            _FoamConnectorIdentityRecords[connectorIndex];
+        int pointOffset = max(
+            0,
+            (int)round(connector.pointRangeAndRadii.x));
+        int pointCount = max(
+            0,
+            (int)round(connector.pointRangeAndRadii.y));
+        if (pointCount < 2)
+        {
+            continue;
+        }
+
+        float minimumDistance = 1.0e20;
+        [loop]
+        for (int pointIndex = 1;
+             pointIndex < pointCount;
+             pointIndex++)
+        {
+            float2 segmentStart = _FoamConnectorPathPoints[
+                pointOffset + pointIndex - 1].xy;
+            float2 segmentEnd = _FoamConnectorPathPoints[
+                pointOffset + pointIndex].xy;
+            minimumDistance = min(
+                minimumDistance,
+                FoamDistancePointToSegment(
+                    metricPosition,
+                    segmentStart,
+                    segmentEnd));
+        }
+
+        float outerRadius = max(0.0001, connector.pointRangeAndRadii.z);
+        if (minimumDistance > outerRadius || currentMajorSupport >= 0.42)
+        {
+            continue;
+        }
+
+        // Preserve the accepted CPU raster exactly. Unity's Mathf.SmoothStep
+        // treats the distance as interpolation t; it is not an edge-based
+        // smoothstep call.
+        float coreRadius = connector.pointRangeAndRadii.w;
+        float value = 1.0 - FoamUnitySmoothStep(
+            coreRadius,
+            outerRadius,
+            minimumDistance);
+        float majorSuppression = 1.0 - FoamUnitySmoothStep(
+            0.16,
+            0.42,
+            saturate(currentMajorSupport));
+        support = max(support, value * majorSuppression);
+    }
+
+    return saturate(support);
+}
+
+bool SampleConnectorIdentityPath(
+    int connectorIndex,
+    float normalizedDistance,
+    float fallbackOrientation,
+    out float2 position,
+    out float2 tangent)
+{
+    position = 0.0.xx;
+    tangent = float2(cos(fallbackOrientation), sin(fallbackOrientation));
+    if (connectorIndex < 0 ||
+        connectorIndex >= _FoamConnectorIdentityCount)
+    {
+        return false;
+    }
+
+    FoamConnectorIdentityData connector =
+        _FoamConnectorIdentityRecords[connectorIndex];
+    int pointOffset = max(
+        0,
+        (int)round(connector.pointRangeAndRadii.x));
+    int pointCount = max(
+        0,
+        (int)round(connector.pointRangeAndRadii.y));
+    if (pointCount < 2)
+    {
+        return false;
+    }
+
+    float target = saturate(normalizedDistance);
+    float4 firstPoint = _FoamConnectorPathPoints[pointOffset];
+    position = firstPoint.xy;
+    [loop]
+    for (int pointIndex = 1;
+         pointIndex < pointCount;
+         pointIndex++)
+    {
+        float4 segmentStart = _FoamConnectorPathPoints[
+            pointOffset + pointIndex - 1];
+        float4 segmentEnd = _FoamConnectorPathPoints[
+            pointOffset + pointIndex];
+        float startDistance = saturate(segmentStart.z);
+        float endDistance = saturate(segmentEnd.z);
+        float2 segment = segmentEnd.xy - segmentStart.xy;
+        float segmentLength = length(segment);
+        if (segmentLength <= 0.0001)
+        {
+            continue;
+        }
+        if (target > endDistance && pointIndex < pointCount - 1)
+        {
+            continue;
+        }
+
+        float segmentRange = max(0.000001, endDistance - startDistance);
+        float t = saturate((target - startDistance) / segmentRange);
+        position = lerp(segmentStart.xy, segmentEnd.xy, t);
+        tangent = segment / segmentLength;
+        return true;
+    }
+
+    return false;
+}
+
+float EvaluateWeakSpanIdentityPressure(
+    float2 metricPosition,
+    float currentMajorSupport,
+    float connectorSupport)
+{
+    if (currentMajorSupport >= 0.30 || connectorSupport < 0.045)
+    {
+        return 0.0;
+    }
+
+    float pressure = 0.0;
+    [loop]
+    for (int weakSpanIndex = 0;
+         weakSpanIndex < _FoamWeakSpanIdentityCount;
+         weakSpanIndex++)
+    {
+        FoamWeakSpanIdentityData weakSpan =
+            _FoamWeakSpanIdentityRecords[weakSpanIndex];
+        int connectorIndex = (int)round(weakSpan.connectorAndPath.x);
+        float normalizedDistance = clamp(
+            weakSpan.connectorAndPath.y,
+            weakSpan.connectorAndPath.z,
+            weakSpan.connectorAndPath.w);
+        float2 centre;
+        float2 pathTangent;
+        if (!SampleConnectorIdentityPath(
+                connectorIndex,
+                normalizedDistance,
+                weakSpan.shape.w,
+                centre,
+                pathTangent))
+        {
+            continue;
+        }
+
+        // Patch 4.7C.3 follows the current deformed Connector tangent. The
+        // accepted orientation remains only the sampling fallback when a path
+        // segment is degenerate.
+        float2 tangent = pathTangent;
+        float2 normal = float2(-tangent.y, tangent.x);
+        float2 delta = metricPosition - centre;
+        float along = dot(delta, tangent) /
+            max(0.0001, weakSpan.shape.x);
+        float across = dot(delta, normal) /
+            max(0.0001, weakSpan.shape.y);
+        float radial = sqrt(along * along + across * across);
+        if (radial >= 1.0)
+        {
+            continue;
+        }
+
+        float noise = FoamWeakSpanValueNoise(
+            metricPosition * 4.2,
+            weakSpan.noiseAndFlags.x);
+        radial += (noise - 0.5) * 0.16;
+        float envelope = 1.0 - FoamEdgeSmoothStep(0.54, 1.0, radial);
+        float connectorMask = FoamEdgeSmoothStep(
+            0.045,
+            0.20,
+            connectorSupport);
+        float majorProtection = 1.0 - FoamEdgeSmoothStep(
+            0.10,
+            0.30,
+            currentMajorSupport);
+        float value =
+            envelope * weakSpan.shape.z * connectorMask * majorProtection;
+        if (value > 0.0001)
+        {
+            pressure = max(pressure, value);
+        }
+    }
+
+    return saturate(pressure);
+}
+
 [numthreads(8, 8, 1)]
 void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
 {
@@ -1776,6 +2086,8 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
         _FoamEvolvingMajorWrite[outputCoordinate] = 0.0;
         _FoamEvolvingHostedNegativeWrite[outputCoordinate] = 0.0;
         _FoamEvolvingFreeWaterNegativeWrite[outputCoordinate] = 0.0;
+        _FoamEvolvingConnectorWrite[outputCoordinate] = 0.0;
+        _FoamEvolvingWeakSpanNegativeWrite[outputCoordinate] = 0.0;
         return;
     }
 
@@ -1792,6 +2104,8 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
         _FoamEvolvingMajorWrite[outputCoordinate] = 0.0;
         _FoamEvolvingHostedNegativeWrite[outputCoordinate] = 0.0;
         _FoamEvolvingFreeWaterNegativeWrite[outputCoordinate] = 0.0;
+        _FoamEvolvingConnectorWrite[outputCoordinate] = 0.0;
+        _FoamEvolvingWeakSpanNegativeWrite[outputCoordinate] = 0.0;
         return;
     }
 
@@ -1807,6 +2121,11 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
     float support = 0.0;
     float hostedNegative = 0.0;
     float freeWaterNegative = 0.0;
+    float connectorSupport = 0.0;
+    float weakSpanNegative = 0.0;
+    float2 metricPosition = float2(localDistance, lateralMetres);
+    bool identityCellValid =
+        fluidCoverage > 0.001 && obstacle < 0.5;
 
     [loop]
     for (int regionIndex = 0;
@@ -1935,6 +2254,20 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
             pressure * freeWaterRecord.maskAndStrength.w);
     }
 
+    if (identityCellValid && _FoamConnectorIdentityCount > 0)
+    {
+        connectorSupport = EvaluateConnectorIdentitySupport(
+            metricPosition,
+            support);
+    }
+    if (identityCellValid && _FoamWeakSpanIdentityCount > 0)
+    {
+        weakSpanNegative = EvaluateWeakSpanIdentityPressure(
+            metricPosition,
+            support,
+            connectorSupport);
+    }
+
     float validMask = fluidCoverage * (1.0 - obstacle);
     _FoamEvolvingMajorWrite[outputCoordinate] = saturate(
         support * validMask);
@@ -1942,6 +2275,10 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
         hostedNegative * validMask);
     _FoamEvolvingFreeWaterNegativeWrite[outputCoordinate] = saturate(
         freeWaterNegative * validMask);
+    _FoamEvolvingConnectorWrite[outputCoordinate] = saturate(
+        connectorSupport);
+    _FoamEvolvingWeakSpanNegativeWrite[outputCoordinate] = saturate(
+        weakSpanNegative);
 }
 
 [numthreads(8, 8, 1)]
@@ -1979,8 +2316,9 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
     float4 generatedWork = _FoamTopologyGeneratedRead.Load(
         int3(outputCoordinate, 0));
 
-    // Generated input keeps static Connector Support and independent negative
-    // classes. Alpha is the complete static hosted field when host-relative
+    // Generated input keeps complete-only static fallbacks for Connector
+    // Support and independent negative classes. Alpha is the complete static
+    // hosted field when host-relative
     // evolution is unavailable; otherwise it contains only accepted hosted
     // regions that could not be prepared for evolution.
     float evolvingMajorSupport = _FoamEvolvingMajorRead.Load(
@@ -1989,14 +2327,27 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
         generatedWork.r,
         evolvingMajorSupport,
         saturate(_FoamMajorEvolutionEnabled));
-    float connectorSupport = generatedWork.g;
+    float evolvingConnectorSupport = _FoamEvolvingConnectorRead.Load(
+        int3(outputCoordinate, 0));
+    float connectorSupport = lerp(
+        generatedWork.g,
+        evolvingConnectorSupport,
+        saturate(_FoamConnectorIdentityReconstructionEnabled));
     float evolvingFreeWaterAgingPressure =
         _FoamEvolvingFreeWaterNegativeRead.Load(
             int3(outputCoordinate, 0));
-    float independentAgingPressure = lerp(
-        generatedWork.b,
-        max(generatedWork.b, evolvingFreeWaterAgingPressure),
+    float evolvingWeakSpanAgingPressure =
+        _FoamEvolvingWeakSpanNegativeRead.Load(
+            int3(outputCoordinate, 0));
+    float independentAgingPressure = generatedWork.b;
+    independentAgingPressure = lerp(
+        independentAgingPressure,
+        max(independentAgingPressure, evolvingFreeWaterAgingPressure),
         saturate(_FoamFreeWaterNegativeEvolutionEnabled));
+    independentAgingPressure = lerp(
+        independentAgingPressure,
+        max(independentAgingPressure, evolvingWeakSpanAgingPressure),
+        saturate(_FoamWeakSpanIdentityReconstructionEnabled));
     float staticHostedAgingPressure = generatedWork.a;
     float evolvingHostedAgingPressure =
         _FoamEvolvingHostedNegativeRead.Load(

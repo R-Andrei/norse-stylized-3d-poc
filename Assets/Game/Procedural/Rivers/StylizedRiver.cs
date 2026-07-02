@@ -705,6 +705,10 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamConnectorLengthPreference = 0.5f;
 
+        [Tooltip("Maximum live Connector stretch relative to the length captured when its current relationship or recycle variant becomes active. A value of 1.45 permits 45% growth before the Connector breaks and attempts an immediate prepared relationship turnover.")]
+        [Range(1.1f, 2f)]
+        [SerializeField] private float foamConnectorBreakStretchRatio = 1.45f;
+
         [Tooltip("Controls the nested deterministic population of closed Interior Pocket negative regions hosted inside broad Major Support. Zero disables Interior Pockets, 0.5 preserves approximately the accepted Patch 4 population, and one activates additional bounded opportunities without reshuffling earlier identities.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamInteriorPocketAmount = 0.5f;
@@ -1172,6 +1176,8 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamConnectorDirectness);
         public float FoamConnectorLengthPreference =>
             Mathf.Clamp01(foamConnectorLengthPreference);
+        public float FoamConnectorBreakStretchRatio =>
+            Mathf.Clamp(foamConnectorBreakStretchRatio, 1.1f, 2f);
         public float FoamInteriorPocketAmount =>
             Mathf.Clamp01(foamInteriorPocketAmount);
         public float FoamEdgeCavityAmount =>
@@ -2819,6 +2825,10 @@ namespace ProgrammaticStylized3D.Rivers
                 foamConnectorDirectness);
             foamConnectorLengthPreference = Mathf.Clamp01(
                 foamConnectorLengthPreference);
+            foamConnectorBreakStretchRatio = Mathf.Clamp(
+                foamConnectorBreakStretchRatio,
+                1.1f,
+                2f);
             foamInteriorPocketAmount = Mathf.Clamp01(
                 foamInteriorPocketAmount);
             foamEdgeCavityAmount = Mathf.Clamp01(

@@ -36,7 +36,7 @@ Current progress:
 - **Step 2 — Per-river staged bootstrap:** implemented and validated. Initialization now advances one explicit phase per `LateUpdate`; Foam remains disabled until complete readiness. The observed early phases were generally below roughly `2.5 ms` instead of recreating the former combined burst.
 - **Step 3 — Dirty-event queue and obstacle rebuild coalescing:** implemented and accepted. Boundary and obstacle changes no longer execute a complete rebuild chain immediately.
 - **Performance pause:** active. Steady-state maintenance staggering, compute-asset splitting, striped dispatch, CPU jobs, and global cross-river scheduling are deferred until Major Support, Connector Support, all four Negative Aging Pressure classes, static combined topology, runtime evolution, rebuild crossfade, and cache/preparation packaging are implemented and validated.
-- **Current implementation milestone:** Patch 4.1 exact Obstacle Footprint, Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, and Patch 4.5 complete static topology are accepted for feature progression. Coefficients remain provisional until the persistent Foam material proves the final result. Patch 4.6 lively Major evolution through Patch 4.6.2 combined lifetime units is accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-field parity/cavity correction are implemented and visually accepted. Patch 4.7B independent Free-Water evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, prepared-upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical CPU/HLSL topology field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector endpoint/path and Weak Span immutable preparation data is implemented and awaits Unity preparation-diagnostic validation. Exact transformed-mesh interval preparation currently runs only in the staged pre-gameplay obstacle phase as a temporary fallback. Production ownership belongs to procedural chunk generation/building/linking after final object placement, with compact data cached for gameplay loading.
+- **Current implementation milestone:** Patch 4.1 exact Obstacle Footprint, Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, and Patch 4.5 complete static topology are accepted for feature progression. Coefficients remain provisional until the persistent Foam material proves the final result. Patch 4.6 lively Major evolution through Patch 4.6.2 combined lifetime units is accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-field parity/cavity correction are implemented and visually accepted. Patch 4.7B independent Free-Water evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, prepared-upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical CPU/HLSL topology field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector endpoint/path and Weak Span immutable preparation data is implemented and its Unity preparation diagnostics are accepted. Patch 4.7C.2 identity reconstruction, separate debug-only parity, and combined evolving-field scheduling are implemented and visually accepted. Patch 4.7C.3 endpoint-driven Connector deformation and Weak Span current-path/tangent following are implemented, but long-run validation exposed permanent Connector population drain from truncated same-host variants and fixed original target pairs. Patch 4.7C.3.1 complete anchor-state coverage and bounded prepared relationship rebinding are implemented. Long-run validation exposed unlimited live stretch and same-pair preservation bias. Patch 4.7C.3.2 ratio-based stretch breaking and deterministic recycle turnover are implemented and await Unity visual/long-run validation. Exact transformed-mesh interval preparation currently runs only in the staged pre-gameplay obstacle phase as a temporary fallback. Production ownership belongs to procedural chunk generation/building/linking after final object placement, with compact data cached for gameplay loading.
 - **Global cross-river scheduling:** intentionally deferred. It will be designed only after the final one-river work categories, dependencies, interruption rules, and costs are known.
 
 The current sequencing rule is now: preserve the accepted performance foundation, prove each topology slice visually before building the next one, keep every expensive proof-stage operation profiled and named, then resume performance work against the real completed pipeline. Do not invent scheduler categories for features that are still provisional.
@@ -70,9 +70,11 @@ Further performance engineering is paused because the free-water topology pipeli
 13. Patch 4.7B independent Free-Water negative evolution — implemented;
 14. Patch 4.7B.1 positive-downstream/lifetime/prepared-anchor recycle correction — implemented and visually accepted;
 15. Patch 4.7C.0 canonical topology field-space consolidation — implemented and visually revalidated;
-16. Patch 4.7C.1 Connector/Weak Span immutable preparation data — implemented; Unity preparation-diagnostic validation pending;
-17. Patch 4.7C.2 identity reconstruction and debug-only parity;
-18. Patch 4.7C.3 Connector/Weak Span runtime evolution;
+16. Patch 4.7C.1 Connector/Weak Span immutable preparation data — implemented and diagnostically accepted;
+17. Patch 4.7C.2 identity reconstruction, debug-only parity, and combined reconstruction scheduling — implemented and visually accepted;
+18. Patch 4.7C.3 Connector/Weak Span runtime evolution — implemented; long-run population persistence failed;
+19. Patch 4.7C.3.1 complete anchor-state coverage and bounded relationship rebinding — implemented; long-run stretch/turnover defects found;
+20. Patch 4.7C.3.2 ratio-based breaking and deterministic recycle turnover — implemented; Unity visual/long-run validation pending;
 19. Patch 4.8 safe explicit replacement-topology transition;
 20. Patch 4.9 production procedural chunk/run cache and precompute packaging.
 
@@ -1311,7 +1313,7 @@ Revert the runtime file to Step 2 and restore the preceding document revision.
 
 ## Step 4 — Staggered Steady-State Topology Maintenance
 
-**Status:** Major scheduling is accepted for feature progression through Patch 4.6.2. Patch 4.7A and Patch 4.7A.1 add accepted host-relative Interior Pocket and Edge Cavity reconstruction inside the same bounded active-movement pass. Patch 4.7B.1 adds the corrected slower Free-Water lifecycle using bounded prepared upstream recycle anchors and no normal-run search, retry, readback, or validation and is visually accepted. Patch 4.7C.0 consolidates CPU/HLSL field-space arithmetic without adding a scheduled runtime work category. Patch 4.7C.1 adds preparation-only Connector endpoint ownership, bounded path/variant data, and Weak Span attachments; it adds no steady-state work category. Connector reconstruction and scheduling remain deferred to Patch 4.7C.2 and Patch 4.7C.3.
+**Status:** Major scheduling is accepted for feature progression through Patch 4.6.2. Patch 4.7A and Patch 4.7A.1 add accepted host-relative Interior Pocket and Edge Cavity reconstruction inside the same bounded active-movement pass. Patch 4.7B.1 adds the corrected slower Free-Water lifecycle using bounded prepared upstream recycle anchors and no normal-run search, retry, readback, or validation and is visually accepted. Patch 4.7C.0 consolidates CPU/HLSL field-space arithmetic without adding a scheduled runtime work category. Patch 4.7C.1 adds preparation-only Connector endpoint ownership, bounded path/variant data, and Weak Span attachments. Patch 4.7C.2 adds Connector/Weak Span records to the existing shared evolving-topology reconstruction pass rather than introducing per-Connector work and is visually accepted. Patch 4.7C.3 updates compact Connector path records from current Major gates and lets Weak Spans follow the current path/tangent. Long-run testing exposed that truncated same-host variants and fixed original pairs caused population drain. Patch 4.7C.3.1 retains complete bounded anchor-state matrices plus a bounded catalogue of additional prepared Major-pair relationships. Patch 4.7C.3.2 adds one relative path-length comparison per retained Connector, breaks over-limit relationships, and makes one deterministic keep-versus-different-pair decision when an endpoint host recycles. Directed selections remain one bounded catalogue scan, exclude the old pair, and use the old pair only as a no-alternative fallback for requested turnover—not for stretch breaks. Major and Free-Water descriptor advancement is still collected first, and at most one combined reconstruction runs per applicable tick. Unity visual/long-run validation is pending.
 
 ### Purpose
 
@@ -1687,15 +1689,18 @@ Accepted/implemented topology work:
 8. Patch 4.7B independent Free-Water local-mask evolution — implemented.
 9. Patch 4.7B.1 downstream/lifetime/prepared-anchor recycle correction — implemented and visually accepted.
 10. Patch 4.7C.0 canonical topology field-space consolidation — implemented and visually revalidated.
-11. Patch 4.7C.1 Connector endpoint/path and Weak Span immutable preparation data — implemented; Unity preparation-diagnostic validation pending.
+11. Patch 4.7C.1 Connector endpoint/path and Weak Span immutable preparation data — implemented and diagnostically accepted.
+12. Patch 4.7C.2 identity reconstruction, debug-only parity, and combined reconstruction scheduling — implemented and visually accepted.
+13. Patch 4.7C.3 Connector deformation, same-host recycle-variant switching, temporary absence, and Weak Span following — implemented; long-run population persistence failed.
+14. Patch 4.7C.3.1 complete anchor-state coverage and bounded relationship rebinding — implemented; long-run defects found;
+15. Patch 4.7C.3.2 ratio-based breaking and deterministic recycle turnover — implemented; Unity visual/long-run validation pending.
 
 Remaining topology slices:
 
-1. Patch 4.7C.2 identity reconstruction plus Editor/development-only parity and combined reconstruction scheduling;
-2. Patch 4.7C.3 Connector deformation, recycle-variant switching, and Weak Span following;
-3. Patch 4.8 safe generated-topology rebuild transition for explicit rebuilds;
-4. Patch 4.9 production procedural chunk/run cache and precompute packaging;
-5. Patch 4.10 topology completion and handoff to separate Foam-material work.
+1. Validate Patch 4.7C.3.2 relative stretch breaking, recycle retain/turnover distribution, different-pair rebinding, and Weak Span following over repeated full Major recycle cycles;
+2. Patch 4.8 safe generated-topology rebuild transition for explicit rebuilds;
+3. Patch 4.9 production procedural chunk/run cache and precompute packaging;
+4. Patch 4.10 topology completion and handoff to separate Foam-material work.
 
 All four negative classes remain preparation-time generators. Interior/edge host analysis, Connector span selection, Free-Water opportunity curation, and spare Connector route preparation may be expensive during the proof path, but ordinary gameplay may only advance compact descriptors, morph retained masks, deform retained paths, perform batched low-resolution reconstruction, and instantly recycle slots. No ordinary movement fade or duplicate old/new support instance is permitted.
 
@@ -1750,16 +1755,20 @@ The scheduling architecture is successful when:
 
 ## 25. Immediate Next Step
 
-Patch 4.7A/4.7A.1 hosted-negative evolution, Patch 4.7B/4.7B.1 Free-Water evolution, and Patch 4.7C.0 canonical field-space consolidation are implemented and visually accepted. Patch 4.7C.1 preparation-only Connector/Weak Span data is implemented. Static and movement coefficient tuning remains provisional.
+Patch 4.7A/4.7A.1 hosted-negative evolution, Patch 4.7B/4.7B.1 Free-Water evolution, Patch 4.7C.0 canonical field-space consolidation, and Patch 4.7C.2 identity Connector/Weak Span reconstruction are implemented and visually accepted. Patch 4.7C.1 preparation-only Connector/Weak Span data is diagnostically accepted. Patch 4.7C.3 live Connector/Weak Span deformation is implemented but its fixed original relationships failed long-run persistence. Patch 4.7C.3.1 complete anchor-state coverage and bounded prepared relationship rebinding are implemented. Long-run validation exposed unlimited live stretch and same-pair preservation bias. Patch 4.7C.3.2 ratio-based stretch breaking and deterministic recycle turnover are implemented and await Unity visual/long-run validation. Static and movement coefficient tuning remains provisional.
 
-The immediate gate is Patch 4.7C.1 Unity preparation validation:
+The immediate gate is Patch 4.7C.3.2 Unity visual and long-run runtime validation:
 
-- verify `Prepared / Accepted` Connector counts match or any unavailable relationship is explicit;
-- verify all accepted endpoint gates report individual Major ownership or an explicit unresolved count;
-- inspect retained path-point totals and available/unavailable recycle-variant counts for bounded, plausible values;
-- verify prepared Weak Span attachments match accepted Weak Span counts or report explicit unavailable records;
-- verify the accepted static Connector and Weak Span fields remain visually unchanged;
-- profile staged preparation to record the temporary added startup cost without treating it as accepted steady gameplay work;
-- verify no new normal-runtime search, retry, readback, validation, dispatch, or managed allocation exists.
+- verify active Connectors remain attached to both moving Major gates through ordinary movement;
+- verify `Connector Break Stretch Ratio` ranges from `1.10–2.00`, defaults to `1.45`, and changes the live relative break envelope without regenerating static topology;
+- verify over-limit paths break before becoming implausibly long, increment `Stretch Breaks`, and cannot reclaim the same Major pair until that blocked pair enters a different host occurrence;
+- verify every valid host recycle produces one deterministic retain-or-turnover decision and that the cumulative distribution approaches approximately 50/50 over enough events;
+- verify requested turnovers select different prepared Major pairs when valid unclaimed catalogue entries exist, and use the old viable relationship only as a counted no-alternative retain;
+- verify duplicate Major pairs and unreasonable per-Major Connector concentration do not appear;
+- verify attached Weak Spans follow normalized path position and the current path tangent across stretch breaks and relationship turnovers;
+- verify temporary absence is bounded and total Connector population does not monotonically collapse after every Major has recycled repeatedly;
+- verify stretch-break, retain, turnover-request, successful-turnover, no-alternative, rebind, identity/recycle-variant, absence, and reappearance diagnostics correspond to visible events;
+- verify Major, hosted-negative, and Free-Water evolution continue to share at most one applicable combined reconstruction;
+- verify normal gameplay adds no readback, runtime pathfinding, ownership search, geometry validation, retry, per-Connector dispatch, or managed allocation.
 
-Patch 4.7C.2 may add Editor/development parity readback only while normal runtime batches all descriptor changes before at most one applicable topology reconstruction. Patch 4.7C.3 may only advance compact endpoint/path/Weak Span descriptors and select bounded prepared variants; it may not add runtime pathfinding, ownership search, validation retries, per-Connector dispatches, or managed allocations.
+Patch 4.7C.3.2 adds only compact per-slot reference/recycle state, one path-length comparison, and bounded indexed selection from preparation-time relationship data. After long-run visual acceptance, proceed to Patch 4.8 explicit replacement-topology transition, then Patch 4.9 cache/precompute packaging.

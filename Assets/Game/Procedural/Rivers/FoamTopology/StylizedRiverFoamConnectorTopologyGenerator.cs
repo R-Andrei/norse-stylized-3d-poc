@@ -35,9 +35,9 @@ namespace ProgrammaticStylized3D.Rivers
         private const float RepeatedComponentScorePenalty = 0.040f;
         private const float LongitudinalSectionLoadPenalty = 0.020f;
         private const float EndpointOwnershipMinimumSupport = 0.035f;
-        private const int MaximumPreparedPathPointCount = 48;
-        private const int MaximumPreparedRecycleVariantCount = 12;
-        private const int MaximumRecycleAnchorsPerEndpoint = 3;
+        internal const int MaximumPreparedPathPointCount = 48;
+        private const int MaximumPreparedReplacementRelationshipCount = 32;
+        private const int MaximumPreparedReplacementPairAttempts = 96;
         private const float PreparedVariantSampleSpacingMetres = 0.12f;
         private const float PreparedVariantMinimumFluidCoverage = 0.20f;
         private const float PreparedVariantMaximumObstacleCoverage = 0.10f;
@@ -428,7 +428,9 @@ namespace ProgrammaticStylized3D.Rivers
                         validFieldLength,
                         fluidCoverage,
                         obstacleMask,
-                        majorTopology);
+                        majorTopology,
+                        out int startRecycleAnchorCount,
+                        out int endRecycleAnchorCount);
                 acceptedPaths.Add(new StylizedRiverFoamConnectorPath(
                     relationshipId,
                     acceptedMetricPath,
@@ -436,6 +438,8 @@ namespace ProgrammaticStylized3D.Rivers
                     normalizedCumulativeLength,
                     startBinding,
                     endBinding,
+                    startRecycleAnchorCount,
+                    endRecycleAnchorCount,
                     pathVariants));
 
                 uint evolutionSeed = MixBits(relationshipId ^ 0xD1B54A35u);
@@ -473,6 +477,28 @@ namespace ProgrammaticStylized3D.Rivers
                         Hash01(evolutionSeed, 46u)));
             }
 
+            List<StylizedRiverFoamConnectorPath>
+                relationshipCataloguePaths =
+                    BuildPreparedRelationshipCatalogue(
+                        acceptedPaths,
+                        pairs,
+                        components,
+                        domain,
+                        width,
+                        height,
+                        fieldLength,
+                        validFieldLength,
+                        validCells,
+                        componentLabels,
+                        fluidCoverage,
+                        majorSupport,
+                        connectorSupport,
+                        metricPositions,
+                        connectorDirectness,
+                        obstacleMask,
+                        majorTopology,
+                        candidateRaster);
+
             int coveredCellCount = 0;
             for (int index = 0; index < connectorSupport.Length; index++)
             {
@@ -491,9 +517,11 @@ namespace ProgrammaticStylized3D.Rivers
                 acceptedRelationships.Count,
                 coveredCellCount,
                 stopwatch.Elapsed.TotalMilliseconds,
+                maximumComponentDegree,
                 connectorSupport,
                 acceptedRelationships.ToArray(),
                 acceptedPaths.ToArray(),
+                relationshipCataloguePaths.ToArray(),
                 rejectionCounts);
         }
 
@@ -638,8 +666,10 @@ namespace ProgrammaticStylized3D.Rivers
                 0,
                 0,
                 milliseconds,
+                1,
                 support,
                 Array.Empty<StylizedRiverFoamConnectorRelationship>(),
+                Array.Empty<StylizedRiverFoamConnectorPath>(),
                 Array.Empty<StylizedRiverFoamConnectorPath>(),
                 rejectionCounts);
         }
@@ -2377,6 +2407,311 @@ namespace ProgrammaticStylized3D.Rivers
             return true;
         }
 
+        private static List<StylizedRiverFoamConnectorPath>
+            BuildPreparedRelationshipCatalogue(
+                List<StylizedRiverFoamConnectorPath> acceptedPaths,
+                IReadOnlyList<ComponentPair> pairs,
+                IReadOnlyList<MajorComponent> components,
+                RiverDomainSnapshot domain,
+                int width,
+                int height,
+                float fieldLength,
+                float validFieldLength,
+                bool[] validCells,
+                int[] componentLabels,
+                float[] fluidCoverage,
+                float[] majorSupport,
+                float[] connectorSupport,
+                Vector2[] metricPositions,
+                float connectorDirectness,
+                float[] obstacleMask,
+                StylizedRiverFoamMajorTopology majorTopology,
+                float[] candidateRaster)
+        {
+            List<StylizedRiverFoamConnectorPath> catalogue = new(
+                acceptedPaths != null
+                    ? acceptedPaths.Count +
+                        MaximumPreparedReplacementRelationshipCount
+                    : MaximumPreparedReplacementRelationshipCount);
+            HashSet<ulong> preparedMajorPairs = new();
+            if (acceptedPaths != null)
+            {
+                for (int pathIndex = 0;
+                     pathIndex < acceptedPaths.Count;
+                     pathIndex++)
+                {
+                    StylizedRiverFoamConnectorPath path =
+                        acceptedPaths[pathIndex];
+                    if (path == null)
+                    {
+                        continue;
+                    }
+
+                    catalogue.Add(path);
+                    if (path.StartEndpointBinding.IsAvailable &&
+                        path.EndEndpointBinding.IsAvailable)
+                    {
+                        preparedMajorPairs.Add(ResolvePreparedMajorPairKey(
+                            path.StartEndpointBinding,
+                            path.EndEndpointBinding));
+                    }
+                }
+            }
+
+            int acceptedCount = catalogue.Count;
+            if (acceptedCount == 0 || pairs == null || components == null)
+            {
+                return catalogue;
+            }
+
+            int replacementTarget = Mathf.Clamp(
+                acceptedCount * 2,
+                Mathf.Min(8, MaximumPreparedReplacementRelationshipCount),
+                MaximumPreparedReplacementRelationshipCount);
+            int replacementCount = 0;
+            int pairAttemptCount = 0;
+            for (int pairIndex = 0;
+                 pairIndex < pairs.Count &&
+                 replacementCount < replacementTarget &&
+                 pairAttemptCount < MaximumPreparedReplacementPairAttempts;
+                 pairIndex++)
+            {
+                ComponentPair pair = pairs[pairIndex];
+                if (pair.StartComponentIndex < 0 ||
+                    pair.StartComponentIndex >= components.Count ||
+                    pair.EndComponentIndex < 0 ||
+                    pair.EndComponentIndex >= components.Count)
+                {
+                    continue;
+                }
+
+                StylizedRiverFoamConnectorEndpointBinding startBinding =
+                    ResolveEndpointBinding(
+                        pair.StartEndpoint,
+                        components[pair.StartComponentIndex],
+                        domain,
+                        validFieldLength,
+                        majorTopology);
+                StylizedRiverFoamConnectorEndpointBinding endBinding =
+                    ResolveEndpointBinding(
+                        pair.EndEndpoint,
+                        components[pair.EndComponentIndex],
+                        domain,
+                        validFieldLength,
+                        majorTopology);
+                if (!startBinding.IsAvailable || !endBinding.IsAvailable ||
+                    startBinding.MajorStableId == endBinding.MajorStableId)
+                {
+                    continue;
+                }
+
+                ulong pairKey = ResolvePreparedMajorPairKey(
+                    startBinding,
+                    endBinding);
+                if (preparedMajorPairs.Contains(pairKey))
+                {
+                    continue;
+                }
+
+                pairAttemptCount++;
+                if (!TryBuildPreparedCataloguePath(
+                        pair,
+                        startBinding,
+                        endBinding,
+                        domain,
+                        width,
+                        height,
+                        fieldLength,
+                        validFieldLength,
+                        validCells,
+                        componentLabels,
+                        fluidCoverage,
+                        majorSupport,
+                        connectorSupport,
+                        metricPositions,
+                        connectorDirectness,
+                        obstacleMask,
+                        majorTopology,
+                        candidateRaster,
+                        out StylizedRiverFoamConnectorPath path))
+                {
+                    continue;
+                }
+
+                catalogue.Add(path);
+                preparedMajorPairs.Add(pairKey);
+                replacementCount++;
+            }
+
+            return catalogue;
+        }
+
+        private static bool TryBuildPreparedCataloguePath(
+            ComponentPair pair,
+            StylizedRiverFoamConnectorEndpointBinding startBinding,
+            StylizedRiverFoamConnectorEndpointBinding endBinding,
+            RiverDomainSnapshot domain,
+            int width,
+            int height,
+            float fieldLength,
+            float validFieldLength,
+            bool[] validCells,
+            int[] componentLabels,
+            float[] fluidCoverage,
+            float[] majorSupport,
+            float[] connectorSupport,
+            Vector2[] metricPositions,
+            float connectorDirectness,
+            float[] obstacleMask,
+            StylizedRiverFoamMajorTopology majorTopology,
+            float[] candidateRaster,
+            out StylizedRiverFoamConnectorPath preparedPath)
+        {
+            preparedPath = null;
+            if (!TryFindPath(
+                    pair,
+                    width,
+                    height,
+                    validCells,
+                    componentLabels,
+                    fluidCoverage,
+                    majorSupport,
+                    connectorSupport,
+                    metricPositions,
+                    connectorDirectness,
+                    out List<int> path,
+                    out Vector2 curvatureWaypoint,
+                    out StylizedRiverFoamConnectorRejectionReason _))
+            {
+                return false;
+            }
+
+            List<int> simplifiedPath = SimplifyPath(
+                path,
+                width,
+                height,
+                validCells,
+                componentLabels,
+                majorSupport,
+                pair.StartComponentIndex,
+                pair.EndComponentIndex,
+                pair.StartEndpoint.CellIndex,
+                pair.EndEndpoint.CellIndex,
+                connectorDirectness,
+                curvatureWaypoint,
+                metricPositions);
+            float pathLength = MeasurePathLength(
+                simplifiedPath,
+                metricPositions);
+            float relativePathLimit = Mathf.Lerp(
+                1.85f,
+                1.65f,
+                connectorDirectness);
+            float pathPadding = Mathf.Lerp(
+                0.58f,
+                0.38f,
+                connectorDirectness);
+            if (pathLength >
+                    pair.DistanceMetres * relativePathLimit + pathPadding ||
+                pathLength > pair.MaximumPathLengthMetres ||
+                PathCrossesBlockedMajorHalo(
+                    path,
+                    validCells,
+                    componentLabels,
+                    majorSupport,
+                    metricPositions,
+                    pair.StartComponentIndex,
+                    pair.EndComponentIndex,
+                    pair.StartEndpoint.CellIndex,
+                    pair.EndEndpoint.CellIndex) ||
+                MeasureUnsupportedSpan(
+                    path,
+                    majorSupport,
+                    metricPositions) < MinimumUnsupportedSpanMetres)
+            {
+                return false;
+            }
+
+            Array.Clear(candidateRaster, 0, candidateRaster.Length);
+            uint relationshipId = ResolveRelationshipId(pair);
+            RasterizeConnector(
+                simplifiedPath,
+                relationshipId,
+                width,
+                height,
+                validCells,
+                majorSupport,
+                metricPositions,
+                candidateRaster);
+            int rasterCoverage = 0;
+            for (int index = 0; index < candidateRaster.Length; index++)
+            {
+                if (candidateRaster[index] >= ConnectorCoverageThreshold)
+                {
+                    rasterCoverage++;
+                }
+            }
+            if (rasterCoverage < 2)
+            {
+                return false;
+            }
+
+            Vector2[] acceptedMetricPath = new Vector2[
+                simplifiedPath.Count];
+            for (int pointIndex = 0;
+                 pointIndex < simplifiedPath.Count;
+                 pointIndex++)
+            {
+                acceptedMetricPath[pointIndex] =
+                    metricPositions[simplifiedPath[pointIndex]];
+            }
+            Vector2[] boundedPath = BuildBoundedPreparedPath(
+                acceptedMetricPath,
+                MaximumPreparedPathPointCount);
+            float[] normalizedLength =
+                BuildNormalizedCumulativeLength(boundedPath);
+            StylizedRiverFoamConnectorPathVariant[] variants =
+                BuildPreparedPathVariants(
+                    boundedPath,
+                    normalizedLength,
+                    startBinding,
+                    endBinding,
+                    domain,
+                    width,
+                    height,
+                    fieldLength,
+                    validFieldLength,
+                    fluidCoverage,
+                    obstacleMask,
+                    majorTopology,
+                    out int startRecycleAnchorCount,
+                    out int endRecycleAnchorCount);
+            preparedPath = new StylizedRiverFoamConnectorPath(
+                relationshipId,
+                acceptedMetricPath,
+                boundedPath,
+                normalizedLength,
+                startBinding,
+                endBinding,
+                startRecycleAnchorCount,
+                endRecycleAnchorCount,
+                variants);
+            return preparedPath.PreparationAvailable;
+        }
+
+        private static ulong ResolvePreparedMajorPairKey(
+            StylizedRiverFoamConnectorEndpointBinding startBinding,
+            StylizedRiverFoamConnectorEndpointBinding endBinding)
+        {
+            uint low = startBinding.MajorStableId < endBinding.MajorStableId
+                ? startBinding.MajorStableId
+                : endBinding.MajorStableId;
+            uint high = startBinding.MajorStableId < endBinding.MajorStableId
+                ? endBinding.MajorStableId
+                : startBinding.MajorStableId;
+            return ((ulong)low << 32) | high;
+        }
+
         private static StylizedRiverFoamConnectorPathVariant[]
             BuildPreparedPathVariants(
                 Vector2[] preparedMetricPath,
@@ -2390,8 +2725,12 @@ namespace ProgrammaticStylized3D.Rivers
                 float validFieldLength,
                 float[] fluidCoverage,
                 float[] obstacleMask,
-                StylizedRiverFoamMajorTopology majorTopology)
+                StylizedRiverFoamMajorTopology majorTopology,
+                out int startRecycleAnchorCount,
+                out int endRecycleAnchorCount)
         {
+            startRecycleAnchorCount = 0;
+            endRecycleAnchorCount = 0;
             if (!startBinding.IsAvailable || !endBinding.IsAvailable)
             {
                 return new[]
@@ -2424,114 +2763,72 @@ namespace ProgrammaticStylized3D.Rivers
 
             IReadOnlyList<StylizedRiverFoamPreparedMajorRegion> prepared =
                 majorTopology.PreparedRegions;
+            if (startBinding.MajorPreparedIndex < 0 ||
+                startBinding.MajorPreparedIndex >= prepared.Count ||
+                endBinding.MajorPreparedIndex < 0 ||
+                endBinding.MajorPreparedIndex >= prepared.Count)
+            {
+                return new[]
+                {
+                    new StylizedRiverFoamConnectorPathVariant(
+                        -1,
+                        -1,
+                        StylizedRiverFoamConnectorPathVariantAvailability
+                            .EndpointOwnershipUnavailable,
+                        null,
+                        null)
+                };
+            }
+
             StylizedRiverFoamPreparedMajorRegion startMajor =
                 prepared[startBinding.MajorPreparedIndex];
             StylizedRiverFoamPreparedMajorRegion endMajor =
                 prepared[endBinding.MajorPreparedIndex];
-            int startAnchorCount = Mathf.Min(
-                MaximumRecycleAnchorsPerEndpoint,
-                startMajor.RecycleAnchors.Count);
-            int endAnchorCount = Mathf.Min(
-                MaximumRecycleAnchorsPerEndpoint,
-                endMajor.RecycleAnchors.Count);
+            startRecycleAnchorCount = startMajor.RecycleAnchors.Count;
+            endRecycleAnchorCount = endMajor.RecycleAnchors.Count;
 
-            List<Vector2Int> combinations = new(
-                MaximumPreparedRecycleVariantCount);
-            for (int startIndex = 0;
-                 startIndex < startAnchorCount;
-                 startIndex++)
-            {
-                AddPreparedVariantCombination(
-                    combinations,
-                    startIndex,
-                    -1);
-            }
-            for (int endIndex = 0;
-                 endIndex < endAnchorCount;
-                 endIndex++)
-            {
-                AddPreparedVariantCombination(
-                    combinations,
-                    -1,
-                    endIndex);
-            }
-            int sameIndexCount = Mathf.Min(
-                startAnchorCount,
-                endAnchorCount);
-            for (int index = 0; index < sameIndexCount; index++)
-            {
-                AddPreparedVariantCombination(
-                    combinations,
-                    index,
-                    index);
-            }
-            for (int startIndex = 0;
-                 startIndex < startAnchorCount &&
-                 combinations.Count < MaximumPreparedRecycleVariantCount;
-                 startIndex++)
-            {
-                for (int endIndex = 0;
-                     endIndex < endAnchorCount &&
-                     combinations.Count <
-                         MaximumPreparedRecycleVariantCount;
-                     endIndex++)
-                {
-                    AddPreparedVariantCombination(
-                        combinations,
-                        startIndex,
-                        endIndex);
-                }
-            }
-
+            int startStateCount = startRecycleAnchorCount + 1;
+            int endStateCount = endRecycleAnchorCount + 1;
+            int variantCount = Mathf.Max(
+                0,
+                startStateCount * endStateCount - 1);
             StylizedRiverFoamConnectorPathVariant[] variants =
-                new StylizedRiverFoamConnectorPathVariant[combinations.Count];
-            for (int combinationIndex = 0;
-                 combinationIndex < combinations.Count;
-                 combinationIndex++)
+                new StylizedRiverFoamConnectorPathVariant[variantCount];
+            int variantIndex = 0;
+            for (int startState = 0;
+                 startState < startStateCount;
+                 startState++)
             {
-                Vector2Int combination = combinations[combinationIndex];
-                variants[combinationIndex] = BuildPreparedPathVariant(
-                    combination.x,
-                    combination.y,
-                    preparedMetricPath,
-                    normalizedCumulativeLength,
-                    startBinding,
-                    endBinding,
-                    startMajor,
-                    endMajor,
-                    domain,
-                    width,
-                    height,
-                    fieldLength,
-                    validFieldLength,
-                    fluidCoverage,
-                    obstacleMask);
+                for (int endState = 0;
+                     endState < endStateCount;
+                     endState++)
+                {
+                    if (startState == 0 && endState == 0)
+                    {
+                        continue;
+                    }
+
+                    int startAnchorIndex = startState - 1;
+                    int endAnchorIndex = endState - 1;
+                    variants[variantIndex++] = BuildPreparedPathVariant(
+                        startAnchorIndex,
+                        endAnchorIndex,
+                        preparedMetricPath,
+                        normalizedCumulativeLength,
+                        startBinding,
+                        endBinding,
+                        startMajor,
+                        endMajor,
+                        domain,
+                        width,
+                        height,
+                        fieldLength,
+                        validFieldLength,
+                        fluidCoverage,
+                        obstacleMask);
+                }
             }
             return variants;
-        }
-
-        private static void AddPreparedVariantCombination(
-            List<Vector2Int> combinations,
-            int startAnchorIndex,
-            int endAnchorIndex)
-        {
-            if (combinations.Count >= MaximumPreparedRecycleVariantCount)
-            {
-                return;
-            }
-
-            for (int index = 0; index < combinations.Count; index++)
-            {
-                Vector2Int existing = combinations[index];
-                if (existing.x == startAnchorIndex &&
-                    existing.y == endAnchorIndex)
-                {
-                    return;
-                }
-            }
-            combinations.Add(new Vector2Int(
-                startAnchorIndex,
-                endAnchorIndex));
         }
 
         private static StylizedRiverFoamConnectorPathVariant
