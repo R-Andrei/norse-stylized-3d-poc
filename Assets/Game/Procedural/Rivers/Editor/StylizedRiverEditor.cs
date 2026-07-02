@@ -1777,9 +1777,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Patch 4.8B safely transitions complete generated topology while live Pressure, Lee, Shore, and Obstacle Footprint remain authoritative. Patch 4.9C loads matching prepared topology without obstacle rescanning, GPU readback, or CPU topology generation. Patch 4.9C.1 automatically creates, regenerates, validates, and persists development caches while keeping release startup cache-only."),
+                    "Patch 4.8B safely transitions complete generated topology while live Pressure, Lee, Shore, and Obstacle Footprint remain authoritative. Patch 4.9C loads matching prepared topology without obstacle rescanning, GPU readback, or CPU topology generation. Patch 4.9C.1 automates development caches. Patch 4.9D records cold/warm startup evidence and blocks release builds whose included Foam rivers lack exact current caches."),
                 new GUIContent(
-                    "Automatic Cache Runtime (Patch 4.9C.1)"));
+                    "Cache-First Runtime + Release Gate (Patch 4.9D)"));
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Replacement Build State",
@@ -1843,6 +1843,14 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     ? "Automatic — Press Play"
                     : "Production — Cache Only");
             EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Obstacle Registry",
+                    "Cache validation and topology preparation cannot begin until the complete generated static-obstacle registry has finished its budgeted refresh."),
+                runtime.TopologyCacheObstacleRegistryReady
+                    ? $"Complete ({runtime.TopologyCacheObstacleRegistryTotalCount:N0} sources)"
+                    : $"Refreshing ({runtime.TopologyCacheObstacleRegistryProcessedCount:N0} / " +
+                      $"{runtime.TopologyCacheObstacleRegistryTotalCount:N0})");
+            EditorGUILayout.LabelField(
                 "Active Prepared Source",
                 runtime.TopologyCacheLoadedForActiveResources
                     ? runtime.TopologyCacheStartupState.StartsWith(
@@ -1886,6 +1894,64 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Failed")
                         ? MessageType.Warning
                         : MessageType.Info);
+            }
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Patch 4.9D Startup Validation",
+                EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                "Validation State",
+                runtime.TopologyStartupValidationComplete
+                    ? "Complete"
+                    : runtime.InitializationComplete
+                        ? "Not Captured"
+                        : "In Progress");
+            EditorGUILayout.LabelField(
+                "Total Staged Startup",
+                runtime.TopologyStartupValidationComplete
+                    ? $"{runtime.TopologyStartupTotalMilliseconds:0.000} ms"
+                    : "—");
+            EditorGUILayout.LabelField(
+                "Slowest Step",
+                runtime.TopologyStartupValidationComplete
+                    ? $"{runtime.TopologyStartupSlowestStep} — " +
+                      $"{runtime.TopologyStartupSlowestStepMilliseconds:0.000} ms"
+                    : "—");
+            EditorGUILayout.LabelField(
+                "Measured Steps / Cache Installs",
+                $"{runtime.TopologyStartupStepCount} / " +
+                runtime.TopologyStartupCacheInstallCount);
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Expensive Preparation Executed",
+                    "Obstacle bake + Major + Connector + Pocket generator executions during the measured startup. A valid direct cache hit must report zero."),
+                new GUIContent(
+                    runtime.TopologyStartupExpensivePreparationCount
+                        .ToString()));
+            EditorGUILayout.LabelField(
+                "Obstacle / Major / Connector / Pocket",
+                $"{runtime.TopologyStartupObstacleBuildCount} / " +
+                $"{runtime.TopologyStartupMajorBuildCount} / " +
+                $"{runtime.TopologyStartupConnectorBuildCount} / " +
+                runtime.TopologyStartupPocketBuildCount);
+            EditorGUILayout.LabelField(
+                "Active Foam Memory Estimate",
+                $"{runtime.EstimatedMemoryBytes / (1024f * 1024f):0.00} MB");
+            if (runtime.TopologyStartupValidationComplete)
+            {
+                bool directHitWithoutPreparation =
+                    runtime.TopologyCacheStartupHitCount > 0 &&
+                    runtime.TopologyStartupExpensivePreparationCount == 0;
+                EditorGUILayout.HelpBox(
+                    directHitWithoutPreparation
+                        ? "Direct cache hit confirmed: no obstacle bake or CPU topology generator executed during startup."
+                        : runtime.TopologyStartupExpensivePreparationCount > 0
+                            ? "This startup used development preparation. Press Play again with unchanged persistent inputs to validate the production cache-hit path."
+                            : "Startup completed without expensive preparation, but no direct cache hit was recorded.",
+                    directHitWithoutPreparation
+                        ? MessageType.Info
+                        : MessageType.Warning);
             }
 
             EditorGUILayout.Space(4f);

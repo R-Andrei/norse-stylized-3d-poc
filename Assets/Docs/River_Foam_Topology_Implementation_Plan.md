@@ -4,7 +4,7 @@
 
 **Status:** Canonical step-by-step implementation plan for Stage 6 Foam topology only.
 
-**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-footprint/parity correction are implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector/Weak Span immutable preparation data is implemented and Unity preparation diagnostics are accepted: all accepted Connectors and Weak Span attachments prepared successfully with zero unresolved endpoints or unavailable attachments in the validation scene. Patch 4.7C.2 identity reconstruction, debug-only parity, and combined reconstruction scheduling are implemented and visually accepted. Patch 4.7C.3 endpoint-driven Connector deformation and Weak Span current-path/tangent following are implemented, but long-run validation exposed permanent Connector population drain because only a subset of same-host anchor states was prepared and relationships could not rebind to different Major targets. Patch 4.7C.3.1 completes anchor-state coverage and adds bounded preparation-time replacement relationships. Long-run validation then exposed two remaining lifecycle defects: valid relationships could stretch indefinitely during ordinary host motion, and runtime preserved the same viable pair after every recycle. Patch 4.7C.3.2 adds ratio-based stretch breaking plus deterministic recycle relationship turnover; validation exposed strong relationship concentration. Patch 4.7C.3.3 deterministic soft endpoint-load distribution is implemented and visually/long-run validated. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Patch 4.8A staged same-grid replacement preparation and atomic activation are implemented and Unity-verified. Patch 4.8B safe old/new generated-topology crossfade, superseding-transition flattening, and differently mapped domain/quality hold/remap transition are implemented and Unity-verified. Patch 4.9A versioned cache contract and deterministic round-trip proof are implemented and Unity-verified. Patch 4.9B stable cross-session fingerprints, runtime-readable cache-asset ownership, explicit cache building, and hit/miss/stale diagnostics are implemented and Unity-verified. Patch 4.9C cache-first startup is implemented. Patch 4.9C.1 automatic Editor/Development cache orchestration is implemented and awaits Unity validation; production cold-start validation remains Patch 4.9D.
+**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-footprint/parity correction are implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector/Weak Span immutable preparation data is implemented and Unity preparation diagnostics are accepted: all accepted Connectors and Weak Span attachments prepared successfully with zero unresolved endpoints or unavailable attachments in the validation scene. Patch 4.7C.2 identity reconstruction, debug-only parity, and combined reconstruction scheduling are implemented and visually accepted. Patch 4.7C.3 endpoint-driven Connector deformation and Weak Span current-path/tangent following are implemented, but long-run validation exposed permanent Connector population drain because only a subset of same-host anchor states was prepared and relationships could not rebind to different Major targets. Patch 4.7C.3.1 completes anchor-state coverage and adds bounded preparation-time replacement relationships. Long-run validation then exposed two remaining lifecycle defects: valid relationships could stretch indefinitely during ordinary host motion, and runtime preserved the same viable pair after every recycle. Patch 4.7C.3.2 adds ratio-based stretch breaking plus deterministic recycle relationship turnover; validation exposed strong relationship concentration. Patch 4.7C.3.3 deterministic soft endpoint-load distribution is implemented and visually/long-run validated. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Patch 4.8A staged same-grid replacement preparation and atomic activation are implemented and Unity-verified. Patch 4.8B safe old/new generated-topology crossfade, superseding-transition flattening, and differently mapped domain/quality hold/remap transition are implemented and Unity-verified. Patch 4.9A versioned cache contract and deterministic round-trip proof are implemented and Unity-verified. Patch 4.9B stable cross-session fingerprints, runtime-readable cache-asset ownership, explicit cache building, and hit/miss/stale diagnostics are implemented and Unity-verified. Patch 4.9C cache-first startup and Patch 4.9C.1 automatic Editor/Development cache orchestration are implemented and Unity-verified. Patch 4.9D production/cold-start validation and release-build cache preflight are implemented and await Unity validation. Patch 4.9D.1 corrects the startup gate so cache fingerprint capture and development generation wait for the complete generated-obstacle registry rather than inferring readiness from an unchanged version while the budgeted refresh is still in flight.
 
 **Primary implementation target:**
 
@@ -1455,7 +1455,7 @@ Live Pressure, Lee, Shore, wake, disturbance, obstacle-source registration, and 
 
 ### Patch 4.9C.1 — automatic development cache orchestration
 
-**Implementation status:** implemented; Unity validation pending.
+**Implementation status:** implemented and Unity-verified.
 
 Routine development becomes Play-only. An Editor-only coordinator scans loaded authored rivers before Play Mode, creates or reuses one deterministic cache asset beside the saved scene, and assigns it persistently when missing. The runtime then:
 
@@ -1473,15 +1473,26 @@ A compatible stale cache remains visible during regeneration. A first-ever river
 
 ### Patch 4.9D — production and cold-start validation
 
-Finally:
+**Implementation status:** implemented; Unity validation pending.
 
-- compare cold and warm Play startup on several rivers and quality tiers;
-- prove that no expensive generator marker executes on a valid cache hit;
-- test stale domain, settings, quality, generator-version, and obstacle fingerprints independently;
-- verify load/upload work remains staged and does not create a new single-frame freeze;
-- verify cache memory remains reasonable while prioritizing lower startup CPU/GPU work;
-- add a release-build preflight that rejects included rivers whose persistent cache is missing, corrupt, unsupported, or stale;
-- remove only proof-generation plumbing that is genuinely obsolete after cache-first startup is accepted.
+The runtime now records one bounded startup-validation window for every full Foam resource initialization. It reports total staged wall time, the slowest individual initialization phase, phase count, cache-install count, estimated active Foam memory, and explicit execution counts for obstacle baking plus Major, Connector, and Pocket generation. A direct persistent-cache hit must complete with all four expensive-preparation counters at zero; the existing Profiler markers remain available for independent confirmation.
+
+A strict Edit-mode release validator deserializes the assigned payload without activating Foam or allocating its GPU simulation field. It verifies storage and payload versions, checksum and metadata agreement, complete graph/obstacle-field content, the current resampled domain, exact prepared obstacle-source fingerprints, generation inputs, and the combined stable key. It never falls back to triangle scanning, topology generation, asset creation, cache assignment, or cache mutation.
+
+An Editor build preprocessor runs that validator over every enabled Foam river in every enabled Build Settings scene before a non-development player build. Missing, empty, corrupt, unsupported, metadata-mismatched, incomplete, stale-domain, stale-obstacle, stale-settings, combined-key, inactive-input, or unavailable-runtime cases reject the build with scene and hierarchy paths. Development builds retain the accepted automatic orchestration. A manual `Tools > Programmatic Stylized 3D > Rivers > Validate Release Foam Caches` command runs the identical gate without starting a build. Automatic cache assignment is suspended while preflight temporarily opens build scenes, so validation cannot modify authored content.
+
+#### Acceptance gate
+
+Pass only if:
+
+- a first development run may report expensive preparation while automatically creating/updating its persistent payload;
+- the next unchanged Play entry reports one direct cache hit, one cache installation, and zero obstacle/Major/Connector/Pocket preparation executions;
+- the Profiler contains cache resolve/install markers but no obstacle bake or topology-generator markers on that hit;
+- total staged startup, slowest-step duration, payload size, and estimated memory remain reasonable across Low, Medium, and High quality rivers;
+- stale domain, obstacle, quality/settings, version, metadata, and corrupt-payload cases each fail with the correct reason;
+- the manual release preflight passes for current caches and fails without creating or changing assets after one cache is removed or made stale;
+- a non-development build is rejected by the same failure, while a Development build retains automatic development recovery;
+- restoring/rebuilding the cache makes the preflight and release build pass again.
 
 ### Rollback
 
@@ -1652,19 +1663,18 @@ A topology patch that cannot answer these questions is not ready.
 
 ## 13. Immediate Next Step
 
-Patch 4.8B, Patch 4.9A, and Patch 4.9B are Unity-verified. Patch 4.9C cache-first startup is implemented. Patch 4.9C.1 automatic development cache orchestration is implemented and awaiting Unity validation.
+Patch 4.8B through Patch 4.9C.1 are Unity-verified. Patch 4.9D production/cold-start telemetry and release-build cache preflight are implemented and awaiting Unity validation.
 
-Validate Patch 4.9C.1 on the actual river:
+Validate Patch 4.9D on the actual river and release pipeline:
 
-- with no assigned cache, press Play once and require automatic asset creation/assignment, automatic staged generation, visible topology, successful round-trip validation, and `Automatically Generated and Cached`;
-- stop and press Play again and require one cache hit, zero generator work, and `Persistent Cache` as the active prepared source;
-- change one persistent topology setting in Edit Mode, press Play, and require the previous compatible cache to remain visible while the complete replacement generates, crossfades, validates, and updates the asset automatically;
-- change a setting only during Play Mode and require a session-only generated topology without overwriting the persistent cache;
-- alter registered obstacle geometry and require live Obstacle Footprint authority plus automatic topology replacement/cache update in development;
-- confirm all manual create/build/validate/generate actions remain optional advanced diagnostics;
-- confirm non-development/release code remains strict cache-only.
+- press Play with the current matching persistent cache and require `Loaded`, one direct hit, one cache installation, and zero obstacle/Major/Connector/Pocket preparation executions;
+- confirm the Profiler shows cache resolve/install markers and no obstacle bake or topology-generator markers on that direct hit;
+- record total staged startup, slowest phase, payload size, and active-memory estimate for representative Low, Medium, and High quality rivers;
+- run `Tools > Programmatic Stylized 3D > Rivers > Validate Release Foam Caches` and require a pass without any asset or scene mutation;
+- make one cache stale or unassign it and require the manual preflight to fail with the exact scene, hierarchy path, and reason while creating or changing nothing;
+- require a non-development build to be rejected by the same stale/missing cache, while a Development build retains automatic recovery;
+- press Play to let development orchestration rebuild and persist the cache, then require the manual preflight and non-development build to pass again.
 
 After acceptance:
 
-1. Patch 4.9D — production and cold-start validation, including build-time cache preflight;
-2. Patch 4.10 — topology completion and handoff to the separate Foam-material implementation.
+1. Patch 4.10 — topology completion and handoff to the separate Foam-material implementation.

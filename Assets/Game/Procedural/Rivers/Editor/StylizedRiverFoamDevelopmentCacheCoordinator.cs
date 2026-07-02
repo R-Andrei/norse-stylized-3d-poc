@@ -22,6 +22,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private const double PlayPollIntervalSeconds = 0.10;
         private const double EditPollIntervalSeconds = 1.0;
 
+        internal static bool BuildPreflightInProgress { get; set; }
+
         private static double nextPollTime;
         private static double nextEditPollTime;
         private static readonly HashSet<string> ReportedAssignmentFailures = new();
@@ -73,6 +75,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
         private static void EnsureLoadedRiverCacheAssignments()
         {
+            if (BuildPreflightInProgress)
+            {
+                return;
+            }
+
             StylizedRiver[] rivers = UnityEngine.Object.FindObjectsByType<
                 StylizedRiver>(FindObjectsInactive.Include);
             Array.Sort(

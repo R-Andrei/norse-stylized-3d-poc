@@ -829,6 +829,21 @@ namespace ProgrammaticStylized3D.Rivers
         public int ValidStaticPressureSourceCount => validStaticSourceCount;
         public int ValidStaticWakeSourceCount => validStaticWakeSourceCount;
         public int ObstacleGeometryVersion => obstacleGeometryVersion;
+        public bool GeneratedObstacleRegistryReady =>
+            (river != null && !river.RuntimeDisturbancesEnabled) ||
+            (!generatedGeometryRegistryDirty &&
+             !generatedGeometryRefreshInProgress);
+        public int GeneratedObstacleRegistryProcessedCount =>
+            generatedGeometryRefreshInProgress
+                ? Mathf.Clamp(
+                    generatedGeometryRefreshIndex,
+                    0,
+                    generatedGeometryScratch.Count)
+                : automaticGeneratedSourceIds.Count;
+        public int GeneratedObstacleRegistryTotalCount =>
+            generatedGeometryRefreshInProgress
+                ? generatedGeometryScratch.Count
+                : automaticGeneratedSourceIds.Count;
         public int LastUpdateComputeDispatchCount =>
             lastUpdateComputeDispatchCount;
         public int RecentPeakComputeDispatchCount =>
@@ -2224,6 +2239,77 @@ namespace ProgrammaticStylized3D.Rivers
         }
 
         /// <summary>
+        /// Synchronously resolves the existing generated-geometry registry for
+        /// release-cache validation. Normal runtime refresh remains frame-budgeted;
+        /// this validation-only path is invoked by Editor build preflight and does
+        /// not allocate disturbance textures or alter authored scene data.
+        /// </summary>
+        public bool PrepareGeneratedGeometrySourcesForCacheValidation(
+            out string status)
+        {
+            river ??= GetComponent<StylizedRiver>();
+            if (river == null || !river.Domain.IsValid)
+            {
+                status = "A valid river domain is required.";
+                return false;
+            }
+
+            if (!river.RuntimeDisturbancesEnabled)
+            {
+                continuousSources.Clear();
+                continuousSourceIdsByOwner.Clear();
+                automaticGeneratedSourceIds.Clear();
+                refreshedAutomaticGeneratedSourceIds.Clear();
+                generatedGeometryScratch.Clear();
+                generatedGeometryRefreshInProgress = false;
+                generatedGeometryRefreshIndex = 0;
+                status =
+                    "Runtime disturbances are disabled; the obstacle-source set is empty.";
+                return true;
+            }
+
+            if (!river.isActiveAndEnabled)
+            {
+                status =
+                    "The river must be active and enabled for exact obstacle-source validation.";
+                return false;
+            }
+
+            if (!river.TryGetSurfaceBounds(out _))
+            {
+                status =
+                    "The river surface bounds are unavailable for exact obstacle-source validation.";
+                return false;
+            }
+
+            generatedGeometryRegistryDirty = true;
+            generatedGeometryRefreshInProgress = false;
+            generatedGeometryRefreshIndex = 0;
+
+            int remainingPasses = Mathf.Max(
+                8,
+                GeneratedGeometryRegistry.Sources.Count + 8);
+            do
+            {
+                RefreshGeneratedGeometrySources();
+                remainingPasses--;
+            }
+            while (generatedGeometryRefreshInProgress &&
+                   remainingPasses > 0);
+
+            if (generatedGeometryRefreshInProgress)
+            {
+                status =
+                    "Generated obstacle-source validation did not settle within its bounded pass.";
+                return false;
+            }
+
+            status =
+                $"Prepared {automaticGeneratedSourceIds.Count} generated obstacle source(s).";
+            return true;
+        }
+
+        /// <summary>
         /// Copies exact fingerprints already prepared by registered generated
         /// static obstacle owners. This cache-first path never rereads mesh
         /// triangles. If one participating source lacks the provider contract,
@@ -2244,6 +2330,15 @@ namespace ProgrammaticStylized3D.Rivers
             if (river == null || !river.Domain.IsValid)
             {
                 status = "A valid river domain is required.";
+                return false;
+            }
+
+            if (!GeneratedObstacleRegistryReady)
+            {
+                status =
+                    "The generated obstacle registry is still refreshing " +
+                    $"({GeneratedObstacleRegistryProcessedCount:N0} / " +
+                    $"{GeneratedObstacleRegistryTotalCount:N0} sources).";
                 return false;
             }
 

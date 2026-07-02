@@ -802,6 +802,23 @@ namespace ProgrammaticStylized3D.Rivers
         private StylizedRiverFoamTopologyCachePackage
             pendingStartupCachePackage;
 
+        // Patch 4.9D records decisive cold/warm startup evidence without
+        // changing scheduling. Each AdvanceInitializationPhase call remains one
+        // bounded staged step; the counters prove whether expensive preparation
+        // executed and identify the slowest individual step.
+        private bool topologyStartupValidationActive;
+        private bool topologyStartupValidationComplete;
+        private double topologyStartupValidationStartedAt;
+        private double topologyStartupValidationTotalMilliseconds;
+        private double topologyStartupValidationSlowestStepMilliseconds;
+        private string topologyStartupValidationSlowestStep = "—";
+        private int topologyStartupValidationStepCount;
+        private int topologyStartupValidationCacheInstallCount;
+        private int topologyStartupValidationObstacleBuildCount;
+        private int topologyStartupValidationMajorBuildCount;
+        private int topologyStartupValidationConnectorBuildCount;
+        private int topologyStartupValidationPocketBuildCount;
+
         private readonly List<PendingInjection> pendingInjections = new();
         private readonly List<FoamReservation> reservations = new();
         private readonly List<MeshFilter> obstacleExclusionMeshFilters = new();
@@ -1443,6 +1460,39 @@ namespace ProgrammaticStylized3D.Rivers
             topologyCacheCombinedFingerprint;
         public int TopologyCacheObstacleSourceCount =>
             topologyCacheObstacleSourceCount;
+        public bool TopologyCacheObstacleRegistryReady
+        {
+            get
+            {
+                disturbanceRuntime ??=
+                    GetComponent<StylizedRiverDisturbanceRuntime>();
+                return disturbanceRuntime == null ||
+                    disturbanceRuntime.GeneratedObstacleRegistryReady;
+            }
+        }
+        public int TopologyCacheObstacleRegistryProcessedCount
+        {
+            get
+            {
+                disturbanceRuntime ??=
+                    GetComponent<StylizedRiverDisturbanceRuntime>();
+                return disturbanceRuntime != null
+                    ? disturbanceRuntime
+                        .GeneratedObstacleRegistryProcessedCount
+                    : 0;
+            }
+        }
+        public int TopologyCacheObstacleRegistryTotalCount
+        {
+            get
+            {
+                disturbanceRuntime ??=
+                    GetComponent<StylizedRiverDisturbanceRuntime>();
+                return disturbanceRuntime != null
+                    ? disturbanceRuntime.GeneratedObstacleRegistryTotalCount
+                    : 0;
+            }
+        }
         public string TopologyCacheStartupState => topologyCacheStartupState;
         public string TopologyCacheStartupSummary =>
             topologyCacheStartupSummary;
@@ -1472,6 +1522,31 @@ namespace ProgrammaticStylized3D.Rivers
             automaticTopologyCacheWriteCount;
         public int AutomaticTopologyCacheWriteSuccessCount =>
             automaticTopologyCacheWriteSuccessCount;
+        public bool TopologyStartupValidationComplete =>
+            topologyStartupValidationComplete;
+        public double TopologyStartupTotalMilliseconds =>
+            topologyStartupValidationTotalMilliseconds;
+        public double TopologyStartupSlowestStepMilliseconds =>
+            topologyStartupValidationSlowestStepMilliseconds;
+        public string TopologyStartupSlowestStep =>
+            topologyStartupValidationSlowestStep;
+        public int TopologyStartupStepCount =>
+            topologyStartupValidationStepCount;
+        public int TopologyStartupCacheInstallCount =>
+            topologyStartupValidationCacheInstallCount;
+        public int TopologyStartupObstacleBuildCount =>
+            topologyStartupValidationObstacleBuildCount;
+        public int TopologyStartupMajorBuildCount =>
+            topologyStartupValidationMajorBuildCount;
+        public int TopologyStartupConnectorBuildCount =>
+            topologyStartupValidationConnectorBuildCount;
+        public int TopologyStartupPocketBuildCount =>
+            topologyStartupValidationPocketBuildCount;
+        public int TopologyStartupExpensivePreparationCount =>
+            topologyStartupValidationObstacleBuildCount +
+            topologyStartupValidationMajorBuildCount +
+            topologyStartupValidationConnectorBuildCount +
+            topologyStartupValidationPocketBuildCount;
         public bool ExplicitTopologyGenerationAvailable =>
             Application.isPlaying &&
             !DevelopmentTopologyGenerationInProgress &&
@@ -1690,6 +1765,8 @@ namespace ProgrammaticStylized3D.Rivers
             pendingAutomaticDevelopmentRebuildAfterStartup = false;
             pendingStartupCacheStaleObstacles = false;
             pendingStartupCacheStaleSettings = false;
+            topologyStartupValidationActive = false;
+            topologyStartupValidationComplete = false;
             if (!Application.isPlaying)
             {
                 topologyCacheSessionPersistentInputKey = string.Empty;
@@ -2163,6 +2240,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             if (initializationPhase == InitializationPhase.Ready)
             {
+                BeginTopologyStartupValidation();
                 PrepareDimensionChangingTopologyTransition();
                 initializationPhase = InitializationPhase.ReleaseOldResources;
                 // The transition capture is a queued GPU write. Keep all old
@@ -2174,18 +2252,87 @@ namespace ProgrammaticStylized3D.Rivers
 
             if (initializationPhase == InitializationPhase.NotStarted)
             {
+                BeginTopologyStartupValidation();
                 initializationPhase = InitializationPhase.ReleaseOldResources;
             }
             else if (InitializationInputsChanged())
             {
+                BeginTopologyStartupValidation();
                 // A domain or quality change invalidates every later phase.
                 // Restart from release rather than allowing partially built
                 // resources to become authoritative.
                 initializationPhase = InitializationPhase.ReleaseOldResources;
             }
 
+            InitializationPhase measuredPhase = initializationPhase;
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             AdvanceInitializationPhase();
+            stopwatch.Stop();
+            RecordTopologyStartupStep(
+                measuredPhase,
+                stopwatch.Elapsed.TotalMilliseconds);
+            if (initializationPhase == InitializationPhase.Ready)
+            {
+                CompleteTopologyStartupValidation();
+            }
+
             return initializationPhase == InitializationPhase.Ready;
+        }
+
+        private void BeginTopologyStartupValidation()
+        {
+            if (topologyStartupValidationActive)
+            {
+                return;
+            }
+
+            topologyStartupValidationActive = true;
+            topologyStartupValidationComplete = false;
+            topologyStartupValidationStartedAt =
+                Time.realtimeSinceStartupAsDouble;
+            topologyStartupValidationTotalMilliseconds = 0.0;
+            topologyStartupValidationSlowestStepMilliseconds = 0.0;
+            topologyStartupValidationSlowestStep = "—";
+            topologyStartupValidationStepCount = 0;
+            topologyStartupValidationCacheInstallCount = 0;
+            topologyStartupValidationObstacleBuildCount = 0;
+            topologyStartupValidationMajorBuildCount = 0;
+            topologyStartupValidationConnectorBuildCount = 0;
+            topologyStartupValidationPocketBuildCount = 0;
+        }
+
+        private void RecordTopologyStartupStep(
+            InitializationPhase phase,
+            double elapsedMilliseconds)
+        {
+            if (!topologyStartupValidationActive)
+            {
+                return;
+            }
+
+            topologyStartupValidationStepCount++;
+            if (elapsedMilliseconds >
+                topologyStartupValidationSlowestStepMilliseconds)
+            {
+                topologyStartupValidationSlowestStepMilliseconds =
+                    elapsedMilliseconds;
+                topologyStartupValidationSlowestStep = phase.ToString();
+            }
+        }
+
+        private void CompleteTopologyStartupValidation()
+        {
+            if (!topologyStartupValidationActive)
+            {
+                return;
+            }
+
+            topologyStartupValidationTotalMilliseconds = Math.Max(
+                0.0,
+                (Time.realtimeSinceStartupAsDouble -
+                 topologyStartupValidationStartedAt) * 1000.0);
+            topologyStartupValidationActive = false;
+            topologyStartupValidationComplete = true;
         }
 
         private bool HasQueuedRebuildWork =>
@@ -2631,6 +2778,226 @@ namespace ProgrammaticStylized3D.Rivers
 #endif
         }
 
+        /// <summary>
+        /// Validates the assigned persistent topology cache against the exact
+        /// current authored inputs without activating Foam or allocating its GPU
+        /// simulation field. Patch 4.9D build preflight uses this strict path; it
+        /// never falls back to mesh scanning, generation, asset creation, or
+        /// cache mutation.
+        /// </summary>
+        public bool TryValidateAssignedTopologyCacheForRelease(
+            out string state,
+            out string summary,
+            out int payloadBytes,
+            out string payloadHash,
+            out int obstacleSourceCount)
+        {
+            state = "Invalid";
+            summary = string.Empty;
+            payloadBytes = 0;
+            payloadHash = "—";
+            obstacleSourceCount = 0;
+
+            river ??= GetComponent<StylizedRiver>();
+            if (river == null)
+            {
+                summary = "The Foam runtime has no StylizedRiver owner.";
+                return false;
+            }
+
+            if (!river.Domain.IsValid)
+            {
+                state = "Inputs Unavailable";
+                summary =
+                    "The authored river does not currently expose a valid resampled domain.";
+                return false;
+            }
+
+            StylizedRiverFoamTopologyCacheAsset asset =
+                river.FoamTopologyCacheAsset;
+            if (asset == null)
+            {
+                state = "Unassigned";
+                summary = "No persistent Foam topology cache is assigned.";
+                return false;
+            }
+
+            if (!asset.HasSupportedStorageContract)
+            {
+                state = "Unsupported Storage";
+                summary =
+                    "The assigned asset uses an unsupported storage contract.";
+                return false;
+            }
+
+            if (!asset.HasPayload)
+            {
+                state = "Empty";
+                summary = "The assigned cache asset contains no payload bytes.";
+                return false;
+            }
+
+            byte[] payload = asset.GetPayloadCopy();
+            payloadBytes = payload.Length;
+            if (!StylizedRiverFoamTopologyCacheCodec.TryDeserialize(
+                    payload,
+                    out StylizedRiverFoamTopologyCachePackage package,
+                    out string loadError))
+            {
+                state = "Invalid Payload";
+                summary = loadError;
+                return false;
+            }
+
+            ulong resolvedPayloadHash =
+                StylizedRiverFoamTopologyCacheCodec.ReadPayloadHash(payload);
+            payloadHash = resolvedPayloadHash.ToString("X16");
+            StylizedRiverFoamTopologyFingerprint storedCombined =
+                StylizedRiverFoamTopologyFingerprints.ComputeCombined(
+                    package.DomainFingerprint,
+                    package.ObstacleFingerprint,
+                    package.GenerationFingerprint);
+            bool metadataMatches =
+                asset.PayloadFormatVersion ==
+                    StylizedRiverFoamTopologyCacheCodec.FormatVersion &&
+                asset.GeneratorContractVersion ==
+                    StylizedRiverFoamTopologyCacheCodec
+                        .GeneratorContractVersion &&
+                asset.PayloadHash == payloadHash &&
+                asset.DomainFingerprint ==
+                    package.DomainFingerprint.ToString() &&
+                asset.ObstacleFingerprint ==
+                    package.ObstacleFingerprint.ToString() &&
+                asset.GenerationFingerprint ==
+                    package.GenerationFingerprint.ToString() &&
+                asset.CombinedFingerprint == storedCombined.ToString();
+            if (!metadataMatches)
+            {
+                state = "Metadata Mismatch";
+                summary =
+                    "The cache asset metadata does not match its validated binary payload.";
+                return false;
+            }
+
+            bool completeContract =
+                package.FieldWidth >= 2 &&
+                package.FieldHeight >= 2 &&
+                package.FieldLength > 0f &&
+                package.ValidFieldLength > 0f &&
+                package.ObstacleExclusion != null &&
+                package.ObstacleExclusion.Length ==
+                    package.FieldWidth * package.FieldHeight &&
+                package.MajorTopology != null &&
+                package.ConnectorTopology != null &&
+                package.PocketTopology != null;
+            if (!completeContract)
+            {
+                state = "Incomplete Contract";
+                summary =
+                    "The payload does not contain one complete prepared topology graph and obstacle field.";
+                return false;
+            }
+
+            disturbanceRuntime ??=
+                GetComponent<StylizedRiverDisturbanceRuntime>();
+            if (disturbanceRuntime != null &&
+                !disturbanceRuntime
+                    .PrepareGeneratedGeometrySourcesForCacheValidation(
+                        out string preparationStatus))
+            {
+                state = "Obstacle Inputs Unavailable";
+                summary = preparationStatus;
+                return false;
+            }
+
+            topologyCachePreparedObstacleFingerprints.Clear();
+            StylizedRiverFoamTopologyFingerprint currentObstacles = default;
+            string obstacleStatus = string.Empty;
+            bool obstacleInputsAvailable;
+            if (disturbanceRuntime == null)
+            {
+                obstacleInputsAvailable = RiverObstacleExclusionResolver
+                    .TryCombineStableSourceFingerprints(
+                        topologyCachePreparedObstacleFingerprints,
+                        out currentObstacles,
+                        out obstacleSourceCount,
+                        out obstacleStatus);
+            }
+            else
+            {
+                obstacleInputsAvailable = disturbanceRuntime
+                    .TryCopyObstacleExclusionStableFingerprintsTo(
+                        topologyCachePreparedObstacleFingerprints,
+                        out obstacleSourceCount,
+                        out obstacleStatus) &&
+                    RiverObstacleExclusionResolver
+                        .TryCombineStableSourceFingerprints(
+                            topologyCachePreparedObstacleFingerprints,
+                            out currentObstacles,
+                            out obstacleSourceCount,
+                            out obstacleStatus);
+            }
+            if (!obstacleInputsAvailable)
+            {
+                state = "Obstacle Inputs Unavailable";
+                summary = obstacleStatus;
+                return false;
+            }
+
+            StylizedRiverFoamTopologyFingerprint currentDomain =
+                StylizedRiverFoamTopologyFingerprints.ComputeDomain(
+                    river.Domain);
+            StylizedRiverFoamTopologyFingerprint currentGeneration =
+                StylizedRiverFoamTopologyFingerprints.ComputeGeneration(
+                    river,
+                    package.FieldWidth,
+                    package.FieldHeight,
+                    package.FieldLength,
+                    package.ValidFieldLength);
+            StylizedRiverFoamTopologyFingerprint currentCombined =
+                StylizedRiverFoamTopologyFingerprints.ComputeCombined(
+                    currentDomain,
+                    currentObstacles,
+                    currentGeneration);
+
+            if (package.DomainFingerprint != currentDomain)
+            {
+                state = "Stale Domain";
+                summary =
+                    "The complete resampled river-domain content changed.";
+                return false;
+            }
+
+            if (package.ObstacleFingerprint != currentObstacles)
+            {
+                state = "Stale Obstacles";
+                summary =
+                    "The exact transformed static obstacle-source geometry changed.";
+                return false;
+            }
+
+            if (package.GenerationFingerprint != currentGeneration)
+            {
+                state = "Stale Settings";
+                summary =
+                    "Quality, field mapping, or a topology-generation setting changed.";
+                return false;
+            }
+
+            if (asset.CombinedFingerprint != currentCombined.ToString())
+            {
+                state = "Combined Key Mismatch";
+                summary =
+                    "The assigned cache does not match the current combined stable input key.";
+                return false;
+            }
+
+            state = "Valid";
+            summary =
+                "The complete payload, metadata, domain, exact obstacle sources, and generation inputs are release-ready.";
+            return true;
+        }
+
         public bool ValidateAssignedTopologyCache()
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -2855,6 +3222,16 @@ namespace ProgrammaticStylized3D.Rivers
 
             disturbanceRuntime ??=
                 GetComponent<StylizedRiverDisturbanceRuntime>();
+            if (disturbanceRuntime != null &&
+                !disturbanceRuntime.GeneratedObstacleRegistryReady)
+            {
+                error =
+                    "The generated obstacle registry is still refreshing " +
+                    $"({disturbanceRuntime.GeneratedObstacleRegistryProcessedCount:N0} / " +
+                    $"{disturbanceRuntime.GeneratedObstacleRegistryTotalCount:N0} sources).";
+                return false;
+            }
+
             topologyCachePreparedObstacleFingerprints.Clear();
             int sourceCount;
             string obstacleStatus;
@@ -4655,6 +5032,14 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         disturbanceRuntime ??=
                             GetComponent<StylizedRiverDisturbanceRuntime>();
+                        if (disturbanceRuntime != null &&
+                            !disturbanceRuntime.GeneratedObstacleRegistryReady)
+                        {
+                            pendingObstacleObservedVersion = int.MinValue;
+                            pendingObstacleStableFrameCount = 0;
+                            break;
+                        }
+
                         int currentObstacleVersion = disturbanceRuntime != null
                             ? disturbanceRuntime.ObstacleGeometryVersion
                             : -1;
@@ -4976,6 +5361,15 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         disturbanceRuntime ??=
                             GetComponent<StylizedRiverDisturbanceRuntime>();
+                        if (disturbanceRuntime != null &&
+                            !disturbanceRuntime.GeneratedObstacleRegistryReady)
+                        {
+                            initializationObstacleObservedVersion =
+                                int.MinValue;
+                            initializationObstacleStableFrameCount = 0;
+                            break;
+                        }
+
                         int currentObstacleVersion = disturbanceRuntime != null
                             ? disturbanceRuntime.ObstacleGeometryVersion
                             : -1;
@@ -5047,6 +5441,7 @@ namespace ProgrammaticStylized3D.Rivers
                     break;
 
                 case InitializationPhase.InstallCachedTopology:
+                    topologyStartupValidationCacheInstallCount++;
                     using (InitInstallTopologyCacheProfilerMarker.Auto())
                     {
                         StylizedRiverFoamTopologyCachePackage package =
@@ -5076,6 +5471,7 @@ namespace ProgrammaticStylized3D.Rivers
                     break;
 
                 case InitializationPhase.BuildObstacleExclusion:
+                    topologyStartupValidationObstacleBuildCount++;
                     RebuildObstacleExclusionCache();
                     initializationObstacleObservedVersion = int.MinValue;
                     initializationObstacleStableFrameCount = 0;
@@ -5083,18 +5479,21 @@ namespace ProgrammaticStylized3D.Rivers
                     break;
 
                 case InitializationPhase.BuildMajorTopology:
+                    topologyStartupValidationMajorBuildCount++;
                     BuildMajorTopology();
                     initializationPhase =
                         InitializationPhase.BuildConnectorTopology;
                     break;
 
                 case InitializationPhase.BuildConnectorTopology:
+                    topologyStartupValidationConnectorBuildCount++;
                     BuildConnectorTopology();
                     initializationPhase =
                         InitializationPhase.BuildPocketTopology;
                     break;
 
                 case InitializationPhase.BuildPocketTopology:
+                    topologyStartupValidationPocketBuildCount++;
                     BuildPocketTopology();
                     initializationPhase = InitializationPhase.ClearMaterial;
                     break;
