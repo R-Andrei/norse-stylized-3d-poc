@@ -99,6 +99,20 @@ namespace ProgrammaticStylized3D.Rivers
         private const float ConnectorMaximumInteriorDeformationMetres = 0.085f;
         private const int ConnectorEndpointWarpSolveIterations = 4;
 
+        // Patch 4.7C.3.3 keeps relationship concentration probabilistic rather
+        // than imposing a per-Major degree ceiling. Every occupied endpoint
+        // sharply reduces selection weight, while a non-zero tail preserves the
+        // possibility of occasional hubs. Crowded relationships also turn over
+        // more readily when either host begins a new occurrence.
+        private const float ConnectorLoadPenaltyBase = 0.22f;
+        private const float ConnectorHubPenaltyBase = 0.60f;
+        private const float ConnectorTurnoverBaseProbability = 0.50f;
+        private const float ConnectorTurnoverCrowdingIncrement = 0.15f;
+        private const float ConnectorTurnoverMaximumProbability = 0.90f;
+        private const float ConnectorLengthPreferenceWeightStrength = 1.35f;
+        private const float ConnectorSelectionJitterMinimum = 0.90f;
+        private const float ConnectorSelectionJitterMaximum = 1.10f;
+
         // The old broad Foam authoring controls were removed in Patch 3.4.
         // Persistent material behaviour remains on one fixed provisional
         // baseline matching the supplied project state until the dedicated
@@ -165,10 +179,62 @@ namespace ProgrammaticStylized3D.Rivers
             ApplyBoundary,
             WaitForObstacleStability,
             BuildObstacleExclusion,
+            RefreshTopologySources
+        }
+
+        private enum TopologyReplacementPhase
+        {
+            Idle,
             BuildMajorTopology,
             BuildConnectorTopology,
             BuildPocketTopology,
-            RefreshTopologySources
+            PrepareGeneratedTexture,
+            ReadyToActivate
+        }
+
+        [Flags]
+        private enum TopologyReplacementReason
+        {
+            None = 0,
+            Settings = 1 << 0,
+            Boundary = 1 << 1,
+            Obstacle = 1 << 2,
+            IdenticalValidation = 1 << 3
+        }
+
+        private sealed class TopologyReplacementBuild
+        {
+            public int RequestId;
+            public int TargetSignature;
+            public int MajorInputSignature;
+            public int ConnectorInputSignature;
+            public int PocketInputSignature;
+            public TopologyReplacementReason Reason;
+            public bool IsIdenticalValidation;
+            public RiverDomainSnapshot Domain;
+            public StylizedRiverQuality Quality;
+            public int FieldWidth;
+            public int FieldHeight;
+            public float FieldLength;
+            public float ValidFieldLength;
+            public float ShoreMotion;
+            public float MajorAmount;
+            public float MajorSize;
+            public float MajorSizeVariation;
+            public float MajorRecycleTerritoryDeviationPercent;
+            public int MajorSeed;
+            public float ConnectorAmount;
+            public float ConnectorDirectness;
+            public float ConnectorLengthPreference;
+            public float InteriorPocketAmount;
+            public float EdgeCavityAmount;
+            public float ConnectorWeakSpanAmount;
+            public float FreeWaterEventAmount;
+            public float[] ObstacleExclusion = Array.Empty<float>();
+            public StylizedRiverFoamMajorTopology MajorTopology;
+            public StylizedRiverFoamConnectorTopology ConnectorTopology;
+            public StylizedRiverFoamPocketTopology PocketTopology;
+            public RenderTexture GeneratedTexture;
         }
 
         // The accepted profiler instrumentation remains active throughout the
@@ -240,14 +306,18 @@ namespace ProgrammaticStylized3D.Rivers
             new ProfilerMarker("RiverFoam.Rebuild.WaitObstacleStability");
         private static readonly ProfilerMarker RebuildBuildObstacleProfilerMarker =
             new ProfilerMarker("RiverFoam.Rebuild.BuildObstacleExclusion");
-        private static readonly ProfilerMarker RebuildBuildMajorProfilerMarker =
-            new ProfilerMarker("RiverFoam.Rebuild.BuildMajor");
-        private static readonly ProfilerMarker RebuildBuildConnectorProfilerMarker =
-            new ProfilerMarker("RiverFoam.Rebuild.BuildConnector");
-        private static readonly ProfilerMarker RebuildBuildPocketProfilerMarker =
-            new ProfilerMarker("RiverFoam.Rebuild.BuildPocket");
         private static readonly ProfilerMarker RebuildRefreshSourcesProfilerMarker =
             new ProfilerMarker("RiverFoam.Rebuild.RefreshTopologySources");
+        private static readonly ProfilerMarker ReplacementBuildMajorProfilerMarker =
+            new ProfilerMarker("RiverFoam.Replacement.BuildMajor");
+        private static readonly ProfilerMarker ReplacementBuildConnectorProfilerMarker =
+            new ProfilerMarker("RiverFoam.Replacement.BuildConnector");
+        private static readonly ProfilerMarker ReplacementBuildPocketProfilerMarker =
+            new ProfilerMarker("RiverFoam.Replacement.BuildPocket");
+        private static readonly ProfilerMarker ReplacementPrepareTextureProfilerMarker =
+            new ProfilerMarker("RiverFoam.Replacement.PrepareGeneratedTexture");
+        private static readonly ProfilerMarker ReplacementActivateProfilerMarker =
+            new ProfilerMarker("RiverFoam.Replacement.Activate");
 
         private static readonly int FoamEnabledId =
             Shader.PropertyToID("_FoamEnabled");
@@ -420,6 +490,8 @@ namespace ProgrammaticStylized3D.Rivers
             public StylizedRiverFoamConnectorPath Path;
             public int StartHostSlotIndex;
             public int EndHostSlotIndex;
+            public float BasePathLengthMetres;
+            public float SelectionWeight;
         }
 
         private struct ConnectorEvolutionSlot
@@ -638,6 +710,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool[] connectorCandidateClaimed = Array.Empty<bool>();
         private bool[] connectorMajorPairClaimed = Array.Empty<bool>();
         private int[] connectorMajorDegree = Array.Empty<int>();
+        private int[] connectorPreviousMajorDegree = Array.Empty<int>();
         private int connectorEvolutionActiveCount;
         private int connectorEvolutionTemporaryAbsenceCount;
         private int connectorEvolutionIdentityPathCount;
@@ -651,6 +724,12 @@ namespace ProgrammaticStylized3D.Rivers
         private int connectorEvolutionTurnoverRequestCount;
         private int connectorEvolutionSuccessfulTurnoverCount;
         private int connectorEvolutionNoAlternativeFallbackCount;
+        private int connectorEvolutionCrowdingBoostedTurnoverCount;
+        private int connectorEvolutionMajorDegreeZeroCount;
+        private int connectorEvolutionMajorDegreeOneCount;
+        private int connectorEvolutionMajorDegreeTwoCount;
+        private int connectorEvolutionMajorDegreeThreePlusCount;
+        private int connectorEvolutionMaximumMajorDegree;
         private int connectorEvolutionAbsenceEventCount;
         private int connectorEvolutionReappearanceCount;
         private int weakSpanEvolutionActiveCount;
@@ -709,14 +788,22 @@ namespace ProgrammaticStylized3D.Rivers
         private RebuildPhase rebuildPhase = RebuildPhase.Idle;
         private bool pendingBoundaryRebuild;
         private bool pendingObstacleRebuild;
-        private bool pendingMajorRebuild;
-        private bool pendingConnectorRebuild;
-        private bool pendingPocketRebuild;
         private bool pendingTopologyRefresh;
+        private bool pendingTopologyReplacementAfterMaintenance;
         private int pendingObstacleObservedVersion = int.MinValue;
         private int pendingObstacleStableFrameCount;
         private int initializationObstacleObservedVersion = int.MinValue;
         private int initializationObstacleStableFrameCount;
+        private TopologyReplacementBuild topologyReplacementBuild;
+        private TopologyReplacementPhase topologyReplacementPhase =
+            TopologyReplacementPhase.Idle;
+        private int topologyReplacementRequestSequence;
+        private int topologyReplacementRequestCount;
+        private int topologyReplacementCoalescedCount;
+        private int topologyReplacementCancelledCount;
+        private int topologyReplacementActivatedCount;
+        private int topologyReplacementIdenticalPreparedCount;
+        private string topologyReplacementLastReason = "None";
         private bool supportWarningReported;
         private bool allocationWarningReported;
         private bool fullyFrozenLastUpdate;
@@ -936,6 +1023,18 @@ namespace ProgrammaticStylized3D.Rivers
             connectorEvolutionSuccessfulTurnoverCount;
         public int ConnectorEvolutionNoAlternativeFallbackCount =>
             connectorEvolutionNoAlternativeFallbackCount;
+        public int ConnectorEvolutionCrowdingBoostedTurnoverCount =>
+            connectorEvolutionCrowdingBoostedTurnoverCount;
+        public int ConnectorEvolutionMajorDegreeZeroCount =>
+            connectorEvolutionMajorDegreeZeroCount;
+        public int ConnectorEvolutionMajorDegreeOneCount =>
+            connectorEvolutionMajorDegreeOneCount;
+        public int ConnectorEvolutionMajorDegreeTwoCount =>
+            connectorEvolutionMajorDegreeTwoCount;
+        public int ConnectorEvolutionMajorDegreeThreePlusCount =>
+            connectorEvolutionMajorDegreeThreePlusCount;
+        public int ConnectorEvolutionMaximumMajorDegree =>
+            connectorEvolutionMaximumMajorDegree;
         public int ConnectorEvolutionAbsenceEventCount =>
             connectorEvolutionAbsenceEventCount;
         public int ConnectorEvolutionReappearanceCount =>
@@ -1090,6 +1189,25 @@ namespace ProgrammaticStylized3D.Rivers
         public double PocketGenerationMilliseconds => pocketTopology != null
             ? pocketTopology.GenerationMilliseconds
             : 0.0;
+        public bool TopologyReplacementInProgress =>
+            topologyReplacementPhase != TopologyReplacementPhase.Idle;
+        public bool TopologyReplacementReady =>
+            topologyReplacementPhase ==
+                TopologyReplacementPhase.ReadyToActivate;
+        public string TopologyReplacementState =>
+            topologyReplacementPhase.ToString();
+        public string TopologyReplacementLastReason =>
+            topologyReplacementLastReason;
+        public int TopologyReplacementRequestCount =>
+            topologyReplacementRequestCount;
+        public int TopologyReplacementCoalescedCount =>
+            topologyReplacementCoalescedCount;
+        public int TopologyReplacementCancelledCount =>
+            topologyReplacementCancelledCount;
+        public int TopologyReplacementActivatedCount =>
+            topologyReplacementActivatedCount;
+        public int TopologyReplacementIdenticalPreparedCount =>
+            topologyReplacementIdenticalPreparedCount;
         public int DynamicShoreRowCount => currentShoreEdgesTexture != null
             ? currentShoreEdgesTexture.width
             : 0;
@@ -1139,6 +1257,7 @@ namespace ProgrammaticStylized3D.Rivers
             advectedState != null &&
             reverseState != null;
         public bool IsSleeping =>
+            !TopologyReplacementInProgress &&
             !IsAutomaticMaterialSupplyActive &&
             !IsTopologyDebugActive &&
             pendingInjections.Count == 0 &&
@@ -1153,6 +1272,10 @@ namespace ProgrammaticStylized3D.Rivers
             EstimateTextureBytes(topologyTexture) +
             EstimateTextureBytes(topologySourcesTexture) +
             EstimateTextureBytes(topologyGeneratedTexture) +
+            EstimateTextureBytes(
+                topologyReplacementBuild != null
+                    ? topologyReplacementBuild.GeneratedTexture
+                    : null) +
             EstimateTextureBytes(evolvingMajorTexture) +
             EstimateTextureBytes(evolvingHostedNegativeTexture) +
             EstimateTextureBytes(evolvingFreeWaterNegativeTexture) +
@@ -1259,14 +1382,13 @@ namespace ProgrammaticStylized3D.Rivers
             rebuildPhase = RebuildPhase.Idle;
             pendingBoundaryRebuild = false;
             pendingObstacleRebuild = false;
-            pendingMajorRebuild = false;
-            pendingConnectorRebuild = false;
-            pendingPocketRebuild = false;
             pendingTopologyRefresh = false;
+            pendingTopologyReplacementAfterMaintenance = false;
             pendingObstacleObservedVersion = int.MinValue;
             pendingObstacleStableFrameCount = 0;
             initializationObstacleObservedVersion = int.MinValue;
             initializationObstacleStableFrameCount = 0;
+            ReleaseTopologyReplacementBuild(true);
             initializationPhase = InitializationPhase.NotStarted;
             BindDisabled();
         }
@@ -1389,8 +1511,15 @@ namespace ProgrammaticStylized3D.Rivers
             QueueObstacleRebuildIfNeeded();
             QueueMajorTopologyRebuildIfNeeded();
             bool rebuildPhaseAdvanced = AdvanceQueuedRebuild();
+            bool topologyReplacementActivated = false;
+            if (!rebuildPhaseAdvanced && !HasQueuedRebuildWork)
+            {
+                topologyReplacementActivated =
+                    AdvanceTopologyReplacementBuild();
+            }
             bool topologyMaintenanceBlocked =
-                rebuildPhaseAdvanced || HasQueuedRebuildWork;
+                rebuildPhaseAdvanced || HasQueuedRebuildWork ||
+                topologyReplacementActivated;
 
             float now = Time.realtimeSinceStartup;
             float deltaTime = Mathf.Clamp(now - lastRuntimeTime, 0f, 0.1f);
@@ -1725,26 +1854,19 @@ namespace ProgrammaticStylized3D.Rivers
             rebuildPhase != RebuildPhase.Idle ||
             pendingBoundaryRebuild ||
             pendingObstacleRebuild ||
-            pendingMajorRebuild ||
-            pendingConnectorRebuild ||
-            pendingPocketRebuild ||
             pendingTopologyRefresh;
 
         private void RequestBoundaryRebuild()
         {
             pendingBoundaryRebuild = true;
-            pendingMajorRebuild = true;
-            pendingConnectorRebuild = true;
-            pendingPocketRebuild = true;
+            pendingTopologyReplacementAfterMaintenance = true;
             pendingTopologyRefresh = true;
         }
 
         private void RequestObstacleRebuild(int currentObstacleVersion)
         {
             pendingObstacleRebuild = true;
-            pendingMajorRebuild = true;
-            pendingConnectorRebuild = true;
-            pendingPocketRebuild = true;
+            pendingTopologyReplacementAfterMaintenance = true;
             pendingTopologyRefresh = true;
 
             if (pendingObstacleObservedVersion != currentObstacleVersion)
@@ -1770,33 +1892,379 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void QueueMajorTopologyRebuildIfNeeded()
         {
-            if (majorTopologyInputSignature !=
-                ResolveMajorTopologyInputSignature())
-            {
-                pendingMajorRebuild = true;
-                pendingConnectorRebuild = true;
-                pendingPocketRebuild = true;
-                pendingTopologyRefresh = true;
-                return;
-            }
-
-            if (connectorTopologyInputSignature !=
-                ResolveConnectorTopologyInputSignature())
-            {
-                pendingConnectorRebuild = true;
-                pendingPocketRebuild = true;
-                pendingTopologyRefresh = true;
-                return;
-            }
-
-            if (pocketTopologyInputSignature ==
-                ResolvePocketTopologyInputSignature())
+            if (river == null || !river.Domain.IsValid ||
+                initializationPhase != InitializationPhase.Ready ||
+                resourcesDirty || fieldWidth < 2 || fieldHeight < 2)
             {
                 return;
             }
 
-            pendingPocketRebuild = true;
-            pendingTopologyRefresh = true;
+            int requestedSignature = ResolveRequestedTopologySignature();
+            int activeSignature = ResolveActiveTopologySignature();
+            if (requestedSignature == activeSignature)
+            {
+                if (topologyReplacementBuild != null &&
+                    !topologyReplacementBuild.IsIdenticalValidation &&
+                    topologyReplacementBuild.TargetSignature !=
+                        requestedSignature)
+                {
+                    CancelTopologyReplacementBuild(true);
+                }
+                return;
+            }
+
+            RequestTopologyReplacement(
+                TopologyReplacementReason.Settings,
+                false);
+        }
+
+        public bool RequestIdenticalTopologyReplacementValidation()
+        {
+            if (!Application.isPlaying ||
+                initializationPhase != InitializationPhase.Ready ||
+                !AreResourcesCompleteAndCurrent())
+            {
+                return false;
+            }
+
+            RequestTopologyReplacement(
+                TopologyReplacementReason.IdenticalValidation,
+                true);
+            return topologyReplacementBuild != null;
+        }
+
+        private void RequestTopologyReplacement(
+            TopologyReplacementReason reason,
+            bool identicalValidation)
+        {
+            if (river == null || !river.Domain.IsValid ||
+                initializationPhase != InitializationPhase.Ready ||
+                resourcesDirty || domainVersion != river.Domain.Version ||
+                allocatedQuality != river.Quality ||
+                fieldWidth < 2 || fieldHeight < 2)
+            {
+                return;
+            }
+
+            ResolveRequestedTopologySignatures(
+                out int majorSignature,
+                out int connectorSignature,
+                out int pocketSignature,
+                out int targetSignature);
+            int activeSignature = ResolveActiveTopologySignature();
+            if (!identicalValidation && targetSignature == activeSignature)
+            {
+                return;
+            }
+
+            if (topologyReplacementBuild != null)
+            {
+                bool sameRequest =
+                    topologyReplacementBuild.TargetSignature ==
+                        targetSignature &&
+                    topologyReplacementBuild.IsIdenticalValidation ==
+                        identicalValidation;
+                if (sameRequest)
+                {
+                    return;
+                }
+
+                CancelTopologyReplacementBuild(true);
+            }
+
+            float[] obstacleSnapshot = obstacleExclusionScalar.Length ==
+                fieldWidth * fieldHeight
+                    ? (float[])obstacleExclusionScalar.Clone()
+                    : new float[fieldWidth * fieldHeight];
+
+            topologyReplacementBuild = new TopologyReplacementBuild
+            {
+                RequestId = ++topologyReplacementRequestSequence,
+                TargetSignature = targetSignature,
+                MajorInputSignature = majorSignature,
+                ConnectorInputSignature = connectorSignature,
+                PocketInputSignature = pocketSignature,
+                Reason = reason,
+                IsIdenticalValidation = identicalValidation,
+                Domain = river.Domain,
+                Quality = river.Quality,
+                FieldWidth = fieldWidth,
+                FieldHeight = fieldHeight,
+                FieldLength = fieldLength,
+                ValidFieldLength = validFieldLength,
+                ShoreMotion = river.ShoreMotion,
+                MajorAmount = river.FoamMajorSupportAmount,
+                MajorSize = river.FoamMajorSupportSize,
+                MajorSizeVariation = river.FoamMajorSupportSizeVariation,
+                MajorRecycleTerritoryDeviationPercent =
+                    river.FoamMajorRecycleTerritoryDeviationPercent,
+                MajorSeed = river.FoamMajorSupportSeed,
+                ConnectorAmount = river.FoamConnectorAmount,
+                ConnectorDirectness = river.FoamConnectorDirectness,
+                ConnectorLengthPreference =
+                    river.FoamConnectorLengthPreference,
+                InteriorPocketAmount = river.FoamInteriorPocketAmount,
+                EdgeCavityAmount = river.FoamEdgeCavityAmount,
+                ConnectorWeakSpanAmount =
+                    river.FoamConnectorWeakSpanAmount,
+                FreeWaterEventAmount = river.FoamFreeWaterEventAmount,
+                ObstacleExclusion = obstacleSnapshot
+            };
+            topologyReplacementPhase =
+                TopologyReplacementPhase.BuildMajorTopology;
+            topologyReplacementRequestCount++;
+            topologyReplacementLastReason =
+                FormatTopologyReplacementReason(reason);
+        }
+
+        private bool AdvanceTopologyReplacementBuild()
+        {
+            TopologyReplacementBuild build = topologyReplacementBuild;
+            if (build == null ||
+                topologyReplacementPhase == TopologyReplacementPhase.Idle)
+            {
+                return false;
+            }
+
+            if (river == null || !river.Domain.IsValid || resourcesDirty ||
+                domainVersion != river.Domain.Version ||
+                allocatedQuality != river.Quality ||
+                build.FieldWidth != fieldWidth ||
+                build.FieldHeight != fieldHeight)
+            {
+                CancelTopologyReplacementBuild(false);
+                return false;
+            }
+
+            int currentTargetSignature = ResolveRequestedTopologySignature();
+            if (build.IsIdenticalValidation)
+            {
+                if (currentTargetSignature != ResolveActiveTopologySignature())
+                {
+                    CancelTopologyReplacementBuild(true);
+                    RequestTopologyReplacement(
+                        TopologyReplacementReason.Settings,
+                        false);
+                    return false;
+                }
+            }
+            else if (currentTargetSignature != build.TargetSignature)
+            {
+                CancelTopologyReplacementBuild(true);
+                RequestTopologyReplacement(
+                    TopologyReplacementReason.Settings,
+                    false);
+                return false;
+            }
+
+            switch (topologyReplacementPhase)
+            {
+                case TopologyReplacementPhase.BuildMajorTopology:
+                    using (ReplacementBuildMajorProfilerMarker.Auto())
+                    {
+                        build.MajorTopology =
+                            StylizedRiverFoamMajorTopologyGenerator.Generate(
+                                build.Domain,
+                                build.FieldWidth,
+                                build.FieldHeight,
+                                build.FieldLength,
+                                build.ValidFieldLength,
+                                build.Quality,
+                                build.ShoreMotion,
+                                build.MajorAmount,
+                                build.MajorSize,
+                                build.MajorSizeVariation,
+                                build.MajorRecycleTerritoryDeviationPercent,
+                                build.MajorSeed,
+                                build.ObstacleExclusion);
+                    }
+                    topologyReplacementPhase =
+                        TopologyReplacementPhase.BuildConnectorTopology;
+                    break;
+
+                case TopologyReplacementPhase.BuildConnectorTopology:
+                    using (ReplacementBuildConnectorProfilerMarker.Auto())
+                    {
+                        build.ConnectorTopology =
+                            StylizedRiverFoamConnectorTopologyGenerator.Generate(
+                                build.Domain,
+                                build.FieldWidth,
+                                build.FieldHeight,
+                                build.FieldLength,
+                                build.ValidFieldLength,
+                                build.Quality,
+                                build.ShoreMotion,
+                                build.MajorSeed,
+                                build.ConnectorAmount,
+                                build.ConnectorDirectness,
+                                build.ConnectorLengthPreference,
+                                build.ObstacleExclusion,
+                                build.MajorTopology);
+                    }
+                    topologyReplacementPhase =
+                        TopologyReplacementPhase.BuildPocketTopology;
+                    break;
+
+                case TopologyReplacementPhase.BuildPocketTopology:
+                    using (ReplacementBuildPocketProfilerMarker.Auto())
+                    {
+                        build.PocketTopology =
+                            StylizedRiverFoamPocketTopologyGenerator.Generate(
+                                build.Domain,
+                                build.FieldWidth,
+                                build.FieldHeight,
+                                build.FieldLength,
+                                build.ValidFieldLength,
+                                build.Quality,
+                                build.ShoreMotion,
+                                build.MajorSeed,
+                                build.InteriorPocketAmount,
+                                build.EdgeCavityAmount,
+                                build.ConnectorWeakSpanAmount,
+                                build.FreeWaterEventAmount,
+                                build.ObstacleExclusion,
+                                build.MajorTopology,
+                                build.ConnectorTopology);
+                    }
+                    topologyReplacementPhase =
+                        TopologyReplacementPhase.PrepareGeneratedTexture;
+                    break;
+
+                case TopologyReplacementPhase.PrepareGeneratedTexture:
+                    using (ReplacementPrepareTextureProfilerMarker.Auto())
+                    {
+                        PrepareTopologyReplacementGeneratedTexture(build);
+                    }
+                    topologyReplacementPhase =
+                        TopologyReplacementPhase.ReadyToActivate;
+                    break;
+
+                case TopologyReplacementPhase.ReadyToActivate:
+                    if (build.IsIdenticalValidation)
+                    {
+                        topologyReplacementIdenticalPreparedCount++;
+                        topologyReplacementLastReason =
+                            FormatTopologyReplacementReason(build.Reason);
+                        ReleaseTopologyReplacementBuild(true);
+                        return false;
+                    }
+                    using (ReplacementActivateProfilerMarker.Auto())
+                    {
+                        return ActivateTopologyReplacement(build);
+                    }
+            }
+
+            return false;
+        }
+
+        private void PrepareTopologyReplacementGeneratedTexture(
+            TopologyReplacementBuild build)
+        {
+            int cellCount = build.FieldWidth * build.FieldHeight;
+            Color[] pixels = new Color[cellCount];
+            build.MajorTopology?.FillUploadPixels(pixels);
+            build.ConnectorTopology?.AddToUploadPixels(pixels, false);
+            build.PocketTopology?.AddToUploadPixels(
+                pixels,
+                false,
+                false,
+                false);
+
+            build.GeneratedTexture = CreateGuidanceTexture(
+                $"PS3D_RiverFoam_TopologyGenerated_Replacement_{build.RequestId}");
+            Texture2D upload = new Texture2D(
+                build.FieldWidth,
+                build.FieldHeight,
+                TextureFormat.RGBAHalf,
+                false,
+                true)
+            {
+                name =
+                    $"T_PS3D_RiverFoamTopologyReplacement_{build.RequestId}",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+
+            upload.SetPixels(pixels);
+            upload.Apply(false, false);
+            Graphics.Blit(upload, build.GeneratedTexture);
+            DestroyUnityObject(upload);
+        }
+
+        private bool ActivateTopologyReplacement(
+            TopologyReplacementBuild build)
+        {
+            if (build == null || build.MajorTopology == null ||
+                build.ConnectorTopology == null ||
+                build.PocketTopology == null ||
+                build.GeneratedTexture == null ||
+                !build.GeneratedTexture.IsCreated())
+            {
+                CancelTopologyReplacementBuild(false);
+                return false;
+            }
+
+            RenderTexture retiredGeneratedTexture = topologyGeneratedTexture;
+            topologyGeneratedTexture = build.GeneratedTexture;
+            build.GeneratedTexture = null;
+            majorTopology = build.MajorTopology;
+            connectorTopology = build.ConnectorTopology;
+            pocketTopology = build.PocketTopology;
+            majorTopologyInputSignature = build.MajorInputSignature;
+            connectorTopologyInputSignature = build.ConnectorInputSignature;
+            pocketTopologyInputSignature = build.PocketInputSignature;
+
+            InitializeMajorEvolution();
+            InitializeConnectorIdentityReconstruction(false);
+            UploadGeneratedTopology();
+            BuildEvolvingMajorField();
+            RefreshDynamicTopologySources(true);
+
+            ReleaseTexture(ref retiredGeneratedTexture);
+            topologyReplacementActivatedCount++;
+            topologyReplacementLastReason =
+                FormatTopologyReplacementReason(build.Reason);
+            ReleaseTopologyReplacementBuild(false);
+            return true;
+        }
+
+        private void CancelTopologyReplacementBuild(bool coalesced)
+        {
+            if (topologyReplacementBuild == null)
+            {
+                return;
+            }
+
+            topologyReplacementCancelledCount++;
+            if (coalesced)
+            {
+                topologyReplacementCoalescedCount++;
+            }
+            ReleaseTopologyReplacementBuild(true);
+        }
+
+        private void ReleaseTopologyReplacementBuild(bool releaseTexture)
+        {
+            if (topologyReplacementBuild != null && releaseTexture &&
+                topologyReplacementBuild.GeneratedTexture != null)
+            {
+                RenderTexture texture =
+                    topologyReplacementBuild.GeneratedTexture;
+                ReleaseTexture(ref texture);
+                topologyReplacementBuild.GeneratedTexture = null;
+            }
+
+            topologyReplacementBuild = null;
+            topologyReplacementPhase = TopologyReplacementPhase.Idle;
+        }
+
+        private static string FormatTopologyReplacementReason(
+            TopologyReplacementReason reason)
+        {
+            return reason == TopologyReplacementReason.None
+                ? "None"
+                : reason.ToString().Replace(",", " +");
         }
 
         private bool AdvanceQueuedRebuild()
@@ -1826,15 +2294,18 @@ namespace ProgrammaticStylized3D.Rivers
                         ApplyBoundaryToState(stateB);
                     }
 
+                    if (!pendingObstacleRebuild &&
+                        pendingTopologyReplacementAfterMaintenance)
+                    {
+                        RequestTopologyReplacement(
+                            TopologyReplacementReason.Boundary,
+                            false);
+                        pendingTopologyReplacementAfterMaintenance = false;
+                    }
+
                     rebuildPhase = pendingObstacleRebuild
                         ? RebuildPhase.WaitForObstacleStability
-                        : pendingMajorRebuild
-                            ? RebuildPhase.BuildMajorTopology
-                            : pendingConnectorRebuild
-                                ? RebuildPhase.BuildConnectorTopology
-                                : pendingPocketRebuild
-                                    ? RebuildPhase.BuildPocketTopology
-                                    : RebuildPhase.RefreshTopologySources;
+                        : RebuildPhase.RefreshTopologySources;
                     break;
 
                 case RebuildPhase.WaitForObstacleStability:
@@ -1875,43 +2346,14 @@ namespace ProgrammaticStylized3D.Rivers
                     pendingObstacleRebuild = false;
                     pendingObstacleObservedVersion = int.MinValue;
                     pendingObstacleStableFrameCount = 0;
-                    pendingMajorRebuild = true;
-                    rebuildPhase = RebuildPhase.BuildMajorTopology;
-                    break;
-
-                case RebuildPhase.BuildMajorTopology:
-                    using (RebuildBuildMajorProfilerMarker.Auto())
+                    if (pendingTopologyReplacementAfterMaintenance)
                     {
-                        BuildMajorTopology();
+                        RequestTopologyReplacement(
+                            TopologyReplacementReason.Obstacle,
+                            false);
+                        pendingTopologyReplacementAfterMaintenance = false;
                     }
-
-                    pendingMajorRebuild = false;
-                    pendingConnectorRebuild = true;
-                    pendingPocketRebuild = true;
-                    rebuildPhase = RebuildPhase.BuildConnectorTopology;
-                    break;
-
-                case RebuildPhase.BuildConnectorTopology:
-                    using (RebuildBuildConnectorProfilerMarker.Auto())
-                    {
-                        BuildConnectorTopology();
-                    }
-
-                    pendingConnectorRebuild = false;
-                    pendingPocketRebuild = true;
-                    rebuildPhase = RebuildPhase.BuildPocketTopology;
-                    break;
-
-                case RebuildPhase.BuildPocketTopology:
-                    using (RebuildBuildPocketProfilerMarker.Auto())
-                    {
-                        BuildPocketTopology();
-                    }
-
-                    pendingPocketRebuild = false;
-                    rebuildPhase = pendingTopologyRefresh
-                        ? RebuildPhase.RefreshTopologySources
-                        : RebuildPhase.Idle;
+                    rebuildPhase = RebuildPhase.RefreshTopologySources;
                     break;
 
                 case RebuildPhase.RefreshTopologySources:
@@ -1944,33 +2386,6 @@ namespace ProgrammaticStylized3D.Rivers
                     (int)RebuildPhase.BuildObstacleExclusion))
             {
                 rebuildPhase = RebuildPhase.WaitForObstacleStability;
-                return;
-            }
-
-            if (pendingMajorRebuild &&
-                (rebuildPhase == RebuildPhase.Idle ||
-                 (int)rebuildPhase >
-                    (int)RebuildPhase.BuildMajorTopology))
-            {
-                rebuildPhase = RebuildPhase.BuildMajorTopology;
-                return;
-            }
-
-            if (pendingConnectorRebuild &&
-                (rebuildPhase == RebuildPhase.Idle ||
-                 (int)rebuildPhase >
-                    (int)RebuildPhase.BuildConnectorTopology))
-            {
-                rebuildPhase = RebuildPhase.BuildConnectorTopology;
-                return;
-            }
-
-            if (pendingPocketRebuild &&
-                (rebuildPhase == RebuildPhase.Idle ||
-                 (int)rebuildPhase >
-                    (int)RebuildPhase.BuildPocketTopology))
-            {
-                rebuildPhase = RebuildPhase.BuildPocketTopology;
                 return;
             }
 
@@ -2486,10 +2901,8 @@ namespace ProgrammaticStylized3D.Rivers
             rebuildPhase = RebuildPhase.Idle;
             pendingBoundaryRebuild = false;
             pendingObstacleRebuild = false;
-            pendingMajorRebuild = false;
-            pendingConnectorRebuild = false;
-            pendingPocketRebuild = false;
             pendingTopologyRefresh = false;
+            pendingTopologyReplacementAfterMaintenance = false;
             pendingObstacleObservedVersion = int.MinValue;
             pendingObstacleStableFrameCount = 0;
             initializationObstacleObservedVersion = int.MinValue;
@@ -4349,12 +4762,21 @@ namespace ProgrammaticStylized3D.Rivers
                         {
                             Path = path,
                             StartHostSlotIndex = startHostSlotIndex,
-                            EndHostSlotIndex = endHostSlotIndex
+                            EndHostSlotIndex = endHostSlotIndex,
+                            BasePathLengthMetres =
+                                MeasureConnectorPreparedPathLength(points),
+                            SelectionWeight = 1f
                         });
                     maximumPathPointCount = Mathf.Max(
                         maximumPathPointCount,
                         points.Length);
                 }
+            }
+
+            if (allConnectorsPrepared)
+            {
+                ResolveConnectorRelationshipSelectionWeights(
+                    relationshipCandidates);
             }
 
             Vector4[] flattenedPoints = allConnectorsPrepared
@@ -4465,6 +4887,8 @@ namespace ProgrammaticStylized3D.Rivers
             connectorCandidateClaimed = new bool[
                 connectorRelationshipCandidates.Length];
             connectorMajorDegree = new int[majorEvolutionSlots.Length];
+            connectorPreviousMajorDegree = new int[
+                majorEvolutionSlots.Length];
             connectorMajorPairClaimed = new bool[
                 majorEvolutionSlots.Length * majorEvolutionSlots.Length];
             connectorIdentityReconstructionReady =
@@ -4634,12 +5058,52 @@ namespace ProgrammaticStylized3D.Rivers
                 connectorCandidateClaimed.Length !=
                     connectorRelationshipCandidates.Length ||
                 connectorMajorDegree.Length != majorEvolutionSlots.Length ||
+                connectorPreviousMajorDegree.Length !=
+                    majorEvolutionSlots.Length ||
                 connectorMajorPairClaimed.Length !=
                     majorEvolutionSlots.Length * majorEvolutionSlots.Length ||
                 majorTopology == null || river == null ||
                 !river.Domain.IsValid)
             {
                 return;
+            }
+
+            Array.Clear(
+                connectorPreviousMajorDegree,
+                0,
+                connectorPreviousMajorDegree.Length);
+            for (int connectorIndex = 0;
+                 connectorIndex < connectorEvolutionSlots.Length;
+                 connectorIndex++)
+            {
+                ConnectorEvolutionSlot previousSlot =
+                    connectorEvolutionSlots[connectorIndex];
+                int previousCandidateIndex =
+                    previousSlot.AssignedCandidateIndex;
+                if (!previousSlot.IsActive || previousCandidateIndex < 0 ||
+                    previousCandidateIndex >=
+                        connectorRelationshipCandidates.Length)
+                {
+                    continue;
+                }
+
+                ConnectorRelationshipCandidate previousCandidate =
+                    connectorRelationshipCandidates[
+                        previousCandidateIndex];
+                int previousStartHost =
+                    previousCandidate.StartHostSlotIndex;
+                int previousEndHost = previousCandidate.EndHostSlotIndex;
+                if (previousStartHost >= 0 &&
+                    previousStartHost <
+                        connectorPreviousMajorDegree.Length &&
+                    previousEndHost >= 0 &&
+                    previousEndHost <
+                        connectorPreviousMajorDegree.Length &&
+                    previousStartHost != previousEndHost)
+                {
+                    connectorPreviousMajorDegree[previousStartHost]++;
+                    connectorPreviousMajorDegree[previousEndHost]++;
+                }
             }
 
             Array.Clear(
@@ -4762,12 +5226,17 @@ namespace ProgrammaticStylized3D.Rivers
                             slot,
                             candidateIndex,
                             startRecycleCount,
-                            endRecycleCount);
+                            endRecycleCount,
+                            out bool crowdingBoostedTurnover);
                     if (requestTurnover)
                     {
                         if (trackTransitions)
                         {
                             connectorEvolutionTurnoverRequestCount++;
+                            if (crowdingBoostedTurnover)
+                            {
+                                connectorEvolutionCrowdingBoostedTurnoverCount++;
+                            }
                         }
                         ReleaseConnectorSlotForRebind(
                             ref slot,
@@ -4783,7 +5252,7 @@ namespace ProgrammaticStylized3D.Rivers
                     }
                 }
 
-                if (!TryClaimConnectorCandidate(candidateIndex, false))
+                if (!TryClaimConnectorCandidate(candidateIndex))
                 {
                     ReleaseConnectorSlotForRebind(
                         ref slot,
@@ -4838,8 +5307,7 @@ namespace ProgrammaticStylized3D.Rivers
                         out _,
                         out _) &&
                     TryClaimConnectorCandidate(
-                        releasedCandidateIndex,
-                        false))
+                        releasedCandidateIndex))
                 {
                     slot.AssignedCandidateIndex = releasedCandidateIndex;
                 }
@@ -5053,6 +5521,8 @@ namespace ProgrammaticStylized3D.Rivers
                 }
             }
 
+            UpdateConnectorDegreeTelemetry();
+
             if (!weakSpanIdentityReconstructionReady)
             {
                 return;
@@ -5070,6 +5540,114 @@ namespace ProgrammaticStylized3D.Rivers
                     connectorEvolutionSlots[connectorIndex].IsActive)
                 {
                     weakSpanEvolutionActiveCount++;
+                }
+            }
+        }
+
+        private static float MeasureConnectorPreparedPathLength(
+            IReadOnlyList<Vector2> points)
+        {
+            if (points == null || points.Count < 2)
+            {
+                return 0f;
+            }
+
+            float length = 0f;
+            for (int pointIndex = 1;
+                 pointIndex < points.Count;
+                 pointIndex++)
+            {
+                length += Vector2.Distance(
+                    points[pointIndex - 1],
+                    points[pointIndex]);
+            }
+            return length;
+        }
+
+        private void ResolveConnectorRelationshipSelectionWeights(
+            List<ConnectorRelationshipCandidate> candidates)
+        {
+            if (candidates == null || candidates.Count == 0)
+            {
+                return;
+            }
+
+            float minimumLength = float.PositiveInfinity;
+            float maximumLength = 0f;
+            for (int candidateIndex = 0;
+                 candidateIndex < candidates.Count;
+                 candidateIndex++)
+            {
+                float length = Mathf.Max(
+                    0f,
+                    candidates[candidateIndex].BasePathLengthMetres);
+                minimumLength = Mathf.Min(minimumLength, length);
+                maximumLength = Mathf.Max(maximumLength, length);
+            }
+
+            float centredLengthPreference = river != null
+                ? (Mathf.Clamp01(river.FoamConnectorLengthPreference) -
+                   0.5f) * 2f
+                : 0f;
+            for (int candidateIndex = 0;
+                 candidateIndex < candidates.Count;
+                 candidateIndex++)
+            {
+                ConnectorRelationshipCandidate candidate =
+                    candidates[candidateIndex];
+                float normalizedLength = maximumLength >
+                        minimumLength + 0.0001f
+                    ? Mathf.InverseLerp(
+                        minimumLength,
+                        maximumLength,
+                        candidate.BasePathLengthMetres)
+                    : 0.5f;
+                float lengthPreferenceWeight = Mathf.Exp(
+                    centredLengthPreference *
+                    (normalizedLength - 0.5f) *
+                    ConnectorLengthPreferenceWeightStrength);
+                float deterministicJitter = Mathf.Lerp(
+                    ConnectorSelectionJitterMinimum,
+                    ConnectorSelectionJitterMaximum,
+                    HashConnectorIdentity(candidate.Path.StableId, 173u));
+                candidate.SelectionWeight = Mathf.Max(
+                    0.0001f,
+                    lengthPreferenceWeight * deterministicJitter);
+                candidates[candidateIndex] = candidate;
+            }
+        }
+
+        private void UpdateConnectorDegreeTelemetry()
+        {
+            connectorEvolutionMajorDegreeZeroCount = 0;
+            connectorEvolutionMajorDegreeOneCount = 0;
+            connectorEvolutionMajorDegreeTwoCount = 0;
+            connectorEvolutionMajorDegreeThreePlusCount = 0;
+            connectorEvolutionMaximumMajorDegree = 0;
+
+            for (int majorIndex = 0;
+                 majorIndex < connectorMajorDegree.Length;
+                 majorIndex++)
+            {
+                int degree = connectorMajorDegree[majorIndex];
+                connectorEvolutionMaximumMajorDegree = Mathf.Max(
+                    connectorEvolutionMaximumMajorDegree,
+                    degree);
+                if (degree <= 0)
+                {
+                    connectorEvolutionMajorDegreeZeroCount++;
+                }
+                else if (degree == 1)
+                {
+                    connectorEvolutionMajorDegreeOneCount++;
+                }
+                else if (degree == 2)
+                {
+                    connectorEvolutionMajorDegreeTwoCount++;
+                }
+                else
+                {
+                    connectorEvolutionMajorDegreeThreePlusCount++;
                 }
             }
         }
@@ -5166,12 +5744,41 @@ namespace ProgrammaticStylized3D.Rivers
             slot.ReferenceEndAnchorIndex = -2;
         }
 
-        private static bool ShouldRequestConnectorRelationshipTurnover(
+        private bool ShouldRequestConnectorRelationshipTurnover(
             ConnectorEvolutionSlot slot,
             int candidateIndex,
             int startRecycleCount,
-            int endRecycleCount)
+            int endRecycleCount,
+            out bool crowdingBoostedTurnover)
         {
+            crowdingBoostedTurnover = false;
+            if (candidateIndex < 0 ||
+                candidateIndex >= connectorRelationshipCandidates.Length)
+            {
+                return false;
+            }
+
+            ConnectorRelationshipCandidate candidate =
+                connectorRelationshipCandidates[candidateIndex];
+            int startDegree = candidate.StartHostSlotIndex >= 0 &&
+                candidate.StartHostSlotIndex <
+                    connectorPreviousMajorDegree.Length
+                    ? connectorPreviousMajorDegree[
+                        candidate.StartHostSlotIndex]
+                    : 0;
+            int endDegree = candidate.EndHostSlotIndex >= 0 &&
+                candidate.EndHostSlotIndex <
+                    connectorPreviousMajorDegree.Length
+                    ? connectorPreviousMajorDegree[
+                        candidate.EndHostSlotIndex]
+                    : 0;
+            int excessDegree = Mathf.Max(0, startDegree - 1) +
+                Mathf.Max(0, endDegree - 1);
+            float turnoverProbability = Mathf.Min(
+                ConnectorTurnoverMaximumProbability,
+                ConnectorTurnoverBaseProbability +
+                excessDegree * ConnectorTurnoverCrowdingIncrement);
+
             uint stream;
             unchecked
             {
@@ -5181,7 +5788,11 @@ namespace ProgrammaticStylized3D.Rivers
                     ((uint)(endRecycleCount + 1) * 0xC2B2AE35u) ^
                     ((uint)(slot.RelationshipRevision + 1) * 0x27D4EB2Du);
             }
-            return HashConnectorIdentity(slot.StableId, stream) < 0.5f;
+            float sample = HashConnectorIdentity(slot.StableId, stream);
+            crowdingBoostedTurnover =
+                sample >= ConnectorTurnoverBaseProbability &&
+                sample < turnoverProbability;
+            return sample < turnoverProbability;
         }
 
         private int SelectConnectorReplacementCandidate(
@@ -5195,50 +5806,124 @@ namespace ProgrammaticStylized3D.Rivers
                 return -1;
             }
 
-            int scanStart = Mathf.Min(
-                candidateCount - 1,
-                Mathf.FloorToInt(
-                    HashConnectorIdentity(
-                        slot.StableId,
-                        (uint)(97 + slot.RelationshipRevision)) *
-                    candidateCount));
-            for (int offset = 0; offset < candidateCount; offset++)
+            double totalWeight = 0.0;
+            for (int candidateIndex = 0;
+                 candidateIndex < candidateCount;
+                 candidateIndex++)
             {
-                int candidateIndex = (scanStart + offset) % candidateCount;
-                if (candidateIndex == excludedCandidateIndex ||
-                    (slot.StretchBlockedCandidateIndex >= 0 &&
-                     IsSameConnectorMajorPair(
-                         candidateIndex,
-                         slot.StretchBlockedCandidateIndex)) ||
-                    (excludeSameMajorPair &&
-                     IsSameConnectorMajorPair(
-                         candidateIndex,
-                         excludedCandidateIndex)) ||
-                    (slot.ReleaseCooldownTicks > 0 &&
-                     candidateIndex == slot.LastReleasedCandidateIndex))
+                if (!TryResolveConnectorSelectionWeight(
+                        slot,
+                        candidateIndex,
+                        excludedCandidateIndex,
+                        excludeSameMajorPair,
+                        out float candidateWeight))
                 {
                     continue;
                 }
-                if (!TryResolveConnectorCandidateState(
+
+                totalWeight += candidateWeight;
+            }
+
+            if (totalWeight <= 0.0)
+            {
+                return -1;
+            }
+
+            uint stream;
+            unchecked
+            {
+                stream = 211u ^
+                    ((uint)(slot.RelationshipRevision + 1) * 0x9E3779B9u) ^
+                    ((uint)(excludedCandidateIndex + 2) * 0x85EBCA6Bu) ^
+                    (excludeSameMajorPair ? 0xC2B2AE35u : 0u);
+            }
+            double threshold = HashConnectorIdentity(
+                slot.StableId,
+                stream) * totalWeight;
+            double cumulativeWeight = 0.0;
+            int fallbackIndex = -1;
+            for (int candidateIndex = 0;
+                 candidateIndex < candidateCount;
+                 candidateIndex++)
+            {
+                if (!TryResolveConnectorSelectionWeight(
+                        slot,
                         candidateIndex,
-                        out _,
-                        out _,
-                        out _,
-                        out _,
-                        out _,
-                        out _))
+                        excludedCandidateIndex,
+                        excludeSameMajorPair,
+                        out float candidateWeight))
                 {
                     continue;
                 }
-                if (TryClaimConnectorCandidate(
-                        candidateIndex,
-                        true))
+
+                fallbackIndex = candidateIndex;
+                cumulativeWeight += candidateWeight;
+                if (threshold <= cumulativeWeight)
                 {
-                    return candidateIndex;
+                    return TryClaimConnectorCandidate(candidateIndex)
+                        ? candidateIndex
+                        : -1;
                 }
             }
 
-            return -1;
+            return fallbackIndex >= 0 &&
+                TryClaimConnectorCandidate(fallbackIndex)
+                    ? fallbackIndex
+                    : -1;
+        }
+
+        private bool TryResolveConnectorSelectionWeight(
+            ConnectorEvolutionSlot slot,
+            int candidateIndex,
+            int excludedCandidateIndex,
+            bool excludeSameMajorPair,
+            out float weight)
+        {
+            weight = 0f;
+            if (candidateIndex < 0 ||
+                candidateIndex >= connectorRelationshipCandidates.Length ||
+                candidateIndex == excludedCandidateIndex ||
+                (slot.StretchBlockedCandidateIndex >= 0 &&
+                 IsSameConnectorMajorPair(
+                     candidateIndex,
+                     slot.StretchBlockedCandidateIndex)) ||
+                (excludeSameMajorPair &&
+                 IsSameConnectorMajorPair(
+                     candidateIndex,
+                     excludedCandidateIndex)) ||
+                (slot.ReleaseCooldownTicks > 0 &&
+                 candidateIndex == slot.LastReleasedCandidateIndex) ||
+                !CanClaimConnectorCandidate(candidateIndex) ||
+                !TryResolveConnectorCandidateState(
+                    candidateIndex,
+                    out _,
+                    out _,
+                    out _,
+                    out _,
+                    out _,
+                    out _))
+            {
+                return false;
+            }
+
+            ConnectorRelationshipCandidate candidate =
+                connectorRelationshipCandidates[candidateIndex];
+            int startDegree = connectorMajorDegree[
+                candidate.StartHostSlotIndex];
+            int endDegree = connectorMajorDegree[
+                candidate.EndHostSlotIndex];
+            int combinedDegree = startDegree + endDegree;
+            int maximumDegree = Mathf.Max(startDegree, endDegree);
+            float loadWeight = Mathf.Pow(
+                ConnectorLoadPenaltyBase,
+                combinedDegree);
+            float hubWeight = Mathf.Pow(
+                ConnectorHubPenaltyBase,
+                maximumDegree);
+            weight = Mathf.Max(
+                0.0000001f,
+                candidate.SelectionWeight * loadWeight * hubWeight);
+            return true;
         }
 
         private bool IsSameConnectorMajorPair(
@@ -5274,9 +5959,7 @@ namespace ProgrammaticStylized3D.Rivers
             return firstLow == secondLow && firstHigh == secondHigh;
         }
 
-        private bool TryClaimConnectorCandidate(
-            int candidateIndex,
-            bool enforceDensityLimit)
+        private bool CanClaimConnectorCandidate(int candidateIndex)
         {
             if (candidateIndex < 0 ||
                 candidateIndex >= connectorRelationshipCandidates.Length ||
@@ -5299,22 +5982,25 @@ namespace ProgrammaticStylized3D.Rivers
             int lowHost = Mathf.Min(startHost, endHost);
             int highHost = Mathf.Max(startHost, endHost);
             int pairIndex = lowHost * connectorMajorDegree.Length + highHost;
-            if (pairIndex < 0 ||
-                pairIndex >= connectorMajorPairClaimed.Length ||
-                connectorMajorPairClaimed[pairIndex])
+            return pairIndex >= 0 &&
+                pairIndex < connectorMajorPairClaimed.Length &&
+                !connectorMajorPairClaimed[pairIndex];
+        }
+
+        private bool TryClaimConnectorCandidate(int candidateIndex)
+        {
+            if (!CanClaimConnectorCandidate(candidateIndex))
             {
                 return false;
             }
 
-            int maximumDegree = connectorTopology != null
-                ? connectorTopology.RuntimeMaximumMajorDegree
-                : 3;
-            if (enforceDensityLimit &&
-                (connectorMajorDegree[startHost] >= maximumDegree ||
-                 connectorMajorDegree[endHost] >= maximumDegree))
-            {
-                return false;
-            }
+            ConnectorRelationshipCandidate candidate =
+                connectorRelationshipCandidates[candidateIndex];
+            int startHost = candidate.StartHostSlotIndex;
+            int endHost = candidate.EndHostSlotIndex;
+            int lowHost = Mathf.Min(startHost, endHost);
+            int highHost = Mathf.Max(startHost, endHost);
+            int pairIndex = lowHost * connectorMajorDegree.Length + highHost;
 
             connectorCandidateClaimed[candidateIndex] = true;
             connectorMajorPairClaimed[pairIndex] = true;
@@ -5768,6 +6454,7 @@ namespace ProgrammaticStylized3D.Rivers
             connectorCandidateClaimed = Array.Empty<bool>();
             connectorMajorPairClaimed = Array.Empty<bool>();
             connectorMajorDegree = Array.Empty<int>();
+            connectorPreviousMajorDegree = Array.Empty<int>();
             connectorEvolutionActiveCount = 0;
             connectorEvolutionTemporaryAbsenceCount = 0;
             connectorEvolutionIdentityPathCount = 0;
@@ -5781,6 +6468,12 @@ namespace ProgrammaticStylized3D.Rivers
             connectorEvolutionTurnoverRequestCount = 0;
             connectorEvolutionSuccessfulTurnoverCount = 0;
             connectorEvolutionNoAlternativeFallbackCount = 0;
+            connectorEvolutionCrowdingBoostedTurnoverCount = 0;
+            connectorEvolutionMajorDegreeZeroCount = 0;
+            connectorEvolutionMajorDegreeOneCount = 0;
+            connectorEvolutionMajorDegreeTwoCount = 0;
+            connectorEvolutionMajorDegreeThreePlusCount = 0;
+            connectorEvolutionMaximumMajorDegree = 0;
             connectorEvolutionAbsenceEventCount = 0;
             connectorEvolutionReappearanceCount = 0;
             weakSpanEvolutionActiveCount = 0;
@@ -7754,27 +8447,18 @@ namespace ProgrammaticStylized3D.Rivers
                 return int.MinValue + 1;
             }
 
-            unchecked
-            {
-                int hash = 17;
-                hash = hash * 31 + river.Domain.Version;
-                hash = hash * 31 + obstacleGeometryVersion;
-                hash = hash * 31 + (int)river.Quality;
-                hash = hash * 31 + fieldWidth;
-                hash = hash * 31 + fieldHeight;
-                hash = hash * 31 + river.FoamMajorSupportSeed;
-                hash = hash * 31 + Mathf.RoundToInt(
-                    river.FoamMajorSupportAmount * 10000f);
-                hash = hash * 31 + Mathf.RoundToInt(
-                    river.FoamMajorSupportSize * 10000f);
-                hash = hash * 31 + Mathf.RoundToInt(
-                    river.FoamMajorSupportSizeVariation * 10000f);
-                hash = hash * 31 + Mathf.RoundToInt(
-                    river.FoamMajorRecycleTerritoryDeviationPercent * 1000f);
-                hash = hash * 31 + Mathf.RoundToInt(
-                    river.ShoreMotion * 10000f);
-                return hash;
-            }
+            return ResolveMajorTopologyInputSignature(
+                river.Domain,
+                obstacleGeometryVersion,
+                river.Quality,
+                fieldWidth,
+                fieldHeight,
+                river.FoamMajorSupportSeed,
+                river.FoamMajorSupportAmount,
+                river.FoamMajorSupportSize,
+                river.FoamMajorSupportSizeVariation,
+                river.FoamMajorRecycleTerritoryDeviationPercent,
+                river.ShoreMotion);
         }
 
         private int ResolveConnectorTopologyInputSignature()
@@ -7786,18 +8470,11 @@ namespace ProgrammaticStylized3D.Rivers
                 return int.MinValue + 2;
             }
 
-            unchecked
-            {
-                int hash = 23;
-                hash = hash * 31 + majorTopologyInputSignature;
-                hash = hash * 31 + Mathf.RoundToInt(
-                    river.FoamConnectorAmount * 10000f);
-                hash = hash * 31 + Mathf.RoundToInt(
-                    river.FoamConnectorDirectness * 10000f);
-                hash = hash * 31 + Mathf.RoundToInt(
-                    river.FoamConnectorLengthPreference * 10000f);
-                return hash;
-            }
+            return ResolveConnectorTopologyInputSignature(
+                majorTopologyInputSignature,
+                river.FoamConnectorAmount,
+                river.FoamConnectorDirectness,
+                river.FoamConnectorLengthPreference);
         }
 
         private int ResolvePocketTopologyInputSignature()
@@ -7809,22 +8486,170 @@ namespace ProgrammaticStylized3D.Rivers
                 return int.MinValue + 3;
             }
 
+            return ResolvePocketTopologyInputSignature(
+                majorTopologyInputSignature,
+                connectorTopologyInputSignature,
+                river.FoamInteriorPocketAmount,
+                river.FoamEdgeCavityAmount,
+                river.FoamConnectorWeakSpanAmount,
+                river.FoamFreeWaterEventAmount);
+        }
+
+        private void ResolveRequestedTopologySignatures(
+            out int majorSignature,
+            out int connectorSignature,
+            out int pocketSignature,
+            out int combinedSignature)
+        {
+            majorSignature = ResolveMajorTopologyInputSignature(
+                river.Domain,
+                obstacleGeometryVersion,
+                river.Quality,
+                fieldWidth,
+                fieldHeight,
+                river.FoamMajorSupportSeed,
+                river.FoamMajorSupportAmount,
+                river.FoamMajorSupportSize,
+                river.FoamMajorSupportSizeVariation,
+                river.FoamMajorRecycleTerritoryDeviationPercent,
+                river.ShoreMotion);
+            connectorSignature = ResolveConnectorTopologyInputSignature(
+                majorSignature,
+                river.FoamConnectorAmount,
+                river.FoamConnectorDirectness,
+                river.FoamConnectorLengthPreference);
+            pocketSignature = ResolvePocketTopologyInputSignature(
+                majorSignature,
+                connectorSignature,
+                river.FoamInteriorPocketAmount,
+                river.FoamEdgeCavityAmount,
+                river.FoamConnectorWeakSpanAmount,
+                river.FoamFreeWaterEventAmount);
+            combinedSignature = CombineTopologySignatures(
+                majorSignature,
+                connectorSignature,
+                pocketSignature);
+        }
+
+        private int ResolveRequestedTopologySignature()
+        {
+            ResolveRequestedTopologySignatures(
+                out _,
+                out _,
+                out _,
+                out int combinedSignature);
+            return combinedSignature;
+        }
+
+        private int ResolveActiveTopologySignature()
+        {
+            if (majorTopology == null || connectorTopology == null ||
+                pocketTopology == null)
+            {
+                return int.MinValue + 4;
+            }
+
+            return CombineTopologySignatures(
+                majorTopologyInputSignature,
+                connectorTopologyInputSignature,
+                pocketTopologyInputSignature);
+        }
+
+        private static int ResolveMajorTopologyInputSignature(
+            RiverDomainSnapshot domain,
+            int obstacleVersion,
+            StylizedRiverQuality quality,
+            int width,
+            int height,
+            int majorSeed,
+            float majorAmount,
+            float majorSize,
+            float majorSizeVariation,
+            float recycleTerritoryDeviationPercent,
+            float shoreMotion)
+        {
+            if (domain == null || !domain.IsValid || width < 2 || height < 2)
+            {
+                return int.MinValue + 1;
+            }
+
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + domain.Version;
+                hash = hash * 31 + obstacleVersion;
+                hash = hash * 31 + (int)quality;
+                hash = hash * 31 + width;
+                hash = hash * 31 + height;
+                hash = hash * 31 + majorSeed;
+                hash = hash * 31 + Mathf.RoundToInt(majorAmount * 10000f);
+                hash = hash * 31 + Mathf.RoundToInt(majorSize * 10000f);
+                hash = hash * 31 + Mathf.RoundToInt(
+                    majorSizeVariation * 10000f);
+                hash = hash * 31 + Mathf.RoundToInt(
+                    recycleTerritoryDeviationPercent * 1000f);
+                hash = hash * 31 + Mathf.RoundToInt(shoreMotion * 10000f);
+                return hash;
+            }
+        }
+
+        private static int ResolveConnectorTopologyInputSignature(
+            int majorSignature,
+            float connectorAmount,
+            float connectorDirectness,
+            float connectorLengthPreference)
+        {
+            unchecked
+            {
+                int hash = 23;
+                hash = hash * 31 + majorSignature;
+                hash = hash * 31 + Mathf.RoundToInt(
+                    connectorAmount * 10000f);
+                hash = hash * 31 + Mathf.RoundToInt(
+                    connectorDirectness * 10000f);
+                hash = hash * 31 + Mathf.RoundToInt(
+                    connectorLengthPreference * 10000f);
+                return hash;
+            }
+        }
+
+        private static int ResolvePocketTopologyInputSignature(
+            int majorSignature,
+            int connectorSignature,
+            float interiorPocketAmount,
+            float edgeCavityAmount,
+            float weakSpanAmount,
+            float freeWaterAmount)
+        {
             unchecked
             {
                 int hash = 29;
-                hash = hash * 31 + majorTopologyInputSignature;
-                hash = hash * 31 + connectorTopologyInputSignature;
+                hash = hash * 31 + majorSignature;
+                hash = hash * 31 + connectorSignature;
                 hash = hash * 31 + Mathf.RoundToInt(
-                    river.FoamInteriorPocketAmount * 10000f);
+                    interiorPocketAmount * 10000f);
                 hash = hash * 31 + Mathf.RoundToInt(
-                    river.FoamEdgeCavityAmount * 10000f);
+                    edgeCavityAmount * 10000f);
                 hash = hash * 31 + Mathf.RoundToInt(
-                    river.FoamConnectorWeakSpanAmount * 10000f);
+                    weakSpanAmount * 10000f);
                 hash = hash * 31 + Mathf.RoundToInt(
-                    river.FoamFreeWaterEventAmount * 10000f);
-                // Patch 4.4: four independent prepared negative classes,
-                // including sparse unhosted Free-Water Negative Events.
+                    freeWaterAmount * 10000f);
                 hash = hash * 31 + 4;
+                return hash;
+            }
+        }
+
+        private static int CombineTopologySignatures(
+            int majorSignature,
+            int connectorSignature,
+            int pocketSignature)
+        {
+            unchecked
+            {
+                int hash = 43;
+                hash = hash * 31 + majorSignature;
+                hash = hash * 31 + connectorSignature;
+                hash = hash * 31 + pocketSignature;
                 return hash;
             }
         }
@@ -8773,6 +9598,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void ReleaseResources()
         {
+            ReleaseTopologyReplacementBuild(true);
             ReleaseTexture(ref stateA);
             ReleaseTexture(ref stateB);
             ReleaseTexture(ref advectedState);
@@ -8888,15 +9714,20 @@ namespace ProgrammaticStylized3D.Rivers
             rebuildPhase = RebuildPhase.Idle;
             pendingBoundaryRebuild = false;
             pendingObstacleRebuild = false;
-            pendingMajorRebuild = false;
-            pendingConnectorRebuild = false;
-            pendingPocketRebuild = false;
             pendingTopologyRefresh = false;
+            pendingTopologyReplacementAfterMaintenance = false;
             pendingObstacleObservedVersion = int.MinValue;
             pendingObstacleStableFrameCount = 0;
             initializationObstacleObservedVersion = int.MinValue;
             initializationObstacleStableFrameCount = 0;
             initializationPhase = InitializationPhase.NotStarted;
+            topologyReplacementRequestSequence = 0;
+            topologyReplacementRequestCount = 0;
+            topologyReplacementCoalescedCount = 0;
+            topologyReplacementCancelledCount = 0;
+            topologyReplacementActivatedCount = 0;
+            topologyReplacementIdenticalPreparedCount = 0;
+            topologyReplacementLastReason = "None";
             domainVersion = -1;
             guidanceAccumulator = 0f;
             topologyMetricsAccumulator = 0f;

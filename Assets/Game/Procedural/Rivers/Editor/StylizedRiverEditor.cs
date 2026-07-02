@@ -1471,7 +1471,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.7 evolves Major Support, Major-hosted negative regions, independent Free-Water Negative Events, Connector Support, and attached Connector Weak Spans from bounded prepared data. Patch 4.7C.3.2 adds ratio-based stretch breaking and deterministic recycle turnover so viable Connectors do not stretch indefinitely or preserve the same Major pair after every host recycle.",
+                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.7 evolves Major Support, Major-hosted negative regions, independent Free-Water Negative Events, Connector Support, and attached Connector Weak Spans from bounded prepared data. Patch 4.7C.3.3 keeps the ratio-based break and recycle-turnover lifecycle while replacing per-Major degree ceilings with a strong deterministic soft distribution bias, so unused support patches are favoured without making occasional hubs impossible.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1759,9 +1759,41 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Patch 4.7 evolves Major Support, Major-hosted negative regions, independent Free-Water Negative Events, Connector Support, and Connector Weak Spans through bounded prepared records. Patch 4.7C.3.2 deforms current paths between live Major gates, breaks paths that exceed their assignment-relative stretch ratio, and makes one deterministic approximately 50/50 keep-versus-new-pair decision when either host begins a recycled occurrence. Authoritative live Pressure, Lee, Shore, and Obstacle Footprint sources remain independently composed."),
+                    "Patch 4.7 evolves Major Support, Major-hosted negative regions, independent Free-Water Negative Events, Connector Support, and Connector Weak Spans through bounded prepared records. Patch 4.7C.3.3 deforms current paths between live Major gates, breaks paths that exceed their assignment-relative stretch ratio, and selects prepared relationships through a strong but non-zero endpoint-load bias. Patch 4.8A keeps the accepted active topology alive while a same-grid replacement is prepared in isolated Major, Connector, negative, and upload phases, then activates only the complete replacement. Authoritative live Pressure, Lee, Shore, and Obstacle Footprint sources remain independently composed."),
                 new GUIContent(
-                    "Breaking/Rebinding Connector Topology (Patch 4.7C.3.2)"));
+                    "Staged Replacement Topology (Patch 4.8A)"));
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Replacement Build State",
+                    "Same-grid explicit topology changes prepare a complete replacement without mutating the currently accepted topology. Dimension-changing domain or quality transitions remain assigned to Patch 4.8B because they require two differently mapped complete resource sets."),
+                new GUIContent(runtime.TopologyReplacementState));
+            EditorGUILayout.LabelField(
+                "Replacement Ready",
+                runtime.TopologyReplacementReady ? "Yes" : "No");
+            EditorGUILayout.LabelField(
+                "Last Replacement Reason",
+                runtime.TopologyReplacementLastReason);
+            EditorGUILayout.LabelField(
+                "Requests / Activations",
+                $"{runtime.TopologyReplacementRequestCount} / " +
+                runtime.TopologyReplacementActivatedCount);
+            EditorGUILayout.LabelField(
+                "Coalesced / Cancelled",
+                $"{runtime.TopologyReplacementCoalescedCount} / " +
+                runtime.TopologyReplacementCancelledCount);
+            EditorGUILayout.LabelField(
+                "Identical Preparations",
+                runtime.TopologyReplacementIdenticalPreparedCount.ToString());
+            using (new EditorGUI.DisabledScope(
+                       !Application.isPlaying ||
+                       !runtime.ResourcesAllocated ||
+                       runtime.TopologyReplacementInProgress))
+            {
+                if (GUILayout.Button("Prepare Identical Topology Replacement"))
+                {
+                    runtime.RequestIdenticalTopologyReplacementValidation();
+                }
+            }
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
                 new GUIContent(
@@ -1969,8 +2001,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorGUI.indentLevel--;
                 EditorGUILayout.LabelField(
                     new GUIContent(
-                        "4.7C.3.2 Break and Relationship Turnover",
-                        "Connector slots use exact prevalidated endpoint-anchor variants, break when their current live length exceeds the exposed assignment-relative stretch ratio, and make a deterministic approximately 50/50 retain-versus-different-pair decision when either host recycles. Runtime performs bounded catalogue selection only; no pathfinding, geometry validation, retry loop, or GPU readback is introduced."),
+                        "4.7C.3.3 Soft Connector Distribution Bias",
+                        "Connector slots use exact prevalidated endpoint-anchor variants and the exposed assignment-relative stretch break. Initial generation and runtime rebinding now use deterministic weighted selection: every existing endpoint connection sharply lowers candidate weight, and concentration on one endpoint adds a second penalty. No degree is forbidden, so occasional hubs remain possible. Crowded relationships also receive a higher recycle-turnover probability."),
                     new GUIContent(
                         runtime.ConnectorEvolutionAvailable
                             ? "Available"
@@ -2006,6 +2038,19 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Successful Turnovers / No-Alternative Retains",
                     $"{runtime.ConnectorEvolutionSuccessfulTurnoverCount} / " +
                     runtime.ConnectorEvolutionNoAlternativeFallbackCount);
+                EditorGUILayout.LabelField(
+                    "Crowding-Boosted Turnovers",
+                    runtime.ConnectorEvolutionCrowdingBoostedTurnoverCount
+                        .ToString());
+                EditorGUILayout.LabelField(
+                    "Major Degree 0 / 1 / 2 / 3+",
+                    $"{runtime.ConnectorEvolutionMajorDegreeZeroCount} / " +
+                    $"{runtime.ConnectorEvolutionMajorDegreeOneCount} / " +
+                    $"{runtime.ConnectorEvolutionMajorDegreeTwoCount} / " +
+                    runtime.ConnectorEvolutionMajorDegreeThreePlusCount);
+                EditorGUILayout.LabelField(
+                    "Maximum Active Major Degree",
+                    runtime.ConnectorEvolutionMaximumMajorDegree.ToString());
                 EditorGUILayout.LabelField(
                     "Absence / Reappearance Events",
                     $"{runtime.ConnectorEvolutionAbsenceEventCount} / " +
@@ -2055,7 +2100,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorGUILayout.LabelField(
                     new GUIContent(
                         "Weak-Span Attachments Prepared / Accepted",
-                        "Each prepared Weak Span retains its Connector identity, normalized path position, endpoint-safe interval, physical radii, strength, seed, and accepted tangent. Patch 4.7C.3.2 samples the Connector slot's current original or replacement path and follows its live tangent after stretch breaks and recycle turnover; static pressure is retained only as a complete-only fallback."),
+                        "Each prepared Weak Span retains its Connector identity, normalized path position, endpoint-safe interval, physical radii, strength, seed, and accepted tangent. Patch 4.7C.3.3 samples the Connector slot's current original or replacement path and follows its live tangent after stretch breaks, soft-balanced rebinding, and recycle turnover; static pressure is retained only as a complete-only fallback."),
                     new GUIContent(
                         $"{runtime.ConnectorWeakSpanPreparedCount} / " +
                         runtime.ConnectorWeakSpanAcceptedCount));
@@ -2065,7 +2110,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorGUILayout.LabelField(
                     new GUIContent(
                         "Weak-Span Runtime Reconstruction",
-                        "Complete-only reconstruction of Connector Weak Span pressure from normalized path attachment and physical shape data. Patch 4.7C.3.2 samples the current deformed original or replacement path and live tangent after stretch breaks and recycle turnover. A Weak Span is temporarily absent only while its Connector slot has no valid prepared relationship assignment."),
+                        "Complete-only reconstruction of Connector Weak Span pressure from normalized path attachment and physical shape data. Patch 4.7C.3.3 samples the current deformed original or replacement path and live tangent after stretch breaks, soft-balanced rebinding, and recycle turnover. A Weak Span is temporarily absent only while its Connector slot has no valid prepared relationship assignment."),
                     new GUIContent(
                         runtime.WeakSpanIdentityReconstructionAvailable
                             ? "Available"

@@ -4,7 +4,7 @@
 
 **Status:** Canonical step-by-step implementation plan for Stage 6 Foam topology only.
 
-**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-footprint/parity correction are implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector/Weak Span immutable preparation data is implemented and Unity preparation diagnostics are accepted: all accepted Connectors and Weak Span attachments prepared successfully with zero unresolved endpoints or unavailable attachments in the validation scene. Patch 4.7C.2 identity reconstruction, debug-only parity, and combined reconstruction scheduling are implemented and visually accepted. Patch 4.7C.3 endpoint-driven Connector deformation and Weak Span current-path/tangent following are implemented, but long-run validation exposed permanent Connector population drain because only a subset of same-host anchor states was prepared and relationships could not rebind to different Major targets. Patch 4.7C.3.1 completes anchor-state coverage and adds bounded preparation-time replacement relationships. Long-run validation then exposed two remaining lifecycle defects: valid relationships could stretch indefinitely during ordinary host motion, and runtime preserved the same viable pair after every recycle. Patch 4.7C.3.2 adds ratio-based stretch breaking plus deterministic recycle relationship turnover and awaits Unity visual/long-run validation. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Explicit rebuild transition and production cache packaging are not yet implemented.
+**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-footprint/parity correction are implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector/Weak Span immutable preparation data is implemented and Unity preparation diagnostics are accepted: all accepted Connectors and Weak Span attachments prepared successfully with zero unresolved endpoints or unavailable attachments in the validation scene. Patch 4.7C.2 identity reconstruction, debug-only parity, and combined reconstruction scheduling are implemented and visually accepted. Patch 4.7C.3 endpoint-driven Connector deformation and Weak Span current-path/tangent following are implemented, but long-run validation exposed permanent Connector population drain because only a subset of same-host anchor states was prepared and relationships could not rebind to different Major targets. Patch 4.7C.3.1 completes anchor-state coverage and adds bounded preparation-time replacement relationships. Long-run validation then exposed two remaining lifecycle defects: valid relationships could stretch indefinitely during ordinary host motion, and runtime preserved the same viable pair after every recycle. Patch 4.7C.3.2 adds ratio-based stretch breaking plus deterministic recycle relationship turnover; validation exposed strong relationship concentration. Patch 4.7C.3.3 deterministic soft endpoint-load distribution is implemented and visually/long-run validated. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Patch 4.8A staged same-grid replacement preparation and atomic activation are implemented and await Unity validation. Patch 4.8B crossfade/differently mapped resource transition and production cache packaging are not yet implemented.
 
 **Primary implementation target:**
 
@@ -1195,14 +1195,35 @@ Whenever either endpoint Major begins a recycled occurrence while the current re
 
 - approximately half retain the current Major pair and use its exact prepared anchor-state variant;
 - approximately half request a different currently valid prepared Major pair;
-- a requested turnover excludes the previous pair and preserves unique-pair and per-Major-degree limits;
+- a requested turnover excludes the previous pair and preserves unique Major pairs; endpoint concentration is handled by the Patch 4.7C.3.3 soft distribution bias rather than a hard degree ceiling;
 - when no different relationship is available, the still-viable previous relationship is retained rather than deleting the Connector needlessly.
 
 Weak Spans remain attached to their logical Connector slots, so a stretch break or successful recycle turnover moves the Weak Span to the replacement path and current tangent without creating a second instance. Runtime work remains bounded prepared-catalogue selection plus the path-length calculation already required for cumulative arc-length output. No pathfinding, geometry validation, retry loop, candidate generation, GPU readback, or managed runtime collection is added.
 
 **Implementation status:** implemented; Unity visual and long-run validation pending. Inspector telemetry reports the exposed ratio, stretch breaks, recycle retain decisions, turnover requests, successful turnovers, no-alternative retains, relationship rebinds, and temporary absence/reappearance.
 
-**Acceptance:** over repeated recycle cycles, retain decisions and turnover requests approach an approximately even distribution subject to deterministic sampling; successful turnovers visibly connect different Major pairs when alternatives exist; a relationship cannot exceed the configured relative stretch envelope; stretch-broken paths never reclaim the same pair as an emergency fallback; Weak Spans follow every replacement; and the Connector population remains stable without stretched bridges, duplicate pairs, uncontrolled Major degree, old/new overlap, runtime search, or readback.
+**Acceptance:** over repeated recycle cycles, retain decisions and turnover requests approach an approximately even distribution subject to deterministic sampling; successful turnovers visibly connect different Major pairs when alternatives exist; a relationship cannot exceed the configured relative stretch envelope; stretch-broken paths never reclaim the same pair as an emergency fallback; Weak Spans follow every replacement; and the Connector population remains stable without stretched bridges, duplicate pairs, systematic hub concentration, old/new overlap, runtime search, or readback.
+
+### Patch 4.7C.3.3 — Soft Connector distribution bias
+
+Unity validation of Patch 4.7C.3.2 confirmed stretch breaking and relationship turnover, but exposed a distribution defect: most Major patches remained unconnected while a small number repeatedly accumulated several relationships. The cause was structural rather than visual randomness. Initial generation used only tiny additive degree adjustments, and runtime rebinding accepted the first valid prepared candidate under a hard per-Major degree ceiling.
+
+Patch 4.7C.3.3 replaces both policies with the same deterministic weighted distribution rule:
+
+- every existing endpoint connection multiplies candidate weight by `0.22`;
+- concentration on the busier endpoint applies an additional `0.60 ^ max(endpoint degrees)` multiplier;
+- prepared geometry and the authored Connector Length Preference remain part of the base candidate weight;
+- weighted selection uses stable topology/slot identity, so the result remains deterministic for one seed;
+- no degree is categorically forbidden, preserving a small but non-zero chance for occasional hubs;
+- duplicate active relationships between the exact same Major pair remain forbidden because they do not add a distinct relationship.
+
+Initial Connector generation applies the weighting while selecting candidate component pairs. Endpoint alternatives for the same component pair share that pair's probability mass, preventing a pair with more retained endpoint alternatives from gaining an accidental multiplicity advantage. Runtime rebinding applies the same load and hub multipliers to the bounded prepared relationship catalogue and performs one deterministic weighted draw.
+
+Recycle turnover remains approximately `50%` for relationships whose endpoints each have degree one or less. Crowding raises turnover probability by `15` percentage points for every endpoint connection above degree one, capped at `90%`. This is still a probability rather than a forced cleanup rule: a hub may persist, and no relationship breaks solely because an endpoint is popular. Stretch breaking remains the only hard live-viability break.
+
+**Implementation status:** implemented; Unity visual and long-run distribution validation pending. Inspector telemetry reports the active Major degree histogram (`0 / 1 / 2 / 3+`), maximum active degree, and turnover requests caused specifically by the crowding boost.
+
+**Acceptance:** across repeated generation seeds and long recycle runs, degree-zero Major patches should fall substantially while occasional degree-three-or-higher hubs remain possible. Rebinding should favour less-used endpoints without creating a rigid matching pattern, the relationship population should remain stable, unique pairs and stretch limits must remain intact, and no runtime pathfinding, geometry validation, retry loop, GPU readback, or managed candidate construction may be introduced.
 
 ### Shared inspection and telemetry
 
@@ -1227,47 +1248,65 @@ Each subpatch may return its classes to their accepted Patch 4.5 static fields w
 
 ### Purpose
 
-Replace the complete generated topology after an explicit source/domain/settings rebuild without an uncontrolled whole-field discontinuity. This is separate from ordinary per-slot evolution, which uses one active instance and no old/new support duplication.
+Replace complete generated topology after an explicit source/domain/settings rebuild without allowing partially rebuilt Major, Connector, and Negative classes to become authoritative. This remains separate from ordinary per-slot evolution, which uses one active instance and no old/new support duplication.
 
-### Exact behaviour change
+### Patch 4.8A — staged same-grid replacement preparation and atomic activation
 
-When a rebuild is required:
+**Status:** implemented; Unity validation pending.
 
-1. preserve the currently active accepted topology;
-2. generate the replacement through staged preparation;
-3. validate and upload the replacement only after complete readiness;
-4. crossfade old and new generated topology over a bounded interval;
-5. keep Anchored Support live from its authoritative sources throughout;
-6. release old generated data only after the crossfade completes.
+Patch 4.8A replaces the previous in-place Major → Connector → Pocket rebuild tail for same-grid topology changes.
 
-Rapid repeated dirty events must coalesce. A later change may invalidate an in-progress replacement, but it must not force synchronous completion.
+When Seed, Amount, Size, Connector settings, Negative settings, or prepared obstacle context changes while the active field dimensions remain valid:
 
-### Immediate inspection
+1. capture one immutable replacement request containing the current river domain reference, quality, field dimensions, authored topology settings, seed, and a private copy of the prepared obstacle scalar field;
+2. leave the currently accepted topology and all of its ordinary evolution active;
+3. build replacement Major Support, Connector Support, and all four Negative classes in separate frames;
+4. prepare a separate generated-topology texture containing the complete static fallback result;
+5. make no active topology object, evolution buffer, or bound generated texture point at the replacement while preparation is incomplete;
+6. activate only the complete replacement in one commit step, then rebuild compact evolution records and compose the new topology before the frame is bound;
+7. retire the previous generated-topology texture only after the atomic commit.
 
-Trigger controlled changes to Seed, Amount, Size, river domain, and obstacle context while viewing the topology on the river.
+A newer target signature cancels only the in-progress replacement. The accepted active topology is not cancelled or cleared. Repeated frames observing the same target do not duplicate work; a genuinely newer request increments coalesced/cancelled telemetry and restarts from the newest immutable snapshot.
+
+Boundary and authoritative Obstacle Footprint refresh remain live source maintenance. After obstacle preparation stabilises, the new obstacle scalar is captured by the replacement request instead of rebuilding active generated classes in place.
+
+Patch 4.8A includes an Editor/development validation command, **Prepare Identical Topology Replacement**. It prepares an identical replacement through every staging phase and discards it without activation. This proves that replacement preparation itself has no visible side effect even when the active topology has already evolved away from its identity pose.
+
+Patch 4.8A deliberately covers **same-grid generated topology replacement**. A domain or quality change that alters field mapping or dimensions still follows the complete resource-initialization path. Preserving and transitioning between two differently mapped complete resource sets belongs to Patch 4.8B rather than being hidden inside this subpatch.
 
 Required telemetry:
 
-- rebuild state;
-- old/new topology readiness;
-- crossfade progress;
-- coalesced invalidation count;
-- cancelled replacement count.
+- replacement build phase;
+- replacement readiness;
+- last request reason;
+- request and activation counts;
+- coalesced and cancelled replacement counts;
+- completed identical preparations.
 
-### Acceptance gate
+Patch 4.8A passes only if:
 
-Pass only if:
+- old generated topology remains visible and continues ordinary evolution throughout preparation;
+- no partially rebuilt class becomes active;
+- settings and obstacle changes activate only after Major, Connector, Pocket, and replacement upload are complete;
+- rapid successive changes cancel/restart only replacement work and settle on the latest target;
+- identical preparation completes without any visible topology change;
+- activation produces no neutral frame, although a direct old/new shape discontinuity remains expected until 4.8B.
 
-- the current topology remains valid while replacement prepares;
-- no whole topology field flashes to neutral;
-- no synchronous rebuild path returns;
-- repeated changes coalesce;
-- old and new topology crossfade safely;
-- source-attached support remains authoritative.
+### Patch 4.8B — bounded old/new transition
+
+Patch 4.8B is next. It will retain both complete generated topology sets after 4.8A readiness and crossfade them over a bounded interval while Anchored Support remains live and authoritative. It must also cover dimension-changing domain/quality transitions by retaining two complete mappings/resources rather than reinterpreting the old field through the new domain.
+
+Required 4.8B behaviour:
+
+- crossfade complete old and replacement generated topology, never partially built classes;
+- avoid a neutral-frame flash and avoid old/new double-strength support;
+- keep Pressure, Lee, Shore, and Obstacle Footprint outside the generated-topology fade;
+- coalesce later requests without forcing the current transition to synchronously complete;
+- release retired CPU/GPU data only after the transition finishes.
 
 ### Rollback
 
-Disable replacement crossfade and restore the accepted queued static-rebuild behaviour while preserving the last valid topology.
+Disable staged replacement and return same-grid topology changes to the last accepted active topology. Do not restore partial in-place Major/Connector/Pocket authority.
 
 ---
 
@@ -1499,25 +1538,23 @@ A topology patch that cannot answer these questions is not ready.
 
 ## 13. Immediate Next Step
 
-Patch 4.7C.0 is implemented and visually revalidated. Patch 4.7C.1 immutable Connector/Weak Span preparation data is implemented and its Unity diagnostics are accepted. Patch 4.7C.2 identity reconstruction, separate debug-only parity, and combined reconstruction scheduling are implemented and visually accepted. Patch 4.7C.3 proved live endpoint-driven deformation but failed long-run population persistence. Patch 4.7C.3.1 complete anchor-state coverage and bounded relationship rebinding are implemented. Long-run validation exposed unbounded live stretch and a hard same-pair preservation bias. Patch 4.7C.3.2 ratio-based stretch breaking and deterministic recycle turnover are implemented and require Unity visual/long-run validation before the topology sequence advances to explicit rebuild handling.
+Patch 4.7C.3.3 soft weighted Connector distribution is visually/long-run validated. Patch 4.8A staged same-grid replacement preparation and atomic activation are implemented.
 
-Validate Patch 4.7C.3.2 on the actual river for long enough that every Major recycles multiple times:
+Validate Patch 4.8A on the actual river:
 
-1. `Connector Break Stretch Ratio` appears with range `1.10–2.00`, default `1.45`, and changing it affects only the live break envelope rather than regenerating static topology;
-2. Connectors break and rebind before producing visibly implausible long bridges, and the `Stretch Breaks` counter matches visible events;
-3. a stretch-broken Connector never immediately reclaims the same Major pair as a fallback;
-4. every valid host recycle produces exactly one deterministic retain-or-turnover decision for each affected active Connector;
-5. recycle retain decisions and turnover requests trend toward an approximately even distribution across repeated events;
-6. successful turnovers visibly connect different current Major pairs, while `No-Alternative Retains` increases only when no different valid unclaimed prepared relationship exists;
-7. unique Major pairs and bounded per-Major degree remain enforced after simultaneous turnover events;
-8. Weak Spans follow the replacement path and live tangent after both stretch breaks and recycle turnovers;
-9. temporary absence remains bounded, recovers when a valid relationship becomes available, and total Connector population does not collapse;
-10. no stretched emergency bridge, detached remnant, duplicate old/new relationship, runtime pathfinding, geometry validation, retry, GPU readback, per-Connector dispatch, or managed allocation is introduced;
-11. Major, hosted-negative, Free-Water, Connector, and Weak Span descriptors still feed at most one combined evolving-topology reconstruction per applicable tick.
+1. allow the active topology to evolve away from its identity pose, then press **Prepare Identical Topology Replacement**; the replacement phases must complete, `Identical Preparations` must increase, and the visible topology must not reset because the identical result is discarded;
+2. change Major Seed, Amount, Size, Connector settings, and each Negative Amount independently; the old accepted topology must remain active until the complete replacement reaches activation;
+3. confirm no intermediate combination appears, such as replacement Majors with active old Connectors or replacement Weak Spans attached to old paths;
+4. confirm activation happens in one commit frame with no neutral topology field, while accepting that an old/new shape jump remains until Patch 4.8B;
+5. change a setting repeatedly during preparation; only the replacement must cancel/restart, `Coalesced / Cancelled` must increase, and the latest target must eventually activate;
+6. change obstacle context; authoritative Obstacle Footprint/source maintenance must settle first, then the replacement must capture the updated prepared obstacle scalar;
+7. ordinary Major, hosted-negative, Free-Water, Connector, and Weak Span evolution must continue while replacement CPU phases run and pause only for the activation frame;
+8. disabling, freezing, sleeping release, destruction, or a dimension-changing domain/quality reinitialization must release the temporary replacement texture safely;
+9. no new compute kernel, normal-runtime readback, path search, retry loop, or per-region dispatch may appear.
 
 After validation, proceed in this exact order:
 
-1. Patch 4.8 — explicit full-topology rebuild transition;
+1. Patch 4.8B — bounded old/new generated-topology crossfade and differently mapped domain/quality resource transition;
 2. Patch 4.9 — procedural chunk/run cache and precompute packaging;
 3. Patch 4.10 — topology completion and handoff to separate Foam-material work.
 

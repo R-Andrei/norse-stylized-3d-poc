@@ -327,7 +327,6 @@ namespace ProgrammaticStylized3D.Rivers
             int acceptedConnectorCount,
             int coveredCellCount,
             double generationMilliseconds,
-            int runtimeMaximumMajorDegree,
             float[] support,
             StylizedRiverFoamConnectorRelationship[] relationships,
             StylizedRiverFoamConnectorPath[] paths,
@@ -341,10 +340,6 @@ namespace ProgrammaticStylized3D.Rivers
             AcceptedConnectorCount = Mathf.Max(0, acceptedConnectorCount);
             CoveredCellCount = Mathf.Max(0, coveredCellCount);
             GenerationMilliseconds = Math.Max(0.0, generationMilliseconds);
-            RuntimeMaximumMajorDegree = Mathf.Clamp(
-                runtimeMaximumMajorDegree,
-                1,
-                3);
             this.support = support ?? Array.Empty<float>();
             this.relationships = relationships ??
                 Array.Empty<StylizedRiverFoamConnectorRelationship>();
@@ -461,7 +456,6 @@ namespace ProgrammaticStylized3D.Rivers
         public int PathAttemptCount { get; }
         public int AcceptedConnectorCount { get; }
         public int CoveredCellCount { get; }
-        public int RuntimeMaximumMajorDegree { get; }
         public int PreparedConnectorCount { get; }
         public int UnavailableConnectorCount => Mathf.Max(
             0,

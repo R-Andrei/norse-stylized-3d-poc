@@ -26,13 +26,13 @@ namespace ProgrammaticStylized3D.Rivers
         private const int EndpointSectorCount = 12;
         private const int MaximumEndpointsPerComponent = 10;
         private const int BaselineMaximumPairAttempts = 48;
-        private const int BaselineMaximumComponentDegree = 2;
         private const float MinimumGapMetres = 0.28f;
         private const float MinimumUnsupportedSpanMetres = 0.24f;
         private const float ConnectorCoverageThreshold = 0.15f;
         private const int LongitudinalDistributionSectionCount = 6;
-        private const float UnconnectedComponentScoreBonus = 0.045f;
-        private const float RepeatedComponentScorePenalty = 0.040f;
+        private const float ConnectorLoadPenaltyBase = 0.22f;
+        private const float ConnectorHubPenaltyBase = 0.60f;
+        private const float ConnectorGeometryWeightTemperature = 0.35f;
         private const float LongitudinalSectionLoadPenalty = 0.020f;
         private const float EndpointOwnershipMinimumSupport = 0.035f;
         internal const int MaximumPreparedPathPointCount = 48;
@@ -167,13 +167,6 @@ namespace ProgrammaticStylized3D.Rivers
                     BaselineMaximumPairAttempts - 36f,
                     BaselineMaximumPairAttempts + 36f,
                     connectorAmount)));
-            int maximumComponentDegree = Mathf.Clamp(
-                Mathf.RoundToInt(Mathf.Lerp(
-                    BaselineMaximumComponentDegree - 1f,
-                    BaselineMaximumComponentDegree + 1f,
-                    connectorAmount)),
-                1,
-                3);
             int cycleBudget = connectorAmount > 0.5f
                 ? Mathf.CeilToInt(
                     (connectorAmount - 0.5f) * 2f *
@@ -202,6 +195,7 @@ namespace ProgrammaticStylized3D.Rivers
             bool[] evaluatedPairs = new bool[pairs.Count];
             int[] acceptedRelationshipsBySection =
                 new int[LongitudinalDistributionSectionCount];
+            Dictionary<ulong, int> eligibleAlternativeCounts = new();
 
             float[] candidateRaster = new float[cellCount];
             while (pathAttemptCount < maximumPairAttempts &&
@@ -214,10 +208,12 @@ namespace ProgrammaticStylized3D.Rivers
                     relationships,
                     acceptedCycleCount,
                     cycleBudget,
-                    maximumComponentDegree,
                     acceptedRelationshipsBySection,
                     acceptedRelationships.Count,
-                    validFieldLength);
+                    validFieldLength,
+                    seed,
+                    pathAttemptCount,
+                    eligibleAlternativeCounts);
                 if (pairIndex < 0)
                 {
                     break;
@@ -517,7 +513,6 @@ namespace ProgrammaticStylized3D.Rivers
                 acceptedRelationships.Count,
                 coveredCellCount,
                 stopwatch.Elapsed.TotalMilliseconds,
-                maximumComponentDegree,
                 connectorSupport,
                 acceptedRelationships.ToArray(),
                 acceptedPaths.ToArray(),
@@ -532,14 +527,20 @@ namespace ProgrammaticStylized3D.Rivers
             DisjointSet relationships,
             int acceptedCycleCount,
             int cycleBudget,
-            int maximumComponentDegree,
             int[] acceptedRelationshipsBySection,
             int acceptedRelationshipCount,
-            float validFieldLength)
+            float validFieldLength,
+            int seed,
+            int selectionAttempt,
+            Dictionary<ulong, int> eligibleAlternativeCounts)
         {
-            int bestIndex = -1;
-            float bestScore = float.PositiveInfinity;
+            if (pairs == null || pairs.Count == 0)
+            {
+                return -1;
+            }
 
+            eligibleAlternativeCounts.Clear();
+            float minimumGeometryScore = float.PositiveInfinity;
             for (int index = 0; index < pairs.Count; index++)
             {
                 if (evaluatedPairs[index])
@@ -548,16 +549,6 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 ComponentPair pair = pairs[index];
-                int startDegree = componentDegree[
-                    pair.StartComponentIndex];
-                int endDegree = componentDegree[
-                    pair.EndComponentIndex];
-                if (startDegree >= maximumComponentDegree ||
-                    endDegree >= maximumComponentDegree)
-                {
-                    continue;
-                }
-
                 bool createsCycle =
                     relationships.Find(pair.StartComponentIndex) ==
                     relationships.Find(pair.EndComponentIndex);
@@ -566,45 +557,180 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
-                // These are deliberately small ordering biases. The
-                // relationship geometry remains the primary score, and a
-                // strong repeated relationship may still outrank a weak first
-                // connection elsewhere.
-                float dynamicScore = pair.Score +
-                    ResolveComponentDegreeScoreAdjustment(startDegree) +
-                    ResolveComponentDegreeScoreAdjustment(endDegree) +
+                float geometryScore = pair.Score +
                     ResolveLongitudinalSectionScoreAdjustment(
                         pair,
                         validFieldLength,
                         acceptedRelationshipsBySection,
                         acceptedRelationshipCount);
+                minimumGeometryScore = Mathf.Min(
+                    minimumGeometryScore,
+                    geometryScore);
 
-                if (dynamicScore < bestScore - 0.000001f ||
-                    (Mathf.Abs(dynamicScore - bestScore) <= 0.000001f &&
-                     (bestIndex < 0 || index < bestIndex)))
+                ulong pairKey = ResolveComponentPairKey(
+                    pair.StartComponentIndex,
+                    pair.EndComponentIndex);
+                eligibleAlternativeCounts.TryGetValue(
+                    pairKey,
+                    out int alternativeCount);
+                eligibleAlternativeCounts[pairKey] = alternativeCount + 1;
+            }
+
+            if (float.IsNaN(minimumGeometryScore) ||
+                float.IsInfinity(minimumGeometryScore))
+            {
+                return -1;
+            }
+
+            double totalWeight = 0.0;
+            for (int index = 0; index < pairs.Count; index++)
+            {
+                if (!TryResolveInitialPairSelectionWeight(
+                        pairs,
+                        evaluatedPairs,
+                        componentDegree,
+                        relationships,
+                        acceptedCycleCount,
+                        cycleBudget,
+                        acceptedRelationshipsBySection,
+                        acceptedRelationshipCount,
+                        validFieldLength,
+                        minimumGeometryScore,
+                        eligibleAlternativeCounts,
+                        index,
+                        out float candidateWeight))
                 {
-                    bestIndex = index;
-                    bestScore = dynamicScore;
+                    continue;
+                }
+
+                totalWeight += candidateWeight;
+            }
+
+            if (totalWeight <= 0.0)
+            {
+                return -1;
+            }
+
+            uint selectionSeed;
+            unchecked
+            {
+                selectionSeed = MixBits(
+                    (uint)seed ^
+                    ((uint)(selectionAttempt + 1) * 0x9E3779B9u) ^
+                    ((uint)(acceptedRelationshipCount + 1) * 0x85EBCA6Bu));
+            }
+            double threshold = Hash01(selectionSeed, 0xC2B2AE35u) *
+                totalWeight;
+            double cumulativeWeight = 0.0;
+            int fallbackIndex = -1;
+            for (int index = 0; index < pairs.Count; index++)
+            {
+                if (!TryResolveInitialPairSelectionWeight(
+                        pairs,
+                        evaluatedPairs,
+                        componentDegree,
+                        relationships,
+                        acceptedCycleCount,
+                        cycleBudget,
+                        acceptedRelationshipsBySection,
+                        acceptedRelationshipCount,
+                        validFieldLength,
+                        minimumGeometryScore,
+                        eligibleAlternativeCounts,
+                        index,
+                        out float candidateWeight))
+                {
+                    continue;
+                }
+
+                fallbackIndex = index;
+                cumulativeWeight += candidateWeight;
+                if (threshold <= cumulativeWeight)
+                {
+                    return index;
                 }
             }
 
-            return bestIndex;
+            return fallbackIndex;
         }
 
-        private static float ResolveComponentDegreeScoreAdjustment(
-            int degree)
+        private static bool TryResolveInitialPairSelectionWeight(
+            IReadOnlyList<ComponentPair> pairs,
+            bool[] evaluatedPairs,
+            int[] componentDegree,
+            DisjointSet relationships,
+            int acceptedCycleCount,
+            int cycleBudget,
+            int[] acceptedRelationshipsBySection,
+            int acceptedRelationshipCount,
+            float validFieldLength,
+            float minimumGeometryScore,
+            IReadOnlyDictionary<ulong, int> eligibleAlternativeCounts,
+            int pairIndex,
+            out float weight)
         {
-            if (degree <= 0)
+            weight = 0f;
+            if (pairIndex < 0 || pairIndex >= pairs.Count ||
+                evaluatedPairs[pairIndex])
             {
-                return -UnconnectedComponentScoreBonus;
+                return false;
             }
 
-            if (degree == 1)
+            ComponentPair pair = pairs[pairIndex];
+            bool createsCycle =
+                relationships.Find(pair.StartComponentIndex) ==
+                relationships.Find(pair.EndComponentIndex);
+            if (createsCycle && acceptedCycleCount >= cycleBudget)
             {
-                return 0f;
+                return false;
             }
 
-            return (degree - 1) * RepeatedComponentScorePenalty;
+            int startDegree = componentDegree[pair.StartComponentIndex];
+            int endDegree = componentDegree[pair.EndComponentIndex];
+            int combinedDegree = startDegree + endDegree;
+            int maximumDegree = Mathf.Max(startDegree, endDegree);
+            float geometryScore = pair.Score +
+                ResolveLongitudinalSectionScoreAdjustment(
+                    pair,
+                    validFieldLength,
+                    acceptedRelationshipsBySection,
+                    acceptedRelationshipCount);
+            float geometryWeight = Mathf.Exp(
+                -(geometryScore - minimumGeometryScore) /
+                ConnectorGeometryWeightTemperature);
+            float loadWeight = Mathf.Pow(
+                ConnectorLoadPenaltyBase,
+                combinedDegree);
+            float hubWeight = Mathf.Pow(
+                ConnectorHubPenaltyBase,
+                maximumDegree);
+            ulong pairKey = ResolveComponentPairKey(
+                pair.StartComponentIndex,
+                pair.EndComponentIndex);
+            int alternativeCount = eligibleAlternativeCounts.TryGetValue(
+                pairKey,
+                out int count)
+                    ? Mathf.Max(1, count)
+                    : 1;
+
+            weight = Mathf.Max(
+                0.0000001f,
+                geometryWeight * loadWeight * hubWeight /
+                alternativeCount);
+            return true;
+        }
+
+        private static ulong ResolveComponentPairKey(
+            int firstComponentIndex,
+            int secondComponentIndex)
+        {
+            uint low = (uint)Mathf.Min(
+                firstComponentIndex,
+                secondComponentIndex);
+            uint high = (uint)Mathf.Max(
+                firstComponentIndex,
+                secondComponentIndex);
+            return ((ulong)low << 32) | high;
         }
 
         private static float ResolveLongitudinalSectionScoreAdjustment(
@@ -666,7 +792,6 @@ namespace ProgrammaticStylized3D.Rivers
                 0,
                 0,
                 milliseconds,
-                1,
                 support,
                 Array.Empty<StylizedRiverFoamConnectorRelationship>(),
                 Array.Empty<StylizedRiverFoamConnectorPath>(),

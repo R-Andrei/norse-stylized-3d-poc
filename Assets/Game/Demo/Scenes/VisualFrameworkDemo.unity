@@ -7927,16 +7927,21 @@ MonoBehaviour:
     geometryContribution: 0.65
     normalContribution: 1
   foamEnabled: 1
-  foamMajorSupportAmount: 0.472
-  foamMajorSupportSize: 0.392
-  foamMajorSupportSizeVariation: 0.887
+  foamMajorSupportAmount: 0.381
+  foamMajorSupportSize: 0.241
+  foamMajorSupportSizeVariation: 0.984
+  foamMajorRecycleTerritoryDeviationPercent: 2
+  foamMajorLifetimeUnits: 7
+  foamMajorLifetimeUnitDeviation: 2
   foamMajorSupportSeed: 22
-  foamConnectorAmount: 0.436
-  foamConnectorDirectness: 0.4
-  foamConnectorLengthPreference: 0.352
-  foamInteriorPocketAmount: 0.5
-  foamEdgeCavityAmount: 0.5
-  foamConnectorWeakSpanAmount: 0.5
+  foamConnectorAmount: 0.353
+  foamConnectorDirectness: 0.467
+  foamConnectorLengthPreference: 0.134
+  foamConnectorBreakStretchRatio: 1.269
+  foamInteriorPocketAmount: 0.416
+  foamEdgeCavityAmount: 0.423
+  foamConnectorWeakSpanAmount: 0.443
+  foamFreeWaterEventAmount: 0.409
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}
   foamDebugView: 6
   foamTestDistanceNormalized: 0.5
