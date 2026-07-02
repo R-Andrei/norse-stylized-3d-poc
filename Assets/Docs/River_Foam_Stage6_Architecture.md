@@ -54,8 +54,9 @@ Approved negative-topology expansion before runtime evolution:
 - Patch 4.8B safe topology transition is implemented and Unity-verified. Before a complete replacement activates, the runtime captures the fully resolved generated topology—including current Major, hosted-negative, Free-Water, Connector, and Weak Span evolution—into one immutable old-state texture. Old and new generated topology then crossfade for one bounded internal second, while live Pressure, Lee, Shore, and exact Obstacle Footprint sources remain outside the fade and are composed once. A later activation during an active fade first flattens the currently visible blend into a new old-state snapshot. Domain/quality changes hold the previous complete renderer bindings during staged initialization, then remap the captured old generated field into the new mapping by global river distance and lateral metres before fading.
 
 Patch 4.9 cache/precompute status:
-- Patch 4.9A versioned exact-value cache contract and deterministic round-trip proof are implemented and await Unity validation;
-- Patch 4.9B stable content fingerprints and explicit cache building, Patch 4.9C cache-first initialization, and Patch 4.9D production/cold-start validation remain unimplemented;
+- Patch 4.9A versioned exact-value cache contract and deterministic round-trip proof are implemented and Unity-verified;
+- Patch 4.9B stable domain/obstacle/generation fingerprints, runtime-readable cache-asset ownership, explicit build/update tooling, and hit/miss/stale validation are implemented and Unity-verified;
+- Patch 4.9C cache-first initialization is implemented; Patch 4.9C.1 automatic development cache orchestration is implemented and awaits Unity validation; Patch 4.9D production/cold-start validation remains unimplemented;
 - topology-to-material lifespan response;
 - final fragmentation, dissipation, and rendering behaviour.
 
@@ -1064,15 +1065,16 @@ The canonical topology-only rollout is maintained in `River_Foam_Topology_Implem
 26. Patch 4.7C.3.3 deterministic soft Connector distribution bias implemented and visually/long-run validated.
 27. Patch 4.8A staged same-grid replacement preparation and atomic activation implemented and Unity-verified.
 28. Patch 4.8B safe old/new generated-topology crossfade, superseding-transition flattening, and differently mapped domain/quality hold/remap transition implemented and Unity-verified.
-29. Patch 4.9A versioned cache contract and deterministic round-trip proof implemented; Unity validation pending.
+29. Patch 4.9A versioned cache contract and deterministic round-trip proof implemented and Unity-verified.
+30. Patch 4.9B stable fingerprints and explicit cache-asset building implemented and Unity-verified.
+31. Patch 4.9C cache-first runtime initialization implemented.
+32. Patch 4.9C.1 automatic Editor/Development cache orchestration implemented; Unity validation pending.
 
 ### Active runtime-evolution sequence
 
-1. Validate Patch 4.9A exact round-trip proof on the actual river.
-2. Patch 4.9B — stable domain/obstacle fingerprints and explicit cache building.
-3. Patch 4.9C — cache-first runtime initialization.
-4. Patch 4.9D — production and cold-start validation.
-5. Patch 4.10 — topology completion and handoff to separate Foam-material work.
+1. Validate Patch 4.9C.1 one-press development orchestration: automatic asset assignment, automatic miss/stale generation, visible stale-cache retention, automatic validated persistence, and a clean second-run cache hit.
+2. Patch 4.9D — production and cold-start validation, including build-time cache preflight.
+3. Patch 4.10 — topology completion and handoff to separate Foam-material work.
 
 Material aging response, fragmentation, dissipation, and rendering are not topology implementation steps and must not begin before topology completion.
 
@@ -1081,9 +1083,10 @@ Material aging response, fragmentation, dissipation, and rendering are not topol
 Patch 4.9 is split so the data contract is accepted before startup ownership changes:
 
 - **4.9A — versioned contract and round-trip proof:** serialize exact 32-bit field values, the exact obstacle scalar mask, all Major local masks and recycle anchors, all Connector ownership/path/variant/catalogue data, all four Negative Aging Pressure class records/masks/attachments, mapping/settings/seed metadata, deterministic counters, format/generator versions, and a corruption checksum. The explicit Play-mode proof reconstructs fresh topology objects, requires byte-identical reserialization and initial generated channels, reports size/hash/timings, rejects corruption, and never activates the loaded graph.
-- **4.9B — stable fingerprints and explicit building:** replace session-local domain/obstacle versions with stable content checksums, define authored river/chunk/run payload ownership, and add an explicit development build/regeneration path.
-- **4.9C — cache-first initialization:** validate/load the payload, upload cached obstacle/topology data, reuse the accepted evolution/upload paths, and skip expensive mesh scanning, forced readback, generation, cleanup, and path searches on valid hits. Production misses must not silently trigger synchronous full generation.
-- **4.9D — production validation:** prove cold/warm startup behaviour, stale-input rejection, absence of expensive generator markers on hits, bounded staged loading, and reasonable memory.
+- **4.9B — stable fingerprints and explicit building:** implemented. The payload now embeds deterministic 128-bit fingerprints for the complete resampled domain, the exact transformed static obstacle-source geometry, and all cache-affecting field/topology-generation settings. A runtime-readable `StylizedRiverFoamTopologyCacheAsset` is one storage provider without coupling the codec to UnityEditor or that asset type. The Inspector creates/assigns the empty asset in Edit Mode, then explicitly builds/updates and validates it after the river reaches `Ready` in Play Mode. Validation reports a hit candidate or unassigned, empty, unsupported, corrupt, metadata-mismatched, stale-domain, stale-obstacle, or stale-settings reasons. No ordinary startup consumes the asset.
+- **4.9C — cache-first initialization:** implemented. Ordinary staged startup waits for generated-source registration to settle, validates the assigned payload against stable domain/generation keys and exact prepared world-geometry fingerprints, deserializes the complete immutable graph, uploads the cached obstacle scalar, and reuses the accepted evolution/upload paths. A valid hit bypasses transformed-triangle rescanning, obstacle baking/readback, and all Major/Connector/Negative generators. Release startup remains strict and never silently runs those expensive generators.
+- **4.9C.1 — automatic development cache orchestration:** implemented. An Editor-only coordinator creates or reuses one deterministic cache asset beside the saved scene and assigns it before Play Mode. In Editor/Development builds, a missing, empty, invalid, or unusable cache automatically runs the staged preparation path. A structurally valid stale cache with the same domain mapping and field dimensions is installed as the visible previous topology while current settings or obstacles prepare a complete replacement through the accepted 4.8 lifecycle. Completed topology is round-trip validated automatically and, in the Editor, written to the assigned asset without manual build or validation buttons. The runtime records the stable input key present at Play entry and refuses to overwrite the persistent cache when later Play-mode-only tweaks produce a different key; those results remain session-only. Manual create/build/validate/generate actions remain diagnostics only.
+- **4.9D — production validation:** prove cold/warm startup behaviour, stale-input rejection, absence of expensive generator markers on hits, bounded staged loading, reasonable memory, and a build preflight that rejects missing or stale release caches.
 
 The binary payload is storage-provider agnostic. It must not be tied permanently to one Editor-only asset type, and Patch 4.8A/4.8B remain the single complete-topology activation/transition authority.
 

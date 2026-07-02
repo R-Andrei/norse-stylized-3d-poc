@@ -255,7 +255,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
     [RequireComponent(typeof(MeshFilter))]
     [RequireComponent(typeof(MeshRenderer))]
     [RequireComponent(typeof(MeshCollider))]
-    public sealed class GeneratedMass : MonoBehaviour, IGeneratedGeometrySource, IGeneratedRiverInteractionSource
+    public sealed class GeneratedMass : MonoBehaviour,
+        IGeneratedGeometrySource,
+        IGeneratedRiverInteractionSource,
+        IGeneratedGeometryStableFingerprintSource
     {
         private const string LegacyRiverFoamProxyObjectName =
             "RiverFoamProxy";
@@ -280,6 +283,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private MeshFilter meshFilter;
         private MeshCollider meshCollider;
         private Mesh generatedMesh;
+        private bool stableWorldGeometryFingerprintValid;
+        private GeneratedGeometryStableFingerprint
+            stableWorldGeometryFingerprint;
+        private Mesh stableWorldGeometryFingerprintMesh;
+        private Matrix4x4 stableWorldGeometryFingerprintMatrix;
 
         public event Action GeometryChanged;
 
@@ -301,6 +309,33 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 CacheComponents();
                 return meshFilter;
             }
+        }
+
+        public bool TryGetStableWorldGeometryFingerprint(
+            out GeneratedGeometryStableFingerprint fingerprint,
+            out string status)
+        {
+            CacheComponents();
+            Mesh currentMesh = meshFilter != null
+                ? meshFilter.sharedMesh
+                : null;
+            Matrix4x4 currentMatrix = meshFilter != null
+                ? meshFilter.transform.localToWorldMatrix
+                : Matrix4x4.identity;
+
+            if (!stableWorldGeometryFingerprintValid ||
+                stableWorldGeometryFingerprintMesh != currentMesh ||
+                !stableWorldGeometryFingerprintMatrix.Equals(currentMatrix))
+            {
+                RefreshStableWorldGeometryFingerprint();
+            }
+
+            fingerprint = stableWorldGeometryFingerprint;
+            status = stableWorldGeometryFingerprintValid
+                ? "Using the generated owner's exact world-geometry fingerprint."
+                : "The generated owner could not prepare an exact " +
+                  "world-geometry fingerprint.";
+            return stableWorldGeometryFingerprintValid;
         }
 
         private void OnEnable()
@@ -361,6 +396,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             if (recipe == null)
             {
                 ClearGeneratedAssignments();
+                InvalidateStableWorldGeometryFingerprint();
                 NotifyGeometryChanged();
                 return;
             }
@@ -383,8 +419,33 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             meshCollider.sharedMesh = generatedMesh;
             meshCollider.convex = false;
 
+            RefreshStableWorldGeometryFingerprint();
             RemoveLegacyRiverFoamProxy();
             NotifyGeometryChanged();
+        }
+
+        private void RefreshStableWorldGeometryFingerprint()
+        {
+            stableWorldGeometryFingerprintValid =
+                GeneratedGeometryStableFingerprintUtility
+                    .TryComputeExactWorldTriangleFingerprint(
+                        meshFilter,
+                        out stableWorldGeometryFingerprint,
+                        out _);
+            stableWorldGeometryFingerprintMesh = meshFilter != null
+                ? meshFilter.sharedMesh
+                : null;
+            stableWorldGeometryFingerprintMatrix = meshFilter != null
+                ? meshFilter.transform.localToWorldMatrix
+                : Matrix4x4.identity;
+        }
+
+        private void InvalidateStableWorldGeometryFingerprint()
+        {
+            stableWorldGeometryFingerprintValid = false;
+            stableWorldGeometryFingerprint = default;
+            stableWorldGeometryFingerprintMesh = null;
+            stableWorldGeometryFingerprintMatrix = Matrix4x4.identity;
         }
 
         [ContextMenu("New Shape")]
@@ -519,6 +580,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             GeneratedGeometryRegistry.Unregister(this);
             ClearGeneratedAssignments();
+            InvalidateStableWorldGeometryFingerprint();
 
             if (generatedMesh == null)
             {

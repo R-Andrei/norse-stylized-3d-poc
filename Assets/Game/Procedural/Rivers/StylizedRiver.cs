@@ -663,6 +663,10 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Master switch for the Stage 6 shared persistent Foam field. When disabled, no Foam textures are allocated or simulated and the water shader receives a neutral Foam input.")]
         [SerializeField] private bool foamEnabled;
 
+        [Tooltip("Persistent prepared-topology cache associated with this authored river. Patch 4.9C.1 creates and assigns one automatically before Play Mode when needed, loads valid payloads directly, and rebuilds stale or missing development caches without requiring a manual workflow. Production remains cache-only.")]
+        [SerializeField]
+        private StylizedRiverFoamTopologyCacheAsset foamTopologyCacheAsset;
+
         [Tooltip("Controls the nested deterministic population of whole-river Major Support. Higher values activate later-ranked opportunities without changing the identity or transform of earlier accepted regions. It does not alter the separate local candidate preview.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamMajorSupportAmount = 0.56f;
@@ -1153,6 +1157,8 @@ namespace ProgrammaticStylized3D.Rivers
             ResolveInteractionMinimumWavelength();
 
         public bool FoamEnabled => foamEnabled;
+        public StylizedRiverFoamTopologyCacheAsset FoamTopologyCacheAsset =>
+            foamTopologyCacheAsset;
         public float FoamMajorSupportAmount =>
             Mathf.Clamp01(foamMajorSupportAmount);
         public float FoamMajorSupportSize =>

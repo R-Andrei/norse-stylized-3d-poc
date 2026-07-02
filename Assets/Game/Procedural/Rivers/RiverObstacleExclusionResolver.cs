@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using ProgrammaticStylized3D.Geometry;
 using UnityEngine;
 
 namespace ProgrammaticStylized3D.Rivers
@@ -261,6 +262,86 @@ namespace ProgrammaticStylized3D.Rivers
 
             status =
                 $"Baked {addedCells} conservative full-resolution obstacle cells from the exact transformed generated mesh.";
+            return true;
+        }
+
+        /// <summary>
+        /// Computes the Patch 4.9B persistent fingerprint from the same exact
+        /// transformed triangle geometry consumed by <see cref="TryBake"/>.
+        /// Source ordering and session-local EntityIds do not participate: each
+        /// mesh is fingerprinted independently, the fingerprints are sorted, and
+        /// the complete multiset is then combined deterministically.
+        /// </summary>
+        internal static bool TryComputeStableSourceFingerprint(
+            IReadOnlyList<MeshFilter> meshFilters,
+            out StylizedRiverFoamTopologyFingerprint fingerprint,
+            out int sourceCount,
+            out string status)
+        {
+            sourceCount = meshFilters?.Count ?? 0;
+            List<GeneratedGeometryStableFingerprint> sourceFingerprints =
+                new(sourceCount);
+
+            for (int sourceIndex = 0;
+                 sourceIndex < sourceCount;
+                 sourceIndex++)
+            {
+                if (!GeneratedGeometryStableFingerprintUtility
+                    .TryComputeExactWorldTriangleFingerprint(
+                        meshFilters[sourceIndex],
+                        out GeneratedGeometryStableFingerprint sourceFingerprint,
+                        out string sourceStatus))
+                {
+                    fingerprint = default;
+                    status =
+                        $"Obstacle source {sourceIndex} could not be fingerprinted: " +
+                        sourceStatus;
+                    return false;
+                }
+
+                sourceFingerprints.Add(sourceFingerprint);
+            }
+
+            return TryCombineStableSourceFingerprints(
+                sourceFingerprints,
+                out fingerprint,
+                out sourceCount,
+                out status);
+        }
+
+        internal static bool TryCombineStableSourceFingerprints(
+            IReadOnlyList<GeneratedGeometryStableFingerprint>
+                sourceFingerprints,
+            out StylizedRiverFoamTopologyFingerprint fingerprint,
+            out int sourceCount,
+            out string status)
+        {
+            sourceCount = sourceFingerprints?.Count ?? 0;
+            List<StylizedRiverFoamTopologyFingerprint> sorted =
+                new(sourceCount);
+            for (int index = 0; index < sourceCount; index++)
+            {
+                GeneratedGeometryStableFingerprint source =
+                    sourceFingerprints[index];
+                sorted.Add(new StylizedRiverFoamTopologyFingerprint(
+                    source.Low,
+                    source.High));
+            }
+
+            sorted.Sort();
+            StylizedRiverFoamStableHashBuilder aggregateBuilder =
+                StylizedRiverFoamStableHashBuilder.Create(
+                    "PS3D.RiverFoam.ObstacleSourceSet");
+            aggregateBuilder.AddInt32(1);
+            aggregateBuilder.AddInt32(sorted.Count);
+            for (int index = 0; index < sorted.Count; index++)
+            {
+                aggregateBuilder.AddFingerprint(sorted[index]);
+            }
+
+            fingerprint = aggregateBuilder.Finish();
+            status =
+                $"Fingerprint covers {sorted.Count:N0} exact transformed obstacle source(s).";
             return true;
         }
 

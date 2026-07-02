@@ -969,6 +969,8 @@ namespace ProgrammaticStylized3D.Rivers
             // Pressure still has its older independent contour path and is
             // explicitly marked for a future shared-data refactor.
             public MeshFilter ObstacleExclusionMeshFilter;
+            public IGeneratedGeometryStableFingerprintSource
+                ObstacleExclusionFingerprintSource;
             public float[] StaticPressureCurrentMultipliers;
             public float[] StaticPressureTransitionStartMultipliers;
             public float[] StaticPressureTargetMultipliers;
@@ -1832,7 +1834,9 @@ namespace ProgrammaticStylized3D.Rivers
             bool rippleCollisionEnabled = true,
             float rippleCollisionAcrossHalfWidth = -1f,
             float rippleCollisionAlongHalfLength = -1f,
-            IReadOnlyList<Vector2> rippleCollisionContour = null)
+            IReadOnlyList<Vector2> rippleCollisionContour = null,
+            IGeneratedGeometryStableFingerprintSource
+                obstacleExclusionFingerprintSource = null)
         {
             if (river == null ||
                 !river.isActiveAndEnabled ||
@@ -1944,6 +1948,8 @@ namespace ProgrammaticStylized3D.Rivers
                     StaticPressureBaseProfile = basePressureProfile,
                     ObstacleExclusionMeshFilter =
                         obstacleExclusionMeshFilter,
+                    ObstacleExclusionFingerprintSource =
+                        obstacleExclusionFingerprintSource,
                     StaticPressureCurrentMultipliers =
                         currentProfileMultipliers,
                     StaticPressureTransitionStartMultipliers =
@@ -2215,6 +2221,76 @@ namespace ProgrammaticStylized3D.Rivers
 
             output.Sort((left, right) =>
                 left.GetEntityId().CompareTo(right.GetEntityId()));
+        }
+
+        /// <summary>
+        /// Copies exact fingerprints already prepared by registered generated
+        /// static obstacle owners. This cache-first path never rereads mesh
+        /// triangles. If one participating source lacks the provider contract,
+        /// the complete set is rejected rather than partially validated.
+        /// </summary>
+        public bool TryCopyObstacleExclusionStableFingerprintsTo(
+            List<GeneratedGeometryStableFingerprint> output,
+            out int sourceCount,
+            out string status)
+        {
+            if (output == null)
+            {
+                throw new ArgumentNullException(nameof(output));
+            }
+
+            output.Clear();
+            sourceCount = 0;
+            if (river == null || !river.Domain.IsValid)
+            {
+                status = "A valid river domain is required.";
+                return false;
+            }
+
+            HashSet<EntityId> seenMeshFilters = new();
+            foreach (KeyValuePair<EntityId, ContinuousSource> pair in
+                     continuousSources)
+            {
+                ContinuousSource source = pair.Value;
+                MeshFilter meshFilter = source.ObstacleExclusionMeshFilter;
+                if (!source.IsStatic || meshFilter == null ||
+                    meshFilter.sharedMesh == null ||
+                    !meshFilter.gameObject.activeInHierarchy)
+                {
+                    continue;
+                }
+
+                EntityId meshId = meshFilter.GetEntityId();
+                if (!seenMeshFilters.Add(meshId))
+                {
+                    continue;
+                }
+
+                sourceCount++;
+                IGeneratedGeometryStableFingerprintSource provider =
+                    source.ObstacleExclusionFingerprintSource;
+                GeneratedGeometryStableFingerprint fingerprint;
+                string providerStatus = string.Empty;
+                if (provider == null ||
+                    !provider.TryGetStableWorldGeometryFingerprint(
+                        out fingerprint,
+                        out providerStatus))
+                {
+                    output.Clear();
+                    status =
+                        $"Static obstacle source {sourceCount - 1} does not " +
+                        "provide a prepared exact world-geometry fingerprint. " +
+                        (providerStatus ?? string.Empty);
+                    return false;
+                }
+
+                output.Add(fingerprint);
+            }
+
+            output.Sort();
+            status =
+                $"Collected {output.Count:N0} prepared exact obstacle fingerprint(s) without scanning mesh triangles.";
+            return true;
         }
 
         public void RemoveContinuousSource(EntityId sourceId)
@@ -2920,7 +2996,8 @@ namespace ProgrammaticStylized3D.Rivers
                     interaction.ImpactRippleCollisionEnabled,
                     collisionFootprint.AcrossHalfWidth,
                     collisionFootprint.AlongHalfLength,
-                    collisionFootprint.Contour))
+                    collisionFootprint.Contour,
+                    source as IGeneratedGeometryStableFingerprintSource))
             {
                 return;
             }

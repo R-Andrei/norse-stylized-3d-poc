@@ -78,10 +78,11 @@ Further performance engineering is paused because the free-water topology pipeli
 21. Patch 4.7C.3.3 soft Connector distribution bias — implemented and visually/long-run validated;
 22. Patch 4.8A staged same-grid replacement preparation and atomic activation — implemented and Unity-verified;
 23. Patch 4.8B safe old/new generated-topology transition, superseding flattening, and dimension-changing domain/quality hold/remap — implemented and Unity-verified;
-24. Patch 4.9A versioned cache contract and deterministic round-trip proof — implemented; Unity validation pending;
-25. Patch 4.9B stable fingerprints and explicit cache building;
-26. Patch 4.9C cache-first initialization;
-27. Patch 4.9D production/cold-start validation.
+24. Patch 4.9A versioned cache contract and deterministic round-trip proof — implemented and Unity-verified;
+25. Patch 4.9B stable fingerprints and explicit cache building — implemented and Unity-verified;
+26. Patch 4.9C cache-first initialization — implemented;
+27. Patch 4.9C.1 automatic Editor/Development cache orchestration — implemented; Unity validation pending;
+28. Patch 4.9D production/cold-start validation.
 
 Topology-to-material aging response and final material lifetime integration remain separate Stage 6 work only after topology completion.
 
@@ -1318,7 +1319,7 @@ Revert the runtime file to Step 2 and restore the preceding document revision.
 
 ## Step 4 — Staggered Steady-State Topology Maintenance
 
-**Status:** Major scheduling is accepted for feature progression through Patch 4.6.2. Patch 4.7A and Patch 4.7A.1 add accepted host-relative Interior Pocket and Edge Cavity reconstruction inside the same bounded active-movement pass. Patch 4.7B.1 adds the corrected slower Free-Water lifecycle using bounded prepared upstream recycle anchors and no normal-run search, retry, readback, or validation and is visually accepted. Patch 4.7C.0 consolidates CPU/HLSL field-space arithmetic without adding a scheduled runtime work category. Patch 4.7C.1 adds preparation-only Connector endpoint ownership, bounded path/variant data, and Weak Span attachments. Patch 4.7C.2 adds Connector/Weak Span records to the existing shared evolving-topology reconstruction pass rather than introducing per-Connector work and is visually accepted. Patch 4.7C.3 updates compact Connector path records from current Major gates and lets Weak Spans follow the current path/tangent. Long-run testing exposed that truncated same-host variants and fixed original pairs caused population drain. Patch 4.7C.3.1 retains complete bounded anchor-state matrices plus a bounded catalogue of additional prepared Major-pair relationships. Patch 4.7C.3.2 adds one relative path-length comparison per retained Connector, breaks over-limit relationships, and makes one deterministic keep-versus-different-pair decision when an endpoint host recycles. Patch 4.7C.3.3 keeps that bounded catalogue scan but replaces the hard per-Major degree ceiling and first-valid result with a deterministic weighted draw using endpoint-load and hub penalties. Crowding raises recycle-turnover probability without creating a forced cleanup pass, and Unity visual/long-run validation is accepted. Major and Free-Water descriptor advancement is still collected first, and at most one combined reconstruction runs per applicable tick. Patch 4.8A stages a same-grid replacement from one immutable request snapshot while the accepted topology remains active and evolving. Major, Connector, Pocket, and replacement-upload phases advance separately; superseding requests cancel only replacement work; incomplete replacements never become authoritative; and the lifecycle is Unity-verified. Patch 4.8B adds one rare full-grid capture at complete activation and one full-grid composition per visible transition update for a bounded internal second. Superseding activations flatten the visible blend into one snapshot rather than accumulating a history chain. Differently mapped reinitialization retains the previous complete renderer bindings while new resources initialize, then performs one physical river-space remapped fade. This transition lifecycle is Unity-verified. Patch 4.9A adds only an explicit development round-trip proof for the complete prepared topology graph and exact obstacle scalar field; it does not alter the accepted initialization schedule or default startup path.
+**Status:** Major scheduling is accepted for feature progression through Patch 4.6.2. Patch 4.7A and Patch 4.7A.1 add accepted host-relative Interior Pocket and Edge Cavity reconstruction inside the same bounded active-movement pass. Patch 4.7B.1 adds the corrected slower Free-Water lifecycle using bounded prepared upstream recycle anchors and no normal-run search, retry, readback, or validation and is visually accepted. Patch 4.7C.0 consolidates CPU/HLSL field-space arithmetic without adding a scheduled runtime work category. Patch 4.7C.1 adds preparation-only Connector endpoint ownership, bounded path/variant data, and Weak Span attachments. Patch 4.7C.2 adds Connector/Weak Span records to the existing shared evolving-topology reconstruction pass rather than introducing per-Connector work and is visually accepted. Patch 4.7C.3 updates compact Connector path records from current Major gates and lets Weak Spans follow the current path/tangent. Long-run testing exposed that truncated same-host variants and fixed original pairs caused population drain. Patch 4.7C.3.1 retains complete bounded anchor-state matrices plus a bounded catalogue of additional prepared Major-pair relationships. Patch 4.7C.3.2 adds one relative path-length comparison per retained Connector, breaks over-limit relationships, and makes one deterministic keep-versus-different-pair decision when an endpoint host recycles. Patch 4.7C.3.3 keeps that bounded catalogue scan but replaces the hard per-Major degree ceiling and first-valid result with a deterministic weighted draw using endpoint-load and hub penalties. Crowding raises recycle-turnover probability without creating a forced cleanup pass, and Unity visual/long-run validation is accepted. Major and Free-Water descriptor advancement is still collected first, and at most one combined reconstruction runs per applicable tick. Patch 4.8A stages a same-grid replacement from one immutable request snapshot while the accepted topology remains active and evolving. Major, Connector, Pocket, and replacement-upload phases advance separately; superseding requests cancel only replacement work; incomplete replacements never become authoritative; and the lifecycle is Unity-verified. Patch 4.8B adds one rare full-grid capture at complete activation and one full-grid composition per visible transition update for a bounded internal second. Superseding activations flatten the visible blend into one snapshot rather than accumulating a history chain. Differently mapped reinitialization retains the previous complete renderer bindings while new resources initialize, then performs one physical river-space remapped fade. This transition lifecycle is Unity-verified. Patch 4.9A adds only an explicit development round-trip proof for the complete prepared topology graph and exact obstacle scalar field and is Unity-verified. Patch 4.9B adds stable cross-session domain, exact-obstacle-source, and generation-input fingerprints plus explicit runtime-readable asset building/validation. Patch 4.9C adds staged cache resolution and installation before the old obstacle/topology preparation phases. Valid hits reconstruct immutable data and upload cached scalar/topology inputs while release misses remain neutral and cache-only. Patch 4.9C.1 adds Editor/Development orchestration around that strict runtime contract: before Play Mode an Editor coordinator creates or reuses and assigns a deterministic scene-associated cache asset; exact hits load normally; compatible stale caches remain visible while the accepted preparation/replacement lifecycle builds a complete successor; missing, invalid, incompatible, or stale development caches generate automatically; and completed persistent-input topology is round-trip validated and written back automatically. Play-mode-only input changes remain session-only and cannot replace the persistent payload. A later static-obstacle change refreshes the exact live Obstacle Footprint while development automatically schedules the complete topology replacement; release never runs the generator fallback.
 
 ### Purpose
 
@@ -1702,15 +1703,16 @@ Accepted/implemented topology work:
 16. Patch 4.7C.3.3 soft Connector distribution bias — implemented and visually/long-run validated.
 17. Patch 4.8A staged replacement preparation and atomic activation — implemented and Unity-verified.
 18. Patch 4.8B safe generated-topology crossfade, superseding-transition flattening, and differently mapped domain/quality hold/remap — implemented and Unity-verified.
-19. Patch 4.9A versioned exact-value cache contract and deterministic round-trip proof — implemented; Unity validation pending.
+19. Patch 4.9A versioned exact-value cache contract and deterministic round-trip proof — implemented and Unity-verified.
+20. Patch 4.9B stable content fingerprints and explicit cache-asset building — implemented and Unity-verified.
+21. Patch 4.9C cache-first runtime initialization with prepared obstacle fingerprints and strict release miss handling — implemented.
+22. Patch 4.9C.1 automatic development asset assignment, miss/stale generation, visible stale-cache retention, and validated persistence — implemented; Unity validation pending.
 
 Remaining topology slices:
 
-1. Validate Patch 4.9A on the actual initialized river;
-2. Patch 4.9B stable domain/obstacle fingerprints and explicit cache building;
-3. Patch 4.9C cache-first runtime initialization;
-4. Patch 4.9D production and cold-start validation;
-5. Patch 4.10 topology completion and handoff to separate Foam-material work.
+1. Validate Patch 4.9C.1 one-press development startup, automatic asset creation/assignment, automatic miss/stale regeneration, visible compatible stale-cache retention, automatic validated persistence, session-only Play changes, and a clean second-run cache hit;
+2. Patch 4.9D production and cold-start validation including release-build preflight;
+3. Patch 4.10 topology completion and handoff to separate Foam-material work.
 
 All four negative classes remain preparation-time generators. Interior/edge host analysis, Connector span selection, Free-Water opportunity curation, and spare Connector route preparation may be expensive during the proof path, but ordinary gameplay may only advance compact descriptors, morph retained masks, deform retained paths, perform batched low-resolution reconstruction, and instantly recycle slots. No ordinary movement fade or duplicate old/new support instance is permitted.
 
@@ -1765,22 +1767,20 @@ The scheduling architecture is successful when:
 
 ## 25. Immediate Next Step
 
-Patch 4.8B is Unity-verified. Patch 4.9A is implemented as an explicit development proof and does not alter the staged startup schedule.
+Patch 4.8B, Patch 4.9A, and Patch 4.9B are Unity-verified. Patch 4.9C cache-first initialization is implemented. Patch 4.9C.1 adds automatic Editor/Development orchestration while preserving strict release cache-only startup.
 
-The immediate gate is Patch 4.9A Unity validation:
+The immediate gate is Patch 4.9C.1 Unity validation:
 
-- after the river reaches `Ready`, run `Validate Topology Cache Round Trip` from the Foam diagnostics;
-- require `Passed`, equal run/pass counts, populated size/hash/timing telemetry, and an unchanged hash on repeated runs against unchanged active topology;
-- verify Final Foam, topology diagnostics, ordinary evolution, replacement state, transition state, and renderer resources do not change because the proof ran;
-- perform one accepted 4.8B topology replacement, let it complete, then rerun the proof and require a valid new payload;
-- confirm the explicit proof rejects its internally corrupted payload and reports no checksum, collection-bound, descriptor, path, mask, channel, or obstacle mismatch;
-- profile ordinary Play entry separately and confirm no 4.9A serialization or load work occurs automatically.
+- remove or unassign the cache, press Play once, and require deterministic asset creation/assignment, automatic staged generation, successful round-trip validation, automatic persistence, and visible Foam;
+- press Play again and require an exact cache hit with no obstacle bake/readback or topology-generator marker;
+- change a persistent setting in Edit Mode and require the compatible stale cache to remain visible while a complete replacement prepares, crossfades, validates, and saves automatically;
+- change a setting only during Play Mode and require session-only output without persistent-cache overwrite;
+- modify a registered obstacle and require live Obstacle Footprint authority plus automatic development replacement/persistence;
+- confirm release/non-development code remains neutral on invalid cache and cannot invoke the generator fallback.
 
 After acceptance, proceed through the split production sequence:
 
-1. **4.9B:** compute stable domain and exact-obstacle content fingerprints, define authored river/chunk/run payload ownership, and add explicit cache building;
-2. **4.9C:** load/validate the complete payload during staged initialization, upload cached obstacle/topology data, and skip expensive proof generators on valid hits without a silent synchronous production fallback;
-3. **4.9D:** validate cold/warm startup, stale reasons, generator-marker absence, staged load spikes, several rivers/quality tiers, and memory;
-4. **4.10:** declare topology complete and hand off to separate Foam-material lifespan work.
+1. **4.9D:** validate cold/warm startup, stale reasons, generator-marker absence, staged load spikes, several rivers/quality tiers, memory, and release-build cache preflight;
+2. **4.10:** declare topology complete and hand off to separate Foam-material lifespan work.
 
-The codec stores exact prepared data rather than only the flattened RGBA field: Major masks/anchors, Connector endpoint ownership and complete path catalogues, all four negative-class records/masks/attachments, exact obstacle scalar values, mapping/settings metadata, deterministic counters, and format/generator versions. Stable cross-session fingerprinting is intentionally deferred to 4.9B; session-local domain and obstacle version counters remain unsuitable as production cache keys.
+The codec stores exact prepared data rather than only the flattened RGBA field: Major masks/anchors, Connector endpoint ownership and complete path catalogues, all four negative-class records/masks/attachments, exact obstacle scalar values, mapping/settings metadata, deterministic counters, and format/generator versions. Patch 4.9B now embeds stable 128-bit domain, exact transformed obstacle-source, and generation-input fingerprints. Session-local domain and obstacle version counters remain only cheap live scheduling signals and are not production cache keys.

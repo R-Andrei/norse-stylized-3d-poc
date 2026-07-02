@@ -7,10 +7,10 @@ using UnityEngine;
 namespace ProgrammaticStylized3D.Rivers
 {
     /// <summary>
-    /// Immutable Patch 4.9A payload source. It contains the complete accepted
-    /// prepared topology graph plus the exact scalar obstacle mask used by the
-    /// generators. Storage ownership and persistent input fingerprints remain
-    /// deliberately deferred to Patch 4.9B.
+    /// Immutable cache payload source. It contains the complete accepted
+    /// prepared topology graph, exact scalar obstacle mask, and Patch 4.9B
+    /// stable cross-session input fingerprints. Storage ownership remains
+    /// independent from the binary codec.
     /// </summary>
     internal sealed class StylizedRiverFoamTopologyCachePackage
     {
@@ -25,6 +25,9 @@ namespace ProgrammaticStylized3D.Rivers
             float domainRequestedSampleSpacing,
             bool domainReverseFlow,
             int domainSampleCount,
+            StylizedRiverFoamTopologyFingerprint domainFingerprint,
+            StylizedRiverFoamTopologyFingerprint obstacleFingerprint,
+            StylizedRiverFoamTopologyFingerprint generationFingerprint,
             StylizedRiverQuality quality,
             float shoreMotion,
             int majorSeed,
@@ -54,6 +57,9 @@ namespace ProgrammaticStylized3D.Rivers
             DomainRequestedSampleSpacing = domainRequestedSampleSpacing;
             DomainReverseFlow = domainReverseFlow;
             DomainSampleCount = domainSampleCount;
+            DomainFingerprint = domainFingerprint;
+            ObstacleFingerprint = obstacleFingerprint;
+            GenerationFingerprint = generationFingerprint;
             Quality = quality;
             ShoreMotion = shoreMotion;
             MajorSeed = majorSeed;
@@ -87,6 +93,9 @@ namespace ProgrammaticStylized3D.Rivers
         public float DomainRequestedSampleSpacing { get; }
         public bool DomainReverseFlow { get; }
         public int DomainSampleCount { get; }
+        public StylizedRiverFoamTopologyFingerprint DomainFingerprint { get; }
+        public StylizedRiverFoamTopologyFingerprint ObstacleFingerprint { get; }
+        public StylizedRiverFoamTopologyFingerprint GenerationFingerprint { get; }
         public StylizedRiverQuality Quality { get; }
         public float ShoreMotion { get; }
         public int MajorSeed { get; }
@@ -141,16 +150,16 @@ namespace ProgrammaticStylized3D.Rivers
     }
 
     /// <summary>
-    /// Patch 4.9A deterministic binary contract for the complete prepared Foam
-    /// topology graph. The format intentionally uses exact 32-bit scalar values
-    /// and explicit bounded counts. It is not yet a production cache provider:
-    /// persistent storage, stable domain/obstacle fingerprints, and cache-first
-    /// startup remain later 4.9 patches.
+    /// Deterministic binary contract for the complete prepared Foam topology
+    /// graph. Patch 4.9B extends the accepted exact-value 4.9A payload with
+    /// stable domain, obstacle-source, and generation-input fingerprints. The
+    /// codec remains storage-provider agnostic and still performs no automatic
+    /// startup loading or renderer activation.
     /// </summary>
     internal static class StylizedRiverFoamTopologyCacheCodec
     {
         private const uint Magic = 0x31434652u; // "RFC1" in little-endian bytes.
-        internal const int FormatVersion = 1;
+        internal const int FormatVersion = 2;
         internal const int GeneratorContractVersion = 1;
 
         private const int ChecksumByteCount = sizeof(ulong);
@@ -184,6 +193,18 @@ namespace ProgrammaticStylized3D.Rivers
             Buffer.BlockCopy(body, 0, result, 0, body.Length);
             WriteUInt64LittleEndian(result, body.Length, checksum);
             return result;
+        }
+
+        internal static ulong ReadPayloadHash(byte[] payload)
+        {
+            if (payload == null || payload.Length < ChecksumByteCount)
+            {
+                return 0ul;
+            }
+
+            return ReadUInt64LittleEndian(
+                payload,
+                payload.Length - ChecksumByteCount);
         }
 
         public static bool TryDeserialize(
@@ -391,6 +412,9 @@ namespace ProgrammaticStylized3D.Rivers
             writer.Write(package.DomainRequestedSampleSpacing);
             writer.Write(package.DomainReverseFlow);
             writer.Write(package.DomainSampleCount);
+            WriteFingerprint(writer, package.DomainFingerprint);
+            WriteFingerprint(writer, package.ObstacleFingerprint);
+            WriteFingerprint(writer, package.GenerationFingerprint);
             writer.Write((int)package.Quality);
             writer.Write(package.ShoreMotion);
             writer.Write(package.MajorSeed);
@@ -430,6 +454,12 @@ namespace ProgrammaticStylized3D.Rivers
                 reader,
                 MaximumCollectionCount,
                 "domain sample count");
+            StylizedRiverFoamTopologyFingerprint domainFingerprint =
+                ReadFingerprint(reader);
+            StylizedRiverFoamTopologyFingerprint obstacleFingerprint =
+                ReadFingerprint(reader);
+            StylizedRiverFoamTopologyFingerprint generationFingerprint =
+                ReadFingerprint(reader);
             int qualityValue = reader.ReadInt32();
             if (!Enum.IsDefined(typeof(StylizedRiverQuality), qualityValue))
             {
@@ -479,6 +509,9 @@ namespace ProgrammaticStylized3D.Rivers
                 requestedSpacing,
                 reverseFlow,
                 sampleCount,
+                domainFingerprint,
+                obstacleFingerprint,
+                generationFingerprint,
                 quality,
                 shoreMotion,
                 majorSeed,
@@ -497,6 +530,22 @@ namespace ProgrammaticStylized3D.Rivers
                 major,
                 connector,
                 pocket);
+        }
+
+        private static void WriteFingerprint(
+            BinaryWriter writer,
+            StylizedRiverFoamTopologyFingerprint fingerprint)
+        {
+            writer.Write(fingerprint.Low);
+            writer.Write(fingerprint.High);
+        }
+
+        private static StylizedRiverFoamTopologyFingerprint ReadFingerprint(
+            BinaryReader reader)
+        {
+            return new StylizedRiverFoamTopologyFingerprint(
+                reader.ReadUInt64(),
+                reader.ReadUInt64());
         }
 
         private static void WriteMajorTopology(
@@ -1503,6 +1552,14 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             ValidateFieldDimensions(package.FieldWidth, package.FieldHeight);
+            if (package.DomainFingerprint == default ||
+                package.ObstacleFingerprint == default ||
+                package.GenerationFingerprint == default)
+            {
+                throw new InvalidDataException(
+                    "Cache payload is missing one or more stable input fingerprints.");
+            }
+
             int cellCount = checked(package.FieldWidth * package.FieldHeight);
             if (package.ObstacleExclusion == null ||
                 package.ObstacleExclusion.Length != cellCount)

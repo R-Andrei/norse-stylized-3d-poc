@@ -13,6 +13,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private bool showPerformanceDiagnostics;
         private bool showFoamTestTools;
         private bool showFoamDiagnostics;
+        private bool showFoamCacheDiagnostics;
         private StylizedRiverFoamMajorCandidate majorCandidatePreview;
         private Texture2D majorCandidatePreviewTexture;
         private Color32[] majorCandidatePreviewPixels;
@@ -1471,7 +1472,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.7 evolves every generated topology class from bounded prepared data, Patch 4.8 replaces complete topology safely, and Patch 4.9A now proves a deterministic versioned binary cache contract without changing normal startup or renderer bindings.",
+                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.9C.1 makes the development workflow Play-only: valid caches load directly, while missing or stale caches generate, validate, and persist automatically. Release builds remain strictly cache-only.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1479,6 +1480,14 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent(
                     "Foam Enabled",
                     "Master switch for the shared persistent Foam field. Disabled Foam allocates no simulation textures and contributes nothing to the water shader."));
+            using (new EditorGUI.DisabledScope(Application.isPlaying))
+            {
+                EditorGUILayout.PropertyField(
+                    Find("foamTopologyCacheAsset"),
+                    new GUIContent(
+                        "Topology Cache Asset",
+                        "Persistent topology payload associated with this authored river. The Editor coordinator creates and assigns one automatically before Play Mode when this field is empty. Valid payloads load directly; missing or stale development payloads rebuild and save automatically."));
+            }
 
             EditorGUILayout.PropertyField(
                 Find("foamMajorSupportAmount"),
@@ -1564,6 +1573,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             if (targets.Length != 1 || target is not StylizedRiver river)
             {
                 return;
+            }
+
+            if (river.FoamTopologyCacheAsset == null)
+            {
+                EditorGUILayout.HelpBox(
+                    Application.isPlaying
+                        ? "No persistent asset was available for this Play session. The topology can still generate automatically, but it will remain session-only. On the next Play entry from a saved scene, the Editor coordinator will create and assign the cache automatically."
+                        : "No cache asset is assigned. Press Play normally; the Editor coordinator will create and assign a deterministic asset automatically for this saved scene.",
+                    MessageType.Info);
             }
 
             EditorGUILayout.Space(4f);
@@ -1759,9 +1777,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Patch 4.8B safely transitions complete generated topology while live Pressure, Lee, Shore, and Obstacle Footprint remain authoritative. Patch 4.9A adds a versioned exact-value codec and explicit round-trip equivalence proof for the complete prepared Major, Connector, and Negative topology graph plus the obstacle scalar field. It does not yet persist assets, validate cross-session fingerprints, or alter normal initialization."),
+                    "Patch 4.8B safely transitions complete generated topology while live Pressure, Lee, Shore, and Obstacle Footprint remain authoritative. Patch 4.9C loads matching prepared topology without obstacle rescanning, GPU readback, or CPU topology generation. Patch 4.9C.1 automatically creates, regenerates, validates, and persists development caches while keeping release startup cache-only."),
                 new GUIContent(
-                    "Cache Round-Trip Proof (Patch 4.9A)"));
+                    "Automatic Cache Runtime (Patch 4.9C.1)"));
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Replacement Build State",
@@ -1806,61 +1824,246 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
-                "Patch 4.9A Cache Contract",
+                "Patch 4.9C.1 Automatic Development Cache",
                 EditorStyles.boldLabel);
             EditorGUILayout.LabelField(
+                "Workflow State",
+                runtime.TopologyCacheStartupState);
+            EditorGUILayout.LabelField(
                 new GUIContent(
-                    "Round-Trip State",
-                    "The explicit proof serializes the complete immutable prepared topology graph and exact obstacle scalar field, deserializes them into fresh topology objects, verifies identical bytes and initial generated channels, and rejects a deliberately corrupted copy. It never activates the reconstructed result."),
-                runtime.TopologyCacheRoundTripState);
+                    "Startup Checks / Direct Hits / Misses",
+                    "A first run that automatically generates and saves a missing or stale cache remains a startup miss by definition. The next matching Play entry should become a direct hit."),
+                new GUIContent(
+                    $"{runtime.TopologyCacheStartupAttemptCount} / " +
+                    $"{runtime.TopologyCacheStartupHitCount} / " +
+                    runtime.TopologyCacheStartupMissCount));
             EditorGUILayout.LabelField(
-                "Proof Runs / Passed",
-                $"{runtime.TopologyCacheRoundTripRunCount} / " +
-                runtime.TopologyCacheRoundTripPassCount);
+                "Development Orchestration",
+                runtime.AutomaticDevelopmentCacheEnabled
+                    ? "Automatic — Press Play"
+                    : "Production — Cache Only");
             EditorGUILayout.LabelField(
-                "Payload Size",
-                runtime.TopologyCacheRoundTripPayloadBytes > 0
-                    ? $"{runtime.TopologyCacheRoundTripPayloadBytes / 1024f:0.0} KiB " +
-                      $"({runtime.TopologyCacheRoundTripPayloadBytes:N0} bytes)"
+                "Active Prepared Source",
+                runtime.TopologyCacheLoadedForActiveResources
+                    ? runtime.TopologyCacheStartupState.StartsWith(
+                        "Using Previous")
+                        ? "Previous Persistent Cache (Rebuilding)"
+                        : "Persistent Cache"
+                    : runtime.TopologyCacheStartupState.Contains("Session-Only")
+                        ? "Session-Only Development Generation"
+                        : runtime.InitializationComplete
+                            ? "Generated Development Topology"
+                            : "None Yet");
+            EditorGUILayout.LabelField(
+                "Automatic Persistence",
+                runtime.AutomaticTopologyCachePersistenceState);
+            EditorGUILayout.LabelField(
+                "Writes / Saved",
+                $"{runtime.AutomaticTopologyCacheWriteCount} / " +
+                runtime.AutomaticTopologyCacheWriteSuccessCount);
+            EditorGUILayout.LabelField(
+                "Payload",
+                runtime.TopologyCacheStartupPayloadBytes > 0
+                    ? $"{runtime.TopologyCacheStartupPayloadBytes / 1024f:0.0} KiB " +
+                      $"({runtime.TopologyCacheStartupPayloadBytes:N0} bytes)"
                     : "—");
             EditorGUILayout.LabelField(
                 "Payload Hash",
-                runtime.TopologyCacheRoundTripPayloadHash);
+                runtime.TopologyCacheStartupPayloadHash);
             EditorGUILayout.LabelField(
-                "Serialize / Load",
-                $"{runtime.TopologyCacheRoundTripSerializationMilliseconds:0.000} / " +
-                $"{runtime.TopologyCacheRoundTripLoadMilliseconds:0.000} ms");
-            EditorGUILayout.LabelField(
-                "Verification",
-                $"{runtime.TopologyCacheRoundTripVerificationMilliseconds:0.000} ms");
-            if (runtime.TopologyCacheRoundTripRunCount > 0)
+                "Validate + Load",
+                $"{runtime.TopologyCacheStartupLoadMilliseconds:0.000} ms");
+            EditorGUILayout.HelpBox(
+                runtime.TopologyCacheStartupSummary,
+                runtime.TopologyCacheStartupState.Contains("Failed")
+                    ? MessageType.Warning
+                    : MessageType.Info);
+            if (runtime.AutomaticTopologyCachePersistenceState != "Idle")
             {
                 EditorGUILayout.HelpBox(
-                    runtime.TopologyCacheRoundTripSummary,
-                    runtime.TopologyCacheRoundTripState == "Passed"
-                        ? MessageType.Info
-                        : MessageType.Warning);
-            }
-            using (new EditorGUI.DisabledScope(
-                       !Application.isPlaying ||
-                       !runtime.TopologyCacheRoundTripReady ||
-                       runtime.TopologyReplacementInProgress))
-            {
-                if (GUILayout.Button("Validate Topology Cache Round Trip"))
-                {
-                    runtime.RunTopologyCacheRoundTripValidation();
-                }
+                    runtime.AutomaticTopologyCachePersistenceSummary,
+                    runtime.AutomaticTopologyCachePersistenceState.Contains(
+                        "Failed")
+                        ? MessageType.Warning
+                        : MessageType.Info);
             }
 
-            using (new EditorGUI.DisabledScope(
-                       !Application.isPlaying ||
-                       !runtime.ResourcesAllocated ||
-                       runtime.TopologyReplacementInProgress))
+            EditorGUILayout.Space(4f);
+            showFoamCacheDiagnostics = EditorGUILayout.Foldout(
+                showFoamCacheDiagnostics,
+                "Advanced Cache Diagnostics",
+                true);
+            if (showFoamCacheDiagnostics)
             {
-                if (GUILayout.Button("Prepare Identical Topology Replacement"))
+                EditorGUI.indentLevel++;
+                using (new EditorGUI.DisabledScope(
+                           !runtime.ExplicitTopologyGenerationAvailable ||
+                           runtime.TopologyReplacementInProgress))
                 {
-                    runtime.RequestIdenticalTopologyReplacementValidation();
+                    if (GUILayout.Button(
+                            "Explicitly Generate Topology (Development Only)"))
+                    {
+                        runtime.RequestExplicitTopologyGeneration();
+                    }
                 }
+
+                if (!Application.isPlaying &&
+                    river.FoamTopologyCacheAsset == null &&
+                    GUILayout.Button(
+                        "Manually Create and Assign Cache Asset"))
+                {
+                    CreateAndAssignFoamTopologyCacheAsset(river);
+                }
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField(
+                    "Patch 4.9A Cache Contract",
+                    EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Round-Trip State",
+                        "The explicit proof serializes the complete immutable prepared topology graph and exact obstacle scalar field, deserializes them into fresh topology objects, verifies identical bytes and initial generated channels, and rejects a deliberately corrupted copy. It never activates the reconstructed result."),
+                    new GUIContent(runtime.TopologyCacheRoundTripState));
+                EditorGUILayout.LabelField(
+                    "Proof Runs / Passed",
+                    $"{runtime.TopologyCacheRoundTripRunCount} / " +
+                    runtime.TopologyCacheRoundTripPassCount);
+                EditorGUILayout.LabelField(
+                    "Payload Size",
+                    runtime.TopologyCacheRoundTripPayloadBytes > 0
+                        ? $"{runtime.TopologyCacheRoundTripPayloadBytes / 1024f:0.0} KiB " +
+                          $"({runtime.TopologyCacheRoundTripPayloadBytes:N0} bytes)"
+                        : "—");
+                EditorGUILayout.LabelField(
+                    "Payload Hash",
+                    runtime.TopologyCacheRoundTripPayloadHash);
+                EditorGUILayout.LabelField(
+                    "Serialize / Load",
+                    $"{runtime.TopologyCacheRoundTripSerializationMilliseconds:0.000} / " +
+                    $"{runtime.TopologyCacheRoundTripLoadMilliseconds:0.000} ms");
+                EditorGUILayout.LabelField(
+                    "Verification",
+                    $"{runtime.TopologyCacheRoundTripVerificationMilliseconds:0.000} ms");
+                if (runtime.TopologyCacheRoundTripRunCount > 0)
+                {
+                    EditorGUILayout.HelpBox(
+                        runtime.TopologyCacheRoundTripSummary,
+                        runtime.TopologyCacheRoundTripState == "Passed"
+                            ? MessageType.Info
+                            : MessageType.Warning);
+                }
+                using (new EditorGUI.DisabledScope(
+                           !Application.isPlaying ||
+                           !runtime.TopologyCacheRoundTripReady ||
+                           runtime.TopologyReplacementInProgress))
+                {
+                    if (GUILayout.Button("Validate Topology Cache Round Trip"))
+                    {
+                        runtime.RunTopologyCacheRoundTripValidation();
+                    }
+                }
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField(
+                    "Patch 4.9B Persistent Cache Build",
+                    EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(
+                    "Build State",
+                    runtime.TopologyCacheBuildState);
+                EditorGUILayout.LabelField(
+                    "Payload / Generator Version",
+                    $"{runtime.TopologyCacheFormatVersion} / " +
+                    runtime.TopologyCacheGeneratorContractVersion);
+                EditorGUILayout.LabelField(
+                    "Builds / Successful",
+                    $"{runtime.TopologyCacheBuildCount} / " +
+                    runtime.TopologyCacheBuildSuccessCount);
+                EditorGUILayout.LabelField(
+                    "Built Payload",
+                    runtime.TopologyCacheBuildPayloadBytes > 0
+                        ? $"{runtime.TopologyCacheBuildPayloadBytes / 1024f:0.0} KiB " +
+                          $"({runtime.TopologyCacheBuildPayloadBytes:N0} bytes)"
+                        : "—");
+                EditorGUILayout.LabelField(
+                    "Built Payload Hash",
+                    runtime.TopologyCacheBuildPayloadHash);
+                EditorGUILayout.LabelField(
+                    "Build Time",
+                    $"{runtime.TopologyCacheBuildMilliseconds:0.000} ms");
+                EditorGUILayout.LabelField(
+                    "Validation State",
+                    runtime.TopologyCacheValidationState);
+                EditorGUILayout.LabelField(
+                    "Checks / Hit Candidates",
+                    $"{runtime.TopologyCacheValidationCount} / " +
+                    runtime.TopologyCacheValidationHitCount);
+                EditorGUILayout.LabelField(
+                    "Domain Fingerprint",
+                    runtime.TopologyCacheDomainFingerprint);
+                EditorGUILayout.LabelField(
+                    "Obstacle Fingerprint",
+                    runtime.TopologyCacheObstacleFingerprint);
+                EditorGUILayout.LabelField(
+                    "Generation Fingerprint",
+                    runtime.TopologyCacheGenerationFingerprint);
+                EditorGUILayout.LabelField(
+                    "Combined Input Key",
+                    runtime.TopologyCacheCombinedFingerprint);
+                EditorGUILayout.LabelField(
+                    "Exact Obstacle Sources",
+                    runtime.TopologyCacheObstacleSourceCount.ToString());
+                if (runtime.TopologyCacheBuildCount > 0)
+                {
+                    EditorGUILayout.HelpBox(
+                        runtime.TopologyCacheBuildSummary,
+                        runtime.TopologyCacheBuildState == "Built"
+                            ? MessageType.Info
+                            : MessageType.Warning);
+                }
+                if (runtime.TopologyCacheValidationCount > 0)
+                {
+                    EditorGUILayout.HelpBox(
+                        runtime.TopologyCacheValidationSummary,
+                        runtime.TopologyCacheValidationState == "Hit Candidate"
+                            ? MessageType.Info
+                            : MessageType.Warning);
+                }
+
+                using (new EditorGUI.DisabledScope(
+                           !Application.isPlaying ||
+                           !runtime.TopologyCacheBuildReady ||
+                           runtime.TopologyReplacementInProgress ||
+                           river.FoamTopologyCacheAsset == null))
+                {
+                    if (GUILayout.Button("Build / Update Topology Cache Asset"))
+                    {
+                        BuildOrUpdateFoamTopologyCache(river, runtime);
+                    }
+                }
+
+                using (new EditorGUI.DisabledScope(
+                           !Application.isPlaying ||
+                           !runtime.TopologyCacheBuildReady ||
+                           runtime.TopologyReplacementInProgress ||
+                           river.FoamTopologyCacheAsset == null))
+                {
+                    if (GUILayout.Button("Validate Assigned Topology Cache"))
+                    {
+                        runtime.ValidateAssignedTopologyCache();
+                    }
+                }
+
+                using (new EditorGUI.DisabledScope(
+                           !Application.isPlaying ||
+                           !runtime.ResourcesAllocated ||
+                           runtime.TopologyReplacementInProgress))
+                {
+                    if (GUILayout.Button("Prepare Identical Topology Replacement"))
+                    {
+                        runtime.RequestIdenticalTopologyReplacementValidation();
+                    }
+                }
+                EditorGUI.indentLevel--;
             }
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
@@ -2895,6 +3098,81 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "The planar-reflection component remains a deferred Stage 8 system and is still ignored by the accepted production shader path.",
                     MessageType.Warning);
             }
+        }
+
+        private void CreateAndAssignFoamTopologyCacheAsset(
+            StylizedRiver river)
+        {
+            if (river == null || Application.isPlaying)
+            {
+                return;
+            }
+
+            string safeName = string.IsNullOrWhiteSpace(river.name)
+                ? "River"
+                : river.name.Replace('/', '_').Replace('\\', '_');
+            string path = EditorUtility.SaveFilePanelInProject(
+                "Create River Foam Topology Cache",
+                $"{safeName}_FoamTopologyCache",
+                "asset",
+                "Choose where this authored river's prepared Foam topology " +
+                "payload should be stored.");
+            if (string.IsNullOrEmpty(path))
+            {
+                return;
+            }
+
+            path = AssetDatabase.GenerateUniqueAssetPath(path);
+            StylizedRiverFoamTopologyCacheAsset asset =
+                CreateInstance<StylizedRiverFoamTopologyCacheAsset>();
+            AssetDatabase.CreateAsset(asset, path);
+            Undo.RegisterCreatedObjectUndo(
+                asset,
+                "Create River Foam Topology Cache");
+            Undo.RecordObject(
+                river,
+                "Assign River Foam Topology Cache");
+            SerializedObject riverObject = new SerializedObject(river);
+            SerializedProperty cacheProperty =
+                riverObject.FindProperty("foamTopologyCacheAsset");
+            cacheProperty.objectReferenceValue = asset;
+            riverObject.ApplyModifiedProperties();
+            EditorUtility.SetDirty(river);
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssets();
+            serializedObject.Update();
+            EditorGUIUtility.PingObject(asset);
+        }
+
+        private void BuildOrUpdateFoamTopologyCache(
+            StylizedRiver river,
+            StylizedRiverFoamRuntime runtime)
+        {
+            serializedObject.ApplyModifiedProperties();
+            StylizedRiverFoamTopologyCacheAsset asset =
+                river.FoamTopologyCacheAsset;
+            if (asset == null)
+            {
+                serializedObject.Update();
+                return;
+            }
+
+            if (!runtime.TryBuildTopologyCache(
+                    out StylizedRiverFoamTopologyCacheBuildArtifact artifact))
+            {
+                serializedObject.Update();
+                return;
+            }
+
+            Undo.RecordObject(
+                asset,
+                "Update River Foam Topology Cache");
+            asset.StoreBuild(artifact);
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssets();
+            serializedObject.Update();
+            runtime.ValidateAssignedTopologyCache();
+            EditorGUIUtility.PingObject(asset);
         }
 
         private void DrawStatus()
