@@ -787,6 +787,31 @@ namespace ProgrammaticStylized3D.Rivers
         public int ConnectorAcceptedCount => connectorTopology != null
             ? connectorTopology.AcceptedConnectorCount
             : 0;
+        public int ConnectorPreparedCount => connectorTopology != null
+            ? connectorTopology.PreparedConnectorCount
+            : 0;
+        public int ConnectorUnavailableCount => connectorTopology != null
+            ? connectorTopology.UnavailableConnectorCount
+            : 0;
+        public int ConnectorPreparedEndpointCount => connectorTopology != null
+            ? connectorTopology.PreparedEndpointCount
+            : 0;
+        public int ConnectorUnresolvedEndpointCount =>
+            connectorTopology != null
+                ? connectorTopology.UnresolvedEndpointCount
+                : 0;
+        public int ConnectorPreparedPathPointCount =>
+            connectorTopology != null
+                ? connectorTopology.PreparedPathPointCount
+                : 0;
+        public int ConnectorPreparedPathVariantCount =>
+            connectorTopology != null
+                ? connectorTopology.PreparedPathVariantCount
+                : 0;
+        public int ConnectorUnavailablePathVariantCount =>
+            connectorTopology != null
+                ? connectorTopology.UnavailablePathVariantCount
+                : 0;
         public string ConnectorTopRejectionReason => connectorTopology != null
             ? connectorTopology.GetTopRejectionSummary()
             : "None";
@@ -831,6 +856,12 @@ namespace ProgrammaticStylized3D.Rivers
             : 0;
         public int ConnectorWeakSpanAcceptedCount => pocketTopology != null
             ? pocketTopology.AcceptedConnectorWeakSpanCount
+            : 0;
+        public int ConnectorWeakSpanPreparedCount => pocketTopology != null
+            ? pocketTopology.PreparedWeakSpanRegionCount
+            : 0;
+        public int ConnectorWeakSpanUnavailableCount => pocketTopology != null
+            ? pocketTopology.UnavailableWeakSpanRegionCount
             : 0;
         public int FreeWaterEventOpportunityCount => pocketTopology != null
             ? pocketTopology.FreeWaterOpportunityCount
@@ -2129,7 +2160,9 @@ namespace ProgrammaticStylized3D.Rivers
             fieldLength = chunkCount * ChunkLengthMetres;
             validFieldLength = domain.LocalLength;
             float longitudinalSpacing =
-                fieldLength / Mathf.Max(1, fieldWidth - 1);
+                StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
+                    fieldLength,
+                    fieldWidth);
             // Keep one inert outflow sample beyond the exact endpoint so
             // bilinear rendering reaches the visible river end without
             // reintroducing a padded population domain.
@@ -2470,7 +2503,9 @@ namespace ProgrammaticStylized3D.Rivers
             using var profilerScope = InitBuildMetricBufferProfilerMarker.Auto();
             metricRows = new FoamMetricRow[fieldWidth];
             float longitudinalSpacing =
-                fieldLength / Mathf.Max(1, fieldWidth - 1);
+                StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
+                    fieldLength,
+                    fieldWidth);
             float curvatureSampleDistance = Mathf.Max(
                 0.5f,
                 longitudinalSpacing * 2f);
@@ -2479,7 +2514,10 @@ namespace ProgrammaticStylized3D.Rivers
             for (int x = 0; x < fieldWidth; x++)
             {
                 float localDistance =
-                    x / (float)Mathf.Max(1, fieldWidth - 1) * fieldLength;
+                    StylizedRiverFoamTopologyFieldSpace.LocalDistanceAtTexel(
+                        x,
+                        fieldWidth,
+                        fieldLength);
                 float clampedLocalDistance = Mathf.Min(
                     localDistance,
                     validFieldLength);
@@ -2490,7 +2528,9 @@ namespace ProgrammaticStylized3D.Rivers
                 float left = Mathf.Max(0.05f, sample.LeftSurfaceHalfWidth);
                 float right = Mathf.Max(0.05f, sample.RightSurfaceHalfWidth);
                 float minimumLateralSpacing =
-                    (left + right) / Mathf.Max(1, fieldHeight - 1);
+                    StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
+                        left + right,
+                        fieldHeight);
 
                 float previousGlobal = Mathf.Max(
                     river.Domain.GlobalDistanceMinimum,
@@ -2577,7 +2617,10 @@ namespace ProgrammaticStylized3D.Rivers
             for (int x = 0; x < fieldWidth; x++)
             {
                 float localDistance =
-                    x / (float)Mathf.Max(1, fieldWidth - 1) * fieldLength;
+                    StylizedRiverFoamTopologyFieldSpace.LocalDistanceAtTexel(
+                        x,
+                        fieldWidth,
+                        fieldLength);
                 if (localDistance > simulationFieldLength + 0.0001f)
                 {
                     continue;
@@ -2606,13 +2649,18 @@ namespace ProgrammaticStylized3D.Rivers
                     animatedEnvelope);
                 float edgeWidth = Mathf.Max(
                     0.05f,
-                    (leftSurface + rightSurface) /
-                    Mathf.Max(1, fieldHeight - 1) * edgeCells);
+                    StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
+                        leftSurface + rightSurface,
+                        fieldHeight) * edgeCells);
 
                 for (int y = 0; y < fieldHeight; y++)
                 {
-                    float across01 = y / (float)Mathf.Max(1, fieldHeight - 1);
-                    float lateral = Across01ToMetres(
+                    float across01 =
+                        StylizedRiverFoamTopologyFieldSpace.Across01AtTexel(
+                            y,
+                            fieldHeight);
+                    float lateral =
+                        StylizedRiverFoamTopologyFieldSpace.Across01ToMetres(
                         across01,
                         leftSurface,
                         rightSurface);
@@ -3133,7 +3181,9 @@ namespace ProgrammaticStylized3D.Rivers
             int centreX = GlobalDistanceToX(injection.GlobalDistance);
             float alongRadius = injection.Radius * injection.Elongation *
                 (injection.CompoundShape ? 1.25f : 1f);
-            float dx = fieldLength / Mathf.Max(1, fieldWidth - 1);
+            float dx = StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
+                fieldLength,
+                fieldWidth);
             int radiusPixels = Mathf.CeilToInt(alongRadius / Mathf.Max(0.001f, dx)) + 2;
             int startX = Mathf.Clamp(centreX - radiusPixels, 0, fieldWidth - 1);
             int endX = Mathf.Clamp(centreX + radiusPixels, 0, fieldWidth - 1);
@@ -4996,9 +5046,16 @@ namespace ProgrammaticStylized3D.Rivers
             StylizedRiverSplineSample anchorSample =
                 river.Domain.SampleAtOrientedDistance(
                     anchor.CentreLocalDistance);
-            float anchorAcrossMetres = ResolveMajorAcrossMetres(
-                anchor.CentreAcrossNormalized,
-                anchorSample);
+            float anchorAcrossMetres =
+                StylizedRiverFoamTopologyFieldSpace
+                    .SignedNormalizedToMetres(
+                        anchor.CentreAcrossNormalized,
+                        Mathf.Max(
+                            0.05f,
+                            anchorSample.LeftSurfaceHalfWidth),
+                        Mathf.Max(
+                            0.05f,
+                            anchorSample.RightSurfaceHalfWidth));
             float anchorRadius = Mathf.Max(
                 preparedRegion.MajorHalfExtentCells,
                 preparedRegion.MinorHalfExtentCells) *
@@ -5018,9 +5075,16 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 MajorEvolutionPose otherPose = ResolveMajorPose(otherSlot);
-                float otherAcrossMetres = ResolveMajorAcrossMetres(
-                    otherPose.AcrossNormalized,
-                    anchorSample);
+                float otherAcrossMetres =
+                    StylizedRiverFoamTopologyFieldSpace
+                        .SignedNormalizedToMetres(
+                            otherPose.AcrossNormalized,
+                            Mathf.Max(
+                                0.05f,
+                                anchorSample.LeftSurfaceHalfWidth),
+                            Mathf.Max(
+                                0.05f,
+                                anchorSample.RightSurfaceHalfWidth));
                 StylizedRiverFoamPreparedMajorRegion otherPrepared =
                     prepared[otherSlot.PreparedIndex];
                 float otherRadius = Mathf.Max(
@@ -5044,22 +5108,6 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             return minimumNormalisedDistance;
-        }
-
-        private static float ResolveMajorAcrossMetres(
-            float acrossNormalized,
-            StylizedRiverSplineSample sample)
-        {
-            if (acrossNormalized < 0f)
-            {
-                return acrossNormalized * Mathf.Max(
-                    0.05f,
-                    sample.LeftSurfaceHalfWidth);
-            }
-
-            return acrossNormalized * Mathf.Max(
-                0.05f,
-                sample.RightSurfaceHalfWidth);
         }
 
         private void ResolveMajorOccurrenceBudget(
@@ -6918,13 +6966,13 @@ namespace ProgrammaticStylized3D.Rivers
 
         private int GlobalDistanceToX(float globalDistance)
         {
-            float normalized =
-                (globalDistance - river.Domain.GlobalDistanceMinimum) /
-                Mathf.Max(0.001f, fieldLength);
-            return Mathf.Clamp(
-                Mathf.RoundToInt(normalized * Mathf.Max(1, fieldWidth - 1)),
-                0,
-                fieldWidth - 1);
+            float localDistance =
+                globalDistance - river.Domain.GlobalDistanceMinimum;
+            return StylizedRiverFoamTopologyFieldSpace
+                .LocalDistanceToNearestTexel(
+                    localDistance,
+                    fieldWidth,
+                    fieldLength);
         }
 
         private int GlobalDistanceToChunk(float globalDistance)
@@ -7052,35 +7100,6 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
-        private static float Across01ToMetres(
-            float across01,
-            float leftHalfWidth,
-            float rightHalfWidth)
-        {
-            if (across01 <= 0.5f)
-            {
-                return -leftHalfWidth * (1f - across01 * 2f);
-            }
-
-            return rightHalfWidth * (across01 * 2f - 1f);
-        }
-
-        private static float AcrossMetresTo01(
-            float acrossMetres,
-            float leftHalfWidth,
-            float rightHalfWidth)
-        {
-            if (acrossMetres <= 0f)
-            {
-                return Mathf.Clamp01(
-                    0.5f + acrossMetres /
-                    Mathf.Max(0.001f, leftHalfWidth * 2f));
-            }
-
-            return Mathf.Clamp01(
-                0.5f + acrossMetres /
-                Mathf.Max(0.001f, rightHalfWidth * 2f));
-        }
 
     }
 }

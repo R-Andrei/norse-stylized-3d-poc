@@ -156,12 +156,13 @@ namespace ProgrammaticStylized3D.Rivers
                 fluidCoverage,
                 validCells);
 
-            Vector2[] metricPositions = BuildMetricPositions(
-                domain,
-                width,
-                height,
-                fieldLength,
-                validFieldLength);
+            Vector2[] metricPositions =
+                StylizedRiverFoamTopologyFieldSpace.BuildMetricPositions(
+                    domain,
+                    width,
+                    height,
+                    fieldLength,
+                    validFieldLength);
             float[] connectorDistance = BuildDistanceFromSources(
                 width,
                 height,
@@ -459,7 +460,10 @@ namespace ProgrammaticStylized3D.Rivers
                         candidate.StableId,
                         candidate.HostRegionId,
                         candidate.Position,
-                        ResolveAcrossNormalized(domain, candidate.Position),
+                        StylizedRiverFoamTopologyFieldSpace
+                            .ResolveAcrossNormalized(
+                                domain,
+                                candidate.Position),
                         orientation,
                         alongRadius,
                         acrossRadius,
@@ -562,6 +566,11 @@ namespace ProgrammaticStylized3D.Rivers
                     domain,
                     fluidCoverage,
                     obstacleMask);
+            StylizedRiverFoamPreparedWeakSpanRegion[]
+                preparedWeakSpanRegions = BuildPreparedWeakSpanRegions(
+                    feasibleWeakSpanRegions,
+                    selectedWeakSpanCount,
+                    connectorTopology);
             float[] hostedFallbackPressure = new float[cellCount];
             MergeUnpreparedHostedPrefix(
                 feasibleInteriorRegions,
@@ -643,6 +652,7 @@ namespace ProgrammaticStylized3D.Rivers
                 regions.ToArray(),
                 preparedHostedRegions,
                 preparedFreeWaterRegions,
+                preparedWeakSpanRegions,
                 rejectionCounts);
         }
 
@@ -680,6 +690,7 @@ namespace ProgrammaticStylized3D.Rivers
                 Array.Empty<
                     StylizedRiverFoamPreparedHostedNegativeRegion>(),
                 Array.Empty<StylizedRiverFoamPreparedFreeWaterRegion>(),
+                Array.Empty<StylizedRiverFoamPreparedWeakSpanRegion>(),
                 rejectionCounts);
         }
 
@@ -743,6 +754,7 @@ namespace ProgrammaticStylized3D.Rivers
                     path.StableId,
                     points,
                     length,
+                    endpointClearance,
                     endpointClearance + usableLength * primaryFraction,
                     Hash01(primaryId, 62u)));
 
@@ -760,6 +772,7 @@ namespace ProgrammaticStylized3D.Rivers
                         path.StableId,
                         points,
                         length,
+                        endpointClearance,
                         endpointClearance + usableLength * secondaryFraction,
                         Hash01(secondaryId, 64u)));
                 }
@@ -870,12 +883,20 @@ namespace ProgrammaticStylized3D.Rivers
                     stableId,
                     opportunity.ConnectorId,
                     position,
-                    ResolveAcrossNormalized(domain, position),
+                    StylizedRiverFoamTopologyFieldSpace
+                        .ResolveAcrossNormalized(
+                            domain,
+                            position),
                     Mathf.Atan2(tangent.y, tangent.x),
                     alongRadius,
                     acrossRadius,
                     Vector2.zero,
-                    CaptureRaster(raster)));
+                    CaptureRaster(raster),
+                    opportunity.PathLength,
+                    opportunity.DistanceAlongPath,
+                    opportunity.EndpointClearance,
+                    strength,
+                    tangent));
             }
 
             return prepared;
@@ -1025,7 +1046,10 @@ namespace ProgrammaticStylized3D.Rivers
                     stableId,
                     InvalidHostId,
                     opportunity.Position,
-                    ResolveAcrossNormalized(domain, opportunity.Position),
+                    StylizedRiverFoamTopologyFieldSpace
+                        .ResolveAcrossNormalized(
+                            domain,
+                            opportunity.Position),
                     orientation,
                     alongRadius,
                     acrossRadius,
@@ -1280,25 +1304,20 @@ namespace ProgrammaticStylized3D.Rivers
         {
             cellIndex = -1;
             resolvedPosition = position;
-            int approximateX = Mathf.Clamp(
-                Mathf.RoundToInt(
-                    position.x / Mathf.Max(0.0001f, fieldLength) *
-                    (width - 1)),
-                0,
-                width - 1);
-            float across01 = position.y < 0f
-                ? Mathf.Lerp(
-                    0.5f,
-                    0f,
-                    Mathf.Clamp01(-position.y / leftWidth))
-                : Mathf.Lerp(
-                    0.5f,
-                    1f,
-                    Mathf.Clamp01(position.y / rightWidth));
-            int approximateY = Mathf.Clamp(
-                Mathf.RoundToInt(across01 * (height - 1)),
-                0,
-                height - 1);
+            int approximateX = StylizedRiverFoamTopologyFieldSpace
+                .LocalDistanceToNearestTexel(
+                    position.x,
+                    width,
+                    fieldLength);
+            float across01 = StylizedRiverFoamTopologyFieldSpace
+                .AcrossMetresTo01Clamped(
+                    position.y,
+                    leftWidth,
+                    rightWidth);
+            int approximateY = StylizedRiverFoamTopologyFieldSpace
+                .Across01ToNearestTexel(
+                    across01,
+                    height);
             int approximateIndex = approximateX + approximateY * width;
             if (validCells[approximateIndex])
             {
@@ -1582,10 +1601,16 @@ namespace ProgrammaticStylized3D.Rivers
                     domain.LocalLength);
                 StylizedRiverSplineSample sample =
                     domain.SampleAtOrientedDistance(localDistance);
-                float lateral = SignedNormalizedToMetres(
-                    region.CentreAcrossNormalized,
-                    Mathf.Max(0.05f, sample.LeftSurfaceHalfWidth),
-                    Mathf.Max(0.05f, sample.RightSurfaceHalfWidth));
+                float lateral =
+                    StylizedRiverFoamTopologyFieldSpace
+                        .SignedNormalizedToMetres(
+                            region.CentreAcrossNormalized,
+                            Mathf.Max(
+                                0.05f,
+                                sample.LeftSurfaceHalfWidth),
+                            Mathf.Max(
+                                0.05f,
+                                sample.RightSurfaceHalfWidth));
                 hosts.Add(new HostMetric(
                     region.StableId,
                     new Vector2(localDistance, lateral)));
@@ -1626,9 +1651,11 @@ namespace ProgrammaticStylized3D.Rivers
                         hostId ^
                         (uint)(index + 1) * 0x85EBCA6Bu);
                     float jitter = Hash01(stableId, 4u) * 0.035f;
-                    float acrossNormalized = ResolveAcrossNormalized(
-                        domain,
-                        positions[index]);
+                    float acrossNormalized =
+                        StylizedRiverFoamTopologyFieldSpace
+                            .ResolveAcrossNormalized(
+                                domain,
+                                positions[index]);
                     candidates.Add(new PocketCandidate(
                         stableId,
                         hostId,
@@ -2608,6 +2635,103 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
+        private static StylizedRiverFoamPreparedWeakSpanRegion[]
+            BuildPreparedWeakSpanRegions(
+                List<PreparedNegativeRegion> prepared,
+                int selectedCount,
+                StylizedRiverFoamConnectorTopology connectorTopology)
+        {
+            selectedCount = Mathf.Clamp(
+                selectedCount,
+                0,
+                prepared != null ? prepared.Count : 0);
+            List<StylizedRiverFoamPreparedWeakSpanRegion> result = new(
+                selectedCount);
+            Dictionary<uint, StylizedRiverFoamConnectorPath> pathById = new();
+            if (connectorTopology != null)
+            {
+                IReadOnlyList<StylizedRiverFoamConnectorPath> paths =
+                    connectorTopology.PreparedPaths;
+                for (int pathIndex = 0;
+                     pathIndex < paths.Count;
+                     pathIndex++)
+                {
+                    StylizedRiverFoamConnectorPath path = paths[pathIndex];
+                    if (path != null && !pathById.ContainsKey(path.StableId))
+                    {
+                        pathById.Add(path.StableId, path);
+                    }
+                }
+            }
+
+            for (int index = 0; index < selectedCount; index++)
+            {
+                PreparedNegativeRegion region = prepared[index];
+                if (region.RegionClass !=
+                    StylizedRiverFoamNegativeRegionClass.ConnectorWeakSpan)
+                {
+                    continue;
+                }
+
+                StylizedRiverFoamPreparedWeakSpanAvailability availability;
+                if (!pathById.TryGetValue(
+                        region.HostRegionId,
+                        out StylizedRiverFoamConnectorPath path))
+                {
+                    availability =
+                        StylizedRiverFoamPreparedWeakSpanAvailability
+                            .MissingConnector;
+                }
+                else if (!path.PreparationAvailable)
+                {
+                    availability =
+                        StylizedRiverFoamPreparedWeakSpanAvailability
+                            .ConnectorPreparationUnavailable;
+                }
+                else if (region.WeakSpanPathLength <= 0.0001f ||
+                    region.WeakSpanDistanceAlongPath <
+                        region.WeakSpanEndpointClearance - 0.0001f ||
+                    region.WeakSpanDistanceAlongPath >
+                        region.WeakSpanPathLength -
+                        region.WeakSpanEndpointClearance + 0.0001f)
+                {
+                    availability =
+                        StylizedRiverFoamPreparedWeakSpanAvailability
+                            .InvalidPathPosition;
+                }
+                else
+                {
+                    availability =
+                        StylizedRiverFoamPreparedWeakSpanAvailability.Available;
+                }
+
+                float inverseLength = region.WeakSpanPathLength > 0.0001f
+                    ? 1f / region.WeakSpanPathLength
+                    : 0f;
+                float normalizedDistance =
+                    region.WeakSpanDistanceAlongPath * inverseLength;
+                float normalizedClearance =
+                    region.WeakSpanEndpointClearance * inverseLength;
+                uint evolutionSeed = MixBits(
+                    region.StableId ^ 0xD1B54A35u);
+                result.Add(new StylizedRiverFoamPreparedWeakSpanRegion(
+                    region.StableId,
+                    region.HostRegionId,
+                    availability,
+                    normalizedDistance,
+                    normalizedClearance,
+                    1f - normalizedClearance,
+                    region.AlongRadius,
+                    region.AcrossRadius,
+                    region.WeakSpanStrength,
+                    evolutionSeed,
+                    region.WeakSpanTangent,
+                    region.Orientation));
+            }
+
+            return result.ToArray();
+        }
+
         private static StylizedRiverFoamPreparedFreeWaterRegion[]
             BuildPreparedFreeWaterRegions(
                 List<PreparedNegativeRegion> prepared,
@@ -2916,10 +3040,16 @@ namespace ProgrammaticStylized3D.Rivers
 
                     StylizedRiverSplineSample sample =
                         domain.SampleAtOrientedDistance(localDistance);
-                    float centreAcrossMetres = SignedNormalizedToMetres(
-                        centreAcrossNormalized,
-                        Mathf.Max(0.05f, sample.LeftSurfaceHalfWidth),
-                        Mathf.Max(0.05f, sample.RightSurfaceHalfWidth));
+                    float centreAcrossMetres =
+                        StylizedRiverFoamTopologyFieldSpace
+                            .SignedNormalizedToMetres(
+                                centreAcrossNormalized,
+                                Mathf.Max(
+                                    0.05f,
+                                    sample.LeftSurfaceHalfWidth),
+                                Mathf.Max(
+                                    0.05f,
+                                    sample.RightSurfaceHalfWidth));
                     Vector2 metricPosition = new Vector2(
                         localDistance,
                         centreAcrossMetres + deltaAcross);
@@ -3253,10 +3383,12 @@ namespace ProgrammaticStylized3D.Rivers
                     return false;
                 }
 
-                float hostValue = SamplePreparedFieldBilinear(
-                    hostSupport,
-                    resolution,
-                    transformed);
+                float hostValue =
+                    StylizedRiverFoamTopologyFieldSpace.SampleScalarBilinear(
+                        hostSupport,
+                        resolution,
+                        resolution,
+                        transformed);
                 totalWeight += pressure;
                 if (hostValue >= MajorInteriorThreshold)
                 {
@@ -3268,29 +3400,6 @@ namespace ProgrammaticStylized3D.Rivers
                 ? insideWeight / totalWeight
                 : 0f;
             return totalWeight > 0.0001f;
-        }
-
-        private static float SamplePreparedFieldBilinear(
-            float[] source,
-            int resolution,
-            Vector2 position)
-        {
-            float x = Mathf.Clamp(position.x - 0.5f, 0f, resolution - 1f);
-            float y = Mathf.Clamp(position.y - 0.5f, 0f, resolution - 1f);
-            int x0 = Mathf.FloorToInt(x);
-            int y0 = Mathf.FloorToInt(y);
-            int x1 = Mathf.Min(x0 + 1, resolution - 1);
-            int y1 = Mathf.Min(y0 + 1, resolution - 1);
-            float tx = x - x0;
-            float ty = y - y0;
-            float a = source[x0 + y0 * resolution];
-            float b = source[x1 + y0 * resolution];
-            float c = source[x0 + y1 * resolution];
-            float d = source[x1 + y1 * resolution];
-            return Mathf.Lerp(
-                Mathf.Lerp(a, b, tx),
-                Mathf.Lerp(c, d, tx),
-                ty);
         }
 
         private static int FindMajorHostIndex(
@@ -3327,10 +3436,16 @@ namespace ProgrammaticStylized3D.Rivers
             // the retained Pocket/Cavity mask attached on tapered bends.
             StylizedRiverSplineSample metricSample =
                 domain.SampleAtOrientedDistance(metricPosition.x);
-            float hostLateralMetres = SignedNormalizedToMetres(
-                ResolveRuntimeMajorAcrossNormalized(hostRegion),
-                Mathf.Max(0.05f, metricSample.LeftHalfWidth),
-                Mathf.Max(0.05f, metricSample.RightHalfWidth));
+            float hostLateralMetres =
+                StylizedRiverFoamTopologyFieldSpace
+                    .SignedNormalizedToMetres(
+                        ResolveRuntimeMajorAcrossNormalized(hostRegion),
+                        Mathf.Max(
+                            0.05f,
+                            metricSample.LeftHalfWidth),
+                        Mathf.Max(
+                            0.05f,
+                            metricSample.RightHalfWidth));
             Vector2 delta = new Vector2(
                 metricPosition.x - hostLocalDistance,
                 metricPosition.y - hostLateralMetres);
@@ -3543,10 +3658,12 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.Min(domain.LocalLength, validFieldLength));
             StylizedRiverSplineSample sample =
                 domain.SampleAtOrientedDistance(widthSampleDistance);
-            float hostLateralMetres = SignedNormalizedToMetres(
-                ResolveRuntimeMajorAcrossNormalized(hostRegion),
-                Mathf.Max(0.05f, sample.LeftHalfWidth),
-                Mathf.Max(0.05f, sample.RightHalfWidth));
+            float hostLateralMetres =
+                StylizedRiverFoamTopologyFieldSpace
+                    .SignedNormalizedToMetres(
+                        ResolveRuntimeMajorAcrossNormalized(hostRegion),
+                        Mathf.Max(0.05f, sample.LeftHalfWidth),
+                        Mathf.Max(0.05f, sample.RightHalfWidth));
             return new Vector2(
                 localDistance,
                 hostLateralMetres + deltaAcross);
@@ -3570,83 +3687,14 @@ namespace ProgrammaticStylized3D.Rivers
             Vector2 metricPosition,
             RiverDomainSnapshot domain)
         {
-            if (source == null || source.Length < width * height ||
-                metricPosition.x < 0f ||
-                metricPosition.x > fieldLength + 0.0001f)
-            {
-                return 0f;
-            }
-
-            float clampedDistance = Mathf.Clamp(
-                metricPosition.x,
-                0f,
-                Mathf.Min(domain.LocalLength, validFieldLength));
-            StylizedRiverSplineSample sample =
-                domain.SampleAtOrientedDistance(clampedDistance);
-            float leftSurface = Mathf.Max(
-                0.05f,
-                sample.LeftSurfaceHalfWidth);
-            float rightSurface = Mathf.Max(
-                0.05f,
-                sample.RightSurfaceHalfWidth);
-            float across01 = AcrossMetresTo01(
-                metricPosition.y,
-                leftSurface,
-                rightSurface);
-            if (across01 < 0f || across01 > 1f)
-            {
-                return 0f;
-            }
-
-            float sourceX = metricPosition.x /
-                Mathf.Max(0.0001f, fieldLength) *
-                Mathf.Max(1, width - 1);
-            float sourceY = across01 * Mathf.Max(1, height - 1);
-            return SampleSourceFieldBilinear(
+            return StylizedRiverFoamTopologyFieldSpace.SampleScalarAtMetric(
                 source,
                 width,
                 height,
-                sourceX,
-                sourceY);
-        }
-
-        private static float SampleSourceFieldBilinear(
-            float[] source,
-            int width,
-            int height,
-            float x,
-            float y)
-        {
-            if (x < 0f || y < 0f ||
-                x > width - 1f || y > height - 1f)
-            {
-                return 0f;
-            }
-
-            int x0 = Mathf.FloorToInt(x);
-            int y0 = Mathf.FloorToInt(y);
-            int x1 = Mathf.Min(x0 + 1, width - 1);
-            int y1 = Mathf.Min(y0 + 1, height - 1);
-            float tx = x - x0;
-            float ty = y - y0;
-            float a = source[x0 + y0 * width];
-            float b = source[x1 + y0 * width];
-            float c = source[x0 + y1 * width];
-            float d = source[x1 + y1 * width];
-            return Mathf.Clamp01(Mathf.Lerp(
-                Mathf.Lerp(a, b, tx),
-                Mathf.Lerp(c, d, tx),
-                ty));
-        }
-
-        private static float AcrossMetresTo01(
-            float metres,
-            float leftWidth,
-            float rightWidth)
-        {
-            return metres < 0f
-                ? 0.5f + metres / Mathf.Max(0.0001f, leftWidth) * 0.5f
-                : 0.5f + metres / Mathf.Max(0.0001f, rightWidth) * 0.5f;
+                fieldLength,
+                validFieldLength,
+                metricPosition,
+                domain);
         }
 
         private static bool ContainsPreparedPressure(float[] pressure)
@@ -3753,46 +3801,6 @@ namespace ProgrammaticStylized3D.Rivers
             return distance;
         }
 
-        private static Vector2[] BuildMetricPositions(
-            RiverDomainSnapshot domain,
-            int width,
-            int height,
-            float fieldLength,
-            float validFieldLength)
-        {
-            Vector2[] positions = new Vector2[width * height];
-            for (int x = 0; x < width; x++)
-            {
-                float localDistance = x /
-                    (float)Mathf.Max(1, width - 1) * fieldLength;
-                float clampedDistance = Mathf.Min(
-                    localDistance,
-                    validFieldLength);
-                StylizedRiverSplineSample sample =
-                    domain.SampleAtOrientedDistance(clampedDistance);
-                float leftSurface = Mathf.Max(
-                    0.05f,
-                    sample.LeftSurfaceHalfWidth);
-                float rightSurface = Mathf.Max(
-                    0.05f,
-                    sample.RightSurfaceHalfWidth);
-
-                for (int y = 0; y < height; y++)
-                {
-                    float across01 = y /
-                        (float)Mathf.Max(1, height - 1);
-                    positions[x + y * width] = new Vector2(
-                        localDistance,
-                        Across01ToMetres(
-                            across01,
-                            leftSurface,
-                            rightSurface));
-                }
-            }
-
-            return positions;
-        }
-
         private static uint ResolveNearestHost(
             Vector2 position,
             List<HostMetric> hosts)
@@ -3818,45 +3826,6 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             return hosts[bestIndex].StableId;
-        }
-
-        private static float ResolveAcrossNormalized(
-            RiverDomainSnapshot domain,
-            Vector2 position)
-        {
-            StylizedRiverSplineSample sample =
-                domain.SampleAtOrientedDistance(Mathf.Clamp(
-                    position.x,
-                    0f,
-                    domain.LocalLength));
-            float left = Mathf.Max(0.05f, sample.LeftSurfaceHalfWidth);
-            float right = Mathf.Max(0.05f, sample.RightSurfaceHalfWidth);
-            return position.y < 0f
-                ? Mathf.Clamp(position.y / left, -1f, 0f)
-                : Mathf.Clamp(position.y / right, 0f, 1f);
-        }
-
-        private static float Across01ToMetres(
-            float across01,
-            float leftWidth,
-            float rightWidth)
-        {
-            if (across01 <= 0.5f)
-            {
-                return Mathf.Lerp(-leftWidth, 0f, across01 * 2f);
-            }
-
-            return Mathf.Lerp(0f, rightWidth, (across01 - 0.5f) * 2f);
-        }
-
-        private static float SignedNormalizedToMetres(
-            float acrossNormalized,
-            float leftWidth,
-            float rightWidth)
-        {
-            return acrossNormalized < 0f
-                ? acrossNormalized * leftWidth
-                : acrossNormalized * rightWidth;
         }
 
         private static float ValueNoise(
@@ -3956,12 +3925,18 @@ namespace ProgrammaticStylized3D.Rivers
                 uint connectorId,
                 Vector2[] points,
                 float pathLength,
+                float endpointClearance,
                 float distanceAlongPath,
                 float activationRank)
             {
                 StableId = stableId;
                 ConnectorId = connectorId;
                 Points = points;
+                PathLength = Mathf.Max(0f, pathLength);
+                EndpointClearance = Mathf.Clamp(
+                    endpointClearance,
+                    0f,
+                    PathLength * 0.5f);
                 DistanceAlongPath = Mathf.Clamp(
                     distanceAlongPath,
                     0f,
@@ -3972,6 +3947,8 @@ namespace ProgrammaticStylized3D.Rivers
             public uint StableId { get; }
             public uint ConnectorId { get; }
             public Vector2[] Points { get; }
+            public float PathLength { get; }
+            public float EndpointClearance { get; }
             public float DistanceAlongPath { get; }
             public float ActivationRank { get; }
         }
@@ -4102,6 +4079,41 @@ namespace ProgrammaticStylized3D.Rivers
                 float acrossRadius,
                 Vector2 breachDirection,
                 RasterSample[] samples)
+                : this(
+                    regionClass,
+                    stableId,
+                    hostRegionId,
+                    position,
+                    acrossNormalized,
+                    orientation,
+                    alongRadius,
+                    acrossRadius,
+                    breachDirection,
+                    samples,
+                    0f,
+                    0f,
+                    0f,
+                    0f,
+                    Vector2.zero)
+            {
+            }
+
+            public PreparedNegativeRegion(
+                StylizedRiverFoamNegativeRegionClass regionClass,
+                uint stableId,
+                uint hostRegionId,
+                Vector2 position,
+                float acrossNormalized,
+                float orientation,
+                float alongRadius,
+                float acrossRadius,
+                Vector2 breachDirection,
+                RasterSample[] samples,
+                float weakSpanPathLength,
+                float weakSpanDistanceAlongPath,
+                float weakSpanEndpointClearance,
+                float weakSpanStrength,
+                Vector2 weakSpanTangent)
             {
                 RegionClass = regionClass;
                 StableId = stableId;
@@ -4113,6 +4125,19 @@ namespace ProgrammaticStylized3D.Rivers
                 AcrossRadius = acrossRadius;
                 BreachDirection = breachDirection;
                 Samples = samples ?? Array.Empty<RasterSample>();
+                WeakSpanPathLength = Mathf.Max(0f, weakSpanPathLength);
+                WeakSpanDistanceAlongPath = Mathf.Clamp(
+                    weakSpanDistanceAlongPath,
+                    0f,
+                    WeakSpanPathLength);
+                WeakSpanEndpointClearance = Mathf.Clamp(
+                    weakSpanEndpointClearance,
+                    0f,
+                    WeakSpanPathLength * 0.5f);
+                WeakSpanStrength = Mathf.Clamp01(weakSpanStrength);
+                WeakSpanTangent = weakSpanTangent.sqrMagnitude > 0.000001f
+                    ? weakSpanTangent.normalized
+                    : Vector2.right;
             }
 
             public StylizedRiverFoamNegativeRegionClass RegionClass { get; }
@@ -4125,6 +4150,11 @@ namespace ProgrammaticStylized3D.Rivers
             public float AcrossRadius { get; }
             public Vector2 BreachDirection { get; }
             public RasterSample[] Samples { get; }
+            public float WeakSpanPathLength { get; }
+            public float WeakSpanDistanceAlongPath { get; }
+            public float WeakSpanEndpointClearance { get; }
+            public float WeakSpanStrength { get; }
+            public Vector2 WeakSpanTangent { get; }
         }
 
         private readonly struct AcceptedNegativeRegion

@@ -36,7 +36,7 @@ Current progress:
 - **Step 2 — Per-river staged bootstrap:** implemented and validated. Initialization now advances one explicit phase per `LateUpdate`; Foam remains disabled until complete readiness. The observed early phases were generally below roughly `2.5 ms` instead of recreating the former combined burst.
 - **Step 3 — Dirty-event queue and obstacle rebuild coalescing:** implemented and accepted. Boundary and obstacle changes no longer execute a complete rebuild chain immediately.
 - **Performance pause:** active. Steady-state maintenance staggering, compute-asset splitting, striped dispatch, CPU jobs, and global cross-river scheduling are deferred until Major Support, Connector Support, all four Negative Aging Pressure classes, static combined topology, runtime evolution, rebuild crossfade, and cache/preparation packaging are implemented and validated.
-- **Current implementation milestone:** Patch 4.1 exact Obstacle Footprint, Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, and Patch 4.5 complete static topology are accepted for feature progression. Coefficients remain provisional until the persistent Foam material proves the final result. Patch 4.6 lively Major evolution through Patch 4.6.2 combined lifetime units is accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-field parity/cavity correction are implemented and visually accepted. Patch 4.7B independent Free-Water evolution is implemented; Patch 4.7B.1 now corrects it to the canonical positive-downstream, finite-lifetime, prepared-upstream-recycle contract and awaits Unity visual/performance revalidation. Exact transformed-mesh interval preparation currently runs only in the staged pre-gameplay obstacle phase as a temporary fallback. Production ownership belongs to procedural chunk generation/building/linking after final object placement, with compact data cached for gameplay loading.
+- **Current implementation milestone:** Patch 4.1 exact Obstacle Footprint, Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, and Patch 4.5 complete static topology are accepted for feature progression. Coefficients remain provisional until the persistent Foam material proves the final result. Patch 4.6 lively Major evolution through Patch 4.6.2 combined lifetime units is accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-field parity/cavity correction are implemented and visually accepted. Patch 4.7B independent Free-Water evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, prepared-upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical CPU/HLSL topology field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector endpoint/path and Weak Span immutable preparation data is implemented and awaits Unity preparation-diagnostic validation. Exact transformed-mesh interval preparation currently runs only in the staged pre-gameplay obstacle phase as a temporary fallback. Production ownership belongs to procedural chunk generation/building/linking after final object placement, with compact data cached for gameplay loading.
 - **Global cross-river scheduling:** intentionally deferred. It will be designed only after the final one-river work categories, dependencies, interruption rules, and costs are known.
 
 The current sequencing rule is now: preserve the accepted performance foundation, prove each topology slice visually before building the next one, keep every expensive proof-stage operation profiled and named, then resume performance work against the real completed pipeline. Do not invent scheduler categories for features that are still provisional.
@@ -68,9 +68,9 @@ Further performance engineering is paused because the free-water topology pipeli
 11. Patch 4.7A hosted negative evolution — implemented;
 12. Patch 4.7A.1 hosted-negative parity/cavity correction — implemented and visually accepted;
 13. Patch 4.7B independent Free-Water negative evolution — implemented;
-14. Patch 4.7B.1 positive-downstream/lifetime/prepared-anchor recycle correction — implemented; Unity visual/performance revalidation pending;
-15. Patch 4.7C.0 canonical topology field-space consolidation;
-16. Patch 4.7C.1 Connector/Weak Span preparation data;
+14. Patch 4.7B.1 positive-downstream/lifetime/prepared-anchor recycle correction — implemented and visually accepted;
+15. Patch 4.7C.0 canonical topology field-space consolidation — implemented and visually revalidated;
+16. Patch 4.7C.1 Connector/Weak Span immutable preparation data — implemented; Unity preparation-diagnostic validation pending;
 17. Patch 4.7C.2 identity reconstruction and debug-only parity;
 18. Patch 4.7C.3 Connector/Weak Span runtime evolution;
 19. Patch 4.8 safe explicit replacement-topology transition;
@@ -1311,7 +1311,7 @@ Revert the runtime file to Step 2 and restore the preceding document revision.
 
 ## Step 4 — Staggered Steady-State Topology Maintenance
 
-**Status:** Major scheduling is accepted for feature progression through Patch 4.6.2. Patch 4.7A and Patch 4.7A.1 add accepted host-relative Interior Pocket and Edge Cavity reconstruction inside the same bounded active-movement pass. Patch 4.7B.1 adds the corrected slower Free-Water lifecycle using bounded prepared upstream recycle anchors and no normal-run search, retry, readback, or validation; Unity visual/performance revalidation is pending. Connector scheduling remains deferred to Patch 4.7C.0 through Patch 4.7C.3.
+**Status:** Major scheduling is accepted for feature progression through Patch 4.6.2. Patch 4.7A and Patch 4.7A.1 add accepted host-relative Interior Pocket and Edge Cavity reconstruction inside the same bounded active-movement pass. Patch 4.7B.1 adds the corrected slower Free-Water lifecycle using bounded prepared upstream recycle anchors and no normal-run search, retry, readback, or validation and is visually accepted. Patch 4.7C.0 consolidates CPU/HLSL field-space arithmetic without adding a scheduled runtime work category. Patch 4.7C.1 adds preparation-only Connector endpoint ownership, bounded path/variant data, and Weak Span attachments; it adds no steady-state work category. Connector reconstruction and scheduling remain deferred to Patch 4.7C.2 and Patch 4.7C.3.
 
 ### Purpose
 
@@ -1685,17 +1685,17 @@ Accepted/implemented topology work:
 6. Patch 4.7A hosted Interior Pocket and Edge Cavity evolution — implemented.
 7. Patch 4.7A.1 initial parity and cavity-footprint correction — implemented and visually accepted.
 8. Patch 4.7B independent Free-Water local-mask evolution — implemented.
-9. Patch 4.7B.1 downstream/lifetime/prepared-anchor recycle correction — implemented; Unity visual/performance revalidation pending.
+9. Patch 4.7B.1 downstream/lifetime/prepared-anchor recycle correction — implemented and visually accepted.
+10. Patch 4.7C.0 canonical topology field-space consolidation — implemented and visually revalidated.
+11. Patch 4.7C.1 Connector endpoint/path and Weak Span immutable preparation data — implemented; Unity preparation-diagnostic validation pending.
 
 Remaining topology slices:
 
-1. Patch 4.7C.0 canonical topology field-space consolidation;
-2. Patch 4.7C.1 Connector endpoint/path and Weak Span attachment preparation;
-3. Patch 4.7C.2 identity reconstruction plus Editor/development-only parity and combined reconstruction scheduling;
-4. Patch 4.7C.3 Connector deformation, recycle-variant switching, and Weak Span following;
-5. Patch 4.8 safe generated-topology rebuild transition for explicit rebuilds;
-6. Patch 4.9 production procedural chunk/run cache and precompute packaging;
-7. Patch 4.10 topology completion and handoff to separate Foam-material work.
+1. Patch 4.7C.2 identity reconstruction plus Editor/development-only parity and combined reconstruction scheduling;
+2. Patch 4.7C.3 Connector deformation, recycle-variant switching, and Weak Span following;
+3. Patch 4.8 safe generated-topology rebuild transition for explicit rebuilds;
+4. Patch 4.9 production procedural chunk/run cache and precompute packaging;
+5. Patch 4.10 topology completion and handoff to separate Foam-material work.
 
 All four negative classes remain preparation-time generators. Interior/edge host analysis, Connector span selection, Free-Water opportunity curation, and spare Connector route preparation may be expensive during the proof path, but ordinary gameplay may only advance compact descriptors, morph retained masks, deform retained paths, perform batched low-resolution reconstruction, and instantly recycle slots. No ordinary movement fade or duplicate old/new support instance is permitted.
 
@@ -1750,16 +1750,16 @@ The scheduling architecture is successful when:
 
 ## 25. Immediate Next Step
 
-Patch 4.7A/4.7A.1 hosted-negative evolution is implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution is implemented, and Patch 4.7B.1 now applies the canonical net-downstream, finite-lifetime, preparation-time-anchor recycle contract. Static and movement coefficient tuning remains provisional.
+Patch 4.7A/4.7A.1 hosted-negative evolution, Patch 4.7B/4.7B.1 Free-Water evolution, and Patch 4.7C.0 canonical field-space consolidation are implemented and visually accepted. Patch 4.7C.1 preparation-only Connector/Weak Span data is implemented. Static and movement coefficient tuning remains provisional.
 
-The immediate gate is Patch 4.7B.1 Unity validation:
+The immediate gate is Patch 4.7C.1 Unity preparation validation:
 
-- confirm independent `5–10 s` dwell and `2–4 s` move/morph rhythms;
-- confirm every ordinary hop has positive longitudinal displacement while lateral direction may vary;
-- confirm time/hop lifetime turnover and egress both recycle instantly to an upstream prepared anchor with no duplicate instance;
-- confirm prepared-anchor fallback count is normally zero or explained by genuinely constrained river geometry;
-- confirm upstream-violation telemetry remains zero;
-- inspect preparation-time anchor cost, active `2 Hz` reconstruction cost, dispatch count, and ready-state allocations;
-- confirm dwell-only Free-Water state avoids unnecessary reconstruction and normal gameplay performs no placement search, retry, readback, or CPU texture construction.
+- verify `Prepared / Accepted` Connector counts match or any unavailable relationship is explicit;
+- verify all accepted endpoint gates report individual Major ownership or an explicit unresolved count;
+- inspect retained path-point totals and available/unavailable recycle-variant counts for bounded, plausible values;
+- verify prepared Weak Span attachments match accepted Weak Span counts or report explicit unavailable records;
+- verify the accepted static Connector and Weak Span fields remain visually unchanged;
+- profile staged preparation to record the temporary added startup cost without treating it as accepted steady gameplay work;
+- verify no new normal-runtime search, retry, readback, validation, dispatch, or managed allocation exists.
 
-After validation, Patch 4.7C.0 is a behaviour-preserving field-space refactor and must not introduce a new scheduled work category. Patch 4.7C.1 remains preparation-only. Patch 4.7C.2 may add Editor/development parity readback only while normal runtime batches all descriptor changes before at most one applicable topology reconstruction. Patch 4.7C.3 may only advance compact endpoint/path/Weak Span descriptors and select bounded prepared variants; it may not add runtime pathfinding, ownership search, validation retries, per-Connector dispatches, or managed allocations.
+Patch 4.7C.2 may add Editor/development parity readback only while normal runtime batches all descriptor changes before at most one applicable topology reconstruction. Patch 4.7C.3 may only advance compact endpoint/path/Weak Span descriptors and select bounded prepared variants; it may not add runtime pathfinding, ownership search, validation retries, per-Connector dispatches, or managed allocations.

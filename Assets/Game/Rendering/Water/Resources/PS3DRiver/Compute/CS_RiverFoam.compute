@@ -239,11 +239,78 @@ float _FoamInjectionShapeSeed;
 float _FoamInjectionShapeVariety;
 float _FoamInjectionCompound;
 
+// Canonical Stage 6 topology-field contract. UV spans the complete field
+// rectangle, texel centres are (index + 0.5) / count, UV-to-sample mapping is
+// uv * count - 0.5, and local mask cell positions place centres at
+// 0.5, 1.5, ... count - 0.5. Keep these formulas in lockstep with
+// StylizedRiverFoamTopologyFieldSpace.cs.
+float FoamTexelCentreUV1D(int index, int count)
+{
+    return ((float)index + 0.5) / max(1.0, (float)count);
+}
+
+float2 FoamTexelCentreUV(uint2 coordinate, int2 dimensions)
+{
+    return ((float2)coordinate + 0.5) /
+        max(float2(1.0, 1.0), (float2)dimensions);
+}
+
+float FoamLocalDistanceAtTexel(int x)
+{
+    return FoamTexelCentreUV1D(x, _FoamDimensions.x) *
+        _FoamFieldLength;
+}
+
+float FoamAcross01AtTexel(int y)
+{
+    return FoamTexelCentreUV1D(y, _FoamDimensions.y);
+}
+
+float2 FoamUVToTexelCoordinate(float2 uv, int2 dimensions)
+{
+    return clamp(
+        saturate(uv) * (float2)dimensions - 0.5,
+        float2(0.0, 0.0),
+        max(float2(0.0, 0.0), (float2)dimensions - 1.0));
+}
+
+int FoamUVToContainingTexel(float u, int count)
+{
+    return clamp(
+        (int)floor(saturate(u) * max(1.0, (float)count)),
+        0,
+        max(0, count - 1));
+}
+
+bool ResolveFoamCellBilinearCoordinates(
+    float2 cellPosition,
+    int2 dimensions,
+    out int2 p0,
+    out int2 p1,
+    out float2 blend)
+{
+    p0 = int2(0, 0);
+    p1 = int2(0, 0);
+    blend = float2(0.0, 0.0);
+    if (any(cellPosition < 0.0) ||
+        any(cellPosition > (float2)dimensions))
+    {
+        return false;
+    }
+
+    float2 coordinate = clamp(
+        cellPosition - 0.5,
+        float2(0.0, 0.0),
+        max(float2(0.0, 0.0), (float2)dimensions - 1.0));
+    p0 = (int2)floor(coordinate);
+    p1 = min(p0 + 1, dimensions - 1);
+    blend = coordinate - p0;
+    return true;
+}
+
 bool IsFoamColumnInsideDomain(int x)
 {
-    float localDistance =
-        x / max(1.0, (float)(_FoamDimensions.x - 1)) *
-        _FoamFieldLength;
+    float localDistance = FoamLocalDistanceAtTexel(x);
     return localDistance <= _FoamValidLength + 0.0001;
 }
 
@@ -255,9 +322,7 @@ bool IsFoamUInsideDomain(float u)
 
 bool IsFoamColumnInsideSimulation(int x)
 {
-    float localDistance =
-        x / max(1.0, (float)(_FoamDimensions.x - 1)) *
-        _FoamFieldLength;
+    float localDistance = FoamLocalDistanceAtTexel(x);
     return localDistance <= _FoamSimulationLength + 0.0001;
 }
 
@@ -431,7 +496,7 @@ float ResolvePressureSupportEnvelope(
     return saturate(support);
 }
 
-float Across01ToMetres(
+float FoamAcross01ToMetres(
     float across01,
     float leftHalfWidth,
     float rightHalfWidth)
@@ -553,8 +618,9 @@ float2 SampleBoundaryBilinear(float2 pixelCoordinate)
 
 float4 SampleGuidanceBilinear(float2 uv)
 {
-    float2 dimensions = max(float2(1.0, 1.0), (float2)_FoamGuidanceDimensions);
-    float2 coordinate = saturate(uv) * max(float2(0.0, 0.0), dimensions - 1.0);
+    float2 coordinate = FoamUVToTexelCoordinate(
+        uv,
+        _FoamGuidanceDimensions);
     int2 baseCoordinate = int2(floor(coordinate));
     int2 nextCoordinate = min(
         baseCoordinate + int2(1, 1),
@@ -572,9 +638,8 @@ float4 SampleGuidanceBilinear(float2 uv)
 
 float4 SampleStateAtUV(float2 uv)
 {
-    float2 coordinate = saturate(uv) *
-        max(float2(0.0, 0.0), (float2)_FoamDimensions - 1.0);
-    return SampleStateBilinear(coordinate);
+    return SampleStateBilinear(
+        FoamUVToTexelCoordinate(uv, _FoamDimensions));
 }
 
 
@@ -588,8 +653,9 @@ float2 LoadFracture(int2 coordinate)
 float2 SampleFractureBilinear(float2 uv)
 {
     int2 safeDimensions = max(_FoamFractureDimensions, int2(1, 1));
-    float2 coordinate = saturate(uv) *
-        (float2)(safeDimensions - int2(1, 1));
+    float2 coordinate = FoamUVToTexelCoordinate(
+        uv,
+        safeDimensions);
     int2 baseCoordinate = int2(floor(coordinate));
     int2 nextCoordinate = min(
         baseCoordinate + int2(1, 1),
@@ -896,13 +962,10 @@ float VoronoiEdgeDistance(float2 position, float timeValue, float seedValue)
 float4 EvaluateNetworkSample(float2 uv)
 {
     float agitation = saturate(_FoamEvolution / 1.8);
-    int metricX = clamp(
-        (int)round(saturate(uv.x) * max(1.0, (float)(_FoamDimensions.x - 1))),
-        0,
-        max(0, _FoamDimensions.x - 1));
+    int metricX = FoamUVToContainingTexel(uv.x, _FoamDimensions.x);
     FoamMetricRow metric = _FoamMetricRows[metricX];
     float globalDistance = _FoamGlobalStart + saturate(uv.x) * _FoamFieldLength;
-    float lateralMetres = Across01ToMetres(
+    float lateralMetres = FoamAcross01ToMetres(
         saturate(uv.y),
         metric.widthsAndSpacing.x,
         metric.widthsAndSpacing.y);
@@ -1265,17 +1328,17 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     FoamMetricRow metric = _FoamMetricRows[x];
-    float across01 = y / max(1.0, (float)(_FoamDimensions.y - 1));
-    float lateralMetres = Across01ToMetres(
+    float across01 = FoamAcross01AtTexel(y);
+    float lateralMetres = FoamAcross01ToMetres(
         across01,
         metric.widthsAndSpacing.x,
         metric.widthsAndSpacing.y);
-    float centreAcrossMetres = Across01ToMetres(
+    float centreAcrossMetres = FoamAcross01ToMetres(
         saturate(_FoamInjectionAcrossNormalized * 0.5 + 0.5),
         metric.widthsAndSpacing.x,
         metric.widthsAndSpacing.y);
     float globalDistance = _FoamGlobalStart +
-        x / max(1.0, (float)(_FoamDimensions.x - 1)) * _FoamFieldLength;
+        FoamLocalDistanceAtTexel(x);
 
     float alongDistance =
         (globalDistance - _FoamInjectionGlobalDistance) /
@@ -1359,17 +1422,16 @@ void BuildCurrentShoreEdges(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int outputX = (int)dispatchId.x;
-    float u = (outputX + 0.5) / max(1.0, (float)_FoamTopologyDimensions.x);
+    float u = FoamTexelCentreUV1D(
+        outputX,
+        _FoamTopologyDimensions.x);
     if (!IsFoamUInsideDomain(u))
     {
         _FoamCurrentShoreEdgesWrite[int2(outputX, 0)] = float2(0.0, 0.0);
         return;
     }
 
-    int metricX = clamp(
-        (int)round(u * max(0.0, (float)(_FoamDimensions.x - 1))),
-        0,
-        max(0, _FoamDimensions.x - 1));
+    int metricX = FoamUVToContainingTexel(u, _FoamDimensions.x);
     FoamMetricRow metric = _FoamMetricRows[metricX];
     if (metric.topologyData.w <= 0.0)
     {
@@ -1544,21 +1606,18 @@ float SampleMajorMaskBilinear(
     float2 cellPosition)
 {
     int2 dimensions = _FoamMajorMaskDimensions;
-    if (cellPosition.x < -0.5 ||
-        cellPosition.y < -0.5 ||
-        cellPosition.x > dimensions.x - 0.5 ||
-        cellPosition.y > dimensions.y - 0.5)
+    int2 p0;
+    int2 p1;
+    float2 blend;
+    if (!ResolveFoamCellBilinearCoordinates(
+            cellPosition,
+            dimensions,
+            p0,
+            p1,
+            blend))
     {
         return 0.0;
     }
-
-    float2 clamped = clamp(
-        cellPosition - 0.5,
-        float2(0.0, 0.0),
-        max(float2(0.0, 0.0), (float2)dimensions - 1.0));
-    int2 p0 = (int2)floor(clamped);
-    int2 p1 = min(p0 + 1, dimensions - 1);
-    float2 blend = clamped - p0;
     float a = _FoamMajorMasks.Load(int4(p0, sliceIndex, 0)).r;
     float b = _FoamMajorMasks.Load(
         int4(int2(p1.x, p0.y), sliceIndex, 0)).r;
@@ -1573,21 +1632,18 @@ float SampleHostedNegativeMaskBilinear(
     float2 cellPosition)
 {
     int2 dimensions = _FoamHostedNegativeMaskDimensions;
-    if (cellPosition.x < -0.5 ||
-        cellPosition.y < -0.5 ||
-        cellPosition.x > dimensions.x - 0.5 ||
-        cellPosition.y > dimensions.y - 0.5)
+    int2 p0;
+    int2 p1;
+    float2 blend;
+    if (!ResolveFoamCellBilinearCoordinates(
+            cellPosition,
+            dimensions,
+            p0,
+            p1,
+            blend))
     {
         return 0.0;
     }
-
-    float2 clamped = clamp(
-        cellPosition - 0.5,
-        float2(0.0, 0.0),
-        max(float2(0.0, 0.0), (float2)dimensions - 1.0));
-    int2 p0 = (int2)floor(clamped);
-    int2 p1 = min(p0 + 1, dimensions - 1);
-    float2 blend = clamped - p0;
     float a = _FoamHostedNegativeMasks.Load(
         int4(p0, sliceIndex, 0)).r;
     float b = _FoamHostedNegativeMasks.Load(
@@ -1604,21 +1660,18 @@ float SampleFreeWaterNegativeMaskBilinear(
     float2 cellPosition)
 {
     int2 dimensions = _FoamFreeWaterMaskDimensions;
-    if (cellPosition.x < -0.5 ||
-        cellPosition.y < -0.5 ||
-        cellPosition.x > dimensions.x - 0.5 ||
-        cellPosition.y > dimensions.y - 0.5)
+    int2 p0;
+    int2 p1;
+    float2 blend;
+    if (!ResolveFoamCellBilinearCoordinates(
+            cellPosition,
+            dimensions,
+            p0,
+            p1,
+            blend))
     {
         return 0.0;
     }
-
-    float2 clamped = clamp(
-        cellPosition - 0.5,
-        float2(0.0, 0.0),
-        max(float2(0.0, 0.0), (float2)dimensions - 1.0));
-    int2 p0 = (int2)floor(clamped);
-    int2 p1 = min(p0 + 1, dimensions - 1);
-    float2 blend = clamped - p0;
     float a = _FoamFreeWaterNegativeMasks.Load(
         int4(p0, sliceIndex, 0)).r;
     float b = _FoamFreeWaterNegativeMasks.Load(
@@ -1717,8 +1770,7 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 outputCoordinate = int2(dispatchId.xy);
-    float2 uv = (float2(dispatchId.xy) + 0.5) /
-        max(float2(1.0, 1.0), (float2)_FoamTopologyDimensions);
+    float2 uv = FoamTexelCentreUV(dispatchId.xy, _FoamTopologyDimensions);
     if (!IsFoamUInsideDomain(uv.x))
     {
         _FoamEvolvingMajorWrite[outputCoordinate] = 0.0;
@@ -1727,14 +1779,12 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float2 fullPixel = uv *
-        max(float2(0.0, 0.0), (float2)_FoamDimensions - 1.0);
+    float2 fullPixel = FoamUVToTexelCoordinate(uv, _FoamDimensions);
     float fluidCoverage = saturate(
         SampleBoundaryClassesBilinear(fullPixel).r);
-    int2 obstacleCoordinate = clamp(
-        (int2)floor(uv * (float2)_FoamDimensions),
-        int2(0, 0),
-        _FoamDimensions - 1);
+    int2 obstacleCoordinate = int2(
+        FoamUVToContainingTexel(uv.x, _FoamDimensions.x),
+        FoamUVToContainingTexel(uv.y, _FoamDimensions.y));
     float obstacle = saturate(_FoamObstacleExclusionRead.Load(
         int3(obstacleCoordinate, 0)));
     if (fluidCoverage <= 0.0001 || obstacle >= 0.9999)
@@ -1745,13 +1795,12 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    int metricX = clamp(
-        (int)round(fullPixel.x),
-        0,
-        max(0, _FoamDimensions.x - 1));
+    int metricX = FoamUVToContainingTexel(
+        uv.x,
+        _FoamDimensions.x);
     FoamMetricRow metric = _FoamMetricRows[metricX];
     float localDistance = saturate(uv.x) * _FoamFieldLength;
-    float lateralMetres = Across01ToMetres(
+    float lateralMetres = FoamAcross01ToMetres(
         saturate(uv.y),
         metric.widthsAndSpacing.x,
         metric.widthsAndSpacing.y);
@@ -1905,8 +1954,7 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 outputCoordinate = int2(dispatchId.xy);
-    float2 uv = (float2(dispatchId.xy) + 0.5) /
-        max(float2(1.0, 1.0), (float2)_FoamTopologyDimensions);
+    float2 uv = FoamTexelCentreUV(dispatchId.xy, _FoamTopologyDimensions);
     if (!IsFoamUInsideDomain(uv.x))
     {
         _FoamTopologyWrite[outputCoordinate] = 0.0.xxxx;
@@ -1914,23 +1962,20 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float2 fullPixel = uv *
-        max(float2(0.0, 0.0), (float2)_FoamDimensions - 1.0);
+    float2 fullPixel = FoamUVToTexelCoordinate(uv, _FoamDimensions);
     float4 boundaryClasses = SampleBoundaryClassesBilinear(fullPixel);
     float fluidCoverage = saturate(boundaryClasses.r);
 
-    int metricX = clamp(
-        (int)round(fullPixel.x),
-        0,
-        max(0, _FoamDimensions.x - 1));
+    int metricX = FoamUVToContainingTexel(
+        uv.x,
+        _FoamDimensions.x);
     FoamMetricRow metric = _FoamMetricRows[metricX];
     // The exact obstacle mask uses the full structural grid. Resolve its texel
     // once here so Pressure Support and negative topology consume the same
     // geometry-aligned coordinate without a half-texel disagreement.
-    int2 obstacleCoordinate = clamp(
-        (int2)floor(uv * (float2)_FoamDimensions),
-        int2(0, 0),
-        _FoamDimensions - 1);
+    int2 obstacleCoordinate = int2(
+        FoamUVToContainingTexel(uv.x, _FoamDimensions.x),
+        FoamUVToContainingTexel(uv.y, _FoamDimensions.y));
     float4 generatedWork = _FoamTopologyGeneratedRead.Load(
         int3(outputCoordinate, 0));
 
@@ -2046,7 +2091,7 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
 
     float2 currentShoreEdges = _FoamCurrentShoreEdgesRead.Load(
         int3(outputCoordinate.x, 0, 0));
-    float lateralMetres = Across01ToMetres(
+    float lateralMetres = FoamAcross01ToMetres(
         uv.y,
         metric.widthsAndSpacing.x,
         metric.widthsAndSpacing.y);
@@ -2129,15 +2174,13 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float2 uv = (float2(dispatchId.xy) + 0.5) /
-        max(float2(1.0, 1.0), (float2)_FoamTopologyDimensions);
+    float2 uv = FoamTexelCentreUV(dispatchId.xy, _FoamTopologyDimensions);
     if (!IsFoamUInsideDomain(uv.x))
     {
         return;
     }
 
-    float2 fullPixel = uv *
-        max(float2(0.0, 0.0), (float2)_FoamDimensions - 1.0);
+    float2 fullPixel = FoamUVToTexelCoordinate(uv, _FoamDimensions);
     if (SampleBoundaryBilinear(fullPixel).x <= 0.001)
     {
         return;
@@ -2215,8 +2258,7 @@ void BuildGuidance(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float2 uv = (float2(dispatchId.xy) + 0.5) /
-        max(float2(1.0, 1.0), (float2)_FoamGuidanceDimensions);
+    float2 uv = FoamTexelCentreUV(dispatchId.xy, _FoamGuidanceDimensions);
     float2 epsilon = 1.0 /
         max(float2(2.0, 2.0), (float2)_FoamGuidanceDimensions);
 
@@ -2232,10 +2274,7 @@ void BuildGuidance(uint3 dispatchId : SV_DispatchThreadID)
     float down = EvaluateNetworkDistance(saturate(uv - float2(0.0, epsilon.y)));
     float up = EvaluateNetworkDistance(saturate(uv + float2(0.0, epsilon.y)));
 
-    int metricX = clamp(
-        (int)round(uv.x * max(1.0, (float)(_FoamDimensions.x - 1))),
-        0,
-        max(0, _FoamDimensions.x - 1));
+    int metricX = FoamUVToContainingTexel(uv.x, _FoamDimensions.x);
     FoamMetricRow metric = _FoamMetricRows[metricX];
     float dxMetres = max(0.01, _FoamFieldLength * epsilon.x * 2.0);
     float totalWidth = max(
@@ -2324,8 +2363,7 @@ void MeasurePopulation(uint3 dispatchId : SV_DispatchThreadID)
         perimeter = !interior;
     }
 
-    float2 fieldUV = (float2(dispatchId.xy) + 0.5) /
-        max(float2(1.0, 1.0), (float2)_FoamDimensions);
+    float2 fieldUV = FoamTexelCentreUV(dispatchId.xy, _FoamDimensions);
     float4 guidance = SampleGuidanceBilinear(fieldUV);
     bool laneCell = guidance.z >= 0.32;
     bool laneVisible = laneCell && visible;
@@ -2372,9 +2410,8 @@ void UpdateFracture(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float2 uv = (float2(dispatchId.xy) + 0.5) /
-        max(float2(1.0, 1.0), (float2)_FoamFractureDimensions);
-    float2 fullPixel = uv * max(float2(0.0, 0.0), (float2)_FoamDimensions - 1.0);
+    float2 uv = FoamTexelCentreUV(dispatchId.xy, _FoamFractureDimensions);
+    float2 fullPixel = FoamUVToTexelCoordinate(uv, _FoamDimensions);
     float2 boundary = SampleBoundaryBilinear(fullPixel);
     if (boundary.x <= 0.001)
     {
@@ -2382,7 +2419,7 @@ void UpdateFracture(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    int metricX = clamp((int)round(fullPixel.x), 0, max(0, _FoamDimensions.x - 1));
+    int metricX = FoamUVToContainingTexel(uv.x, _FoamDimensions.x);
     FoamMetricRow metric = _FoamMetricRows[metricX];
     float totalWidth = max(0.05, metric.widthsAndSpacing.x + metric.widthsAndSpacing.y);
     FoamMotionSample motion = ResolveMotion(fullPixel, uv);
@@ -2429,7 +2466,7 @@ void UpdateFracture(uint3 dispatchId : SV_DispatchThreadID)
         length(guideUp.xy - guideDown.xy));
 
     float worldDistance = _FoamGlobalStart + uv.x * _FoamFieldLength;
-    float lateralMetres = Across01ToMetres(
+    float lateralMetres = FoamAcross01ToMetres(
         uv.y,
         metric.widthsAndSpacing.x,
         metric.widthsAndSpacing.y);
@@ -2512,9 +2549,9 @@ void AdvectForward(uint3 dispatchId : SV_DispatchThreadID)
     FoamMetricRow metric = _FoamMetricRows[x];
     float longitudinalSpacing = max(0.01, metric.widthsAndSpacing.z);
     float lateralSpacing = max(0.01, metric.widthsAndSpacing.w);
-    float2 fieldUV = float2(
-        x / max(1.0, (float)(_FoamDimensions.x - 1)),
-        y / max(1.0, (float)(_FoamDimensions.y - 1)));
+    float2 fieldUV = FoamTexelCentreUV(
+        uint2(x, y),
+        _FoamDimensions);
     FoamMotionSample motion = ResolveMotion(float2(x, y), fieldUV);
     float2 backPixel = float2(
         x - motion.velocity.x * _FoamDeltaTime / longitudinalSpacing,
@@ -2557,9 +2594,9 @@ void AdvectReverse(uint3 dispatchId : SV_DispatchThreadID)
     FoamMetricRow metric = _FoamMetricRows[x];
     float longitudinalSpacing = max(0.01, metric.widthsAndSpacing.z);
     float lateralSpacing = max(0.01, metric.widthsAndSpacing.w);
-    float2 fieldUV = float2(
-        x / max(1.0, (float)(_FoamDimensions.x - 1)),
-        y / max(1.0, (float)(_FoamDimensions.y - 1)));
+    float2 fieldUV = FoamTexelCentreUV(
+        uint2(x, y),
+        _FoamDimensions);
     FoamMotionSample motion = ResolveMotion(float2(x, y), fieldUV);
     float2 forwardPixel = float2(
         x + motion.velocity.x * _FoamDeltaTime / longitudinalSpacing,
@@ -2604,11 +2641,11 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     FoamMetricRow metric = _FoamMetricRows[x];
     float longitudinalSpacing = max(0.01, metric.widthsAndSpacing.z);
     float lateralSpacing = max(0.01, metric.widthsAndSpacing.w);
-    float2 fieldUV = float2(
-        x / max(1.0, (float)(_FoamDimensions.x - 1)),
-        y / max(1.0, (float)(_FoamDimensions.y - 1)));
+    float2 fieldUV = FoamTexelCentreUV(
+        uint2(x, y),
+        _FoamDimensions);
     float globalDistance = _FoamGlobalStart + fieldUV.x * _FoamFieldLength;
-    float lateralMetres = Across01ToMetres(
+    float lateralMetres = FoamAcross01ToMetres(
         fieldUV.y,
         metric.widthsAndSpacing.x,
         metric.widthsAndSpacing.y);

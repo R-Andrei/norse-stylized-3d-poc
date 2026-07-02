@@ -1471,7 +1471,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam and Surface Tracing",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.7 evolves Major Support, Major-hosted negative regions, and independent Free-Water Negative Events from prepared masks. Connector Support and Connector Weak Spans remain on the accepted static baseline.",
+                "Stage 6.2 retains Pressure Support, stationary Lee Support, dynamic Shore Support, and the water-level-aware Obstacle Footprint. Patch 4.7 evolves Major Support, Major-hosted negative regions, and independent Free-Water Negative Events from prepared masks. Patch 4.7C.1 now retains individual Connector endpoint ownership, bounded path data, recycle variants, and Weak Span attachments, while Connector Support and Connector Weak Spans remain on the accepted static baseline until identity reconstruction.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(
@@ -1754,7 +1754,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Patch 4.7 evolves Major Support, Major-hosted negative regions, and independent Free-Water Negative Events through prepared masks. Connector Support and Connector Weak Spans remain static. Authoritative live Pressure, Lee, Shore, and Obstacle Footprint sources remain independently composed."),
+                    "Patch 4.7 evolves Major Support, Major-hosted negative regions, and independent Free-Water Negative Events through prepared masks. Patch 4.7C.1 prepares Connector endpoint/path ownership and Weak Span attachment data without changing their static raster. Authoritative live Pressure, Lee, Shore, and Obstacle Footprint sources remain independently composed."),
                 new GUIContent("Evolving Major/Negative Topology (Patch 4.7B)"));
             EditorGUILayout.LabelField(
                 new GUIContent("Field Resolution"),
@@ -1889,6 +1889,32 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Accepted Connectors",
                     runtime.ConnectorAcceptedCount.ToString());
                 EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "4.7C.1 Preparation",
+                        "Preparation-only retained data. Complete means every accepted Connector has two individual Major owners, a bounded path with normalized cumulative arc length, and explicit bounded recycle alternatives. Connector rasterization remains static in this patch."),
+                    new GUIContent(
+                        runtime.ConnectorPreparedCount ==
+                            runtime.ConnectorAcceptedCount
+                            ? "Complete"
+                            : "Partial"));
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField(
+                    "Prepared / Accepted",
+                    $"{runtime.ConnectorPreparedCount} / " +
+                    runtime.ConnectorAcceptedCount);
+                EditorGUILayout.LabelField(
+                    "Owned / Unresolved Endpoints",
+                    $"{runtime.ConnectorPreparedEndpointCount} / " +
+                    runtime.ConnectorUnresolvedEndpointCount);
+                EditorGUILayout.LabelField(
+                    "Retained Path Points",
+                    runtime.ConnectorPreparedPathPointCount.ToString());
+                EditorGUILayout.LabelField(
+                    "Recycle Variants Available / Unavailable",
+                    $"{runtime.ConnectorPreparedPathVariantCount} / " +
+                    runtime.ConnectorUnavailablePathVariantCount);
+                EditorGUI.indentLevel--;
+                EditorGUILayout.LabelField(
                     "Top Rejection Reason",
                     runtime.ConnectorTopRejectionReason);
                 EditorGUILayout.LabelField(
@@ -1929,6 +1955,16 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Weak-Span Selected / Feasible",
                     $"{runtime.ConnectorWeakSpanAcceptedCount} / " +
                     runtime.ConnectorWeakSpanCandidateCount);
+                EditorGUILayout.LabelField(
+                    new GUIContent(
+                        "Weak-Span Attachments Prepared / Accepted",
+                        "Each prepared Weak Span retains its Connector identity, normalized path position, endpoint-safe interval, physical radii, strength, seed, and accepted tangent. The static accepted pressure field remains authoritative until Patch 4.7C.2."),
+                    new GUIContent(
+                        $"{runtime.ConnectorWeakSpanPreparedCount} / " +
+                        runtime.ConnectorWeakSpanAcceptedCount));
+                EditorGUILayout.LabelField(
+                    "Weak-Span Attachments Unavailable",
+                    runtime.ConnectorWeakSpanUnavailableCount.ToString());
                 EditorGUILayout.LabelField(
                     "Free-Water Opportunities",
                     runtime.FreeWaterEventOpportunityCount.ToString());

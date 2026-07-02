@@ -255,6 +255,71 @@ namespace ProgrammaticStylized3D.Rivers
         internal float[] LocalPressureData => localPressure;
     }
 
+    internal enum StylizedRiverFoamPreparedWeakSpanAvailability
+    {
+        Available,
+        MissingConnector,
+        ConnectorPreparationUnavailable,
+        InvalidPathPosition
+    }
+
+    /// <summary>
+    /// Complete immutable attachment data for one accepted Connector Weak Span.
+    /// Patch 4.7C.1 retains the normalized path position, gate-safe interval,
+    /// physical shape, and accepted tangent without moving or rerasterizing it.
+    /// Unavailable records remain explicit for later temporary-absence handling.
+    /// </summary>
+    internal sealed class StylizedRiverFoamPreparedWeakSpanRegion
+    {
+        public StylizedRiverFoamPreparedWeakSpanRegion(
+            uint stableId,
+            uint connectorStableId,
+            StylizedRiverFoamPreparedWeakSpanAvailability availability,
+            float normalizedPathDistance,
+            float minimumNormalizedPathDistance,
+            float maximumNormalizedPathDistance,
+            float alongRadiusMetres,
+            float acrossRadiusMetres,
+            float strength,
+            uint evolutionSeed,
+            Vector2 acceptedTangent,
+            float acceptedOrientationRadians)
+        {
+            StableId = stableId;
+            ConnectorStableId = connectorStableId;
+            Availability = availability;
+            NormalizedPathDistance = Mathf.Clamp01(normalizedPathDistance);
+            MinimumNormalizedPathDistance = Mathf.Clamp01(
+                minimumNormalizedPathDistance);
+            MaximumNormalizedPathDistance = Mathf.Clamp01(
+                maximumNormalizedPathDistance);
+            AlongRadiusMetres = Mathf.Max(0f, alongRadiusMetres);
+            AcrossRadiusMetres = Mathf.Max(0f, acrossRadiusMetres);
+            Strength = Mathf.Clamp01(strength);
+            EvolutionSeed = evolutionSeed;
+            AcceptedTangent = acceptedTangent.sqrMagnitude > 0.000001f
+                ? acceptedTangent.normalized
+                : Vector2.right;
+            AcceptedOrientationRadians = acceptedOrientationRadians;
+        }
+
+        public uint StableId { get; }
+        public uint ConnectorStableId { get; }
+        public StylizedRiverFoamPreparedWeakSpanAvailability Availability
+            { get; }
+        public bool IsAvailable => Availability ==
+            StylizedRiverFoamPreparedWeakSpanAvailability.Available;
+        public float NormalizedPathDistance { get; }
+        public float MinimumNormalizedPathDistance { get; }
+        public float MaximumNormalizedPathDistance { get; }
+        public float AlongRadiusMetres { get; }
+        public float AcrossRadiusMetres { get; }
+        public float Strength { get; }
+        public uint EvolutionSeed { get; }
+        public Vector2 AcceptedTangent { get; }
+        public float AcceptedOrientationRadians { get; }
+    }
+
     /// <summary>
     /// Immutable result of one deterministic prepared Negative Aging Pressure
     /// build. The aggregate field remains independent from
@@ -274,6 +339,8 @@ namespace ProgrammaticStylized3D.Rivers
             preparedHostedRegions;
         private readonly StylizedRiverFoamPreparedFreeWaterRegion[]
             preparedFreeWaterRegions;
+        private readonly StylizedRiverFoamPreparedWeakSpanRegion[]
+            preparedWeakSpanRegions;
         private readonly int[] rejectionCounts;
 
         internal StylizedRiverFoamPocketTopology(
@@ -304,6 +371,8 @@ namespace ProgrammaticStylized3D.Rivers
                 preparedHostedRegions,
             StylizedRiverFoamPreparedFreeWaterRegion[]
                 preparedFreeWaterRegions,
+            StylizedRiverFoamPreparedWeakSpanRegion[]
+                preparedWeakSpanRegions,
             int[] rejectionCounts)
         {
             Width = Mathf.Max(0, width);
@@ -350,6 +419,8 @@ namespace ProgrammaticStylized3D.Rivers
                 Array.Empty<StylizedRiverFoamPreparedHostedNegativeRegion>();
             this.preparedFreeWaterRegions = preparedFreeWaterRegions ??
                 Array.Empty<StylizedRiverFoamPreparedFreeWaterRegion>();
+            this.preparedWeakSpanRegions = preparedWeakSpanRegions ??
+                Array.Empty<StylizedRiverFoamPreparedWeakSpanRegion>();
             this.rejectionCounts = rejectionCounts ??
                 new int[Enum.GetValues(
                     typeof(StylizedRiverFoamPocketRejectionReason)).Length];
@@ -374,6 +445,26 @@ namespace ProgrammaticStylized3D.Rivers
         public int PreparedHostedRegionCount => preparedHostedRegions.Length;
         public int PreparedFreeWaterRegionCount =>
             preparedFreeWaterRegions.Length;
+        public int PreparedWeakSpanRegionCount
+        {
+            get
+            {
+                int count = 0;
+                for (int index = 0;
+                     index < preparedWeakSpanRegions.Length;
+                     index++)
+                {
+                    if (preparedWeakSpanRegions[index].IsAvailable)
+                    {
+                        count++;
+                    }
+                }
+                return count;
+            }
+        }
+        public int UnavailableWeakSpanRegionCount => Mathf.Max(
+            0,
+            AcceptedConnectorWeakSpanCount - PreparedWeakSpanRegionCount);
         public int PreparedFreeWaterRecycleAnchorCount
         {
             get
@@ -448,6 +539,8 @@ namespace ProgrammaticStylized3D.Rivers
             PreparedHostedRegions => preparedHostedRegions;
         internal IReadOnlyList<StylizedRiverFoamPreparedFreeWaterRegion>
             PreparedFreeWaterRegions => preparedFreeWaterRegions;
+        internal IReadOnlyList<StylizedRiverFoamPreparedWeakSpanRegion>
+            PreparedWeakSpanRegions => preparedWeakSpanRegions;
 
         public int GetRejectionCount(
             StylizedRiverFoamPocketRejectionReason reason)

@@ -140,7 +140,10 @@ namespace ProgrammaticStylized3D.Rivers
 
             for (int x = minimumX; x <= maximumX; x++)
             {
-                float centreU = (x + 0.5f) / Mathf.Max(1f, fieldWidth);
+                float centreU =
+                    StylizedRiverFoamTopologyFieldSpace.TexelCentreUv(
+                        x,
+                        fieldWidth);
                 float centreGlobalDistance =
                     river.Domain.GlobalDistanceMinimum +
                     centreU * fieldLength;
@@ -150,11 +153,15 @@ namespace ProgrammaticStylized3D.Rivers
                             centreGlobalDistance,
                             river.Domain.GlobalDistanceMinimum,
                             river.Domain.GlobalDistanceMaximum));
-                float minimumAcross01 = AcrossMetresTo01(
+                float minimumAcross01 =
+                    StylizedRiverFoamTopologyFieldSpace
+                        .AcrossMetresTo01Clamped(
                     minimumAcross,
                     centreSample.LeftSurfaceHalfWidth,
                     centreSample.RightSurfaceHalfWidth);
-                float maximumAcross01 = AcrossMetresTo01(
+                float maximumAcross01 =
+                    StylizedRiverFoamTopologyFieldSpace
+                        .AcrossMetresTo01Clamped(
                     maximumAcross,
                     centreSample.LeftSurfaceHalfWidth,
                     centreSample.RightSurfaceHalfWidth);
@@ -356,15 +363,19 @@ namespace ProgrammaticStylized3D.Rivers
 
             float globalStart = river.Domain.GlobalDistanceMinimum;
             minimumX = Mathf.Clamp(
-                Mathf.FloorToInt(
-                    (minimumGlobal - globalStart) /
-                    fieldLength * fieldWidth) - 1,
+                StylizedRiverFoamTopologyFieldSpace
+                    .LocalDistanceToContainingTexel(
+                        minimumGlobal - globalStart,
+                        fieldWidth,
+                        fieldLength) - 1,
                 0,
                 fieldWidth - 1);
             maximumX = Mathf.Clamp(
-                Mathf.CeilToInt(
-                    (maximumGlobal - globalStart) /
-                    fieldLength * fieldWidth) + 1,
+                StylizedRiverFoamTopologyFieldSpace
+                    .LocalDistanceToCeilingTexel(
+                        maximumGlobal - globalStart,
+                        fieldWidth,
+                        fieldLength) + 1,
                 0,
                 fieldWidth - 1);
 
@@ -400,7 +411,8 @@ namespace ProgrammaticStylized3D.Rivers
                         globalDistance,
                         river.Domain.GlobalDistanceMinimum,
                         river.Domain.GlobalDistanceMaximum));
-            float acrossMetres = Across01ToMetres(
+            float acrossMetres =
+                StylizedRiverFoamTopologyFieldSpace.Across01ToMetres(
                 v,
                 sample.LeftSurfaceHalfWidth,
                 sample.RightSurfaceHalfWidth);
@@ -576,34 +588,6 @@ namespace ProgrammaticStylized3D.Rivers
             return true;
         }
 
-        private static float Across01ToMetres(
-            float across01,
-            float leftHalfWidth,
-            float rightHalfWidth)
-        {
-            if (across01 <= 0.5f)
-            {
-                return -leftHalfWidth * (1f - across01 * 2f);
-            }
 
-            return rightHalfWidth * (across01 * 2f - 1f);
-        }
-
-        private static float AcrossMetresTo01(
-            float acrossMetres,
-            float leftHalfWidth,
-            float rightHalfWidth)
-        {
-            if (acrossMetres <= 0f)
-            {
-                return Mathf.Clamp01(
-                    0.5f + acrossMetres /
-                    Mathf.Max(0.001f, leftHalfWidth * 2f));
-            }
-
-            return Mathf.Clamp01(
-                0.5f + acrossMetres /
-                Mathf.Max(0.001f, rightHalfWidth * 2f));
-        }
     }
 }

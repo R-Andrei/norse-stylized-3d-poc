@@ -45,11 +45,11 @@ Approved negative-topology expansion before runtime evolution:
 - Patch 4.5 combined static validation accepted for feature progression; all population and shape coefficients remain provisional until the final Foam material proves the complete visual result;
 - Patch 4.6 lively single-instance Major Support movement and morphing, Patch 4.6.1 local recycle territories, and Patch 4.6.2 combined lifetime units accepted for feature progression; exact movement and lifetime tuning remains provisional;
 - Patch 4.7A hosted Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 host-space footprint/parity correction are implemented and visually accepted;
-- Patch 4.7B independent Free-Water local-mask evolution is implemented; Patch 4.7B.1 corrects it to positive net downstream hops, finite combined time/hop lifetime, and instant preparation-time-anchor recycle at lifetime or egress. Unity visual/performance revalidation is pending.
+- Patch 4.7B independent Free-Water local-mask evolution and Patch 4.7B.1 positive-downstream/lifetime/prepared-anchor recycle correction are implemented and visually accepted;
+- Patch 4.7C.0 canonical topology field-space consolidation is implemented and visually revalidated;
+- Patch 4.7C.1 Connector endpoint ownership/path data and Weak Span attachment preparation is implemented and awaits Unity preparation-diagnostic validation.
 
 Not yet implemented or accepted:
-- Patch 4.7C.0 canonical topology field-space consolidation;
-- Patch 4.7C.1 Connector endpoint ownership/path data and Weak Span attachment preparation;
 - Patch 4.7C.2 identity reconstruction and Editor/development-only parity;
 - Patch 4.7C.3 Connector deformation, recycle-variant switching, and Weak Span following;
 - safe generated-topology rebuild replacement/crossfade for explicit domain or settings rebuilds;
@@ -1042,18 +1042,18 @@ The canonical topology-only rollout is maintained in `River_Foam_Topology_Implem
 16. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution implemented.
 17. Patch 4.7A.1 hosted-negative footprint/parity correction implemented and visually accepted.
 18. Patch 4.7B independent Free-Water evolution implemented.
-19. Patch 4.7B.1 positive-downstream/lifetime/recycle contract correction implemented; Unity revalidation pending.
+19. Patch 4.7B.1 positive-downstream/lifetime/recycle contract correction implemented and visually accepted.
+20. Patch 4.7C.0 canonical CPU/HLSL topology field-space contract implemented and visually revalidated.
+21. Patch 4.7C.1 Connector endpoint/path and Weak Span immutable preparation data implemented; Unity preparation-diagnostic validation pending.
 
 ### Active runtime-evolution sequence
 
-1. Revalidate Patch 4.7B.1 Free-Water downstream motion, finite occurrence turnover, upstream prepared-anchor recycle, zero upstream violations, and preparation/runtime cost.
-2. Patch 4.7C.0 — consolidate the shared CPU/HLSL topology field-space contract without changing feature-specific geometry or adding normal-runtime validation.
-3. Patch 4.7C.1 — retain individual endpoint Major ownership, host-local endpoint gates, bounded/resampled Connector paths, normalized cumulative arc length, bounded recycle-anchor path variants, and complete Weak Span path attachment data.
-4. Patch 4.7C.2 — reconstruct Connector Support and Weak Spans at identity poses, compare against accepted static fields in Editor/development diagnostics only, and batch descriptor advancement into at most one applicable topology reconstruction tick.
-5. Patch 4.7C.3 — enable endpoint-driven path deformation, Weak Span tangent following, immediate prevalidated recycle-variant switching, and temporary absence for unavailable endpoint combinations.
-6. Patch 4.8 — safe generated-topology rebuild transition for explicit rebuilds.
-7. Patch 4.9 — procedural chunk/run cache and precompute packaging.
-8. Patch 4.10 — topology completion and handoff to separate Foam-material work.
+1. Validate Patch 4.7C.1 preparation diagnostics: accepted/prepared Connectors, individual endpoint ownership, bounded retained points, available/unavailable recycle alternatives, and Weak Span attachment completeness.
+2. Patch 4.7C.2 — reconstruct Connector Support and Weak Spans at identity poses, compare against accepted static fields in Editor/development diagnostics only, and batch descriptor advancement into at most one applicable topology reconstruction tick.
+3. Patch 4.7C.3 — enable endpoint-driven path deformation, Weak Span tangent following, immediate prevalidated recycle-variant switching, and temporary absence for unavailable endpoint combinations.
+4. Patch 4.8 — safe generated-topology rebuild transition for explicit rebuilds.
+5. Patch 4.9 — procedural chunk/run cache and precompute packaging.
+6. Patch 4.10 — topology completion and handoff to separate Foam-material work.
 
 Material aging response, fragmentation, dissipation, and rendering are not topology implementation steps and must not begin before topology completion.
 

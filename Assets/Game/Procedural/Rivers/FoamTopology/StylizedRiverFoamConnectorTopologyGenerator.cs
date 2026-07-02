@@ -34,6 +34,15 @@ namespace ProgrammaticStylized3D.Rivers
         private const float UnconnectedComponentScoreBonus = 0.045f;
         private const float RepeatedComponentScorePenalty = 0.040f;
         private const float LongitudinalSectionLoadPenalty = 0.020f;
+        private const float EndpointOwnershipMinimumSupport = 0.035f;
+        private const int MaximumPreparedPathPointCount = 48;
+        private const int MaximumPreparedRecycleVariantCount = 12;
+        private const int MaximumRecycleAnchorsPerEndpoint = 3;
+        private const float PreparedVariantSampleSpacingMetres = 0.12f;
+        private const float PreparedVariantMinimumFluidCoverage = 0.20f;
+        private const float PreparedVariantMaximumObstacleCoverage = 0.10f;
+        private const float PreparedVariantMaximumStretchRatio = 2.20f;
+        private const float PreparedVariantMaximumExtraLengthMetres = 4.0f;
 
         public static StylizedRiverFoamConnectorTopology Generate(
             RiverDomainSnapshot domain,
@@ -103,12 +112,13 @@ namespace ProgrammaticStylized3D.Rivers
                 fluidCoverage,
                 validCells);
 
-            Vector2[] metricPositions = BuildMetricPositions(
-                domain,
-                width,
-                height,
-                fieldLength,
-                validFieldLength);
+            Vector2[] metricPositions =
+                StylizedRiverFoamTopologyFieldSpace.BuildMetricPositions(
+                    domain,
+                    width,
+                    height,
+                    fieldLength,
+                    validFieldLength);
             int[] componentLabels = new int[cellCount];
             for (int index = 0; index < componentLabels.Length; index++)
             {
@@ -386,9 +396,47 @@ namespace ProgrammaticStylized3D.Rivers
                     acceptedMetricPath[pointIndex] =
                         metricPositions[simplifiedPath[pointIndex]];
                 }
+                Vector2[] preparedMetricPath = BuildBoundedPreparedPath(
+                    acceptedMetricPath,
+                    MaximumPreparedPathPointCount);
+                float[] normalizedCumulativeLength =
+                    BuildNormalizedCumulativeLength(preparedMetricPath);
+                StylizedRiverFoamConnectorEndpointBinding startBinding =
+                    ResolveEndpointBinding(
+                        pair.StartEndpoint,
+                        components[pair.StartComponentIndex],
+                        domain,
+                        validFieldLength,
+                        majorTopology);
+                StylizedRiverFoamConnectorEndpointBinding endBinding =
+                    ResolveEndpointBinding(
+                        pair.EndEndpoint,
+                        components[pair.EndComponentIndex],
+                        domain,
+                        validFieldLength,
+                        majorTopology);
+                StylizedRiverFoamConnectorPathVariant[] pathVariants =
+                    BuildPreparedPathVariants(
+                        preparedMetricPath,
+                        normalizedCumulativeLength,
+                        startBinding,
+                        endBinding,
+                        domain,
+                        width,
+                        height,
+                        fieldLength,
+                        validFieldLength,
+                        fluidCoverage,
+                        obstacleMask,
+                        majorTopology);
                 acceptedPaths.Add(new StylizedRiverFoamConnectorPath(
                     relationshipId,
-                    acceptedMetricPath));
+                    acceptedMetricPath,
+                    preparedMetricPath,
+                    normalizedCumulativeLength,
+                    startBinding,
+                    endBinding,
+                    pathVariants));
 
                 uint evolutionSeed = MixBits(relationshipId ^ 0xD1B54A35u);
                 int acceptedSection = ResolveLongitudinalSection(
@@ -406,15 +454,13 @@ namespace ProgrammaticStylized3D.Rivers
                         pair.EndEndpoint.StableId,
                         domain.GlobalDistanceMinimum +
                             pair.StartEndpoint.Position.x,
-                        ResolveAcrossNormalized(
-                            pair.StartEndpoint.CellIndex,
-                            width,
+                        StylizedRiverFoamTopologyFieldSpace.SignedAcrossNormalizedAtTexel(
+                            pair.StartEndpoint.CellIndex / width,
                             height),
                         domain.GlobalDistanceMinimum +
                             pair.EndEndpoint.Position.x,
-                        ResolveAcrossNormalized(
-                            pair.EndEndpoint.CellIndex,
-                            width,
+                        StylizedRiverFoamTopologyFieldSpace.SignedAcrossNormalizedAtTexel(
+                            pair.EndEndpoint.CellIndex / width,
                             height),
                         pathLength,
                         evolutionSeed,
@@ -598,46 +644,6 @@ namespace ProgrammaticStylized3D.Rivers
                 rejectionCounts);
         }
 
-        private static Vector2[] BuildMetricPositions(
-            RiverDomainSnapshot domain,
-            int width,
-            int height,
-            float fieldLength,
-            float validFieldLength)
-        {
-            Vector2[] positions = new Vector2[width * height];
-            for (int x = 0; x < width; x++)
-            {
-                float localDistance = x /
-                    (float)Mathf.Max(1, width - 1) * fieldLength;
-                float clampedDistance = Mathf.Min(
-                    localDistance,
-                    validFieldLength);
-                StylizedRiverSplineSample sample =
-                    domain.SampleAtOrientedDistance(clampedDistance);
-                float leftSurface = Mathf.Max(
-                    0.05f,
-                    sample.LeftSurfaceHalfWidth);
-                float rightSurface = Mathf.Max(
-                    0.05f,
-                    sample.RightSurfaceHalfWidth);
-
-                for (int y = 0; y < height; y++)
-                {
-                    float across01 = y /
-                        (float)Mathf.Max(1, height - 1);
-                    positions[x + y * width] = new Vector2(
-                        localDistance,
-                        Across01ToMetres(
-                            across01,
-                            leftSurface,
-                            rightSurface));
-                }
-            }
-
-            return positions;
-        }
-
         private static List<MajorComponent> ExtractMajorComponents(
             int width,
             int height,
@@ -735,19 +741,15 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverFoamMajorRegion region = regions[regionIndex];
                 float localDistance = region.CentreGlobalDistance -
                     domain.GlobalDistanceMinimum;
-                int x = Mathf.Clamp(
-                    Mathf.RoundToInt(
-                        localDistance /
-                        Mathf.Max(0.0001f, fieldLength) *
-                        (width - 1)),
-                    0,
-                    width - 1);
-                int y = Mathf.Clamp(
-                    Mathf.RoundToInt(
-                        (region.CentreAcrossNormalized * 0.5f + 0.5f) *
-                        (height - 1)),
-                    0,
-                    height - 1);
+                int x = StylizedRiverFoamTopologyFieldSpace
+                    .LocalDistanceToNearestTexel(
+                        localDistance,
+                        width,
+                        fieldLength);
+                int y = StylizedRiverFoamTopologyFieldSpace
+                    .SignedAcrossNormalizedToNearestTexel(
+                        region.CentreAcrossNormalized,
+                        height);
                 int componentIndex = FindNearestComponentLabel(
                     x,
                     y,
@@ -2108,6 +2110,663 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
+        private static Vector2[] BuildBoundedPreparedPath(
+            Vector2[] source,
+            int maximumPointCount)
+        {
+            if (source == null || source.Length == 0)
+            {
+                return Array.Empty<Vector2>();
+            }
+
+            maximumPointCount = Mathf.Max(2, maximumPointCount);
+            if (source.Length <= maximumPointCount)
+            {
+                return (Vector2[])source.Clone();
+            }
+
+            float[] cumulative = BuildCumulativeLength(source);
+            float totalLength = cumulative[cumulative.Length - 1];
+            if (totalLength <= 0.0001f)
+            {
+                return new[] { source[0], source[source.Length - 1] };
+            }
+
+            Vector2[] bounded = new Vector2[maximumPointCount];
+            bounded[0] = source[0];
+            bounded[maximumPointCount - 1] = source[source.Length - 1];
+            int segmentIndex = 1;
+            for (int pointIndex = 1;
+                 pointIndex < maximumPointCount - 1;
+                 pointIndex++)
+            {
+                float targetDistance = totalLength * pointIndex /
+                    (maximumPointCount - 1f);
+                while (segmentIndex < cumulative.Length - 1 &&
+                       cumulative[segmentIndex] < targetDistance)
+                {
+                    segmentIndex++;
+                }
+
+                float previousDistance = cumulative[segmentIndex - 1];
+                float segmentDistance = Mathf.Max(
+                    0.0001f,
+                    cumulative[segmentIndex] - previousDistance);
+                float blend = Mathf.Clamp01(
+                    (targetDistance - previousDistance) / segmentDistance);
+                bounded[pointIndex] = Vector2.Lerp(
+                    source[segmentIndex - 1],
+                    source[segmentIndex],
+                    blend);
+            }
+
+            return bounded;
+        }
+
+        private static float[] BuildNormalizedCumulativeLength(
+            Vector2[] points)
+        {
+            float[] cumulative = BuildCumulativeLength(points);
+            if (cumulative.Length == 0)
+            {
+                return cumulative;
+            }
+
+            float total = cumulative[cumulative.Length - 1];
+            if (total <= 0.0001f)
+            {
+                for (int index = 0; index < cumulative.Length; index++)
+                {
+                    cumulative[index] = cumulative.Length > 1
+                        ? index / (cumulative.Length - 1f)
+                        : 0f;
+                }
+                return cumulative;
+            }
+
+            for (int index = 0; index < cumulative.Length; index++)
+            {
+                cumulative[index] = Mathf.Clamp01(cumulative[index] / total);
+            }
+            cumulative[cumulative.Length - 1] = 1f;
+            return cumulative;
+        }
+
+        private static float[] BuildCumulativeLength(Vector2[] points)
+        {
+            if (points == null || points.Length == 0)
+            {
+                return Array.Empty<float>();
+            }
+
+            float[] cumulative = new float[points.Length];
+            for (int index = 1; index < points.Length; index++)
+            {
+                cumulative[index] = cumulative[index - 1] +
+                    Vector2.Distance(points[index - 1], points[index]);
+            }
+            return cumulative;
+        }
+
+        private static float MeasurePathLength(Vector2[] points)
+        {
+            if (points == null || points.Length < 2)
+            {
+                return 0f;
+            }
+
+            float length = 0f;
+            for (int index = 1; index < points.Length; index++)
+            {
+                length += Vector2.Distance(points[index - 1], points[index]);
+            }
+            return length;
+        }
+
+        private static StylizedRiverFoamConnectorEndpointBinding
+            ResolveEndpointBinding(
+                ConnectorEndpoint endpoint,
+                MajorComponent component,
+                RiverDomainSnapshot domain,
+                float validFieldLength,
+                StylizedRiverFoamMajorTopology majorTopology)
+        {
+            IReadOnlyList<StylizedRiverFoamMajorRegion> regions =
+                majorTopology.Regions;
+            IReadOnlyList<StylizedRiverFoamPreparedMajorRegion> prepared =
+                majorTopology.PreparedRegions;
+            int regionCount = Mathf.Min(regions.Count, prepared.Count);
+            int bestIndex = -1;
+            float bestSupport = 0f;
+            Vector2 bestLocalOffset = Vector2.zero;
+
+            for (int regionIndex = 0;
+                 regionIndex < regionCount;
+                 regionIndex++)
+            {
+                StylizedRiverFoamMajorRegion region = regions[regionIndex];
+                if (component.SourceRegionIds.Count > 0 &&
+                    !ContainsStableId(
+                        component.SourceRegionIds,
+                        region.StableId))
+                {
+                    continue;
+                }
+
+                StylizedRiverFoamPreparedMajorRegion preparedRegion =
+                    prepared[regionIndex];
+                if (preparedRegion.StableId != region.StableId ||
+                    !TryResolveMajorLocalOffset(
+                        endpoint.Position,
+                        region,
+                        preparedRegion,
+                        domain,
+                        validFieldLength,
+                        out Vector2 localOffset,
+                        out Vector2 candidatePosition))
+                {
+                    continue;
+                }
+
+                float support =
+                    StylizedRiverFoamTopologyFieldSpace.SampleScalarBilinear(
+                        preparedRegion.LocalSupportData,
+                        preparedRegion.MaskResolution,
+                        preparedRegion.MaskResolution,
+                        candidatePosition);
+                if (support > bestSupport + 0.000001f ||
+                    (Mathf.Abs(support - bestSupport) <= 0.000001f &&
+                     bestIndex >= 0 &&
+                     region.StableId < regions[bestIndex].StableId))
+                {
+                    bestIndex = regionIndex;
+                    bestSupport = support;
+                    bestLocalOffset = localOffset;
+                }
+            }
+
+            float acceptedAcross =
+                StylizedRiverFoamTopologyFieldSpace.ResolveAcrossNormalized(
+                    domain,
+                    endpoint.Position);
+            bool available = bestIndex >= 0 &&
+                bestSupport >= EndpointOwnershipMinimumSupport;
+            uint stableId = available
+                ? regions[bestIndex].StableId
+                : 0u;
+            return new StylizedRiverFoamConnectorEndpointBinding(
+                available,
+                stableId,
+                available ? bestIndex : -1,
+                bestLocalOffset,
+                endpoint.Position,
+                acceptedAcross,
+                bestSupport);
+        }
+
+        private static bool ContainsStableId(
+            List<uint> stableIds,
+            uint stableId)
+        {
+            for (int index = 0; index < stableIds.Count; index++)
+            {
+                if (stableIds[index] == stableId)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool TryResolveMajorLocalOffset(
+            Vector2 metricPosition,
+            StylizedRiverFoamMajorRegion region,
+            StylizedRiverFoamPreparedMajorRegion preparedRegion,
+            RiverDomainSnapshot domain,
+            float validFieldLength,
+            out Vector2 localOffsetCells,
+            out Vector2 candidatePosition)
+        {
+            localOffsetCells = Vector2.zero;
+            candidatePosition = Vector2.zero;
+            if (domain == null || !domain.IsValid ||
+                region.MetresPerCandidateCell <= 0.0001f)
+            {
+                return false;
+            }
+
+            float sampleDistance = Mathf.Clamp(
+                metricPosition.x,
+                0f,
+                Mathf.Min(domain.LocalLength, validFieldLength));
+            StylizedRiverSplineSample sample =
+                domain.SampleAtOrientedDistance(sampleDistance);
+            float centreAcrossMetres =
+                StylizedRiverFoamTopologyFieldSpace.SignedNormalizedToMetres(
+                    region.CentreAcrossNormalized,
+                    Mathf.Max(0.05f, sample.LeftHalfWidth),
+                    Mathf.Max(0.05f, sample.RightHalfWidth));
+            Vector2 delta = new Vector2(
+                metricPosition.x -
+                    (region.CentreGlobalDistance -
+                     domain.GlobalDistanceMinimum),
+                metricPosition.y - centreAcrossMetres);
+            float orientationCosine = Mathf.Cos(region.OrientationRadians);
+            float orientationSine = Mathf.Sin(region.OrientationRadians);
+            float sourceMajor = (
+                orientationCosine * delta.x +
+                orientationSine * delta.y) /
+                region.MetresPerCandidateCell;
+            float sourceMinor = (
+                -orientationSine * delta.x +
+                orientationCosine * delta.y) /
+                region.MetresPerCandidateCell;
+            localOffsetCells = new Vector2(sourceMajor, sourceMinor);
+
+            float principalCosine = Mathf.Cos(
+                preparedRegion.PrincipalAngleRadians);
+            float principalSine = Mathf.Sin(
+                preparedRegion.PrincipalAngleRadians);
+            candidatePosition = new Vector2(
+                preparedRegion.CentroidCells.x +
+                    principalCosine * sourceMajor -
+                    principalSine * sourceMinor,
+                preparedRegion.CentroidCells.y +
+                    principalSine * sourceMajor +
+                    principalCosine * sourceMinor);
+            return true;
+        }
+
+        private static StylizedRiverFoamConnectorPathVariant[]
+            BuildPreparedPathVariants(
+                Vector2[] preparedMetricPath,
+                float[] normalizedCumulativeLength,
+                StylizedRiverFoamConnectorEndpointBinding startBinding,
+                StylizedRiverFoamConnectorEndpointBinding endBinding,
+                RiverDomainSnapshot domain,
+                int width,
+                int height,
+                float fieldLength,
+                float validFieldLength,
+                float[] fluidCoverage,
+                float[] obstacleMask,
+                StylizedRiverFoamMajorTopology majorTopology)
+        {
+            if (!startBinding.IsAvailable || !endBinding.IsAvailable)
+            {
+                return new[]
+                {
+                    new StylizedRiverFoamConnectorPathVariant(
+                        -1,
+                        -1,
+                        StylizedRiverFoamConnectorPathVariantAvailability
+                            .EndpointOwnershipUnavailable,
+                        null,
+                        null)
+                };
+            }
+            if (preparedMetricPath == null || preparedMetricPath.Length < 2 ||
+                normalizedCumulativeLength == null ||
+                normalizedCumulativeLength.Length !=
+                    preparedMetricPath.Length)
+            {
+                return new[]
+                {
+                    new StylizedRiverFoamConnectorPathVariant(
+                        -1,
+                        -1,
+                        StylizedRiverFoamConnectorPathVariantAvailability
+                            .NoUsablePolyline,
+                        null,
+                        null)
+                };
+            }
+
+            IReadOnlyList<StylizedRiverFoamPreparedMajorRegion> prepared =
+                majorTopology.PreparedRegions;
+            StylizedRiverFoamPreparedMajorRegion startMajor =
+                prepared[startBinding.MajorPreparedIndex];
+            StylizedRiverFoamPreparedMajorRegion endMajor =
+                prepared[endBinding.MajorPreparedIndex];
+            int startAnchorCount = Mathf.Min(
+                MaximumRecycleAnchorsPerEndpoint,
+                startMajor.RecycleAnchors.Count);
+            int endAnchorCount = Mathf.Min(
+                MaximumRecycleAnchorsPerEndpoint,
+                endMajor.RecycleAnchors.Count);
+
+            List<Vector2Int> combinations = new(
+                MaximumPreparedRecycleVariantCount);
+            for (int startIndex = 0;
+                 startIndex < startAnchorCount;
+                 startIndex++)
+            {
+                AddPreparedVariantCombination(
+                    combinations,
+                    startIndex,
+                    -1);
+            }
+            for (int endIndex = 0;
+                 endIndex < endAnchorCount;
+                 endIndex++)
+            {
+                AddPreparedVariantCombination(
+                    combinations,
+                    -1,
+                    endIndex);
+            }
+            int sameIndexCount = Mathf.Min(
+                startAnchorCount,
+                endAnchorCount);
+            for (int index = 0; index < sameIndexCount; index++)
+            {
+                AddPreparedVariantCombination(
+                    combinations,
+                    index,
+                    index);
+            }
+            for (int startIndex = 0;
+                 startIndex < startAnchorCount &&
+                 combinations.Count < MaximumPreparedRecycleVariantCount;
+                 startIndex++)
+            {
+                for (int endIndex = 0;
+                     endIndex < endAnchorCount &&
+                     combinations.Count <
+                         MaximumPreparedRecycleVariantCount;
+                     endIndex++)
+                {
+                    AddPreparedVariantCombination(
+                        combinations,
+                        startIndex,
+                        endIndex);
+                }
+            }
+
+            StylizedRiverFoamConnectorPathVariant[] variants =
+                new StylizedRiverFoamConnectorPathVariant[combinations.Count];
+            for (int combinationIndex = 0;
+                 combinationIndex < combinations.Count;
+                 combinationIndex++)
+            {
+                Vector2Int combination = combinations[combinationIndex];
+                variants[combinationIndex] = BuildPreparedPathVariant(
+                    combination.x,
+                    combination.y,
+                    preparedMetricPath,
+                    normalizedCumulativeLength,
+                    startBinding,
+                    endBinding,
+                    startMajor,
+                    endMajor,
+                    domain,
+                    width,
+                    height,
+                    fieldLength,
+                    validFieldLength,
+                    fluidCoverage,
+                    obstacleMask);
+            }
+            return variants;
+        }
+
+        private static void AddPreparedVariantCombination(
+            List<Vector2Int> combinations,
+            int startAnchorIndex,
+            int endAnchorIndex)
+        {
+            if (combinations.Count >= MaximumPreparedRecycleVariantCount)
+            {
+                return;
+            }
+
+            for (int index = 0; index < combinations.Count; index++)
+            {
+                Vector2Int existing = combinations[index];
+                if (existing.x == startAnchorIndex &&
+                    existing.y == endAnchorIndex)
+                {
+                    return;
+                }
+            }
+            combinations.Add(new Vector2Int(
+                startAnchorIndex,
+                endAnchorIndex));
+        }
+
+        private static StylizedRiverFoamConnectorPathVariant
+            BuildPreparedPathVariant(
+                int startAnchorIndex,
+                int endAnchorIndex,
+                Vector2[] identityPath,
+                float[] identityNormalizedLength,
+                StylizedRiverFoamConnectorEndpointBinding startBinding,
+                StylizedRiverFoamConnectorEndpointBinding endBinding,
+                StylizedRiverFoamPreparedMajorRegion startMajor,
+                StylizedRiverFoamPreparedMajorRegion endMajor,
+                RiverDomainSnapshot domain,
+                int width,
+                int height,
+                float fieldLength,
+                float validFieldLength,
+                float[] fluidCoverage,
+                float[] obstacleMask)
+        {
+            if (!TryResolveEndpointGate(
+                    startBinding,
+                    startMajor,
+                    startAnchorIndex,
+                    domain,
+                    validFieldLength,
+                    out Vector2 startGate) ||
+                !TryResolveEndpointGate(
+                    endBinding,
+                    endMajor,
+                    endAnchorIndex,
+                    domain,
+                    validFieldLength,
+                    out Vector2 endGate))
+            {
+                return new StylizedRiverFoamConnectorPathVariant(
+                    startAnchorIndex,
+                    endAnchorIndex,
+                    StylizedRiverFoamConnectorPathVariantAvailability
+                        .InvalidEndpointGate,
+                    null,
+                    null);
+            }
+
+            Vector2 startDelta = startGate - identityPath[0];
+            Vector2 endDelta = endGate -
+                identityPath[identityPath.Length - 1];
+            Vector2[] variantPath = new Vector2[identityPath.Length];
+            for (int pointIndex = 0;
+                 pointIndex < identityPath.Length;
+                 pointIndex++)
+            {
+                float pathFraction = identityNormalizedLength[pointIndex];
+                variantPath[pointIndex] = identityPath[pointIndex] +
+                    Vector2.Lerp(startDelta, endDelta, pathFraction);
+            }
+            variantPath[0] = startGate;
+            variantPath[variantPath.Length - 1] = endGate;
+
+            StylizedRiverFoamConnectorPathVariantAvailability availability =
+                ValidatePreparedPathVariant(
+                    identityPath,
+                    variantPath,
+                    domain,
+                    width,
+                    height,
+                    fieldLength,
+                    validFieldLength,
+                    fluidCoverage,
+                    obstacleMask);
+            return new StylizedRiverFoamConnectorPathVariant(
+                startAnchorIndex,
+                endAnchorIndex,
+                availability,
+                availability ==
+                    StylizedRiverFoamConnectorPathVariantAvailability.Available
+                        ? variantPath
+                        : null,
+                availability ==
+                    StylizedRiverFoamConnectorPathVariantAvailability.Available
+                        ? BuildNormalizedCumulativeLength(variantPath)
+                        : null);
+        }
+
+        private static bool TryResolveEndpointGate(
+            StylizedRiverFoamConnectorEndpointBinding binding,
+            StylizedRiverFoamPreparedMajorRegion preparedMajor,
+            int anchorIndex,
+            RiverDomainSnapshot domain,
+            float validFieldLength,
+            out Vector2 metricPosition)
+        {
+            metricPosition = binding.AcceptedMetricPosition;
+            if (anchorIndex < 0)
+            {
+                return binding.IsAvailable;
+            }
+            if (!binding.IsAvailable ||
+                anchorIndex >= preparedMajor.RecycleAnchors.Count)
+            {
+                return false;
+            }
+
+            StylizedRiverFoamMajorRecycleAnchor anchor =
+                preparedMajor.RecycleAnchors[anchorIndex];
+            Vector2 localMetres = binding.MajorLocalOffsetCells *
+                anchor.MetresPerCandidateCell;
+            float orientationCosine = Mathf.Cos(anchor.OrientationRadians);
+            float orientationSine = Mathf.Sin(anchor.OrientationRadians);
+            float deltaAlong =
+                orientationCosine * localMetres.x -
+                orientationSine * localMetres.y;
+            float deltaAcross =
+                orientationSine * localMetres.x +
+                orientationCosine * localMetres.y;
+            float localDistance = anchor.CentreLocalDistance + deltaAlong;
+            if (localDistance < 0f || localDistance > validFieldLength)
+            {
+                return false;
+            }
+
+            StylizedRiverSplineSample sample =
+                domain.SampleAtOrientedDistance(Mathf.Clamp(
+                    localDistance,
+                    0f,
+                    domain.LocalLength));
+            float centreAcrossMetres =
+                StylizedRiverFoamTopologyFieldSpace.SignedNormalizedToMetres(
+                    anchor.CentreAcrossNormalized,
+                    Mathf.Max(0.05f, sample.LeftHalfWidth),
+                    Mathf.Max(0.05f, sample.RightHalfWidth));
+            metricPosition = new Vector2(
+                localDistance,
+                centreAcrossMetres + deltaAcross);
+            return true;
+        }
+
+        private static StylizedRiverFoamConnectorPathVariantAvailability
+            ValidatePreparedPathVariant(
+                Vector2[] identityPath,
+                Vector2[] variantPath,
+                RiverDomainSnapshot domain,
+                int width,
+                int height,
+                float fieldLength,
+                float validFieldLength,
+                float[] fluidCoverage,
+                float[] obstacleMask)
+        {
+            float identityLength = MeasurePathLength(identityPath);
+            float variantLength = MeasurePathLength(variantPath);
+            if (identityLength <= 0.0001f || variantLength <= 0.0001f)
+            {
+                return StylizedRiverFoamConnectorPathVariantAvailability
+                    .NoUsablePolyline;
+            }
+
+            float maximumLength = Mathf.Min(
+                identityLength * PreparedVariantMaximumStretchRatio,
+                identityLength + PreparedVariantMaximumExtraLengthMetres);
+            if (variantLength > maximumLength)
+            {
+                return StylizedRiverFoamConnectorPathVariantAvailability
+                    .ExcessiveStretch;
+            }
+
+            for (int segmentIndex = 1;
+                 segmentIndex < variantPath.Length;
+                 segmentIndex++)
+            {
+                Vector2 start = variantPath[segmentIndex - 1];
+                Vector2 end = variantPath[segmentIndex];
+                float segmentLength = Vector2.Distance(start, end);
+                int sampleCount = Mathf.Max(
+                    1,
+                    Mathf.CeilToInt(
+                        segmentLength /
+                        PreparedVariantSampleSpacingMetres));
+                for (int sampleIndex = 0;
+                     sampleIndex <= sampleCount;
+                     sampleIndex++)
+                {
+                    Vector2 samplePosition = Vector2.Lerp(
+                        start,
+                        end,
+                        sampleIndex / (float)sampleCount);
+                    if (samplePosition.x < 0f ||
+                        samplePosition.x > validFieldLength ||
+                        !StylizedRiverFoamTopologyFieldSpace
+                            .TryMetricToCellPosition(
+                                domain,
+                                samplePosition,
+                                width,
+                                height,
+                                fieldLength,
+                                validFieldLength,
+                                out Vector2 cellPosition))
+                    {
+                        return StylizedRiverFoamConnectorPathVariantAvailability
+                            .OutsideValidWater;
+                    }
+
+                    float fluid =
+                        StylizedRiverFoamTopologyFieldSpace
+                            .SampleScalarBilinear(
+                                fluidCoverage,
+                                width,
+                                height,
+                                cellPosition);
+                    if (fluid < PreparedVariantMinimumFluidCoverage)
+                    {
+                        return StylizedRiverFoamConnectorPathVariantAvailability
+                            .OutsideValidWater;
+                    }
+
+                    float obstacle = obstacleMask != null &&
+                        obstacleMask.Length >= width * height
+                            ? StylizedRiverFoamTopologyFieldSpace
+                                .SampleScalarBilinear(
+                                    obstacleMask,
+                                    width,
+                                    height,
+                                    cellPosition)
+                            : 0f;
+                    if (obstacle > PreparedVariantMaximumObstacleCoverage)
+                    {
+                        return StylizedRiverFoamConnectorPathVariantAvailability
+                            .ObstacleOverlap;
+                    }
+                }
+            }
+
+            return StylizedRiverFoamConnectorPathVariantAvailability.Available;
+        }
+
         private static uint ResolveRelationshipId(ComponentPair pair)
         {
             uint lowComponent = pair.StartComponentId < pair.EndComponentId
@@ -2131,16 +2790,6 @@ namespace ProgrammaticStylized3D.Rivers
                 RotateLeft(highEndpoint, 23));
         }
 
-        private static float ResolveAcrossNormalized(
-            int cellIndex,
-            int width,
-            int height)
-        {
-            int y = cellIndex / width;
-            return y /
-                (float)Mathf.Max(1, height - 1) * 2f - 1f;
-        }
-
         private static float ResolveAverageVisibleWidth(
             RiverDomainSnapshot domain)
         {
@@ -2155,18 +2804,6 @@ namespace ProgrammaticStylized3D.Rivers
                 total += sample.LeftHalfWidth + sample.RightHalfWidth;
             }
             return total / sampleCount;
-        }
-
-        private static float Across01ToMetres(
-            float across01,
-            float leftHalfWidth,
-            float rightHalfWidth)
-        {
-            if (across01 <= 0.5f)
-            {
-                return -leftHalfWidth * (1f - across01 * 2f);
-            }
-            return rightHalfWidth * (across01 * 2f - 1f);
         }
 
         private static float DistancePointToSegment(

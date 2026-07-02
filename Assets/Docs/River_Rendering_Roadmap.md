@@ -303,7 +303,9 @@ Accepted and retained:
 - Patch 4.5 complete static topology accepted for feature progression, with coefficients intentionally left provisional;
 - Patch 4.6 lively single-instance Major movement and morphing through Patch 4.6.2 combined lifetime units accepted for feature progression, with tuning still provisional;
 - Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 footprint/parity correction implemented and visually accepted;
-- Patch 4.7B independent Free-Water local-mask evolution implemented; Patch 4.7B.1 corrects it to positive downstream hops, finite time/hop occurrence lifetime, and instant preparation-time-anchor recycle at lifetime or egress, with Unity revalidation pending;
+- Patch 4.7B independent Free-Water local-mask evolution and Patch 4.7B.1 positive-downstream/lifetime/prepared-anchor recycle correction implemented and visually accepted;
+- Patch 4.7C.0 canonical CPU/HLSL topology field-space consolidation implemented and visually revalidated;
+- Patch 4.7C.1 Connector endpoint/path and Weak Span immutable preparation data implemented; Unity preparation-diagnostic validation pending;
 - exact transformed-mesh water-level-aware Obstacle Footprint, distinct from padded Pressure/Lee disturbance footprints;
 - persistent field, chunking, freezing, sleeping, and fixed-cost GPU infrastructure;
 - permanent Foam profiler instrumentation;
@@ -325,8 +327,6 @@ Negative Aging Pressure now has four approved source classes:
 Each class receives an independent `0–1` Amount control with default `0.5`. Amount activates a nested deterministic opportunity subset and controls population only.
 
 Still unimplemented or unaccepted:
-- Patch 4.7C.0 canonical topology field-space consolidation;
-- Patch 4.7C.1 Connector endpoint/path and Weak Span attachment preparation;
 - Patch 4.7C.2 identity reconstruction and Editor/development-only parity;
 - Patch 4.7C.3 Connector deformation, recycle-variant switching, and Weak Span following;
 - safe topology rebuild transition for explicit rebuilds;
@@ -369,7 +369,7 @@ The four negative classes retain class identity and evolution metadata even if t
 
 Current authoring retains Major `Amount`, `Size`, `Size Variation`, `Recycle Territory Deviation (%)`, `Lifetime Units`, `Lifetime Unit Deviation`, and `Seed`, plus Connector `Amount`, `Directness`, and `Length Preference`. Patch 4.2 adds `Interior Pocket Amount` and `Edge Cavity Amount`; Patch 4.3 adds `Connector Weak Span Amount`; Patch 4.4 adds `Free-Water Event Amount`. All four use range `0–1`, default `0.5`, and are accepted for feature progression with later coefficient tuning permitted.
 
-Runtime topology evolution uses fixed logical slots with one active instance each. Majors dwell about `2–5 s`, then move and morph for roughly `1–2 s` with positive net downstream progress and bounded lateral/diagonal motion; they instantly recycle inside persistent local territories centred on their original accepted longitudinal positions without duplicate old/new support. The territory deviation control ranges from `0–10%` and defaults to `3%`; near-egress homes shift upstream enough to preserve movement runway. Occurrence turnover uses one combined lifetime-unit budget consumed by both elapsed time and completed hops, exposed through `Major Lifetime Units` (`1–20`, default `6`) and `Major Lifetime Unit Deviation` (`0–10`, default `2`). This avoids slow local persistence and excessive fast-hop churn caused by independent time-or-hop limits. Hosted Interior Pockets and Edge Cavities follow their Major with bounded independent variation. Free-Water Events now use the same single-instance lifecycle independently at `5–10 s` dwell and `2–4 s` movement: every ordinary hop is net-downstream, a finite time/hop budget ends each occurrence, and lifetime or egress instantly selects a bounded preparation-time validated upstream anchor. The next Connector sequence first consolidates the shared field-space contract, then retains individual endpoint Major ownership/path/Weak Span data, proves identity reconstruction parity, and only then enables endpoint-driven deformation and prevalidated recycle-variant switching. Anchored Pressure, Lee, and Shore Support remain attached to authoritative live sources. No gameplay candidate generation, component cleanup, pathfinding, distance transforms, rejection loops, or validation readbacks are permitted.
+Runtime topology evolution uses fixed logical slots with one active instance each. Majors dwell about `2–5 s`, then move and morph for roughly `1–2 s` with positive net downstream progress and bounded lateral/diagonal motion; they instantly recycle inside persistent local territories centred on their original accepted longitudinal positions without duplicate old/new support. The territory deviation control ranges from `0–10%` and defaults to `3%`; near-egress homes shift upstream enough to preserve movement runway. Occurrence turnover uses one combined lifetime-unit budget consumed by both elapsed time and completed hops, exposed through `Major Lifetime Units` (`1–20`, default `6`) and `Major Lifetime Unit Deviation` (`0–10`, default `2`). This avoids slow local persistence and excessive fast-hop churn caused by independent time-or-hop limits. Hosted Interior Pockets and Edge Cavities follow their Major with bounded independent variation. Free-Water Events now use the same single-instance lifecycle independently at `5–10 s` dwell and `2–4 s` movement: every ordinary hop is net-downstream, a finite time/hop budget ends each occurrence, and lifetime or egress instantly selects a bounded preparation-time validated upstream anchor. The Connector sequence has consolidated the shared field-space contract and now retains individual endpoint Major ownership, bounded path/variant data, and complete Weak Span attachments. The next step proves identity reconstruction parity before enabling endpoint-driven deformation and prevalidated recycle-variant switching. Anchored Pressure, Lee, and Shore Support remain attached to authoritative live sources. No gameplay candidate generation, component cleanup, pathfinding, distance transforms, rejection loops, or validation readbacks are permitted.
 
 ### Immediate continuation order
 
@@ -384,9 +384,9 @@ Runtime topology evolution uses fixed logical slots with one active instance eac
 9. Patch 4.7A — hosted Interior Pocket and Edge Cavity evolution — implemented.
 10. Patch 4.7A.1 — hosted-negative footprint/parity correction — implemented and visually accepted.
 11. Patch 4.7B — independent Free-Water local-mask evolution — implemented.
-12. Patch 4.7B.1 — downstream/lifetime/prepared-anchor recycle correction — implemented; Unity revalidation pending.
-13. Patch 4.7C.0 — canonical topology field-space contract.
-14. Patch 4.7C.1 — Connector endpoint/path and Weak Span attachment preparation.
+12. Patch 4.7B.1 — downstream/lifetime/prepared-anchor recycle correction — implemented and visually accepted.
+13. Patch 4.7C.0 — canonical topology field-space contract — implemented and visually revalidated.
+14. Patch 4.7C.1 — Connector endpoint/path and Weak Span immutable preparation data — implemented; Unity preparation-diagnostic validation pending.
 15. Patch 4.7C.2 — identity reconstruction, debug-only parity, and combined reconstruction scheduling.
 16. Patch 4.7C.3 — Connector deformation, recycle-variant switching, and Weak Span following.
 17. Patch 4.8 — safe generated-topology rebuild transition for explicit rebuilds.
@@ -476,9 +476,9 @@ Separate material lifetime and topology-response authoring remains deferred unti
 13. Patch 4.7A hosted Interior Pocket and Edge Cavity evolution — implemented.
 14. Patch 4.7A.1 hosted-negative footprint/parity correction — implemented and visually accepted.
 15. Patch 4.7B independent Free-Water local-mask evolution — implemented.
-16. Patch 4.7B.1 downstream/lifetime/prepared-anchor recycle correction — implemented; Unity revalidation pending.
-17. Patch 4.7C.0 canonical topology field-space contract.
-18. Patch 4.7C.1 Connector endpoint/path and Weak Span attachment preparation.
+16. Patch 4.7B.1 downstream/lifetime/prepared-anchor recycle correction — implemented and visually accepted.
+17. Patch 4.7C.0 canonical topology field-space contract — implemented and visually revalidated.
+18. Patch 4.7C.1 Connector endpoint/path and Weak Span immutable preparation data — implemented; Unity preparation-diagnostic validation pending.
 19. Patch 4.7C.2 identity reconstruction, debug-only parity, and combined reconstruction scheduling.
 20. Patch 4.7C.3 Connector deformation, recycle-variant switching, and Weak Span following.
 21. Patch 4.8 safe topology rebuild transition for explicit rebuilds.

@@ -566,15 +566,19 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.Abs(cosineOrientation) * shape.MajorHalfExtentCells +
                 Mathf.Abs(sineOrientation) * shape.MinorHalfExtentCells);
             int minimumX = Mathf.Clamp(
-                Mathf.FloorToInt(
-                    (centreLocalDistance - alongRadius) /
-                    Mathf.Max(0.0001f, fieldLength) * width) - 1,
+                StylizedRiverFoamTopologyFieldSpace
+                    .LocalDistanceToContainingTexel(
+                        centreLocalDistance - alongRadius,
+                        width,
+                        fieldLength) - 1,
                 0,
                 width - 1);
             int maximumX = Mathf.Clamp(
-                Mathf.CeilToInt(
-                    (centreLocalDistance + alongRadius) /
-                    Mathf.Max(0.0001f, fieldLength) * width) + 1,
+                StylizedRiverFoamTopologyFieldSpace
+                    .LocalDistanceToCeilingTexel(
+                        centreLocalDistance + alongRadius,
+                        width,
+                        fieldLength) + 1,
                 0,
                 width - 1);
 
@@ -590,25 +594,32 @@ namespace ProgrammaticStylized3D.Rivers
 
             for (int x = minimumX; x <= maximumX; x++)
             {
-                float localDistance = (x + 0.5f) /
-                    Mathf.Max(1f, width) * fieldLength;
+                float localDistance =
+                    StylizedRiverFoamTopologyFieldSpace.LocalDistanceAtTexel(
+                        x,
+                        width,
+                        fieldLength);
                 float clampedDistance = Mathf.Clamp(
                     localDistance,
                     0f,
                     validFieldLength);
                 StylizedRiverSplineSample sample =
                     domain.SampleAtOrientedDistance(clampedDistance);
-                float centreAcrossMetres = SignedNormalizedToMetres(
-                    centreAcrossNormalized,
-                    sample.LeftHalfWidth,
-                    sample.RightHalfWidth);
+                float centreAcrossMetres =
+                    StylizedRiverFoamTopologyFieldSpace
+                        .SignedNormalizedToMetres(
+                            centreAcrossNormalized,
+                            sample.LeftHalfWidth,
+                            sample.RightHalfWidth);
                 float deltaAlong = localDistance - centreLocalDistance;
 
                 for (int y = 0; y < height; y++)
                 {
-                    float across01 = (y + 0.5f) /
-                        Mathf.Max(1f, height);
-                    float acrossMetres = Across01ToMetres(
+                    float across01 =
+                        StylizedRiverFoamTopologyFieldSpace.Across01AtTexel(
+                            y,
+                            height);
+                    float acrossMetres = StylizedRiverFoamTopologyFieldSpace.Across01ToMetres(
                         across01,
                         sample.LeftSurfaceHalfWidth,
                         sample.RightSurfaceHalfWidth);
@@ -933,13 +944,19 @@ namespace ProgrammaticStylized3D.Rivers
             float maximumLocalDistance =
                 opportunity.CentreLocalDistance + alongRadius;
             int minimumX = Mathf.Clamp(
-                Mathf.FloorToInt(
-                    minimumLocalDistance / fieldLength * width) - 1,
+                StylizedRiverFoamTopologyFieldSpace
+                    .LocalDistanceToContainingTexel(
+                        minimumLocalDistance,
+                        width,
+                        fieldLength) - 1,
                 0,
                 width - 1);
             int maximumX = Mathf.Clamp(
-                Mathf.CeilToInt(
-                    maximumLocalDistance / fieldLength * width) + 1,
+                StylizedRiverFoamTopologyFieldSpace
+                    .LocalDistanceToCeilingTexel(
+                        maximumLocalDistance,
+                        width,
+                        fieldLength) + 1,
                 0,
                 width - 1);
 
@@ -957,26 +974,33 @@ namespace ProgrammaticStylized3D.Rivers
 
             for (int x = minimumX; x <= maximumX; x++)
             {
-                float localDistance = (x + 0.5f) /
-                    Mathf.Max(1f, width) * fieldLength;
+                float localDistance =
+                    StylizedRiverFoamTopologyFieldSpace.LocalDistanceAtTexel(
+                        x,
+                        width,
+                        fieldLength);
                 float clampedLocalDistance = Mathf.Clamp(
                     localDistance,
                     0f,
                     validFieldLength);
                 StylizedRiverSplineSample sample =
                     domain.SampleAtOrientedDistance(clampedLocalDistance);
-                float centreAcrossMetres = SignedNormalizedToMetres(
-                    centreAcrossNormalized,
-                    sample.LeftHalfWidth,
-                    sample.RightHalfWidth);
+                float centreAcrossMetres =
+                    StylizedRiverFoamTopologyFieldSpace
+                        .SignedNormalizedToMetres(
+                            centreAcrossNormalized,
+                            sample.LeftHalfWidth,
+                            sample.RightHalfWidth);
                 float deltaAlong = localDistance -
                     opportunity.CentreLocalDistance;
 
                 for (int y = 0; y < height; y++)
                 {
-                    float across01 = (y + 0.5f) /
-                        Mathf.Max(1f, height);
-                    float acrossMetres = Across01ToMetres(
+                    float across01 =
+                        StylizedRiverFoamTopologyFieldSpace.Across01AtTexel(
+                            y,
+                            height);
+                    float acrossMetres = StylizedRiverFoamTopologyFieldSpace.Across01ToMetres(
                         across01,
                         sample.LeftSurfaceHalfWidth,
                         sample.RightSurfaceHalfWidth);
@@ -1169,7 +1193,7 @@ namespace ProgrammaticStylized3D.Rivers
             float minimumNormalisedDistance = 4f;
             StylizedRiverSplineSample sample =
                 domain.SampleAtOrientedDistance(centreLocalDistance);
-            float acrossMetres = SignedNormalizedToMetres(
+            float acrossMetres = StylizedRiverFoamTopologyFieldSpace.SignedNormalizedToMetres(
                 centreAcrossNormalized,
                 sample.LeftHalfWidth,
                 sample.RightHalfWidth);
@@ -1180,10 +1204,12 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverSplineSample acceptedSample =
                     domain.SampleAtOrientedDistance(
                         accepted.CentreLocalDistance);
-                float acceptedAcrossMetres = SignedNormalizedToMetres(
-                    accepted.CentreAcrossNormalized,
-                    acceptedSample.LeftHalfWidth,
-                    acceptedSample.RightHalfWidth);
+                float acceptedAcrossMetres =
+                    StylizedRiverFoamTopologyFieldSpace
+                        .SignedNormalizedToMetres(
+                            accepted.CentreAcrossNormalized,
+                            acceptedSample.LeftHalfWidth,
+                            acceptedSample.RightHalfWidth);
                 float alongDistance = Mathf.Abs(
                     centreLocalDistance - accepted.CentreLocalDistance) /
                     Mathf.Max(
@@ -1251,23 +1277,25 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            int centreX = Mathf.Clamp(
-                Mathf.FloorToInt(
-                    centreLocalDistance / fieldLength * width),
-                0,
-                width - 1);
-            int centreY = Mathf.Clamp(
-                Mathf.RoundToInt(
-                    (centreAcrossNormalized * 0.5f + 0.5f) *
-                    (height - 1)),
-                0,
-                height - 1);
+            int centreX = StylizedRiverFoamTopologyFieldSpace
+                .LocalDistanceToContainingTexel(
+                    centreLocalDistance,
+                    width,
+                    fieldLength);
+            int centreY = StylizedRiverFoamTopologyFieldSpace
+                .SignedAcrossNormalizedToContainingTexel(
+                    centreAcrossNormalized,
+                    height);
+            float longitudinalSpacing =
+                StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
+                    fieldLength,
+                    width);
             int upstreamCells = Mathf.Clamp(
-                Mathf.CeilToInt(3.2f / fieldLength * width),
+                Mathf.CeilToInt(3.2f / longitudinalSpacing),
                 1,
                 width);
             int immediateCells = Mathf.Clamp(
-                Mathf.FloorToInt(0.35f / fieldLength * width),
+                Mathf.FloorToInt(0.35f / longitudinalSpacing),
                 0,
                 upstreamCells);
             int lateralCells = Mathf.Max(2, Mathf.RoundToInt(height * 0.08f));
@@ -1276,8 +1304,11 @@ namespace ProgrammaticStylized3D.Rivers
                  x <= Mathf.Max(0, centreX - immediateCells);
                  x++)
             {
-                float localDistance = (x + 0.5f) /
-                    Mathf.Max(1f, width) * fieldLength;
+                float localDistance =
+                    StylizedRiverFoamTopologyFieldSpace.LocalDistanceAtTexel(
+                        x,
+                        width,
+                        fieldLength);
                 if (localDistance > validFieldLength)
                 {
                     continue;
@@ -1324,8 +1355,11 @@ namespace ProgrammaticStylized3D.Rivers
 
             for (int x = 0; x < width; x++)
             {
-                float localDistance = x /
-                    (float)Mathf.Max(1, width - 1) * fieldLength;
+                float localDistance =
+                    StylizedRiverFoamTopologyFieldSpace.LocalDistanceAtTexel(
+                        x,
+                        width,
+                        fieldLength);
                 if (localDistance > validFieldLength + 0.0001f)
                 {
                     continue;
@@ -1352,14 +1386,17 @@ namespace ProgrammaticStylized3D.Rivers
                     animatedEnvelope);
                 float edgeWidth = Mathf.Max(
                     0.05f,
-                    (leftSurface + rightSurface) /
-                    Mathf.Max(1, height - 1) * edgeCells);
+                    StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
+                        leftSurface + rightSurface,
+                        height) * edgeCells);
 
                 for (int y = 0; y < height; y++)
                 {
-                    float across01 = y /
-                        (float)Mathf.Max(1, height - 1);
-                    float lateral = Across01ToMetres(
+                    float across01 =
+                        StylizedRiverFoamTopologyFieldSpace.Across01AtTexel(
+                            y,
+                            height);
+                    float lateral = StylizedRiverFoamTopologyFieldSpace.Across01ToMetres(
                         across01,
                         leftSurface,
                         rightSurface);
@@ -1436,29 +1473,6 @@ namespace ProgrammaticStylized3D.Rivers
                 : acrossNormalized > 0.24f
                     ? 2
                     : 1;
-        }
-
-        private static float Across01ToMetres(
-            float across01,
-            float leftHalfWidth,
-            float rightHalfWidth)
-        {
-            if (across01 <= 0.5f)
-            {
-                return -leftHalfWidth * (1f - across01 * 2f);
-            }
-
-            return rightHalfWidth * (across01 * 2f - 1f);
-        }
-
-        private static float SignedNormalizedToMetres(
-            float acrossNormalized,
-            float leftHalfWidth,
-            float rightHalfWidth)
-        {
-            return acrossNormalized < 0f
-                ? acrossNormalized * leftHalfWidth
-                : acrossNormalized * rightHalfWidth;
         }
 
         private static float SampleObstacle(float[] obstacleMask, int index)

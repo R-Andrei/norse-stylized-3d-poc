@@ -4,7 +4,7 @@
 
 **Status:** Canonical step-by-step implementation plan for Stage 6 Foam topology only.
 
-**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-footprint/parity correction are implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution is implemented; Patch 4.7B.1 now corrects it to the canonical positive-downstream, finite-lifetime, upstream-recycle contract and requires Unity visual/performance revalidation. The next phase is split into Patch 4.7C.0 canonical field-space consolidation, Patch 4.7C.1 Connector/Weak Span preparation data, Patch 4.7C.2 identity reconstruction/parity, and Patch 4.7C.3 runtime evolution. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Explicit rebuild transition and production cache packaging are not yet implemented.
+**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-footprint/parity correction are implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector/Weak Span immutable preparation data is implemented and awaits Unity preparation-diagnostic validation. The next implementation phase is Patch 4.7C.2 identity reconstruction/parity, followed by Patch 4.7C.3 runtime evolution. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Explicit rebuild transition and production cache packaging are not yet implemented.
 
 **Primary implementation target:**
 
@@ -1039,7 +1039,7 @@ The evolving field must initially reproduce the accepted static hosted-negative 
 
 ### Patch 4.7B — Slower Free-Water Negative Event evolution
 
-**Implementation status:** Patch 4.7B independent local-mask evolution is implemented and its original visual path was accepted. Patch 4.7B.1 corrects the movement contract and requires Unity visual/performance revalidation.
+**Implementation status:** Patch 4.7B independent local-mask evolution and Patch 4.7B.1 canonical downstream/lifetime/recycle correction are implemented and visually accepted.
 
 Each Free-Water Event remains one logical slot with one active instance. The corrected runtime state follows the same single-instance lifecycle pattern as Major Support, with slower independent timings and no host relationship:
 
@@ -1071,6 +1071,8 @@ Introduce one deliberately small CPU utility and matching HLSL formulas for the 
 
 Migrate existing implementations without redesigning feature-specific shape generation. Connector paths remain path-specific and Major/negative masks remain mask-specific; only their common river/field coordinate contract is shared. This is a behaviour-preserving refactor. Any visible change or parity difference is treated as evidence of an old convention disagreement and investigated explicitly. Debug-only diagnostics are permitted; normal gameplay gains no validation, readback, retry, or additional search work.
 
+**Implementation status:** implemented and visually revalidated. `StylizedRiverFoamTopologyFieldSpace.cs` now owns CPU texel-centre UV, field spacing, longitudinal distance, normalized/metric lateral conversion, inverse metric-to-cell mapping, shared metric-position generation, and scalar bilinear sampling. Major, Connector, Pocket/Free-Water, exact obstacle, and runtime metric/boundary paths use this contract. `CS_RiverFoam.compute` mirrors the texel-centre, UV-to-texel, containing-texel, lateral conversion, and cell-centred bilinear-coordinate formulas. Feature-specific Major masks, negative masks, Connector routing, and obstacle interval logic remain specialized. No normal-runtime validation, retry, search, or readback was added.
+
 **Acceptance:** existing Major, hosted-negative, and Free-Water identity poses reconstruct unchanged within the accepted diagnostic tolerance, and all migrated code uses one texel-centre and inverse-mapping convention.
 
 ### Patch 4.7C.1 — Connector and Weak Span preparation data
@@ -1096,7 +1098,11 @@ Weak Span preparation must retain:
 - strength, seed, orientation/tangent requirements, and any shape parameters needed for exact reconstruction;
 - endpoint-clearance limits required to remain gate-safe after deformation or replacement.
 
-**Acceptance:** every accepted Connector endpoint and Weak Span either has complete immutable runtime data or is reported explicitly as unavailable. No runtime raster path changes in this subpatch.
+**Implementation status:** implemented. Each accepted Connector now retains its unchanged authoritative static polyline plus a bounded runtime polyline of at most `48` points, normalized cumulative arc length, and two preparation-time endpoint bindings selected from the strongest individual Major-mask contribution at each accepted gate. Gate offsets are stored in the owning Major candidate's principal-axis cell frame. Up to `12` deterministic recycle alternatives are prepared from at most `3` anchors per endpoint; each alternative is a prewarped accepted path and is retained either as available or with an explicit failure reason after bounded valid-water, exact-obstacle, and stretch checks. No alternative pathfinding or runtime search was added.
+
+Each accepted Connector Weak Span now retains its Connector identity, normalized path distance, normalized endpoint-safe interval, physical along/across radii, strength, deterministic evolution seed, accepted tangent, and accepted orientation. Records remain explicit when their owning Connector preparation is unavailable or their path position is invalid. Inspector diagnostics report prepared/accepted Connectors, owned/unresolved endpoints, retained point count, available/unavailable recycle variants, and prepared/unavailable Weak Span attachments. The static Connector and Weak Span fields remain authoritative in this subpatch.
+
+**Acceptance:** every accepted Connector endpoint and Weak Span either has complete immutable runtime data or is reported explicitly as unavailable. No runtime raster path changes in this subpatch. Unity preparation-diagnostic validation is pending.
 
 ### Patch 4.7C.2 — Identity reconstruction and parity
 
@@ -1432,26 +1438,24 @@ A topology patch that cannot answer these questions is not ready.
 
 ## 13. Immediate Next Step
 
-Patch 4.7A/4.7A.1 hosted-negative evolution is implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution is implemented, and Patch 4.7B.1 now corrects its lifecycle to the canonical positive-downstream, finite-lifetime, preparation-time-anchor recycle contract. Unity must revalidate the corrected behaviour and its preparation/runtime cost before Connector work begins.
+Patch 4.7C.0 is implemented and visually revalidated. Patch 4.7C.1 immutable Connector/Weak Span preparation data is implemented and now requires Unity preparation-diagnostic validation before identity reconstruction is added.
 
-Validate Patch 4.7B.1 on the actual river:
+Validate Patch 4.7C.1 on the actual river:
 
-1. each slot independently dwells for `5–10 s` and moves/morphs for `2–4 s`;
-2. every ordinary hop has positive net downstream movement with bounded lateral/diagonal displacement;
-3. occurrence turnover is finite and visibly recycles rather than wandering forever around one home;
-4. egress recycle relocates immediately to an upstream prepared anchor without a duplicate old/new instance;
-5. prepared-anchor fallback count is normally zero or explainable on genuinely constrained geometry;
-6. Inspector upstream-violation count remains zero;
-7. active `2 Hz` reconstruction and preparation-time anchor generation remain acceptably cheap and allocate nothing during ordinary ready-state evolution.
+1. Connector `Prepared / Accepted` matches, or any unavailable Connector is explicit rather than silently omitted;
+2. every accepted Connector reports two individually owned Major endpoints, or the unresolved-endpoint counter exposes the exact deficit;
+3. retained path-point totals remain bounded and plausible for the river's accepted Connector population;
+4. available and unavailable recycle-variant counts remain bounded, deterministic, and non-negative;
+5. prepared Weak Span attachments match accepted Weak Spans, or explicit unavailable records account for the difference;
+6. Connector Support and Connector Weak Spans remain visually identical to the accepted static result because no runtime raster path changed;
+7. staged preparation cost is profiled as temporary cache/precompute work, while normal gameplay adds no search, retry, readback, dispatch, validation, or managed allocation.
 
-After that validation, proceed in this exact order:
+After validation, proceed in this exact order:
 
-1. Patch 4.7C.0 — canonical topology field-space contract;
-2. Patch 4.7C.1 — Connector endpoint ownership, retained paths/arc length, recycle variants, and Weak Span attachment data;
-3. Patch 4.7C.2 — identity reconstruction plus Editor/development-only parity;
-4. Patch 4.7C.3 — ordinary Connector deformation, Weak Span following, recycle-variant switching, and temporary absence for unavailable combinations;
-5. Patch 4.8 — explicit full-topology rebuild transition;
-6. Patch 4.9 — procedural chunk/run cache and precompute packaging;
-7. Patch 4.10 — topology completion and handoff to separate Foam-material work.
+1. Patch 4.7C.2 — identity reconstruction plus Editor/development-only parity and combined reconstruction scheduling;
+2. Patch 4.7C.3 — ordinary Connector deformation, Weak Span following, recycle-variant switching, and temporary absence for unavailable combinations;
+3. Patch 4.8 — explicit full-topology rebuild transition;
+4. Patch 4.9 — procedural chunk/run cache and precompute packaging;
+5. Patch 4.10 — topology completion and handoff to separate Foam-material work.
 
 Topology is not considered implemented until runtime evolution, explicit rebuild handling, and cache/preparation handoff pass. Only then may the separate Foam material-lifecycle implementation begin.
