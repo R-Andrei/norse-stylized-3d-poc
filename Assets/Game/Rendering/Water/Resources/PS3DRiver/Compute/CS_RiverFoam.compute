@@ -3,6 +3,7 @@
 #pragma kernel BuildGuidance
 #pragma kernel BuildCurrentShoreEdges
 #pragma kernel ComposeTopology
+#pragma kernel CaptureGeneratedTopology
 #pragma kernel BuildEvolvingMajorSupport
 #pragma kernel ClearObstacleExclusion
 #pragma kernel UpdateObstacleExclusion
@@ -125,6 +126,7 @@ Texture2D<float> _FoamObstacleExclusionRead;
 RWTexture2D<float4> _FoamGuidanceWrite;
 Texture2D<float4> _FoamGuidanceRead;
 Texture2D<float4> _FoamTopologyGeneratedRead;
+Texture2D<float4> _FoamTopologyTransitionFromRead;
 Texture2D<float> _FoamEvolvingMajorRead;
 RWTexture2D<float> _FoamEvolvingMajorWrite;
 Texture2D<float> _FoamEvolvingHostedNegativeRead;
@@ -140,6 +142,7 @@ Texture2DArray<float4> _FoamHostedNegativeMasks;
 Texture2DArray<float4> _FoamFreeWaterNegativeMasks;
 RWTexture2D<float4> _FoamTopologyWrite;
 RWTexture2D<float4> _FoamTopologySourcesWrite;
+RWTexture2D<float4> _FoamTopologyTransitionCaptureWrite;
 RWTexture2D<float2> _FoamCurrentShoreEdgesWrite;
 Texture2D<float2> _FoamCurrentShoreEdgesRead;
 Texture2D<float4> _FoamTopologyRead;
@@ -151,6 +154,7 @@ Texture2D<float4> _FoamStaticPressureField;
 RWTexture2D<float2> _FoamFractureWrite;
 Texture2D<float2> _FoamFractureRead;
 StructuredBuffer<FoamMetricRow> _FoamMetricRows;
+StructuredBuffer<FoamMetricRow> _FoamTopologyTransitionMetricRows;
 StructuredBuffer<FoamObstacleSample> _FoamObstacleSamples;
 StructuredBuffer<FoamObstacleIntervalCell> _FoamObstacleCells;
 StructuredBuffer<FoamMajorEvolutionData> _FoamMajorEvolutionRecords;
@@ -186,6 +190,7 @@ RWByteAddressBuffer _FoamTopologyMetrics;
 int2 _FoamDimensions;
 int2 _FoamGuidanceDimensions;
 int2 _FoamTopologyDimensions;
+int2 _FoamTopologyTransitionDimensions;
 int2 _FoamMajorMaskDimensions;
 int2 _FoamHostedNegativeMaskDimensions;
 int2 _FoamFreeWaterMaskDimensions;
@@ -256,6 +261,12 @@ float _FoamHostedNegativeEvolutionEnabled;
 float _FoamFreeWaterNegativeEvolutionEnabled;
 float _FoamConnectorIdentityReconstructionEnabled;
 float _FoamWeakSpanIdentityReconstructionEnabled;
+float _FoamTopologyTransitionEnabled;
+float _FoamTopologyTransitionBlend;
+float _FoamTopologyTransitionSameMapping;
+float _FoamTopologyTransitionGlobalStart;
+float _FoamTopologyTransitionFieldLength;
+float _FoamTopologyTransitionValidLength;
 
 float _FoamInjectionGlobalDistance;
 float _FoamInjectionAcrossNormalized;
@@ -537,6 +548,21 @@ float FoamAcross01ToMetres(
     }
 
     return rightHalfWidth * (across01 * 2.0 - 1.0);
+}
+
+float FoamMetresToAcross01(
+    float lateralMetres,
+    float leftHalfWidth,
+    float rightHalfWidth)
+{
+    if (lateralMetres <= 0.0)
+    {
+        return 0.5 * (1.0 + lateralMetres /
+            max(0.0001, leftHalfWidth));
+    }
+
+    return 0.5 * (1.0 + lateralMetres /
+        max(0.0001, rightHalfWidth));
 }
 
 float4 SampleStateBilinear(float2 pixelCoordinate)
@@ -2281,6 +2307,183 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
         weakSpanNegative);
 }
 
+float3 ResolveCurrentGeneratedTopology(int2 outputCoordinate)
+{
+    float4 generatedWork = _FoamTopologyGeneratedRead.Load(
+        int3(outputCoordinate, 0));
+
+    float evolvingMajorSupport = _FoamEvolvingMajorRead.Load(
+        int3(outputCoordinate, 0));
+    float majorSupport = lerp(
+        generatedWork.r,
+        evolvingMajorSupport,
+        saturate(_FoamMajorEvolutionEnabled));
+
+    float evolvingConnectorSupport = _FoamEvolvingConnectorRead.Load(
+        int3(outputCoordinate, 0));
+    float connectorSupport = lerp(
+        generatedWork.g,
+        evolvingConnectorSupport,
+        saturate(_FoamConnectorIdentityReconstructionEnabled));
+
+    float evolvingFreeWaterAgingPressure =
+        _FoamEvolvingFreeWaterNegativeRead.Load(
+            int3(outputCoordinate, 0));
+    float evolvingWeakSpanAgingPressure =
+        _FoamEvolvingWeakSpanNegativeRead.Load(
+            int3(outputCoordinate, 0));
+    float independentAgingPressure = generatedWork.b;
+    independentAgingPressure = lerp(
+        independentAgingPressure,
+        max(independentAgingPressure, evolvingFreeWaterAgingPressure),
+        saturate(_FoamFreeWaterNegativeEvolutionEnabled));
+    independentAgingPressure = lerp(
+        independentAgingPressure,
+        max(independentAgingPressure, evolvingWeakSpanAgingPressure),
+        saturate(_FoamWeakSpanIdentityReconstructionEnabled));
+
+    float staticHostedAgingPressure = generatedWork.a;
+    float evolvingHostedAgingPressure =
+        _FoamEvolvingHostedNegativeRead.Load(
+            int3(outputCoordinate, 0));
+    float hostedAgingPressure = lerp(
+        staticHostedAgingPressure,
+        max(staticHostedAgingPressure, evolvingHostedAgingPressure),
+        saturate(_FoamHostedNegativeEvolutionEnabled));
+
+    return saturate(float3(
+        majorSupport,
+        connectorSupport,
+        max(independentAgingPressure, hostedAgingPressure)));
+}
+
+float3 SampleTopologyTransitionBilinear(float2 uv)
+{
+    float2 pixelCoordinate = FoamUVToTexelCoordinate(
+        uv,
+        _FoamTopologyTransitionDimensions);
+    int2 baseCoordinate = int2(floor(pixelCoordinate));
+    int2 nextCoordinate = min(
+        baseCoordinate + int2(1, 1),
+        _FoamTopologyTransitionDimensions - int2(1, 1));
+    float2 blend = frac(pixelCoordinate);
+
+    float3 a = _FoamTopologyTransitionFromRead.Load(
+        int3(baseCoordinate, 0)).rgb;
+    float3 b = _FoamTopologyTransitionFromRead.Load(
+        int3(int2(nextCoordinate.x, baseCoordinate.y), 0)).rgb;
+    float3 c = _FoamTopologyTransitionFromRead.Load(
+        int3(int2(baseCoordinate.x, nextCoordinate.y), 0)).rgb;
+    float3 d = _FoamTopologyTransitionFromRead.Load(
+        int3(nextCoordinate, 0)).rgb;
+    return lerp(
+        lerp(a, b, blend.x),
+        lerp(c, d, blend.x),
+        blend.y);
+}
+
+float3 ApplyGeneratedTopologyTransition(
+    float3 currentGenerated,
+    int2 outputCoordinate,
+    float2 uv,
+    FoamMetricRow currentMetric)
+{
+    if (_FoamTopologyTransitionEnabled <= 0.5)
+    {
+        return currentGenerated;
+    }
+
+    float3 previousGenerated = 0.0.xxx;
+    bool previousAvailable = false;
+    if (_FoamTopologyTransitionSameMapping > 0.5 &&
+        all(outputCoordinate < _FoamTopologyTransitionDimensions))
+    {
+        previousGenerated = _FoamTopologyTransitionFromRead.Load(
+            int3(outputCoordinate, 0)).rgb;
+        previousAvailable = true;
+    }
+    else
+    {
+        float currentLocalDistance = saturate(uv.x) * _FoamFieldLength;
+        float globalDistance = _FoamGlobalStart + currentLocalDistance;
+        float previousLocalDistance =
+            globalDistance - _FoamTopologyTransitionGlobalStart;
+        if (previousLocalDistance >= 0.0 &&
+            previousLocalDistance <=
+                _FoamTopologyTransitionValidLength + 0.0001 &&
+            _FoamTopologyTransitionFieldLength > 0.0001)
+        {
+            float previousU = previousLocalDistance /
+                _FoamTopologyTransitionFieldLength;
+            int previousMetricX = FoamUVToContainingTexel(
+                previousU,
+                _FoamTopologyTransitionDimensions.x);
+            FoamMetricRow previousMetric =
+                _FoamTopologyTransitionMetricRows[previousMetricX];
+            float lateralMetres = FoamAcross01ToMetres(
+                saturate(uv.y),
+                currentMetric.widthsAndSpacing.x,
+                currentMetric.widthsAndSpacing.y);
+            float previousLeft = max(
+                0.0001,
+                previousMetric.widthsAndSpacing.x);
+            float previousRight = max(
+                0.0001,
+                previousMetric.widthsAndSpacing.y);
+            if (lateralMetres >= -previousLeft &&
+                lateralMetres <= previousRight)
+            {
+                float previousV = FoamMetresToAcross01(
+                    lateralMetres,
+                    previousLeft,
+                    previousRight);
+                previousGenerated = SampleTopologyTransitionBilinear(
+                    float2(previousU, previousV));
+                previousAvailable = true;
+            }
+        }
+    }
+
+    float3 previousOrZero = previousAvailable
+        ? previousGenerated
+        : 0.0.xxx;
+    return saturate(lerp(
+        previousOrZero,
+        currentGenerated,
+        saturate(_FoamTopologyTransitionBlend)));
+}
+
+[numthreads(8, 8, 1)]
+void CaptureGeneratedTopology(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamTopologyDimensions.x ||
+        dispatchId.y >= (uint)_FoamTopologyDimensions.y)
+    {
+        return;
+    }
+
+    int2 outputCoordinate = int2(dispatchId.xy);
+    float2 uv = FoamTexelCentreUV(dispatchId.xy, _FoamTopologyDimensions);
+    if (!IsFoamUInsideDomain(uv.x))
+    {
+        _FoamTopologyTransitionCaptureWrite[outputCoordinate] = 0.0.xxxx;
+        return;
+    }
+
+    int metricX = FoamUVToContainingTexel(
+        uv.x,
+        _FoamDimensions.x);
+    FoamMetricRow metric = _FoamMetricRows[metricX];
+    float3 generated = ResolveCurrentGeneratedTopology(outputCoordinate);
+    generated = ApplyGeneratedTopologyTransition(
+        generated,
+        outputCoordinate,
+        uv,
+        metric);
+    _FoamTopologyTransitionCaptureWrite[outputCoordinate] =
+        float4(generated, 0.0);
+}
+
 [numthreads(8, 8, 1)]
 void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
 {
@@ -2313,52 +2516,16 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
     int2 obstacleCoordinate = int2(
         FoamUVToContainingTexel(uv.x, _FoamDimensions.x),
         FoamUVToContainingTexel(uv.y, _FoamDimensions.y));
-    float4 generatedWork = _FoamTopologyGeneratedRead.Load(
-        int3(outputCoordinate, 0));
-
-    // Generated input keeps complete-only static fallbacks for Connector
-    // Support and independent negative classes. Alpha is the complete static
-    // hosted field when host-relative
-    // evolution is unavailable; otherwise it contains only accepted hosted
-    // regions that could not be prepared for evolution.
-    float evolvingMajorSupport = _FoamEvolvingMajorRead.Load(
-        int3(outputCoordinate, 0));
-    float majorSupport = lerp(
-        generatedWork.r,
-        evolvingMajorSupport,
-        saturate(_FoamMajorEvolutionEnabled));
-    float evolvingConnectorSupport = _FoamEvolvingConnectorRead.Load(
-        int3(outputCoordinate, 0));
-    float connectorSupport = lerp(
-        generatedWork.g,
-        evolvingConnectorSupport,
-        saturate(_FoamConnectorIdentityReconstructionEnabled));
-    float evolvingFreeWaterAgingPressure =
-        _FoamEvolvingFreeWaterNegativeRead.Load(
-            int3(outputCoordinate, 0));
-    float evolvingWeakSpanAgingPressure =
-        _FoamEvolvingWeakSpanNegativeRead.Load(
-            int3(outputCoordinate, 0));
-    float independentAgingPressure = generatedWork.b;
-    independentAgingPressure = lerp(
-        independentAgingPressure,
-        max(independentAgingPressure, evolvingFreeWaterAgingPressure),
-        saturate(_FoamFreeWaterNegativeEvolutionEnabled));
-    independentAgingPressure = lerp(
-        independentAgingPressure,
-        max(independentAgingPressure, evolvingWeakSpanAgingPressure),
-        saturate(_FoamWeakSpanIdentityReconstructionEnabled));
-    float staticHostedAgingPressure = generatedWork.a;
-    float evolvingHostedAgingPressure =
-        _FoamEvolvingHostedNegativeRead.Load(
-            int3(outputCoordinate, 0));
-    float hostedAgingPressure = lerp(
-        staticHostedAgingPressure,
-        max(staticHostedAgingPressure, evolvingHostedAgingPressure),
-        saturate(_FoamHostedNegativeEvolutionEnabled));
-    float pocketAgingPressure = max(
-        independentAgingPressure,
-        hostedAgingPressure);
+    float3 generatedTopology = ResolveCurrentGeneratedTopology(
+        outputCoordinate);
+    generatedTopology = ApplyGeneratedTopologyTransition(
+        generatedTopology,
+        outputCoordinate,
+        uv,
+        metric);
+    float majorSupport = generatedTopology.r;
+    float connectorSupport = generatedTopology.g;
+    float pocketAgingPressure = generatedTopology.b;
 
     float4 staticPressure = 0.0.xxxx;
     float4 staticWake = 0.0.xxxx;

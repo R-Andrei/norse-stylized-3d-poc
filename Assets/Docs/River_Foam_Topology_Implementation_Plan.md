@@ -4,7 +4,7 @@
 
 **Status:** Canonical step-by-step implementation plan for Stage 6 Foam topology only.
 
-**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-footprint/parity correction are implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector/Weak Span immutable preparation data is implemented and Unity preparation diagnostics are accepted: all accepted Connectors and Weak Span attachments prepared successfully with zero unresolved endpoints or unavailable attachments in the validation scene. Patch 4.7C.2 identity reconstruction, debug-only parity, and combined reconstruction scheduling are implemented and visually accepted. Patch 4.7C.3 endpoint-driven Connector deformation and Weak Span current-path/tangent following are implemented, but long-run validation exposed permanent Connector population drain because only a subset of same-host anchor states was prepared and relationships could not rebind to different Major targets. Patch 4.7C.3.1 completes anchor-state coverage and adds bounded preparation-time replacement relationships. Long-run validation then exposed two remaining lifecycle defects: valid relationships could stretch indefinitely during ordinary host motion, and runtime preserved the same viable pair after every recycle. Patch 4.7C.3.2 adds ratio-based stretch breaking plus deterministic recycle relationship turnover; validation exposed strong relationship concentration. Patch 4.7C.3.3 deterministic soft endpoint-load distribution is implemented and visually/long-run validated. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Patch 4.8A staged same-grid replacement preparation and atomic activation are implemented and await Unity validation. Patch 4.8B crossfade/differently mapped resource transition and production cache packaging are not yet implemented.
+**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-footprint/parity correction are implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector/Weak Span immutable preparation data is implemented and Unity preparation diagnostics are accepted: all accepted Connectors and Weak Span attachments prepared successfully with zero unresolved endpoints or unavailable attachments in the validation scene. Patch 4.7C.2 identity reconstruction, debug-only parity, and combined reconstruction scheduling are implemented and visually accepted. Patch 4.7C.3 endpoint-driven Connector deformation and Weak Span current-path/tangent following are implemented, but long-run validation exposed permanent Connector population drain because only a subset of same-host anchor states was prepared and relationships could not rebind to different Major targets. Patch 4.7C.3.1 completes anchor-state coverage and adds bounded preparation-time replacement relationships. Long-run validation then exposed two remaining lifecycle defects: valid relationships could stretch indefinitely during ordinary host motion, and runtime preserved the same viable pair after every recycle. Patch 4.7C.3.2 adds ratio-based stretch breaking plus deterministic recycle relationship turnover; validation exposed strong relationship concentration. Patch 4.7C.3.3 deterministic soft endpoint-load distribution is implemented and visually/long-run validated. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Patch 4.8A staged same-grid replacement preparation and atomic activation are implemented and Unity-verified. Patch 4.8B safe old/new generated-topology crossfade, superseding-transition flattening, and differently mapped domain/quality hold/remap transition are implemented and await Unity validation. Production cache packaging is not yet implemented.
 
 **Primary implementation target:**
 
@@ -1252,7 +1252,7 @@ Replace complete generated topology after an explicit source/domain/settings reb
 
 ### Patch 4.8A — staged same-grid replacement preparation and atomic activation
 
-**Status:** implemented; Unity validation pending.
+**Status:** implemented and Unity-verified.
 
 Patch 4.8A replaces the previous in-place Major → Connector → Pocket rebuild tail for same-grid topology changes.
 
@@ -1292,17 +1292,48 @@ Patch 4.8A passes only if:
 - identical preparation completes without any visible topology change;
 - activation produces no neutral frame, although a direct old/new shape discontinuity remains expected until 4.8B.
 
-### Patch 4.8B — bounded old/new transition
+### Patch 4.8B — safe old/new generated-topology transition
 
-Patch 4.8B is next. It will retain both complete generated topology sets after 4.8A readiness and crossfade them over a bounded interval while Anchored Support remains live and authoritative. It must also cover dimension-changing domain/quality transitions by retaining two complete mappings/resources rather than reinterpreting the old field through the new domain.
+**Status:** implemented; Unity validation pending.
 
-Required 4.8B behaviour:
+Patch 4.8B retains one fully resolved old generated-topology snapshot when a complete 4.8A replacement activates. The snapshot is not merely the static upload: one dedicated compute pass resolves the currently visible Major, hosted-negative, Free-Water, Connector, and Weak Span generated classes, including any active ordinary evolution, into one immutable RGB generated-topology texture.
 
-- crossfade complete old and replacement generated topology, never partially built classes;
-- avoid a neutral-frame flash and avoid old/new double-strength support;
-- keep Pressure, Lee, Shore, and Obstacle Footprint outside the generated-topology fade;
-- coalesce later requests without forcing the current transition to synchronously complete;
-- release retired CPU/GPU data only after the transition finishes.
+The complete new topology becomes the target only after preparation. Composition then performs a bounded internal one-second linear crossfade:
+
+```text
+Generated = lerp(ResolvedOldGenerated, ResolvedNewGenerated, progress)
+FinalTopology = ComposeLiveSourcesOnce(Generated)
+```
+
+This prevents both a neutral-frame flash and additive old/new double strength. Pressure, Lee, Shore, exact Obstacle Footprint, static wake, and other authoritative live sources remain outside the generated fade and are sampled/composed only once against the blended generated field.
+
+Same-mapping replacements load the retained old texel directly. For a domain or quality change whose dimensions or mapping differ:
+
+1. capture the current fully resolved generated field and retain its metric rows, global start, field length, and valid length;
+2. detach and hold the prior complete renderer bindings while the normal staged resource initialization creates the new complete field set;
+3. after readiness, release the held renderer bindings and remap each current topology texel into the old snapshot by global river distance and physical lateral metres;
+4. treat positions outside the old valid river interval or old lateral water width as zero old coverage rather than clamping an invalid edge strip;
+5. crossfade the remapped old generated field into the new generated target.
+
+If another complete topology activates before the current fade completes, one capture pass first flattens the currently visible old/new generated blend into a fresh transition snapshot. The superseding replacement then fades from that flattened state; it never forces the prior transition to finish synchronously and never chains shader sampling through several historical fields.
+
+Required telemetry:
+
+- transition state: idle, holding previous mapping, or crossfading;
+- current transition progress and fixed proof duration;
+- started and completed transition counts;
+- differently mapped transition count;
+- superseding flattened-transition count.
+
+Patch 4.8B passes only if:
+
+- same-grid Seed/Amount/Size/Connector/negative replacements fade continuously from the complete visible old generated topology to the complete new topology;
+- old and new support do not sum above their ordinary class ranges and no neutral/black generated frame appears;
+- live Pressure, Lee, Shore, and Obstacle Footprint react authoritatively during the fade rather than being frozen or duplicated;
+- rapid complete activations flatten the current visible blend and restart smoothly without a synchronous finish or multi-history sample chain;
+- quality or domain changes keep the previous complete renderer result visible throughout staged initialization, then fade through physical river-space remapping once the new resource set is ready;
+- old renderer resources, captured textures, and retained metric buffers are released after the transition or normal lifecycle cancellation;
+- no normal-runtime GPU readback, path search, retry loop, or per-region transition dispatch is added.
 
 ### Rollback
 
@@ -1538,24 +1569,23 @@ A topology patch that cannot answer these questions is not ready.
 
 ## 13. Immediate Next Step
 
-Patch 4.7C.3.3 soft weighted Connector distribution is visually/long-run validated. Patch 4.8A staged same-grid replacement preparation and atomic activation are implemented.
+Patch 4.7C.3.3 soft weighted Connector distribution is visually/long-run validated. Patch 4.8A staged replacement preparation and atomic activation are implemented and Unity-verified. Patch 4.8B safe topology transition is implemented.
 
-Validate Patch 4.8A on the actual river:
+Validate Patch 4.8B on the actual river:
 
-1. allow the active topology to evolve away from its identity pose, then press **Prepare Identical Topology Replacement**; the replacement phases must complete, `Identical Preparations` must increase, and the visible topology must not reset because the identical result is discarded;
-2. change Major Seed, Amount, Size, Connector settings, and each Negative Amount independently; the old accepted topology must remain active until the complete replacement reaches activation;
-3. confirm no intermediate combination appears, such as replacement Majors with active old Connectors or replacement Weak Spans attached to old paths;
-4. confirm activation happens in one commit frame with no neutral topology field, while accepting that an old/new shape jump remains until Patch 4.8B;
-5. change a setting repeatedly during preparation; only the replacement must cancel/restart, `Coalesced / Cancelled` must increase, and the latest target must eventually activate;
-6. change obstacle context; authoritative Obstacle Footprint/source maintenance must settle first, then the replacement must capture the updated prepared obstacle scalar;
-7. ordinary Major, hosted-negative, Free-Water, Connector, and Weak Span evolution must continue while replacement CPU phases run and pause only for the activation frame;
-8. disabling, freezing, sleeping release, destruction, or a dimension-changing domain/quality reinitialization must release the temporary replacement texture safely;
-9. no new compute kernel, normal-runtime readback, path search, retry loop, or per-region dispatch may appear.
+1. let the active topology evolve, change Major Seed once, and confirm `Transition State` becomes `Crossfading`, progress advances from `0%` to `100%`, and `Transitions Started / Completed` advances without a black/neutral frame or an additive bright spike;
+2. inspect Major, Connector, hosted-negative, Free-Water, and Weak Span diagnostics during the fade; the old complete generated result must dissolve while the complete replacement appears, with no mixed partial-generation phase;
+3. change a topology setting again before the first fade finishes; confirm `Flattened Transitions` increases and the visible blend continues smoothly rather than jumping or forcing the first fade to complete;
+4. alter an authoritative live source or obstacle during a generated fade; Pressure, Lee, Shore, and exact Obstacle Footprint must respond once, remain current, and not inherit the old/new generated blend;
+5. change quality or rebuild the river domain; confirm `Transition State` first reports `Holding Previous Mapping`, the previous complete rendered result remains visible throughout staged initialization, then `Remapped Transitions` increases and a crossfade begins after the new resources become ready;
+6. inspect newly exposed or removed river extents during a remapped transition; out-of-overlap old coverage must fade from zero rather than smear from an old edge texel;
+7. rapidly supersede requests and repeat domain/quality changes; old transition textures, metric buffers, and held renderer resources must retire after completion without memory growth, missing bindings, or stale topology;
+8. disabling, freezing, destroying, or forcing another initialization during either hold or crossfade must release retained resources safely;
+9. no normal-runtime readback, topology search, retry loop, additive old/new composition, or per-region transition dispatch may appear.
 
 After validation, proceed in this exact order:
 
-1. Patch 4.8B — bounded old/new generated-topology crossfade and differently mapped domain/quality resource transition;
-2. Patch 4.9 — procedural chunk/run cache and precompute packaging;
-3. Patch 4.10 — topology completion and handoff to separate Foam-material work.
+1. Patch 4.9 — procedural chunk/run cache and precompute packaging;
+2. Patch 4.10 — topology completion and handoff to separate Foam-material work.
 
 Topology is not considered implemented until runtime evolution, explicit rebuild handling, and cache/preparation handoff pass. Only then may the separate Foam material-lifecycle implementation begin.

@@ -311,7 +311,8 @@ Accepted and retained:
 - Patch 4.7C.3.1 complete anchor-state coverage plus bounded preparation-time replacement-relationship rebinding implemented; long-run stretch/turnover defects found;
 - Patch 4.7C.3.2 ratio-based stretch breaking plus deterministic recycle relationship turnover implemented; concentration defect found;
 - Patch 4.7C.3.3 deterministic soft endpoint-load distribution implemented and visually/long-run validated;
-- Patch 4.8A staged same-grid replacement preparation and atomic activation implemented; Unity validation pending;
+- Patch 4.8A staged same-grid replacement preparation and atomic activation implemented and Unity-verified;
+- Patch 4.8B safe old/new generated-topology crossfade, superseding-transition flattening, and differently mapped domain/quality hold/remap transition implemented; Unity validation pending;
 - exact transformed-mesh water-level-aware Obstacle Footprint, distinct from padded Pressure/Lee disturbance footprints;
 - persistent field, chunking, freezing, sleeping, and fixed-cost GPU infrastructure;
 - permanent Foam profiler instrumentation;
@@ -333,7 +334,6 @@ Negative Aging Pressure now has four approved source classes:
 Each class receives an independent `0–1` Amount control with default `0.5`. Amount activates a nested deterministic opportunity subset and controls population only.
 
 Still unimplemented or unaccepted:
-- Patch 4.8B bounded old/new generated-topology crossfade and dimension-changing domain/quality transition;
 - procedural chunk/run cache/precompute packaging;
 - separate topology-to-material lifespan response;
 - final fragmentation, dissipation, and rendering behaviour.
@@ -375,7 +375,7 @@ Current authoring retains Major `Amount`, `Size`, `Size Variation`, `Recycle Ter
 
 Runtime topology evolution uses fixed logical slots with one active instance each. Majors dwell about `2–5 s`, then move and morph for roughly `1–2 s` with positive net downstream progress and bounded lateral/diagonal motion; they instantly recycle inside persistent local territories centred on their original accepted longitudinal positions without duplicate old/new support. The territory deviation control ranges from `0–10%` and defaults to `3%`; near-egress homes shift upstream enough to preserve movement runway. Occurrence turnover uses one combined lifetime-unit budget consumed by both elapsed time and completed hops, exposed through `Major Lifetime Units` (`1–20`, default `6`) and `Major Lifetime Unit Deviation` (`0–10`, default `2`). This avoids slow local persistence and excessive fast-hop churn caused by independent time-or-hop limits. Hosted Interior Pockets and Edge Cavities follow their Major with bounded independent variation. Free-Water Events now use the same single-instance lifecycle independently at `5–10 s` dwell and `2–4 s` movement: every ordinary hop is net-downstream, a finite time/hop budget ends each occurrence, and lifetime or egress instantly selects a bounded preparation-time validated upstream anchor. The Connector sequence has consolidated the shared field-space contract, retains individual endpoint Major ownership and bounded path/variant data, and deforms active paths between current Major gates. Patch 4.7C.3.1 retains every actual endpoint-anchor combination and a bounded catalogue of additional prevalidated relationships between different Major slots. Patch 4.7C.3.2 captures a reference path length whenever a relationship or endpoint-anchor variant becomes active, exposes `Connector Break Stretch Ratio` (`1.10–2.00`, default `1.45`), and breaks a relationship when live length exceeds `reference × ratio`. On each endpoint-host recycle, one deterministic approximately 50/50 decision retains the current pair or requests a different valid prepared pair; requested turnover excludes the previous pair and falls back to it only when no alternative exists, while stretch breaks block the over-limit pair for that slot until either blocked host begins another occurrence. Weak Spans remain attached to logical Connector slots and follow the current original or replacement path and tangent. Patch 4.7C.3.3 then replaces hard per-Major degree rejection and first-valid rebinding with deterministic weighted selection: every occupied endpoint sharply reduces candidate weight, extra concentration on the busier endpoint is penalized again, and crowded relationships receive higher recycle-turnover probability. No degree is impossible, so occasional hubs remain valid. Temporary absence remains allowed only when no applicable prepared relationship exists; the population must not drain permanently across recycle cycles. Anchored Pressure, Lee, and Shore Support remain attached to authoritative live sources. No gameplay candidate generation, component cleanup, pathfinding, distance transforms, rejection loops, or validation readbacks are permitted.
 
-Patch 4.8A changes explicit same-grid rebuild ownership without changing topology shape rules. A replacement request captures immutable domain/settings/obstacle inputs, builds Major, Connector, Pocket, and a separate generated-topology texture over several frames, and leaves the accepted active topology evolving throughout. A superseding target cancels only replacement work. Complete replacements activate atomically; incomplete class combinations are never bound. The identical-preparation diagnostic runs the full replacement pipeline and discards the result without activation so preparation can be verified as visually side-effect free. Patch 4.8B remains responsible for retaining old and new complete generated sets during a bounded crossfade and for domain/quality transitions whose field mapping or dimensions differ.
+Patch 4.8A changes explicit replacement ownership without changing topology shape rules. A replacement request captures immutable domain/settings/obstacle inputs, builds Major, Connector, Pocket, and a separate generated-topology texture over several frames, and leaves the accepted active topology evolving throughout. A superseding target cancels only replacement work. Complete replacements activate atomically; incomplete class combinations are never bound. The identical-preparation diagnostic runs the full replacement pipeline and discards the result without activation so preparation can be verified as visually side-effect free. Patch 4.8B captures the current fully resolved generated field immediately before complete activation, then linearly crossfades that immutable old snapshot into the new complete generated target for one bounded internal second. Live Pressure, Lee, Shore, and exact Obstacle Footprint remain outside the generated blend. Superseding activations flatten the current visible blend into one new source snapshot. Domain or quality changes keep the old complete renderer bindings visible during staged initialization, then remap old generated topology by global distance and physical lateral metres into the new field before fading.
 
 ### Immediate continuation order
 
@@ -398,8 +398,8 @@ Patch 4.8A changes explicit same-grid rebuild ownership without changing topolog
 17. Patch 4.7C.3.1 — complete anchor-state coverage and bounded relationship rebinding — implemented; long-run defects found.
 18. Patch 4.7C.3.2 — ratio-based breaking and deterministic recycle turnover — implemented; concentration defect found.
 19. Patch 4.7C.3.3 — deterministic soft Connector distribution bias — implemented and visually/long-run validated.
-20. Patch 4.8A — staged same-grid replacement preparation and atomic activation — implemented; Unity validation pending.
-21. Patch 4.8B — bounded old/new generated-topology transition and differently mapped resource transition.
+20. Patch 4.8A — staged replacement preparation and atomic activation — implemented and Unity-verified.
+21. Patch 4.8B — safe old/new generated-topology crossfade, superseding flattening, and differently mapped domain/quality hold/remap transition — implemented; Unity validation pending.
 22. Patch 4.9 — procedural chunk/run cache and precompute packaging.
 23. Patch 4.10 — topology completion and handoff to separate Foam-material work.
 24. Resume deferred performance work against the completed topology pipeline.
@@ -494,8 +494,8 @@ Separate material lifetime and topology-response authoring remains deferred unti
 21. Patch 4.7C.3.1 complete anchor-state coverage and bounded relationship rebinding — implemented; long-run defects found.
 22. Patch 4.7C.3.2 ratio-based breaking and deterministic recycle turnover — implemented; concentration defect found.
 23. Patch 4.7C.3.3 soft Connector distribution bias — implemented and visually/long-run validated.
-24. Patch 4.8A staged same-grid replacement preparation and atomic activation — implemented; Unity validation pending.
-25. Patch 4.8B bounded old/new transition, including domain/quality mapping changes.
+24. Patch 4.8A staged replacement preparation and atomic activation — implemented and Unity-verified.
+25. Patch 4.8B safe old/new generated-topology crossfade, superseding flattening, and domain/quality hold/remap transition — implemented; Unity validation pending.
 26. Patch 4.9 procedural chunk/run cache/precompute packaging.
 27. Patch 4.10 topology completion handoff.
 28. Separate topology-to-material lifespan integration.

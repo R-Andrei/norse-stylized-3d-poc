@@ -44,6 +44,9 @@ namespace ProgrammaticStylized3D.Rivers
         private const float ShoreSupportCoreWidthMetres = 0.228127f;
         private const float ShoreSupportFadeWidthMetres = 0.03f;
         private const int ObstacleRebuildStableFrameCount = 2;
+        // Patch 4.8B uses one bounded generated-topology transition. This is
+        // an internal proof duration rather than a public authoring control.
+        private const float TopologyReplacementTransitionSeconds = 1.0f;
 
         // Patch 4.6 Major Support evolution. These are provisional internal
         // coefficients, not public authoring controls.
@@ -237,6 +240,31 @@ namespace ProgrammaticStylized3D.Rivers
             public RenderTexture GeneratedTexture;
         }
 
+        private sealed class TopologyTransitionSnapshot
+        {
+            public RenderTexture GeneratedTexture;
+            public ComputeBuffer MetricBuffer;
+            public int Width;
+            public int Height;
+            public int DomainVersion;
+            public float GlobalStart;
+            public float FieldLength;
+            public float ValidFieldLength;
+
+            // Dimension-changing transitions keep the last complete renderer
+            // bindings alive while the replacement resource set initializes.
+            public bool HoldsVisibleResources;
+            public RenderTexture PreviousState;
+            public RenderTexture CurrentState;
+            public RenderTexture Guidance;
+            public RenderTexture Topology;
+            public RenderTexture TopologySources;
+            public RenderTexture Fracture;
+            public RenderTexture ObstacleExclusion;
+            public Texture2D Boundary;
+            public float Interpolation;
+        }
+
         // The accepted profiler instrumentation remains active throughout the
         // topology proof. Initialization advances through an explicit per-river
         // phase machine, but each
@@ -318,6 +346,8 @@ namespace ProgrammaticStylized3D.Rivers
             new ProfilerMarker("RiverFoam.Replacement.PrepareGeneratedTexture");
         private static readonly ProfilerMarker ReplacementActivateProfilerMarker =
             new ProfilerMarker("RiverFoam.Replacement.Activate");
+        private static readonly ProfilerMarker TopologyTransitionCaptureProfilerMarker =
+            new ProfilerMarker("RiverFoam.Replacement.CaptureTransition");
 
         private static readonly int FoamEnabledId =
             Shader.PropertyToID("_FoamEnabled");
@@ -804,6 +834,17 @@ namespace ProgrammaticStylized3D.Rivers
         private int topologyReplacementActivatedCount;
         private int topologyReplacementIdenticalPreparedCount;
         private string topologyReplacementLastReason = "None";
+        private TopologyTransitionSnapshot topologyTransitionSnapshot;
+        private RenderTexture retiredTopologyTransitionTexture;
+        private ComputeBuffer retiredTopologyTransitionMetricBuffer;
+        private int retiredTopologyTransitionReleaseFrame = -1;
+        private RenderTexture retiredGeneratedTopologyTexture;
+        private int retiredGeneratedTopologyReleaseFrame = -1;
+        private float topologyTransitionElapsed;
+        private int topologyTransitionStartedCount;
+        private int topologyTransitionCompletedCount;
+        private int topologyTransitionRemappedCount;
+        private int topologyTransitionFlattenedCount;
         private bool supportWarningReported;
         private bool allocationWarningReported;
         private bool fullyFrozenLastUpdate;
@@ -819,6 +860,7 @@ namespace ProgrammaticStylized3D.Rivers
         private float fieldLength;
         private float validFieldLength;
         private float simulationFieldLength;
+        private float allocatedGlobalStart;
         private float simulationAccumulator;
         private float guidanceAccumulator;
         private float topologyMetricsAccumulator;
@@ -833,6 +875,7 @@ namespace ProgrammaticStylized3D.Rivers
         private int buildGuidanceKernel = -1;
         private int buildCurrentShoreEdgesKernel = -1;
         private int composeTopologyKernel = -1;
+        private int captureGeneratedTopologyKernel = -1;
         private int buildEvolvingMajorSupportKernel = -1;
         private int clearObstacleExclusionKernel = -1;
         private int updateObstacleExclusionKernel = -1;
@@ -1208,6 +1251,31 @@ namespace ProgrammaticStylized3D.Rivers
             topologyReplacementActivatedCount;
         public int TopologyReplacementIdenticalPreparedCount =>
             topologyReplacementIdenticalPreparedCount;
+        public bool TopologyTransitionActive =>
+            topologyTransitionSnapshot != null;
+        public string TopologyTransitionState =>
+            topologyTransitionSnapshot == null
+                ? "Idle"
+                : topologyTransitionSnapshot.HoldsVisibleResources
+                    ? "Holding Previous Mapping"
+                    : "Crossfading";
+        public float TopologyTransitionProgress =>
+            topologyTransitionSnapshot == null ||
+            topologyTransitionSnapshot.HoldsVisibleResources
+                ? 0f
+                : Mathf.Clamp01(
+                    topologyTransitionElapsed /
+                    TopologyReplacementTransitionSeconds);
+        public float TopologyTransitionDuration =>
+            TopologyReplacementTransitionSeconds;
+        public int TopologyTransitionStartedCount =>
+            topologyTransitionStartedCount;
+        public int TopologyTransitionCompletedCount =>
+            topologyTransitionCompletedCount;
+        public int TopologyTransitionRemappedCount =>
+            topologyTransitionRemappedCount;
+        public int TopologyTransitionFlattenedCount =>
+            topologyTransitionFlattenedCount;
         public int DynamicShoreRowCount => currentShoreEdgesTexture != null
             ? currentShoreEdgesTexture.width
             : 0;
@@ -1258,6 +1326,7 @@ namespace ProgrammaticStylized3D.Rivers
             reverseState != null;
         public bool IsSleeping =>
             !TopologyReplacementInProgress &&
+            !TopologyTransitionActive &&
             !IsAutomaticMaterialSupplyActive &&
             !IsTopologyDebugActive &&
             pendingInjections.Count == 0 &&
@@ -1276,6 +1345,9 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyReplacementBuild != null
                     ? topologyReplacementBuild.GeneratedTexture
                     : null) +
+            EstimateTopologyTransitionBytes() +
+            EstimateTextureBytes(retiredTopologyTransitionTexture) +
+            EstimateTextureBytes(retiredGeneratedTopologyTexture) +
             EstimateTextureBytes(evolvingMajorTexture) +
             EstimateTextureBytes(evolvingHostedNegativeTexture) +
             EstimateTextureBytes(evolvingFreeWaterNegativeTexture) +
@@ -1389,6 +1461,7 @@ namespace ProgrammaticStylized3D.Rivers
             initializationObstacleObservedVersion = int.MinValue;
             initializationObstacleStableFrameCount = 0;
             ReleaseTopologyReplacementBuild(true);
+            ReleaseTopologyTransition(true);
             initializationPhase = InitializationPhase.NotStarted;
             BindDisabled();
         }
@@ -1419,6 +1492,8 @@ namespace ProgrammaticStylized3D.Rivers
         {
             using var profilerScope = LateUpdateProfilerMarker.Auto();
             ResetLastUpdateDiagnostics();
+            ReleaseRetiredTopologyTransitionResourcesIfReady();
+            ReleaseRetiredGeneratedTopologyTextureIfReady();
 
             if (river == null)
             {
@@ -1493,7 +1568,8 @@ namespace ProgrammaticStylized3D.Rivers
                 CountActiveChunks() > 0;
             bool hasWork = materialWork || topologyDebugActive;
 
-            if (!hasWork && currentState == null)
+            if (!hasWork && currentState == null &&
+                !HasTopologyTransitionVisibleHold)
             {
                 BindDisabled();
                 return;
@@ -1504,7 +1580,10 @@ namespace ProgrammaticStylized3D.Rivers
 
             if (!EnsureResources())
             {
-                BindDisabled();
+                if (!BindTopologyTransitionHold())
+                {
+                    BindDisabled();
+                }
                 return;
             }
 
@@ -1525,6 +1604,8 @@ namespace ProgrammaticStylized3D.Rivers
             float deltaTime = Mathf.Clamp(now - lastRuntimeTime, 0f, 0.1f);
             lastRuntimeTime = now;
 
+            bool topologyTransitionChanged =
+                AdvanceTopologyTransition(deltaTime);
             bool evolvingTopologyRebuilt = false;
             if (!topologyMaintenanceBlocked)
             {
@@ -1536,8 +1617,12 @@ namespace ProgrammaticStylized3D.Rivers
                 if (evolvingTopologyDirty && BuildEvolvingMajorField())
                 {
                     evolvingTopologyRebuilt = true;
-                    RefreshDynamicTopologySources(false, false);
                 }
+            }
+
+            if (evolvingTopologyRebuilt || topologyTransitionChanged)
+            {
+                RefreshDynamicTopologySources(false, false);
             }
 
             bool manualInjectedThisUpdate = ProcessPendingInjections(now);
@@ -1833,8 +1918,18 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            if (initializationPhase == InitializationPhase.NotStarted ||
-                initializationPhase == InitializationPhase.Ready)
+            if (initializationPhase == InitializationPhase.Ready)
+            {
+                PrepareDimensionChangingTopologyTransition();
+                initializationPhase = InitializationPhase.ReleaseOldResources;
+                // The transition capture is a queued GPU write. Keep all old
+                // source textures alive through this frame and release them on
+                // the next initialization step rather than immediately after
+                // dispatching the capture.
+                return false;
+            }
+
+            if (initializationPhase == InitializationPhase.NotStarted)
             {
                 initializationPhase = InitializationPhase.ReleaseOldResources;
             }
@@ -2205,6 +2300,8 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
+            CaptureActiveGeneratedTopologyTransition(false);
+
             RenderTexture retiredGeneratedTexture = topologyGeneratedTexture;
             topologyGeneratedTexture = build.GeneratedTexture;
             build.GeneratedTexture = null;
@@ -2221,7 +2318,7 @@ namespace ProgrammaticStylized3D.Rivers
             BuildEvolvingMajorField();
             RefreshDynamicTopologySources(true);
 
-            ReleaseTexture(ref retiredGeneratedTexture);
+            RetireGeneratedTopologyTexture(retiredGeneratedTexture);
             topologyReplacementActivatedCount++;
             topologyReplacementLastReason =
                 FormatTopologyReplacementReason(build.Reason);
@@ -2265,6 +2362,474 @@ namespace ProgrammaticStylized3D.Rivers
             return reason == TopologyReplacementReason.None
                 ? "None"
                 : reason.ToString().Replace(",", " +");
+        }
+
+        private bool HasTopologyTransitionVisibleHold =>
+            topologyTransitionSnapshot != null &&
+            topologyTransitionSnapshot.HoldsVisibleResources;
+
+        private void PrepareDimensionChangingTopologyTransition()
+        {
+            if (HasTopologyTransitionVisibleHold ||
+                !CanCaptureActiveGeneratedTopology())
+            {
+                return;
+            }
+
+            if (CaptureActiveGeneratedTopologyTransition(true))
+            {
+                topologyTransitionRemappedCount++;
+            }
+        }
+
+        private bool CanCaptureActiveGeneratedTopology()
+        {
+            return computeShader != null &&
+                captureGeneratedTopologyKernel >= 0 &&
+                fieldWidth > 0 && fieldHeight > 0 &&
+                guidanceWidth > 0 && guidanceHeight > 0 &&
+                metricBuffer != null &&
+                metricRows.Length == fieldWidth &&
+                topologyGeneratedTexture != null &&
+                topologyGeneratedTexture.IsCreated() &&
+                evolvingMajorTexture != null &&
+                evolvingHostedNegativeTexture != null &&
+                evolvingFreeWaterNegativeTexture != null &&
+                evolvingConnectorTexture != null &&
+                evolvingWeakSpanNegativeTexture != null;
+        }
+
+        private bool CaptureActiveGeneratedTopologyTransition(
+            bool holdVisibleResources)
+        {
+            if (!CanCaptureActiveGeneratedTopology())
+            {
+                return false;
+            }
+
+            using var profilerScope =
+                TopologyTransitionCaptureProfilerMarker.Auto();
+            RenderTexture capture = CreateTopologyTexture(
+                guidanceWidth,
+                guidanceHeight,
+                $"PS3D_RiverFoam_TopologyTransition_{Time.frameCount}");
+            ComputeBuffer capturedMetricBuffer = new ComputeBuffer(
+                fieldWidth,
+                Marshal.SizeOf<FoamMetricRow>(),
+                ComputeBufferType.Structured);
+            capturedMetricBuffer.SetData(metricRows);
+
+            ConfigureTopologyParameters(0f);
+            computeShader.SetFloat("_FoamGlobalStart", allocatedGlobalStart);
+            BindGeneratedTopologyInputs(captureGeneratedTopologyKernel);
+            ConfigureTopologyTransitionInputs(
+                captureGeneratedTopologyKernel);
+            computeShader.SetBuffer(
+                captureGeneratedTopologyKernel,
+                "_FoamMetricRows",
+                metricBuffer);
+            computeShader.SetTexture(
+                captureGeneratedTopologyKernel,
+                "_FoamTopologyTransitionCaptureWrite",
+                capture);
+            Dispatch(
+                captureGeneratedTopologyKernel,
+                guidanceWidth,
+                guidanceHeight);
+
+            TopologyTransitionSnapshot previousSnapshot =
+                topologyTransitionSnapshot;
+            topologyTransitionSnapshot = new TopologyTransitionSnapshot
+            {
+                GeneratedTexture = capture,
+                MetricBuffer = capturedMetricBuffer,
+                Width = guidanceWidth,
+                Height = guidanceHeight,
+                DomainVersion = domainVersion,
+                GlobalStart = allocatedGlobalStart,
+                FieldLength = fieldLength,
+                ValidFieldLength = validFieldLength
+            };
+            topologyTransitionElapsed = 0f;
+            topologyTransitionStartedCount++;
+
+            if (previousSnapshot != null)
+            {
+                topologyTransitionFlattenedCount++;
+                RetireTopologyTransitionSnapshot(previousSnapshot);
+            }
+
+            if (holdVisibleResources)
+            {
+                DetachVisibleResourcesToTopologyTransition(
+                    topologyTransitionSnapshot);
+            }
+
+            return true;
+        }
+
+        private void BindGeneratedTopologyInputs(int kernel)
+        {
+            computeShader.SetFloat(
+                "_FoamMajorEvolutionEnabled",
+                majorEvolutionReady ? 1f : 0f);
+            computeShader.SetFloat(
+                "_FoamHostedNegativeEvolutionEnabled",
+                hostedNegativeEvolutionReady ? 1f : 0f);
+            computeShader.SetFloat(
+                "_FoamFreeWaterNegativeEvolutionEnabled",
+                freeWaterEvolutionReady ? 1f : 0f);
+            computeShader.SetFloat(
+                "_FoamConnectorIdentityReconstructionEnabled",
+                connectorIdentityReconstructionReady ? 1f : 0f);
+            computeShader.SetFloat(
+                "_FoamWeakSpanIdentityReconstructionEnabled",
+                weakSpanIdentityReconstructionReady ? 1f : 0f);
+            computeShader.SetTexture(
+                kernel,
+                "_FoamTopologyGeneratedRead",
+                topologyGeneratedTexture);
+            computeShader.SetTexture(
+                kernel,
+                "_FoamEvolvingMajorRead",
+                evolvingMajorTexture);
+            computeShader.SetTexture(
+                kernel,
+                "_FoamEvolvingHostedNegativeRead",
+                evolvingHostedNegativeTexture);
+            computeShader.SetTexture(
+                kernel,
+                "_FoamEvolvingFreeWaterNegativeRead",
+                evolvingFreeWaterNegativeTexture);
+            computeShader.SetTexture(
+                kernel,
+                "_FoamEvolvingConnectorRead",
+                evolvingConnectorTexture);
+            computeShader.SetTexture(
+                kernel,
+                "_FoamEvolvingWeakSpanNegativeRead",
+                evolvingWeakSpanNegativeTexture);
+        }
+
+        private void ConfigureTopologyTransitionInputs(int kernel)
+        {
+            TopologyTransitionSnapshot snapshot = topologyTransitionSnapshot;
+            bool enabled = snapshot != null &&
+                !snapshot.HoldsVisibleResources &&
+                snapshot.GeneratedTexture != null &&
+                snapshot.GeneratedTexture.IsCreated() &&
+                snapshot.MetricBuffer != null;
+            if (!enabled)
+            {
+                computeShader.SetFloat(
+                    "_FoamTopologyTransitionEnabled",
+                    0f);
+                computeShader.SetFloat(
+                    "_FoamTopologyTransitionBlend",
+                    1f);
+                computeShader.SetFloat(
+                    "_FoamTopologyTransitionSameMapping",
+                    1f);
+                computeShader.SetInts(
+                    "_FoamTopologyTransitionDimensions",
+                    guidanceWidth,
+                    guidanceHeight);
+                computeShader.SetFloat(
+                    "_FoamTopologyTransitionGlobalStart",
+                    allocatedGlobalStart);
+                computeShader.SetFloat(
+                    "_FoamTopologyTransitionFieldLength",
+                    fieldLength);
+                computeShader.SetFloat(
+                    "_FoamTopologyTransitionValidLength",
+                    validFieldLength);
+                computeShader.SetBuffer(
+                    kernel,
+                    "_FoamTopologyTransitionMetricRows",
+                    metricBuffer);
+                computeShader.SetTexture(
+                    kernel,
+                    "_FoamTopologyTransitionFromRead",
+                    topologyGeneratedTexture);
+                return;
+            }
+
+            bool sameMapping = snapshot.DomainVersion == domainVersion &&
+                snapshot.Width == guidanceWidth &&
+                snapshot.Height == guidanceHeight &&
+                Mathf.Abs(snapshot.GlobalStart - allocatedGlobalStart) <
+                    0.0001f &&
+                Mathf.Abs(snapshot.FieldLength - fieldLength) < 0.0001f &&
+                Mathf.Abs(snapshot.ValidFieldLength - validFieldLength) <
+                    0.0001f;
+            computeShader.SetFloat(
+                "_FoamTopologyTransitionEnabled",
+                1f);
+            computeShader.SetFloat(
+                "_FoamTopologyTransitionBlend",
+                TopologyTransitionProgress);
+            computeShader.SetFloat(
+                "_FoamTopologyTransitionSameMapping",
+                sameMapping ? 1f : 0f);
+            computeShader.SetInts(
+                "_FoamTopologyTransitionDimensions",
+                snapshot.Width,
+                snapshot.Height);
+            computeShader.SetFloat(
+                "_FoamTopologyTransitionGlobalStart",
+                snapshot.GlobalStart);
+            computeShader.SetFloat(
+                "_FoamTopologyTransitionFieldLength",
+                snapshot.FieldLength);
+            computeShader.SetFloat(
+                "_FoamTopologyTransitionValidLength",
+                snapshot.ValidFieldLength);
+            computeShader.SetBuffer(
+                kernel,
+                "_FoamTopologyTransitionMetricRows",
+                snapshot.MetricBuffer);
+            computeShader.SetTexture(
+                kernel,
+                "_FoamTopologyTransitionFromRead",
+                snapshot.GeneratedTexture);
+        }
+
+        private bool AdvanceTopologyTransition(float deltaTime)
+        {
+            if (topologyTransitionSnapshot == null ||
+                topologyTransitionSnapshot.HoldsVisibleResources ||
+                initializationPhase != InitializationPhase.Ready)
+            {
+                return false;
+            }
+
+            float previousProgress = TopologyTransitionProgress;
+            topologyTransitionElapsed = Mathf.Min(
+                TopologyReplacementTransitionSeconds,
+                topologyTransitionElapsed + Mathf.Max(0f, deltaTime));
+            if (topologyTransitionElapsed >=
+                TopologyReplacementTransitionSeconds - 0.0001f)
+            {
+                TopologyTransitionSnapshot completed =
+                    topologyTransitionSnapshot;
+                topologyTransitionSnapshot = null;
+                topologyTransitionElapsed = 0f;
+                topologyTransitionCompletedCount++;
+                RetireTopologyTransitionSnapshot(completed);
+                return true;
+            }
+
+            return TopologyTransitionProgress > previousProgress + 0.000001f;
+        }
+
+        private void DetachVisibleResourcesToTopologyTransition(
+            TopologyTransitionSnapshot snapshot)
+        {
+            if (snapshot == null || currentState == null ||
+                previousState == null || topologyTexture == null ||
+                topologySourcesTexture == null)
+            {
+                return;
+            }
+
+            snapshot.PreviousState = previousState;
+            snapshot.CurrentState = currentState;
+            snapshot.Guidance = guidanceTexture;
+            snapshot.Topology = topologyTexture;
+            snapshot.TopologySources = topologySourcesTexture;
+            snapshot.Fracture = currentFracture;
+            snapshot.ObstacleExclusion = obstacleExclusionTexture;
+            snapshot.Boundary = boundaryTexture;
+            snapshot.Interpolation = simulationInterpolation;
+            snapshot.HoldsVisibleResources = true;
+
+            if (stateA == previousState || stateA == currentState)
+            {
+                stateA = null;
+            }
+            if (stateB == previousState || stateB == currentState)
+            {
+                stateB = null;
+            }
+            previousState = null;
+            currentState = null;
+            writeState = null;
+            guidanceTexture = null;
+            topologyTexture = null;
+            topologySourcesTexture = null;
+            if (fractureA == snapshot.Fracture)
+            {
+                fractureA = null;
+            }
+            if (fractureB == snapshot.Fracture)
+            {
+                fractureB = null;
+            }
+            currentFracture = null;
+            obstacleExclusionTexture = null;
+            boundaryTexture = null;
+        }
+
+        private void ReleaseTopologyTransitionVisibleHold()
+        {
+            TopologyTransitionSnapshot snapshot = topologyTransitionSnapshot;
+            if (snapshot == null || !snapshot.HoldsVisibleResources)
+            {
+                return;
+            }
+
+            ReleaseHeldTopologyTransitionTextures(snapshot);
+            snapshot.HoldsVisibleResources = false;
+        }
+
+        private void RetireTopologyTransitionSnapshot(
+            TopologyTransitionSnapshot snapshot)
+        {
+            if (snapshot == null)
+            {
+                return;
+            }
+
+            ReleaseHeldTopologyTransitionTextures(snapshot);
+            ReleaseRetiredTopologyTransitionResourcesNow();
+            retiredTopologyTransitionTexture = snapshot.GeneratedTexture;
+            retiredTopologyTransitionMetricBuffer = snapshot.MetricBuffer;
+            retiredTopologyTransitionReleaseFrame = Time.frameCount + 2;
+            snapshot.GeneratedTexture = null;
+            snapshot.MetricBuffer = null;
+        }
+
+        private void ReleaseHeldTopologyTransitionTextures(
+            TopologyTransitionSnapshot snapshot)
+        {
+            if (snapshot == null)
+            {
+                return;
+            }
+
+            RenderTexture previous = snapshot.PreviousState;
+            RenderTexture current = snapshot.CurrentState;
+            if (current == previous)
+            {
+                current = null;
+            }
+            ReleaseTexture(ref previous);
+            ReleaseTexture(ref current);
+            snapshot.PreviousState = null;
+            snapshot.CurrentState = null;
+
+            RenderTexture guidance = snapshot.Guidance;
+            RenderTexture topology = snapshot.Topology;
+            RenderTexture sources = snapshot.TopologySources;
+            RenderTexture fracture = snapshot.Fracture;
+            RenderTexture obstacle = snapshot.ObstacleExclusion;
+            ReleaseTexture(ref guidance);
+            ReleaseTexture(ref topology);
+            ReleaseTexture(ref sources);
+            ReleaseTexture(ref fracture);
+            ReleaseTexture(ref obstacle);
+            snapshot.Guidance = null;
+            snapshot.Topology = null;
+            snapshot.TopologySources = null;
+            snapshot.Fracture = null;
+            snapshot.ObstacleExclusion = null;
+
+            if (snapshot.Boundary != null)
+            {
+                DestroyUnityObject(snapshot.Boundary);
+                snapshot.Boundary = null;
+            }
+        }
+
+        private void ReleaseRetiredTopologyTransitionResourcesIfReady()
+        {
+            if (retiredTopologyTransitionReleaseFrame < 0 ||
+                Time.frameCount < retiredTopologyTransitionReleaseFrame)
+            {
+                return;
+            }
+
+            ReleaseRetiredTopologyTransitionResourcesNow();
+        }
+
+        private void ReleaseRetiredTopologyTransitionResourcesNow()
+        {
+            ReleaseTexture(ref retiredTopologyTransitionTexture);
+            retiredTopologyTransitionMetricBuffer?.Release();
+            retiredTopologyTransitionMetricBuffer = null;
+            retiredTopologyTransitionReleaseFrame = -1;
+        }
+
+
+        private void RetireGeneratedTopologyTexture(RenderTexture texture)
+        {
+            if (texture == null)
+            {
+                return;
+            }
+
+            ReleaseRetiredGeneratedTopologyTextureNow();
+            retiredGeneratedTopologyTexture = texture;
+            retiredGeneratedTopologyReleaseFrame = Time.frameCount + 2;
+        }
+
+        private void ReleaseRetiredGeneratedTopologyTextureIfReady()
+        {
+            if (retiredGeneratedTopologyReleaseFrame < 0 ||
+                Time.frameCount < retiredGeneratedTopologyReleaseFrame)
+            {
+                return;
+            }
+
+            ReleaseRetiredGeneratedTopologyTextureNow();
+        }
+
+        private void ReleaseRetiredGeneratedTopologyTextureNow()
+        {
+            ReleaseTexture(ref retiredGeneratedTopologyTexture);
+            retiredGeneratedTopologyReleaseFrame = -1;
+        }
+
+        private void ReleaseTopologyTransition(bool releaseVisibleResources)
+        {
+            if (topologyTransitionSnapshot != null)
+            {
+                if (releaseVisibleResources)
+                {
+                    ReleaseHeldTopologyTransitionTextures(
+                        topologyTransitionSnapshot);
+                }
+                RenderTexture generated =
+                    topologyTransitionSnapshot.GeneratedTexture;
+                ReleaseTexture(ref generated);
+                topologyTransitionSnapshot.GeneratedTexture = null;
+                topologyTransitionSnapshot.MetricBuffer?.Release();
+                topologyTransitionSnapshot.MetricBuffer = null;
+                topologyTransitionSnapshot = null;
+            }
+
+            topologyTransitionElapsed = 0f;
+            ReleaseRetiredTopologyTransitionResourcesNow();
+            ReleaseRetiredGeneratedTopologyTextureNow();
+        }
+
+        private long EstimateTopologyTransitionBytes()
+        {
+            TopologyTransitionSnapshot snapshot = topologyTransitionSnapshot;
+            if (snapshot == null)
+            {
+                return 0L;
+            }
+
+            return EstimateTextureBytes(snapshot.GeneratedTexture) +
+                EstimateTextureBytes(snapshot.PreviousState) +
+                EstimateTextureBytes(snapshot.CurrentState) +
+                EstimateTextureBytes(snapshot.Guidance) +
+                EstimateTextureBytes(snapshot.Topology) +
+                EstimateTextureBytes(snapshot.TopologySources) +
+                EstimateTextureBytes(snapshot.Fracture) +
+                EstimateTextureBytes(snapshot.ObstacleExclusion) +
+                EstimateTextureBytes(snapshot.Boundary);
         }
 
         private bool AdvanceQueuedRebuild()
@@ -2452,7 +3017,7 @@ namespace ProgrammaticStylized3D.Rivers
                 case InitializationPhase.ReleaseOldResources:
                     using (InitReleaseOldResourcesProfilerMarker.Auto())
                     {
-                        ReleaseResources();
+                        ReleaseResources(false);
                     }
 
                     initializationPhase = InitializationPhase.LoadCompute;
@@ -2731,6 +3296,8 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.FindKernel("BuildCurrentShoreEdges");
             composeTopologyKernel =
                 computeShader.FindKernel("ComposeTopology");
+            captureGeneratedTopologyKernel =
+                computeShader.FindKernel("CaptureGeneratedTopology");
             buildEvolvingMajorSupportKernel =
                 computeShader.FindKernel("BuildEvolvingMajorSupport");
             clearObstacleExclusionKernel =
@@ -2821,6 +3388,7 @@ namespace ProgrammaticStylized3D.Rivers
             simulationFieldLength = Mathf.Min(
                 fieldLength,
                 validFieldLength + longitudinalSpacing);
+            allocatedGlobalStart = domain.GlobalDistanceMinimum;
             allocationWarningReported = false;
             domainVersion = domain.Version;
             allocatedQuality = river.Quality;
@@ -2891,6 +3459,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             resourcesDirty = false;
+            ReleaseTopologyTransitionVisibleHold();
             simulationAccumulator = 0f;
             guidanceAccumulator = 0f;
             topologyMetricsAccumulator = 0f;
@@ -3010,9 +3579,20 @@ namespace ProgrammaticStylized3D.Rivers
 
         private RenderTexture CreateGuidanceTexture(string textureName)
         {
-            RenderTexture texture = new RenderTexture(
+            return CreateTopologyTexture(
                 guidanceWidth,
                 guidanceHeight,
+                textureName);
+        }
+
+        private static RenderTexture CreateTopologyTexture(
+            int width,
+            int height,
+            string textureName)
+        {
+            RenderTexture texture = new RenderTexture(
+                Mathf.Max(1, width),
+                Mathf.Max(1, height),
                 0,
                 RenderTextureFormat.ARGBHalf,
                 RenderTextureReadWrite.Linear)
@@ -3937,7 +4517,7 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetInt("_FoamChunkCount", chunkCount);
             computeShader.SetFloat(
                 "_FoamGlobalStart",
-                river.Domain.GlobalDistanceMinimum);
+                allocatedGlobalStart);
             computeShader.SetFloat("_FoamFieldLength", fieldLength);
             computeShader.SetFloat("_FoamDeltaTime", deltaTime);
             computeShader.SetFloat(
@@ -8664,7 +9244,7 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat("_FoamValidLength", validFieldLength);
             computeShader.SetFloat(
                 "_FoamGlobalStart",
-                river.Domain.GlobalDistanceMinimum);
+                allocatedGlobalStart);
             computeShader.SetFloat("_FoamFieldLength", fieldLength);
             computeShader.SetFloat("_FoamDeltaTime", deltaTime);
             computeShader.SetFloat(
@@ -8829,45 +9409,8 @@ namespace ProgrammaticStylized3D.Rivers
                     composeTopologyKernel,
                     "_FoamObstacleExclusionRead",
                     obstacleExclusionTexture);
-                computeShader.SetTexture(
-                    composeTopologyKernel,
-                    "_FoamTopologyGeneratedRead",
-                    topologyGeneratedTexture);
-                computeShader.SetFloat(
-                    "_FoamMajorEvolutionEnabled",
-                    majorEvolutionReady ? 1f : 0f);
-                computeShader.SetFloat(
-                    "_FoamHostedNegativeEvolutionEnabled",
-                    hostedNegativeEvolutionReady ? 1f : 0f);
-                computeShader.SetFloat(
-                    "_FoamFreeWaterNegativeEvolutionEnabled",
-                    freeWaterEvolutionReady ? 1f : 0f);
-                computeShader.SetFloat(
-                    "_FoamConnectorIdentityReconstructionEnabled",
-                    connectorIdentityReconstructionReady ? 1f : 0f);
-                computeShader.SetFloat(
-                    "_FoamWeakSpanIdentityReconstructionEnabled",
-                    weakSpanIdentityReconstructionReady ? 1f : 0f);
-                computeShader.SetTexture(
-                    composeTopologyKernel,
-                    "_FoamEvolvingMajorRead",
-                    evolvingMajorTexture);
-                computeShader.SetTexture(
-                    composeTopologyKernel,
-                    "_FoamEvolvingHostedNegativeRead",
-                    evolvingHostedNegativeTexture);
-                computeShader.SetTexture(
-                    composeTopologyKernel,
-                    "_FoamEvolvingFreeWaterNegativeRead",
-                    evolvingFreeWaterNegativeTexture);
-                computeShader.SetTexture(
-                    composeTopologyKernel,
-                    "_FoamEvolvingConnectorRead",
-                    evolvingConnectorTexture);
-                computeShader.SetTexture(
-                    composeTopologyKernel,
-                    "_FoamEvolvingWeakSpanNegativeRead",
-                    evolvingWeakSpanNegativeTexture);
+                BindGeneratedTopologyInputs(composeTopologyKernel);
+                ConfigureTopologyTransitionInputs(composeTopologyKernel);
                 computeShader.SetTexture(
                     composeTopologyKernel,
                     "_FoamStaticWakeField",
@@ -9515,6 +10058,85 @@ namespace ProgrammaticStylized3D.Rivers
             lastUpdateCellIterations += count;
         }
 
+        private bool BindTopologyTransitionHold()
+        {
+            TopologyTransitionSnapshot snapshot = topologyTransitionSnapshot;
+            if (snapshot == null || !snapshot.HoldsVisibleResources ||
+                snapshot.PreviousState == null || snapshot.CurrentState == null ||
+                snapshot.Topology == null || snapshot.TopologySources == null)
+            {
+                return false;
+            }
+
+            if (surfaceRenderer == null && river != null)
+            {
+                surfaceRenderer = river.SurfaceRenderer;
+            }
+            if (surfaceRenderer == null)
+            {
+                return false;
+            }
+
+            propertyBlock ??= new MaterialPropertyBlock();
+            surfaceRenderer.GetPropertyBlock(propertyBlock);
+            propertyBlock.SetFloat(FoamEnabledId, 1f);
+            propertyBlock.SetTexture(FoamPreviousId, snapshot.PreviousState);
+            propertyBlock.SetTexture(FoamCurrentId, snapshot.CurrentState);
+            propertyBlock.SetTexture(
+                FoamGuidanceId,
+                snapshot.Guidance != null
+                    ? snapshot.Guidance
+                    : Texture2D.blackTexture);
+            propertyBlock.SetTexture(FoamTopologyId, snapshot.Topology);
+            propertyBlock.SetTexture(
+                FoamTopologySourcesId,
+                snapshot.TopologySources);
+            propertyBlock.SetTexture(
+                FoamFractureId,
+                snapshot.Fracture != null
+                    ? snapshot.Fracture
+                    : Texture2D.blackTexture);
+            propertyBlock.SetTexture(
+                FoamBoundaryId,
+                snapshot.Boundary != null
+                    ? snapshot.Boundary
+                    : Texture2D.blackTexture);
+            propertyBlock.SetTexture(
+                FoamObstacleExclusionId,
+                snapshot.ObstacleExclusion != null
+                    ? snapshot.ObstacleExclusion
+                    : Texture2D.blackTexture);
+            propertyBlock.SetFloat(
+                FoamInterpolationId,
+                snapshot.Interpolation);
+            propertyBlock.SetFloat(FoamGlobalStartId, snapshot.GlobalStart);
+            propertyBlock.SetFloat(
+                FoamFieldLengthId,
+                Mathf.Max(0.001f, snapshot.FieldLength));
+            propertyBlock.SetColor(FoamColourId, river.FoamColour);
+            propertyBlock.SetFloat(
+                FoamStrengthId,
+                ProvisionalMaterialStrength);
+            propertyBlock.SetFloat(
+                FoamCoverageId,
+                ProvisionalMaterialCoverage);
+            propertyBlock.SetFloat(
+                FoamSharpnessId,
+                ProvisionalMaterialSharpness);
+            propertyBlock.SetFloat(
+                FoamDetailScaleId,
+                ProvisionalMaterialDetailScale);
+            propertyBlock.SetFloat(
+                FoamDetailStrengthId,
+                ProvisionalMaterialDetailStrength);
+            propertyBlock.SetFloat(
+                FoamDebugViewId,
+                (float)river.FoamDebugView);
+            propertyBlock.SetFloat(FoamSeedId, river.VisualSeed);
+            surfaceRenderer.SetPropertyBlock(propertyBlock);
+            return true;
+        }
+
         private void BindField()
         {
             if (surfaceRenderer == null || currentState == null || previousState == null)
@@ -9539,7 +10161,7 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamObstacleExclusionId,
                 obstacleExclusionTexture);
             propertyBlock.SetFloat(FoamInterpolationId, simulationInterpolation);
-            propertyBlock.SetFloat(FoamGlobalStartId, river.Domain.GlobalDistanceMinimum);
+            propertyBlock.SetFloat(FoamGlobalStartId, allocatedGlobalStart);
             propertyBlock.SetFloat(FoamFieldLengthId, Mathf.Max(0.001f, fieldLength));
             propertyBlock.SetColor(FoamColourId, river.FoamColour);
             propertyBlock.SetFloat(
@@ -9596,9 +10218,14 @@ namespace ProgrammaticStylized3D.Rivers
             surfaceRenderer.SetPropertyBlock(propertyBlock);
         }
 
-        private void ReleaseResources()
+        private void ReleaseResources(
+            bool releaseTopologyTransition = true)
         {
             ReleaseTopologyReplacementBuild(true);
+            if (releaseTopologyTransition)
+            {
+                ReleaseTopologyTransition(true);
+            }
             ReleaseTexture(ref stateA);
             ReleaseTexture(ref stateB);
             ReleaseTexture(ref advectedState);
@@ -9682,6 +10309,7 @@ namespace ProgrammaticStylized3D.Rivers
             buildGuidanceKernel = -1;
             buildCurrentShoreEdgesKernel = -1;
             composeTopologyKernel = -1;
+            captureGeneratedTopologyKernel = -1;
             buildEvolvingMajorSupportKernel = -1;
             clearObstacleExclusionKernel = -1;
             updateObstacleExclusionKernel = -1;
@@ -9706,6 +10334,7 @@ namespace ProgrammaticStylized3D.Rivers
             fieldLength = 0f;
             validFieldLength = 0f;
             simulationFieldLength = 0f;
+            allocatedGlobalStart = 0f;
             initializationMotionTime = 0f;
             chunkActive = Array.Empty<bool>();
             chunkActiveUntil = Array.Empty<double>();
@@ -9728,6 +10357,13 @@ namespace ProgrammaticStylized3D.Rivers
             topologyReplacementActivatedCount = 0;
             topologyReplacementIdenticalPreparedCount = 0;
             topologyReplacementLastReason = "None";
+            if (releaseTopologyTransition)
+            {
+                topologyTransitionStartedCount = 0;
+                topologyTransitionCompletedCount = 0;
+                topologyTransitionRemappedCount = 0;
+                topologyTransitionFlattenedCount = 0;
+            }
             domainVersion = -1;
             guidanceAccumulator = 0f;
             topologyMetricsAccumulator = 0f;

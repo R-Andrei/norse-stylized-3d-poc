@@ -1759,13 +1759,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Stage 6 Mode",
-                    "Patch 4.7 evolves Major Support, Major-hosted negative regions, independent Free-Water Negative Events, Connector Support, and Connector Weak Spans through bounded prepared records. Patch 4.7C.3.3 deforms current paths between live Major gates, breaks paths that exceed their assignment-relative stretch ratio, and selects prepared relationships through a strong but non-zero endpoint-load bias. Patch 4.8A keeps the accepted active topology alive while a same-grid replacement is prepared in isolated Major, Connector, negative, and upload phases, then activates only the complete replacement. Authoritative live Pressure, Lee, Shore, and Obstacle Footprint sources remain independently composed."),
+                    "Patch 4.7 evolves Major Support, Major-hosted negative regions, independent Free-Water Negative Events, Connector Support, and Connector Weak Spans through bounded prepared records. Patch 4.7C.3.3 deforms current paths between live Major gates, breaks paths that exceed their assignment-relative stretch ratio, and selects prepared relationships through a strong but non-zero endpoint-load bias. Patch 4.8A prepares complete replacement topology without mutating the accepted active set. Patch 4.8B captures the fully resolved generated topology, crossfades old to new without double strength or a neutral frame, keeps Pressure, Lee, Shore, and Obstacle Footprint live and authoritative, and holds the previous complete renderer bindings while a differently mapped domain or quality resource set initializes."),
                 new GUIContent(
-                    "Staged Replacement Topology (Patch 4.8A)"));
+                    "Safe Topology Transition (Patch 4.8B)"));
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Replacement Build State",
-                    "Same-grid explicit topology changes prepare a complete replacement without mutating the currently accepted topology. Dimension-changing domain or quality transitions remain assigned to Patch 4.8B because they require two differently mapped complete resource sets."),
+                    "Explicit topology changes prepare a complete replacement without mutating the currently accepted topology. The complete result becomes the new target only after every preparation phase is ready."),
                 new GUIContent(runtime.TopologyReplacementState));
             EditorGUILayout.LabelField(
                 "Replacement Ready",
@@ -1784,6 +1784,25 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 "Identical Preparations",
                 runtime.TopologyReplacementIdenticalPreparedCount.ToString());
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Transition State",
+                    "Crossfading means the previous fully resolved generated topology is blended into the new complete generated topology. Holding Previous Mapping means the prior complete renderer bindings remain visible while a differently mapped domain or quality resource set initializes."),
+                new GUIContent(runtime.TopologyTransitionState));
+            EditorGUILayout.LabelField(
+                "Transition Progress",
+                FormatPercent(runtime.TopologyTransitionProgress));
+            EditorGUILayout.LabelField(
+                "Transition Duration",
+                $"{runtime.TopologyTransitionDuration:0.00} s");
+            EditorGUILayout.LabelField(
+                "Transitions Started / Completed",
+                $"{runtime.TopologyTransitionStartedCount} / " +
+                runtime.TopologyTransitionCompletedCount);
+            EditorGUILayout.LabelField(
+                "Remapped / Flattened Transitions",
+                $"{runtime.TopologyTransitionRemappedCount} / " +
+                runtime.TopologyTransitionFlattenedCount);
             using (new EditorGUI.DisabledScope(
                        !Application.isPlaying ||
                        !runtime.ResourcesAllocated ||

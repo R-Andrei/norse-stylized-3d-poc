@@ -50,10 +50,10 @@ Approved negative-topology expansion before runtime evolution:
 - Patch 4.7C.1 Connector endpoint ownership/path data and Weak Span attachment preparation is implemented and Unity diagnostics are accepted;
 - Patch 4.7C.2 complete-only identity reconstruction, separate Editor/development parity, and one-dispatch combined reconstruction scheduling are implemented and visually accepted;
 - Patch 4.7C.3 endpoint-driven Connector deformation and Weak Span path/tangent following are implemented; long-run Unity validation exposed permanent population drain because relationships covered only a subset of same-host anchor states and could not rebind to different Major pairs. Patch 4.7C.3.1 completes every bounded same-host anchor combination and adds a preparation-time replacement-relationship catalogue. Long-run validation then exposed unlimited live stretch and a hard preference for retaining the same still-valid pair. Patch 4.7C.3.2 adds an exposed relative stretch-break envelope and deterministic recycle turnover. Validation exposed strong relationship concentration on a small subset of Majors. Patch 4.7C.3.3 replaces hard degree limits and first-valid selection with a strong deterministic soft distribution bias and is visually/long-run validated.
-- Patch 4.8A staged same-grid replacement preparation is implemented: immutable replacement requests build Major, Connector, Pocket, and a private generated-topology texture in separate frames while the accepted active topology keeps evolving. Superseding requests cancel only replacement work; complete replacements activate atomically. An identical-replacement validation path prepares and discards a full replacement without touching the visible topology. Unity validation is pending.
+- Patch 4.8A staged same-grid replacement preparation is implemented and Unity-verified: immutable replacement requests build Major, Connector, Pocket, and a private generated-topology texture in separate frames while the accepted active topology keeps evolving. Superseding requests cancel only replacement work; complete replacements activate atomically. An identical-replacement validation path prepares and discards a full replacement without touching the visible topology.
+- Patch 4.8B safe topology transition is implemented and awaits Unity validation. Before a complete replacement activates, the runtime captures the fully resolved generated topology—including current Major, hosted-negative, Free-Water, Connector, and Weak Span evolution—into one immutable old-state texture. Old and new generated topology then crossfade for one bounded internal second, while live Pressure, Lee, Shore, and exact Obstacle Footprint sources remain outside the fade and are composed once. A later activation during an active fade first flattens the currently visible blend into a new old-state snapshot. Domain/quality changes hold the previous complete renderer bindings during staged initialization, then remap the captured old generated field into the new mapping by global river distance and lateral metres before fading.
 
 Not yet implemented or accepted:
-- Patch 4.8B bounded old/new generated-topology crossfade, including dimension-changing domain/quality transitions;
 - procedural chunk/run cache packaging for generated topology and exact obstacle data;
 - topology-to-material lifespan response;
 - final fragmentation, dissipation, and rendering behaviour.
@@ -794,7 +794,7 @@ Movement progress
 
 During a move, the descriptor interpolates toward the target and one resulting mask is rasterized. At completion, target becomes current. At recycle, the descriptor is replaced immediately with a valid state from that slot's local recycle territory in the same topology update.
 
-This ordinary evolution model must not be confused with the **explicit full-topology rebuild** path. Patch 4.8A now preserves the accepted active topology while a same-grid replacement is prepared from one immutable request snapshot. Major, Connector, Pocket, and replacement upload advance in separate frames, and no partial replacement class becomes authoritative. Patch 4.8B will retain old and new complete generated sets for a bounded crossfade and will extend the transition to differently mapped domain/quality resource sets. This rebuild path is not used for routine per-region movement.
+This ordinary evolution model must not be confused with the **explicit full-topology rebuild** path. Patch 4.8A preserves the accepted active topology while a replacement is prepared from one immutable request snapshot. Major, Connector, Pocket, and replacement upload advance in separate frames, and no partial replacement class becomes authoritative. Patch 4.8B captures the fully resolved generated old state immediately before complete replacement activation, then performs one bounded old-to-new generated-topology crossfade. Same-mapping replacements sample the captured old texel directly. Differently mapped domain/quality replacements retain the prior complete renderer bindings while initialization runs, then reproject the captured old generated field through global river distance and lateral metres using its retained metric rows. Live Pressure, Lee, Shore, and exact Obstacle Footprint sources are never duplicated inside the generated fade. This rebuild path is not used for routine per-region movement.
 
 ### Asynchronous and Staggered Scheduling
 
@@ -957,7 +957,9 @@ The accepted initialization safety contract is:
 
 After readiness, boundary and obstacle changes no longer invoke a complete topology chain immediately. They set coalesced pending dependencies and advance through one queued maintenance phase per frame. Boundary rebuild, application to material state, obstacle stability/exact preparation, and authoritative source refresh remain separate phases. Once those live sources are current, Patch 4.8A captures the settled obstacle scalar and prepares replacement Major, Connector, Pocket, and generated upload data outside the accepted active topology. Ordinary low-rate topology evolution may continue while replacement CPU preparation runs; it is blocked only during live maintenance or the final atomic activation frame.
 
-Patch 4.8A adds one temporary generated-topology texture per in-progress replacement. It is populated with the complete static fallback result and is never bound while incomplete. Identical validation prepares and discards this texture without activation. Ordinary replacement activation transfers that texture to active ownership, rebuilds compact evolution resources, recomposes the final topology in the same commit frame, and then retires the former generated texture. Patch 4.8B will add the old/new transition lifetime rather than releasing the old set immediately.
+Patch 4.8A adds one temporary generated-topology texture per in-progress replacement. It is populated with the complete static fallback result and is never bound while incomplete. Identical validation prepares and discards this texture without activation. Patch 4.8B changes activation ownership: immediately before the complete replacement becomes authoritative, one compute pass captures the current fully resolved generated topology into a private transition texture. The replacement then takes active ownership, rebuilds compact evolution resources, and recomposes against the captured old generated field. The transition uses a linear one-second internal blend and therefore never adds old and new strengths together. Pressure, Lee, Shore, obstacle, and other live sources are evaluated only after the generated blend.
+
+If another complete replacement activates before the fade finishes, the current visible generated blend is captured as one flattened snapshot and becomes the next transition source; the previous snapshot is retired only after queued GPU work is safely past it. For a dimension or domain-mapping change, the old complete material/topology renderer bindings remain visible during staged resource initialization. Once the new resource set is complete, those held bindings are retired and the captured generated source is remapped into the new grid by global longitudinal distance and physical lateral offset. Old coverage outside the new/old shared river interval contributes zero rather than being clamped into a false edge strip.
 
 A global cross-river scheduler is deliberately deferred. The complete single-river pipeline and its final work categories must be accepted before multi-river arbitration is designed.
 
@@ -1059,14 +1061,14 @@ The canonical topology-only rollout is maintained in `River_Foam_Topology_Implem
 24. Patch 4.7C.3.1 complete anchor-state coverage and bounded replacement-relationship rebinding implemented; long-run validation exposed stretch and turnover defects.
 25. Patch 4.7C.3.2 ratio-based Connector breaking and deterministic recycle relationship turnover implemented; distribution defect found.
 26. Patch 4.7C.3.3 deterministic soft Connector distribution bias implemented and visually/long-run validated.
-27. Patch 4.8A staged same-grid replacement preparation and atomic activation implemented; Unity validation pending.
+27. Patch 4.8A staged same-grid replacement preparation and atomic activation implemented and Unity-verified.
+28. Patch 4.8B safe old/new generated-topology crossfade, superseding-transition flattening, and differently mapped domain/quality hold/remap transition implemented; Unity validation pending.
 
 ### Active runtime-evolution sequence
 
-1. Validate Patch 4.8A same-grid replacement staging, superseding-request coalescing, identical preparation, and atomic activation on the actual river.
-2. Patch 4.8B — bounded old/new generated-topology crossfade and dimension-changing resource transition.
-3. Patch 4.9 — procedural chunk/run cache and precompute packaging.
-4. Patch 4.10 — topology completion and handoff to separate Foam-material work.
+1. Validate Patch 4.8B same-grid crossfade, rapid superseding activation, and dimension/mapping-changing hold/remap transition on the actual river.
+2. Patch 4.9 — procedural chunk/run cache and precompute packaging.
+3. Patch 4.10 — topology completion and handoff to separate Foam-material work.
 
 Material aging response, fragmentation, dissipation, and rendering are not topology implementation steps and must not begin before topology completion.
 
