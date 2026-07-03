@@ -4,7 +4,7 @@
 
 **Status:** Canonical step-by-step implementation plan for Stage 6 Foam topology only.
 
-**Patch status:** Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, Patch 4.5 complete static topology, and Patch 4.6 through 4.6.2 Major evolution are accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-footprint/parity correction are implemented and visually accepted. Patch 4.7B independent Free-Water mask evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector/Weak Span immutable preparation data is implemented and Unity preparation diagnostics are accepted: all accepted Connectors and Weak Span attachments prepared successfully with zero unresolved endpoints or unavailable attachments in the validation scene. Patch 4.7C.2 identity reconstruction, debug-only parity, and combined reconstruction scheduling are implemented and visually accepted. Patch 4.7C.3 endpoint-driven Connector deformation and Weak Span current-path/tangent following are implemented, but long-run validation exposed permanent Connector population drain because only a subset of same-host anchor states was prepared and relationships could not rebind to different Major targets. Patch 4.7C.3.1 completes anchor-state coverage and adds bounded preparation-time replacement relationships. Long-run validation then exposed two remaining lifecycle defects: valid relationships could stretch indefinitely during ordinary host motion, and runtime preserved the same viable pair after every recycle. Patch 4.7C.3.2 adds ratio-based stretch breaking plus deterministic recycle relationship turnover; validation exposed strong relationship concentration. Patch 4.7C.3.3 deterministic soft endpoint-load distribution is implemented and visually/long-run validated. Static population, shape, and movement coefficients remain provisional until the final Foam material proves the complete visual result. Patch 4.8A staged same-grid replacement preparation and atomic activation are implemented and Unity-verified. Patch 4.8B safe old/new generated-topology crossfade, superseding-transition flattening, and differently mapped domain/quality hold/remap transition are implemented and Unity-verified. Patch 4.9A versioned cache contract and deterministic round-trip proof are implemented and Unity-verified. Patch 4.9B stable cross-session fingerprints, runtime-readable cache-asset ownership, explicit cache building, and hit/miss/stale diagnostics are implemented and Unity-verified. Patch 4.9C cache-first startup and Patch 4.9C.1 automatic Editor/Development cache orchestration are implemented and Unity-verified. Patch 4.9D production/cold-start validation, release-build cache preflight, and Patch 4.9D.1 complete generated-obstacle-registry gating are implemented and Unity-verified. Patch 4.10A freezes the material-facing topology contract in documentation. Patch 4.10B runtime hardening, semantic accessors, obsolete-proof cleanup, and bounded Unity validation are complete; topology generation is closed. Patch 4.11A begins the separate material implementation with persistent Remaining Life and topology-driven aging without changing topology generation or cache data. Patch 4.11B then freezes a distributed event-driven material-birth contract in the Stage 6 architecture and roadmap; it does not reopen this topology plan. Patch 4.11B.1 removes obsolete material-population and provisional-fracture proof plumbing only; no topology generator, cache payload, topology identity, evolution rule, or material-facing topology channel changes.
+**Patch status:** Topology work through Patch 4.10B is complete and Unity-validated. Major, Connector, all four Negative Aging Pressure classes, evolution, replacement transitions, cache/precompute packaging, exact Obstacle Footprint, semantic sampling, and neutral-safe bindings remain accepted. Material work after 4.10B does not reopen topology generation. Patches 4.11C.1 and 4.11C.2 prove the material-owned progressive source and transfer boundary; the remaining material-state correction is split into 4.11C.3–4.11C.7 and is owned by `River_Foam_Material_State_Correction_Implementation_Plan.md`. No correction patch changes topology generators, cache payloads, topology identities, evolution rules, or material-facing topology channels.
 
 **Primary implementation target:**
 
@@ -22,6 +22,7 @@
 
 - `Docs/River_Foam_Stage6_Architecture.md` — owns the full Stage 6 behavioural and visual contract.
 - `Docs/River_Progressive_Initialization_and_Work_Scheduling_Plan.md` — owns initialization, rebuild scheduling, profiling, and performance safeguards.
+- `Docs/River_Foam_Material_State_Correction_Implementation_Plan.md` — owns the detailed 4.11C.3–4.11C.7 material correction.
 - `Docs/River_Rendering_Roadmap.md` — owns the concise river-wide milestone summary.
 
 This document owns the implementation order, patch boundaries, inspection requirements, tests, acceptance gates, and rollback expectations for **Foam topology only**.
@@ -86,7 +87,7 @@ This plan covers:
 This plan does not cover:
 
 - Foam material spawning or replenishment;
-- Amount, Remaining Life, Integrity, or other persistent material-state equations;
+- emitter Amount, persistent Presence, Remaining Life, Material Pattern, or other material-state equations;
 - topology-to-material lifespan response;
 - fragmentation or dissipation of Foam material;
 - final Foam shading or colour;
@@ -1502,6 +1503,8 @@ Pass only if:
 
 ## Patch 4.10 — Topology Completion and Material-System Handoff
 
+**Current material-state note:** Patch 4.10A froze topology resources and ownership. Its historical description of the then-current Amount/Integrity/Phase material state is superseded by the Presence/Remaining-Life/Material-Pattern contract implemented through 4.11C.3–4.11C.7. The topology textures and cache contract themselves do not change.
+
 Patch 4.10 is intentionally split. Patch 4.10A freezes the contract before code changes. Patch 4.10B makes the smallest runtime and diagnostic changes required to conform to that contract and then closes topology.
 
 ### Patch 4.10A — Frozen material-facing topology contract
@@ -1528,7 +1531,7 @@ Declare exactly what later Foam-material work may read, who owns each value, how
 | `_FoamBoundary` | existing boundary channels | valid-water and boundary information | domain/boundary runtime |
 | `_FoamPrevious` / `_FoamCurrent` | RGBA | provisional persistent Foam material state | material lifecycle, not topology |
 
-All material-facing topology, anchored-source, obstacle, and boundary values use normalized `0–1` ranges and the canonical Foam field mapping. Material-state channel meanings were provisional in 4.10A; Patch 4.11A subsequently freezes them as Amount, amount-weighted Remaining Life, amount-weighted Integrity, and transported phase/provenance.
+All material-facing topology, anchored-source, obstacle, and boundary values use normalized `0–1` ranges and the canonical Foam field mapping. Persistent material-state channel meanings remain outside the topology contract. The final material contract is Presence, Presence-weighted Remaining Life, Presence-weighted Material Pattern, and reserved zero as defined by 4.11C.3–4.11C.7.
 
 #### Negative-class decision
 
@@ -1543,7 +1546,7 @@ A later material-facing subtype expansion requires visible evidence that one agg
 - **Material lifecycle** owns material amount, age/freshness, integrity, provenance, birth-event scheduling, breakup, motion, and death.
 - **Rendering** owns colour, opacity, visible edge treatment, and fine visual detail.
 
-The topology runtime does not spawn or erase material, implement fragmentation or dissipation, determine final colour/opacity, or own material lifetime. The material-owned birth scheduler may sample the frozen topology outputs as bounded candidate weights or trajectory context, but it may not ask topology to fill material Amount, expose support masks as continuous emitters, or modify the accepted topology/cache contract.
+The topology runtime does not spawn or erase material, implement fragmentation or dissipation, determine final colour/opacity, or own material lifetime. The material-owned birth scheduler may sample the frozen topology outputs as bounded candidate weights or trajectory context, but it may not ask topology to fill material Presence, expose support masks as continuous emitters, or modify the accepted topology/cache contract.
 
 #### Sampling and mapping contract
 
@@ -1728,6 +1731,17 @@ A topology patch that cannot answer these questions is not ready.
 
 ## 13. Immediate Next Step
 
-Patch 4.10B passed its bounded Unity completion gate. Persistent-cache startup, generated-only transitions, live-source authority, retained diagnostics, neutral binding paths, compute import, and strict release-cache validation remain accepted. Topology generation is complete.
+Topology generation remains complete and closed after Patch 4.10B.
 
-Patch 4.11A now implements the first separate material-lifecycle slice: persistent Remaining Life and Integrity travel as amount-weighted moments, positive and aggregate negative topology multiply the local aging rate, and expired material loses actual Amount gradually. Patch 4.11B documents distributed progressive material-birth events owned entirely by the material system. Patch 4.11B.1 removes the superseded autonomous supply/population controller and provisional fracture proof before those events are implemented. Their implementation and validation belong to `River_Foam_Stage6_Architecture.md` and `River_Rendering_Roadmap.md`; neither the cleanup nor any birth event may add a topology generator, change the cache payload, or reinterpret topology identities as continuous material emitters.
+Material-owned **Patch 4.11C.3 — Source Quantity and Birth-Merge Correction** is implemented in code and awaits focused Unity validation. After acceptance, work continues with C.4 persistent state migration, C.5 transport/valid-fluid correction, C.6 lifetime authority/presentation, and C.7 validation/closure.
+
+These patches may sample the accepted topology outputs but may not:
+
+- add or change a topology generator;
+- change cache payloads, fingerprints, or versions;
+- reinterpret topology identities as continuous emitters;
+- collapse positive support and Negative Aging Pressure;
+- treat `_FoamTopology.a` as a second obstacle exclusion;
+- change topology evolution or replacement transitions.
+
+Detailed implementation requirements belong to `River_Foam_Material_State_Correction_Implementation_Plan.md`. Patch 4.11D remains blocked until C.7 is accepted.

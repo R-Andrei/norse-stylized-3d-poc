@@ -18,6 +18,9 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture stateB;
         private RenderTexture advectedState;
         private RenderTexture reverseState;
+        private RenderTexture progressiveBirthSourceTexture;
+        private RenderTexture progressiveBirthTransferDebugTexture;
+        private RenderTexture progressiveBirthDebugTexture;
         private RenderTexture previousState;
         private RenderTexture currentState;
         private RenderTexture writeState;
@@ -44,6 +47,7 @@ namespace ProgrammaticStylized3D.Rivers
         private ComputeBuffer obstacleExclusionCellBuffer;
         private ComputeBuffer obstacleExclusionSampleBuffer;
         private ComputeBuffer topologyMetricsBuffer;
+        private ComputeBuffer progressiveBirthDebugCounterBuffer;
         private ComputeBuffer majorEvolutionBuffer;
         private ComputeBuffer hostedNegativeEvolutionBuffer;
         private ComputeBuffer freeWaterEvolutionBuffer;
@@ -158,6 +162,10 @@ namespace ProgrammaticStylized3D.Rivers
 
         private readonly List<PendingInjection> pendingInjections = new();
         private readonly List<FoamReservation> reservations = new();
+        private readonly ProgressiveRibbonEvent[] progressiveRibbonEvents =
+            new ProgressiveRibbonEvent[ProgressiveRibbonEventCapacity];
+        private readonly uint[] progressiveBirthDebugCounterReadback =
+            new uint[ProgressiveBirthDebugCounterCount];
         private readonly List<MeshFilter> obstacleExclusionMeshFilters = new();
         private readonly List<MeshFilter> topologyCacheFingerprintMeshFilters =
             new();
@@ -327,6 +335,10 @@ namespace ProgrammaticStylized3D.Rivers
         private double idleSince;
         private int clearKernel = -1;
         private int injectKernel = -1;
+        private int clearProgressiveBirthDebugAllKernel = -1;
+        private int clearProgressiveBirthDebugTransientKernel = -1;
+        private int paintProgressiveBirthDebugSegmentKernel = -1;
+        private int paintProgressiveBirthSourceSegmentKernel = -1;
         private int buildGuidanceKernel = -1;
         private int buildCurrentShoreEdgesKernel = -1;
         private int composeTopologyKernel = -1;
@@ -352,6 +364,30 @@ namespace ProgrammaticStylized3D.Rivers
         private float lastInjectionBoundaryCoverage = -1f;
         private bool lastInjectionStateSynchronized;
         private int manualInjectionSequence;
+        private int progressiveRibbonSequence;
+        private int activeProgressiveRibbonEventCount;
+        private int progressiveRibbonStartedCount;
+        private int progressiveRibbonCompletedCount;
+        private int progressiveRibbonRejectedCount;
+        private float latestProgressiveRibbonProgress;
+        private float latestProgressiveRibbonHeadDistanceNormalized;
+        private float latestProgressiveRibbonHeadAcrossNormalized;
+        private float latestProgressiveRibbonPreviousDistanceNormalized;
+        private float latestProgressiveRibbonPreviousAcrossNormalized;
+        private float lastProgressiveRibbonSegmentLength;
+        private int latestProgressiveRibbonEventId;
+        private int progressiveRibbonEventUpdateCount;
+        private int progressiveRibbonSegmentDispatchAttemptCount;
+        private int progressiveRibbonSegmentDispatchSubmittedCount;
+        private float progressiveRibbonCumulativeCentrelineDistance;
+        private bool progressiveBirthDebugResetPending;
+        private bool progressiveBirthDebugReadbackPending;
+        private bool progressiveBirthDebugReadbackAvailable;
+        private int progressiveBirthDebugResourceGeneration;
+        private int progressiveBirthDebugSessionGeneration;
+        private uint progressiveBirthDebugLatestAffectedTexels;
+        private uint progressiveBirthDebugCumulativeAffectedTexels;
+        private bool progressiveBirthSourceContainsData;
 
         private bool HasQueuedRebuildWork =>
             rebuildPhase != RebuildPhase.Idle ||

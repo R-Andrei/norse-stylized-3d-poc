@@ -1633,17 +1633,149 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     Find("foamTestAmount"),
                     new GUIContent(
                         "Amount",
-                        "Persistent Foam coverage injected into the shared field."));
+                        "Source-only coefficient controlling how much of the candidate birth shape becomes occupied Foam. Zero creates nothing; one accepts the complete valid shape. It does not change Initial Remaining Life or durability."));
                 EditorGUILayout.PropertyField(
                     Find("foamTestRemainingLife"),
                     new GUIContent(
                         "Initial Remaining Life",
-                        "Normalized lifetime assigned to newly injected material. One starts with a complete lifetime; lower values begin closer to end-of-life weakening and dissipation. Injected Integrity still begins high automatically."));
+                        "Normalized lifetime assigned equally to every accepted part of the source. One starts with a complete lifetime; lower values begin closer to end-of-life weakening and dissipation. Source Amount does not modify this value."));
                 EditorGUILayout.PropertyField(
                     Find("foamTestElongation"),
                     new GUIContent(
                         "Along-Flow Elongation",
-                        "Multiplies the patch radius along the river. One is approximately circular; larger values create ribbons."));
+                        "Multiplies only the legacy one-frame diagnostic patch radius along the river. Progressive ribbons use their separate Ribbon Half-Width control and do not use this value."));
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField(
+                    "Patch 4.11C Progressive Ribbon Proof",
+                    EditorStyles.boldLabel);
+                EditorGUILayout.PropertyField(
+                    Find("foamTestProgressiveRibbonHalfWidth"),
+                    new GUIContent(
+                        "Ribbon Half-Width",
+                        "Dedicated progressive-source half-width in world metres. This is independent of the legacy one-frame patch Radius."));
+                EditorGUILayout.PropertyField(
+                    Find("foamTestProgressiveRibbonDuration"),
+                    new GUIContent(
+                        "Event Duration",
+                        "How long the manual emission head remains active. The approved proof range is 0.5–3 seconds."));
+                EditorGUILayout.PropertyField(
+                    Find("foamTestProgressiveRibbonTravelDistance"),
+                    new GUIContent(
+                        "Travel Distance",
+                        "Net downstream distance travelled by the emission head during the event. The approved proof range is 0.5–8 metres."));
+                EditorGUILayout.PropertyField(
+                    Find("foamTestProgressiveRibbonAcrossDrift"),
+                    new GUIContent(
+                        "Across Drift",
+                        "Total normalized lateral displacement from start to end. Negative moves toward the left river edge and positive toward the right."));
+                EditorGUILayout.PropertyField(
+                    Find("foamTestProgressiveRibbonPathWander"),
+                    new GUIContent(
+                        "Path Wander",
+                        "Strength of one deterministic smooth bend. This is coherent event shape, not frame-to-frame jitter."));
+
+                using (new EditorGUI.DisabledScope(!Application.isPlaying))
+                {
+                    if (GUILayout.Button(
+                            new GUIContent(
+                                "Start Progressive Ribbon",
+                                "Starts one corrected Patch 4.11C proof event. The proven trajectory is rasterized into a per-step birth source and transferred once into persistent material; no complete ribbon is stamped in one frame.")))
+                    {
+                        ApplyFoamTestProperties();
+                        river.StartFoamProgressiveRibbonProof();
+                    }
+                }
+
+                StylizedRiverFoamRuntime proofRuntime =
+                    river.GetComponent<StylizedRiverFoamRuntime>();
+                if (Application.isPlaying && proofRuntime != null)
+                {
+                    EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                    EditorGUILayout.LabelField(
+                        "Progressive Event State",
+                        EditorStyles.boldLabel);
+                    EditorGUILayout.LabelField(
+                        "Source Family",
+                        "Manual Progressive Proof");
+                    EditorGUILayout.LabelField(
+                        "Active / Capacity",
+                        $"{proofRuntime.ActiveProgressiveRibbonEventCount} / " +
+                        proofRuntime.ProgressiveRibbonPoolCapacity);
+                    EditorGUILayout.LabelField(
+                        "Started / Completed / Rejected",
+                        $"{proofRuntime.ProgressiveRibbonStartedCount} / " +
+                        $"{proofRuntime.ProgressiveRibbonCompletedCount} / " +
+                        proofRuntime.ProgressiveRibbonRejectedCount);
+                    EditorGUILayout.LabelField(
+                        "Latest Event / Progress",
+                        proofRuntime.LatestProgressiveRibbonEventId > 0
+                            ? $"#{proofRuntime.LatestProgressiveRibbonEventId} / " +
+                              FormatPercent(
+                                  proofRuntime.LatestProgressiveRibbonProgress)
+                            : "—");
+                    EditorGUILayout.LabelField(
+                        "Previous Head",
+                        proofRuntime.LatestProgressiveRibbonEventId > 0
+                            ? $"Along " +
+                              $"{proofRuntime.LatestProgressiveRibbonPreviousDistanceNormalized:0.000}, " +
+                              $"Across {proofRuntime.LatestProgressiveRibbonPreviousAcrossNormalized:0.000}"
+                            : "—");
+                    EditorGUILayout.LabelField(
+                        "Current Head",
+                        proofRuntime.LatestProgressiveRibbonEventId > 0
+                            ? $"Along " +
+                              $"{proofRuntime.LatestProgressiveRibbonHeadDistanceNormalized:0.000}, " +
+                              $"Across {proofRuntime.LatestProgressiveRibbonHeadAcrossNormalized:0.000}"
+                            : "—");
+                    EditorGUILayout.LabelField(
+                        "Ribbon Half-Width",
+                        $"{river.FoamTestProgressiveRibbonHalfWidth:0.000} m");
+                    EditorGUILayout.LabelField(
+                        "Last Submitted Segment",
+                        $"{proofRuntime.LastProgressiveRibbonSegmentLength:0.000} m");
+                    EditorGUILayout.LabelField(
+                        "Event Updates",
+                        proofRuntime.ProgressiveRibbonEventUpdateCount.ToString());
+                    EditorGUILayout.LabelField(
+                        "Segment Dispatches",
+                        $"{proofRuntime.ProgressiveRibbonSegmentDispatchAttemptCount} attempted / " +
+                        $"{proofRuntime.ProgressiveRibbonSegmentDispatchSubmittedCount} submitted");
+                    EditorGUILayout.LabelField(
+                        "Cumulative Centreline",
+                        $"{proofRuntime.ProgressiveRibbonCumulativeCentrelineDistance:0.000} m");
+                    string sourceTexelState;
+                    if (!proofRuntime.ProgressiveBirthSourceDebugActive)
+                    {
+                        sourceTexelState =
+                            "Select Progressive Birth Source debug view";
+                    }
+                    else if (proofRuntime.ProgressiveBirthDebugReadbackPending &&
+                             !proofRuntime.ProgressiveBirthDebugReadbackAvailable)
+                    {
+                        sourceTexelState = "GPU readback pending";
+                    }
+                    else if (!proofRuntime.ProgressiveBirthDebugReadbackAvailable)
+                    {
+                        sourceTexelState = "No verified source write yet";
+                    }
+                    else
+                    {
+                        sourceTexelState =
+                            $"{proofRuntime.ProgressiveBirthDebugLatestAffectedTexels} latest / " +
+                            $"{proofRuntime.ProgressiveBirthDebugCumulativeAffectedTexels} cumulative unique";
+                    }
+
+                    EditorGUILayout.LabelField(
+                        "Verified Debug-Source Texels",
+                        sourceTexelState);
+                    EditorGUILayout.EndVertical();
+                }
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField(
+                    "Legacy One-Frame Diagnostics",
+                    EditorStyles.boldLabel);
 
                 using (new EditorGUI.DisabledScope(!Application.isPlaying))
                 {
@@ -1710,7 +1842,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     if (GUILayout.Button(
                             new GUIContent(
                                 "Clear Foam",
-                                "Clears the four-channel Foam state and pending diagnostics. When Amount is above zero, the measured autonomous population begins rebuilding on subsequent simulation steps.")))
+                                "Clears the four-channel Foam state, pending manual injections, active progressive-ribbon events, and material reservations. The river remains empty until another explicit diagnostic or later approved automatic birth event.")))
                     {
                         ApplyFoamTestProperties();
                         river.ClearFoam();
@@ -1720,7 +1852,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 if (!Application.isPlaying)
                 {
                     EditorGUILayout.HelpBox(
-                        "Enter Play Mode to observe the autonomous network. Manual shapes may be injected to test how explicit material merges into, breaks within, and is reorganised by the same complete solver.",
+                        "Enter Play Mode to start a manual progressive-ribbon proof or use the retained one-frame diagnostic shapes. Patch 4.11C adds no automatic spawning.",
                         MessageType.Info);
                 }
 
@@ -1747,7 +1879,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Support Classes",
                 "Negative Influence Classes",
                 "Support and Negative Influence",
-                "Material Remaining Life"
+                "Material Remaining Life",
+                "Progressive Birth Source",
+                "Progressive Birth Transfer"
             };
             int[] foamDebugValues =
             {
@@ -1756,7 +1890,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.SupportClasses,
                 (int)StylizedRiverFoamDebugView.NegativeInfluenceClasses,
                 (int)StylizedRiverFoamDebugView.SupportAndNegativeInfluence,
-                (int)StylizedRiverFoamDebugView.MaterialRemainingLife
+                (int)StylizedRiverFoamDebugView.MaterialRemainingLife,
+                (int)StylizedRiverFoamDebugView.ProgressiveBirthSource,
+                (int)StylizedRiverFoamDebugView.ProgressiveBirthTransfer
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -1770,7 +1906,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             int selectedDebugIndex = EditorGUILayout.Popup(
                 new GUIContent(
                     "Debug View",
-                    "Final Foam disables Foam diagnostics. Four topology diagnostics and one material-lifetime diagnostic remain available."),
+                    "Final Foam disables Foam diagnostics. Four topology diagnostics, one material-lifetime diagnostic, the source-isolation view, and the Patch 4.11C.2 source-to-material transfer view are available."),
                 currentDebugIndex,
                 foamDebugLabels);
             if (EditorGUI.EndChangeCheck())
@@ -3388,6 +3524,14 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 case StylizedRiverFoamDebugView.MaterialRemainingLife:
                     return
                         "Persistent material Remaining Life after transport and amount-weighted merging. White/cyan is young material, amber is mid-life, red is near death, and black contains no visible Foam. Compare an injected patch while switching to the support/negative views to verify slower supported aging, neutral aging, accelerated negative aging, and continuous overlap response.";
+
+                case StylizedRiverFoamDebugView.ProgressiveBirthSource:
+                    return
+                        "Patch 4.11C.3 source isolation before advection, aging, topology response, temporal interpolation, and the normal Foam visibility threshold. Amount now selects deterministic coherent spatial subsets of the candidate ribbon. Blue = the complete planned accepted source. Green = cumulative accepted source geometry submitted since the latest idle start. Red = accepted source geometry submitted during the latest material update. Yellow = the current emission-head position. The Inspector's verified texel counts come from this GPU debug target, not from CPU event bookkeeping or the persistent material-state texture.";
+
+                case StylizedRiverFoamDebugView.ProgressiveBirthTransfer:
+                    return
+                        "Patch 4.11C.3 source-to-material handoff. Red = current per-step source coverage after deterministic Amount-to-area selection and valid-fluid clipping. Green = source coverage newly accepted into the temporary old-format persistent material this update. Blue = persistent material Amount before transfer. Yellow means the source created new material; magenta means it overlapped material that already met or exceeded the source coverage and therefore did not strengthen or rejuvenate it.";
 
                 default:
                     return "Normal rendered Foam result. No Foam diagnostic colour encoding is active.";

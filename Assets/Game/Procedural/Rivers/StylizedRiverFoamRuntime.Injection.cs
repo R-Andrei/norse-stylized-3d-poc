@@ -44,7 +44,7 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 CentreGlobalDistance = injection.GlobalDistance,
                 AlongRadius = injection.Radius * injection.Elongation,
-                RemainingAmount = injection.Amount,
+                RemainingAmount = injection.SourceAmount,
                 Elapsed = 0f,
                 MaximumLifetime = Mathf.Clamp(
                     injection.RemainingLife *
@@ -113,10 +113,28 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void ActivateInjectionRange(PendingInjection injection, float now)
         {
-            float padding = Mathf.Max(0.5f, injection.Radius * injection.Elongation);
+            float padding = injection.SegmentShape
+                ? Mathf.Max(
+                    0.5f,
+                    Mathf.Max(
+                        injection.SegmentStartRadius,
+                        injection.SegmentEndRadius))
+                : Mathf.Max(
+                    0.5f,
+                    injection.Radius * injection.Elongation);
+            float minimumGlobal = injection.SegmentShape
+                ? Mathf.Min(
+                    injection.SegmentStartGlobalDistance,
+                    injection.SegmentEndGlobalDistance)
+                : injection.GlobalDistance;
+            float maximumGlobal = injection.SegmentShape
+                ? Mathf.Max(
+                    injection.SegmentStartGlobalDistance,
+                    injection.SegmentEndGlobalDistance)
+                : injection.GlobalDistance;
             ActivateGlobalRange(
-                injection.GlobalDistance - padding,
-                injection.GlobalDistance + padding,
+                minimumGlobal - padding,
+                maximumGlobal + padding,
                 now + Mathf.Min(
                     5f,
                     ResolveMaximumMaterialReservationSeconds()));
@@ -217,15 +235,36 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void DispatchInjection(PendingInjection injection)
         {
-            int centreX = GlobalDistanceToX(injection.GlobalDistance);
-            float alongRadius = injection.Radius * injection.Elongation *
-                (injection.CompoundShape ? 1.25f : 1f);
-            float dx = StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
-                fieldLength,
-                fieldWidth);
-            int radiusPixels = Mathf.CeilToInt(alongRadius / Mathf.Max(0.001f, dx)) + 2;
-            int startX = Mathf.Clamp(centreX - radiusPixels, 0, fieldWidth - 1);
-            int endX = Mathf.Clamp(centreX + radiusPixels, 0, fieldWidth - 1);
+            float minimumGlobal;
+            float maximumGlobal;
+            if (injection.SegmentShape)
+            {
+                float segmentPadding = Mathf.Max(
+                    injection.SegmentStartRadius,
+                    injection.SegmentEndRadius);
+                minimumGlobal = Mathf.Min(
+                    injection.SegmentStartGlobalDistance,
+                    injection.SegmentEndGlobalDistance) - segmentPadding;
+                maximumGlobal = Mathf.Max(
+                    injection.SegmentStartGlobalDistance,
+                    injection.SegmentEndGlobalDistance) + segmentPadding;
+            }
+            else
+            {
+                float alongRadius = injection.Radius * injection.Elongation *
+                    (injection.CompoundShape ? 1.25f : 1f);
+                minimumGlobal = injection.GlobalDistance - alongRadius;
+                maximumGlobal = injection.GlobalDistance + alongRadius;
+            }
+
+            int startX = Mathf.Clamp(
+                GlobalDistanceToX(minimumGlobal) - 2,
+                0,
+                fieldWidth - 1);
+            int endX = Mathf.Clamp(
+                GlobalDistanceToX(maximumGlobal) + 2,
+                0,
+                fieldWidth - 1);
             int countX = endX - startX + 1;
 
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
@@ -240,20 +279,57 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat("_FoamInjectionGlobalDistance", injection.GlobalDistance);
             computeShader.SetFloat("_FoamInjectionAcrossNormalized", injection.AcrossNormalized);
             computeShader.SetFloat("_FoamInjectionRadius", injection.Radius);
-            computeShader.SetFloat("_FoamInjectionAmount", injection.Amount);
+            computeShader.SetFloat("_FoamInjectionAmount", injection.SourceAmount);
             computeShader.SetFloat(
                 "_FoamInjectionRemainingLife",
                 injection.RemainingLife);
             computeShader.SetFloat("_FoamInjectionIntegrity", injection.Integrity);
             computeShader.SetFloat("_FoamInjectionPhase", injection.Phase);
             computeShader.SetFloat("_FoamInjectionElongation", injection.Elongation);
+            computeShader.SetFloat(
+                "_FoamInjectionSourceFillSeed",
+                injection.SourceFillSeed);
+            computeShader.SetFloat(
+                "_FoamInjectionSourceFillFeatureSize",
+                injection.SourceFillFeatureSize);
             computeShader.SetFloat("_FoamInjectionShapeSeed", injection.ShapeSeed);
             computeShader.SetFloat("_FoamInjectionShapeVariety", injection.ShapeVariety);
             computeShader.SetFloat(
                 "_FoamInjectionCompound",
                 injection.CompoundShape ? 1f : 0f);
+            computeShader.SetFloat(
+                "_FoamInjectionSegment",
+                injection.SegmentShape ? 1f : 0f);
+            computeShader.SetFloat(
+                "_FoamInjectionSegmentStartGlobalDistance",
+                injection.SegmentStartGlobalDistance);
+            computeShader.SetFloat(
+                "_FoamInjectionSegmentStartAcrossNormalized",
+                injection.SegmentStartAcrossNormalized);
+            computeShader.SetFloat(
+                "_FoamInjectionSegmentStartRadius",
+                injection.SegmentStartRadius);
+            computeShader.SetFloat(
+                "_FoamInjectionSegmentStartAmount",
+                injection.SegmentStartSourceAmount);
+            computeShader.SetFloat(
+                "_FoamInjectionSegmentEndGlobalDistance",
+                injection.SegmentEndGlobalDistance);
+            computeShader.SetFloat(
+                "_FoamInjectionSegmentEndAcrossNormalized",
+                injection.SegmentEndAcrossNormalized);
+            computeShader.SetFloat(
+                "_FoamInjectionSegmentEndRadius",
+                injection.SegmentEndRadius);
+            computeShader.SetFloat(
+                "_FoamInjectionSegmentEndAmount",
+                injection.SegmentEndSourceAmount);
             computeShader.SetBuffer(injectKernel, "_FoamMetricRows", metricBuffer);
             computeShader.SetTexture(injectKernel, "_FoamBoundary", boundaryTexture);
+            computeShader.SetTexture(
+                injectKernel,
+                "_FoamObstacleExclusionRead",
+                obstacleExclusionTexture);
 
             DispatchInjectionToState(currentState, countX);
 

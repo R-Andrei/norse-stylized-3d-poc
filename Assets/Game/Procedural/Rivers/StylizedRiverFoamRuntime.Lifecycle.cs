@@ -72,10 +72,12 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseResources();
             pendingInjections.Clear();
             reservations.Clear();
+            ClearProgressiveRibbonEvents();
         }
 
         private void OnDestroy()
         {
+            ClearProgressiveRibbonEvents();
             BindDisabled();
             ReleaseResources();
         }
@@ -100,6 +102,7 @@ namespace ProgrammaticStylized3D.Rivers
                 ReleaseResources();
                 pendingInjections.Clear();
                 reservations.Clear();
+                ClearProgressiveRibbonEvents();
                 ResetManualInjectionSequence();
                 return;
             }
@@ -133,6 +136,7 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 pendingInjections.Clear();
                 reservations.Clear();
+                ClearProgressiveRibbonEvents();
                 ResetManualInjectionSequence();
 
                 if (!fullyFrozenLastUpdate)
@@ -149,11 +153,18 @@ namespace ProgrammaticStylized3D.Rivers
             fullyFrozenLastUpdate = false;
 
             bool topologyDebugActive = IsTopologyDebugActive;
+            bool progressiveBirthDebugActive =
+                IsProgressiveBirthSourceDebugActive;
+            bool progressiveBirthTransferDebugActive =
+                IsProgressiveBirthTransferDebugActive;
             bool materialWork =
                 pendingInjections.Count > 0 ||
+                activeProgressiveRibbonEventCount > 0 ||
                 reservations.Count > 0 ||
                 CountActiveChunks() > 0;
-            bool hasWork = materialWork || topologyDebugActive;
+            bool hasWork = materialWork || topologyDebugActive ||
+                progressiveBirthDebugActive ||
+                progressiveBirthTransferDebugActive;
 
             if (!hasWork && currentState == null &&
                 !HasTopologyTransitionVisibleHold)
@@ -234,7 +245,17 @@ namespace ProgrammaticStylized3D.Rivers
                 while (simulationAccumulator >= stepDuration)
                 {
                     simulationAccumulator -= stepDuration;
+                    BeginProgressiveBirthSourceStep();
+                    if (progressiveBirthDebugActive)
+                    {
+                        BeginProgressiveBirthDebugStep();
+                    }
+
+                    bool progressiveRibbonDeposited =
+                        AdvanceProgressiveRibbonEvents(stepDuration, now);
                     bool materialStepActive =
+                        progressiveRibbonDeposited ||
+                        activeProgressiveRibbonEventCount > 0 ||
                         reservations.Count > 0 ||
                         CountActiveChunks() > 0;
 
@@ -293,6 +314,11 @@ namespace ProgrammaticStylized3D.Rivers
                     if (materialStepActive)
                     {
                         SimulateActiveChunks(stepDuration);
+                    }
+
+                    if (progressiveBirthDebugActive)
+                    {
+                        EndProgressiveBirthDebugStep();
                     }
                 }
 
@@ -388,7 +414,14 @@ namespace ProgrammaticStylized3D.Rivers
             // Keep the public parameter name for source compatibility; its
             // canonical Patch 4.11A meaning is normalized initial Remaining Life.
             float resolvedRemainingLife = Mathf.Clamp01(freshness);
+            float resolvedRadius = Mathf.Clamp(radius, 0.05f, 8f);
             float shapeSeed = river.VisualSeed + injectionIndex * 17.371f;
+            float sourceFillSeed =
+                river.VisualSeed * 0.431f +
+                injectionIndex * 71.371f +
+                ManualSourceFillSeedSalt;
+            float sourceFillFeatureSize =
+                ResolveSourceFillFeatureSize(resolvedRadius);
             float phase = Mathf.Repeat(
                 river.VisualSeed * 0.000173f + injectionIndex * 0.6180339f,
                 1f);
@@ -399,13 +432,15 @@ namespace ProgrammaticStylized3D.Rivers
                 new PendingInjection(
                     globalDistance,
                     Mathf.Clamp(acrossNormalized, -1f, 1f),
-                    Mathf.Clamp(radius, 0.05f, 8f),
+                    resolvedRadius,
                     resolvedAmount,
                     resolvedRemainingLife,
                     integrity,
                     phase,
                     Mathf.Clamp(elongation, 0.25f, 8f),
                     true,
+                    sourceFillSeed,
+                    sourceFillFeatureSize,
                     shapeSeed,
                     ProvisionalMaterialShapeVariety,
                     true));
@@ -417,6 +452,7 @@ namespace ProgrammaticStylized3D.Rivers
         {
             pendingInjections.Clear();
             reservations.Clear();
+            ClearProgressiveRibbonEvents();
             ResetManualInjectionSequence();
             lastInjectionBoundaryCoverage = -1f;
             lastInjectionStateSynchronized = false;
@@ -446,6 +482,23 @@ namespace ProgrammaticStylized3D.Rivers
                 DispatchClear(reverseState, 0, fieldWidth);
             }
 
+            if (progressiveBirthSourceTexture != null)
+            {
+                DispatchClear(
+                    progressiveBirthSourceTexture,
+                    0,
+                    fieldWidth);
+            }
+
+            if (progressiveBirthTransferDebugTexture != null)
+            {
+                DispatchClear(
+                    progressiveBirthTransferDebugTexture,
+                    0,
+                    fieldWidth);
+            }
+
+            progressiveBirthSourceContainsData = false;
             Array.Clear(chunkActive, 0, chunkActive.Length);
             Array.Clear(chunkActiveUntil, 0, chunkActiveUntil.Length);
         }

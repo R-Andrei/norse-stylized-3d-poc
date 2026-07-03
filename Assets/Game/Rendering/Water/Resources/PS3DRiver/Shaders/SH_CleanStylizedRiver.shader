@@ -85,6 +85,8 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamEnabled("Foam Enabled", Float) = 0
         [HideInInspector] _FoamPrevious("Foam Previous", 2D) = "black" {}
         [HideInInspector] _FoamCurrent("Foam Current", 2D) = "black" {}
+        [HideInInspector] _FoamBirthDebug("Foam Progressive Birth Debug", 2D) = "black" {}
+        [HideInInspector] _FoamBirthTransferDebug("Foam Progressive Birth Transfer Debug", 2D) = "black" {}
         [HideInInspector] _FoamGuidance("Foam Guidance", 2D) = "black" {}
         [HideInInspector] _FoamTopology("Foam Topology", 2D) = "black" {}
         [HideInInspector] _FoamTopologySources("Foam Topology Sources", 2D) = "black" {}
@@ -256,6 +258,8 @@ Shader "PS3D/Stylized River Water"
                 float _FoamDetailStrength;
                 float _FoamDebugView;
                 float _FoamSeed;
+                float4 _FoamBirthDebug_TexelSize;
+                float4 _FoamBirthTransferDebug_TexelSize;
                 float4 _FoamObstacleExclusion_TexelSize;
 
                 float _DomainFallbackDepth;
@@ -282,6 +286,8 @@ Shader "PS3D/Stylized River Water"
             SAMPLER(sampler_FoamPrevious);
             TEXTURE2D(_FoamCurrent);
             SAMPLER(sampler_FoamCurrent);
+            TEXTURE2D(_FoamBirthDebug);
+            TEXTURE2D(_FoamBirthTransferDebug);
             TEXTURE2D(_FoamGuidance);
             // Guidance remains a bound compatibility/debug texture, but the
             // compact Batch 1 debug menu no longer samples it in this pass.
@@ -827,6 +833,52 @@ Shader "PS3D/Stylized River Water"
                         lifetimeColour,
                         materialPresence);
                     return half4(lifetimeColour, 1.0);
+                }
+
+                if (foamDebug == 10)
+                {
+                    int2 birthDebugDimensions = int2(
+                        max(1.0, _FoamBirthDebug_TexelSize.z),
+                        max(1.0, _FoamBirthDebug_TexelSize.w));
+                    int2 birthDebugCoordinate = clamp(
+                        (int2)floor(
+                            foam.fieldUV *
+                            (float2)birthDebugDimensions),
+                        int2(0, 0),
+                        birthDebugDimensions - 1);
+                    float4 birthDebug = saturate(
+                        _FoamBirthDebug.Load(
+                            int3(birthDebugCoordinate, 0)));
+                    float3 debugColour =
+                        birthDebug.b * float3(0.08, 0.20, 0.75) +
+                        birthDebug.g * float3(0.05, 0.85, 0.15) +
+                        birthDebug.r * float3(1.00, 0.08, 0.03);
+                    debugColour = lerp(
+                        debugColour,
+                        float3(1.00, 0.95, 0.08),
+                        birthDebug.a);
+                    return half4(saturate(debugColour), 1.0);
+                }
+
+                if (foamDebug == 11)
+                {
+                    int2 transferDimensions = int2(
+                        max(1.0, _FoamBirthTransferDebug_TexelSize.z),
+                        max(1.0, _FoamBirthTransferDebug_TexelSize.w));
+                    int2 transferCoordinate = clamp(
+                        (int2)floor(
+                            foam.fieldUV *
+                            (float2)transferDimensions),
+                        int2(0, 0),
+                        transferDimensions - 1);
+                    float4 transferDebug = saturate(
+                        _FoamBirthTransferDebug.Load(
+                            int3(transferCoordinate, 0)));
+                    float3 transferColour =
+                        transferDebug.r * float3(1.00, 0.08, 0.03) +
+                        transferDebug.g * float3(0.05, 0.90, 0.12) +
+                        transferDebug.b * float3(0.08, 0.22, 0.90);
+                    return half4(saturate(transferColour), 1.0);
                 }
 
                 if (foamDebug == 3 || foamDebug == 6 ||

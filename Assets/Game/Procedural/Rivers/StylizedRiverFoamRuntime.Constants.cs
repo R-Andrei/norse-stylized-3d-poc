@@ -23,6 +23,26 @@ namespace ProgrammaticStylized3D.Rivers
         private const float EndOfLifeDissipationSeconds = 4f;
         private const float EndOfLifeDissipationStart = 0.35f;
         private const float TopologyMetricsUpdateRate = 2f;
+        private const int ProgressiveRibbonEventCapacity = 8;
+        private const int ProgressiveBirthDebugCounterCount = 2;
+        private const float ProgressiveRibbonMinimumDuration = 0.5f;
+        private const float ProgressiveRibbonMaximumDuration = 3f;
+        private const float ProgressiveRibbonMinimumTravelDistance = 0.5f;
+        private const float ProgressiveRibbonMaximumTravelDistance = 8f;
+        private const float ProgressiveRibbonMaximumBendAcross = 0.35f;
+        private const float ProgressiveRibbonWidthVariation = 0.20f;
+        private const float ProgressiveRibbonRampInEnd = 0.18f;
+        private const float ProgressiveRibbonTaperStart = 0.72f;
+        private const float ProgressiveRibbonMinimumHalfWidth = 0.05f;
+        private const float ProgressiveRibbonMaximumHalfWidth = 1f;
+        // Patch 4.11C.3 converts source Amount into a deterministic spatial
+        // subset. The feature scale is physical, source-relative, and is later
+        // clamped against the actual field spacing in HLSL so Low quality does
+        // not collapse the fill into one-texel checkerboard fragments.
+        private const float SourceFillMinimumFeatureSizeMetres = 0.20f;
+        private const float SourceFillFeatureSizeRadiusMultiplier = 0.65f;
+        private const float ProgressiveSourceFillSeedSalt = 83.173f;
+        private const float ManualSourceFillSeedSalt = 141.919f;
         private const int ThreadGroupSize = 8;
         private const int TopologyMetricCount = 16;
         // Canonical Stage 6 Shore Support band measured inward from the
@@ -355,6 +375,10 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamPrevious");
         private static readonly int FoamCurrentId =
             Shader.PropertyToID("_FoamCurrent");
+        private static readonly int FoamBirthDebugId =
+            Shader.PropertyToID("_FoamBirthDebug");
+        private static readonly int FoamBirthTransferDebugId =
+            Shader.PropertyToID("_FoamBirthTransferDebug");
         private static readonly int FoamGuidanceId =
             Shader.PropertyToID("_FoamGuidance");
         private static readonly int FoamTopologyId =

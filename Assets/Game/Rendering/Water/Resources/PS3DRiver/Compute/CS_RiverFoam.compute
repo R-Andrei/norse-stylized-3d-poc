@@ -1,5 +1,9 @@
 #pragma kernel ClearRange
 #pragma kernel InjectFoam
+#pragma kernel ClearProgressiveBirthDebugAll
+#pragma kernel ClearProgressiveBirthDebugTransient
+#pragma kernel PaintProgressiveBirthDebugSegment
+#pragma kernel PaintProgressiveBirthSourceSegment
 #pragma kernel BuildGuidance
 #pragma kernel BuildCurrentShoreEdges
 #pragma kernel ComposeTopology
@@ -106,7 +110,10 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     float coverage = LoadBoundary(coordinate).x;
-    if (coverage <= 0.001)
+    float obstacleFootprint = saturate(
+        _FoamObstacleExclusionRead.Load(int3(coordinate, 0)));
+    float validFluid = coverage * (1.0 - obstacleFootprint);
+    if (validFluid <= 0.001)
     {
         _FoamStateWrite[coordinate] = 0.0.xxxx;
         return;
@@ -124,23 +131,99 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
         metric.widthsAndSpacing.y);
     float globalDistance = _FoamGlobalStart +
         FoamLocalDistanceAtTexel(x);
+    float2 physicalPosition = float2(globalDistance, lateralMetres);
+    float2 physicalCellSpacing = float2(
+        max(0.01, metric.widthsAndSpacing.z),
+        max(0.01, metric.widthsAndSpacing.w));
 
+    float alongRadius = max(
+        0.05,
+        _FoamInjectionRadius * _FoamInjectionElongation);
+    float acrossRadius = max(0.05, _FoamInjectionRadius);
     float alongDistance =
-        (globalDistance - _FoamInjectionGlobalDistance) /
-        max(0.05, _FoamInjectionRadius * _FoamInjectionElongation);
+        (globalDistance - _FoamInjectionGlobalDistance) / alongRadius;
     float acrossDistance =
-        (lateralMetres - centreAcrossMetres) /
-        max(0.05, _FoamInjectionRadius);
+        (lateralMetres - centreAcrossMetres) / acrossRadius;
     float radial = length(float2(alongDistance, acrossDistance));
-    float ellipseShape = saturate(1.0 - radial);
-    ellipseShape = ellipseShape * ellipseShape * (3.0 - 2.0 * ellipseShape);
-    float compoundShape = EvaluateCompoundInjectionShape(
+    float sourceEdgeWidth = max(
+        physicalCellSpacing.x / alongRadius,
+        physicalCellSpacing.y / acrossRadius) * 0.75;
+    sourceEdgeWidth = clamp(sourceEdgeWidth, 0.015, 0.30);
+    float ellipseShape = 1.0 - smoothstep(
+        1.0 - sourceEdgeWidth,
+        1.0 + sourceEdgeWidth,
+        radial);
+    float compoundRaw = EvaluateCompoundInjectionShape(
         alongDistance,
         acrossDistance);
+    float compoundEdgeWidth = clamp(sourceEdgeWidth * 0.75, 0.02, 0.18);
+    float compoundShape = smoothstep(
+        0.12 - compoundEdgeWidth,
+        0.12 + compoundEdgeWidth,
+        compoundRaw);
     float shape = lerp(
         ellipseShape,
         compoundShape,
         saturate(_FoamInjectionCompound));
+    float sourceAmount = saturate(_FoamInjectionAmount);
+
+    if (_FoamInjectionSegment > 0.5)
+    {
+        float startAcrossMetres = FoamAcross01ToMetres(
+            saturate(
+                _FoamInjectionSegmentStartAcrossNormalized * 0.5 + 0.5),
+            metric.widthsAndSpacing.x,
+            metric.widthsAndSpacing.y);
+        float endAcrossMetres = FoamAcross01ToMetres(
+            saturate(
+                _FoamInjectionSegmentEndAcrossNormalized * 0.5 + 0.5),
+            metric.widthsAndSpacing.x,
+            metric.widthsAndSpacing.y);
+        float2 segmentStart = float2(
+            _FoamInjectionSegmentStartGlobalDistance,
+            startAcrossMetres);
+        float2 segmentEnd = float2(
+            _FoamInjectionSegmentEndGlobalDistance,
+            endAcrossMetres);
+        float2 segmentAxis = segmentEnd - segmentStart;
+        float axisLengthSquared = max(dot(segmentAxis, segmentAxis), 0.000001);
+        float segmentT = saturate(
+            dot(physicalPosition - segmentStart, segmentAxis) /
+            axisLengthSquared);
+        float2 closestPoint = segmentStart + segmentAxis * segmentT;
+        float segmentRadius = max(
+            0.025,
+            lerp(
+                _FoamInjectionSegmentStartRadius,
+                _FoamInjectionSegmentEndRadius,
+                segmentT));
+        float segmentDistanceMetres = distance(
+            physicalPosition,
+            closestPoint);
+        float segmentEdgeWidthMetres = max(
+            0.01,
+            max(physicalCellSpacing.x, physicalCellSpacing.y) * 0.75);
+        shape = 1.0 - smoothstep(
+            segmentRadius - segmentEdgeWidthMetres,
+            segmentRadius + segmentEdgeWidthMetres,
+            segmentDistanceMetres);
+        sourceAmount = saturate(lerp(
+            _FoamInjectionSegmentStartAmount,
+            _FoamInjectionSegmentEndAmount,
+            segmentT));
+    }
+
+    float sourceFill = EvaluateFoamSourceFillCoverage(
+        physicalPosition,
+        sourceAmount,
+        _FoamInjectionSourceFillSeed,
+        _FoamInjectionSourceFillFeatureSize,
+        physicalCellSpacing);
+    float injectedAmount = saturate(shape * sourceFill * validFluid);
+    if (injectedAmount <= 0.0001)
+    {
+        return;
+    }
 
     float4 previous = _FoamStateWrite[coordinate];
     float previousAmount = saturate(previous.x);
@@ -150,31 +233,28 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
     float previousIntegrity = previousAmount > 0.0001
         ? saturate(previous.z / previousAmount)
         : 0.0;
-    float injectedAmount = saturate(
-        shape * _FoamInjectionAmount * coverage);
-    float combinedAmount = 1.0 -
-        (1.0 - previousAmount) * (1.0 - injectedAmount);
+    float combinedAmount = max(previousAmount, injectedAmount);
     float addedAmount = max(0.0, combinedAmount - previousAmount);
+    if (addedAmount <= 0.0001)
+    {
+        return;
+    }
+
     float injectedRemainingLife = saturate(
         _FoamInjectionRemainingLife);
     float injectedIntegrity = saturate(
         _FoamInjectionIntegrity);
-
-    float remainingLife = combinedAmount > 0.0001
-        ? saturate(
-            (previousRemainingLife * previousAmount +
-             injectedRemainingLife * addedAmount) /
-            combinedAmount)
-        : 0.0;
-    float integrity = combinedAmount > 0.0001
-        ? saturate(
-            (previousIntegrity * previousAmount +
-             injectedIntegrity * addedAmount) /
-            combinedAmount)
-        : 0.0;
+    float remainingLife = saturate(
+        (previousRemainingLife * previousAmount +
+         injectedRemainingLife * addedAmount) /
+        max(0.0001, combinedAmount));
+    float integrity = saturate(
+        (previousIntegrity * previousAmount +
+         injectedIntegrity * addedAmount) /
+        max(0.0001, combinedAmount));
 
     float phase = saturate(_FoamInjectionPhase);
-    if (previousAmount > 0.001 && combinedAmount > 0.001)
+    if (previousAmount > 0.001)
     {
         phase = MixPhaseShortest(
             saturate(previous.w),
@@ -182,11 +262,326 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
             saturate(addedAmount / combinedAmount));
     }
 
-    previous.x = combinedAmount;
-    previous.y = combinedAmount * remainingLife;
-    previous.z = combinedAmount * integrity;
-    previous.w = combinedAmount > 0.001 ? phase : 0.0;
-    _FoamStateWrite[coordinate] = saturate(previous);
+    _FoamStateWrite[coordinate] = saturate(float4(
+        combinedAmount,
+        combinedAmount * remainingLife,
+        combinedAmount * integrity,
+        phase));
+}
+
+[numthreads(8, 8, 1)]
+void PaintProgressiveBirthSourceSegment(
+    uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    int y = (int)dispatchId.y;
+    if (x < 0 || x >= _FoamDimensions.x ||
+        !IsFoamColumnInsideDomain(x))
+    {
+        return;
+    }
+
+    int2 coordinate = int2(x, y);
+    float coverage = LoadBoundary(coordinate).x;
+    float obstacleFootprint = saturate(
+        _FoamObstacleExclusionRead.Load(int3(coordinate, 0)));
+    float validFluid = coverage * (1.0 - obstacleFootprint);
+    if (validFluid <= 0.001)
+    {
+        return;
+    }
+
+    FoamMetricRow metric = _FoamMetricRows[x];
+    float across01 = FoamAcross01AtTexel(y);
+    float lateralMetres = FoamAcross01ToMetres(
+        across01,
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+    float globalDistance = _FoamGlobalStart +
+        FoamLocalDistanceAtTexel(x);
+    float2 physicalPosition = float2(globalDistance, lateralMetres);
+    float2 physicalCellSpacing = float2(
+        max(0.01, metric.widthsAndSpacing.z),
+        max(0.01, metric.widthsAndSpacing.w));
+    float startAcrossMetres = FoamAcross01ToMetres(
+        saturate(
+            _FoamInjectionSegmentStartAcrossNormalized * 0.5 + 0.5),
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+    float endAcrossMetres = FoamAcross01ToMetres(
+        saturate(
+            _FoamInjectionSegmentEndAcrossNormalized * 0.5 + 0.5),
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+    float2 segmentStart = float2(
+        _FoamInjectionSegmentStartGlobalDistance,
+        startAcrossMetres);
+    float2 segmentEnd = float2(
+        _FoamInjectionSegmentEndGlobalDistance,
+        endAcrossMetres);
+    float2 segmentAxis = segmentEnd - segmentStart;
+    float axisLengthSquared = max(
+        dot(segmentAxis, segmentAxis),
+        0.000001);
+    float segmentT = saturate(
+        dot(physicalPosition - segmentStart, segmentAxis) /
+        axisLengthSquared);
+    float2 closestPoint = segmentStart + segmentAxis * segmentT;
+    float segmentRadius = max(
+        0.025,
+        lerp(
+            _FoamInjectionSegmentStartRadius,
+            _FoamInjectionSegmentEndRadius,
+            segmentT));
+    float segmentDistanceMetres = distance(
+        physicalPosition,
+        closestPoint);
+    float segmentEdgeWidthMetres = max(
+        0.01,
+        max(physicalCellSpacing.x, physicalCellSpacing.y) * 0.75);
+    float segmentShape = 1.0 - smoothstep(
+        segmentRadius - segmentEdgeWidthMetres,
+        segmentRadius + segmentEdgeWidthMetres,
+        segmentDistanceMetres);
+    float sourceAmount = saturate(lerp(
+        _FoamInjectionSegmentStartAmount,
+        _FoamInjectionSegmentEndAmount,
+        segmentT));
+    float sourceFill = EvaluateFoamSourceFillCoverage(
+        physicalPosition,
+        sourceAmount,
+        _FoamInjectionSourceFillSeed,
+        _FoamInjectionSourceFillFeatureSize,
+        physicalCellSpacing);
+    float incomingSourceAmount = saturate(
+        segmentShape * sourceFill * validFluid);
+    if (incomingSourceAmount <= 0.0001)
+    {
+        return;
+    }
+
+    float4 previousSource =
+        _FoamProgressiveBirthSourceWrite[coordinate];
+    float previousSourceAmount = saturate(previousSource.x);
+    float combinedSourceAmount = max(
+        previousSourceAmount,
+        incomingSourceAmount);
+    float addedSourceAmount = max(
+        0.0,
+        combinedSourceAmount - previousSourceAmount);
+    if (addedSourceAmount <= 0.0001)
+    {
+        return;
+    }
+
+    float incomingRemainingLife = saturate(
+        _FoamInjectionRemainingLife);
+    float incomingIntegrity = saturate(
+        _FoamInjectionIntegrity);
+    float combinedRemainingLife = saturate(
+        (previousSource.y +
+         incomingRemainingLife * addedSourceAmount) /
+        max(0.0001, combinedSourceAmount));
+    float combinedIntegrity = saturate(
+        (previousSource.z +
+         incomingIntegrity * addedSourceAmount) /
+        max(0.0001, combinedSourceAmount));
+    float combinedPhase = saturate(_FoamInjectionPhase);
+    if (previousSourceAmount > 0.001)
+    {
+        combinedPhase = MixPhaseShortest(
+            saturate(previousSource.w),
+            combinedPhase,
+            saturate(addedSourceAmount / combinedSourceAmount));
+    }
+
+    _FoamProgressiveBirthSourceWrite[coordinate] = saturate(float4(
+        combinedSourceAmount,
+        combinedSourceAmount * combinedRemainingLife,
+        combinedSourceAmount * combinedIntegrity,
+        combinedPhase));
+}
+
+[numthreads(8, 8, 1)]
+void ClearProgressiveBirthDebugAll(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    int y = (int)dispatchId.y;
+    if (x < 0 || x >= _FoamDimensions.x)
+    {
+        return;
+    }
+
+    _FoamBirthDebugWrite[int2(x, y)] = 0.0.xxxx;
+    if (dispatchId.x == 0 && dispatchId.y == 0)
+    {
+        _FoamBirthDebugCounters[0] = 0;
+        _FoamBirthDebugCounters[1] = 0;
+    }
+}
+
+[numthreads(8, 8, 1)]
+void ClearProgressiveBirthDebugTransient(
+    uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    int y = (int)dispatchId.y;
+    if (x < 0 || x >= _FoamDimensions.x)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(x, y);
+    float4 debugState = _FoamBirthDebugWrite[coordinate];
+    debugState.r = 0.0;
+    debugState.a = 0.0;
+    _FoamBirthDebugWrite[coordinate] = debugState;
+    if (dispatchId.x == 0 && dispatchId.y == 0)
+    {
+        _FoamBirthDebugCounters[0] = 0;
+    }
+}
+
+[numthreads(8, 8, 1)]
+void PaintProgressiveBirthDebugSegment(
+    uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    int y = (int)dispatchId.y;
+    if (x < 0 || x >= _FoamDimensions.x ||
+        !IsFoamColumnInsideDomain(x))
+    {
+        return;
+    }
+
+    int2 coordinate = int2(x, y);
+    float coverage = LoadBoundary(coordinate).x;
+    float obstacleFootprint = saturate(
+        _FoamObstacleExclusionRead.Load(int3(coordinate, 0)));
+    float validFluid = coverage * (1.0 - obstacleFootprint);
+    if (validFluid <= 0.001)
+    {
+        return;
+    }
+
+    FoamMetricRow metric = _FoamMetricRows[x];
+    float across01 = FoamAcross01AtTexel(y);
+    float lateralMetres = FoamAcross01ToMetres(
+        across01,
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+    float globalDistance = _FoamGlobalStart +
+        FoamLocalDistanceAtTexel(x);
+    float2 physicalPosition = float2(globalDistance, lateralMetres);
+    float2 physicalCellSpacing = float2(
+        max(0.01, metric.widthsAndSpacing.z),
+        max(0.01, metric.widthsAndSpacing.w));
+    float startAcrossMetres = FoamAcross01ToMetres(
+        saturate(
+            _FoamInjectionSegmentStartAcrossNormalized * 0.5 + 0.5),
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+    float endAcrossMetres = FoamAcross01ToMetres(
+        saturate(
+            _FoamInjectionSegmentEndAcrossNormalized * 0.5 + 0.5),
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+    float2 segmentStart = float2(
+        _FoamInjectionSegmentStartGlobalDistance,
+        startAcrossMetres);
+    float2 segmentEnd = float2(
+        _FoamInjectionSegmentEndGlobalDistance,
+        endAcrossMetres);
+    float2 segmentAxis = segmentEnd - segmentStart;
+    float axisLengthSquared = max(dot(segmentAxis, segmentAxis), 0.000001);
+    float segmentT = saturate(
+        dot(physicalPosition - segmentStart, segmentAxis) /
+        axisLengthSquared);
+    float2 closestPoint = segmentStart + segmentAxis * segmentT;
+    float segmentRadius = max(
+        0.025,
+        lerp(
+            _FoamInjectionSegmentStartRadius,
+            _FoamInjectionSegmentEndRadius,
+            segmentT));
+    float segmentDistanceMetres = distance(
+        physicalPosition,
+        closestPoint);
+    float segmentEdgeWidthMetres = max(
+        0.01,
+        max(physicalCellSpacing.x, physicalCellSpacing.y) * 0.75);
+    float segmentShape = 1.0 - smoothstep(
+        segmentRadius - segmentEdgeWidthMetres,
+        segmentRadius + segmentEdgeWidthMetres,
+        segmentDistanceMetres);
+    float sourceAmount = saturate(lerp(
+        _FoamInjectionSegmentStartAmount,
+        _FoamInjectionSegmentEndAmount,
+        segmentT));
+    float sourceFill = EvaluateFoamSourceFillCoverage(
+        physicalPosition,
+        sourceAmount,
+        _FoamInjectionSourceFillSeed,
+        _FoamInjectionSourceFillFeatureSize,
+        physicalCellSpacing);
+    float source = saturate(segmentShape * sourceFill * validFluid);
+
+    float4 debugState = _FoamBirthDebugWrite[coordinate];
+    if (_FoamBirthDebugPaintMode > 0.5)
+    {
+        debugState.b = max(debugState.b, source);
+        _FoamBirthDebugWrite[coordinate] = saturate(debugState);
+        return;
+    }
+
+    if (source > 0.001)
+    {
+        uint ignored;
+        if (debugState.r <= 0.001)
+        {
+            InterlockedAdd(_FoamBirthDebugCounters[0], 1, ignored);
+        }
+        if (debugState.g <= 0.001)
+        {
+            InterlockedAdd(_FoamBirthDebugCounters[1], 1, ignored);
+        }
+
+        debugState.r = max(debugState.r, source);
+        debugState.g = max(debugState.g, source);
+    }
+
+    float headRadius = max(
+        0.05,
+        min(_FoamInjectionSegmentEndRadius * 0.28, 0.20));
+    float headShape = saturate(
+        1.0 - distance(physicalPosition, segmentEnd) / headRadius);
+    headShape = headShape * headShape * (3.0 - 2.0 * headShape);
+    debugState.a = max(debugState.a, headShape * validFluid);
+    _FoamBirthDebugWrite[coordinate] = saturate(debugState);
 }
 
 // Compatibility helper for provisional metrics/guidance only. The accepted
@@ -1022,6 +1417,7 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     if (!IsFoamColumnInsideSimulation(x))
     {
         _FoamStateWrite[coordinate] = 0.0.xxxx;
+        _FoamBirthTransferDebugWrite[coordinate] = 0.0.xxxx;
         return;
     }
 
@@ -1030,6 +1426,7 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     if (coverage <= 0.001)
     {
         _FoamStateWrite[coordinate] = 0.0.xxxx;
+        _FoamBirthTransferDebugWrite[coordinate] = 0.0.xxxx;
         return;
     }
 
@@ -1184,6 +1581,56 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     amount = saturate(amount);
     remainingLife = saturate(remainingLife);
     integrity = saturate(integrity);
+
+    // Patch 4.11C.3 integrates the per-step progressive birth source exactly
+    // once after ordinary transport, aging, reinforcement, and dissipation.
+    // Emitter Amount has already selected a deterministic spatial subset; the
+    // resulting source coverage is a geometric target rather than an additive
+    // quantity, so overlap and update cadence cannot repeatedly strengthen or
+    // rejuvenate material that already meets the source coverage.
+    float persistentAmountBeforeBirth = amount;
+    float4 birthSource = _FoamProgressiveBirthSourceRead.Load(
+        int3(coordinate, 0));
+    float sourceAmount = materialTopology.validFluid > 0.001
+        ? saturate(birthSource.x)
+        : 0.0;
+    float acceptedAmount = max(0.0, sourceAmount - amount);
+    if (acceptedAmount > 0.0001)
+    {
+        float sourceRemainingLife = sourceAmount > 0.0001
+            ? saturate(birthSource.y / sourceAmount)
+            : 0.0;
+        float sourceIntegrity = sourceAmount > 0.0001
+            ? saturate(birthSource.z / sourceAmount)
+            : 0.0;
+        float combinedAmount = saturate(amount + acceptedAmount);
+        remainingLife = combinedAmount > 0.0001
+            ? saturate(
+                (remainingLife * amount +
+                 sourceRemainingLife * acceptedAmount) /
+                combinedAmount)
+            : 0.0;
+        integrity = combinedAmount > 0.0001
+            ? saturate(
+                (integrity * amount +
+                 sourceIntegrity * acceptedAmount) /
+                combinedAmount)
+            : 0.0;
+        phase = amount > 0.001
+            ? MixPhaseShortest(
+                phase,
+                saturate(birthSource.w),
+                saturate(acceptedAmount / combinedAmount))
+            : saturate(birthSource.w);
+        amount = combinedAmount;
+    }
+
+    _FoamBirthTransferDebugWrite[coordinate] = saturate(float4(
+        sourceAmount,
+        acceptedAmount,
+        persistentAmountBeforeBirth,
+        amount));
+
     if (amount < 0.001)
     {
         _FoamStateWrite[coordinate] = 0.0.xxxx;

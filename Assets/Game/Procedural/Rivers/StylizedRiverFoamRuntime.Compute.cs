@@ -8,6 +8,14 @@ namespace ProgrammaticStylized3D.Rivers
         {
             clearKernel = computeShader.FindKernel("ClearRange");
             injectKernel = computeShader.FindKernel("InjectFoam");
+            clearProgressiveBirthDebugAllKernel =
+                computeShader.FindKernel("ClearProgressiveBirthDebugAll");
+            clearProgressiveBirthDebugTransientKernel =
+                computeShader.FindKernel("ClearProgressiveBirthDebugTransient");
+            paintProgressiveBirthDebugSegmentKernel =
+                computeShader.FindKernel("PaintProgressiveBirthDebugSegment");
+            paintProgressiveBirthSourceSegmentKernel =
+                computeShader.FindKernel("PaintProgressiveBirthSourceSegment");
             buildGuidanceKernel = computeShader.FindKernel("BuildGuidance");
             buildCurrentShoreEdgesKernel =
                 computeShader.FindKernel("BuildCurrentShoreEdges");
@@ -248,6 +256,14 @@ namespace ProgrammaticStylized3D.Rivers
                 simulateKernel,
                 "_FoamObstacleExclusionRead",
                 obstacleExclusionTexture);
+            computeShader.SetTexture(
+                simulateKernel,
+                "_FoamProgressiveBirthSourceRead",
+                progressiveBirthSourceTexture);
+            computeShader.SetTexture(
+                simulateKernel,
+                "_FoamBirthTransferDebugWrite",
+                progressiveBirthTransferDebugTexture);
             computeShader.SetTexture(
                 simulateKernel,
                 "_FoamStateWrite",

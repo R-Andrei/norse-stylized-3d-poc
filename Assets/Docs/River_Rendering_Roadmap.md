@@ -279,386 +279,199 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 
 ## 6. Foam and Surface Tracing
 
-**Problem:** Create a persistent stylized surface film that forms broad broken sheets, dominant ribbons, medium branches, temporary connectors, enclosed dark-water pockets, peeling strips, and secondary fragments while preserving substantial open water and downstream causality.
+**Problem:** Create persistent stylized surface film that can form broad sheets, dominant ribbons, branches, temporary connectors, enclosed water pockets, peeling strips, and secondary fragments while preserving substantial open water and downstream causality.
 
-The canonical detailed contract and topology implementation sequence are maintained in:
+Detailed contracts are maintained in:
 
 ```text
 Assets/Docs/River_Foam_Stage6_Architecture.md
 Assets/Docs/River_Foam_Topology_Implementation_Plan.md
+Assets/Docs/River_Foam_Material_State_Correction_Implementation_Plan.md
 ```
 
-### Current status
+### Current Status
 
-Accepted and retained:
+Topology generation, evolution, replacement transitions, cache/precompute packaging, exact obstacle preparation, and runtime binding hardening are complete through Patch 4.10B. Topology generation remains closed.
 
-- shared `64 / 96 / 128` structural tiers, with `96` as standard/default;
-- Shore, Lee, and geometry-supported Pressure Support;
-- field-first Major Support generation, whole-river distribution, accepted Major controls, and stable identity;
-- Major-to-Major Connector Support with accepted Amount, Directness, Length Preference, endpoint gates, clearance halos, detour limits, and soft participation distribution;
-- initial Interior Pocket negative topology hosted by broad Major interiors;
-- Patch 4.2 Interior Pocket Amount and one-sided Edge Cavities accepted for feature progression, with coefficient tuning deferred;
-- Patch 4.3 Connector Weak Spans accepted after visual validation;
-- Patch 4.4 Free-Water Negative Events accepted after visual tuning;
-- Patch 4.5 complete static topology accepted for feature progression, with coefficients intentionally left provisional;
-- Patch 4.6 lively single-instance Major movement and morphing through Patch 4.6.2 combined lifetime units accepted for feature progression, with tuning still provisional;
-- Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 footprint/parity correction implemented and visually accepted;
-- Patch 4.7B independent Free-Water local-mask evolution and Patch 4.7B.1 positive-downstream/lifetime/prepared-anchor recycle correction implemented and visually accepted;
-- Patch 4.7C.0 canonical CPU/HLSL topology field-space consolidation implemented and visually revalidated;
-- Patch 4.7C.1 Connector endpoint/path and Weak Span immutable preparation data implemented and diagnostically accepted;
-- Patch 4.7C.2 identity Connector/Weak Span reconstruction, separate debug-only parity, and combined reconstruction scheduling implemented and visually accepted;
-- Patch 4.7C.3 endpoint-driven Connector deformation and Weak Span current-path/tangent following implemented; long-run validation exposed permanent Connector population drain from truncated same-host anchor coverage and fixed original target pairs;
-- Patch 4.7C.3.1 complete anchor-state coverage plus bounded preparation-time replacement-relationship rebinding implemented; long-run stretch/turnover defects found;
-- Patch 4.7C.3.2 ratio-based stretch breaking plus deterministic recycle relationship turnover implemented; concentration defect found;
-- Patch 4.7C.3.3 deterministic soft endpoint-load distribution implemented and visually/long-run validated;
-- Patch 4.8A staged same-grid replacement preparation and atomic activation implemented and Unity-verified;
-- Patch 4.8B safe old/new generated-topology crossfade, superseding-transition flattening, and differently mapped domain/quality hold/remap transition implemented and Unity-verified;
-- Patch 4.9A versioned exact-value cache contract and deterministic round-trip proof implemented and Unity-verified;
-- Patch 4.9B stable content fingerprints, runtime-readable cache asset, explicit build/update tooling, and hit/miss/stale validation implemented and Unity-verified;
-- Patch 4.9C cache-first runtime initialization implemented;
-- Patch 4.9C.1 automatic Editor/Development cache orchestration implemented and Unity-verified;
-- Patch 4.9D cold/warm startup telemetry and strict release-build cache preflight implemented and Unity-verified;
-- Patch 4.9D.1 complete generated-obstacle-registry cache gate implemented and Unity-verified;
-- Patch 4.10A material-facing topology contract documented and frozen; Patch 4.10B runtime hardening, semantic accessors, obsolete-proof cleanup, and bounded Unity validation complete; topology generation is closed;
-- Patch 4.11A persistent Remaining Life, amount-weighted lifecycle transport/merge, multiplicative topology aging, gradual actual material dissipation, and a Material Remaining Life diagnostic implemented and accepted for progression; full visible validation resumes when legitimate born material exists;
-- Patch 4.11B distributed event-driven birth architecture and the remaining Foam patch sequence documented and accepted;
-- Patch 4.11B.1 legacy autonomous material-population and provisional-fracture cleanup implemented; Unity validation pending;
-- exact transformed-mesh water-level-aware Obstacle Footprint, distinct from padded Pressure/Lee disturbance footprints;
-- persistent field, chunking, freezing, sleeping, and fixed-cost GPU infrastructure;
-- permanent Foam profiler instrumentation;
-- staged per-river initialization;
-- queued/coalesced post-ready boundary and obstacle rebuilds;
-- removal of superseded lobe/nucleus topology, stale old Pocket/Connector paths, the unused fixture, and obsolete broad Foam controls.
+Material/birth progress:
 
-The canonical topology direction remains:
+- 4.11A introduced Remaining Life and topology aging but retained persistent Amount, Integrity, Phase, boundary attenuation, reinforcement, and Amount-based rendering. Later legitimate birth tests show that Remaining Life is not the visible survival authority.
+- 4.11B documents distributed event-driven births.
+- 4.11B.1 removes autonomous population and provisional fracture proof.
+- 4.11C implements an eight-slot manual progressive event runtime; Final Foam did not visibly follow the growing source.
+- 4.11C.1 proves the isolated trajectory and source rasterization.
+- 4.11C.2 proves the dedicated per-step source transfer and exposes the persistent material-state failure.
+- The former monolithic 4.11C.3 is superseded by 4.11C.3–4.11C.7.
 
-> **Build final-quality topology as small inspectable vertical slices, preserve identity/evolution metadata, serialize the complete prepared graph and exact obstacle field, and let ordinary runtime install and evolve cached data rather than regenerate it.**
+### Canonical Topology/Material Relationship
 
-Negative Aging Pressure now has four approved source classes:
+Topology is a soft aging influence:
 
-1. Interior Pocket;
-2. Edge Cavity;
-3. Connector Weak Span;
-4. Free-Water Negative Event.
+- positive support slows Remaining Life loss;
+- neutral water uses the ordinary rate;
+- aggregate Negative Aging Pressure accelerates the same clock;
+- positive and negative influence may overlap;
+- topology does not continuously create, erase, hide, or reveal material.
 
-Each class receives an independent `0–1` Amount control with default `0.5`. Amount activates a nested deterministic opportunity subset and controls population only.
+Material-facing topology resources remain frozen:
 
-Still unimplemented or unaccepted:
-- Patch 4.11C manual progressive-birth proof and fixed event runtime;
-- Patch 4.11D Anchored Birth Event scheduling;
-- Patch 4.11E Open-Water Birth Events and spatial fairness;
-- Patch 4.11F integrated birth population acceptance and optional-upstream decision;
-- Patch 4.12 Integrity, fracture, fragment motion, and dissolution;
-- Patch 4.13 mature rendering, reference tuning, and control consolidation;
-- Patch 4.14 final performance and regression closure.
+| Resource | Canonical meaning |
+|---|---|
+| `_FoamTopology.r` | Major Support |
+| `_FoamTopology.g` | Connector Support |
+| `_FoamTopology.b` | aggregate Negative Aging Pressure |
+| `_FoamTopology.a` | compatibility/debug Obstacle copy only |
+| `_FoamTopologySources.r/g/b` | Pressure / Lee / Shore Support |
+| `_FoamObstacleExclusion.r` | canonical exact Obstacle Footprint |
 
-The production cache/precompute handoff and topology generation are complete. Patch 4.11A establishes persistent lifecycle state, Patch 4.11B replaces the earlier upstream-primary proposal with distributed event-driven births throughout the mapped river, and Patch 4.11B.1 removes the obsolete autonomous population/fracture proof before that event system is implemented.
+### Canonical Persistent Material Contract
 
-### Current performance scheduling status
+Beginning with 4.11C.4:
 
-- Instrumentation, staged single-river initialization, and the coalesced dirty-rebuild queue are accepted and remain in place.
-- Further performance work remains paused until distributed birth, active Integrity, breakup, and mature rendering expose the real steady-state material work graph and costs.
-- Expensive topology preparation is now owned by the persistent cache/precompute path. A valid runtime cache hit must not repeat source extraction, shape generation, cleanup, pathfinding, distance transforms, rejection, or obstacle preparation.
-- Steady-state scheduling, compute splitting, striping, jobs, and global cross-river scheduling remain deferred.
+| Channel | Meaning |
+|---:|---|
+| R | Presence |
+| G | Presence × Remaining Life |
+| B | Presence × Material Pattern |
+| A | zero/reserved |
 
-### Canonical material/topology relationship
+Definitions:
 
-Topology is a **soft lifespan influence**, not a binary occupancy map.
+- **Amount:** source-only spatial quantity; discarded after birth;
+- **Presence:** persistent geometric coverage;
+- **Remaining Life:** sole ordinary survival clock;
+- **Material Pattern:** transported future breakup variation with no current survival or normal-render authority.
 
-- Positive influence slows foam aging.
-- Neutral water uses the normal aging rate.
-- Negative influence accelerates foam aging.
-- Positive and negative influence may overlap and remain separately available.
-- Topology does not directly spawn, erase, hide, or reveal foam.
+Generic Integrity and material Phase are removed. Future breakup starts from `Age = 1 - Remaining Life` plus Pattern and approved stress; explicit fracture state is added only if exact persistent cracks require it.
 
-The old destructive composition `Positive × (1 - Negative)` remains non-canonical.
+### Lifetime Equation
 
-### Patch 4.10A frozen material-facing contract
+```text
+PositiveInfluence = max(Major, Connector, Pressure, Lee, Shore)
+PositiveFactor = lerp(1, Supported Aging Rate, PositiveInfluence)
+NegativeFactor = lerp(1, Negative Aging Rate, Negative Aging Pressure)
+LocalAgingRate = PositiveFactor × NegativeFactor
+RemainingLife -= DeltaTime × LocalAgingRate / NeutralLifetime
+```
 
-Patch 4.10A freezes the existing material-facing resources without adding a new texture or changing visible Foam behaviour. All topology and source values are normalized `0–1` fields using the canonical Foam field mapping and structural-grid dimensions.
+Defaults remain `4 / 0.2 / 4`, producing ideal neutral/support/negative/overlap lives of approximately `4 / 20 / 1 / 5` seconds while the material stays in those full-influence regions.
 
-| Material binding | Channel | Canonical meaning | Ownership |
-|---|---:|---|---|
-| `_FoamTopology` | R | Major Support | generated, evolving topology |
-|  | G | Connector Support | generated, evolving topology |
-|  | B | aggregate Negative Aging Pressure | generated, evolving topology |
-|  | A | same-grid Obstacle Footprint copy | compatibility and diagnostics only |
-| `_FoamTopologySources` | R | Pressure Support | live anchored source |
-|  | G | Lee Support | live anchored source |
-|  | B | Shore Support | live anchored source |
-|  | A | reserved zero | no current owner |
-| `_FoamObstacleExclusion` | R | exact current Obstacle Footprint | canonical material and validity source |
-| `_FoamPrevious` / `_FoamCurrent` | R | material Amount | persistent material lifecycle |
-|  | G | Amount × normalized Remaining Life | persistent material lifecycle |
-|  | B | Amount × normalized Integrity | persistent material lifecycle |
-|  | A | transported phase/provenance | persistent material lifecycle |
+Final-life visibility uses Remaining Life inside the selected time budget; no separate Amount-decay tail remains.
 
-The first material-lifecycle implementation receives **only the aggregate Negative Aging Pressure field**. Interior Pocket, Edge Cavity, Connector Weak Span, and Free-Water Negative Event identities remain retained in cache data, runtime evolution records, and diagnostics, but they are not four independently bound material fields. A later expansion requires visible evidence and a separately approved contract change.
+### Renumbered Correction Sequence
 
-The ownership boundary is fixed:
+#### 4.11C.3 — Source Quantity and Birth-Merge Correction
 
-- cache/preparation owns immutable generated identities, prepared geometry, masks, paths, anchors, and exact obstacle data;
-- the topology runtime owns generated evolution, live anchored-source composition, replacement activation, transitions, and normalized material-facing influence fields;
-- the material lifecycle owns material amount, age/freshness, integrity, provenance, birth, breakup, motion, and death;
-- rendering owns colour, opacity, edge treatment, and visible fine detail.
+**Status:** Implemented in code; focused Unity validation pending. Persistent material packing remains intentionally unchanged until 4.11C.4.
 
-Same-resolution compute consumers should load the corresponding integer texel directly. Rendering, diagnostics, or differently mapped consumers should sample through the canonical Foam field mapping and physical river-space coordinates. No consumer may pre-collapse support and negative influence into destructive net support.
+- convert Amount into deterministic coherent nested birth area;
+- use geometric union for overlapping source segments/events;
+- make manual and progressive source semantics identical;
+- apply canonical obstacle validity to manual injection;
+- remove diagnostic Amount-to-life coupling;
+- preserve the proven trajectory and old persistent packing temporarily.
 
-Only generated Major, Connector, and aggregate negative topology participate in topology replacement crossfades. Pressure, Lee, Shore, exact Obstacle Footprint, boundary/valid-water state, and material state remain live authorities outside that generated blend. `_FoamObstacleExclusion` is canonical; `_FoamTopology.a` must not be multiplied with it as a second independent exclusion.
+#### 4.11C.4 — Persistent Material-State Migration
 
-Patch 4.10B implements complete bindings for normal readiness, cache installation, replacement hold/crossfade, reallocation, disabled Foam, frozen/inactive states, component disable, and destruction. Disabled or unavailable resources bind neutral black fallbacks and safe mapping values rather than relying on stale references being ignored. Bounded Unity validation passed and topology generation is closed.
+- atomically install Presence/Life/Pattern packing;
+- centralize semantic encode/decode;
+- generate transported Material Pattern;
+- remove active Integrity, material Phase, circular mixing, Amount neighbourhood logic, material reinforcement, and life rejuvenation;
+- preserve disturbance-driven motion;
+- render the base shape from Presence;
+- add Presence/Life/Pattern diagnostics.
 
-### Patch 4.11A persistent lifetime and topology aging
+#### 4.11C.5 — Transport and Valid-Fluid Correction
 
-Patch 4.11A freezes the persistent material-state contract:
+- advect premultiplied state without repeated bank attenuation;
+- clamp MacCormack moments;
+- stabilize Presence contour with the smooth cubic remap;
+- use `Valid Fluid = Boundary × (1 - canonical obstacle)`;
+- clip partial coverage with idempotent `min(Presence, Valid Fluid)`.
 
-- `R = Amount`;
-- `G = Amount × normalized Remaining Life`;
-- `B = Amount × normalized Integrity`;
-- `A = transported phase/provenance`.
+#### 4.11C.6 — Lifetime Authority and Presentation
 
-Remaining Life and Integrity are amount-weighted moments. Manual injection, disturbance reinforcement, advection, split/merge behaviour, and rendering decode all use the same conservative contract. Future event-born material must initialize the same moments. Empty cells cannot transport lifetime or cohesion independently of Foam amount.
+- make the approved topology equation the sole ordinary clock;
+- derive final fade from Remaining Life inside its last normalized `0.35`;
+- rewrite CPU reservations without Amount decay or a post-life tail;
+- change metrics from Amount to Presence;
+- add Local Aging Response;
+- correct Inspector semantics and transfer legend.
 
-The first lifecycle controls are `Neutral Lifetime (s)` (`1–10`, default `4`), `Supported Aging Rate` (`0.1–1`, default `0.2`), and `Negative Aging Rate` (`1–8`, default `4`). Positive support and aggregate Negative Aging Pressure remain separate and multiply continuously to determine the local aging rate. Neither topology field directly changes Amount. Patch 4.11A.2 adds a read-only Inspector summary showing the approximate neutral, fully supported, full-negative, and full-overlap lifetimes calculated from the selected values.
+#### 4.11C.7 — Validation and Closure
 
-Expired material begins actual gradual Amount loss inside the final `0.35` normalized Remaining Life band. The internal proof curve approaches five percent Amount over approximately four seconds at full expiry, avoiding a one-frame pop and preventing invisible expired material from reappearing. Mature fragmentation and breakup presentation remain later patches.
+- development packed-state invariant checks;
+- semantic old-state audit;
+- full amount/lifetime/topology/overlap/pattern/boundary/quality/runtime matrix;
+- update all canonical documents with measured results;
+- unblock 4.11D only after Unity acceptance.
 
-`Material Remaining Life` is the dedicated validation view: light cyan is young, amber is mid-life, red is near death, and black contains no visible material.
+### Continuation After Closure
 
-### Patch 4.11B distributed event-driven birth contract
-
-Patch 4.11B is documentation-only. It rejects upstream-only inflow as the primary material source because the approved short neutral lifetime would bias visible Foam toward the river entrance and fail to give downstream areas a reasonable chance to host material.
-
-The production birth system is split into temporary progressive events:
-
-- **Anchored Birth Events** prefer obstacle lee regions and shoulders, may create shorter occasional pressure-face arcs, may peel from Shore Support, and may use Major/Connector context without turning any support field into a continuous emitter;
-- **Open-Water Birth Events** begin in valid random river areas and draw narrow or broadening ribbons under downstream transport, giving every broad longitudinal region a non-zero chance of Foam;
-- **Upstream Ingress** remains optional and subordinate, added only if the two primary families leave a proven entrance-specific defect.
-
-Each event owns a compact moving emission head. It deposits only its travelled segment each material update, ramps in and out, varies width and strength coherently, moves net-downstream with bounded lateral/diagonal wander, and initializes the canonical Amount/Remaining Life/Integrity/phase state. No complete patch may appear in one frame.
-
-Distribution uses soft regional inactivity weighting, material vacancy suppression, and recent-birth cooldown. It does not use global target coverage, arbitrary empty-cell repair, or continuous support replenishment. Exact event durations, counts, rates, widths, source ratios, ranges, defaults, and public controls remain unapproved until their individual implementation patches are inspected.
-
-### Patch 4.11B.1 legacy population and fracture cleanup
-
-Before the progressive-ribbon proof, Patch 4.11B.1 removes the runtime paths that would make its result ambiguous:
-
-- the global target-coverage controller and distributed random material supply;
-- the population-reduction buffer, measurement kernels/cadence, and forced whole-river chunk activation used by that supply;
-- the provisional half-resolution fracture textures, update/clear kernels, renderer binding, and proof Integrity damage/tearing behaviour.
-
-The cleanup adds no birth event and no new visual feature. Clearing material now leaves an empty river until explicit manual injection. Manual injection, conservative lifecycle transport, topology-modulated aging, end-of-life dissipation, disturbance reinforcement of existing material, topology/cache operation, and the proof renderer remain. Integrity continues to travel as an amount-weighted state channel but stays inert until Patch 4.12A defines its approved evolution.
-
-### Remaining topology architecture
-
-- **Major Support:** accepted broad positive support generated as field-first soft topology from actual river context.
-- **Connector Support:** accepted sparse relational positive support between meaningful disconnected Major components, with bounded preparation-time search and no gameplay graph/pathfinding.
-- **Negative Aging Pressure:** aggregate negative influence with four logical source classes:
-  - **Interior Pocket:** closed Major-hosted negative area preserving a positive rim;
-  - **Edge Cavity:** lopsided Major-hosted negative area permitted to breach one deliberate side;
-  - **Connector Weak Span:** short Connector-hosted negative section away from endpoint gates;
-  - **Free-Water Negative Event:** sparse valid-water negative area requiring no positive host.
-
-The four negative classes retain class identity and evolution metadata even if the current output texture carries one aggregate negative field. They are not direct visible Foam and do not geometrically subtract positive topology.
-
-Current authoring retains Major `Amount`, `Size`, `Size Variation`, `Recycle Territory Deviation (%)`, `Lifetime Units`, `Lifetime Unit Deviation`, and `Seed`, plus Connector `Amount`, `Directness`, and `Length Preference`. Patch 4.2 adds `Interior Pocket Amount` and `Edge Cavity Amount`; Patch 4.3 adds `Connector Weak Span Amount`; Patch 4.4 adds `Free-Water Event Amount`. All four use range `0–1`, default `0.5`, and are accepted for feature progression with later coefficient tuning permitted.
-
-Runtime topology evolution uses fixed logical slots with one active instance each. Majors dwell about `2–5 s`, then move and morph for roughly `1–2 s` with positive net downstream progress and bounded lateral/diagonal motion; they instantly recycle inside persistent local territories centred on their original accepted longitudinal positions without duplicate old/new support. The territory deviation control ranges from `0–10%` and defaults to `3%`; near-egress homes shift upstream enough to preserve movement runway. Occurrence turnover uses one combined lifetime-unit budget consumed by both elapsed time and completed hops, exposed through `Major Lifetime Units` (`1–20`, default `6`) and `Major Lifetime Unit Deviation` (`0–10`, default `2`). This avoids slow local persistence and excessive fast-hop churn caused by independent time-or-hop limits. Hosted Interior Pockets and Edge Cavities follow their Major with bounded independent variation. Free-Water Events now use the same single-instance lifecycle independently at `5–10 s` dwell and `2–4 s` movement: every ordinary hop is net-downstream, a finite time/hop budget ends each occurrence, and lifetime or egress instantly selects a bounded preparation-time validated upstream anchor. The Connector sequence has consolidated the shared field-space contract, retains individual endpoint Major ownership and bounded path/variant data, and deforms active paths between current Major gates. Patch 4.7C.3.1 retains every actual endpoint-anchor combination and a bounded catalogue of additional prevalidated relationships between different Major slots. Patch 4.7C.3.2 captures a reference path length whenever a relationship or endpoint-anchor variant becomes active, exposes `Connector Break Stretch Ratio` (`1.10–2.00`, default `1.45`), and breaks a relationship when live length exceeds `reference × ratio`. On each endpoint-host recycle, one deterministic approximately 50/50 decision retains the current pair or requests a different valid prepared pair; requested turnover excludes the previous pair and falls back to it only when no alternative exists, while stretch breaks block the over-limit pair for that slot until either blocked host begins another occurrence. Weak Spans remain attached to logical Connector slots and follow the current original or replacement path and tangent. Patch 4.7C.3.3 then replaces hard per-Major degree rejection and first-valid rebinding with deterministic weighted selection: every occupied endpoint sharply reduces candidate weight, extra concentration on the busier endpoint is penalized again, and crowded relationships receive higher recycle-turnover probability. No degree is impossible, so occasional hubs remain valid. Temporary absence remains allowed only when no applicable prepared relationship exists; the population must not drain permanently across recycle cycles. Anchored Pressure, Lee, and Shore Support remain attached to authoritative live sources. No gameplay candidate generation, component cleanup, pathfinding, distance transforms, rejection loops, or validation readbacks are permitted.
-
-Patch 4.8A changes explicit replacement ownership without changing topology shape rules. A replacement request captures immutable domain/settings/obstacle inputs, builds Major, Connector, Pocket, and a separate generated-topology texture over several frames, and leaves the accepted active topology evolving throughout. A superseding target cancels only replacement work. Complete replacements activate atomically; incomplete class combinations are never bound. The identical-preparation diagnostic runs the full replacement pipeline and discards the result without activation so preparation can be verified as visually side-effect free. Patch 4.8B captures the current fully resolved generated field immediately before complete activation, then linearly crossfades that immutable old snapshot into the new complete generated target for one bounded internal second. Live Pressure, Lee, Shore, and exact Obstacle Footprint remain outside the generated blend. Superseding activations flatten the current visible blend into one new source snapshot. Domain or quality changes keep the old complete renderer bindings visible during staged initialization, then remap old generated topology by global distance and physical lateral metres into the new field before fading.
-
-Patch 4.9 is split into staged gates. 4.9A proves a storage-provider-agnostic versioned binary payload for the complete prepared object graph—not merely the flattened topology texture—and the exact obstacle scalar mask. 4.9B adds stable cross-session domain/obstacle/generation fingerprints, a runtime-readable authored-river asset provider, explicit build/update tooling, and precise hit/miss/stale diagnostics. 4.9C implements strict cache-first runtime initialization: generated owners prepare exact world-geometry fingerprints, ordinary staged startup validates and installs a matching complete payload, cached obstacle scalar/topology data reuse the accepted evolution/upload paths, valid hits bypass obstacle scanning/readback plus all topology generators, and release misses remain neutral. 4.9C.1 adds one-press Editor/Development orchestration and is Unity-verified: an Editor coordinator creates/reuses and assigns a deterministic scene-associated cache asset, development misses or stale inputs generate automatically, compatible stale topology remains visible through the accepted 4.8 replacement/crossfade lifecycle, completed persistent-input topology is round-trip validated and saved automatically, and Play-mode-only changes remain session-only. Static-obstacle changes keep live Obstacle Footprint authority while development prepares and persists the complete replacement. 4.9D is implemented as a validation gate rather than a visual/runtime redesign: startup reports total staged time, slowest phase, cache installs, active memory estimate, and exact obstacle/Major/Connector/Pocket preparation counts; a direct hit must report zero expensive preparation. A strict Edit-mode validator and non-development build preprocessor reject missing, corrupt, unsupported, incomplete, metadata-mismatched, or stale caches for every enabled Foam river in enabled build scenes without modifying assets.
-
-### Immediate continuation order
-
-1. Documentation expansion for four-class Negative Aging Pressure — complete.
-2. Patch 4.2 — Interior Pocket Amount and Edge Cavities — accepted for feature progression; coefficient tuning deferred.
-3. Patch 4.3 — Connector Weak Spans — accepted after visual validation.
-4. Patch 4.4 — Free-Water Negative Events — accepted after visual tuning.
-5. Patch 4.5 — complete static topology — accepted for feature progression; tuning remains provisional.
-6. Patch 4.6 — lively single-instance Major movement and morphing — implemented.
-7. Patch 4.6.1 — distributed local recycle territories and deviation control — implemented.
-8. Patch 4.6.2 — combined elapsed-time and completed-hop lifetime units — accepted for feature progression; tuning remains provisional.
-9. Patch 4.7A — hosted Interior Pocket and Edge Cavity evolution — implemented.
-10. Patch 4.7A.1 — hosted-negative footprint/parity correction — implemented and visually accepted.
-11. Patch 4.7B — independent Free-Water local-mask evolution — implemented.
-12. Patch 4.7B.1 — downstream/lifetime/prepared-anchor recycle correction — implemented and visually accepted.
-13. Patch 4.7C.0 — canonical topology field-space contract — implemented and visually revalidated.
-14. Patch 4.7C.1 — Connector endpoint/path and Weak Span immutable preparation data — implemented and diagnostically accepted.
-15. Patch 4.7C.2 — identity reconstruction, debug-only parity, and combined reconstruction scheduling — implemented and visually accepted.
-16. Patch 4.7C.3 — Connector deformation, same-host recycle-variant switching, temporary absence, and Weak Span following — implemented; long-run population persistence failed.
-17. Patch 4.7C.3.1 — complete anchor-state coverage and bounded relationship rebinding — implemented; long-run defects found.
-18. Patch 4.7C.3.2 — ratio-based breaking and deterministic recycle turnover — implemented; concentration defect found.
-19. Patch 4.7C.3.3 — deterministic soft Connector distribution bias — implemented and visually/long-run validated.
-20. Patch 4.8A — staged replacement preparation and atomic activation — implemented and Unity-verified.
-21. Patch 4.8B — safe old/new generated-topology crossfade, superseding flattening, and differently mapped domain/quality hold/remap transition — implemented and Unity-verified.
-22. Patch 4.9A — versioned cache contract and deterministic round-trip proof — implemented and Unity-verified.
-23. Patch 4.9B — stable content fingerprints and explicit cache building — implemented and Unity-verified.
-24. Patch 4.9C — cache-first runtime initialization — implemented.
-25. Patch 4.9C.1 — automatic development cache orchestration — implemented and Unity-verified.
-26. Patch 4.9D — production/cold-start telemetry and release-build cache preflight — implemented and Unity-verified.
-27. Patch 4.10A — material-facing channel, ownership, mapping, transition, and neutral-binding contract — documented and accepted.
-28. Patch 4.10B — runtime contract hardening, semantic accessors, obsolete topology-proof cleanup, and bounded Unity validation — complete; topology generation closed.
-29. Patch 4.11A — persistent Remaining Life, conservative lifecycle moments, topology aging, actual end-of-life dissipation, and lifetime diagnostics — implemented and accepted for progression; full visible validation deferred until born material exists.
-30. Patch 4.11B — distributed event-driven birth contract and revised remaining Foam sequence — documentation complete.
-31. Patch 4.11B.1 — remove the legacy autonomous distributed-supply/population path and provisional fracture proof — implemented; Unity validation pending.
-32. Patch 4.11C — fixed-capacity event runtime plus manually triggered progressive ribbon deposition and birth diagnostics.
-33. Patch 4.11D — Anchored Birth Events around lee, shoulder, shore, occasional pressure, and approved Major/Connector context.
-34. Patch 4.11E — Open-Water Birth Events, regional inactivity weighting, vacancy suppression, and recent-birth cooldown.
-35. Patch 4.11F — integrated birth population, source-family balancing, long-run validation, minimal control consolidation, and evidence-based optional-upstream decision.
-36. Patch 4.12A — active Integrity evolution.
-37. Patch 4.12B — state-backed fracture growth, holes, strips, and fragment separation.
-38. Patch 4.12C — breakup motion and terminal dissolution.
-39. Patch 4.13A — mature state-backed Foam rendering.
-40. Patch 4.13B — reference matching, topology/birth/lifecycle tuning, proof cleanup, and final control consolidation.
-41. Patch 4.14 — deferred performance work, quality scaling, multi-river scheduling only where measured, and final Stage 6 regression closure.
-
-### Terminology
-
-The canonical Stage 6 names describe lifecycle influence rather than hard occupancy:
-
-- `Pressure Support`, `Lee Support`, and `Shore Support` form `Anchored Support`;
-- `Major Support` and `Connector Support` are evolving positive lifespan support;
-- `Negative Aging Pressure` is the aggregate evolving negative lifespan influence;
-- its four classes are `Interior Pocket`, `Edge Cavity`, `Connector Weak Span`, and `Free-Water Negative Event`;
-- `Obstacle Footprint` is authoritative water-level-aware exact object geometry prepared from final transformed meshes before gameplay and is distinct from padded Pressure/Lee disturbance footprints.
-
-Retained debug enum numeric values and existing texture channel packing are unchanged. Low-level compatibility identifiers may keep older `Pocket` names where changing them would add risk, but user-facing terminology and subtype metadata follow the canonical names.
+- **4.11D:** Anchored Birth Events;
+- **4.11E:** Open-Water Births and Spatial Fairness;
+- **4.11F:** Integrated Birth Population and optional-ingress decision;
+- **4.12A:** Age- and Pattern-Driven Breakup Readiness;
+- **4.12B:** Persistent Fracture and Separation only if exact state is justified;
+- **4.12C:** Edge Shredding and Dissolution Motion;
+- **4.13:** Mature Foam Rendering and Reference Matching;
+- **4.14:** Performance and Regression Closure.
 
 ### Diagnostics
 
-Retain:
+Required material views after C.6:
 
-- `Anchored Support` — Pressure Support, Lee Support, Shore Support;
-- `Support Classes` — Major Support, Connector Support, combined Anchored Support;
-- `Negative Influence Classes` — aggregate Negative Aging Pressure and Obstacle Footprint; each negative class is isolated during implementation by setting the other three Amount controls to zero;
-- `Support and Negative Influence` — combined support and combined negative influence shown together without destructive subtraction;
-- `Material Remaining Life` — persistent material lifetime after transport and amount-weighted merging;
-- `Final Foam (Debug Off)` — normal rendered material.
+- Final Foam;
+- Material Presence;
+- Material Remaining Life;
+- Material Pattern;
+- Local Aging Response;
+- Progressive Birth Source;
+- Progressive Birth Transfer;
+- retained topology and obstacle views.
 
-Yellow overlap in `Support and Negative Influence` means both influences exist. It does not mean either field has already erased the other.
+New serialized debug values are appended, never renumbered.
 
-Implementation inspection remains deliberately small:
+### Public Controls
 
-- one compact four-stage preview is permitted for an individual Major candidate;
-- every river-dependent result is inspected on the real river;
-- permanent telemetry is limited to attempted/accepted/rejected counts, dominant rejection reasons, coverage, and generation time for the active layer;
-- temporary endpoint, path, or pocket-centre overlays are allowed only while resolving one specific implementation question.
+Normal controls:
 
-### Structural resolution policy
+- Neutral Lifetime `1–10`, default `4`;
+- Supported Aging Rate `0.1–1`, default `0.2`;
+- Negative Aging Rate `1–8`, default `4`;
+- Foam Colour.
 
-Stage 6 uses one quality-scaled structural grid for persistent material, topology, guidance, and current Obstacle Footprint:
+Advanced manual proof controls retain source Radius, source-only Amount, Initial Remaining Life, Event Duration, Travel Distance, Across Drift, and Path Wander.
 
-- `Low`: `64 × 64` per 32 m chunk region;
-- `Medium`: `96 × 96`, standard/default;
-- `High`: `128 × 128`.
+No generic Integrity or material Phase control is added.
 
-Multi-chunk rivers extend the longitudinal dimension by chunk count. Physical topology scale and lifecycle behaviour remain metric and quality-independent.
+### Performance Constraints
 
-### Public controls
+- fixed-capacity event records;
+- no per-event GameObjects or steady-state managed allocations;
+- source-local Pattern/fill generation rather than full-field noise each update;
+- no global target-coverage controller;
+- no continuous topology-to-material filling;
+- no production GPU readback for birth scheduling;
+- inactive, sleeping, frozen, disabled, culled, and distant rivers avoid unnecessary work;
+- topology caches and preparation remain unchanged;
+- deferred scheduling optimization resumes only after the final material work graph is measurable.
 
-Accepted normal Inspector controls:
+### Failure Rule
 
-- `Foam Enabled`;
-- `Major Support Amount`;
-- `Major Support Size`;
-- `Major Support Size Variation`;
-- `Major Support Seed`;
-- `Connector Amount`;
-- `Connector Directness`;
-- `Connector Length Preference`;
-- `Interior Pocket Amount` — range `0–1`, default `0.5`, accepted for feature progression; coefficient tuning deferred;
-- `Edge Cavity Amount` — range `0–1`, default `0.5`, accepted for feature progression; coefficient tuning deferred;
-- `Connector Weak Span Amount` — range `0–1`, default `0.5`, accepted after Patch 4.3 visual validation;
-- `Free-Water Event Amount` — range `0–1`, default `0.5`, accepted after Patch 4.4 visual tuning;
-- `Neutral Lifetime (s)` — range `1–10`, default `4`;
-- `Supported Aging Rate` — range `0.1–1`, default `0.2`;
-- `Negative Aging Rate` — range `1–8`, default `4`;
-- `Foam Colour`.
+Diagnose the smallest failed boundary in this order:
 
-For each negative class, `0` means none, `0.5` means a sensible category-specific baseline, and `1` means maximum bounded population. Amount changes nested stable activation only, not size, strength, seed, or evolution speed.
+1. source geometry and Amount-to-area gate;
+2. source texture union;
+3. source-to-persistent merge;
+4. packed state encoding/decoding;
+5. forward/reverse transport;
+6. valid-fluid clipping;
+7. topology age rate;
+8. CPU reservation/activity;
+9. final renderer and diagnostics.
 
-Patch 3.4 removed `Foam Preset`, the old broad `Amount`, `Web Granularity`, `Network Evolution`, `Breakup Frequency`, `Foam Speed`, `Major Evolution Rate`, and `Major Cleanup Rate`, together with their obsolete support code.
-
-Patch 4.11A adds the first material-lifetime and topology-response authoring surface. Patch 4.11A.1 replaces its unapproved provisional tuning with the approved `4 / 0.2 / 4` defaults and performs a one-time migration for existing rivers. Patch 4.11A.2 adds the derived read-only lifetime summary without changing serialized data or runtime simulation. The lifecycle slice is accepted for progression, with full visible validation deferred until born material exists. Patch 4.11B approves only the birth-system behaviour and sequence; it approves no event-control names, ranges, defaults, pool capacities, rates, or source ratios. Patch 4.11B.1 removes the superseded autonomous population and provisional fracture proof without adding a replacement birth path. Every later implementation patch must present its remaining choices before editing code.
-
-### Implementation order
-
-1. Documentation, terminology, profiler instrumentation, staged initialization, and dirty-rebuild scheduling — complete.
-2. Major candidate generation and whole-river distribution — complete.
-3. Connector Support and refinements — complete.
-4. Initial Interior Pocket proof — complete.
-5. Exact transformed-mesh Obstacle Footprint and procedural chunk/run preparation contract — complete.
-6. Patch 4.2 Interior Pocket Amount and Edge Cavities — accepted for feature progression; coefficient tuning deferred.
-7. Patch 4.3 Connector Weak Spans — accepted after visual validation.
-8. Patch 4.4 Free-Water Negative Events — accepted after visual tuning.
-9. Patch 4.5 complete static topology — accepted for feature progression; tuning remains provisional.
-10. Patch 4.6 lively single-instance Major movement and morphing — implemented.
-11. Patch 4.6.1 local recycle territories — implemented.
-12. Patch 4.6.2 combined lifetime units — accepted for feature progression; tuning remains provisional.
-13. Patch 4.7A hosted Interior Pocket and Edge Cavity evolution — implemented.
-14. Patch 4.7A.1 hosted-negative footprint/parity correction — implemented and visually accepted.
-15. Patch 4.7B independent Free-Water local-mask evolution — implemented.
-16. Patch 4.7B.1 downstream/lifetime/prepared-anchor recycle correction — implemented and visually accepted.
-17. Patch 4.7C.0 canonical topology field-space contract — implemented and visually revalidated.
-18. Patch 4.7C.1 Connector endpoint/path and Weak Span immutable preparation data — implemented and diagnostically accepted.
-19. Patch 4.7C.2 identity reconstruction, debug-only parity, and combined reconstruction scheduling — implemented and visually accepted.
-20. Patch 4.7C.3 Connector deformation, same-host recycle-variant switching, temporary absence, and Weak Span following — implemented; long-run population persistence failed.
-21. Patch 4.7C.3.1 complete anchor-state coverage and bounded relationship rebinding — implemented; long-run defects found.
-22. Patch 4.7C.3.2 ratio-based breaking and deterministic recycle turnover — implemented; concentration defect found.
-23. Patch 4.7C.3.3 soft Connector distribution bias — implemented and visually/long-run validated.
-24. Patch 4.8A staged replacement preparation and atomic activation — implemented and Unity-verified.
-25. Patch 4.8B safe old/new generated-topology crossfade, superseding flattening, and domain/quality hold/remap transition — implemented and Unity-verified.
-26. Patch 4.9A versioned cache contract and deterministic round-trip proof — implemented and Unity-verified.
-27. Patch 4.9B stable fingerprints and explicit cache building — implemented and Unity-verified.
-28. Patch 4.9C cache-first runtime initialization — implemented.
-29. Patch 4.9C.1 automatic development cache orchestration — implemented and Unity-verified.
-30. Patch 4.9D production/cold-start telemetry and release-build cache preflight — implemented and Unity-verified.
-31. Patch 4.10A frozen material-facing topology contract — documented and accepted.
-32. Patch 4.10B runtime contract hardening, semantic accessors, obsolete proof cleanup, and bounded Unity validation — complete; topology generation closed.
-33. Patch 4.11A persistent Remaining Life, conservative lifecycle transport/merge, multiplicative topology aging, gradual actual material dissipation, and lifetime diagnostics — implemented; Patch 4.11A.1 corrects lifecycle ranges/defaults and migrates existing rivers; accepted for progression with full visible validation deferred.
-34. Patch 4.11B distributed event-driven birth contract and revised implementation sequence — documentation complete.
-35. Patch 4.11B.1 legacy autonomous population and provisional fracture cleanup — implemented; Unity validation pending.
-36. Patch 4.11C fixed event runtime and manual progressive-stroke proof.
-37. Patch 4.11D Anchored Birth Event scheduling.
-38. Patch 4.11E Open-Water Birth Events and spatial fairness.
-39. Patch 4.11F integrated birth population and optional-upstream decision.
-40. Patch 4.12A active Integrity evolution.
-41. Patch 4.12B state-backed fracture and separation.
-42. Patch 4.12C breakup motion and dissolution.
-43. Patch 4.13A mature Foam rendering.
-44. Patch 4.13B reference tuning, proof cleanup, and final control consolidation.
-45. Patch 4.14 deferred performance work and final PC-first profiling/regression.
-
-Every positive and negative topology class is implemented and accepted separately before the combined topology is judged. This is an explicit anti-regression rule.
-
-### Performance constraints
-
-- prioritize CPU/GPU compute and runtime latency over modest memory use; retain compact masks, shape variants, anchors, and descriptors when they eliminate meaningful runtime work;
-- no continuously maintained topology graph;
-- no permanent node network or pathfinding;
-- no GameObjects, per-frame managed topology objects, or continuously maintained object records per foam patch; compact cached value records for stable topology identity and evolution metadata are allowed;
-- no final-shader loops over objects or topology structures;
-- anchored geometry preprocessing only when sources change;
-- low-rate topology evolution;
-- temporary visual-proof generation may use expensive source extraction, field generation, candidate retry, cleanup, distance transforms, bounded pathfinding, validation, and curation during initialization or explicit pre-gameplay preparation;
-- those expensive operations are restricted to bounded Editor/Development cache preparation, remain profiled, and are forbidden as ordinary gameplay or release-runtime fallback;
-- the final runtime target is bounded sampling/composition of accepted fields or compact descriptors, with no final shader loops over candidate lists, path graphs, shape libraries, or growing structure collections;
-- inactive, sleeping, frozen, and distant chunks perform no unnecessary work;
-- profile update spikes as well as average cost.
-- further scheduling optimisation remains paused until Major, Connector, all four negative classes, runtime evolution, rebuild crossfade, and cache/preparation packaging are complete.
-
-Deferred optimization notes:
-
-- Static Pressure retains its accepted contour source for now. Patch 4.1 restores exact transformed-mesh intervals for authoritative Foam Obstacle Footprint during staged pre-gameplay preparation. The future procedural chunk generation/building/linking phase must own and cache that compact data after final object placement; this is not restricted to editor baking.
-- Foam Obstacle Footprint may rebuild once before generated-source refresh has completed and again after `ObstacleGeometryVersion` settles. Defer Foam obstacle rebuilds until the disturbance refresh is complete enough to avoid redundant startup work.
-- The old Foam contour pixel-raster path is removed. Reuse compact exact interval buffers and the prepared structural scalar snapshot; ordinary gameplay must not rescan triangles.
-- Patch 4.10B confirms that `Final Foam (Debug Off)` does not request topology metric reset/readback work; retained metrics remain gated by active topology diagnostics or explicit development profiling.
-- Tighten Static Pressure, Static Wake, and ripple-boundary dirty flags so source/profile changes rebuild only the affected textures and passes.
-
-### Failure rule
-
-If a topology slice fails, stop at the smallest inspectable stage: candidate generation, source context, Major placement, Connector rules, negative-class rules, composition/upload, runtime evolution, or cache/rebuild integration. Do not automatically revert to the lobe grammar, toy path descriptors, a graph conveyor, per-texel procedural reconstruction, or another unmeasured primitive grammar. Any representation change requires measured evidence and explicit approval.
+Do not compensate for a failed state boundary with automatic births, fracture, opacity tuning, or broader population controls.
 
 ## 7. Secondary Water Effects
 

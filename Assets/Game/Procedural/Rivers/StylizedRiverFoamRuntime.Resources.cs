@@ -74,6 +74,8 @@ namespace ProgrammaticStylized3D.Rivers
                 currentState != null &&
                 advectedState != null &&
                 reverseState != null &&
+                progressiveBirthSourceTexture != null &&
+                progressiveBirthTransferDebugTexture != null &&
                 guidanceTexture != null &&
                 topologyTexture != null &&
                 topologySourcesTexture != null &&
@@ -182,6 +184,11 @@ namespace ProgrammaticStylized3D.Rivers
                             "PS3D_RiverFoam_Advected");
                         reverseState = CreateFieldTexture(
                             "PS3D_RiverFoam_Reverse");
+                        progressiveBirthSourceTexture = CreateFieldTexture(
+                            "PS3D_RiverFoam_ProgressiveBirthSource");
+                        progressiveBirthTransferDebugTexture =
+                            CreateFieldTexture(
+                                "PS3D_RiverFoam_ProgressiveBirthTransferDebug");
                     }
 
                     initializationPhase =
@@ -437,6 +444,14 @@ namespace ProgrammaticStylized3D.Rivers
                         DispatchClear(stateB, 0, fieldWidth);
                         DispatchClear(advectedState, 0, fieldWidth);
                         DispatchClear(reverseState, 0, fieldWidth);
+                        DispatchClear(
+                            progressiveBirthSourceTexture,
+                            0,
+                            fieldWidth);
+                        DispatchClear(
+                            progressiveBirthTransferDebugTexture,
+                            0,
+                            fieldWidth);
                     }
 
                     initializationPhase = InitializationPhase.BuildGuidance;
@@ -862,6 +877,10 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseTexture(ref stateB);
             ReleaseTexture(ref advectedState);
             ReleaseTexture(ref reverseState);
+            ReleaseTexture(ref progressiveBirthSourceTexture);
+            ReleaseTexture(ref progressiveBirthTransferDebugTexture);
+            progressiveBirthSourceContainsData = false;
+            ReleaseProgressiveBirthDiagnosticResources();
             ReleaseTexture(ref guidanceTexture);
             ReleaseTexture(ref topologyTexture);
             ReleaseTexture(ref topologySourcesTexture);

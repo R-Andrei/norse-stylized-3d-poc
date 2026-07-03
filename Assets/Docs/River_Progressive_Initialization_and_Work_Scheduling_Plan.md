@@ -2,7 +2,7 @@
 
 ## Document Status
 
-**Status:** Retained performance architecture and progress record. Steps 1–3 are implemented and accepted. Further performance scheduling is intentionally paused while the topology pipeline is completed.
+**Status:** Retained performance architecture and progress record. Steps 1–3 are implemented and accepted. Further performance scheduling is intentionally paused while the material birth, corrected lifecycle, breakup, and mature rendering pipeline is completed.
 
 **Current code baseline:** per-river staged Foam bootstrap, permanent profiler instrumentation, and queued/coalesced dirty rebuilds.
 
@@ -18,6 +18,7 @@
 
 - `Docs/River_Foam_Stage6_Architecture.md`
 - `Docs/River_Foam_Topology_Implementation_Plan.md`
+- `Docs/River_Foam_Material_State_Correction_Implementation_Plan.md`
 - `Docs/River_Rendering_Roadmap.md`
 
 This plan exists because the current river runtime can concentrate too much CPU work, resource creation, GPU dispatch work, and first-use shader work into one frame. The resulting freeze has repeatedly returned when the Foam topology implementation became more complex, even when steady-state runtime cost remained acceptable.
@@ -26,7 +27,7 @@ The objective is not merely to fix one particular Major Support version. The obj
 
 The implementation must proceed slowly. Each step below is intentionally narrow, independently testable, and reversible. No later step should be started until the previous step passes its acceptance gate.
 
-## Implementation Status Update — 1 July 2026
+## Implementation Status Update — 3 July 2026
 
 The rollout order has been deliberately revised after profiling the first working staged bootstrap. The single-river pipeline is not mature enough to justify a global cross-river scheduler yet. Multi-river arbitration is therefore deferred until the complete per-river initialization, dirty rebuild, steady-state topology, and feature-readiness pipeline is understood and accepted.
 
@@ -35,7 +36,7 @@ Current progress:
 - **Step 1 — Instrumentation:** implemented and validated. The original hitch-free baseline showed approximately `29.5 ms` inside `RiverFoam.EnsureResources.Total` in one startup frame, with the individual boundary, obstacle, topology, clear, guidance, and diagnostic phases exposed separately.
 - **Step 2 — Per-river staged bootstrap:** implemented and validated. Initialization now advances one explicit phase per `LateUpdate`; Foam remains disabled until complete readiness. The observed early phases were generally below roughly `2.5 ms` instead of recreating the former combined burst.
 - **Step 3 — Dirty-event queue and obstacle rebuild coalescing:** implemented and accepted. Boundary and obstacle changes no longer execute a complete rebuild chain immediately.
-- **Performance pause:** active. Topology generation, evolution, replacement, cache/preparation packaging, and Patch 4.10B bounded validation are complete. Patch 4.11A is accepted for progression, but broader scheduling work remains deferred until the distributed birth, Integrity, breakup, and mature rendering slices expose the real steady-state work graph.
+- **Performance pause:** active. Topology generation, evolution, replacement, cache/preparation packaging, and Patch 4.10B bounded validation are complete. Patch 4.11A provided historical lifecycle groundwork, but later testing exposed that persistent Amount still owns visible survival. Broader scheduling work remains deferred until the 4.11C.3–4.11C.7 correction, distributed birth, breakup, and mature rendering slices expose the real steady-state work graph.
 - **Current implementation milestone:** Patch 4.1 exact Obstacle Footprint, Patch 4.2 Interior Pockets and Edge Cavities, Patch 4.3 Connector Weak Spans, Patch 4.4 Free-Water Negative Events, and Patch 4.5 complete static topology are accepted for feature progression. Coefficients remain provisional until the persistent Foam material proves the final result. Patch 4.6 lively Major evolution through Patch 4.6.2 combined lifetime units is accepted for feature progression. Patch 4.7A host-relative Interior Pocket and Edge Cavity evolution and Patch 4.7A.1 hosted-field parity/cavity correction are implemented and visually accepted. Patch 4.7B independent Free-Water evolution and Patch 4.7B.1 canonical positive-downstream, finite-lifetime, prepared-upstream-recycle correction are implemented and visually accepted. Patch 4.7C.0 canonical CPU/HLSL topology field-space consolidation is implemented and visually revalidated. Patch 4.7C.1 Connector endpoint/path and Weak Span immutable preparation data is implemented and its Unity preparation diagnostics are accepted. Patch 4.7C.2 identity reconstruction, separate debug-only parity, and combined evolving-field scheduling are implemented and visually accepted. Patch 4.7C.3 through 4.7C.3.3 complete endpoint-driven Connector/Weak Span evolution, recycle rebinding, stretch breaking, relationship turnover, and soft distribution balancing and are visually/long-run validated. Patch 4.8A staged same-grid replacement preparation is implemented and Unity-verified: active topology remains authoritative while immutable replacement Major, Connector, Pocket, and upload phases advance separately, and only a complete replacement activates. Patch 4.8B safe topology transition is implemented and Unity-verified: a dedicated compute pass captures the fully resolved old generated topology, generated old/new values crossfade for one bounded internal second, live Pressure/Lee/Shore/Obstacle sources remain outside the fade, superseding activations flatten the current visible blend, and differently mapped domain/quality initialization holds the previous complete bindings before physical river-space remapping. Patch 4.9A through 4.9D.1 now provide the production ownership path: complete prepared topology and exact obstacle data are serialized into persistent caches, valid runtime hits install that data with zero expensive preparation, and release runtime remains cache-only.
 - **Global cross-river scheduling:** intentionally deferred. It will be designed only after the final one-river work categories, dependencies, interruption rules, and costs are known.
 
@@ -86,11 +87,19 @@ Further performance engineering is paused because the free-water topology pipeli
 29. Patch 4.9D.1 complete generated-obstacle-registry cache gate — implemented and Unity-verified;
 30. Patch 4.10A frozen material-facing topology contract — documented and accepted;
 31. Patch 4.10B runtime hardening, semantic accessors, obsolete-proof cleanup, and bounded Unity validation — complete; topology generation closed;
-32. Patch 4.11A persistent Remaining Life, conservative lifecycle transport/merge, multiplicative topology aging, gradual actual material dissipation, and lifetime diagnostics — implemented and accepted for progression; full visible validation waits for legitimate born material.
+32. Patch 4.11A first persistent Remaining-Life implementation — historical groundwork; later legitimate birth tests exposed persistent Amount as the visible survival authority.
 33. Patch 4.11B distributed event-driven birth architecture and revised remaining Foam sequence — documentation complete.
-34. Patch 4.11B.1 legacy autonomous material-population and provisional-fracture cleanup — implemented; Unity validation pending.
+34. Patch 4.11B.1 legacy autonomous material-population and provisional-fracture cleanup — implemented and Unity-verified.
+35. Patch 4.11C fixed-capacity manual event runtime — implemented; visual validation failed.
+36. Patch 4.11C.1 source-only progressive-birth diagnostics — implemented and Unity-validated.
+37. Patch 4.11C.2 dedicated per-step source transfer and diagnostics — implemented; persistent material-state/lifetime failure exposed.
+38. Patch 4.11C.3 Source Quantity and Birth-Merge Correction — implemented; focused Unity validation pending.
+39. Patch 4.11C.4 Persistent Material-State Migration — next only after 4.11C.3 acceptance.
+40. Patch 4.11C.5 Transport and Valid-Fluid Correction.
+41. Patch 4.11C.6 Lifetime Authority and Presentation.
+42. Patch 4.11C.7 Validation, Regression Audit, and Documentation Closure.
 
-The old distributed-supply controller, population-reduction work, forced whole-river activation, and provisional fracture field are no longer runtime work categories. Until Patch 4.11C, material exists only after explicit manual injection. Mature Integrity, fracture, breakup motion, rendering, and performance closure remain separate bounded patches.
+The old distributed-supply controller, population-reduction work, forced whole-river activation, and provisional fracture field are no longer runtime work categories. No automatic material source exists yet. Corrected material state, event-driven population, age/Pattern-driven breakup, rendering, and performance closure remain separate bounded patches.
 
 Optimising ordinary topology maintenance, splitting compute assets, striping full-grid kernels, or designing global multi-river arbitration before those dependencies are real would formalise provisional work categories and likely create avoidable rewrites. Performance work resumes only after the combined topology pipeline has a stable visual and dependency contract.
 
@@ -569,7 +578,7 @@ Any shader-visible resource that can be bound before its authored data is ready 
 
 Examples:
 
-- material state: zero Amount, zero amount-weighted Remaining Life, zero amount-weighted Integrity, and neutral phase/provenance;
+- material state after 4.11C.4: zero Presence, zero Presence-weighted Remaining Life, zero Presence-weighted Material Pattern, and zero reserved alpha;
 - topology: zero positive support and zero aging pressure;
 - topology sources: zero Shore/Pressure/Lee influence;
 - Major: zero support;
@@ -1707,11 +1716,19 @@ Accepted/implemented topology work:
 24. Patch 4.9D.1 complete generated-obstacle-registry cache gate — implemented and Unity-verified.
 25. Patch 4.10A material-facing topology contract — documented and accepted.
 26. Patch 4.10B bounded Unity regression validation and final topology acceptance — complete.
-27. Patch 4.11A persistent material lifetime and topology aging — implemented and accepted for progression; visible proof resumes with born material.
+27. Patch 4.11A first persistent lifetime implementation — historical groundwork; later legitimate birth tests expose persistent Amount as the visible survival authority.
 28. Patch 4.11B distributed event-driven birth contract — documentation complete.
-29. Patch 4.11B.1 legacy autonomous material-population and provisional-fracture cleanup — implemented; Unity validation pending.
+29. Patch 4.11B.1 legacy autonomous population and provisional-fracture cleanup — implemented and Unity-verified.
+30. Patch 4.11C fixed-capacity manual event runtime — implemented; Final Foam progressive proof failed.
+31. Patch 4.11C.1 source-only progressive-birth diagnostics — implemented and Unity-validated.
+32. Patch 4.11C.2 dedicated per-step source transfer and transfer diagnostics — implemented; persistent state/lifetime failure exposed.
+33. Patch 4.11C.3 Source Quantity and Birth-Merge Correction — implemented; focused Unity validation pending.
+34. Patch 4.11C.4 Persistent Material-State Migration.
+35. Patch 4.11C.5 Transport and Valid-Fluid Correction.
+36. Patch 4.11C.6 Lifetime Authority and Presentation.
+37. Patch 4.11C.7 Validation, Regression Audit, and Documentation Closure.
 
-Topology generation is closed. Scheduling optimisation remains paused until the event-driven birth, Integrity, breakup, and mature-render pipeline produces measured steady-state and cold-start evidence.
+Topology generation is closed. Scheduling optimisation remains paused until the corrected Presence/Life/Pattern material state, event-driven birth, breakup, and mature-render pipeline produces measured steady-state and cold-start evidence.
 
 All four negative classes remain preparation-time generators. Interior/edge host analysis, Connector span selection, Free-Water opportunity curation, and spare Connector route preparation may be expensive during the proof path, but ordinary gameplay may only advance compact descriptors, morph retained masks, deform retained paths, perform batched low-resolution reconstruction, and instantly recycle slots. No ordinary movement fade or duplicate old/new support instance is permitted.
 
@@ -1728,12 +1745,12 @@ No performance task may be used as a reason to combine the positive and four neg
 
 ### Material-birth scheduling constraints
 
-Patch 4.11B adds no runtime work, but it freezes the constraints that Patch 4.11C–4.11F must preserve:
+Patch 4.11B adds no runtime work, but it freezes the constraints that Patch 4.11C–4.11F must preserve. The detailed C.3–C.7 material contract is owned by `River_Foam_Material_State_Correction_Implementation_Plan.md`:
 
 - birth events use a fixed-capacity compact pool with no per-event GameObjects or steady-state managed allocations;
 - automatic event selection occurs at a bounded cadence and uses bounded candidate attempts; no unbounded path search, graph search, rejection loop, or GPU readback is allowed;
 - active event heads may deposit at the normal material update cadence so progressive strokes remain continuous;
-- candidate selection may sample live support/topology/validity fields, but those fields never write material Amount directly;
+- candidate selection may sample live support/topology/validity fields, but those fields never continuously write material Presence; emitter Amount remains source-only;
 - regional inactivity, local cooldown, and material vacancy may influence event weights without becoming a global target-coverage controller;
 - deterministic event identity, seed, source family, start context, age, path state, and previous/current head positions remain compact and inspectable;
 - reverse flow must resolve downstream direction from the canonical river contract rather than assuming texture-space orientation;
@@ -1782,20 +1799,25 @@ The scheduling architecture is successful when:
 
 ## 25. Immediate Next Step
 
-Patch 4.11A is accepted for progression: import, runtime operation, lifecycle controls, and derived lifetime display behave correctly, but full visible aging proof requires legitimate born material. Patch 4.11B replaces the old upstream-primary proposal with a distributed event-driven birth contract. Patch 4.11B.1 then removes the autonomous target-coverage/distributed-supply path and provisional fracture proof so that the next event can be judged in isolation.
+The permanent performance foundation remains accepted: named profiler phases, one-phase-per-frame staged initialization, and queued/coalesced dirty rebuilds.
 
-After bounded Unity validation of that cleanup, the next implementation is **Patch 4.11C — Fixed Event Runtime and Manual Progressive Ribbon Proof**.
+The current gate is focused Unity validation of **Patch 4.11C.3 — Source Quantity and Birth-Merge Correction**. Its code changes emitter Amount into deterministic coherent birth area, fixes source union and manual obstacle validity, removes the diagnostic Amount-to-life coupling, and preserves the current trajectory and old persistent packing temporarily.
 
-Patch 4.11C must do only the following:
+After user acceptance, implementation continues with:
 
-- add a fixed-capacity compact birth-event state representation;
-- add one explicit manual/development trigger for a single event at a chosen valid river location;
-- advance one emission head through canonical river coordinates with net-downstream travel and bounded coherent lateral/diagonal variation;
-- deposit the travelled segment progressively into Amount, amount-weighted Remaining Life, amount-weighted Integrity, and phase/provenance;
-- use a smooth ramp-in/sustain/taper envelope and coherent width/strength variation;
-- expose a minimal event-state/path diagnostic sufficient to inspect start, head, previous head, age, source family, and active/inactive state;
-- preserve cache-first startup, topology ownership, reverse flow, freeze/thaw, disable/re-enable, chunk activation, and resource lifecycle safety.
+1. 4.11C.4 atomic Presence/Life/Pattern state migration;
+2. 4.11C.5 transport and idempotent valid-fluid correction;
+3. 4.11C.6 lifetime authority, renderer fade, reservations, metrics, and Local Aging Response;
+4. 4.11C.7 invariant checks, full regression matrix, and documentation closure.
 
-Patch 4.11C must **not** add automatic anchored selection, open-water selection, regional fairness, upstream ingress, branching, mature fracture, final rendering, or unapproved public tuning controls. Its purpose is to prove that one event can grow a believable ribbon over time without a complete patch appearing at once.
+Performance safeguards for these patches:
 
-Before implementation, the exact files, state representation, trigger surface, event duration/width/strength proof values, and any proposed Inspector fields must be presented for approval.
+- fixed-capacity event records remain;
+- no per-event GameObjects or steady-state allocations;
+- source-local Pattern/fill work only where births are rasterized;
+- no continuous topology-to-material filling;
+- no global target-coverage controller;
+- no production GPU readback for scheduling;
+- no topology cache or initialization-state-machine change unless a measured integration defect requires a separately approved patch.
+
+Further scheduling optimisation and Patch 4.11D remain blocked until C.7 passes and the corrected steady-state work graph is measurable.

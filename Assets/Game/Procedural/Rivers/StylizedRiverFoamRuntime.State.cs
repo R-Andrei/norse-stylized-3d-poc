@@ -11,42 +11,119 @@ namespace ProgrammaticStylized3D.Rivers
                 float globalDistance,
                 float acrossNormalized,
                 float radius,
-                float amount,
+                float sourceAmount,
                 float remainingLife,
                 float integrity,
                 float phase,
                 float elongation,
                 bool isManual,
+                float sourceFillSeed,
+                float sourceFillFeatureSize,
                 float shapeSeed = 0f,
                 float shapeVariety = 0f,
-                bool compoundShape = false)
+                bool compoundShape = false,
+                bool segmentShape = false,
+                float segmentStartGlobalDistance = 0f,
+                float segmentStartAcrossNormalized = 0f,
+                float segmentStartRadius = 0f,
+                float segmentStartAmount = 0f,
+                float segmentEndGlobalDistance = 0f,
+                float segmentEndAcrossNormalized = 0f,
+                float segmentEndRadius = 0f,
+                float segmentEndAmount = 0f)
             {
                 GlobalDistance = globalDistance;
                 AcrossNormalized = acrossNormalized;
                 Radius = radius;
-                Amount = amount;
+                SourceAmount = sourceAmount;
                 RemainingLife = remainingLife;
                 Integrity = integrity;
                 Phase = phase;
                 Elongation = elongation;
                 IsManual = isManual;
+                SourceFillSeed = sourceFillSeed;
+                SourceFillFeatureSize = sourceFillFeatureSize;
                 ShapeSeed = shapeSeed;
                 ShapeVariety = shapeVariety;
                 CompoundShape = compoundShape;
+                SegmentShape = segmentShape;
+                SegmentStartGlobalDistance = segmentShape
+                    ? segmentStartGlobalDistance
+                    : globalDistance;
+                SegmentStartAcrossNormalized = segmentShape
+                    ? segmentStartAcrossNormalized
+                    : acrossNormalized;
+                SegmentStartRadius = segmentShape
+                    ? segmentStartRadius
+                    : radius;
+                SegmentStartSourceAmount = segmentShape
+                    ? segmentStartAmount
+                    : sourceAmount;
+                SegmentEndGlobalDistance = segmentShape
+                    ? segmentEndGlobalDistance
+                    : globalDistance;
+                SegmentEndAcrossNormalized = segmentShape
+                    ? segmentEndAcrossNormalized
+                    : acrossNormalized;
+                SegmentEndRadius = segmentShape
+                    ? segmentEndRadius
+                    : radius;
+                SegmentEndSourceAmount = segmentShape
+                    ? segmentEndAmount
+                    : sourceAmount;
             }
 
             public float GlobalDistance { get; }
             public float AcrossNormalized { get; }
             public float Radius { get; }
-            public float Amount { get; }
+            public float SourceAmount { get; }
             public float RemainingLife { get; }
             public float Integrity { get; }
             public float Phase { get; }
             public float Elongation { get; }
             public bool IsManual { get; }
+            public float SourceFillSeed { get; }
+            public float SourceFillFeatureSize { get; }
             public float ShapeSeed { get; }
             public float ShapeVariety { get; }
             public bool CompoundShape { get; }
+            public bool SegmentShape { get; }
+            public float SegmentStartGlobalDistance { get; }
+            public float SegmentStartAcrossNormalized { get; }
+            public float SegmentStartRadius { get; }
+            public float SegmentStartSourceAmount { get; }
+            public float SegmentEndGlobalDistance { get; }
+            public float SegmentEndAcrossNormalized { get; }
+            public float SegmentEndRadius { get; }
+            public float SegmentEndSourceAmount { get; }
+        }
+
+        private struct ProgressiveRibbonEvent
+        {
+            public bool Active;
+            public int EventId;
+            public float StartGlobalDistance;
+            public float StartAcrossNormalized;
+            public float Duration;
+            public float TravelDistance;
+            public float AcrossDrift;
+            public float PathWander;
+            public float BaseRadius;
+            public float SourceAmount;
+            public float RemainingLife;
+            public float Integrity;
+            public float Phase;
+            public float ShapeSeed;
+            public float SourceFillSeed;
+            public float SourceFillFeatureSize;
+            public float BendSign;
+            public float WidthPhase;
+            public float Elapsed;
+            public float PreviousGlobalDistance;
+            public float PreviousAcrossNormalized;
+            public float PreviousRadius;
+            public float PreviousEmissionAmount;
+            public bool DebugTrajectoryPending;
         }
 
         private sealed class FoamReservation

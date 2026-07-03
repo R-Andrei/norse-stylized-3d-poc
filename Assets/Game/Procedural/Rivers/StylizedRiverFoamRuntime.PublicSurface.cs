@@ -555,6 +555,48 @@ namespace ProgrammaticStylized3D.Rivers
         public int ActiveChunkCount => CountActiveChunks();
         public int PendingInjectionCount => pendingInjections.Count;
         public int ActiveReservationCount => reservations.Count;
+        public int ProgressiveRibbonPoolCapacity =>
+            ProgressiveRibbonEventCapacity;
+        public int ActiveProgressiveRibbonEventCount =>
+            activeProgressiveRibbonEventCount;
+        public int ProgressiveRibbonStartedCount =>
+            progressiveRibbonStartedCount;
+        public int ProgressiveRibbonCompletedCount =>
+            progressiveRibbonCompletedCount;
+        public int ProgressiveRibbonRejectedCount =>
+            progressiveRibbonRejectedCount;
+        public int LatestProgressiveRibbonEventId =>
+            latestProgressiveRibbonEventId;
+        public float LatestProgressiveRibbonProgress =>
+            latestProgressiveRibbonProgress;
+        public float LatestProgressiveRibbonHeadDistanceNormalized =>
+            latestProgressiveRibbonHeadDistanceNormalized;
+        public float LatestProgressiveRibbonHeadAcrossNormalized =>
+            latestProgressiveRibbonHeadAcrossNormalized;
+        public float LatestProgressiveRibbonPreviousDistanceNormalized =>
+            latestProgressiveRibbonPreviousDistanceNormalized;
+        public float LatestProgressiveRibbonPreviousAcrossNormalized =>
+            latestProgressiveRibbonPreviousAcrossNormalized;
+        public float LastProgressiveRibbonSegmentLength =>
+            lastProgressiveRibbonSegmentLength;
+        public int ProgressiveRibbonEventUpdateCount =>
+            progressiveRibbonEventUpdateCount;
+        public int ProgressiveRibbonSegmentDispatchAttemptCount =>
+            progressiveRibbonSegmentDispatchAttemptCount;
+        public int ProgressiveRibbonSegmentDispatchSubmittedCount =>
+            progressiveRibbonSegmentDispatchSubmittedCount;
+        public float ProgressiveRibbonCumulativeCentrelineDistance =>
+            progressiveRibbonCumulativeCentrelineDistance;
+        public bool ProgressiveBirthDebugReadbackAvailable =>
+            progressiveBirthDebugReadbackAvailable;
+        public bool ProgressiveBirthDebugReadbackPending =>
+            progressiveBirthDebugReadbackPending;
+        public uint ProgressiveBirthDebugLatestAffectedTexels =>
+            progressiveBirthDebugLatestAffectedTexels;
+        public uint ProgressiveBirthDebugCumulativeAffectedTexels =>
+            progressiveBirthDebugCumulativeAffectedTexels;
+        public bool ProgressiveBirthSourceDebugActive =>
+            IsProgressiveBirthSourceDebugActive;
         public int InjectedLastUpdate => injectedLastUpdate;
         public float LastInjectionBoundaryCoverage => lastInjectionBoundaryCoverage;
         public bool LastInjectionStateSynchronized =>
@@ -577,7 +619,10 @@ namespace ProgrammaticStylized3D.Rivers
             !TopologyReplacementInProgress &&
             !TopologyTransitionActive &&
             !IsTopologyDebugActive &&
+            !IsProgressiveBirthSourceDebugActive &&
+            !IsProgressiveBirthTransferDebugActive &&
             pendingInjections.Count == 0 &&
+            activeProgressiveRibbonEventCount == 0 &&
             reservations.Count == 0 &&
             CountActiveChunks() == 0;
         public long EstimatedMemoryBytes =>
@@ -585,6 +630,9 @@ namespace ProgrammaticStylized3D.Rivers
             EstimateTextureBytes(stateB) +
             EstimateTextureBytes(advectedState) +
             EstimateTextureBytes(reverseState) +
+            EstimateTextureBytes(progressiveBirthSourceTexture) +
+            EstimateTextureBytes(progressiveBirthTransferDebugTexture) +
+            EstimateTextureBytes(progressiveBirthDebugTexture) +
             EstimateTextureBytes(guidanceTexture) +
             EstimateTextureBytes(topologyTexture) +
             EstimateTextureBytes(topologySourcesTexture) +

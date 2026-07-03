@@ -14,6 +14,97 @@ float2 FoamHash22(float2 value)
 }
 
 
+float FoamSourceFillValueNoise(float2 position, float seed)
+{
+    float2 baseCell = floor(position);
+    float2 local = frac(position);
+    local = local * local * (3.0 - 2.0 * local);
+
+    float seedOffset = seed * 0.071;
+    float a = FoamHash11(
+        dot(baseCell, float2(37.17, 91.73)) + seedOffset);
+    float b = FoamHash11(
+        dot(baseCell + float2(1.0, 0.0), float2(37.17, 91.73)) +
+        seedOffset);
+    float c = FoamHash11(
+        dot(baseCell + float2(0.0, 1.0), float2(37.17, 91.73)) +
+        seedOffset);
+    float d = FoamHash11(
+        dot(baseCell + float2(1.0, 1.0), float2(37.17, 91.73)) +
+        seedOffset);
+    return lerp(lerp(a, b, local.x), lerp(c, d, local.x), local.y);
+}
+
+
+float EvaluateFoamSourceFillField(
+    float2 physicalPosition,
+    float sourceFillSeed,
+    float featureSize)
+{
+    float safeFeatureSize = max(0.05, featureSize);
+    float2 seedOffset = float2(
+        FoamHash11(sourceFillSeed + 17.13),
+        FoamHash11(sourceFillSeed + 43.71)) * 23.0;
+    float2 basePosition = physicalPosition / safeFeatureSize + seedOffset;
+
+    float broad = FoamSourceFillValueNoise(
+        basePosition * 0.72,
+        sourceFillSeed + 11.0);
+    float secondary = FoamSourceFillValueNoise(
+        mul(float2x2(0.82, -0.37, 0.37, 0.82), basePosition) * 1.43 +
+        float2(7.3, 19.1),
+        sourceFillSeed + 29.0);
+    float combined = saturate(broad * 0.78 + secondary * 0.22);
+    // Stretch the naturally centre-heavy value-noise distribution so Amount
+    // changes produce useful area differences across the full 0-1 range.
+    return smoothstep(0.12, 0.88, combined);
+}
+
+
+float EvaluateFoamSourceFillCoverage(
+    float2 physicalPosition,
+    float sourceAmount,
+    float sourceFillSeed,
+    float requestedFeatureSize,
+    float2 physicalCellSpacing)
+{
+    float amount = saturate(sourceAmount);
+    if (amount <= 0.0001)
+    {
+        return 0.0;
+    }
+    if (amount >= 0.9999)
+    {
+        return 1.0;
+    }
+
+    // Keep coherent source islands at least a few structural texels wide on
+    // every quality tier. This is source rasterization only, not persistent
+    // material evolution.
+    float maximumCellSpacing = max(
+        max(0.01, physicalCellSpacing.x),
+        max(0.01, physicalCellSpacing.y));
+    float featureSize = max(
+        requestedFeatureSize,
+        maximumCellSpacing * 2.5);
+    float fillValue = EvaluateFoamSourceFillField(
+        physicalPosition,
+        sourceFillSeed,
+        featureSize);
+    float transitionWidth = clamp(
+        maximumCellSpacing / featureSize * 0.30,
+        0.025,
+        0.12);
+
+    // Thresholding one fixed field makes every higher Amount a nested
+    // superset of every lower Amount for the same source and coordinates.
+    return smoothstep(
+        fillValue - transitionWidth,
+        fillValue + transitionWidth,
+        amount);
+}
+
+
 float PhaseDistance(float a, float b)
 {
     float difference = abs(frac(a - b + 0.5) - 0.5);

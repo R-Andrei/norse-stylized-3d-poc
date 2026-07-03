@@ -37,6 +37,12 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(FoamPreviousId, snapshot.PreviousState);
             propertyBlock.SetTexture(FoamCurrentId, snapshot.CurrentState);
             propertyBlock.SetTexture(
+                FoamBirthDebugId,
+                ResolveBoundTexture(progressiveBirthDebugTexture));
+            propertyBlock.SetTexture(
+                FoamBirthTransferDebugId,
+                ResolveBoundTexture(progressiveBirthTransferDebugTexture));
+            propertyBlock.SetTexture(
                 FoamGuidanceId,
                 ResolveBoundTexture(snapshot.Guidance));
             propertyBlock.SetTexture(FoamTopologyId, snapshot.Topology);
@@ -99,6 +105,12 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(FoamPreviousId, previousState);
             propertyBlock.SetTexture(FoamCurrentId, currentState);
             propertyBlock.SetTexture(
+                FoamBirthDebugId,
+                ResolveBoundTexture(progressiveBirthDebugTexture));
+            propertyBlock.SetTexture(
+                FoamBirthTransferDebugId,
+                ResolveBoundTexture(progressiveBirthTransferDebugTexture));
+            propertyBlock.SetTexture(
                 FoamGuidanceId,
                 ResolveBoundTexture(guidanceTexture));
             propertyBlock.SetTexture(
@@ -154,6 +166,10 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(FoamEnabledId, 0f);
             propertyBlock.SetTexture(FoamPreviousId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamCurrentId, Texture2D.blackTexture);
+            propertyBlock.SetTexture(FoamBirthDebugId, Texture2D.blackTexture);
+            propertyBlock.SetTexture(
+                FoamBirthTransferDebugId,
+                Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamGuidanceId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamTopologyId, Texture2D.blackTexture);
             propertyBlock.SetTexture(

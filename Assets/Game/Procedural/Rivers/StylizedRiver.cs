@@ -97,7 +97,9 @@ namespace ProgrammaticStylized3D.Rivers
         SupportAndNegativeInfluence = 6,
         SupportClasses = 7,
         NegativeInfluenceClasses = 8,
-        MaterialRemainingLife = 9
+        MaterialRemainingLife = 9,
+        ProgressiveBirthSource = 10,
+        ProgressiveBirthTransfer = 11
     }
 
     public enum StylizedRiverDisturbanceDebugView
@@ -186,6 +188,21 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamNegativeAgingRate = 1f;
         private const float MaximumFoamNegativeAgingRate = 8f;
         private const float DefaultFoamNegativeAgingRate = 4f;
+        private const float MinimumFoamProgressiveRibbonDuration = 0.5f;
+        private const float MaximumFoamProgressiveRibbonDuration = 3f;
+        private const float DefaultFoamProgressiveRibbonDuration = 1.5f;
+        private const float MinimumFoamProgressiveRibbonTravelDistance = 0.5f;
+        private const float MaximumFoamProgressiveRibbonTravelDistance = 8f;
+        private const float DefaultFoamProgressiveRibbonTravelDistance = 3f;
+        private const float MinimumFoamProgressiveRibbonAcrossDrift = -1f;
+        private const float MaximumFoamProgressiveRibbonAcrossDrift = 1f;
+        private const float DefaultFoamProgressiveRibbonAcrossDrift = 0.25f;
+        private const float MinimumFoamProgressiveRibbonPathWander = 0f;
+        private const float MaximumFoamProgressiveRibbonPathWander = 1f;
+        private const float DefaultFoamProgressiveRibbonPathWander = 0.35f;
+        private const float MinimumFoamProgressiveRibbonHalfWidth = 0.05f;
+        private const float MaximumFoamProgressiveRibbonHalfWidth = 1f;
+        private const float DefaultFoamProgressiveRibbonHalfWidth = 0.20f;
 
 
         [Header("Setup")]
@@ -780,6 +797,7 @@ namespace ProgrammaticStylized3D.Rivers
         [HideInInspector, SerializeField, Range(0.05f, 8f)]
         private float foamTestRadius = 0.8f;
 
+        [Tooltip("Source-only coefficient controlling how much of the candidate birth shape becomes occupied Foam. It does not modify Initial Remaining Life or durability.")]
         [HideInInspector, SerializeField, Range(0f, 1f)]
         private float foamTestAmount = 0.85f;
 
@@ -789,6 +807,46 @@ namespace ProgrammaticStylized3D.Rivers
 
         [HideInInspector, SerializeField, Range(0.25f, 8f)]
         private float foamTestElongation = 1.5f;
+
+        [Tooltip("Half-width in world metres used only by the progressive-ribbon birth source. The legacy one-frame diagnostic Radius remains separate.")]
+        [HideInInspector, SerializeField]
+        [Range(
+            MinimumFoamProgressiveRibbonHalfWidth,
+            MaximumFoamProgressiveRibbonHalfWidth)]
+        private float foamTestProgressiveRibbonHalfWidth =
+            DefaultFoamProgressiveRibbonHalfWidth;
+
+        [Tooltip("Duration of the Patch 4.11C manual progressive-ribbon event. The event deposits only the distance travelled during each material update.")]
+        [HideInInspector, SerializeField]
+        [Range(
+            MinimumFoamProgressiveRibbonDuration,
+            MaximumFoamProgressiveRibbonDuration)]
+        private float foamTestProgressiveRibbonDuration =
+            DefaultFoamProgressiveRibbonDuration;
+
+        [Tooltip("Net downstream distance travelled by the Patch 4.11C manual emission head while the event is active.")]
+        [HideInInspector, SerializeField]
+        [Range(
+            MinimumFoamProgressiveRibbonTravelDistance,
+            MaximumFoamProgressiveRibbonTravelDistance)]
+        private float foamTestProgressiveRibbonTravelDistance =
+            DefaultFoamProgressiveRibbonTravelDistance;
+
+        [Tooltip("Total normalized lateral drift from event start to event end. Negative moves toward the left river edge; positive moves toward the right river edge.")]
+        [HideInInspector, SerializeField]
+        [Range(
+            MinimumFoamProgressiveRibbonAcrossDrift,
+            MaximumFoamProgressiveRibbonAcrossDrift)]
+        private float foamTestProgressiveRibbonAcrossDrift =
+            DefaultFoamProgressiveRibbonAcrossDrift;
+
+        [Tooltip("Strength of one deterministic smooth bend added to the manual progressive-ribbon path. Zero follows only the selected downstream travel and Across Drift; one uses the full bounded proof bend.")]
+        [HideInInspector, SerializeField]
+        [Range(
+            MinimumFoamProgressiveRibbonPathWander,
+            MaximumFoamProgressiveRibbonPathWander)]
+        private float foamTestProgressiveRibbonPathWander =
+            DefaultFoamProgressiveRibbonPathWander;
 
         [Header("Water Body Validation")]
         [SerializeField]
@@ -1255,6 +1313,31 @@ namespace ProgrammaticStylized3D.Rivers
         // provisional Freshness name. The value now means normalized Remaining Life.
         public float FoamTestFreshness => foamTestRemainingLife;
         public float FoamTestElongation => foamTestElongation;
+        public float FoamTestProgressiveRibbonHalfWidth =>
+            Mathf.Clamp(
+                foamTestProgressiveRibbonHalfWidth,
+                MinimumFoamProgressiveRibbonHalfWidth,
+                MaximumFoamProgressiveRibbonHalfWidth);
+        public float FoamTestProgressiveRibbonDuration =>
+            Mathf.Clamp(
+                foamTestProgressiveRibbonDuration,
+                MinimumFoamProgressiveRibbonDuration,
+                MaximumFoamProgressiveRibbonDuration);
+        public float FoamTestProgressiveRibbonTravelDistance =>
+            Mathf.Clamp(
+                foamTestProgressiveRibbonTravelDistance,
+                MinimumFoamProgressiveRibbonTravelDistance,
+                MaximumFoamProgressiveRibbonTravelDistance);
+        public float FoamTestProgressiveRibbonAcrossDrift =>
+            Mathf.Clamp(
+                foamTestProgressiveRibbonAcrossDrift,
+                MinimumFoamProgressiveRibbonAcrossDrift,
+                MaximumFoamProgressiveRibbonAcrossDrift);
+        public float FoamTestProgressiveRibbonPathWander =>
+            Mathf.Clamp(
+                foamTestProgressiveRibbonPathWander,
+                MinimumFoamProgressiveRibbonPathWander,
+                MaximumFoamProgressiveRibbonPathWander);
 
         // Compatibility aliases for existing emitter and renderer integrations.
         // They are no longer backed by exposed global Stage 5 controls.
@@ -1530,6 +1613,10 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.NegativeInfluenceClasses;
                 case (int)StylizedRiverFoamDebugView.MaterialRemainingLife:
                     return StylizedRiverFoamDebugView.MaterialRemainingLife;
+                case (int)StylizedRiverFoamDebugView.ProgressiveBirthSource:
+                    return StylizedRiverFoamDebugView.ProgressiveBirthSource;
+                case (int)StylizedRiverFoamDebugView.ProgressiveBirthTransfer:
+                    return StylizedRiverFoamDebugView.ProgressiveBirthTransfer;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }
@@ -2005,6 +2092,20 @@ namespace ProgrammaticStylized3D.Rivers
             return foamRuntime;
         }
 
+        public bool StartFoamProgressiveRibbonProof()
+        {
+            return GetOrCreateFoamRuntime()?.StartProgressiveRibbonNormalized(
+                foamTestDistanceNormalized,
+                foamTestAcrossNormalized,
+                foamTestProgressiveRibbonHalfWidth,
+                foamTestAmount,
+                foamTestRemainingLife,
+                foamTestProgressiveRibbonDuration,
+                foamTestProgressiveRibbonTravelDistance,
+                foamTestProgressiveRibbonAcrossDrift,
+                foamTestProgressiveRibbonPathWander) == true;
+        }
+
         public bool EmitFoamTestPatch()
         {
             return GetOrCreateFoamRuntime()?.EmitNormalized(
@@ -2136,7 +2237,7 @@ namespace ProgrammaticStylized3D.Rivers
                         0.07f,
                         foamTestRadius * (0.28f + 0.04f * (index + 2))),
                     foamTestAmount * amountScale,
-                    foamTestRemainingLife * Mathf.Lerp(0.72f, 1f, amountScale),
+                    foamTestRemainingLife,
                     Mathf.Max(1.8f, foamTestElongation * 1.35f));
             }
 
