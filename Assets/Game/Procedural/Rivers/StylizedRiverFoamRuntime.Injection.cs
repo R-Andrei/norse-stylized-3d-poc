@@ -46,7 +46,12 @@ namespace ProgrammaticStylized3D.Rivers
                 AlongRadius = injection.Radius * injection.Elongation,
                 RemainingAmount = injection.Amount,
                 Elapsed = 0f,
-                MaximumLifetime = MaximumManualReservationSeconds
+                MaximumLifetime = Mathf.Clamp(
+                    injection.RemainingLife *
+                    ResolveMaximumMaterialReservationSeconds() +
+                    EndOfLifeDissipationSeconds * 2f,
+                    EndOfLifeDissipationSeconds,
+                    MaximumManualReservationSeconds)
             };
         }
 
@@ -56,9 +61,10 @@ namespace ProgrammaticStylized3D.Rivers
             float speed =
                 river.FlowSpeedMetresPerSecond *
                 ProvisionalMaterialFlowFollow * liquid;
-            float amountDecay =
-                DecayToFivePercent /
-                Mathf.Max(0.05f, ProvisionalMaterialLifetime);
+            // The CPU reservation is deliberately conservative because the
+            // exact GPU Remaining Life depends on material-facing topology along
+            // the transported path. Let it approach expiry over the maximum
+            // supported lifetime instead of retiring a still-living patch early.
             float spread =
                 ProvisionalMaterialSpread *
                 ProvisionalMaterialEvolution;
@@ -70,8 +76,11 @@ namespace ProgrammaticStylized3D.Rivers
                 reservation.CentreGlobalDistance += speed * deltaTime;
                 reservation.AlongRadius +=
                     (0.15f + spread * 0.35f) * deltaTime;
+                float reservationDecay =
+                    DecayToFivePercent /
+                    Mathf.Max(0.05f, reservation.MaximumLifetime);
                 reservation.RemainingAmount *=
-                    Mathf.Exp(-amountDecay * deltaTime);
+                    Mathf.Exp(-reservationDecay * deltaTime);
 
                 if (reservation.Elapsed >= reservation.MaximumLifetime ||
                     reservation.RemainingAmount < 0.015f)
@@ -84,15 +93,33 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
+        private float ResolveMaximumMaterialReservationSeconds()
+        {
+            if (river == null)
+            {
+                return MaximumManualReservationSeconds;
+            }
+
+            float slowestAgeRate = Mathf.Max(
+                0.05f,
+                river.FoamSupportedAgingRate);
+            float supportedLifetime =
+                river.FoamNeutralLifetime / slowestAgeRate;
+            return Mathf.Clamp(
+                supportedLifetime + EndOfLifeDissipationSeconds * 2f,
+                river.FoamNeutralLifetime,
+                MaximumManualReservationSeconds);
+        }
+
         private void ActivateInjectionRange(PendingInjection injection, float now)
         {
             float padding = Mathf.Max(0.5f, injection.Radius * injection.Elongation);
             ActivateGlobalRange(
                 injection.GlobalDistance - padding,
                 injection.GlobalDistance + padding,
-                now + Mathf.Max(
-                    ProvisionalMaterialLifetime,
-                    ProvisionalMaterialFreshnessLifetime));
+                now + Mathf.Min(
+                    5f,
+                    ResolveMaximumMaterialReservationSeconds()));
         }
 
         private void ActivateReservationRange(FoamReservation reservation, float now)
@@ -224,7 +251,9 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat("_FoamInjectionAcrossNormalized", injection.AcrossNormalized);
             computeShader.SetFloat("_FoamInjectionRadius", injection.Radius);
             computeShader.SetFloat("_FoamInjectionAmount", injection.Amount);
-            computeShader.SetFloat("_FoamInjectionFreshness", injection.Freshness);
+            computeShader.SetFloat(
+                "_FoamInjectionRemainingLife",
+                injection.RemainingLife);
             computeShader.SetFloat("_FoamInjectionIntegrity", injection.Integrity);
             computeShader.SetFloat("_FoamInjectionPhase", injection.Phase);
             computeShader.SetFloat("_FoamInjectionElongation", injection.Elongation);

@@ -96,7 +96,8 @@ namespace ProgrammaticStylized3D.Rivers
         AnchoredSupport = 3,
         SupportAndNegativeInfluence = 6,
         SupportClasses = 7,
-        NegativeInfluenceClasses = 8
+        NegativeInfluenceClasses = 8,
+        MaterialRemainingLife = 9
     }
 
     public enum StylizedRiverDisturbanceDebugView
@@ -174,6 +175,17 @@ namespace ProgrammaticStylized3D.Rivers
 
         private const string NormalTextureResourcePath =
             "PS3DRiver/Textures/T_RiverNormal";
+
+        private const int CurrentFoamMaterialLifecycleTuningVersion = 1;
+        private const float MinimumFoamNeutralLifetime = 1f;
+        private const float MaximumFoamNeutralLifetime = 10f;
+        private const float DefaultFoamNeutralLifetime = 4f;
+        private const float MinimumFoamSupportedAgingRate = 0.1f;
+        private const float MaximumFoamSupportedAgingRate = 1f;
+        private const float DefaultFoamSupportedAgingRate = 0.2f;
+        private const float MinimumFoamNegativeAgingRate = 1f;
+        private const float MaximumFoamNegativeAgingRate = 8f;
+        private const float DefaultFoamNegativeAgingRate = 4f;
 
 
         [Header("Setup")]
@@ -729,6 +741,28 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterEventAmount = 0.5f;
 
+        [Tooltip("Lifetime in seconds for unsupported Foam in neutral water. Positive topology multiplies this aging rate downward; Negative Aging Pressure multiplies it upward. This controls persistent material life, not topology lifetime.")]
+        [Range(MinimumFoamNeutralLifetime, MaximumFoamNeutralLifetime)]
+        [SerializeField]
+        private float foamNeutralLifetime = DefaultFoamNeutralLifetime;
+
+        [Tooltip("Aging-rate multiplier at full positive support. Values below one extend Remaining Life. The default 0.20 gives fully supported material five times the neutral lifetime before negative overlap is considered.")]
+        [Range(
+            MinimumFoamSupportedAgingRate,
+            MaximumFoamSupportedAgingRate)]
+        [SerializeField]
+        private float foamSupportedAgingRate = DefaultFoamSupportedAgingRate;
+
+        [Tooltip("Aging-rate multiplier at full Negative Aging Pressure. Values above one consume Remaining Life faster. Positive and negative multipliers remain independent and multiply continuously when they overlap.")]
+        [Range(
+            MinimumFoamNegativeAgingRate,
+            MaximumFoamNegativeAgingRate)]
+        [SerializeField]
+        private float foamNegativeAgingRate = DefaultFoamNegativeAgingRate;
+
+        [SerializeField, HideInInspector]
+        private int foamMaterialLifecycleTuningVersion;
+
         [Tooltip("Lit, non-emissive Foam tint. The alpha channel controls maximum Foam opacity, so no separate opacity control is required.")]
         [SerializeField] private Color foamColour =
             new Color(0.94f, 0.97f, 0.94f, 0.72f);
@@ -749,8 +783,9 @@ namespace ProgrammaticStylized3D.Rivers
         [HideInInspector, SerializeField, Range(0f, 1f)]
         private float foamTestAmount = 0.85f;
 
+        [FormerlySerializedAs("foamTestFreshness")]
         [HideInInspector, SerializeField, Range(0f, 1f)]
-        private float foamTestFreshness = 1f;
+        private float foamTestRemainingLife = 1f;
 
         [HideInInspector, SerializeField, Range(0.25f, 8f)]
         private float foamTestElongation = 1.5f;
@@ -1192,6 +1227,21 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamConnectorWeakSpanAmount);
         public float FoamFreeWaterEventAmount =>
             Mathf.Clamp01(foamFreeWaterEventAmount);
+        public float FoamNeutralLifetime =>
+            Mathf.Clamp(
+                foamNeutralLifetime,
+                MinimumFoamNeutralLifetime,
+                MaximumFoamNeutralLifetime);
+        public float FoamSupportedAgingRate =>
+            Mathf.Clamp(
+                foamSupportedAgingRate,
+                MinimumFoamSupportedAgingRate,
+                MaximumFoamSupportedAgingRate);
+        public float FoamNegativeAgingRate =>
+            Mathf.Clamp(
+                foamNegativeAgingRate,
+                MinimumFoamNegativeAgingRate,
+                MaximumFoamNegativeAgingRate);
         public Color FoamColour => foamColour;
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
         public float FoamTestDistanceNormalized =>
@@ -1200,7 +1250,10 @@ namespace ProgrammaticStylized3D.Rivers
             foamTestAcrossNormalized;
         public float FoamTestRadius => foamTestRadius;
         public float FoamTestAmount => foamTestAmount;
-        public float FoamTestFreshness => foamTestFreshness;
+        public float FoamTestRemainingLife => foamTestRemainingLife;
+        // Compatibility alias for integrations compiled against the former
+        // provisional Freshness name. The value now means normalized Remaining Life.
+        public float FoamTestFreshness => foamTestRemainingLife;
         public float FoamTestElongation => foamTestElongation;
 
         // Compatibility aliases for existing emitter and renderer integrations.
@@ -1390,6 +1443,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void OnEnable()
         {
+            MigrateFoamMaterialLifecycleTuningIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -1474,12 +1528,31 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.SupportClasses;
                 case (int)StylizedRiverFoamDebugView.NegativeInfluenceClasses:
                     return StylizedRiverFoamDebugView.NegativeInfluenceClasses;
+                case (int)StylizedRiverFoamDebugView.MaterialRemainingLife:
+                    return StylizedRiverFoamDebugView.MaterialRemainingLife;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }
         }
+
+        private void MigrateFoamMaterialLifecycleTuningIfRequired()
+        {
+            if (foamMaterialLifecycleTuningVersion >=
+                CurrentFoamMaterialLifecycleTuningVersion)
+            {
+                return;
+            }
+
+            foamNeutralLifetime = DefaultFoamNeutralLifetime;
+            foamSupportedAgingRate = DefaultFoamSupportedAgingRate;
+            foamNegativeAgingRate = DefaultFoamNegativeAgingRate;
+            foamMaterialLifecycleTuningVersion =
+                CurrentFoamMaterialLifecycleTuningVersion;
+        }
+
         private void OnValidate()
         {
+            MigrateFoamMaterialLifecycleTuningIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -1939,7 +2012,7 @@ namespace ProgrammaticStylized3D.Rivers
                 foamTestAcrossNormalized,
                 foamTestRadius,
                 foamTestAmount,
-                foamTestFreshness,
+                foamTestRemainingLife,
                 foamTestElongation) == true;
         }
 
@@ -1961,14 +2034,14 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.Clamp(foamTestAcrossNormalized - acrossOffset, -1f, 1f),
                 foamTestRadius,
                 foamTestAmount,
-                foamTestFreshness,
+                foamTestRemainingLife,
                 foamTestElongation);
             bool right = runtime.EmitNormalized(
                 foamTestDistanceNormalized,
                 Mathf.Clamp(foamTestAcrossNormalized + acrossOffset, -1f, 1f),
                 foamTestRadius,
                 foamTestAmount,
-                foamTestFreshness,
+                foamTestRemainingLife,
                 foamTestElongation);
             return left || right;
         }
@@ -1980,7 +2053,7 @@ namespace ProgrammaticStylized3D.Rivers
                 foamTestAcrossNormalized,
                 Mathf.Max(0.08f, foamTestRadius * 0.35f),
                 foamTestAmount,
-                foamTestFreshness,
+                foamTestRemainingLife,
                 Mathf.Max(3f, foamTestElongation * 2.5f)) == true;
         }
 
@@ -2009,21 +2082,21 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.Clamp(foamTestAcrossNormalized - acrossStep * 0.65f, -1f, 1f),
                 Mathf.Max(0.08f, foamTestRadius * 0.42f),
                 foamTestAmount,
-                foamTestFreshness,
+                foamTestRemainingLife,
                 Mathf.Max(2.4f, foamTestElongation * 1.9f));
             emitted |= runtime.EmitNormalized(
                 foamTestDistanceNormalized,
                 foamTestAcrossNormalized,
                 Mathf.Max(0.08f, foamTestRadius * 0.55f),
                 foamTestAmount,
-                foamTestFreshness,
+                foamTestRemainingLife,
                 Mathf.Max(2.0f, foamTestElongation * 1.55f));
             emitted |= runtime.EmitNormalized(
                 Mathf.Clamp01(foamTestDistanceNormalized + alongStep * 0.65f),
                 Mathf.Clamp(foamTestAcrossNormalized + acrossStep, -1f, 1f),
                 Mathf.Max(0.08f, foamTestRadius * 0.34f),
                 foamTestAmount * 0.82f,
-                foamTestFreshness,
+                foamTestRemainingLife,
                 Mathf.Max(2.8f, foamTestElongation * 2.25f));
             return emitted;
         }
@@ -2063,7 +2136,7 @@ namespace ProgrammaticStylized3D.Rivers
                         0.07f,
                         foamTestRadius * (0.28f + 0.04f * (index + 2))),
                     foamTestAmount * amountScale,
-                    foamTestFreshness * Mathf.Lerp(0.72f, 1f, amountScale),
+                    foamTestRemainingLife * Mathf.Lerp(0.72f, 1f, amountScale),
                     Mathf.Max(1.8f, foamTestElongation * 1.35f));
             }
 
@@ -2078,7 +2151,7 @@ namespace ProgrammaticStylized3D.Rivers
                 shoreAcross,
                 foamTestRadius,
                 foamTestAmount,
-                foamTestFreshness,
+                foamTestRemainingLife,
                 foamTestElongation) == true;
         }
 
@@ -2843,6 +2916,18 @@ namespace ProgrammaticStylized3D.Rivers
                 foamConnectorWeakSpanAmount);
             foamFreeWaterEventAmount = Mathf.Clamp01(
                 foamFreeWaterEventAmount);
+            foamNeutralLifetime = Mathf.Clamp(
+                foamNeutralLifetime,
+                MinimumFoamNeutralLifetime,
+                MaximumFoamNeutralLifetime);
+            foamSupportedAgingRate = Mathf.Clamp(
+                foamSupportedAgingRate,
+                MinimumFoamSupportedAgingRate,
+                MaximumFoamSupportedAgingRate);
+            foamNegativeAgingRate = Mathf.Clamp(
+                foamNegativeAgingRate,
+                MinimumFoamNegativeAgingRate,
+                MaximumFoamNegativeAgingRate);
             foamColour.a = Mathf.Clamp01(foamColour.a);
             foamTestDistanceNormalized = Mathf.Clamp01(
                 foamTestDistanceNormalized);
@@ -2852,7 +2937,8 @@ namespace ProgrammaticStylized3D.Rivers
                 1f);
             foamTestRadius = Mathf.Clamp(foamTestRadius, 0.05f, 8f);
             foamTestAmount = Mathf.Clamp01(foamTestAmount);
-            foamTestFreshness = Mathf.Clamp01(foamTestFreshness);
+            foamTestRemainingLife = Mathf.Clamp01(
+                foamTestRemainingLife);
             foamTestElongation = Mathf.Clamp(
                 foamTestElongation,
                 0.25f,

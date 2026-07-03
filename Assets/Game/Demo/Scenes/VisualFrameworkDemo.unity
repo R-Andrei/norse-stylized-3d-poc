@@ -7927,6 +7927,7 @@ MonoBehaviour:
     geometryContribution: 0.65
     normalContribution: 1
   foamEnabled: 1
+  foamTopologyCacheAsset: {fileID: 11400000, guid: 8dcdcb5a7b0f2d34d8f556a66d6aabba, type: 2}
   foamMajorSupportAmount: 0.381
   foamMajorSupportSize: 0.241
   foamMajorSupportSizeVariation: 0.984
@@ -7943,7 +7944,7 @@ MonoBehaviour:
   foamConnectorWeakSpanAmount: 0.443
   foamFreeWaterEventAmount: 0.409
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}
-  foamDebugView: 6
+  foamDebugView: 0
   foamTestDistanceNormalized: 0.5
   foamTestAcrossNormalized: 0
   foamTestRadius: 0.8

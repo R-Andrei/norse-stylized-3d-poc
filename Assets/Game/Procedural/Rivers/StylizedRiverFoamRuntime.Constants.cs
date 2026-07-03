@@ -18,12 +18,13 @@ namespace ProgrammaticStylized3D.Rivers
         private const int MediumStructuralResolution = 96;
         private const int HighStructuralResolution = 128;
         private const float ResourceReleaseDelaySeconds = 2f;
-        private const float MaximumManualReservationSeconds = 90f;
+        private const float MaximumManualReservationSeconds = 300f;
         private const float DecayToFivePercent = 2.995732f;
+        private const float EndOfLifeDissipationSeconds = 4f;
+        private const float EndOfLifeDissipationStart = 0.35f;
         private const float TopologyMetricsUpdateRate = 2f;
         private const int ThreadGroupSize = 8;
         private const int TopologyMetricCount = 16;
-        private const float TopologyMetricQuantisation = 1023f;
         // Canonical Stage 6 Shore Support band measured inward from the
         // instantaneous Stage 3 visible water edge. These metric widths remain
         // fixed while the accepted anchored-support contract is retained.
@@ -124,8 +125,6 @@ namespace ProgrammaticStylized3D.Rivers
         private const float ProvisionalMaterialSpread = 0.42858f;
         private const float ProvisionalMaterialCohesion = 0.056401f;
         private const float ProvisionalMaterialConnectivity = 0.228127f;
-        private const float ProvisionalMaterialLifetime = 29.810668f;
-        private const float ProvisionalMaterialFreshnessLifetime = 2.307567f;
         private const float ProvisionalMaterialIntegrityDamage = 0.703747f;
         private const float ProvisionalMaterialShoreRetention = 1.35f;
         private const float ProvisionalMaterialTargetCoverage = 0.203078f;

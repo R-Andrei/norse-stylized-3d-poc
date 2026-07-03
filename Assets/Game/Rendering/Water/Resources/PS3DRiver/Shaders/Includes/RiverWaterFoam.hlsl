@@ -42,7 +42,7 @@ float RiverFoamFbm(float2 position, float seed)
 struct RiverWaterFoamResult
 {
     float amount;
-    float freshness;
+    float remainingLife;
     float integrity;
     float phase;
     float mask;
@@ -69,7 +69,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
 {
     RiverWaterFoamResult result;
     result.amount = 0.0;
-    result.freshness = 0.0;
+    result.remainingLife = 0.0;
     result.integrity = 0.0;
     result.phase = 0.0;
     result.mask = 0.0;
@@ -99,8 +99,12 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         saturate(interpolation));
 
     float amount = saturate(state.x);
-    float freshness = saturate(state.y);
-    float integrity = saturate(state.z);
+    float remainingLife = amount > 0.0001
+        ? saturate(state.y / amount)
+        : 0.0;
+    float integrity = amount > 0.0001
+        ? saturate(state.z / amount)
+        : 0.0;
     float phase = saturate(state.w);
     float resolvedStrength = max(0.0, strength);
     float resolvedCoverage = saturate(coverage);
@@ -144,7 +148,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     mask *= 1.0 - saturate(freezeAmount);
 
     result.amount = amount;
-    result.freshness = freshness;
+    result.remainingLife = remainingLife;
     result.integrity = integrity;
     result.phase = phase;
     result.mask = saturate(mask);
@@ -156,7 +160,7 @@ float3 RiverWaterResolveFoamColour(
     float3 foamColour,
     float3 lighting,
     float minimumNightVisibility,
-    float freshness,
+    float remainingLife,
     float integrity)
 {
     float3 lit = max(
@@ -165,9 +169,9 @@ float3 RiverWaterResolveFoamColour(
             minimumNightVisibility,
             minimumNightVisibility),
         lighting);
-    float freshnessLift = lerp(0.86, 1.07, saturate(freshness));
+    float lifetimeLift = lerp(0.86, 1.07, saturate(remainingLife));
     float integrityLift = lerp(0.92, 1.03, saturate(integrity));
-    return max(0.0, foamColour * lit * freshnessLift * integrityLift);
+    return max(0.0, foamColour * lit * lifetimeLift * integrityLift);
 }
 
 float3 RiverWaterFoamPhaseDebugColour(float phase)

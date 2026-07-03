@@ -543,21 +543,13 @@ namespace ProgrammaticStylized3D.Rivers
         public bool TopologyMetricsAvailable => topologyMetricsAvailable;
         public float MajorSupportCoverage => TopologyCoverageRatio(1);
         public float ConnectorSupportCoverage => TopologyCoverageRatio(2);
-        public float PocketPressureCoverage => TopologyCoverageRatio(3);
-        public float FoamWithinPocketPressure => TopologyRegionRatio(4, 3);
+        public float NegativeAgingPressureCoverage => TopologyCoverageRatio(3);
+        public float FoamWithinNegativeAgingPressure =>
+            TopologyRegionRatio(4, 3);
         public float VisibleMaterialCoverage => TopologyCoverageRatio(5);
-        public float MaterialDeficitInsideNetSupport =>
-            topologyMetricsAvailable && latestTopologyMetrics[6] > 0u
-                ? latestTopologyMetrics[7] /
-                  (TopologyMetricQuantisation * latestTopologyMetrics[6])
-                : 0f;
         public float FoamWithinShoreSupport => TopologyRegionRatio(9, 8);
         public float FoamWithinPressureLeeSupport => TopologyRegionRatio(13, 12);
         public float PerimeterRatio => TopologyRegionRatio(14, 5);
-        public float LegacyNetSupportCoverage => TopologyCoverageRatio(6);
-        public float OpenSpanCoverage => topologyMetricsAvailable
-            ? Mathf.Clamp01(1f - LegacyNetSupportCoverage)
-            : 0f;
         public float ConnectorMajorOverlap => TopologyRegionRatio(15, 2);
         public int FractureWidth => currentFracture != null ? currentFracture.width : 0;
         public int FractureHeight => currentFracture != null ? currentFracture.height : 0;

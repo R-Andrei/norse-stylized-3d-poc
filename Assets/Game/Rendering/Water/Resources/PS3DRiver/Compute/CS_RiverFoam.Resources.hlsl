@@ -1,8 +1,11 @@
-// Shared Stage 6 material state:
-// R = persistent Amount
-// G = Freshness / recent activation
-// B = structural Integrity
+// Canonical Patch 4.11A persistent material state:
+// R = Amount
+// G = Amount * normalized Remaining Life
+// B = Amount * normalized Integrity
 // A = material phase / provenance
+// Premultiplying the transported attributes makes advection and merging
+// conservative: empty cells cannot carry life or integrity independently of
+// material amount. Consumers decode G/R and B/R only when Amount is non-zero.
 RWTexture2D<float4> _FoamStateWrite;
 Texture2D<float4> _FoamStateRead;
 RWTexture2D<float4> _FoamAdvectionWrite;
@@ -63,16 +66,15 @@ StructuredBuffer<FoamWeakSpanIdentityData>
 //           z = shore-support visible count, w = visible guidance-lane count.
 RWByteAddressBuffer _FoamPopulationMetrics;
 
-// One global topology diagnostic record. Values are uint counters; deficit is
-// quantised to 0..1023 per supported topology cell.
-//  0 valid cells                  8 shore-support cells
-//  1 major-support cells           9 foam within shore support
-//  2 connector-support cells      10 reserved
-//  3 pocket-pressure cells        11 reserved
-//  4 foam within pocket pressure  12 Pressure/Lee-support cells
-//  5 visible material cells       13 foam within Pressure/Lee support
-//  6 legacy net-support cells     14 perimeter-visible cells
-//  7 summed legacy deficit        15 Connector/Major overlap cells
+// One global topology diagnostic record. Values are uint counters.
+//  0 valid-fluid cells                    8 shore-support cells
+//  1 major-support cells                  9 foam within shore support
+//  2 connector-support cells             10 reserved
+//  3 negative-aging-pressure cells       11 reserved
+//  4 foam within negative aging pressure 12 Pressure/Lee-support cells
+//  5 visible material cells              13 foam within Pressure/Lee support
+//  6 reserved                            14 perimeter-visible cells
+//  7 reserved                            15 Connector/Major overlap cells
 RWByteAddressBuffer _FoamTopologyMetrics;
 
 int2 _FoamDimensions;
@@ -111,8 +113,11 @@ float _FoamBreakup;
 float _FoamSpread;
 float _FoamCohesion;
 float _FoamConnectivity;
-float _FoamAmountDecay;
-float _FoamFreshnessDecay;
+float _FoamNeutralLifetime;
+float _FoamPositiveAgeMultiplier;
+float _FoamNegativeAgeMultiplier;
+float _FoamEndOfLifeDissipationRate;
+float _FoamEndOfLifeDissipationStart;
 float _FoamIntegrityDamage;
 float _FoamShoreRetention;
 float _FoamTime;
@@ -160,7 +165,7 @@ float _FoamInjectionGlobalDistance;
 float _FoamInjectionAcrossNormalized;
 float _FoamInjectionRadius;
 float _FoamInjectionAmount;
-float _FoamInjectionFreshness;
+float _FoamInjectionRemainingLife;
 float _FoamInjectionIntegrity;
 float _FoamInjectionPhase;
 float _FoamInjectionElongation;

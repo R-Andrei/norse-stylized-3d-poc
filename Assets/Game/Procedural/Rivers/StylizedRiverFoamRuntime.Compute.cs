@@ -88,13 +88,20 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamConnectivity",
                 ProvisionalMaterialConnectivity);
             computeShader.SetFloat(
-                "_FoamAmountDecay",
-                DecayToFivePercent /
-                Mathf.Max(0.05f, ProvisionalMaterialLifetime));
+                "_FoamNeutralLifetime",
+                river.FoamNeutralLifetime);
             computeShader.SetFloat(
-                "_FoamFreshnessDecay",
-                DecayToFivePercent /
-                Mathf.Max(0.05f, ProvisionalMaterialFreshnessLifetime));
+                "_FoamPositiveAgeMultiplier",
+                river.FoamSupportedAgingRate);
+            computeShader.SetFloat(
+                "_FoamNegativeAgeMultiplier",
+                river.FoamNegativeAgingRate);
+            computeShader.SetFloat(
+                "_FoamEndOfLifeDissipationRate",
+                DecayToFivePercent / EndOfLifeDissipationSeconds);
+            computeShader.SetFloat(
+                "_FoamEndOfLifeDissipationStart",
+                EndOfLifeDissipationStart);
             computeShader.SetFloat(
                 "_FoamIntegrityDamage",
                 Mathf.Clamp01(ProvisionalMaterialIntegrityDamage));
@@ -269,6 +276,18 @@ namespace ProgrammaticStylized3D.Rivers
                 simulateKernel,
                 "_FoamFractureRead",
                 currentFracture);
+            computeShader.SetTexture(
+                simulateKernel,
+                "_FoamTopologyRead",
+                topologyTexture);
+            computeShader.SetTexture(
+                simulateKernel,
+                "_FoamTopologySourcesRead",
+                topologySourcesTexture);
+            computeShader.SetTexture(
+                simulateKernel,
+                "_FoamObstacleExclusionRead",
+                obstacleExclusionTexture);
             computeShader.SetTexture(
                 simulateKernel,
                 "_FoamStateWrite",

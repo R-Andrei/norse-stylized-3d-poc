@@ -5,6 +5,13 @@ namespace ProgrammaticStylized3D.Rivers
 {
     public sealed partial class StylizedRiverFoamRuntime
     {
+        private static Texture ResolveBoundTexture(Texture texture)
+        {
+            return texture != null
+                ? texture
+                : Texture2D.blackTexture;
+        }
+
         private bool BindTopologyTransitionHold()
         {
             TopologyTransitionSnapshot snapshot = topologyTransitionSnapshot;
@@ -31,28 +38,20 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(FoamCurrentId, snapshot.CurrentState);
             propertyBlock.SetTexture(
                 FoamGuidanceId,
-                snapshot.Guidance != null
-                    ? snapshot.Guidance
-                    : Texture2D.blackTexture);
+                ResolveBoundTexture(snapshot.Guidance));
             propertyBlock.SetTexture(FoamTopologyId, snapshot.Topology);
             propertyBlock.SetTexture(
                 FoamTopologySourcesId,
                 snapshot.TopologySources);
             propertyBlock.SetTexture(
                 FoamFractureId,
-                snapshot.Fracture != null
-                    ? snapshot.Fracture
-                    : Texture2D.blackTexture);
+                ResolveBoundTexture(snapshot.Fracture));
             propertyBlock.SetTexture(
                 FoamBoundaryId,
-                snapshot.Boundary != null
-                    ? snapshot.Boundary
-                    : Texture2D.blackTexture);
+                ResolveBoundTexture(snapshot.Boundary));
             propertyBlock.SetTexture(
                 FoamObstacleExclusionId,
-                snapshot.ObstacleExclusion != null
-                    ? snapshot.ObstacleExclusion
-                    : Texture2D.blackTexture);
+                ResolveBoundTexture(snapshot.ObstacleExclusion));
             propertyBlock.SetFloat(
                 FoamInterpolationId,
                 snapshot.Interpolation);
@@ -60,7 +59,9 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(
                 FoamFieldLengthId,
                 Mathf.Max(0.001f, snapshot.FieldLength));
-            propertyBlock.SetColor(FoamColourId, river.FoamColour);
+            propertyBlock.SetColor(
+                FoamColourId,
+                river != null ? river.FoamColour : Color.clear);
             propertyBlock.SetFloat(
                 FoamStrengthId,
                 ProvisionalMaterialStrength);
@@ -78,15 +79,18 @@ namespace ProgrammaticStylized3D.Rivers
                 ProvisionalMaterialDetailStrength);
             propertyBlock.SetFloat(
                 FoamDebugViewId,
-                (float)river.FoamDebugView);
-            propertyBlock.SetFloat(FoamSeedId, river.VisualSeed);
+                river != null ? (float)river.FoamDebugView : 0f);
+            propertyBlock.SetFloat(
+                FoamSeedId,
+                river != null ? river.VisualSeed : 0f);
             surfaceRenderer.SetPropertyBlock(propertyBlock);
             return true;
         }
 
         private void BindField()
         {
-            if (surfaceRenderer == null || currentState == null || previousState == null)
+            if (surfaceRenderer == null || river == null ||
+                currentState == null || previousState == null)
             {
                 BindDisabled();
                 return;
@@ -97,16 +101,24 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(FoamEnabledId, 1f);
             propertyBlock.SetTexture(FoamPreviousId, previousState);
             propertyBlock.SetTexture(FoamCurrentId, currentState);
-            propertyBlock.SetTexture(FoamGuidanceId, guidanceTexture);
-            propertyBlock.SetTexture(FoamTopologyId, topologyTexture);
+            propertyBlock.SetTexture(
+                FoamGuidanceId,
+                ResolveBoundTexture(guidanceTexture));
+            propertyBlock.SetTexture(
+                FoamTopologyId,
+                ResolveBoundTexture(topologyTexture));
             propertyBlock.SetTexture(
                 FoamTopologySourcesId,
-                topologySourcesTexture);
-            propertyBlock.SetTexture(FoamFractureId, currentFracture);
-            propertyBlock.SetTexture(FoamBoundaryId, boundaryTexture);
+                ResolveBoundTexture(topologySourcesTexture));
+            propertyBlock.SetTexture(
+                FoamFractureId,
+                ResolveBoundTexture(currentFracture));
+            propertyBlock.SetTexture(
+                FoamBoundaryId,
+                ResolveBoundTexture(boundaryTexture));
             propertyBlock.SetTexture(
                 FoamObstacleExclusionId,
-                obstacleExclusionTexture);
+                ResolveBoundTexture(obstacleExclusionTexture));
             propertyBlock.SetFloat(FoamInterpolationId, simulationInterpolation);
             propertyBlock.SetFloat(FoamGlobalStartId, allocatedGlobalStart);
             propertyBlock.SetFloat(FoamFieldLengthId, Mathf.Max(0.001f, fieldLength));
@@ -146,6 +158,8 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock ??= new MaterialPropertyBlock();
             surfaceRenderer.GetPropertyBlock(propertyBlock);
             propertyBlock.SetFloat(FoamEnabledId, 0f);
+            propertyBlock.SetTexture(FoamPreviousId, Texture2D.blackTexture);
+            propertyBlock.SetTexture(FoamCurrentId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamGuidanceId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamTopologyId, Texture2D.blackTexture);
             propertyBlock.SetTexture(
@@ -157,11 +171,16 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamObstacleExclusionId,
                 Texture2D.blackTexture);
             propertyBlock.SetFloat(FoamInterpolationId, 1f);
-            propertyBlock.SetFloat(
-                FoamDebugViewId,
-                river != null && river.FoamEnabled
-                    ? (float)river.FoamDebugView
-                    : 0f);
+            propertyBlock.SetFloat(FoamGlobalStartId, 0f);
+            propertyBlock.SetFloat(FoamFieldLengthId, 1f);
+            propertyBlock.SetColor(FoamColourId, Color.clear);
+            propertyBlock.SetFloat(FoamStrengthId, 0f);
+            propertyBlock.SetFloat(FoamCoverageId, 0f);
+            propertyBlock.SetFloat(FoamSharpnessId, 1f);
+            propertyBlock.SetFloat(FoamDetailScaleId, 1f);
+            propertyBlock.SetFloat(FoamDetailStrengthId, 0f);
+            propertyBlock.SetFloat(FoamDebugViewId, 0f);
+            propertyBlock.SetFloat(FoamSeedId, 0f);
             surfaceRenderer.SetPropertyBlock(propertyBlock);
         }
 

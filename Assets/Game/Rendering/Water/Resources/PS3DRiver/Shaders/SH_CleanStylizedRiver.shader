@@ -791,7 +791,7 @@ Shader "PS3D/Stylized River Water"
                     _FoamColour.rgb,
                     lighting.combined,
                     _MinimumNightVisibility,
-                    foam.freshness,
+                    foam.remainingLife,
                     foam.integrity);
                 // Foam Colour alpha is the single canonical opacity control.
                 // The hidden legacy _FoamOpacity property remains only so old
@@ -803,6 +803,35 @@ Shader "PS3D/Stylized River Water"
                 finalColour = MixFog(finalColour, input.motionData.w);
 
                 int foamDebug = (int)round(_FoamDebugView);
+                if (foamDebug == 9)
+                {
+                    float materialPresence = smoothstep(
+                        0.001,
+                        0.035,
+                        foam.amount);
+                    float lowerLifeBlend = smoothstep(
+                        0.0,
+                        0.5,
+                        foam.remainingLife);
+                    float upperLifeBlend = smoothstep(
+                        0.5,
+                        1.0,
+                        foam.remainingLife);
+                    float3 lifetimeColour = lerp(
+                        float3(0.95, 0.08, 0.02),
+                        float3(1.00, 0.58, 0.04),
+                        lowerLifeBlend);
+                    lifetimeColour = lerp(
+                        lifetimeColour,
+                        float3(0.65, 0.95, 1.00),
+                        upperLifeBlend);
+                    lifetimeColour = lerp(
+                        float3(0.0, 0.0, 0.0),
+                        lifetimeColour,
+                        materialPresence);
+                    return half4(lifetimeColour, 1.0);
+                }
+
                 if (foamDebug == 3 || foamDebug == 6 ||
                     foamDebug == 7 || foamDebug == 8)
                 {
@@ -850,7 +879,7 @@ Shader "PS3D/Stylized River Water"
 
                     if (foamDebug == 8)
                     {
-                        // Independent negative-influence inputs. Red = Pocket Aging
+                        // Independent negative-influence inputs. Red = aggregate Negative Aging
                         // Pressure, blue = the conservative current-water Obstacle
                         // Footprint from the exact-mesh solid-interval mask.
                         return half4(

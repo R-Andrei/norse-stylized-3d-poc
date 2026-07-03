@@ -12,7 +12,7 @@ namespace ProgrammaticStylized3D.Rivers
                 float acrossNormalized,
                 float radius,
                 float amount,
-                float freshness,
+                float remainingLife,
                 float integrity,
                 float phase,
                 float elongation,
@@ -25,7 +25,7 @@ namespace ProgrammaticStylized3D.Rivers
                 AcrossNormalized = acrossNormalized;
                 Radius = radius;
                 Amount = amount;
-                Freshness = freshness;
+                RemainingLife = remainingLife;
                 Integrity = integrity;
                 Phase = phase;
                 Elongation = elongation;
@@ -39,7 +39,7 @@ namespace ProgrammaticStylized3D.Rivers
             public float AcrossNormalized { get; }
             public float Radius { get; }
             public float Amount { get; }
-            public float Freshness { get; }
+            public float RemainingLife { get; }
             public float Integrity { get; }
             public float Phase { get; }
             public float Elongation { get; }

@@ -1,28 +1,51 @@
+struct FoamMaterialTopologySample
+{
+    float majorSupport;
+    float connectorSupport;
+    float negativeAgingPressure;
+    float pressureSupport;
+    float leeSupport;
+    float shoreSupport;
+    float combinedAnchoredSupport;
+    float obstacleFootprint;
+    float obstacleFootprintCopy;
+    float validFluid;
+};
 
 
-float FoamCombinedAnchoredSupport(float4 anchoredSources)
+FoamMaterialTopologySample FoamResolveMaterialTopology(
+    float4 topology,
+    float4 anchoredSources,
+    float boundaryCoverage,
+    float canonicalObstacleFootprint)
+{
+    FoamMaterialTopologySample sample;
+    sample.majorSupport = saturate(topology.r);
+    sample.connectorSupport = saturate(topology.g);
+    sample.negativeAgingPressure = saturate(topology.b);
+    sample.pressureSupport = saturate(anchoredSources.r);
+    sample.leeSupport = saturate(anchoredSources.g);
+    sample.shoreSupport = saturate(anchoredSources.b);
+    sample.combinedAnchoredSupport = max(
+        max(sample.pressureSupport, sample.leeSupport),
+        sample.shoreSupport);
+
+    // _FoamObstacleExclusionRead is authoritative. topology.a remains only a
+    // same-grid compatibility/debug copy and must not be multiplied with the
+    // canonical footprint or applied as a second exclusion.
+    sample.obstacleFootprint = saturate(canonicalObstacleFootprint);
+    sample.obstacleFootprintCopy = saturate(topology.a);
+    sample.validFluid = saturate(boundaryCoverage) *
+        (1.0 - sample.obstacleFootprint);
+    return sample;
+}
+
+
+float FoamCombinedMaterialSupport(FoamMaterialTopologySample sample)
 {
     return max(
-        max(anchoredSources.r, anchoredSources.g),
-        anchoredSources.b);
-}
-
-
-float FoamCombinedNegativeInfluence(float4 topology)
-{
-    return max(topology.b, topology.a);
-}
-
-float FoamComposeLegacyNetSupport(
-    float4 topology,
-    float4 anchoredSources)
-{
-    float combinedSupport = max(
-        max(topology.r, topology.g),
-        FoamCombinedAnchoredSupport(anchoredSources));
-    return saturate(
-        combinedSupport *
-        (1.0 - FoamCombinedNegativeInfluence(topology)));
+        max(sample.majorSupport, sample.connectorSupport),
+        sample.combinedAnchoredSupport);
 }
 
 

@@ -56,13 +56,15 @@ Approved negative-topology expansion before runtime evolution:
 Patch 4.9 cache/precompute status:
 - Patch 4.9A versioned exact-value cache contract and deterministic round-trip proof are implemented and Unity-verified;
 - Patch 4.9B stable domain/obstacle/generation fingerprints, runtime-readable cache-asset ownership, explicit build/update tooling, and hit/miss/stale validation are implemented and Unity-verified;
-- Patch 4.9C cache-first initialization and Patch 4.9C.1 automatic development cache orchestration are implemented and Unity-verified; Patch 4.9D production/cold-start telemetry and release-build cache preflight are implemented and await Unity validation; Patch 4.9D.1 gates cache capture and topology preparation on completion of the budgeted generated-obstacle registry refresh, preventing persistent-input keys from being captured from a partial source set;
-- topology-to-material lifespan response;
-- final fragmentation, dissipation, and rendering behaviour.
+- Patch 4.9C cache-first initialization, Patch 4.9C.1 automatic development cache orchestration, Patch 4.9D production/cold-start telemetry and release-build cache preflight, and Patch 4.9D.1 complete generated-obstacle-registry gating are implemented and Unity-verified;
+- Patch 4.10A freezes the material-facing topology contract, and Patch 4.10B runtime hardening, semantic accessors, obsolete-proof cleanup, and bounded Unity validation are complete; topology generation is closed;
+- Patch 4.11A persistent Remaining Life, amount-weighted lifecycle transport/merge, topology-driven aging, and gradual end-of-life material dissipation are implemented and accepted for progression; full visible lifecycle validation remains coupled to the first legitimate material-birth implementation;
+- Patch 4.11B freezes the distributed event-driven material-birth architecture and the remaining step-by-step Foam sequence in documentation only;
+- event-runtime implementation, anchored births, open-water births, spatial fairness, mature fragmentation, breakup motion, dissolution presentation, and final rendering remain separate bounded patches.
 
 The canonical implementation order is topology first: complete all static topology classes, runtime evolution, rebuild crossfade, and cache/preparation handoff before beginning separate Foam-material work.
 
-Temporary generation may remain expensive during staged pre-gameplay proof preparation, but every such cost must be profiled and labelled as future procedural chunk/run precompute work rather than silently normalized as active-gameplay runtime.
+Editor/Development cache misses may still run the accepted staged preparation path, but ordinary production runtime installs persistent cached data. Expensive generation remains profiled, bounded, and forbidden as active-gameplay or release-runtime fallback.
 
 ## Reference Read
 
@@ -178,16 +180,25 @@ Integrity / Cohesion
 Lightweight transported history as required
 ```
 
-The exact RGBA channel assignment is not locked by this documentation pass. The existing `Amount / Freshness / Integrity / Phase` packing must be reassessed before Batch 2 because the accepted lifecycle now requires explicit persistent lifetime information.
+Patch 4.11A freezes the persistent material packing as:
 
-New material receives a lifetime with controlled variation. During transport, its lifetime state moves with the material.
+| Channel | Canonical material meaning |
+|---:|---|
+| R | `Amount` |
+| G | `Amount × normalized Remaining Life` |
+| B | `Amount × normalized Integrity` |
+| A | transported material phase/provenance |
+
+Remaining Life and Integrity are stored as amount-weighted moments. Transport, correction, splitting, and merging therefore cannot move youth or cohesion through empty cells independently of material. Consumers decode `G / R` and `B / R` only when Amount is non-zero.
+
+New manual or provisional supply material receives a normalized initial Remaining Life and Integrity. During transport, those attributes move with the material and combine by an amount-weighted rule.
 
 ### Topology Modifies Aging Rate
 
 Each material update applies a local aging rate:
 
 ```text
-RemainingLife -= DeltaTime × LocalAgeRate
+RemainingLife -= DeltaTime × LocalAgeRate / NeutralLifetime
 ```
 
 The canonical qualitative behaviour is:
@@ -216,7 +227,17 @@ PositiveAgeMultiplier < 1
 NegativeAgeMultiplier > 1
 ```
 
-The exact formula, defaults, and authoring names remain subject to visual testing. The important contract is that both influences survive an overlap and both contribute to the final aging rate.
+Patch 4.11A implements this multiplicative response using three normal Inspector controls:
+
+- `Neutral Lifetime (s)` — range `1–10`, default `4`;
+- `Supported Aging Rate` — range `0.1–1`, default `0.2`;
+- `Negative Aging Rate` — range `1–8`, default `4`.
+
+Patch 4.11A.1 corrects the unapproved provisional tuning originally introduced with 4.11A. Existing rivers migrate once to the approved `4 / 0.2 / 4` defaults instead of retaining or merely clamping the old `30 / 0.30 / 3` tuple.
+
+Patch 4.11A.2 adds a read-only `Calculated Lifetimes` Inspector panel directly beneath these controls. It reports the approximate neutral, fully supported, full-negative, and full-support-plus-negative times produced by the currently selected values. The display is derived only from the aging-rate contract and does not change runtime behaviour.
+
+The controls remain subject to visual tuning, but the contract is fixed: positive and negative influence survive overlap and both contribute continuously to the final aging rate. Topology still does not alter Amount directly.
 
 ### Overlap Is Valid
 
@@ -262,17 +283,17 @@ The accepted direction is an end-of-life transition in which:
 
 The previously discussed lifetime bands are illustrative, not fixed. The exact curve and thresholds must be judged in motion and may be revised.
 
-Death cannot be purely cosmetic. The simulation must eventually reduce or disperse actual material so invisible expired foam cannot reappear later.
+Death cannot be purely cosmetic. Patch 4.11A begins actual end-of-life removal when Remaining Life enters its final `0.35` normalized band. Amount then decays continuously with an internal approximately four-second five-percent dissipation time at full expiry, rather than disappearing on one frame. This internal proof curve is not a public control.
 
-The renderer may add stable sub-cell breakup and fading, but it may not invent macro fragmentation unsupported by material state.
+Mature crack growth, fragment separation, and breakup-responsive rendering remain later material patches. The renderer may add stable sub-cell breakup and fading, but it may not invent macro fragmentation unsupported by material state.
 
 ## Split and Merge Lifetime Behaviour
 
 The field representation must preserve lifecycle history without tracking a permanent object graph.
 
 - When material splits, transported lifetime state travels with the separated material.
-- When material merges, lifetime may be combined through an amount-weighted rule or another conservative field operation.
-- The exact merge rule remains provisional until Batch 2 implementation evidence exists.
+- When material merges, Remaining Life and Integrity combine by amount-weighted moments.
+- Patch 4.11A applies the same conservative rule to manual injection, provisional distributed supply, disturbance reinforcement, advection, and final state storage.
 
 No per-patch IDs, managed object lists, or evolving network graph are required.
 
@@ -290,21 +311,82 @@ Do not add additional transport, storage-clearing, or sub-cell simulation work s
 
 A hard simulation barrier may still be justified later if visible leakage, re-emergence, or transport through large obstacles proves to be a real defect. That is deferred polish, not a current prerequisite.
 
-## Material Supply Contract
+## Material Birth and Supply Contract
 
-Topology does not create material.
+Persistent Foam material may be created only by the **material-owned birth system** or by an explicit manual diagnostic injection. Topology and support fields remain influence/context data; they never write material Amount directly.
 
-Positive support may extend lifespan, but it must not directly fill a deficit or spawn foam because an area is empty.
+The accepted production direction is **distributed, event-driven birth**, not upstream-only inflow and not continuous filling from support textures. A birth is a temporary compact emitter that progressively draws a ribbon into the persistent material state over time.
 
-The later Batch 2 supply system should use independently justified sources, with upstream inflow remaining the primary continuous source. Any additional replenishment, event source, or extinction-prevention source must be explicitly approved and rate-limited.
+### Approved source families
 
-The following earlier ideas are no longer canonical:
+The birth scheduler may choose among two primary source families:
 
-- direct filling toward `structuralCapacity`;
+1. **Anchored Birth Event**
+   - originates from believable static or slowly changing support context;
+   - prefers obstacle lee regions and obstacle shoulders for longer peeling streamers;
+   - may use shorter, less frequent upstream-pressure events for impact-like arcs;
+   - may begin along Shore Support and peel away from the bank;
+   - may use Major or Connector Support to weight an origin or guide part of a trajectory, but support never becomes a continuously emitting mask.
+
+2. **Open-Water Birth Event**
+   - originates in valid open water so every longitudinal part of the river has a non-zero chance to receive Foam;
+   - begins as a narrow strip or small progressive ribbon rather than an instantaneous blob;
+   - follows downstream causality while allowing bounded lateral or diagonal movement;
+   - is selected through bounded spatial opportunity and recent-activity weighting rather than a global coverage deficit.
+
+**Upstream Ingress** is optional and subordinate. It is not the primary supply contract and must not be implemented unless integrated testing shows that chunk entrances look unnaturally empty after anchored and open-water births are working.
+
+### Progressive event behaviour
+
+Each active event owns one compact emission head and persistent event identity. During its bounded lifetime it:
+
+- advances broadly downstream in canonical river coordinates;
+- may drift laterally, travel diagonally, bend through smooth coherent variation, and vary speed without becoming a sustained upstream traveller;
+- deposits only the segment travelled since the previous material update, preventing gaps without stamping a complete patch at once;
+- ramps emission in, sustains it, and tapers it out so the beginning and ending are not rectangular cuts;
+- varies width and Amount smoothly over time;
+- writes proper Amount, initial Remaining Life, initial Integrity, and transported phase/provenance into the existing material-state contract;
+- leaves the deposited material to ordinary transport, aging, merging, fragmentation, and death after the event stops.
+
+An event should persist long enough to visibly grow a trail—typically on the order of fractions of a second to several seconds—but exact ranges, defaults, source ratios, and public controls are **not approved by this documentation patch**. Every implementation slice must present its proposed values before code changes.
+
+The first implementation does not require elaborate branching. A single coherent head with a curved, tapered path is the proof target. Forking or child trails remain optional later refinements only if the simple system cannot approach the reference.
+
+### Distribution without forced coverage
+
+The river must be spatially eligible for Foam without being continuously covered by Foam.
+
+Use soft spatial fairness:
+
+- divide the mapped river into broad longitudinal regions, with lateral lanes only if needed;
+- track recent birth activity or cooldown in those regions;
+- gradually raise selection weight for regions that have been inactive longer;
+- suppress new events near very recent birth paths and heavily occupied material;
+- allow randomness and temporary empty regions rather than guaranteeing one active event everywhere.
+
+This fairness mechanism is not a target-coverage controller. It must not fill whichever texels are empty, repair topology deficits, or force the visible population toward a fixed percentage.
+
+### Runtime representation and cost
+
+- use a fixed-capacity pool of compact event records, not GameObjects or per-event managed allocations;
+- use bounded candidate selection and bounded retries; no unbounded gameplay search, pathfinding, graph traversal, or GPU-to-CPU readback;
+- event scheduling may run at a lower cadence than material deposition, while active heads deposit continuously at the material update cadence;
+- reuse the canonical river mapping, valid-water mask, Obstacle Footprint, support fields, and existing persistent material textures;
+- retain deterministic seeds/identities so a chosen event can be debugged and reproduced;
+- keep inactive, sleeping, frozen, culled, and distant rivers from scheduling or advancing unnecessary events.
+
+### Rejected supply models
+
+The following are not canonical:
+
+- upstream-only inflow as the primary population source;
+- direct filling toward `structuralCapacity` or any replacement target-coverage value;
 - topology-driven deficit repair;
 - unlimited anchored-support replenishment;
-- connectors or pockets acting as material sources;
-- random distributed births drawing the visible network.
+- Major, Connector, Pressure, Lee, Shore, or negative topology acting as continuous material masks;
+- one-frame random blobs or complete ribbons appearing at once;
+- independent white noise drawing the visible network;
+- global extinction prevention that silently repopulates arbitrary empty cells.
 
 ## Persistent Evolving-Field Topology
 
@@ -385,7 +467,7 @@ The approved architecture now separates three concerns:
 2. **Temporary execution may be expensive.** During the current proof-of-style phase, this generator may run during Foam initialization, an explicit Play-mode preparation phase, or a controlled pre-gameplay loading window.
 3. **Active gameplay must remain lean later.** Once the visual model is accepted, the same generator should move into a cached per-river/per-run bake so gameplay loads or samples accepted topology data rather than regenerating it.
 
-Temporary runtime/pre-gameplay generation is not the final performance contract. Any readback, CPU search, pathfinding, distance transform, candidate rejection, or full-field topology construction in this proof path must be marked as future cache/precompute work and must not become hidden steady-state gameplay cost.
+The persistent cache is the final production ownership contract. Readback, CPU search, pathfinding, distance transforms, candidate rejection, and full-field topology construction may run only in bounded Editor/Development preparation and must never become hidden steady-state gameplay or release fallback.
 
 #### Active field-first topology generator
 
@@ -908,28 +990,36 @@ Topology implementation follows a minimal inspectability rule:
 
 ## Current Data Contract
 
-Current implementation texture packing remains:
+Patch 4.10A freezes the material-facing resources below. Channel positions are stable and the semantic names define their purpose even where low-level compatibility identifiers retain older `Pocket` terminology.
 
-```text
-Topology RGBA:
-    R = Major Support
-    G = Connector Support
-    B = aggregate Negative Aging Pressure (legacy low-level Pocket channel name may remain)
-    A = derived structural-grid Obstacle Footprint
+| Material binding | Channel | Canonical meaning | Ownership |
+|---|---:|---|---|
+| `_FoamTopology` | R | Major Support | generated, evolving topology |
+|  | G | Connector Support | generated, evolving topology |
+|  | B | aggregate Negative Aging Pressure | generated, evolving topology |
+|  | A | derived same-grid Obstacle Footprint copy | compatibility and diagnostics only |
+| `_FoamTopologySources` | R | Pressure Support | live anchored source |
+|  | G | stationary Lee Support | live anchored source |
+|  | B | dynamic Shore Support | live anchored source |
+|  | A | reserved zero | no current owner |
+| `_FoamObstacleExclusion` | R | exact point-sampled current-water Obstacle Footprint | canonical material and validity source |
+| `_FoamPrevious` / `_FoamCurrent` | R | material Amount | persistent material lifecycle |
+|  | G | Amount × normalized Remaining Life | persistent material lifecycle |
+|  | B | Amount × normalized Integrity | persistent material lifecycle |
+|  | A | transported phase/provenance | persistent material lifecycle |
+| `_FoamBoundary` | existing boundary channels | current valid-water and boundary information | domain/boundary runtime |
 
-Anchored Sources RGBA (existing `_FoamTopologySources` resource):
-    R = Pressure Support
-    G = stationary Lee Support
-    B = dynamic Shore Support
-    A = reserved zero
+All topology, anchored-source, obstacle, and boundary values are normalized `0–1` fields using the canonical Foam field mapping. The material-state channel semantics remain provisional until the separate material-lifecycle patch defines them.
 
-Obstacle Footprint RHalf (existing `_FoamObstacleExclusion` compatibility resource):
-    authoritative point-sampled current-water object footprint
-```
+The first material-lifecycle implementation receives the aggregate Negative Aging Pressure field only. Interior Pocket, Edge Cavity, Connector Weak Span, and Free-Water Negative Event identities remain available to cache reconstruction, class-specific topology evolution, and diagnostics, but they are not independently bound to the material. No additional packed negative-class texture is part of Patch 4.10.
 
-This packing is an implementation detail. Channel positions remain stable while the semantic names above define their purpose.
+Same-resolution compute consumers should use the corresponding integer texel. Rendering, diagnostics, and differently mapped consumers should use canonical field UV or physical river-space remapping. Support and negative influence remain independent and must not be reduced to `Positive × (1 - Negative)` before lifecycle evaluation.
 
-The topology response must read support and negative-influence channels separately. It must not reduce them to one `Positive × (1 - Negative)` texture before lifecycle evaluation.
+`_FoamObstacleExclusion` is the authoritative obstacle source for material and validity decisions. `_FoamTopology.a` is retained as a same-grid compatibility/debug copy and must not be applied as a second independent exclusion.
+
+Only generated Major, Connector, and aggregate negative topology participate in replacement crossfades. Pressure, Lee, Shore, Obstacle Footprint, boundary/valid-water state, and persistent material state remain live authorities outside the generated blend.
+
+Patch 4.10B makes every binding path complete and neutral-safe: normal readiness, direct cache installation, replacement hold/crossfade, resource reallocation, disabled Foam, frozen or inactive rivers, component disable, and destruction. Missing or disabled resources bind black fallbacks and safe mapping values; stale texture references are not part of the contract. Bounded Unity validation passed and topology generation is closed.
 
 ## Structural Resolution Policy
 
@@ -976,7 +1066,7 @@ Further performance work is now formally paused after the accepted profiler inst
 - No GameObject or managed allocation per Major, Connector, negative region, or Foam patch.
 - No final-shader loops over objects, structures, or sources.
 - Remaining free-water topology must scale primarily with structural texel count.
-- The active visual-proof generator may run expensive field-first topology construction during Foam initialization or explicit pre-gameplay preparation, but this is temporary proof plumbing. It must be profiled and labelled as future cache/precompute work.
+- Editor/Development cache preparation may run expensive field-first topology construction through the staged path. It remains profiled and bounded; release runtime is cache-only and ordinary gameplay does not run the generators.
 - The active generator may use candidate retries, connected-component cleanup, hole filling, distance transforms, endpoint clustering, bounded pathfinding, rejection, and composition scoring because those operations are necessary to prove the final visual model.
 - Active gameplay must not run those expensive topology-generation operations once the production pipeline exists. Gameplay should consume cached per-river/per-run fields, cached descriptors, or another accepted compact representation.
 - During the temporary proof path, generation runs only on initialization or queued topology rebuilds, never every frame as ordinary steady-state maintenance.
@@ -1000,7 +1090,7 @@ Deferred optimization notes:
 
 - Foam Obstacle Footprint now waits for a short stable `ObstacleGeometryVersion` window and coalesces repeated ready-state changes before rasterization. Validate that this removes redundant startup and source-churn rebuilds without leaving stale geometry.
 - Reuse the prepared interval buffers and structural scalar snapshot; do not restore the removed contour `Color[]` raster/upload path.
-- Audit topology/debug work so `Final Foam (Debug Off)` does not trigger diagnostic-grade topology composition or metric refreshes.
+- Patch 4.10B confirms that `Final Foam (Debug Off)` does not request topology metric reset/readback work; retained metrics remain gated by active topology diagnostics or explicit development profiling.
 - Tighten Static Pressure, Static Wake, and ripple-boundary dirty flags so source/profile changes rebuild only the affected textures and passes.
 - Defer a global cross-river work scheduler until the accepted single-river pipeline exposes stable initialization, rebuild, maintenance, and feature-readiness work categories.
 - Future Static Pressure fidelity work should consume the shared compact geometry prepared by procedural chunk building/linking, not add another runtime mesh scanner.
@@ -1069,14 +1159,29 @@ The canonical topology-only rollout is maintained in `River_Foam_Topology_Implem
 30. Patch 4.9B stable fingerprints and explicit cache-asset building implemented and Unity-verified.
 31. Patch 4.9C cache-first runtime initialization implemented.
 32. Patch 4.9C.1 automatic Editor/Development cache orchestration implemented and Unity-verified.
-33. Patch 4.9D cold/warm startup telemetry plus strict release-build cache preflight implemented; Unity validation pending.
+33. Patch 4.9D cold/warm startup telemetry plus strict release-build cache preflight implemented and Unity-verified.
+34. Patch 4.10A material-facing channel, ownership, sampling, transition, and neutral-binding contract documented and accepted.
+35. Patch 4.10B runtime binding hardening, semantic topology accessors, obsolete destructive-proof cleanup, and bounded Unity validation complete; topology generation closed.
+36. Patch 4.11A persistent Remaining Life, amount-weighted lifecycle moments, multiplicative topology aging, gradual actual material dissipation, and Material Remaining Life diagnostics implemented and accepted for progression; full visible validation deferred until legitimate born material exists.
 
-### Active runtime-evolution sequence
+### Topology closure and active material sequence
 
-1. Validate Patch 4.9D cold/warm startup evidence, zero expensive preparation on direct hits, and the strict release-build cache preflight.
-2. Patch 4.10 — topology completion and handoff to separate Foam-material work.
+1. Patch 4.10A — freeze and document the material-facing topology contract — complete.
+2. Patch 4.10B — harden runtime bindings, add one canonical semantic sampling helper, remove obsolete destructive-support proof plumbing, and pass bounded Unity regression validation — complete. Topology generation is closed.
+3. Patch 4.11A — establish persistent Remaining Life, conservative amount-weighted lifecycle transport/merge, multiplicative positive/negative topology aging, gradual actual material dissipation, and a dedicated lifetime diagnostic — implemented and accepted for progression. Full visual validation resumes once legitimate born material exists.
+4. Patch 4.11B — freeze the distributed event-driven birth contract and revise the remaining Foam roadmap — documentation only.
+5. Patch 4.11C — implement the fixed-capacity event runtime, one manually triggered progressive ribbon, event-state diagnostics, and correct lifecycle-state deposition. No automatic scheduling yet.
+6. Patch 4.11D — add Anchored Birth Event scheduling around lee regions, obstacle shoulders, occasional pressure faces, Shore Support, and approved Major/Connector context, with local cooldown and no continuous support emission.
+7. Patch 4.11E — add Open-Water Birth Events, broad-region inactivity weighting, local vacancy suppression, and recent-birth cooldown so every river region has a chance without target-coverage filling.
+8. Patch 4.11F — integrate both source families, validate population over short and long runs, consolidate the minimum proven birth controls, and decide from evidence whether optional minor Upstream Ingress is needed.
+9. Patch 4.12A — make Integrity an active structural property driven by age, negative pressure, disturbance, and material deformation evidence without yet inventing renderer-only cracks.
+10. Patch 4.12B — implement state-backed fracture growth, hole opening, strip separation, and detached-fragment creation while preserving Amount and lifecycle moments.
+11. Patch 4.12C — add breakup-responsive differential motion and final dissolution behaviour for detached or critically weak material.
+12. Patch 4.13A — replace the proof renderer with mature state-backed Foam presentation: broad sheets, dominant ribbons, branches, torn edges, pockets, peeling strips, and secondary fragments.
+13. Patch 4.13B — tune the integrated birth/topology/lifecycle/breakup system against the reference, consolidate public controls, remove proof-only controls and diagnostics, and freeze the final visual contract.
+14. Patch 4.14 — resume deferred PC-first profiling, quality-tier scaling, sleeping/freezing/culling validation, multi-river scheduling only where measured, and final Stage 6 regression acceptance.
 
-Material aging response, fragmentation, dissipation, and rendering are not topology implementation steps and must not begin before topology completion.
+Every implementation patch remains independently inspectable and may not silently absorb the behaviour assigned to later patches. Accepted topology generation stays closed unless a concrete integration defect proves otherwise.
 
 ### Patch 4.9 cache/precompute contract
 
@@ -1086,7 +1191,7 @@ Patch 4.9 is split so the data contract is accepted before startup ownership cha
 - **4.9B — stable fingerprints and explicit building:** implemented. The payload now embeds deterministic 128-bit fingerprints for the complete resampled domain, the exact transformed static obstacle-source geometry, and all cache-affecting field/topology-generation settings. A runtime-readable `StylizedRiverFoamTopologyCacheAsset` is one storage provider without coupling the codec to UnityEditor or that asset type. The Inspector creates/assigns the empty asset in Edit Mode, then explicitly builds/updates and validates it after the river reaches `Ready` in Play Mode. Validation reports a hit candidate or unassigned, empty, unsupported, corrupt, metadata-mismatched, stale-domain, stale-obstacle, or stale-settings reasons. No ordinary startup consumes the asset.
 - **4.9C — cache-first initialization:** implemented. Ordinary staged startup waits for generated-source registration to settle, validates the assigned payload against stable domain/generation keys and exact prepared world-geometry fingerprints, deserializes the complete immutable graph, uploads the cached obstacle scalar, and reuses the accepted evolution/upload paths. A valid hit bypasses transformed-triangle rescanning, obstacle baking/readback, and all Major/Connector/Negative generators. Release startup remains strict and never silently runs those expensive generators.
 - **4.9C.1 — automatic development cache orchestration:** implemented and Unity-verified. An Editor-only coordinator creates or reuses one deterministic cache asset beside the saved scene and assigns it before Play Mode. In Editor/Development builds, a missing, empty, invalid, or unusable cache automatically runs the staged preparation path. A structurally valid stale cache with the same domain mapping and field dimensions is installed as the visible previous topology while current settings or obstacles prepare a complete replacement through the accepted 4.8 lifecycle. Completed topology is round-trip validated automatically and, in the Editor, written to the assigned asset without manual build or validation buttons. The runtime records the stable input key present at Play entry and refuses to overwrite the persistent cache when later Play-mode-only tweaks produce a different key; those results remain session-only. Manual create/build/validate/generate actions remain diagnostics only.
-- **4.9D — production validation:** implemented; Unity validation pending. The runtime reports total staged startup time, slowest phase, cache installs, active memory estimate, and exact counts of obstacle/Major/Connector/Pocket preparation. A direct cache hit must report zero expensive preparation. A pure Edit-mode validator proves payload, metadata, complete graph content, current domain, exact prepared obstacle-source fingerprints, generation inputs, and combined key without activating Foam or mutating assets. A non-development build preprocessor applies that gate to every enabled Foam river in enabled Build Settings scenes and rejects any invalid release cache; a menu command runs the same validation manually.
+- **4.9D — production validation:** implemented and Unity-verified. Direct persistent-cache startup reports one cache installation and zero obstacle/Major/Connector/Pocket preparation executions. The runtime reports total staged startup time, slowest phase, active memory estimate, and cache/preparation counters; the strict Edit-mode validator and non-development build preprocessor verify complete current caches without activating Foam or mutating assets.
 
 The binary payload is storage-provider agnostic. It must not be tied permanently to one Editor-only asset type, and Patch 4.8A/4.8B remain the single complete-topology activation/transition authority.
 
@@ -1107,7 +1212,7 @@ Pass only if the paused diagnostic and generator tooling show:
 - short rivers visibly contain small, medium, and occasional large support regions;
 - shapes distribute laterally and diagonally as well as longitudinally;
 - substantial neutral water remains between broad support regions;
-- temporary generation costs are profiled and clearly marked as future cache/precompute work;
+- development cache-generation costs remain profiled and release/ordinary runtime remains cache-only;
 - generated masks do not reveal repeated primitive stamps, harmonic blobs, cellular damage, skeleton bias, toy path descriptors, or an ellipse-dominated family;
 - every ordinary hop makes positive net downstream progress, while bounded lateral or diagonal movement does not produce longitudinal upstream motion;
 - scale remains stable across quality tiers, bends, width variation, chunks, and reverse flow.
@@ -1141,18 +1246,38 @@ Pass only if:
 - every class follows its approved asynchronous single-instance movement/morph rhythm once runtime evolution is implemented;
 - no class acts as instant geometric subtraction.
 
-### Batch 2 Material Response
+### Batch 2 Persistent Lifecycle Response
+
+Patch 4.11A implements the first bounded material-lifecycle slice and is accepted for progression after clean Unity operation. Its full visible proof remains deferred until Patch 4.11C provides legitimate material that can be followed through birth, transport, support, negative pressure, and death.
 
 Pass only if:
 
-- topology does not directly spawn or erase foam;
-- support, neutral, and negative-influence regions visibly produce different aging rates;
+- topology does not directly write or erase material Amount;
+- support, neutral, and negative-influence regions visibly produce different aging rates once born material reaches them;
 - overlap produces a continuous competing response;
-- existing foam survives topology changes according to its own remaining life;
+- Remaining Life and Integrity travel and merge with Amount rather than leaving empty-cell attribute trails;
+- existing material survives topology changes according to its own Remaining Life;
 - death does not pop;
 - expired material actually dissipates from simulation state;
-- downstream causality is preserved;
-- 10-second and 60-second views retain comparable broad population and composition.
+- downstream causality is preserved.
+
+### Distributed Event-Driven Birth
+
+The combined Patch 4.11C–4.11F birth sequence passes only if:
+
+- no complete patch, blob, or ribbon appears in one frame;
+- a birth visibly grows from a moving emission head over a bounded multi-frame event;
+- deposited strokes have tapered beginnings/endings and coherent width/Amount variation;
+- event paths remain net-downstream while supporting believable lateral and diagonal movement;
+- anchored births favour believable lee, shoulder, shore, and occasional pressure contexts without permanently revealing support masks;
+- open-water births give the full mapped river a chance to receive Foam without forcing simultaneous or permanent coverage;
+- broad-region inactivity weighting prevents chronic starvation while preserving random empty intervals;
+- local cooldown and vacancy suppression prevent one obstacle, support patch, or recently painted trail from monopolising births;
+- topology is used only as bounded scheduler context and later aging influence, never as continuous material filling;
+- all events initialize the canonical Amount/Remaining Life/Integrity/phase state correctly;
+- fixed-capacity records, bounded selection, reverse flow, freeze/thaw, disable/re-enable, chunk activation, and replacement transitions remain safe;
+- 10-second and 60-second runs show varied, asynchronous compositions rather than a repeating conveyor, synchronized pulse, or stable target-coverage equilibrium;
+- optional upstream ingress remains absent unless anchored plus open-water evidence shows a real entrance-starvation defect.
 
 ## Non-Goals
 
@@ -1160,9 +1285,9 @@ Pass only if:
 - Do not integrate Impact Ripple-to-Foam behaviour in the current Stage 6 plan.
 - Do not use a shader-only procedural mask to invent macro topology.
 - Do not treat topology as a final occupancy picture.
-- Do not make topology directly spawn, hide, reveal, or erase foam.
-- Do not make banks, Pressure, Lee, Major, Connector, or Pocket unlimited emitters.
-- Do not make distributed random births the primary visible shape source.
+- Do not let the topology runtime directly spawn, hide, reveal, or erase Foam; the material-owned scheduler may only sample topology as bounded event context.
+- Do not make banks, Pressure, Lee, Major, Connector, or negative classes continuous or unlimited emitters.
+- Do not use instantaneous random stamps, independent noise, or global target-coverage repair as the visible birth system.
 - Do not build a real evolving web graph, dynamic node network, or per-structure object conveyor.
 - Do not add expensive hard obstacle handling unless a visible gameplay defect justifies it.
 - Do not let tiny fragments become the dominant identity.
@@ -1182,8 +1307,9 @@ Stage 6 closes only after:
 1. Anchored Support inputs and current Obstacle Footprint diagnostics remain accepted;
 2. Major, Connector, and all four Negative Aging Pressure classes pass separately and together;
 3. terminology and authoring are coherent;
-4. soft topology-to-lifetime material response passes;
-5. end-of-life fragmentation and dissipation pass;
-6. final rendering and public controls pass;
-7. PC-first profiling, quality, lifecycle, chunking, sleeping, freeze/thaw, reverse-flow, and long-running regression pass;
-8. the roadmap is updated with conservative measured results.
+4. soft topology-to-lifetime material response passes with legitimate born material;
+5. anchored and open-water progressive birth events pass separately and together without target-coverage filling;
+6. Integrity, fracture, fragment separation, breakup motion, and end-of-life dissolution pass;
+7. mature state-backed rendering and consolidated public controls pass against the reference hierarchy;
+8. PC-first profiling, quality, lifecycle, chunking, sleeping, freeze/thaw, reverse-flow, and long-running regression pass;
+9. the roadmap is updated with conservative measured results.

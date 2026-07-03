@@ -76,6 +76,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void OnDestroy()
         {
+            BindDisabled();
             ReleaseResources();
         }
 
@@ -149,8 +150,6 @@ namespace ProgrammaticStylized3D.Rivers
 
             bool automaticMaterialSupplyActive =
                 IsAutomaticMaterialSupplyActive;
-            // TODO: Audit topology/debug gating so Final Foam does not force
-            // diagnostic-grade topology composition or metric refreshes.
             bool topologyDebugActive = IsTopologyDebugActive;
             bool materialWork =
                 automaticMaterialSupplyActive ||
@@ -418,13 +417,15 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             int injectionIndex = ++manualInjectionSequence;
-            float resolvedFreshness = Mathf.Clamp01(freshness);
+            // Keep the public parameter name for source compatibility; its
+            // canonical Patch 4.11A meaning is normalized initial Remaining Life.
+            float resolvedRemainingLife = Mathf.Clamp01(freshness);
             float shapeSeed = river.VisualSeed + injectionIndex * 17.371f;
             float phase = Mathf.Repeat(
                 river.VisualSeed * 0.000173f + injectionIndex * 0.6180339f,
                 1f);
             float integrity = Mathf.Clamp01(
-                Mathf.Lerp(0.78f, 1f, resolvedFreshness));
+                Mathf.Lerp(0.78f, 1f, resolvedRemainingLife));
 
             pendingInjections.Add(
                 new PendingInjection(
@@ -432,7 +433,7 @@ namespace ProgrammaticStylized3D.Rivers
                     Mathf.Clamp(acrossNormalized, -1f, 1f),
                     Mathf.Clamp(radius, 0.05f, 8f),
                     resolvedAmount,
-                    resolvedFreshness,
+                    resolvedRemainingLife,
                     integrity,
                     phase,
                     Mathf.Clamp(elongation, 0.25f, 8f),

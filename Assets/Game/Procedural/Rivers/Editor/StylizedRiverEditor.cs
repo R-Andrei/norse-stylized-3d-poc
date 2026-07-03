@@ -1564,6 +1564,28 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent(
                     "Free-Water Event Amount",
                     "Controls the nested deterministic population of sparse valid-water negative events that require no Major or Connector host. Neutral or weakly supported opportunities activate first, but positive overlap remains permitted. Zero disables them; 0.5 is the normal sparse baseline; one permits the maximum bounded population."));
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField("Material Lifecycle", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(
+                Find("foamNeutralLifetime"),
+                new GUIContent(
+                    "Neutral Lifetime (s)",
+                    "Normalized Remaining Life reaches zero after approximately this many seconds in neutral water. Support and Negative Aging Pressure continuously multiply the local aging rate."));
+            EditorGUILayout.PropertyField(
+                Find("foamSupportedAgingRate"),
+                new GUIContent(
+                    "Supported Aging Rate",
+                    "Aging-rate multiplier at full positive support. Values below one extend life. At the default 0.20, fully supported Foam ages five times more slowly than neutral Foam before negative overlap is considered."));
+            EditorGUILayout.PropertyField(
+                Find("foamNegativeAgingRate"),
+                new GUIContent(
+                    "Negative Aging Rate",
+                    "Aging-rate multiplier at full Negative Aging Pressure. Values above one shorten life. Positive and negative rates multiply rather than destructively erasing one another."));
+            DrawFoamLifecycleTimingSummary(
+                Find("foamNeutralLifetime"),
+                Find("foamSupportedAgingRate"),
+                Find("foamNegativeAgingRate"));
             EditorGUILayout.PropertyField(
                 Find("foamColour"),
                 new GUIContent(
@@ -1613,10 +1635,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Amount",
                         "Persistent Foam coverage injected into the shared field."));
                 EditorGUILayout.PropertyField(
-                    Find("foamTestFreshness"),
+                    Find("foamTestRemainingLife"),
                     new GUIContent(
-                        "Freshness",
-                        "Initial source youth. Freshness decays much faster than Amount, while injected Integrity begins high automatically."));
+                        "Initial Remaining Life",
+                        "Normalized lifetime assigned to newly injected material. One starts with a complete lifetime; lower values begin closer to end-of-life weakening and dissipation. Injected Integrity still begins high automatically."));
                 EditorGUILayout.PropertyField(
                     Find("foamTestElongation"),
                     new GUIContent(
@@ -1649,7 +1671,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     if (GUILayout.Button(
                             new GUIContent(
                                 "Emit Thin Ribbon",
-                                "Injects a narrow elongated patch to test transport, Freshness loss, Integrity weakening, and crisp state extraction.")))
+                                "Injects a narrow elongated patch to test transport, Remaining Life loss, Integrity weakening, and crisp state extraction.")))
                     {
                         ApplyFoamTestProperties();
                         river.EmitFoamThinRibbon();
@@ -1669,7 +1691,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     if (GUILayout.Button(
                             new GUIContent(
                                 "Emit Fragment Chain",
-                                "Injects a staggered chain of small sources to compare independent phase, Amount lifetime, Freshness lifetime, and Integrity evolution.")))
+                                "Injects a staggered chain of small sources to compare independent phase, Remaining Life, and Integrity evolution.")))
                     {
                         ApplyFoamTestProperties();
                         river.EmitFoamFragmentChain();
@@ -1724,7 +1746,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Anchored Support",
                 "Support Classes",
                 "Negative Influence Classes",
-                "Support and Negative Influence"
+                "Support and Negative Influence",
+                "Material Remaining Life"
             };
             int[] foamDebugValues =
             {
@@ -1732,7 +1755,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.AnchoredSupport,
                 (int)StylizedRiverFoamDebugView.SupportClasses,
                 (int)StylizedRiverFoamDebugView.NegativeInfluenceClasses,
-                (int)StylizedRiverFoamDebugView.SupportAndNegativeInfluence
+                (int)StylizedRiverFoamDebugView.SupportAndNegativeInfluence,
+                (int)StylizedRiverFoamDebugView.MaterialRemainingLife
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -1746,7 +1770,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             int selectedDebugIndex = EditorGUILayout.Popup(
                 new GUIContent(
                     "Debug View",
-                    "Final Foam disables Foam diagnostics. Only the four currently authoritative topology diagnostics remain available."),
+                    "Final Foam disables Foam diagnostics. Four topology diagnostics and one material-lifetime diagnostic remain available."),
                 currentDebugIndex,
                 foamDebugLabels);
             if (EditorGUI.EndChangeCheck())
@@ -2593,12 +2617,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Major Support Coverage",
                     FormatPercent(runtime.MajorSupportCoverage));
                 EditorGUILayout.LabelField(
-                    "Legacy Net Support Coverage",
-                    FormatPercent(runtime.LegacyNetSupportCoverage));
-                EditorGUILayout.LabelField(
-                    "Open Span Coverage",
-                    FormatPercent(runtime.OpenSpanCoverage));
-                EditorGUILayout.LabelField(
                     "Connector Support Coverage",
                     FormatPercent(runtime.ConnectorSupportCoverage));
                 EditorGUILayout.LabelField(
@@ -2606,10 +2624,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     FormatPercent(runtime.ConnectorMajorOverlap));
                 EditorGUILayout.LabelField(
                     "Negative Aging Pressure Coverage",
-                    FormatPercent(runtime.PocketPressureCoverage));
+                    FormatPercent(runtime.NegativeAgingPressureCoverage));
                 EditorGUILayout.LabelField(
-                    "Foam Within Negative Pressure",
-                    FormatPercent(runtime.FoamWithinPocketPressure));
+                    "Foam Within Negative Aging Pressure",
+                    FormatPercent(runtime.FoamWithinNegativeAgingPressure));
                 EditorGUILayout.LabelField(
                     "Visible Material Coverage",
                     FormatPercent(runtime.VisibleMaterialCoverage));
@@ -3241,6 +3259,62 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUIUtility.PingObject(asset);
         }
 
+        private static void DrawFoamLifecycleTimingSummary(
+            SerializedProperty neutralLifetimeProperty,
+            SerializedProperty supportedAgingRateProperty,
+            SerializedProperty negativeAgingRateProperty)
+        {
+            EditorGUILayout.Space(2f);
+
+            if (neutralLifetimeProperty.hasMultipleDifferentValues ||
+                supportedAgingRateProperty.hasMultipleDifferentValues ||
+                negativeAgingRateProperty.hasMultipleDifferentValues)
+            {
+                EditorGUILayout.HelpBox(
+                    "Calculated lifetimes require the selected rivers to use the same lifecycle values.",
+                    MessageType.Info);
+                return;
+            }
+
+            float neutralLifetime = Mathf.Max(0.0001f, neutralLifetimeProperty.floatValue);
+            float supportedAgingRate = Mathf.Max(0.0001f, supportedAgingRateProperty.floatValue);
+            float negativeAgingRate = Mathf.Max(0.0001f, negativeAgingRateProperty.floatValue);
+
+            float supportedLifetime = neutralLifetime / supportedAgingRate;
+            float negativeLifetime = neutralLifetime / negativeAgingRate;
+            float overlapLifetime =
+                neutralLifetime / (supportedAgingRate * negativeAgingRate);
+
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.LabelField(
+                new GUIContent(
+                    "Calculated Lifetimes",
+                    "Approximate time for normalized Remaining Life to reach zero. Supply, reinforcement, and amount-weighted merging can add younger material during runtime."),
+                EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                "Neutral Water",
+                FormatFoamLifetime(neutralLifetime));
+            EditorGUILayout.LabelField(
+                "Full Positive Support",
+                FormatFoamLifetime(supportedLifetime));
+            EditorGUILayout.LabelField(
+                "Full Negative Aging Pressure",
+                FormatFoamLifetime(negativeLifetime));
+            EditorGUILayout.LabelField(
+                "Full Support + Full Negative",
+                FormatFoamLifetime(overlapLifetime));
+            EditorGUILayout.LabelField(
+                "Calculation",
+                "Neutral lifetime ÷ combined aging-rate multiplier",
+                EditorStyles.miniLabel);
+            EditorGUILayout.EndVertical();
+        }
+
+        private static string FormatFoamLifetime(float seconds)
+        {
+            return $"{seconds:0.##} s";
+        }
+
         private void DrawStatus()
         {
             if (targets.Length != 1)
@@ -3318,6 +3392,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 case StylizedRiverFoamDebugView.SupportAndNegativeInfluence:
                     return
                         "Green = the unweighted maximum of Major Support, Connector Support, Pressure Support, Lee Support, and Shore Support. Red = the maximum of aggregate Negative Aging Pressure and Obstacle Footprint. Yellow means both are present at the same location; it does not mean either field has already erased the other. Black = neither.";
+
+                case StylizedRiverFoamDebugView.MaterialRemainingLife:
+                    return
+                        "Persistent material Remaining Life after transport and amount-weighted merging. White/cyan is young material, amber is mid-life, red is near death, and black contains no visible Foam. Compare an injected patch while switching to the support/negative views to verify slower supported aging, neutral aging, accelerated negative aging, and continuous overlap response.";
 
                 default:
                     return "Normal rendered Foam result. No Foam diagnostic colour encoding is active.";

@@ -146,7 +146,7 @@ void ApplyFoamDistributedSupply(
     float downstreamSign,
     FoamMotionSample motion,
     inout float amount,
-    inout float freshness,
+    inout float remainingLife,
     inout float integrity,
     inout float phase)
 {
@@ -186,12 +186,16 @@ void ApplyFoamDistributedSupply(
         float previousAmount = amount;
         amount = saturate(amount + bornAmount * (1.0 - amount));
         float added = max(0.0, amount - previousAmount);
-        float sourceFreshness = lerp(0.50, 0.78, sourcePulse);
+        float sourceRemainingLife = lerp(0.50, 0.78, sourcePulse);
         float sourceIntegrity = lerp(0.62, 0.86, sourcePulse);
         if (amount > 0.0001)
         {
-            freshness = saturate((freshness * previousAmount + sourceFreshness * added) / amount);
-            integrity = saturate((integrity * previousAmount + sourceIntegrity * added) / amount);
+            remainingLife = saturate(
+                (remainingLife * previousAmount +
+                 sourceRemainingLife * added) / amount);
+            integrity = saturate(
+                (integrity * previousAmount +
+                 sourceIntegrity * added) / amount);
         }
         float sourcePhase = frac(
             sourceNoise * 0.73 +

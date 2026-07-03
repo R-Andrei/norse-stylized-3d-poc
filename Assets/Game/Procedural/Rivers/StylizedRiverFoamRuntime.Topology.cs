@@ -747,6 +747,7 @@ namespace ProgrammaticStylized3D.Rivers
             using var profilerScope = DiagnosticsMeasureTopologyProfilerMarker.Auto();
             if (computeShader == null || currentState == null ||
                 topologyTexture == null || topologySourcesTexture == null ||
+                boundaryTexture == null || obstacleExclusionTexture == null ||
                 topologyMetricsBuffer == null ||
                 resetTopologyMetricsKernel < 0 ||
                 measureTopologyMetricsKernel < 0)
@@ -789,6 +790,10 @@ namespace ProgrammaticStylized3D.Rivers
                 measureTopologyMetricsKernel,
                 "_FoamBoundary",
                 boundaryTexture);
+            computeShader.SetTexture(
+                measureTopologyMetricsKernel,
+                "_FoamObstacleExclusionRead",
+                obstacleExclusionTexture);
             computeShader.SetBuffer(
                 measureTopologyMetricsKernel,
                 "_FoamTopologyMetrics",

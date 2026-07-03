@@ -25,11 +25,11 @@
 #include "CS_RiverFoam.Coordinates.hlsl"
 #include "CS_RiverFoam.Sampling.hlsl"
 #include "CS_RiverFoam.Noise.hlsl"
+#include "CS_RiverFoam.Topology.hlsl"
 #include "CS_RiverFoam.Support.hlsl"
 #include "CS_RiverFoam.Network.hlsl"
 #include "CS_RiverFoam.Motion.hlsl"
 #include "CS_RiverFoam.Simulation.hlsl"
-#include "CS_RiverFoam.Topology.hlsl"
 #include "CS_RiverFoam.Evolution.hlsl"
 #include "CS_RiverFoam.TopologyTransition.hlsl"
 
@@ -148,15 +148,34 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
 
     float4 previous = _FoamStateWrite[coordinate];
     float previousAmount = saturate(previous.x);
+    float previousRemainingLife = previousAmount > 0.0001
+        ? saturate(previous.y / previousAmount)
+        : 0.0;
+    float previousIntegrity = previousAmount > 0.0001
+        ? saturate(previous.z / previousAmount)
+        : 0.0;
     float injectedAmount = saturate(
         shape * _FoamInjectionAmount * coverage);
     float combinedAmount = 1.0 -
         (1.0 - previousAmount) * (1.0 - injectedAmount);
     float addedAmount = max(0.0, combinedAmount - previousAmount);
-    float injectedFreshness = saturate(
-        shape * _FoamInjectionFreshness * coverage);
+    float injectedRemainingLife = saturate(
+        _FoamInjectionRemainingLife);
     float injectedIntegrity = saturate(
-        shape * _FoamInjectionIntegrity * coverage);
+        _FoamInjectionIntegrity);
+
+    float remainingLife = combinedAmount > 0.0001
+        ? saturate(
+            (previousRemainingLife * previousAmount +
+             injectedRemainingLife * addedAmount) /
+            combinedAmount)
+        : 0.0;
+    float integrity = combinedAmount > 0.0001
+        ? saturate(
+            (previousIntegrity * previousAmount +
+             injectedIntegrity * addedAmount) /
+            combinedAmount)
+        : 0.0;
 
     float phase = saturate(_FoamInjectionPhase);
     if (previousAmount > 0.001 && combinedAmount > 0.001)
@@ -168,8 +187,8 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     previous.x = combinedAmount;
-    previous.y = max(saturate(previous.y), injectedFreshness);
-    previous.z = max(saturate(previous.z), injectedIntegrity);
+    previous.y = combinedAmount * remainingLife;
+    previous.z = combinedAmount * integrity;
     previous.w = combinedAmount > 0.001 ? phase : 0.0;
     _FoamStateWrite[coordinate] = saturate(previous);
 }
@@ -593,7 +612,7 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
         metric);
     float majorSupport = generatedTopology.r;
     float connectorSupport = generatedTopology.g;
-    float pocketAgingPressure = generatedTopology.b;
+    float negativeAgingPressure = generatedTopology.b;
 
     float4 staticPressure = 0.0.xxxx;
     float4 staticWake = 0.0.xxxx;
@@ -707,10 +726,11 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
     float dynamicShoreMask = shoreSupport * validDomainMask *
         (1.0 - obstacleFootprint);
 
-    // Pocket remains an independent negative field, so weak and transitional
-    // positive influence may still overlap it and later compete through the
-    // material-lifecycle response. Only authoritative strong anchored cores
-    // are protected here, together with the exact obstacle footprint.
+    // Aggregate Negative Aging Pressure remains an independent negative field,
+    // so weak and transitional positive influence may still overlap it and
+    // later compete through the material-lifecycle response. Only authoritative
+    // strong anchored cores are protected here, together with the exact
+    // obstacle footprint.
     float anchoredCore = max(
         max(pressureSupport, leeSupport),
         shoreSupport);
@@ -718,17 +738,18 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
         0.72,
         0.92,
         anchoredCore);
-    pocketAgingPressure *=
+    negativeAgingPressure *=
         (1.0 - anchoredCoreProtection) *
         (1.0 - obstacleFootprint);
 
-    // Topology RGBA = Major, Connector, Pocket Aging Pressure, and the derived
+    // Topology RGBA = Major, Connector, aggregate Negative Aging Pressure,
+    // and the derived
     // guidance-resolution copy of the conservative current-water solid mask.
     // Anchored source RGBA = Pressure Support, Lee Support, Shore Support, zero.
     float4 topology = saturate(float4(
         majorSupport * staticFluidMask,
         connectorSupport * staticFluidMask,
-        pocketAgingPressure * staticFluidMask,
+        negativeAgingPressure * staticFluidMask,
         obstacleFootprint));
     float4 sources = saturate(float4(
         pressureSupport * staticFluidMask,
@@ -767,22 +788,36 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     float2 fullPixel = FoamUVToTexelCoordinate(uv, _FoamDimensions);
-    if (SampleBoundaryBilinear(fullPixel).x <= 0.001)
+    float boundaryCoverage = SampleBoundaryBilinear(fullPixel).x;
+    int2 obstacleCoordinate = int2(
+        FoamUVToContainingTexel(uv.x, _FoamDimensions.x),
+        FoamUVToContainingTexel(uv.y, _FoamDimensions.y));
+    float canonicalObstacleFootprint = LoadObstacleExclusionCell(
+        obstacleCoordinate);
+
+    float4 topology = _FoamTopologyRead.Load(int3(dispatchId.xy, 0));
+    float4 sources = _FoamTopologySourcesRead.Load(int3(dispatchId.xy, 0));
+    FoamMaterialTopologySample materialTopology =
+        FoamResolveMaterialTopology(
+            topology,
+            sources,
+            boundaryCoverage,
+            canonicalObstacleFootprint);
+    if (materialTopology.validFluid <= 0.001)
     {
         return;
     }
 
-    float4 topology = _FoamTopologyRead.Load(int3(dispatchId.xy, 0));
-    float4 sources = _FoamTopologySourcesRead.Load(int3(dispatchId.xy, 0));
-    float legacyNetSupport = FoamComposeLegacyNetSupport(topology, sources);
     float amount = SampleStateAtUV(uv).x;
     bool visible = amount >= _FoamVisibleThreshold;
-    bool major = topology.r >= 0.15;
-    bool connector = topology.g >= 0.12;
-    bool pocket = topology.b >= 0.35;
-    bool supported = legacyNetSupport >= 0.15;
-    bool shoreSupported = sources.b >= 0.15;
-    bool pressureLeeSupported = max(sources.r, sources.g) >= 0.15;
+    bool major = materialTopology.majorSupport >= 0.15;
+    bool connector = materialTopology.connectorSupport >= 0.12;
+    bool negativeAging =
+        materialTopology.negativeAgingPressure >= 0.35;
+    bool shoreSupported = materialTopology.shoreSupport >= 0.15;
+    bool pressureLeeSupported = max(
+        materialTopology.pressureSupport,
+        materialTopology.leeSupport) >= 0.15;
 
     float2 texel = 1.0 /
         max(float2(2.0, 2.0), (float2)_FoamTopologyDimensions);
@@ -796,17 +831,17 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     _FoamTopologyMetrics.InterlockedAdd(0u, 1u, originalValue);
     _FoamTopologyMetrics.InterlockedAdd(4u, major ? 1u : 0u, originalValue);
     _FoamTopologyMetrics.InterlockedAdd(8u, connector ? 1u : 0u, originalValue);
-    _FoamTopologyMetrics.InterlockedAdd(12u, pocket ? 1u : 0u, originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(
+        12u,
+        negativeAging ? 1u : 0u,
+        originalValue);
     _FoamTopologyMetrics.InterlockedAdd(
         16u,
-        pocket && visible ? 1u : 0u,
+        negativeAging && visible ? 1u : 0u,
         originalValue);
     _FoamTopologyMetrics.InterlockedAdd(20u, visible ? 1u : 0u, originalValue);
-    _FoamTopologyMetrics.InterlockedAdd(24u, supported ? 1u : 0u, originalValue);
-    uint deficitValue = supported
-        ? (uint)round(saturate(legacyNetSupport - amount) * 1023.0)
-        : 0u;
-    _FoamTopologyMetrics.InterlockedAdd(28u, deficitValue, originalValue);
+    // Metric slots 6 and 7 remain reserved after removal of the obsolete
+    // destructive net-support proof diagnostics.
     _FoamTopologyMetrics.InterlockedAdd(
         32u,
         shoreSupported ? 1u : 0u,
@@ -831,7 +866,7 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
         originalValue);
     _FoamTopologyMetrics.InterlockedAdd(
         60u,
-        connector && topology.r >= 0.24 ? 1u : 0u,
+        connector && materialTopology.majorSupport >= 0.24 ? 1u : 0u,
         originalValue);
 }
 
@@ -1261,8 +1296,12 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     corrected.x = min(corrected.x, donorMaximum + 0.0005);
 
     float amount = saturate(corrected.x);
-    float freshness = saturate(corrected.y);
-    float integrity = saturate(corrected.z);
+    float remainingLife = amount > 0.0001
+        ? saturate(corrected.y / amount)
+        : 0.0;
+    float integrity = amount > 0.0001
+        ? saturate(corrected.z / amount)
+        : 0.0;
     float phase = saturate(forward.w);
 
     float agitation = saturate(_FoamEvolution / 1.8);
@@ -1309,12 +1348,41 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         downstreamSign,
         motion,
         amount,
-        freshness,
+        remainingLife,
         integrity,
         phase);
 
+    float4 topologyState = _FoamTopologyRead.Load(
+        int3(coordinate, 0));
+    float4 anchoredSources = _FoamTopologySourcesRead.Load(
+        int3(coordinate, 0));
+    float obstacleFootprint = _FoamObstacleExclusionRead.Load(
+        int3(coordinate, 0));
+    FoamMaterialTopologySample materialTopology =
+        FoamResolveMaterialTopology(
+            topologyState,
+            anchoredSources,
+            coverage,
+            obstacleFootprint);
+    float positiveInfluence = FoamCombinedMaterialSupport(
+        materialTopology);
+    float positiveAgeFactor = lerp(
+        1.0,
+        max(0.01, _FoamPositiveAgeMultiplier),
+        positiveInfluence);
+    float negativeAgeFactor = lerp(
+        1.0,
+        max(1.0, _FoamNegativeAgeMultiplier),
+        materialTopology.negativeAgingPressure);
+    float localAgeRate = positiveAgeFactor * negativeAgeFactor;
+    remainingLife = max(
+        0.0,
+        remainingLife -
+        _FoamDeltaTime * localAgeRate /
+        max(0.05, _FoamNeutralLifetime));
+
     float2 fracture = SampleFractureBilinear(fieldUV);
-    float age = 1.0 - freshness;
+    float age = 1.0 - remainingLife;
     float turbulenceDamage = saturate(
         motion.wakeEnergy * 0.12 + motion.rippleIntensity * 0.38);
     float strainDamage = saturate(
@@ -1327,7 +1395,7 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
 
     float captureSupport = saturate(motion.capture * (0.10 + motion.leeStrength * 0.25));
     integrity += (1.0 - integrity) * captureSupport * _FoamDeltaTime;
-    integrity = max(integrity, freshness * 0.34);
+    integrity = max(integrity, remainingLife * 0.34);
 
     float structuralWeakness = pow(saturate(1.0 - integrity), lerp(2.2, 1.18, fragmentation));
     float coherentTear =
@@ -1382,18 +1450,30 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         float added = max(0.0, amount - previousAmount);
         if (amount > 0.0001)
         {
-            freshness = saturate((freshness * previousAmount + saturate(0.54 + impactReinforcement * 0.28) * added) / amount);
-            integrity = saturate((integrity * previousAmount + saturate(0.52 + leeReinforcement * 0.32) * added) / amount);
+            remainingLife = saturate(
+                (remainingLife * previousAmount +
+                 saturate(0.54 + impactReinforcement * 0.28) * added) /
+                amount);
+            integrity = saturate(
+                (integrity * previousAmount +
+                 saturate(0.52 + leeReinforcement * 0.32) * added) /
+                amount);
         }
     }
 
     float captureRetention = saturate(
         motion.capture + boundary.y * max(0.0, _FoamShoreRetention));
-    float amountDecay = max(0.0, _FoamAmountDecay);
+    float endOfLife = 1.0 - smoothstep(
+        0.0,
+        max(0.001, _FoamEndOfLifeDissipationStart),
+        remainingLife);
+    float amountDecay = max(
+        0.0,
+        _FoamEndOfLifeDissipationRate) *
+        endOfLife * endOfLife;
     amountDecay *= lerp(1.0, 0.075, pow(captureRetention, 1.30));
     amountDecay *= lerp(1.0, 0.46, tinyFragment);
     amount *= exp(-amountDecay * _FoamDeltaTime);
-    freshness *= exp(-max(0.0, _FoamFreshnessDecay) * _FoamDeltaTime);
 
     float capturePeel =
         captureRetention * age * edgeExposure * fragmentation *
@@ -1401,11 +1481,13 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     amount *= exp(-capturePeel * _FoamDeltaTime);
 
     amount *= lerp(0.52, 1.0, coverage);
-    freshness *= lerp(0.68, 1.0, coverage);
+    // Boundary coverage scales transported material moments together with
+    // Amount. Do not independently shorten normalized Remaining Life near the
+    // shore; Shore Support already owns the material-facing aging response.
     integrity *= lerp(0.72, 1.0, coverage);
 
     amount = saturate(amount);
-    freshness = saturate(freshness);
+    remainingLife = saturate(remainingLife);
     integrity = saturate(integrity);
     if (amount < 0.001)
     {
@@ -1414,7 +1496,11 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     float materialPresence = smoothstep(0.001, 0.035, amount);
-    freshness *= materialPresence;
+    remainingLife *= materialPresence;
     integrity *= materialPresence;
-    _FoamStateWrite[coordinate] = saturate(float4(amount, freshness, integrity, phase));
+    _FoamStateWrite[coordinate] = saturate(float4(
+        amount,
+        amount * remainingLife,
+        amount * integrity,
+        phase));
 }

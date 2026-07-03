@@ -124,6 +124,11 @@ namespace ProgrammaticStylized3D.Rivers
                 case InitializationPhase.ReleaseOldResources:
                     using (InitReleaseOldResourcesProfilerMarker.Auto())
                     {
+                        if (!HasTopologyTransitionVisibleHold)
+                        {
+                            BindDisabled();
+                        }
+
                         ReleaseResources(false);
                     }
 
