@@ -88,7 +88,6 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamGuidance("Foam Guidance", 2D) = "black" {}
         [HideInInspector] _FoamTopology("Foam Topology", 2D) = "black" {}
         [HideInInspector] _FoamTopologySources("Foam Topology Sources", 2D) = "black" {}
-        [HideInInspector] _FoamFracture("Foam Fracture", 2D) = "black" {}
         [HideInInspector] _FoamBoundary("Foam Boundary", 2D) = "black" {}
         [HideInInspector] _FoamObstacleExclusion("Foam Obstacle Footprint", 2D) = "black" {}
         [HideInInspector] _FoamInterpolation("Foam Interpolation", Range(0, 1)) = 1
@@ -292,8 +291,6 @@ Shader "PS3D/Stylized River Water"
             // sampler name remain associated with an actively sampled texture.
             TEXTURE2D(_FoamTopology);
             TEXTURE2D(_FoamTopologySources);
-            TEXTURE2D(_FoamFracture);
-            SAMPLER(sampler_FoamFracture);
             TEXTURE2D(_FoamBoundary);
             SAMPLER(sampler_FoamBoundary);
             TEXTURE2D(_FoamObstacleExclusion);

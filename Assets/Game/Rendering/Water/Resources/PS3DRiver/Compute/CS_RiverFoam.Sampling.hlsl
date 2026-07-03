@@ -141,33 +141,6 @@ float4 SampleStateAtUV(float2 uv)
 
 
 
-float2 LoadFracture(int2 coordinate)
-{
-    int2 safeDimensions = max(_FoamFractureDimensions, int2(1, 1));
-    int2 clamped = clamp(coordinate, int2(0, 0), safeDimensions - int2(1, 1));
-    return saturate(_FoamFractureRead.Load(int3(clamped, 0)));
-}
-
-
-float2 SampleFractureBilinear(float2 uv)
-{
-    int2 safeDimensions = max(_FoamFractureDimensions, int2(1, 1));
-    float2 coordinate = FoamUVToTexelCoordinate(
-        uv,
-        safeDimensions);
-    int2 baseCoordinate = int2(floor(coordinate));
-    int2 nextCoordinate = min(
-        baseCoordinate + int2(1, 1),
-        safeDimensions - int2(1, 1));
-    float2 blend = frac(coordinate);
-    float2 a = LoadFracture(baseCoordinate);
-    float2 b = LoadFracture(int2(nextCoordinate.x, baseCoordinate.y));
-    float2 c = LoadFracture(int2(baseCoordinate.x, nextCoordinate.y));
-    float2 d = LoadFracture(nextCoordinate);
-    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
-}
-
-
 void ResolveExternalBilinearCoordinates(
     int2 dimensions,
     float2 uv,

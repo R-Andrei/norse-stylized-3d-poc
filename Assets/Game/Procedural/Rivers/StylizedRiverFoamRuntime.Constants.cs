@@ -121,14 +121,10 @@ namespace ProgrammaticStylized3D.Rivers
         private const float ProvisionalMaterialShapeVariety = 0.763854f;
         private const float ProvisionalMaterialFlowFollow = 1.02818f;
         private const float ProvisionalMaterialEvolution = 1.26135f;
-        private const float ProvisionalMaterialBreakup = 0.703747f;
         private const float ProvisionalMaterialSpread = 0.42858f;
         private const float ProvisionalMaterialCohesion = 0.056401f;
         private const float ProvisionalMaterialConnectivity = 0.228127f;
-        private const float ProvisionalMaterialIntegrityDamage = 0.703747f;
         private const float ProvisionalMaterialShoreRetention = 1.35f;
-        private const float ProvisionalMaterialTargetCoverage = 0.203078f;
-        private const float ProvisionalMaterialSupplyRate = 1.1152f;
         private const float ProvisionalMaterialVisibleThreshold = 0.16432f;
         private const float ProvisionalMaterialGuidanceStrength = 1.15646f;
         private const float ProvisionalMaterialBoundaryAttraction = 1.951f;
@@ -173,10 +169,8 @@ namespace ProgrammaticStylized3D.Rivers
             BuildConnectorTopology,
             BuildPocketTopology,
             ClearMaterial,
-            ClearFracture,
             BuildGuidance,
             RefreshInitialTopologySources,
-            MeasureInitialPopulation,
             Finalize,
             Ready,
             Failed
@@ -266,7 +260,6 @@ namespace ProgrammaticStylized3D.Rivers
             public RenderTexture Guidance;
             public RenderTexture Topology;
             public RenderTexture TopologySources;
-            public RenderTexture Fracture;
             public RenderTexture ObstacleExclusion;
             public Texture2D Boundary;
             public float Interpolation;
@@ -313,8 +306,6 @@ namespace ProgrammaticStylized3D.Rivers
             new ProfilerMarker("RiverFoam.Init.BuildObstacleExclusion");
         private static readonly ProfilerMarker InitClearMaterialProfilerMarker =
             new ProfilerMarker("RiverFoam.Init.ClearMaterial");
-        private static readonly ProfilerMarker InitClearFractureProfilerMarker =
-            new ProfilerMarker("RiverFoam.Init.ClearFracture");
         private static readonly ProfilerMarker InitBuildGuidanceProfilerMarker =
             new ProfilerMarker("RiverFoam.Init.BuildGuidance");
         private static readonly ProfilerMarker TopologyBuildMajorProfilerMarker =
@@ -333,8 +324,6 @@ namespace ProgrammaticStylized3D.Rivers
             new ProfilerMarker("RiverFoam.Evolution.UploadMajorDescriptors");
         private static readonly ProfilerMarker MajorEvolutionBuildProfilerMarker =
             new ProfilerMarker("RiverFoam.Evolution.BuildMajorField");
-        private static readonly ProfilerMarker DiagnosticsMeasurePopulationProfilerMarker =
-            new ProfilerMarker("RiverFoam.Diagnostics.MeasurePopulation");
         private static readonly ProfilerMarker DiagnosticsMeasureTopologyProfilerMarker =
             new ProfilerMarker("RiverFoam.Diagnostics.MeasureTopology");
         private static readonly ProfilerMarker RebuildBuildBoundaryProfilerMarker =
@@ -372,8 +361,6 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamTopology");
         private static readonly int FoamTopologySourcesId =
             Shader.PropertyToID("_FoamTopologySources");
-        private static readonly int FoamFractureId =
-            Shader.PropertyToID("_FoamFracture");
         private static readonly int FoamBoundaryId =
             Shader.PropertyToID("_FoamBoundary");
         private static readonly int FoamObstacleExclusionId =

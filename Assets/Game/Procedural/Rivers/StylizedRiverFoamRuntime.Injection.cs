@@ -160,16 +160,6 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
-        private void ActivateAllChunks(double activeUntil)
-        {
-            for (int chunk = 0; chunk < chunkCount; chunk++)
-            {
-                chunkActive[chunk] = true;
-                chunkActiveUntil[chunk] = Math.Max(
-                    chunkActiveUntil[chunk],
-                    activeUntil);
-            }
-        }
 
         private void UpdateActiveChunks(float now)
         {

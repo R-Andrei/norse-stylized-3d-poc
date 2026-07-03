@@ -736,7 +736,6 @@ namespace ProgrammaticStylized3D.Rivers
             snapshot.Guidance = guidanceTexture;
             snapshot.Topology = topologyTexture;
             snapshot.TopologySources = topologySourcesTexture;
-            snapshot.Fracture = currentFracture;
             snapshot.ObstacleExclusion = obstacleExclusionTexture;
             snapshot.Boundary = boundaryTexture;
             snapshot.Interpolation = simulationInterpolation;
@@ -756,15 +755,6 @@ namespace ProgrammaticStylized3D.Rivers
             guidanceTexture = null;
             topologyTexture = null;
             topologySourcesTexture = null;
-            if (fractureA == snapshot.Fracture)
-            {
-                fractureA = null;
-            }
-            if (fractureB == snapshot.Fracture)
-            {
-                fractureB = null;
-            }
-            currentFracture = null;
             obstacleExclusionTexture = null;
             boundaryTexture = null;
         }
@@ -820,17 +810,14 @@ namespace ProgrammaticStylized3D.Rivers
             RenderTexture guidance = snapshot.Guidance;
             RenderTexture topology = snapshot.Topology;
             RenderTexture sources = snapshot.TopologySources;
-            RenderTexture fracture = snapshot.Fracture;
             RenderTexture obstacle = snapshot.ObstacleExclusion;
             ReleaseTexture(ref guidance);
             ReleaseTexture(ref topology);
             ReleaseTexture(ref sources);
-            ReleaseTexture(ref fracture);
             ReleaseTexture(ref obstacle);
             snapshot.Guidance = null;
             snapshot.Topology = null;
             snapshot.TopologySources = null;
-            snapshot.Fracture = null;
             snapshot.ObstacleExclusion = null;
 
             if (snapshot.Boundary != null)
@@ -925,7 +912,6 @@ namespace ProgrammaticStylized3D.Rivers
                 EstimateTextureBytes(snapshot.Guidance) +
                 EstimateTextureBytes(snapshot.Topology) +
                 EstimateTextureBytes(snapshot.TopologySources) +
-                EstimateTextureBytes(snapshot.Fracture) +
                 EstimateTextureBytes(snapshot.ObstacleExclusion) +
                 EstimateTextureBytes(snapshot.Boundary);
         }

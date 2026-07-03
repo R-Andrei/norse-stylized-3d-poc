@@ -28,10 +28,6 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamGuidanceDimensions",
                 guidanceWidth,
                 guidanceHeight);
-            computeShader.SetInts(
-                "_FoamFractureDimensions",
-                fractureWidth,
-                fractureHeight);
             computeShader.SetInt("_FoamChunkCount", chunkCount);
             computeShader.SetFloat(
                 "_FoamGlobalStart",

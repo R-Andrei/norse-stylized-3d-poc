@@ -60,6 +60,7 @@ Patch 4.9 cache/precompute status:
 - Patch 4.10A freezes the material-facing topology contract, and Patch 4.10B runtime hardening, semantic accessors, obsolete-proof cleanup, and bounded Unity validation are complete; topology generation is closed;
 - Patch 4.11A persistent Remaining Life, amount-weighted lifecycle transport/merge, topology-driven aging, and gradual end-of-life material dissipation are implemented and accepted for progression; full visible lifecycle validation remains coupled to the first legitimate material-birth implementation;
 - Patch 4.11B freezes the distributed event-driven material-birth architecture and the remaining step-by-step Foam sequence in documentation only;
+- Patch 4.11B.1 removes the superseded global target-coverage/distributed-supply path, its population-reduction resources and forced whole-river activation, plus the provisional fracture field and active proof tearing; Integrity remains transported but inert until Patch 4.12A;
 - event-runtime implementation, anchored births, open-water births, spatial fairness, mature fragmentation, breakup motion, dissolution presentation, and final rendering remain separate bounded patches.
 
 The canonical implementation order is topology first: complete all static topology classes, runtime evolution, rebuild crossfade, and cache/preparation handoff before beginning separate Foam-material work.
@@ -191,7 +192,7 @@ Patch 4.11A freezes the persistent material packing as:
 
 Remaining Life and Integrity are stored as amount-weighted moments. Transport, correction, splitting, and merging therefore cannot move youth or cohesion through empty cells independently of material. Consumers decode `G / R` and `B / R` only when Amount is non-zero.
 
-New manual or provisional supply material receives a normalized initial Remaining Life and Integrity. During transport, those attributes move with the material and combine by an amount-weighted rule.
+New manual or future event-born material receives a normalized initial Remaining Life and Integrity. During transport, those attributes move with the material and combine by an amount-weighted rule.
 
 ### Topology Modifies Aging Rate
 
@@ -293,7 +294,7 @@ The field representation must preserve lifecycle history without tracking a perm
 
 - When material splits, transported lifetime state travels with the separated material.
 - When material merges, Remaining Life and Integrity combine by amount-weighted moments.
-- Patch 4.11A applies the same conservative rule to manual injection, provisional distributed supply, disturbance reinforcement, advection, and final state storage.
+- Patch 4.11A applies the same conservative rule to manual injection, disturbance reinforcement, advection, and final state storage. Future event-born material must initialize the same packed moments.
 
 No per-patch IDs, managed object lists, or evolving network graph are required.
 
@@ -1031,7 +1032,7 @@ Stage 6 uses the same quality-scaled structural grid for persistent material, to
 
 Multi-chunk rivers extend the longitudinal dimension by chunk count while retaining the selected cross-river resolution.
 
-The auxiliary fracture field may remain lower resolution if it is not authoritative topology.
+Patch 4.11B.1 removes the provisional auxiliary fracture field. A future Patch 4.12 fracture representation must be introduced deliberately from the accepted Integrity contract, remain state-backed, and justify any separate resolution or storage rather than inheriting the removed proof texture.
 
 Resolution changes spatial precision and cost. It must not change physical topology scale, flow direction, lifecycle rules, or authored metric widths.
 
@@ -1170,16 +1171,17 @@ The canonical topology-only rollout is maintained in `River_Foam_Topology_Implem
 2. Patch 4.10B — harden runtime bindings, add one canonical semantic sampling helper, remove obsolete destructive-support proof plumbing, and pass bounded Unity regression validation — complete. Topology generation is closed.
 3. Patch 4.11A — establish persistent Remaining Life, conservative amount-weighted lifecycle transport/merge, multiplicative positive/negative topology aging, gradual actual material dissipation, and a dedicated lifetime diagnostic — implemented and accepted for progression. Full visual validation resumes once legitimate born material exists.
 4. Patch 4.11B — freeze the distributed event-driven birth contract and revise the remaining Foam roadmap — documentation only.
-5. Patch 4.11C — implement the fixed-capacity event runtime, one manually triggered progressive ribbon, event-state diagnostics, and correct lifecycle-state deposition. No automatic scheduling yet.
-6. Patch 4.11D — add Anchored Birth Event scheduling around lee regions, obstacle shoulders, occasional pressure faces, Shore Support, and approved Major/Connector context, with local cooldown and no continuous support emission.
-7. Patch 4.11E — add Open-Water Birth Events, broad-region inactivity weighting, local vacancy suppression, and recent-birth cooldown so every river region has a chance without target-coverage filling.
-8. Patch 4.11F — integrate both source families, validate population over short and long runs, consolidate the minimum proven birth controls, and decide from evidence whether optional minor Upstream Ingress is needed.
-9. Patch 4.12A — make Integrity an active structural property driven by age, negative pressure, disturbance, and material deformation evidence without yet inventing renderer-only cracks.
-10. Patch 4.12B — implement state-backed fracture growth, hole opening, strip separation, and detached-fragment creation while preserving Amount and lifecycle moments.
-11. Patch 4.12C — add breakup-responsive differential motion and final dissolution behaviour for detached or critically weak material.
-12. Patch 4.13A — replace the proof renderer with mature state-backed Foam presentation: broad sheets, dominant ribbons, branches, torn edges, pockets, peeling strips, and secondary fragments.
-13. Patch 4.13B — tune the integrated birth/topology/lifecycle/breakup system against the reference, consolidate public controls, remove proof-only controls and diagnostics, and freeze the final visual contract.
-14. Patch 4.14 — resume deferred PC-first profiling, quality-tier scaling, sleeping/freezing/culling validation, multi-river scheduling only where measured, and final Stage 6 regression acceptance.
+5. Patch 4.11B.1 — remove the superseded autonomous distributed-supply/population controller and provisional fracture proof so the birth proof begins from empty, inert material state — implemented; Unity validation pending.
+6. Patch 4.11C — implement the fixed-capacity event runtime, one manually triggered progressive ribbon, event-state diagnostics, and correct lifecycle-state deposition. No automatic scheduling yet.
+7. Patch 4.11D — add Anchored Birth Event scheduling around lee regions, obstacle shoulders, occasional pressure faces, Shore Support, and approved Major/Connector context, with local cooldown and no continuous support emission.
+8. Patch 4.11E — add Open-Water Birth Events, broad-region inactivity weighting, local vacancy suppression, and recent-birth cooldown so every river region has a chance without target-coverage filling.
+9. Patch 4.11F — integrate both source families, validate population over short and long runs, consolidate the minimum proven birth controls, and decide from evidence whether optional minor Upstream Ingress is needed.
+10. Patch 4.12A — make Integrity an active structural property driven by age, negative pressure, disturbance, and material deformation evidence without yet inventing renderer-only cracks.
+11. Patch 4.12B — implement state-backed fracture growth, hole opening, strip separation, and detached-fragment creation while preserving Amount and lifecycle moments.
+12. Patch 4.12C — add breakup-responsive differential motion and final dissolution behaviour for detached or critically weak material.
+13. Patch 4.13A — replace the proof renderer with mature state-backed Foam presentation: broad sheets, dominant ribbons, branches, torn edges, pockets, peeling strips, and secondary fragments.
+14. Patch 4.13B — tune the integrated birth/topology/lifecycle/breakup system against the reference, consolidate public controls, remove proof-only controls and diagnostics, and freeze the final visual contract.
+15. Patch 4.14 — resume deferred PC-first profiling, quality-tier scaling, sleeping/freezing/culling validation, multi-river scheduling only where measured, and final Stage 6 regression acceptance.
 
 Every implementation patch remains independently inspectable and may not silently absorb the behaviour assigned to later patches. Accepted topology generation stays closed unless a concrete integration defect proves otherwise.
 
@@ -1248,9 +1250,11 @@ Pass only if:
 
 ### Batch 2 Persistent Lifecycle Response
 
-Patch 4.11A implements the first bounded material-lifecycle slice and is accepted for progression after clean Unity operation. Its full visible proof remains deferred until Patch 4.11C provides legitimate material that can be followed through birth, transport, support, negative pressure, and death.
+Patch 4.11A implements the first bounded material-lifecycle slice and is accepted for progression after clean Unity operation. Patch 4.11B.1 removes the obsolete autonomous population and provisional fracture paths so Patch 4.11C begins from an empty, non-tearing baseline. Full visible lifecycle proof remains deferred until Patch 4.11C provides legitimate material that can be followed through birth, transport, support, negative pressure, and death.
 
-Pass only if:
+The 4.11B.1 cleanup baseline passes only if clearing material leaves the river empty until an explicit manual injection, no hidden target-coverage controller reactivates inactive chunks, no population-reduction buffer or cadence remains, no provisional fracture texture or active Integrity damage remains, and manual injection still transports, ages, reinforces, and dissipates through the accepted lifecycle.
+
+Patch 4.11A lifecycle response then passes only if:
 
 - topology does not directly write or erase material Amount;
 - support, neutral, and negative-influence regions visibly produce different aging rates once born material reaches them;

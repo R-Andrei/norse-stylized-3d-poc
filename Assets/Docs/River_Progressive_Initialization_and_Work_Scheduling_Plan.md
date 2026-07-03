@@ -88,8 +88,9 @@ Further performance engineering is paused because the free-water topology pipeli
 31. Patch 4.10B runtime hardening, semantic accessors, obsolete-proof cleanup, and bounded Unity validation — complete; topology generation closed;
 32. Patch 4.11A persistent Remaining Life, conservative lifecycle transport/merge, multiplicative topology aging, gradual actual material dissipation, and lifetime diagnostics — implemented and accepted for progression; full visible validation waits for legitimate born material.
 33. Patch 4.11B distributed event-driven birth architecture and revised remaining Foam sequence — documentation complete.
+34. Patch 4.11B.1 legacy autonomous material-population and provisional-fracture cleanup — implemented; Unity validation pending.
 
-The provisional distributed supply remains only as temporary proof plumbing until Patch 4.11C–4.11F replace it with fixed-capacity progressive Anchored and Open-Water Birth Events. Mature Integrity, fracture, breakup motion, rendering, and performance closure remain separate bounded patches.
+The old distributed-supply controller, population-reduction work, forced whole-river activation, and provisional fracture field are no longer runtime work categories. Until Patch 4.11C, material exists only after explicit manual injection. Mature Integrity, fracture, breakup motion, rendering, and performance closure remain separate bounded patches.
 
 Optimising ordinary topology maintenance, splitting compute assets, striping full-grid kernels, or designing global multi-river arbitration before those dependencies are real would formalise provisional work categories and likely create avoidable rewrites. Performance work resumes only after the combined topology pipeline has a stable visual and dependency contract.
 
@@ -164,6 +165,8 @@ The historical sequence included, in one synchronous call path:
 22. measuring the initial population;
 23. resetting all accumulators;
 24. returning the runtime as ready.
+
+Patch 4.11B.1 later removes the historical fracture allocation/clear phases, population metrics allocation/measurement, and autonomous whole-river supply activation. They remain listed above only because this subsection records the old measured baseline.
 
 The topology bootstrap invoked from this path is itself composite. `BuildTopologyField(0f)` currently performs:
 
@@ -466,8 +469,6 @@ ClearMaterialStateA
 ClearMaterialStateB
 ClearAdvectedState
 ClearReverseState
-ClearFractureA
-ClearFractureB
 BuildGuidance
 BuildCurrentShoreEdges
 ComposeAnchoredSources
@@ -493,7 +494,7 @@ Not every state must consume a separate frame forever. The key is that the state
 | Resolve dimensions | Calculate chunks, resolutions, lengths | Valid domain | Field dimensions | Light |
 | Allocate material textures | Create state A/B, advected, reverse | Dimensions | Material textures | Heavy allocation |
 | Allocate guidance/topology textures | Create guidance, topology, sources, generated positive fields, aggregate negative field, and required class working resources | Dimensions | Topology textures | Heavy allocation |
-| Allocate auxiliary textures | Create shore edges, obstacle, fracture A/B | Dimensions | Auxiliary textures | Heavy allocation |
+| Allocate auxiliary textures | Create shore-edge and obstacle resources | Dimensions | Auxiliary textures | Heavy allocation |
 | Initialize neutral resources | Create neutral disturbance fallback | Texture support | Safe fallback texture | Light/medium |
 | Allocate buffers | Metrics, exact obstacle intervals, and accepted topology metadata buffers | Capacities | GPU/CPU buffers | Medium allocation |
 | Build metric buffer | Build and upload river metric rows | Domain/dimensions | Metric buffer contents | CPU/upload heavy |
@@ -502,7 +503,6 @@ Not every state must consume a separate frame forever. The key is that the state
 | Build obstacle exclusion | Prepare exact transformed-mesh solid intervals, evaluate current-water mask, and capture the topology-generation snapshot | Stable final placed sources, boundary | Cached interval buffers, obstacle texture, CPU scalar snapshot | Temporary CPU-heavy pre-gameplay preparation |
 | Clear topology resources | Clear topology/source/generated positive/aggregate negative textures | Allocated textures | Known zero topology | Heavy group; may split |
 | Clear material states | Clear each material-state texture | Allocated material textures | Known empty material | GPU dispatch per field |
-| Clear fracture fields | Clear fracture A/B | Fracture textures | Known neutral fracture | GPU dispatch per field |
 | Build guidance | Dispatch guidance kernel | Metric/boundary resources | Guidance field | Full-grid heavy |
 | Build current shore edges | Dispatch shoreline evaluator | Metric data | Current shore-edge texture | Medium/full-width |
 | Compose anchored sources | Update obstacle mask and compose shore/Pressure/Lee sources | Shore, disturbance, obstacle | Topology source field | Full-grid heavy |
@@ -510,7 +510,7 @@ Not every state must consume a separate frame forever. The key is that the state
 | Build Connector topology | Run bounded relationship preparation or load cached result, then upload | Major, boundary, obstacles | Connector Support and metadata | Temporary CPU-heavy proof work / cached production load |
 | Build Negative Aging Pressure | Run active class generators or load cached result, then upload aggregate field and subtype metadata | Major, Connector, anchored cores, obstacles | Aggregate negative field and class metadata | Temporary CPU-heavy proof work / cached production load |
 | Compose final topology | Compose all current topology classes | All topology inputs | Final topology field | Full-grid heavy |
-| Initialize metrics | Reset and optionally measure diagnostics/population | Ready fields | Initial counters | Optional/deferred |
+| Initialize metrics | Reset and optionally measure topology diagnostics | Ready fields | Initial counters | Optional/deferred |
 | Ready | Mark complete and enter normal scheduling | Required phases complete | Runtime active | Light |
 
 ### 8.4 No visual activation changes in the first staged patch
@@ -569,7 +569,7 @@ Any shader-visible resource that can be bound before its authored data is ready 
 
 Examples:
 
-- material state: zero Amount/Freshness/Integrity/Phase;
+- material state: zero Amount, zero amount-weighted Remaining Life, zero amount-weighted Integrity, and neutral phase/provenance;
 - topology: zero positive support and zero aging pressure;
 - topology sources: zero Shore/Pressure/Lee influence;
 - Major: zero support;
@@ -577,7 +577,6 @@ Examples:
 - Connector: zero support;
 - obstacle exclusion: no exclusion unless fail-closed safety requires the opposite for a particular pass;
 - disturbance source: existing neutral disturbance texture;
-- fracture: neutral unfractured state.
 
 The neutral meaning must be checked against each kernel and shader before progressive binding is implemented. A generic black texture is not automatically safe for every semantic.
 
@@ -736,10 +735,8 @@ Obstacle source changed
 - `PocketField`
 - `ConnectorField`
 - `FinalTopology`
-- `PopulationMetrics`
 - `TopologyMetrics`
 - `GuidanceField`
-- `FractureField`
 
 The implementation does not need a general-purpose graph library. A small explicit dependency table is preferable and easier to audit.
 
@@ -821,8 +818,6 @@ Systems to offset include:
 - Major cleanup;
 - Pocket update;
 - future Connector update;
-- fracture update;
-- population measurement;
 - topology metrics;
 - obstacle-version checks.
 
@@ -885,7 +880,7 @@ One kernel should be warmed per frame initially.
 
 ### 14.4 Compute asset split
 
-The current `CS_RiverFoam.compute` contains core material simulation, topology, diagnostics, obstacle work, fracture work, and Major Support. A future isolation pass should divide responsibilities.
+After Patch 4.11B.1, `CS_RiverFoam.compute` contains core material simulation, topology, diagnostics, obstacle work, and Major Support. The superseded population-reduction and provisional-fracture kernels are gone. A future isolation pass may divide the remaining responsibilities only where profiling justifies it.
 
 A possible target is:
 
@@ -896,8 +891,6 @@ CS_RiverFoam_Core.compute
     advection
     simulation
     boundaries
-    population
-    fracture
 
 CS_RiverFoam_TopologySources.compute
     current shore edges
@@ -964,7 +957,7 @@ Potential candidates include:
 - Pocket construction;
 - future Connector rasterization;
 - topology composition;
-- population and topology measurements.
+- topology measurements.
 
 ### 15.4 Determinism requirements
 
@@ -1051,7 +1044,6 @@ RiverFoam.Init.BuildBoundary
 RiverFoam.Init.WaitObstacleStability
 RiverFoam.Init.BuildObstacleExclusion
 RiverFoam.Init.ClearMaterial
-RiverFoam.Init.ClearFracture
 RiverFoam.Init.BuildGuidance
 RiverFoam.Init.BuildTopology.Total
 RiverFoam.Topology.RefreshSources
@@ -1060,7 +1052,6 @@ RiverFoam.Topology.RasterMajor
 RiverFoam.Topology.CleanupMajor
 RiverFoam.Topology.BuildPocket
 RiverFoam.Topology.Compose
-RiverFoam.Diagnostics.MeasurePopulation
 RiverFoam.Diagnostics.MeasureTopology
 RiverFoam.Rebuild.BuildBoundary
 RiverFoam.Rebuild.ApplyBoundary
@@ -1718,6 +1709,7 @@ Accepted/implemented topology work:
 26. Patch 4.10B bounded Unity regression validation and final topology acceptance — complete.
 27. Patch 4.11A persistent material lifetime and topology aging — implemented and accepted for progression; visible proof resumes with born material.
 28. Patch 4.11B distributed event-driven birth contract — documentation complete.
+29. Patch 4.11B.1 legacy autonomous material-population and provisional-fracture cleanup — implemented; Unity validation pending.
 
 Topology generation is closed. Scheduling optimisation remains paused until the event-driven birth, Integrity, breakup, and mature-render pipeline produces measured steady-state and cold-start evidence.
 
@@ -1790,9 +1782,9 @@ The scheduling architecture is successful when:
 
 ## 25. Immediate Next Step
 
-Patch 4.11A is accepted for progression: import, runtime operation, lifecycle controls, and derived lifetime display behave correctly, but full visible aging proof is impossible while the current material population remains provisional. Patch 4.11B therefore replaces the old upstream-primary proposal with a distributed event-driven birth contract.
+Patch 4.11A is accepted for progression: import, runtime operation, lifecycle controls, and derived lifetime display behave correctly, but full visible aging proof requires legitimate born material. Patch 4.11B replaces the old upstream-primary proposal with a distributed event-driven birth contract. Patch 4.11B.1 then removes the autonomous target-coverage/distributed-supply path and provisional fracture proof so that the next event can be judged in isolation.
 
-The next implementation is **Patch 4.11C — Fixed Event Runtime and Manual Progressive Ribbon Proof**.
+After bounded Unity validation of that cleanup, the next implementation is **Patch 4.11C — Fixed Event Runtime and Manual Progressive Ribbon Proof**.
 
 Patch 4.11C must do only the following:
 

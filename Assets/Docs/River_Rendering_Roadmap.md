@@ -322,6 +322,7 @@ Accepted and retained:
 - Patch 4.10A material-facing topology contract documented and frozen; Patch 4.10B runtime hardening, semantic accessors, obsolete-proof cleanup, and bounded Unity validation complete; topology generation is closed;
 - Patch 4.11A persistent Remaining Life, amount-weighted lifecycle transport/merge, multiplicative topology aging, gradual actual material dissipation, and a Material Remaining Life diagnostic implemented and accepted for progression; full visible validation resumes when legitimate born material exists;
 - Patch 4.11B distributed event-driven birth architecture and the remaining Foam patch sequence documented and accepted;
+- Patch 4.11B.1 legacy autonomous material-population and provisional-fracture cleanup implemented; Unity validation pending;
 - exact transformed-mesh water-level-aware Obstacle Footprint, distinct from padded Pressure/Lee disturbance footprints;
 - persistent field, chunking, freezing, sleeping, and fixed-cost GPU infrastructure;
 - permanent Foam profiler instrumentation;
@@ -351,7 +352,7 @@ Still unimplemented or unaccepted:
 - Patch 4.13 mature rendering, reference tuning, and control consolidation;
 - Patch 4.14 final performance and regression closure.
 
-The production cache/precompute handoff and topology generation are complete. Patch 4.11A establishes persistent lifecycle state, while Patch 4.11B replaces the earlier upstream-primary proposal with distributed event-driven births throughout the mapped river.
+The production cache/precompute handoff and topology generation are complete. Patch 4.11A establishes persistent lifecycle state, Patch 4.11B replaces the earlier upstream-primary proposal with distributed event-driven births throughout the mapped river, and Patch 4.11B.1 removes the obsolete autonomous population/fracture proof before that event system is implemented.
 
 ### Current performance scheduling status
 
@@ -416,7 +417,7 @@ Patch 4.11A freezes the persistent material-state contract:
 - `B = Amount × normalized Integrity`;
 - `A = transported phase/provenance`.
 
-Remaining Life and Integrity are amount-weighted moments. Manual injection, provisional distributed supply, disturbance reinforcement, advection, split/merge behaviour, and rendering decode all use the same conservative contract. Empty cells cannot transport lifetime or cohesion independently of Foam amount.
+Remaining Life and Integrity are amount-weighted moments. Manual injection, disturbance reinforcement, advection, split/merge behaviour, and rendering decode all use the same conservative contract. Future event-born material must initialize the same moments. Empty cells cannot transport lifetime or cohesion independently of Foam amount.
 
 The first lifecycle controls are `Neutral Lifetime (s)` (`1–10`, default `4`), `Supported Aging Rate` (`0.1–1`, default `0.2`), and `Negative Aging Rate` (`1–8`, default `4`). Positive support and aggregate Negative Aging Pressure remain separate and multiply continuously to determine the local aging rate. Neither topology field directly changes Amount. Patch 4.11A.2 adds a read-only Inspector summary showing the approximate neutral, fully supported, full-negative, and full-overlap lifetimes calculated from the selected values.
 
@@ -437,6 +438,16 @@ The production birth system is split into temporary progressive events:
 Each event owns a compact moving emission head. It deposits only its travelled segment each material update, ramps in and out, varies width and strength coherently, moves net-downstream with bounded lateral/diagonal wander, and initializes the canonical Amount/Remaining Life/Integrity/phase state. No complete patch may appear in one frame.
 
 Distribution uses soft regional inactivity weighting, material vacancy suppression, and recent-birth cooldown. It does not use global target coverage, arbitrary empty-cell repair, or continuous support replenishment. Exact event durations, counts, rates, widths, source ratios, ranges, defaults, and public controls remain unapproved until their individual implementation patches are inspected.
+
+### Patch 4.11B.1 legacy population and fracture cleanup
+
+Before the progressive-ribbon proof, Patch 4.11B.1 removes the runtime paths that would make its result ambiguous:
+
+- the global target-coverage controller and distributed random material supply;
+- the population-reduction buffer, measurement kernels/cadence, and forced whole-river chunk activation used by that supply;
+- the provisional half-resolution fracture textures, update/clear kernels, renderer binding, and proof Integrity damage/tearing behaviour.
+
+The cleanup adds no birth event and no new visual feature. Clearing material now leaves an empty river until explicit manual injection. Manual injection, conservative lifecycle transport, topology-modulated aging, end-of-life dissipation, disturbance reinforcement of existing material, topology/cache operation, and the proof renderer remain. Integrity continues to travel as an amount-weighted state channel but stays inert until Patch 4.12A defines its approved evolution.
 
 ### Remaining topology architecture
 
@@ -490,16 +501,17 @@ Patch 4.9 is split into staged gates. 4.9A proves a storage-provider-agnostic ve
 28. Patch 4.10B — runtime contract hardening, semantic accessors, obsolete topology-proof cleanup, and bounded Unity validation — complete; topology generation closed.
 29. Patch 4.11A — persistent Remaining Life, conservative lifecycle moments, topology aging, actual end-of-life dissipation, and lifetime diagnostics — implemented and accepted for progression; full visible validation deferred until born material exists.
 30. Patch 4.11B — distributed event-driven birth contract and revised remaining Foam sequence — documentation complete.
-31. Patch 4.11C — fixed-capacity event runtime plus manually triggered progressive ribbon deposition and birth diagnostics.
-32. Patch 4.11D — Anchored Birth Events around lee, shoulder, shore, occasional pressure, and approved Major/Connector context.
-33. Patch 4.11E — Open-Water Birth Events, regional inactivity weighting, vacancy suppression, and recent-birth cooldown.
-34. Patch 4.11F — integrated birth population, source-family balancing, long-run validation, minimal control consolidation, and evidence-based optional-upstream decision.
-35. Patch 4.12A — active Integrity evolution.
-36. Patch 4.12B — state-backed fracture growth, holes, strips, and fragment separation.
-37. Patch 4.12C — breakup motion and terminal dissolution.
-38. Patch 4.13A — mature state-backed Foam rendering.
-39. Patch 4.13B — reference matching, topology/birth/lifecycle tuning, proof cleanup, and final control consolidation.
-40. Patch 4.14 — deferred performance work, quality scaling, multi-river scheduling only where measured, and final Stage 6 regression closure.
+31. Patch 4.11B.1 — remove the legacy autonomous distributed-supply/population path and provisional fracture proof — implemented; Unity validation pending.
+32. Patch 4.11C — fixed-capacity event runtime plus manually triggered progressive ribbon deposition and birth diagnostics.
+33. Patch 4.11D — Anchored Birth Events around lee, shoulder, shore, occasional pressure, and approved Major/Connector context.
+34. Patch 4.11E — Open-Water Birth Events, regional inactivity weighting, vacancy suppression, and recent-birth cooldown.
+35. Patch 4.11F — integrated birth population, source-family balancing, long-run validation, minimal control consolidation, and evidence-based optional-upstream decision.
+36. Patch 4.12A — active Integrity evolution.
+37. Patch 4.12B — state-backed fracture growth, holes, strips, and fragment separation.
+38. Patch 4.12C — breakup motion and terminal dissolution.
+39. Patch 4.13A — mature state-backed Foam rendering.
+40. Patch 4.13B — reference matching, topology/birth/lifecycle tuning, proof cleanup, and final control consolidation.
+41. Patch 4.14 — deferred performance work, quality scaling, multi-river scheduling only where measured, and final Stage 6 regression closure.
 
 ### Terminology
 
@@ -568,7 +580,7 @@ For each negative class, `0` means none, `0.5` means a sensible category-specifi
 
 Patch 3.4 removed `Foam Preset`, the old broad `Amount`, `Web Granularity`, `Network Evolution`, `Breakup Frequency`, `Foam Speed`, `Major Evolution Rate`, and `Major Cleanup Rate`, together with their obsolete support code.
 
-Patch 4.11A adds the first material-lifetime and topology-response authoring surface. Patch 4.11A.1 replaces its unapproved provisional tuning with the approved `4 / 0.2 / 4` defaults and performs a one-time migration for existing rivers. Patch 4.11A.2 adds the derived read-only lifetime summary without changing serialized data or runtime simulation. The lifecycle slice is accepted for progression, with full visible validation deferred until born material exists. Patch 4.11B approves only the birth-system behaviour and sequence; it approves no event-control names, ranges, defaults, pool capacities, rates, or source ratios. Every later implementation patch must present those choices before editing code.
+Patch 4.11A adds the first material-lifetime and topology-response authoring surface. Patch 4.11A.1 replaces its unapproved provisional tuning with the approved `4 / 0.2 / 4` defaults and performs a one-time migration for existing rivers. Patch 4.11A.2 adds the derived read-only lifetime summary without changing serialized data or runtime simulation. The lifecycle slice is accepted for progression, with full visible validation deferred until born material exists. Patch 4.11B approves only the birth-system behaviour and sequence; it approves no event-control names, ranges, defaults, pool capacities, rates, or source ratios. Patch 4.11B.1 removes the superseded autonomous population and provisional fracture proof without adding a replacement birth path. Every later implementation patch must present its remaining choices before editing code.
 
 ### Implementation order
 
@@ -606,16 +618,17 @@ Patch 4.11A adds the first material-lifetime and topology-response authoring sur
 32. Patch 4.10B runtime contract hardening, semantic accessors, obsolete proof cleanup, and bounded Unity validation — complete; topology generation closed.
 33. Patch 4.11A persistent Remaining Life, conservative lifecycle transport/merge, multiplicative topology aging, gradual actual material dissipation, and lifetime diagnostics — implemented; Patch 4.11A.1 corrects lifecycle ranges/defaults and migrates existing rivers; accepted for progression with full visible validation deferred.
 34. Patch 4.11B distributed event-driven birth contract and revised implementation sequence — documentation complete.
-35. Patch 4.11C fixed event runtime and manual progressive-stroke proof.
-36. Patch 4.11D Anchored Birth Event scheduling.
-37. Patch 4.11E Open-Water Birth Events and spatial fairness.
-38. Patch 4.11F integrated birth population and optional-upstream decision.
-39. Patch 4.12A active Integrity evolution.
-40. Patch 4.12B state-backed fracture and separation.
-41. Patch 4.12C breakup motion and dissolution.
-42. Patch 4.13A mature Foam rendering.
-43. Patch 4.13B reference tuning, proof cleanup, and final control consolidation.
-44. Patch 4.14 deferred performance work and final PC-first profiling/regression.
+35. Patch 4.11B.1 legacy autonomous population and provisional fracture cleanup — implemented; Unity validation pending.
+36. Patch 4.11C fixed event runtime and manual progressive-stroke proof.
+37. Patch 4.11D Anchored Birth Event scheduling.
+38. Patch 4.11E Open-Water Birth Events and spatial fairness.
+39. Patch 4.11F integrated birth population and optional-upstream decision.
+40. Patch 4.12A active Integrity evolution.
+41. Patch 4.12B state-backed fracture and separation.
+42. Patch 4.12C breakup motion and dissolution.
+43. Patch 4.13A mature Foam rendering.
+44. Patch 4.13B reference tuning, proof cleanup, and final control consolidation.
+45. Patch 4.14 deferred performance work and final PC-first profiling/regression.
 
 Every positive and negative topology class is implemented and accepted separately before the combined topology is judged. This is an explicit anti-regression rule.
 

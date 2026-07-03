@@ -25,14 +25,6 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.FindKernel("ResetTopologyMetrics");
             measureTopologyMetricsKernel =
                 computeShader.FindKernel("MeasureTopologyMetrics");
-            resetPopulationKernel =
-                computeShader.FindKernel("ResetPopulation");
-            measurePopulationKernel =
-                computeShader.FindKernel("MeasurePopulation");
-            updateFractureKernel =
-                computeShader.FindKernel("UpdateFracture");
-            clearFractureKernel =
-                computeShader.FindKernel("ClearFractureRange");
             advectForwardKernel =
                 computeShader.FindKernel("AdvectForward");
             advectReverseKernel =
@@ -53,10 +45,6 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamGuidanceDimensions",
                 guidanceWidth,
                 guidanceHeight);
-            computeShader.SetInts(
-                "_FoamFractureDimensions",
-                fractureWidth,
-                fractureHeight);
             computeShader.SetInt(
                 "_FoamResolutionPerChunk",
                 resolutionPerChunk);
@@ -81,7 +69,6 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamEvolution",
                 ProvisionalMaterialEvolution);
-            computeShader.SetFloat("_FoamBreakup", ProvisionalMaterialBreakup);
             computeShader.SetFloat("_FoamSpread", ProvisionalMaterialSpread);
             computeShader.SetFloat("_FoamCohesion", ProvisionalMaterialCohesion);
             computeShader.SetFloat(
@@ -103,23 +90,10 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamEndOfLifeDissipationStart",
                 EndOfLifeDissipationStart);
             computeShader.SetFloat(
-                "_FoamIntegrityDamage",
-                Mathf.Clamp01(ProvisionalMaterialIntegrityDamage));
-            computeShader.SetFloat(
                 "_FoamShoreRetention",
                 ProvisionalMaterialShoreRetention);
             computeShader.SetFloat("_FoamTime", river.MotionTime);
             computeShader.SetFloat("_FoamSeed", river.VisualSeed);
-            computeShader.SetFloat(
-                "_FoamTargetCoverage",
-                IsAutomaticMaterialSupplyActive
-                    ? ProvisionalMaterialTargetCoverage
-                    : 0f);
-            computeShader.SetFloat(
-                "_FoamSupplyRate",
-                IsAutomaticMaterialSupplyActive
-                    ? ProvisionalMaterialSupplyRate
-                    : 0f);
             computeShader.SetFloat(
                 "_FoamVisibleThreshold",
                 ProvisionalMaterialVisibleThreshold);
@@ -231,12 +205,6 @@ namespace ProgrammaticStylized3D.Rivers
                 rippleTexture,
                 staticWakeTexture,
                 staticPressureTexture);
-            BindMotionKernel(
-                updateFractureKernel,
-                wakeTexture,
-                rippleTexture,
-                staticWakeTexture,
-                staticPressureTexture);
 
             computeShader.SetTexture(
                 advectForwardKernel,
@@ -256,10 +224,6 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamAdvectionWrite",
                 reverseState);
 
-            computeShader.SetBuffer(
-                simulateKernel,
-                "_FoamPopulationMetrics",
-                populationMetricsBuffer);
             computeShader.SetTexture(
                 simulateKernel,
                 "_FoamStateRead",
@@ -272,10 +236,6 @@ namespace ProgrammaticStylized3D.Rivers
                 simulateKernel,
                 "_FoamReverseRead",
                 reverseState);
-            computeShader.SetTexture(
-                simulateKernel,
-                "_FoamFractureRead",
-                currentFracture);
             computeShader.SetTexture(
                 simulateKernel,
                 "_FoamTopologyRead",
@@ -338,34 +298,10 @@ namespace ProgrammaticStylized3D.Rivers
 
             // Corrected transport is intentionally a three-dispatch sequence:
             // forward advection, reverse error estimate, then bounded correction
-            // plus population, topology, tearing, capture, and reinforcement.
+            // plus lifecycle aging, topology response, capture, and reinforcement.
             Dispatch(advectForwardKernel, countX, fieldHeight);
             Dispatch(advectReverseKernel, countX, fieldHeight);
             Dispatch(simulateKernel, countX, fieldHeight);
-        }
-
-        private void DispatchClearFracture(
-            RenderTexture target,
-            int startX,
-            int countX)
-        {
-            if (computeShader == null || target == null ||
-                clearFractureKernel < 0 || countX <= 0)
-            {
-                return;
-            }
-
-            computeShader.SetInts(
-                "_FoamFractureDimensions",
-                fractureWidth,
-                fractureHeight);
-            computeShader.SetInt("_FoamFractureRangeStart", startX);
-            computeShader.SetInt("_FoamFractureRangeCount", countX);
-            computeShader.SetTexture(
-                clearFractureKernel,
-                "_FoamFractureWrite",
-                target);
-            Dispatch(clearFractureKernel, countX, fractureHeight);
         }
 
         private void DispatchClear(RenderTexture target, int startX, int countX)
@@ -428,17 +364,6 @@ namespace ProgrammaticStylized3D.Rivers
             DispatchClear(advectedState, startX, countX);
             DispatchClear(reverseState, startX, countX);
 
-            int fractureStart = Mathf.Clamp(
-                Mathf.FloorToInt(startX / (float)Mathf.Max(1, fieldWidth) * fractureWidth),
-                0,
-                Mathf.Max(0, fractureWidth - 1));
-            int fractureEnd = Mathf.Clamp(
-                Mathf.CeilToInt((startX + countX) / (float)Mathf.Max(1, fieldWidth) * fractureWidth),
-                fractureStart + 1,
-                fractureWidth);
-            int fractureCount = fractureEnd - fractureStart;
-            DispatchClearFracture(fractureA, fractureStart, fractureCount);
-            DispatchClearFracture(fractureB, fractureStart, fractureCount);
         }
 
         private void Dispatch(int kernel, int width, int height)

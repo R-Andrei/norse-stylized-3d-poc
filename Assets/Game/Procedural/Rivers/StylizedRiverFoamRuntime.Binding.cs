@@ -44,9 +44,6 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamTopologySourcesId,
                 snapshot.TopologySources);
             propertyBlock.SetTexture(
-                FoamFractureId,
-                ResolveBoundTexture(snapshot.Fracture));
-            propertyBlock.SetTexture(
                 FoamBoundaryId,
                 ResolveBoundTexture(snapshot.Boundary));
             propertyBlock.SetTexture(
@@ -111,9 +108,6 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamTopologySourcesId,
                 ResolveBoundTexture(topologySourcesTexture));
             propertyBlock.SetTexture(
-                FoamFractureId,
-                ResolveBoundTexture(currentFracture));
-            propertyBlock.SetTexture(
                 FoamBoundaryId,
                 ResolveBoundTexture(boundaryTexture));
             propertyBlock.SetTexture(
@@ -165,7 +159,6 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(
                 FoamTopologySourcesId,
                 Texture2D.blackTexture);
-            propertyBlock.SetTexture(FoamFractureId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamBoundaryId, Texture2D.blackTexture);
             propertyBlock.SetTexture(
                 FoamObstacleExclusionId,

@@ -32,10 +32,6 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture evolvingWeakSpanNegativeTexture;
         private RenderTexture currentShoreEdgesTexture;
         private RenderTexture obstacleExclusionTexture;
-        private RenderTexture fractureA;
-        private RenderTexture fractureB;
-        private RenderTexture currentFracture;
-        private RenderTexture writeFracture;
         private RenderTexture neutralDisturbanceTexture;
         private Texture2D boundaryTexture;
         private Texture2D obstacleExclusionReadbackTexture;
@@ -47,7 +43,6 @@ namespace ProgrammaticStylized3D.Rivers
         private ComputeBuffer metricBuffer;
         private ComputeBuffer obstacleExclusionCellBuffer;
         private ComputeBuffer obstacleExclusionSampleBuffer;
-        private ComputeBuffer populationMetricsBuffer;
         private ComputeBuffer topologyMetricsBuffer;
         private ComputeBuffer majorEvolutionBuffer;
         private ComputeBuffer hostedNegativeEvolutionBuffer;
@@ -319,8 +314,6 @@ namespace ProgrammaticStylized3D.Rivers
         private int resolutionPerChunk;
         private int guidanceWidth;
         private int guidanceHeight;
-        private int fractureWidth;
-        private int fractureHeight;
         private float fieldLength;
         private float validFieldLength;
         private float simulationFieldLength;
@@ -328,8 +321,6 @@ namespace ProgrammaticStylized3D.Rivers
         private float simulationAccumulator;
         private float guidanceAccumulator;
         private float topologyMetricsAccumulator;
-        private float populationAccumulator;
-        private float fractureAccumulator;
         private float simulationInterpolation = 1f;
         private float initializationMotionTime;
         private float lastRuntimeTime;
@@ -345,10 +336,6 @@ namespace ProgrammaticStylized3D.Rivers
         private int updateObstacleExclusionKernel = -1;
         private int resetTopologyMetricsKernel = -1;
         private int measureTopologyMetricsKernel = -1;
-        private int resetPopulationKernel = -1;
-        private int measurePopulationKernel = -1;
-        private int updateFractureKernel = -1;
-        private int clearFractureKernel = -1;
         private int advectForwardKernel = -1;
         private int advectReverseKernel = -1;
         private int simulateKernel = -1;

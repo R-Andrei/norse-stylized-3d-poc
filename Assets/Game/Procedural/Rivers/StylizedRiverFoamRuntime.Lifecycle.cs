@@ -148,11 +148,8 @@ namespace ProgrammaticStylized3D.Rivers
 
             fullyFrozenLastUpdate = false;
 
-            bool automaticMaterialSupplyActive =
-                IsAutomaticMaterialSupplyActive;
             bool topologyDebugActive = IsTopologyDebugActive;
             bool materialWork =
-                automaticMaterialSupplyActive ||
                 pendingInjections.Count > 0 ||
                 reservations.Count > 0 ||
                 CountActiveChunks() > 0;
@@ -222,10 +219,9 @@ namespace ProgrammaticStylized3D.Rivers
 
             if (manualInjectedThisUpdate)
             {
-                // Manual diagnostics remain immediately visible, but they now
-                // enter the same autonomous guidance, population, boundary,
-                // Wake, Impact, merging, and structural-failure solver on the
-                // following simulation step.
+                // Manual diagnostics remain immediately visible, then enter
+                // the same transport, guidance, boundary, lifecycle, and
+                // disturbance-reinforcement solver on the following step.
                 simulationAccumulator = 0f;
                 simulationInterpolation = 1f;
             }
@@ -239,26 +235,14 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     simulationAccumulator -= stepDuration;
                     bool materialStepActive =
-                        automaticMaterialSupplyActive ||
                         reservations.Count > 0 ||
                         CountActiveChunks() > 0;
 
                     if (materialStepActive)
                     {
                         UpdateReservations(stepDuration, now);
-
-                        if (automaticMaterialSupplyActive)
-                        {
-                            ActivateAllChunks(now + stepDuration * 3f);
-                        }
-                        else
-                        {
-                            UpdateActiveChunks(now);
-                        }
-
+                        UpdateActiveChunks(now);
                         ConfigureSharedComputeParameters(stepDuration);
-                        populationAccumulator += stepDuration;
-                        fractureAccumulator += stepDuration;
                     }
 
                     guidanceAccumulator += stepDuration;
@@ -308,22 +292,6 @@ namespace ProgrammaticStylized3D.Rivers
 
                     if (materialStepActive)
                     {
-                        float populationInterval = 1f /
-                            Mathf.Max(1f, ResolvePopulationUpdateRate());
-                        if (populationAccumulator >= populationInterval)
-                        {
-                            MeasurePopulation();
-                            populationAccumulator %= populationInterval;
-                        }
-
-                        float fractureInterval = 1f /
-                            Mathf.Max(1f, ResolveFractureUpdateRate());
-                        if (fractureAccumulator >= fractureInterval)
-                        {
-                            UpdateFractureField(fractureAccumulator);
-                            fractureAccumulator %= fractureInterval;
-                        }
-
                         SimulateActiveChunks(stepDuration);
                     }
                 }
@@ -455,8 +423,6 @@ namespace ProgrammaticStylized3D.Rivers
             simulationAccumulator = 0f;
             guidanceAccumulator = 0f;
             topologyMetricsAccumulator = 0f;
-            populationAccumulator = 0f;
-            fractureAccumulator = 0f;
             simulationInterpolation = 1f;
             idleSince = Time.realtimeSinceStartupAsDouble;
 
@@ -479,9 +445,6 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 DispatchClear(reverseState, 0, fieldWidth);
             }
-
-            DispatchClearFracture(fractureA, 0, fractureWidth);
-            DispatchClearFracture(fractureB, 0, fractureWidth);
 
             Array.Clear(chunkActive, 0, chunkActive.Length);
             Array.Clear(chunkActiveUntil, 0, chunkActiveUntil.Length);

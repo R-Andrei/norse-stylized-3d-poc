@@ -42,8 +42,6 @@ Texture2D<float4> _FoamWakeField;
 Texture2D<float4> _FoamRippleField;
 Texture2D<float4> _FoamStaticWakeField;
 Texture2D<float4> _FoamStaticPressureField;
-RWTexture2D<float2> _FoamFractureWrite;
-Texture2D<float2> _FoamFractureRead;
 StructuredBuffer<FoamMetricRow> _FoamMetricRows;
 StructuredBuffer<FoamMetricRow> _FoamTopologyTransitionMetricRows;
 StructuredBuffer<FoamObstacleSample> _FoamObstacleSamples;
@@ -59,12 +57,6 @@ StructuredBuffer<float4> _FoamConnectorPathPoints;
 StructuredBuffer<FoamWeakSpanIdentityData>
     _FoamWeakSpanIdentityRecords;
 
-// Per chunk, two uint4 records are stored in one raw buffer:
-// record 0: x = quantised Amount sum, y = visible-cell count,
-//           z = valid fluid-cell count, w = guidance-lane cell count.
-// record 1: x = perimeter-cell count, y = broad-interior count,
-//           z = shore-support visible count, w = visible guidance-lane count.
-RWByteAddressBuffer _FoamPopulationMetrics;
 
 // One global topology diagnostic record. Values are uint counters.
 //  0 valid-fluid cells                    8 shore-support cells
@@ -88,11 +80,8 @@ int2 _FoamWakeDimensions;
 int2 _FoamRippleDimensions;
 int2 _FoamStaticWakeDimensions;
 int2 _FoamStaticPressureDimensions;
-int2 _FoamFractureDimensions;
 int _FoamRangeStart;
 int _FoamRangeCount;
-int _FoamFractureRangeStart;
-int _FoamFractureRangeCount;
 int _FoamObstacleCellCount;
 int _FoamMajorEvolutionCount;
 int _FoamHostedNegativeEvolutionCount;
@@ -109,7 +98,6 @@ float _FoamSimulationLength;
 float _FoamFlowSpeed;
 float _FoamFlowDirection;
 float _FoamEvolution;
-float _FoamBreakup;
 float _FoamSpread;
 float _FoamCohesion;
 float _FoamConnectivity;
@@ -118,19 +106,15 @@ float _FoamPositiveAgeMultiplier;
 float _FoamNegativeAgeMultiplier;
 float _FoamEndOfLifeDissipationRate;
 float _FoamEndOfLifeDissipationStart;
-float _FoamIntegrityDamage;
 float _FoamShoreRetention;
 float _FoamTime;
 float _FoamSeed;
-float _FoamTargetCoverage;
-float _FoamSupplyRate;
 float _FoamVisibleThreshold;
 float _FoamGuidanceStrength;
 float _FoamBoundaryAttraction;
 float _FoamWakeReinforcement;
 float _FoamImpactReinforcement;
 float _FoamDisturbanceEnabled;
-float _FoamFractureDeltaTime;
 float _FoamMotionFlowSpeed;
 float _FoamMotionWaveHeight;
 float _FoamMotionWaveLength;

@@ -9,10 +9,6 @@
 #pragma kernel UpdateObstacleExclusion
 #pragma kernel ResetTopologyMetrics
 #pragma kernel MeasureTopologyMetrics
-#pragma kernel ResetPopulation
-#pragma kernel MeasurePopulation
-#pragma kernel UpdateFracture
-#pragma kernel ClearFractureRange
 #pragma kernel AdvectForward
 #pragma kernel AdvectReverse
 #pragma kernel SimulateFoam
@@ -916,227 +912,6 @@ void BuildGuidance(uint3 dispatchId : SV_DispatchThreadID)
         saturate(centreSample.z));
 }
 
-[numthreads(64, 1, 1)]
-void ResetPopulation(uint3 dispatchId : SV_DispatchThreadID)
-{
-    if (dispatchId.x >= (uint)_FoamChunkCount)
-    {
-        return;
-    }
-
-    uint byteOffset = dispatchId.x * 32u;
-    _FoamPopulationMetrics.Store4(
-        byteOffset,
-        uint4(0, 0, 0, 0));
-    _FoamPopulationMetrics.Store4(
-        byteOffset + 16u,
-        uint4(0, 0, 0, 0));
-}
-
-[numthreads(8, 8, 1)]
-void MeasurePopulation(uint3 dispatchId : SV_DispatchThreadID)
-{
-    if (dispatchId.x >= (uint)_FoamDimensions.x ||
-        dispatchId.y >= (uint)_FoamDimensions.y)
-    {
-        return;
-    }
-
-    int2 coordinate = int2(dispatchId.xy);
-    if (!IsFoamColumnInsideDomain(coordinate.x))
-    {
-        return;
-    }
-
-    float coverage = LoadBoundary(coordinate).x;
-    if (coverage <= 0.05)
-    {
-        return;
-    }
-
-    float4 state = _FoamStateRead.Load(int3(coordinate, 0));
-    uint safeResolution = max(1u, (uint)_FoamResolutionPerChunk);
-    uint maximumChunk = (uint)max(0, _FoamChunkCount - 1);
-    uint chunk = min(dispatchId.x / safeResolution, maximumChunk);
-    uint byteOffset = chunk * 32u;
-
-    float threshold = max(0.001, _FoamVisibleThreshold);
-    bool visible = state.x >= threshold;
-    bool interior = false;
-    bool perimeter = false;
-
-    if (visible)
-    {
-        float neighbourThreshold = threshold * 0.82;
-        float n0 = LoadState(coordinate + int2(-1, 0)).x;
-        float n1 = LoadState(coordinate + int2(1, 0)).x;
-        float n2 = LoadState(coordinate + int2(0, -1)).x;
-        float n3 = LoadState(coordinate + int2(0, 1)).x;
-        float n4 = LoadState(coordinate + int2(-1, -1)).x;
-        float n5 = LoadState(coordinate + int2(1, -1)).x;
-        float n6 = LoadState(coordinate + int2(-1, 1)).x;
-        float n7 = LoadState(coordinate + int2(1, 1)).x;
-        interior =
-            n0 >= neighbourThreshold && n1 >= neighbourThreshold &&
-            n2 >= neighbourThreshold && n3 >= neighbourThreshold &&
-            n4 >= neighbourThreshold && n5 >= neighbourThreshold &&
-            n6 >= neighbourThreshold && n7 >= neighbourThreshold;
-        perimeter = !interior;
-    }
-
-    float2 fieldUV = FoamTexelCentreUV(dispatchId.xy, _FoamDimensions);
-    float4 guidance = SampleGuidanceBilinear(fieldUV);
-    bool laneCell = guidance.z >= 0.32;
-    bool laneVisible = laneCell && visible;
-
-    uint amountValue = (uint)round(saturate(state.x) * 4096.0);
-    uint originalValue;
-    _FoamPopulationMetrics.InterlockedAdd(byteOffset + 0u, amountValue, originalValue);
-    _FoamPopulationMetrics.InterlockedAdd(byteOffset + 4u, visible ? 1u : 0u, originalValue);
-    _FoamPopulationMetrics.InterlockedAdd(byteOffset + 8u, 1u, originalValue);
-    _FoamPopulationMetrics.InterlockedAdd(byteOffset + 12u, laneCell ? 1u : 0u, originalValue);
-    _FoamPopulationMetrics.InterlockedAdd(byteOffset + 16u, perimeter ? 1u : 0u, originalValue);
-    _FoamPopulationMetrics.InterlockedAdd(byteOffset + 20u, interior ? 1u : 0u, originalValue);
-    _FoamPopulationMetrics.InterlockedAdd(
-        byteOffset + 24u,
-        LoadBoundary(coordinate).y > 0.10 && visible ? 1u : 0u,
-        originalValue);
-    _FoamPopulationMetrics.InterlockedAdd(byteOffset + 28u, laneVisible ? 1u : 0u, originalValue);
-}
-
-[numthreads(8, 8, 1)]
-void ClearFractureRange(uint3 dispatchId : SV_DispatchThreadID)
-{
-    if (dispatchId.x >= (uint)_FoamFractureRangeCount ||
-        dispatchId.y >= (uint)_FoamFractureDimensions.y)
-    {
-        return;
-    }
-
-    int x = _FoamFractureRangeStart + (int)dispatchId.x;
-    if (x < 0 || x >= _FoamFractureDimensions.x)
-    {
-        return;
-    }
-
-    _FoamFractureWrite[int2(x, (int)dispatchId.y)] = float2(0.0, 0.0);
-}
-
-[numthreads(8, 8, 1)]
-void UpdateFracture(uint3 dispatchId : SV_DispatchThreadID)
-{
-    if (dispatchId.x >= (uint)_FoamFractureDimensions.x ||
-        dispatchId.y >= (uint)_FoamFractureDimensions.y)
-    {
-        return;
-    }
-
-    float2 uv = FoamTexelCentreUV(dispatchId.xy, _FoamFractureDimensions);
-    float2 fullPixel = FoamUVToTexelCoordinate(uv, _FoamDimensions);
-    float2 boundary = SampleBoundaryBilinear(fullPixel);
-    if (boundary.x <= 0.001)
-    {
-        _FoamFractureWrite[int2(dispatchId.xy)] = float2(0.0, 0.0);
-        return;
-    }
-
-    int metricX = FoamUVToContainingTexel(uv.x, _FoamDimensions.x);
-    FoamMetricRow metric = _FoamMetricRows[metricX];
-    float totalWidth = max(0.05, metric.widthsAndSpacing.x + metric.widthsAndSpacing.y);
-    FoamMotionSample motion = ResolveMotion(fullPixel, uv);
-    float2 backUv = uv - float2(
-        motion.velocity.x * _FoamFractureDeltaTime / max(0.05, _FoamFieldLength),
-        motion.velocity.y * _FoamFractureDeltaTime / totalWidth);
-    float2 previous = SampleFractureBilinear(backUv);
-
-    float4 centre = SampleStateAtUV(uv);
-    float phase = centre.w;
-    float angle = phase * 6.2831853 +
-        (FoamFbm(float2(
-            (_FoamGlobalStart + uv.x * _FoamFieldLength) * 0.13,
-            uv.y * 7.1) + _FoamSeed * 0.0019) - 0.5) * 2.4;
-    float2 d0 = float2(cos(angle), sin(angle));
-    float2 d1 = float2(-d0.y, d0.x);
-    float2 fractureTexel = 1.0 /
-        max(float2(2.0, 2.0), (float2)_FoamFractureDimensions);
-
-    float4 a = SampleStateAtUV(saturate(uv + d0 * fractureTexel * 1.5));
-    float4 b = SampleStateAtUV(saturate(uv - d0 * fractureTexel * 1.5));
-    float4 c = SampleStateAtUV(saturate(uv + d1 * fractureTexel * 1.5));
-    float4 d = SampleStateAtUV(saturate(uv - d1 * fractureTexel * 1.5));
-    float support0 = min(a.x, b.x);
-    float support1 = min(c.x, d.x);
-    float averageSupport = (a.x + b.x + c.x + d.x) * 0.25;
-    float edgeExposure = saturate(
-        1.0 - averageSupport / max(0.035, centre.x));
-    float neckStress = smoothstep(0.08, 0.38, max(support0, support1)) *
-        (1.0 - smoothstep(0.06, 0.28, min(support0, support1)));
-    float phaseStress = (
-        PhaseDistance(a.w, phase) * a.x +
-        PhaseDistance(b.w, phase) * b.x +
-        PhaseDistance(c.w, phase) * c.x +
-        PhaseDistance(d.w, phase) * d.x) /
-        max(0.001, a.x + b.x + c.x + d.x);
-
-    float4 guideLeft = SampleGuidanceBilinear(saturate(uv - float2(fractureTexel.x, 0.0)));
-    float4 guideRight = SampleGuidanceBilinear(saturate(uv + float2(fractureTexel.x, 0.0)));
-    float4 guideDown = SampleGuidanceBilinear(saturate(uv - float2(0.0, fractureTexel.y)));
-    float4 guideUp = SampleGuidanceBilinear(saturate(uv + float2(0.0, fractureTexel.y)));
-    float guidanceShear = saturate(
-        length(guideRight.xy - guideLeft.xy) +
-        length(guideUp.xy - guideDown.xy));
-
-    float worldDistance = _FoamGlobalStart + uv.x * _FoamFieldLength;
-    float lateralMetres = FoamAcross01ToMetres(
-        uv.y,
-        metric.widthsAndSpacing.x,
-        metric.widthsAndSpacing.y);
-    float regionalClock = _FoamTime * lerp(0.045, 0.16, saturate(_FoamEvolution / 1.8));
-    float regionalDefect = FoamFbm(
-        float2(worldDistance * 0.21 + regionalClock, lateralMetres * 0.43 - regionalClock * 0.57) +
-        phase * 11.7 + _FoamSeed * 0.0043);
-    float defectGate = smoothstep(0.58, 0.82, regionalDefect);
-
-    float age = 1.0 - centre.y;
-    float structuralWeakness = saturate(1.0 - centre.z);
-    float turbulence = saturate(
-        motion.wakeEnergy * 0.18 +
-        motion.rippleIntensity * 0.46 +
-        guidanceShear * 0.23);
-    float stress = saturate(
-        edgeExposure * 0.42 +
-        neckStress * 0.78 +
-        phaseStress * 0.62 +
-        age * 0.20 +
-        turbulence * 0.45 +
-        defectGate * age * 0.38);
-    stress *= smoothstep(0.025, 0.22, centre.x);
-    stress *= lerp(0.18, 1.0, saturate(_FoamBreakup));
-    stress *= lerp(0.42, 1.0, structuralWeakness);
-
-    float2 pa = SampleFractureBilinear(saturate(uv + d0 * fractureTexel * 1.2));
-    float2 pb = SampleFractureBilinear(saturate(uv - d0 * fractureTexel * 1.2));
-    float2 pc = SampleFractureBilinear(saturate(uv + d1 * fractureTexel * 1.2));
-    float2 pd = SampleFractureBilinear(saturate(uv - d1 * fractureTexel * 1.2));
-    float propagated = max(max(pa.x, pb.x), max(pc.x, pd.x));
-    propagated *= lerp(0.91, 0.985, saturate(_FoamBreakup));
-
-    float damage = previous.x * exp(-_FoamFractureDeltaTime * 0.17);
-    damage = max(damage, propagated * smoothstep(0.20, 0.86, stress + previous.y * 0.28));
-    damage = saturate(damage + stress * _FoamFractureDeltaTime * lerp(0.28, 1.10, saturate(_FoamBreakup)));
-    float coherence = previous.y * exp(-_FoamFractureDeltaTime * 0.10);
-    coherence = max(coherence, smoothstep(0.20, 0.62, damage));
-    coherence = saturate(coherence + stress * _FoamFractureDeltaTime * 0.38);
-
-    if (centre.x < 0.006)
-    {
-        damage *= exp(-_FoamFractureDeltaTime * 1.8);
-        coherence *= exp(-_FoamFractureDeltaTime * 1.2);
-    }
-
-    _FoamFractureWrite[int2(dispatchId.xy)] = saturate(float2(damage, coherence));
-}
-
 [numthreads(8, 8, 1)]
 void AdvectForward(uint3 dispatchId : SV_DispatchThreadID)
 {
@@ -1244,7 +1019,6 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 coordinate = int2(x, y);
-    bool insidePhysicalDomain = IsFoamColumnInsideDomain(x);
     if (!IsFoamColumnInsideSimulation(x))
     {
         _FoamStateWrite[coordinate] = 0.0.xxxx;
@@ -1288,7 +1062,6 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     // One-sided causal limiter: anti-diffusion may sharpen material already
     // carried from an upstream/lateral donor, but it may not advance a front
     // beyond the physically sampled donor region.
-    float downstreamSign = _FoamFlowSpeed < -0.0001 ? -1.0 : 1.0;
     // ResolveOriginalBounds already inspected the four bilinear donor texels.
     // Reuse that bound rather than resampling the same neighbourhood four more
     // times; it is both causal and materially cheaper in the heaviest kernel.
@@ -1305,52 +1078,19 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     float phase = saturate(forward.w);
 
     float agitation = saturate(_FoamEvolution / 1.8);
-    float fragmentation = saturate(_FoamBreakup);
     float directionalAverage;
-    float edgeExposure;
-    float neckness;
-    float tipness;
-    float phaseStress;
     float broadAmount;
-    float enclosedSupport;
     float neighbourPhase;
-    ResolveFoamDirectionalNeighbourhood(
+    ResolveFoamMaterialNeighbourhood(
         x,
         y,
         globalDistance,
         lateralMetres,
         phase,
-        amount,
         agitation,
         directionalAverage,
-        edgeExposure,
-        neckness,
-        tipness,
-        phaseStress,
         broadAmount,
-        enclosedSupport,
         neighbourPhase);
-
-    float targetCoverage = saturate(_FoamTargetCoverage);
-    float sourceNeed = ResolveFoamSourceNeed(x, targetCoverage);
-    ApplyFoamDistributedSupply(
-        x,
-        y,
-        fieldUV,
-        globalDistance,
-        lateralMetres,
-        sourceNeed,
-        broadAmount,
-        enclosedSupport,
-        coverage,
-        insidePhysicalDomain,
-        agitation,
-        downstreamSign,
-        motion,
-        amount,
-        remainingLife,
-        integrity,
-        phase);
 
     float4 topologyState = _FoamTopologyRead.Load(
         int3(coordinate, 0));
@@ -1381,47 +1121,8 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         _FoamDeltaTime * localAgeRate /
         max(0.05, _FoamNeutralLifetime));
 
-    float2 fracture = SampleFractureBilinear(fieldUV);
-    float age = 1.0 - remainingLife;
-    float turbulenceDamage = saturate(
-        motion.wakeEnergy * 0.12 + motion.rippleIntensity * 0.38);
-    float strainDamage = saturate(
-        neckness * 0.72 + tipness * 0.30 + phaseStress * 0.58 + edgeExposure * 0.34);
-    float integrityLoss = max(0.0, _FoamIntegrityDamage) * (
-        0.008 + age * 0.032 + strainDamage * lerp(0.08, 0.34, fragmentation) +
-        fracture.x * fracture.y * lerp(0.22, 0.82, fragmentation) +
-        turbulenceDamage * lerp(0.05, 0.24, fragmentation));
-    integrity = max(0.0, integrity - integrityLoss * _FoamDeltaTime);
-
-    float captureSupport = saturate(motion.capture * (0.10 + motion.leeStrength * 0.25));
-    integrity += (1.0 - integrity) * captureSupport * _FoamDeltaTime;
-    integrity = max(integrity, remainingLife * 0.34);
-
-    float structuralWeakness = pow(saturate(1.0 - integrity), lerp(2.2, 1.18, fragmentation));
-    float coherentTear =
-        fracture.x * fracture.y * structuralWeakness *
-        lerp(0.18, 2.25, fragmentation) *
-        lerp(0.72, 1.28, agitation);
-    float edgeBite =
-        coherentTear * edgeExposure * lerp(0.42, 1.45, fracture.y);
-    float tipPeel =
-        coherentTear * tipness * lerp(0.30, 1.05, fragmentation);
-    float neckCollapse =
-        coherentTear * smoothstep(0.18, 0.72, neckness) *
-        smoothstep(0.42, 0.90, structuralWeakness) *
-        lerp(0.55, 3.6, fragmentation);
-    float interiorCrack =
-        coherentTear * smoothstep(0.30, 0.65, amount) *
-        smoothstep(0.20, 0.62, directionalAverage) *
-        (1.0 - edgeExposure) * 0.42;
-
-    float tinyFragment =
-        smoothstep(0.010, 0.13, amount) *
-        (1.0 - smoothstep(0.10, 0.30, directionalAverage));
-    float fragmentGrace = lerp(1.0, 0.42, tinyFragment);
-    amount *= exp(-(
-        edgeBite + tipPeel + neckCollapse + interiorCrack) *
-        fragmentGrace * _FoamDeltaTime);
+    // Integrity is transported conservatively but deliberately does not evolve
+    // until Patch 4.12A introduces the approved state-backed integrity model.
 
     // Merging only mixes already overlapping material. No amount is inserted
     // across a gap, so a connection requires real donor flux.
@@ -1472,19 +1173,13 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         _FoamEndOfLifeDissipationRate) *
         endOfLife * endOfLife;
     amountDecay *= lerp(1.0, 0.075, pow(captureRetention, 1.30));
-    amountDecay *= lerp(1.0, 0.46, tinyFragment);
     amount *= exp(-amountDecay * _FoamDeltaTime);
 
-    float capturePeel =
-        captureRetention * age * edgeExposure * fragmentation *
-        fracture.x * fracture.y * lerp(0.04, 0.34, agitation);
-    amount *= exp(-capturePeel * _FoamDeltaTime);
 
     amount *= lerp(0.52, 1.0, coverage);
     // Boundary coverage scales transported material moments together with
     // Amount. Do not independently shorten normalized Remaining Life near the
     // shore; Shore Support already owns the material-facing aging response.
-    integrity *= lerp(0.72, 1.0, coverage);
 
     amount = saturate(amount);
     remainingLife = saturate(remainingLife);

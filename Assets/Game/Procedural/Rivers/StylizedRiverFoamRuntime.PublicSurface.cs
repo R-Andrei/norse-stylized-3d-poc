@@ -551,11 +551,7 @@ namespace ProgrammaticStylized3D.Rivers
         public float FoamWithinPressureLeeSupport => TopologyRegionRatio(13, 12);
         public float PerimeterRatio => TopologyRegionRatio(14, 5);
         public float ConnectorMajorOverlap => TopologyRegionRatio(15, 2);
-        public int FractureWidth => currentFracture != null ? currentFracture.width : 0;
-        public int FractureHeight => currentFracture != null ? currentFracture.height : 0;
         public float GuidanceUpdateRate => ResolveGuidanceUpdateRate();
-        public float PopulationUpdateRate => ResolvePopulationUpdateRate();
-        public float FractureUpdateRate => ResolveFractureUpdateRate();
         public int ActiveChunkCount => CountActiveChunks();
         public int PendingInjectionCount => pendingInjections.Count;
         public int ActiveReservationCount => reservations.Count;
@@ -580,7 +576,6 @@ namespace ProgrammaticStylized3D.Rivers
         public bool IsSleeping =>
             !TopologyReplacementInProgress &&
             !TopologyTransitionActive &&
-            !IsAutomaticMaterialSupplyActive &&
             !IsTopologyDebugActive &&
             pendingInjections.Count == 0 &&
             reservations.Count == 0 &&
@@ -612,8 +607,6 @@ namespace ProgrammaticStylized3D.Rivers
             EstimateTextureBytes(freeWaterNegativeMaskTextureArray) +
             EstimateTextureBytes(currentShoreEdgesTexture) +
             EstimateTextureBytes(obstacleExclusionTexture) +
-            EstimateTextureBytes(fractureA) +
-            EstimateTextureBytes(fractureB) +
             EstimateTextureBytes(neutralDisturbanceTexture) +
             EstimateTextureBytes(boundaryTexture) +
             EstimateTextureBytes(obstacleExclusionReadbackTexture) +
@@ -628,9 +621,6 @@ namespace ProgrammaticStylized3D.Rivers
                 : 0L) +
             (metricBuffer != null
                 ? (long)metricBuffer.count * metricBuffer.stride
-                : 0L) +
-            (populationMetricsBuffer != null
-                ? (long)populationMetricsBuffer.count * populationMetricsBuffer.stride
                 : 0L) +
             (topologyMetricsBuffer != null
                 ? (long)topologyMetricsBuffer.count * topologyMetricsBuffer.stride
@@ -674,9 +664,6 @@ namespace ProgrammaticStylized3D.Rivers
         private bool DevelopmentTopologyGenerationInProgress =>
             explicitTopologyGenerationInProgress ||
             automaticTopologyGenerationInProgress;
-
-        private bool IsAutomaticMaterialSupplyActive =>
-            river != null && river.FoamEnabled;
 
         private bool IsTopologyDebugActive
         {

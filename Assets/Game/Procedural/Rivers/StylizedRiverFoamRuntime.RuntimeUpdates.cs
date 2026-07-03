@@ -10,93 +10,6 @@ namespace ProgrammaticStylized3D.Rivers
 {
     public sealed partial class StylizedRiverFoamRuntime
     {
-        private void MeasurePopulation()
-        {
-            using var profilerScope = DiagnosticsMeasurePopulationProfilerMarker.Auto();
-            if (computeShader == null || currentState == null ||
-                boundaryTexture == null || populationMetricsBuffer == null ||
-                resetPopulationKernel < 0 || measurePopulationKernel < 0)
-            {
-                return;
-            }
-
-            computeShader.SetInt("_FoamChunkCount", chunkCount);
-            computeShader.SetBuffer(
-                resetPopulationKernel,
-                "_FoamPopulationMetrics",
-                populationMetricsBuffer);
-            DispatchOneDimensional(
-                resetPopulationKernel,
-                chunkCount,
-                64);
-
-            computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
-            computeShader.SetFloat("_FoamValidLength", validFieldLength);
-            computeShader.SetFloat(
-                "_FoamSimulationLength",
-                simulationFieldLength);
-            computeShader.SetInt(
-                "_FoamResolutionPerChunk",
-                resolutionPerChunk);
-            computeShader.SetFloat(
-                "_FoamVisibleThreshold",
-                ProvisionalMaterialVisibleThreshold);
-            computeShader.SetTexture(
-                measurePopulationKernel,
-                "_FoamStateRead",
-                currentState);
-            computeShader.SetTexture(
-                measurePopulationKernel,
-                "_FoamBoundary",
-                boundaryTexture);
-            computeShader.SetInts(
-                "_FoamGuidanceDimensions",
-                guidanceWidth,
-                guidanceHeight);
-            computeShader.SetTexture(
-                measurePopulationKernel,
-                "_FoamGuidanceRead",
-                guidanceTexture);
-            computeShader.SetBuffer(
-                measurePopulationKernel,
-                "_FoamPopulationMetrics",
-                populationMetricsBuffer);
-            Dispatch(measurePopulationKernel, fieldWidth, fieldHeight);
-        }
-
-        private void UpdateFractureField(float deltaTime)
-        {
-            if (computeShader == null || currentState == null ||
-                currentFracture == null || writeFracture == null ||
-                updateFractureKernel < 0)
-            {
-                return;
-            }
-
-            computeShader.SetFloat(
-                "_FoamFractureDeltaTime",
-                Mathf.Max(0.0001f, deltaTime));
-            computeShader.SetTexture(
-                updateFractureKernel,
-                "_FoamStateRead",
-                currentState);
-            computeShader.SetTexture(
-                updateFractureKernel,
-                "_FoamFractureRead",
-                currentFracture);
-            computeShader.SetTexture(
-                updateFractureKernel,
-                "_FoamFractureWrite",
-                writeFracture);
-            Dispatch(updateFractureKernel, fractureWidth, fractureHeight);
-            (currentFracture, writeFracture) =
-                (writeFracture, currentFracture);
-            computeShader.SetTexture(
-                simulateKernel,
-                "_FoamFractureRead",
-                currentFracture);
-        }
-
         private void HandleDomainChanged(RiverDomainSnapshot _)
         {
             resourcesDirty = true;
@@ -125,38 +38,6 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverQuality.Medium => 6f,
                 StylizedRiverQuality.High => 8f,
                 _ => 6f
-            };
-        }
-
-        private float ResolvePopulationUpdateRate()
-        {
-            if (river == null)
-            {
-                return 6f;
-            }
-
-            return river.Quality switch
-            {
-                StylizedRiverQuality.Low => 4f,
-                StylizedRiverQuality.Medium => 6f,
-                StylizedRiverQuality.High => 8f,
-                _ => 6f
-            };
-        }
-
-        private float ResolveFractureUpdateRate()
-        {
-            if (river == null)
-            {
-                return 10f;
-            }
-
-            return river.Quality switch
-            {
-                StylizedRiverQuality.Low => 8f,
-                StylizedRiverQuality.Medium => 10f,
-                StylizedRiverQuality.High => 12f,
-                _ => 10f
             };
         }
 

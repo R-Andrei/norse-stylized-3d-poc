@@ -89,13 +89,10 @@ namespace ProgrammaticStylized3D.Rivers
                 currentShoreEdgesTexture != null &&
                 obstacleExclusionTexture != null &&
                 obstacleExclusionTexture.IsCreated() &&
-                currentFracture != null &&
-                writeFracture != null &&
                 neutralDisturbanceTexture != null &&
                 neutralDisturbanceTexture.IsCreated() &&
                 boundaryTexture != null &&
                 metricBuffer != null &&
-                populationMetricsBuffer != null &&
                 topologyMetricsBuffer != null &&
                 domainVersion == river.Domain.Version &&
                 allocatedQuality == river.Quality;
@@ -233,12 +230,6 @@ namespace ProgrammaticStylized3D.Rivers
                 case InitializationPhase.AllocateAuxiliaryTextures:
                     using (InitAllocateAuxiliaryTexturesProfilerMarker.Auto())
                     {
-                        fractureA = CreateFractureTexture(
-                            "PS3D_RiverFoam_FractureA");
-                        fractureB = CreateFractureTexture(
-                            "PS3D_RiverFoam_FractureB");
-                        currentFracture = fractureA;
-                        writeFracture = fractureB;
                         neutralDisturbanceTexture =
                             CreateNeutralDisturbanceTexture();
                         previousState = stateA;
@@ -271,10 +262,6 @@ namespace ProgrammaticStylized3D.Rivers
                 case InitializationPhase.AllocateBuffers:
                     using (InitAllocateBuffersProfilerMarker.Auto())
                     {
-                        populationMetricsBuffer = new ComputeBuffer(
-                            chunkCount * 8,
-                            sizeof(uint),
-                            ComputeBufferType.Raw);
                         topologyMetricsBuffer = new ComputeBuffer(
                             TopologyMetricCount,
                             sizeof(uint),
@@ -452,16 +439,6 @@ namespace ProgrammaticStylized3D.Rivers
                         DispatchClear(reverseState, 0, fieldWidth);
                     }
 
-                    initializationPhase = InitializationPhase.ClearFracture;
-                    break;
-
-                case InitializationPhase.ClearFracture:
-                    using (InitClearFractureProfilerMarker.Auto())
-                    {
-                        DispatchClearFracture(fractureA, 0, fractureWidth);
-                        DispatchClearFracture(fractureB, 0, fractureWidth);
-                    }
-
                     initializationPhase = InitializationPhase.BuildGuidance;
                     break;
 
@@ -473,12 +450,6 @@ namespace ProgrammaticStylized3D.Rivers
 
                 case InitializationPhase.RefreshInitialTopologySources:
                     RefreshDynamicTopologySources(true);
-                    initializationPhase =
-                        InitializationPhase.MeasureInitialPopulation;
-                    break;
-
-                case InitializationPhase.MeasureInitialPopulation:
-                    MeasurePopulation();
                     initializationPhase = InitializationPhase.Finalize;
                     break;
 
@@ -524,16 +495,9 @@ namespace ProgrammaticStylized3D.Rivers
             // hidden lattice and then upsampled.
             guidanceWidth = fieldWidth;
             guidanceHeight = fieldHeight;
-            fractureWidth = Mathf.Max(16, Mathf.CeilToInt(fieldWidth * 0.5f));
-            fractureHeight = Mathf.Max(
-                16,
-                Mathf.CeilToInt(fieldHeight * 0.5f));
-
             if (maximumTextureSize < 24 ||
                 fieldHeight > maximumTextureSize ||
-                guidanceHeight > maximumTextureSize ||
-                fractureWidth > maximumTextureSize ||
-                fractureHeight > maximumTextureSize)
+                guidanceHeight > maximumTextureSize)
             {
                 ReportAllocationFailure(maximumTextureSize);
                 initializationPhase = InitializationPhase.Failed;
@@ -635,8 +599,6 @@ namespace ProgrammaticStylized3D.Rivers
             simulationAccumulator = 0f;
             guidanceAccumulator = 0f;
             topologyMetricsAccumulator = 0f;
-            populationAccumulator = 0f;
-            fractureAccumulator = 0f;
             simulationInterpolation = 1f;
             lastRuntimeTime = Time.realtimeSinceStartup;
             rebuildPhase = RebuildPhase.Idle;
@@ -853,26 +815,6 @@ namespace ProgrammaticStylized3D.Rivers
             return texture;
         }
 
-        private RenderTexture CreateFractureTexture(string textureName)
-        {
-            RenderTexture texture = new RenderTexture(
-                fractureWidth,
-                fractureHeight,
-                0,
-                RenderTextureFormat.RGHalf,
-                RenderTextureReadWrite.Linear)
-            {
-                name = textureName,
-                enableRandomWrite = true,
-                useMipMap = false,
-                autoGenerateMips = false,
-                filterMode = FilterMode.Bilinear,
-                wrapMode = TextureWrapMode.Clamp,
-                hideFlags = HideFlags.DontSave
-            };
-            texture.Create();
-            return texture;
-        }
 
         private static RenderTexture CreateNeutralDisturbanceTexture()
         {
@@ -931,11 +873,7 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseTexture(ref evolvingWeakSpanNegativeTexture);
             ReleaseTexture(ref currentShoreEdgesTexture);
             ReleaseTexture(ref obstacleExclusionTexture);
-            ReleaseTexture(ref fractureA);
-            ReleaseTexture(ref fractureB);
             ReleaseTexture(ref neutralDisturbanceTexture);
-            currentFracture = null;
-            writeFracture = null;
             previousState = null;
             currentState = null;
             writeState = null;
@@ -987,8 +925,6 @@ namespace ProgrammaticStylized3D.Rivers
             connectorTopologyInputSignature = int.MinValue;
             pocketTopologyInputSignature = int.MinValue;
             obstacleGeometryVersion = -1;
-            populationMetricsBuffer?.Release();
-            populationMetricsBuffer = null;
             if (topologyMetricsReadbackPending)
             {
                 // The request callback owns this retired buffer until the GPU
@@ -1021,10 +957,6 @@ namespace ProgrammaticStylized3D.Rivers
             updateObstacleExclusionKernel = -1;
             resetTopologyMetricsKernel = -1;
             measureTopologyMetricsKernel = -1;
-            resetPopulationKernel = -1;
-            measurePopulationKernel = -1;
-            updateFractureKernel = -1;
-            clearFractureKernel = -1;
             advectForwardKernel = -1;
             advectReverseKernel = -1;
             simulateKernel = -1;
@@ -1033,8 +965,6 @@ namespace ProgrammaticStylized3D.Rivers
             fieldHeight = 0;
             guidanceWidth = 0;
             guidanceHeight = 0;
-            fractureWidth = 0;
-            fractureHeight = 0;
             chunkCount = 0;
             resolutionPerChunk = 0;
             fieldLength = 0f;
@@ -1073,8 +1003,6 @@ namespace ProgrammaticStylized3D.Rivers
             domainVersion = -1;
             guidanceAccumulator = 0f;
             topologyMetricsAccumulator = 0f;
-            populationAccumulator = 0f;
-            fractureAccumulator = 0f;
         }
 
 

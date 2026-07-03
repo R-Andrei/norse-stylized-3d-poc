@@ -2644,17 +2644,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             EditorGUILayout.LabelField(
-                new GUIContent(
-                    "Fracture Resolution",
-                    "Half-resolution persistent structural-damage field. Red stores accumulated damage; green stores crack coherence. It advances at a lower rate than material transport and never directly renders or deletes Foam."),
-                new GUIContent(
-                    runtime.ResourcesAllocated
-                        ? $"{runtime.FractureWidth} × {runtime.FractureHeight}"
-                        : "Not allocated"));
-            EditorGUILayout.LabelField(
                 new GUIContent("Subsystem Rates"),
                 new GUIContent(
-                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Population {runtime.PopulationUpdateRate:0} Hz · Fracture {runtime.FractureUpdateRate:0} Hz · Major/hosted reconstruction while moving; Free-Water updates slowly; Connector Weak Spans remain static"));
+                    $"Guidance {runtime.GuidanceUpdateRate:0} Hz · Major/hosted reconstruction while moving; Free-Water updates slowly; Connector Weak Spans remain static"));
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Transport",
@@ -2711,7 +2703,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawMemoryDiagnostic(
                 "Allocated Foam Memory",
                 runtime.EstimatedMemoryBytes,
-                "Estimated material state, corrected-advection scratch textures, guidance, final topology, generated Major/Connector/Pocket input and upload texture, anchored-source topology, fracture, boundary, population/topology metrics, and the local river metric buffer. Obsolete nucleus, Major ping-pong, disabled Connector stub, Pocket stub, and fixture resources are absent.");
+                "Estimated material state, corrected-advection scratch textures, guidance, final topology, generated Major/Connector/Pocket input and upload texture, anchored-source topology, boundary, topology metrics, and the local river metric buffer. Superseded distributed-population and provisional-fracture resources are absent.");
 
             if (GUILayout.Button(
                     new GUIContent(
