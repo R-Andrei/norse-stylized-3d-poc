@@ -317,10 +317,10 @@ Split into partials by runtime responsibility while preserving the runtime compo
 
 **Pass checklist:**
 
-- [ ] Pass 1 - Baseline and include-order map: record all kernels, resource declarations, struct layouts, and C# binding assumptions before moving code.
-- [ ] Pass 2 - Struct/resource/sampling include split: move low-level declarations and pure sampling helpers into includes while keeping the main compute file as the kernel manifest.
-- [ ] Pass 3 - Topology/evolution/simulation include split: move domain-specific helper groups into includes without changing kernel entry points.
-- [ ] Pass 4 - Large function reduction and cleanup: reduce the biggest helper/kernel bodies where safe, revalidate all kernel lookup, and update this log.
+- [x] Pass 1 - Baseline and include-order map: record all kernels, resource declarations, struct layouts, and C# binding assumptions before moving code.
+- [x] Pass 2 - Struct/resource/sampling include split: move low-level declarations and pure sampling helpers into includes while keeping the main compute file as the kernel manifest.
+- [x] Pass 3 - Topology/evolution/simulation include split: move domain-specific helper groups into includes without changing kernel entry points.
+- [x] Pass 4 - Large function reduction and cleanup: reduce the biggest helper/kernel bodies where safe, revalidate all kernel lookup, and update this log.
 
 **Observed shape:**
 
@@ -421,6 +421,8 @@ Split helper code into include files while keeping the main compute asset as the
 
 **Recommended pass count:** 3.
 
+**Status:** Deferred as of 2026-07-03. Re-evaluate this opportunity before starting any pass; the checklist below is retained as a planning snapshot, not an active implementation queue.
+
 **Pass checklist:**
 
 - [ ] Pass 1 - Mechanical editor partial split: split the custom inspector by visible Inspector section and shared editor helpers without changing serialized property names.
@@ -515,6 +517,8 @@ Split the custom inspector into partial files by visible Inspector section and h
 
 **Recommended pass count:** 4.
 
+**Status:** Deferred as of 2026-07-03. Re-evaluate this opportunity before starting any pass; the checklist below is retained as a planning snapshot, not an active implementation queue.
+
 **Pass checklist:**
 
 - [ ] Pass 1 - Serialization-safe partial split: convert to partial and move methods by responsibility while leaving serialized field declarations and names stable.
@@ -599,6 +603,8 @@ Reduce the main component file without moving serialized state into new componen
 **Priority:** High.
 
 **Recommended pass count:** 4.
+
+**Status:** Deferred as of 2026-07-03. Re-evaluate this opportunity before starting any pass; the checklist below is retained as a planning snapshot, not an active implementation queue.
 
 **Pass checklist:**
 
@@ -712,6 +718,8 @@ Suggested file groups:
 
 **Recommended pass count:** 3.
 
+**Status:** Deferred as of 2026-07-03. Re-evaluate this opportunity before starting any pass; the checklist below is retained as a planning snapshot, not an active implementation queue.
+
 **Pass checklist:**
 
 - [ ] Pass 1 - Format baseline and mechanical split: document the current cache format, sample existing assets, and split package/contracts from codec entry points.
@@ -784,6 +792,8 @@ Split codec responsibilities into readable read/write/validate chunks without ch
 **Priority:** Medium-high.
 
 **Recommended pass count:** 4.
+
+**Status:** Deferred as of 2026-07-03. Re-evaluate this opportunity before starting any pass; the checklist below is retained as a planning snapshot, not an active implementation queue.
 
 **Pass checklist:**
 
@@ -897,6 +907,8 @@ For HLSL:
 
 **Recommended pass count:** 3.
 
+**Status:** Deferred as of 2026-07-03. Re-evaluate this opportunity before starting any pass; the checklist below is retained as a planning snapshot, not an active implementation queue.
+
 **Pass checklist:**
 
 - [ ] Pass 1 - Shader contract baseline: record pass state, property names, include order, debug values, and representative visual modes.
@@ -982,6 +994,8 @@ Keep shader behaviour identical while reducing the size of the main fragment pat
 **Current size:** 2241 lines.
 
 **Recommended pass count:** 2.
+
+**Status:** Deferred as of 2026-07-03. Re-evaluate this opportunity before starting any pass; the checklist below is retained as a planning snapshot, not an active implementation queue.
 
 **Pass checklist:**
 
@@ -1095,3 +1109,8 @@ Use this section as work proceeds.
 | 2026-07-02 | Item 2, Pass 2 | Split `StylizedRiverDisturbanceRuntime` resource allocation/release, kernel setup, generic compute dispatch, domain dispatch wrappers, and renderer material binding into focused partial files. | Method-equivalence, symbol-location, brace-balance, and `git diff --check` checks passed; command-line compile could not run because no .NET SDK is installed. | Behaviour-preserving mechanical move only; Unity import/compile remains required. |
 | 2026-07-02 | Item 2, Pass 3 | Split `StylizedRiverDisturbanceRuntime` generated-source syncing, continuous/static source APIs, impact/debug emission and reservations, static pressure profiles, static wake source/variation code, ripple boundary/metrics, and source-path coordinate/chunk helpers into focused partial files. | Method-equivalence, symbol-location, brace-balance, and `git diff --check` checks passed; command-line compile could not run because no .NET SDK is installed. | Behaviour-preserving mechanical move only; Unity import/compile remains required. |
 | 2026-07-02 | Item 2, Pass 4 | Reduced the largest remaining `StylizedRiverDisturbanceRuntime` flows by extracting generated static-pressure resolution and static bake upload helpers while preserving generated-source diagnostics and emitter/static-source call order. | Focused call-site review, symbol-location, brace-balance, trailing-whitespace, and `git diff --check` checks passed; command-line compile could not run because no .NET SDK is installed. | Final cleanup pass for Item 2; Unity import/compile remains required. |
+| 2026-07-03 | Item 3, Pass 1 | Recorded the `CS_RiverFoam.compute` baseline in `CS_RiverFoam_Compute_Refactor_Baseline.md`, including kernel manifest, current include order, struct layouts, resource/uniform declarations, helper dependency groups, and C# binding assumptions. | Kernel pragma list and C# `FindKernel` names were cross-checked; `_Foam...` compute/material string contracts were scanned; no compute code was moved in this pass. | Baseline-only pass for the upcoming include split; Unity compute import/compile remains required after future code movement. |
+| 2026-07-03 | Item 3, Pass 2 | Split `CS_RiverFoam.compute` structs, resource/uniform declarations, coordinate/load helpers, bilinear sampling helpers, and hash/noise/injection-shape helpers into focused HLSL includes while leaving all kernel entry points in the main compute asset. | Kernel pragma/C# `FindKernel` contract check passed; moved struct/function equivalence and `_Foam...` symbol-set checks passed; `git diff --check` reported only existing line-ending warnings. | Behaviour-preserving include split only; Unity compute import/compile remains required. |
+| 2026-07-03 | Item 3, Pass 3 | Split `CS_RiverFoam.compute` support envelope, network/guidance, motion, topology helper, evolution/identity, and topology-transition helpers into focused HLSL includes while keeping all kernel entry points in the main compute asset. | Kernel pragma/C# `FindKernel` contract check passed; moved helper definitions no longer remain in the main compute file; include line endings are consistently CRLF; `git diff --check` reported only existing line-ending warnings. | Behaviour-preserving include split only; Unity compute import/compile remains required. |
+| 2026-07-03 | Item 3, Pass 4 | Reduced the largest remaining `CS_RiverFoam.compute` kernel by extracting simulation neighbourhood sampling, population source-need, and distributed supply helpers into `CS_RiverFoam.Simulation.hlsl`; normalized the main compute and include files to consistent CRLF endings. | Kernel pragma/C# `FindKernel` contract check passed; main compute still contains the 19 kernel entry functions; all `CS_RiverFoam` compute/include files have consistent line endings; `git diff --check` reported only the checklist line-ending warning. | Final cleanup pass for Item 3; Unity compute import/compile remains required. |
+| 2026-07-03 | Items 4-10 deferred | Marked the remaining refactor opportunities as deferred after completing the first three priority items. | No code changes for the deferred items; their pass plans remain in the document as planning snapshots. | Re-scan and re-prioritize these opportunities before starting future refactor passes. |
