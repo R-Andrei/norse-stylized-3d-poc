@@ -44,7 +44,6 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 CentreGlobalDistance = injection.GlobalDistance,
                 AlongRadius = injection.Radius * injection.Elongation,
-                RemainingAmount = injection.SourceAmount,
                 Elapsed = 0f,
                 MaximumLifetime = Mathf.Clamp(
                     injection.RemainingLife *
@@ -76,14 +75,7 @@ namespace ProgrammaticStylized3D.Rivers
                 reservation.CentreGlobalDistance += speed * deltaTime;
                 reservation.AlongRadius +=
                     (0.15f + spread * 0.35f) * deltaTime;
-                float reservationDecay =
-                    DecayToFivePercent /
-                    Mathf.Max(0.05f, reservation.MaximumLifetime);
-                reservation.RemainingAmount *=
-                    Mathf.Exp(-reservationDecay * deltaTime);
-
-                if (reservation.Elapsed >= reservation.MaximumLifetime ||
-                    reservation.RemainingAmount < 0.015f)
+                if (reservation.Elapsed >= reservation.MaximumLifetime)
                 {
                     reservations.RemoveAt(index);
                     continue;
@@ -283,8 +275,9 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamInjectionRemainingLife",
                 injection.RemainingLife);
-            computeShader.SetFloat("_FoamInjectionIntegrity", injection.Integrity);
-            computeShader.SetFloat("_FoamInjectionPhase", injection.Phase);
+            computeShader.SetFloat(
+                "_FoamInjectionPatternSeed",
+                injection.PatternSeed);
             computeShader.SetFloat("_FoamInjectionElongation", injection.Elongation);
             computeShader.SetFloat(
                 "_FoamInjectionSourceFillSeed",

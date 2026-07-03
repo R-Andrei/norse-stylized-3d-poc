@@ -22,7 +22,8 @@ Material/birth status:
 - Patch 4.11C implements the fixed-capacity manual progressive-ribbon event loop. Final Foam did not visibly reproduce the progressive source.
 - Patch 4.11C.1 proves trajectory generation, event scheduling, canonical coordinate mapping, and current/cumulative source rasterization.
 - Patch 4.11C.2 proves the dedicated per-step source-to-material transfer boundary. Testing then exposed that visible survival remains controlled by persistent Amount, boundary attenuation, renderer thresholds, and reinforcement rather than by Remaining Life.
-- Patch 4.11C.3 is implemented in code and awaits focused Unity validation. Amount now selects deterministic coherent source area; progressive source writes use geometric max-union; manual injection uses the canonical obstacle mask; fragment Amount no longer shortens Initial Remaining Life; the proven trajectory and old persistent packing remain unchanged.
+- Patch 4.11C.3 is Unity-validated and accepted. Amount selects deterministic coherent source area; progressive source writes use geometric max-union; manual injection uses the canonical obstacle mask; fragment Amount no longer shortens Initial Remaining Life; the proven trajectory remains unchanged.
+- Patch 4.11C.4 is implemented in code and awaits focused Unity validation. Persistent and per-step source textures now use Presence, Presence-weighted Remaining Life, Presence-weighted Material Pattern, and reserved zero. Integrity and material Phase are removed from active Foam state and rendering. Disturbances retain motion influence but no longer add Presence or rejuvenate life. Presence, Remaining Life, and Material Pattern diagnostics are available. Multiplicative transport/bank attenuation is intentionally left for 4.11C.5.
 - The former monolithic 4.11C.3 proposal is superseded by five bounded patches documented in `River_Foam_Material_State_Correction_Implementation_Plan.md`:
   - 4.11C.3 Source Quantity and Birth-Merge Correction;
   - 4.11C.4 Persistent Material-State Migration;
@@ -315,8 +316,8 @@ Only Added Presence receives source Life and Pattern. The same union rule applie
 
 The former monolithic correction is split as follows:
 
-- **4.11C.3 — Source Quantity and Birth-Merge Correction:** deterministic Amount-to-area conversion, nested source subsets, source-to-source union, manual obstacle validity, fragment-chain Amount/life decoupling, and source-only naming cleanup. Persistent packing remains temporarily old-format.
-- **4.11C.4 — Persistent Material-State Migration:** atomically install Presence/Life/Pattern packing, remove Integrity/material Phase and disturbance material reinforcement, add Pattern generation and diagnostics, and migrate every writer/reader.
+- **4.11C.3 — Source Quantity and Birth-Merge Correction:** Unity-validated. Deterministic Amount-to-area conversion, nested source subsets, source-to-source union, manual obstacle validity, fragment-chain Amount/life decoupling, and source-only naming cleanup.
+- **4.11C.4 — Persistent Material-State Migration:** implemented; Unity validation pending. Presence/Life/Pattern packing is atomic across all writers/readers; Integrity/material Phase and disturbance material reinforcement are removed; Pattern generation and Presence/Life/Pattern diagnostics are active.
 - **4.11C.5 — Transport and Valid-Fluid Correction:** move premultiplied state without repeated bank attenuation, clamp MacCormack moments, stabilize Presence contour, and clip by idempotent canonical valid fluid.
 - **4.11C.6 — Lifetime Authority and Presentation:** make the topology equation the sole ordinary clock, move final fade inside Remaining Life, rewrite reservations/metrics, add Local Aging Response, and correct Inspector semantics.
 - **4.11C.7 — Validation, Regression Audit, and Documentation Closure:** packed-state invariant checks, semantic static audit, complete Unity matrix, and final documentation agreement.
@@ -1060,8 +1061,8 @@ Active material sequence:
 4. 4.11C — fixed-capacity manual event runtime — implemented; Final Foam progressive proof failed.
 5. 4.11C.1 — isolated source diagnostics — implemented and Unity-validated.
 6. 4.11C.2 — dedicated per-step source transfer — implemented; exposed persistent-state/lifetime failure.
-7. 4.11C.3 — Source Quantity and Birth-Merge Correction — implemented; focused Unity validation pending.
-8. 4.11C.4 — Persistent Material-State Migration.
+7. 4.11C.3 — Source Quantity and Birth-Merge Correction — Unity-validated and accepted.
+8. 4.11C.4 — Persistent Material-State Migration — implemented; focused Unity validation pending.
 9. 4.11C.5 — Transport and Valid-Fluid Correction.
 10. 4.11C.6 — Lifetime Authority and Presentation.
 11. 4.11C.7 — Validation, Regression Audit, and Documentation Closure.

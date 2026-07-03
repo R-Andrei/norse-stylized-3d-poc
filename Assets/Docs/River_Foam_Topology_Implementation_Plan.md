@@ -1543,7 +1543,7 @@ A later material-facing subtype expansion requires visible evidence that one agg
 
 - **Cache/preparation** owns immutable generated identities, prepared geometry, local masks, paths, anchors, variants, exact obstacle data, deterministic metadata, and serialization.
 - **Topology runtime** owns generated evolution, live anchored-source composition, complete replacement activation, generated-topology crossfades, and normalized material-facing influence fields.
-- **Material lifecycle** owns material amount, age/freshness, integrity, provenance, birth-event scheduling, breakup, motion, and death.
+- **Material lifecycle** owns Presence, Remaining Life, Material Pattern, birth-event scheduling, transport, future breakup state, and material death. Emitter Amount remains source-only and is discarded after birth conversion.
 - **Rendering** owns colour, opacity, visible edge treatment, and fine visual detail.
 
 The topology runtime does not spawn or erase material, implement fragmentation or dissipation, determine final colour/opacity, or own material lifetime. The material-owned birth scheduler may sample the frozen topology outputs as bounded candidate weights or trajectory context, but it may not ask topology to fill material Presence, expose support masks as continuous emitters, or modify the accepted topology/cache contract.
@@ -1733,7 +1733,7 @@ A topology patch that cannot answer these questions is not ready.
 
 Topology generation remains complete and closed after Patch 4.10B.
 
-Material-owned **Patch 4.11C.3 — Source Quantity and Birth-Merge Correction** is implemented in code and awaits focused Unity validation. After acceptance, work continues with C.4 persistent state migration, C.5 transport/valid-fluid correction, C.6 lifetime authority/presentation, and C.7 validation/closure.
+Material-owned **Patch 4.11C.3 — Source Quantity and Birth-Merge Correction** is Unity-validated. **Patch 4.11C.4 — Persistent Material-State Migration** is implemented and awaits focused Unity validation. After acceptance, work continues with C.5 transport/valid-fluid correction, C.6 lifetime authority/presentation, and C.7 validation/closure.
 
 These patches may sample the accepted topology outputs but may not:
 

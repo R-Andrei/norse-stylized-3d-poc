@@ -78,10 +78,6 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamEvolution",
                 ProvisionalMaterialEvolution);
             computeShader.SetFloat("_FoamSpread", ProvisionalMaterialSpread);
-            computeShader.SetFloat("_FoamCohesion", ProvisionalMaterialCohesion);
-            computeShader.SetFloat(
-                "_FoamConnectivity",
-                ProvisionalMaterialConnectivity);
             computeShader.SetFloat(
                 "_FoamNeutralLifetime",
                 river.FoamNeutralLifetime);
@@ -91,20 +87,11 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamNegativeAgeMultiplier",
                 river.FoamNegativeAgingRate);
-            computeShader.SetFloat(
-                "_FoamEndOfLifeDissipationRate",
-                DecayToFivePercent / EndOfLifeDissipationSeconds);
-            computeShader.SetFloat(
-                "_FoamEndOfLifeDissipationStart",
-                EndOfLifeDissipationStart);
-            computeShader.SetFloat(
-                "_FoamShoreRetention",
-                ProvisionalMaterialShoreRetention);
             computeShader.SetFloat("_FoamTime", river.MotionTime);
             computeShader.SetFloat("_FoamSeed", river.VisualSeed);
             computeShader.SetFloat(
-                "_FoamVisibleThreshold",
-                ProvisionalMaterialVisibleThreshold);
+                "_FoamPresenceMetricThreshold",
+                PresenceMetricThreshold);
             computeShader.SetFloat(
                 "_FoamGuidanceStrength",
                 ProvisionalMaterialGuidanceStrength);
@@ -112,11 +99,11 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamBoundaryAttraction",
                 ProvisionalMaterialBoundaryAttraction);
             computeShader.SetFloat(
-                "_FoamWakeReinforcement",
-                ProvisionalMaterialWakeReinforcement);
+                "_FoamWakeMotionInfluence",
+                ProvisionalWakeMotionInfluence);
             computeShader.SetFloat(
-                "_FoamImpactReinforcement",
-                ProvisionalMaterialImpactReinforcement);
+                "_FoamImpactMotionInfluence",
+                ProvisionalImpactMotionInfluence);
 
             bool disturbanceAvailable =
                 disturbanceRuntime != null &&

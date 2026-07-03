@@ -362,7 +362,7 @@ Final-life visibility uses Remaining Life inside the selected time budget; no se
 
 #### 4.11C.3 — Source Quantity and Birth-Merge Correction
 
-**Status:** Implemented in code; focused Unity validation pending. Persistent material packing remains intentionally unchanged until 4.11C.4.
+**Status:** Unity-validated and accepted. The temporary old persistent packing was replaced by 4.11C.4.
 
 - convert Amount into deterministic coherent nested birth area;
 - use geometric union for overlapping source segments/events;
@@ -372,6 +372,8 @@ Final-life visibility uses Remaining Life inside the selected time budget; no se
 - preserve the proven trajectory and old persistent packing temporarily.
 
 #### 4.11C.4 — Persistent Material-State Migration
+
+**Status:** Implemented in code; focused Unity validation pending. C.5 remains the next patch after acceptance.
 
 - atomically install Presence/Life/Pattern packing;
 - centralize semantic encode/decode;

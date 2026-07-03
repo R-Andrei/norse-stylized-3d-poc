@@ -10,8 +10,8 @@ namespace ProgrammaticStylized3D.Rivers
 {
     /// <summary>
     /// Hidden Stage 6 runtime that owns the complete shared Foam network.
-    /// Amount, amount-weighted Remaining Life, amount-weighted Integrity,
-    /// and material phase are transported in one persistent state while a
+    /// Presence, Presence-weighted Remaining Life, and Presence-weighted
+    /// Material Pattern are transported in one persistent state while a
     /// shared structural-resolution guidance field,
     /// GPU-only population controller, boundaries, Wake, and Impact activity organise
     /// that material into an evolving web-like tracer network.

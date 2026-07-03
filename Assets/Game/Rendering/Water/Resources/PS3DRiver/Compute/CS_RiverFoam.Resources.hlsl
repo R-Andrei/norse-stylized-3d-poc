@@ -1,11 +1,11 @@
-// Canonical Patch 4.11A persistent material state:
-// R = Amount
-// G = Amount * normalized Remaining Life
-// B = Amount * normalized Integrity
-// A = material phase / provenance
-// Premultiplying the transported attributes makes advection and merging
-// conservative: empty cells cannot carry life or integrity independently of
-// material amount. Consumers decode G/R and B/R only when Amount is non-zero.
+// Canonical Patch 4.11C.4 persistent and per-step source state:
+// R = Presence
+// G = Presence * normalized Remaining Life
+// B = Presence * normalized Material Pattern
+// A = reserved and always zero
+// Premultiplying transported attributes by Presence preserves normalized Life
+// and Pattern across interpolation with empty water. Consumers decode G/R and
+// B/R only when Presence is non-zero.
 RWTexture2D<float4> _FoamStateWrite;
 Texture2D<float4> _FoamStateRead;
 RWTexture2D<float4> _FoamBirthDebugWrite;
@@ -104,21 +104,16 @@ float _FoamFlowSpeed;
 float _FoamFlowDirection;
 float _FoamEvolution;
 float _FoamSpread;
-float _FoamCohesion;
-float _FoamConnectivity;
 float _FoamNeutralLifetime;
 float _FoamPositiveAgeMultiplier;
 float _FoamNegativeAgeMultiplier;
-float _FoamEndOfLifeDissipationRate;
-float _FoamEndOfLifeDissipationStart;
-float _FoamShoreRetention;
 float _FoamTime;
 float _FoamSeed;
-float _FoamVisibleThreshold;
+float _FoamPresenceMetricThreshold;
 float _FoamGuidanceStrength;
 float _FoamBoundaryAttraction;
-float _FoamWakeReinforcement;
-float _FoamImpactReinforcement;
+float _FoamWakeMotionInfluence;
+float _FoamImpactMotionInfluence;
 float _FoamDisturbanceEnabled;
 float _FoamMotionFlowSpeed;
 float _FoamMotionWaveHeight;
@@ -157,8 +152,7 @@ float _FoamInjectionAmount;
 float _FoamInjectionSourceFillSeed;
 float _FoamInjectionSourceFillFeatureSize;
 float _FoamInjectionRemainingLife;
-float _FoamInjectionIntegrity;
-float _FoamInjectionPhase;
+float _FoamInjectionPatternSeed;
 float _FoamInjectionElongation;
 float _FoamInjectionShapeSeed;
 float _FoamInjectionShapeVariety;

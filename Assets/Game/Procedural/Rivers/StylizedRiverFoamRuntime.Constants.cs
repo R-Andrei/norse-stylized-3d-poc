@@ -19,9 +19,7 @@ namespace ProgrammaticStylized3D.Rivers
         private const int HighStructuralResolution = 128;
         private const float ResourceReleaseDelaySeconds = 2f;
         private const float MaximumManualReservationSeconds = 300f;
-        private const float DecayToFivePercent = 2.995732f;
         private const float EndOfLifeDissipationSeconds = 4f;
-        private const float EndOfLifeDissipationStart = 0.35f;
         private const float TopologyMetricsUpdateRate = 2f;
         private const int ProgressiveRibbonEventCapacity = 8;
         private const int ProgressiveBirthDebugCounterCount = 2;
@@ -43,6 +41,8 @@ namespace ProgrammaticStylized3D.Rivers
         private const float SourceFillFeatureSizeRadiusMultiplier = 0.65f;
         private const float ProgressiveSourceFillSeedSalt = 83.173f;
         private const float ManualSourceFillSeedSalt = 141.919f;
+        private const float ProgressivePatternSeedSalt = 191.447f;
+        private const float ManualPatternSeedSalt = 233.719f;
         private const int ThreadGroupSize = 8;
         private const int TopologyMetricCount = 16;
         // Canonical Stage 6 Shore Support band measured inward from the
@@ -142,14 +142,11 @@ namespace ProgrammaticStylized3D.Rivers
         private const float ProvisionalMaterialFlowFollow = 1.02818f;
         private const float ProvisionalMaterialEvolution = 1.26135f;
         private const float ProvisionalMaterialSpread = 0.42858f;
-        private const float ProvisionalMaterialCohesion = 0.056401f;
-        private const float ProvisionalMaterialConnectivity = 0.228127f;
-        private const float ProvisionalMaterialShoreRetention = 1.35f;
-        private const float ProvisionalMaterialVisibleThreshold = 0.16432f;
+        private const float PresenceMetricThreshold = 0.16432f;
         private const float ProvisionalMaterialGuidanceStrength = 1.15646f;
         private const float ProvisionalMaterialBoundaryAttraction = 1.951f;
-        private const float ProvisionalMaterialWakeReinforcement = 1.047333f;
-        private const float ProvisionalMaterialImpactReinforcement = 0f;
+        private const float ProvisionalWakeMotionInfluence = 1.047333f;
+        private const float ProvisionalImpactMotionInfluence = 0f;
 
         private enum TopologyCacheStartupResolution
         {

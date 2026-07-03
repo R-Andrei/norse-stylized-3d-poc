@@ -103,11 +103,8 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamInjectionRemainingLife",
                 segment.RemainingLife);
             computeShader.SetFloat(
-                "_FoamInjectionIntegrity",
-                segment.Integrity);
-            computeShader.SetFloat(
-                "_FoamInjectionPhase",
-                segment.Phase);
+                "_FoamInjectionPatternSeed",
+                segment.PatternSeed);
             computeShader.SetFloat(
                 "_FoamInjectionSegmentStartGlobalDistance",
                 segment.SegmentStartGlobalDistance);

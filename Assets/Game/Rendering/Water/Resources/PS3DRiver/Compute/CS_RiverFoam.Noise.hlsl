@@ -105,17 +105,31 @@ float EvaluateFoamSourceFillCoverage(
 }
 
 
-float PhaseDistance(float a, float b)
-{
-    float difference = abs(frac(a - b + 0.5) - 0.5);
-    return difference * 2.0;
-}
 
-
-float MixPhaseShortest(float fromPhase, float toPhase, float blend)
+float EvaluateFoamMaterialPattern(
+    float2 physicalPosition,
+    float patternSeed,
+    float requestedFeatureSize,
+    float2 physicalCellSpacing)
 {
-    float delta = frac(toPhase - fromPhase + 0.5) - 0.5;
-    return frac(fromPhase + delta * saturate(blend) + 1.0);
+    float maximumCellSpacing = max(
+        max(0.01, physicalCellSpacing.x),
+        max(0.01, physicalCellSpacing.y));
+    float featureSize = max(
+        max(0.30, requestedFeatureSize * 1.65),
+        maximumCellSpacing * 3.0);
+    float2 seedOffset = float2(
+        FoamHash11(patternSeed + 7.91),
+        FoamHash11(patternSeed + 61.37)) * 31.0;
+    float2 position = physicalPosition / featureSize + seedOffset;
+    float broad = FoamSourceFillValueNoise(
+        position * 0.63,
+        patternSeed + 101.0);
+    float secondary = FoamSourceFillValueNoise(
+        mul(float2x2(0.71, 0.49, -0.49, 0.71), position) * 1.18 +
+        float2(13.1, 5.7),
+        patternSeed + 149.0);
+    return saturate(broad * 0.74 + secondary * 0.26);
 }
 
 

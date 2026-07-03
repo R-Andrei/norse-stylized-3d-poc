@@ -93,8 +93,8 @@ Further performance engineering is paused because the free-water topology pipeli
 35. Patch 4.11C fixed-capacity manual event runtime — implemented; visual validation failed.
 36. Patch 4.11C.1 source-only progressive-birth diagnostics — implemented and Unity-validated.
 37. Patch 4.11C.2 dedicated per-step source transfer and diagnostics — implemented; persistent material-state/lifetime failure exposed.
-38. Patch 4.11C.3 Source Quantity and Birth-Merge Correction — implemented; focused Unity validation pending.
-39. Patch 4.11C.4 Persistent Material-State Migration — next only after 4.11C.3 acceptance.
+38. Patch 4.11C.3 Source Quantity and Birth-Merge Correction — Unity-validated and accepted.
+39. Patch 4.11C.4 Persistent Material-State Migration — implemented; focused Unity validation pending.
 40. Patch 4.11C.5 Transport and Valid-Fluid Correction.
 41. Patch 4.11C.6 Lifetime Authority and Presentation.
 42. Patch 4.11C.7 Validation, Regression Audit, and Documentation Closure.
@@ -1722,8 +1722,8 @@ Accepted/implemented topology work:
 30. Patch 4.11C fixed-capacity manual event runtime — implemented; Final Foam progressive proof failed.
 31. Patch 4.11C.1 source-only progressive-birth diagnostics — implemented and Unity-validated.
 32. Patch 4.11C.2 dedicated per-step source transfer and transfer diagnostics — implemented; persistent state/lifetime failure exposed.
-33. Patch 4.11C.3 Source Quantity and Birth-Merge Correction — implemented; focused Unity validation pending.
-34. Patch 4.11C.4 Persistent Material-State Migration.
+33. Patch 4.11C.3 Source Quantity and Birth-Merge Correction — Unity-validated and accepted.
+34. Patch 4.11C.4 Persistent Material-State Migration — implemented; focused Unity validation pending.
 35. Patch 4.11C.5 Transport and Valid-Fluid Correction.
 36. Patch 4.11C.6 Lifetime Authority and Presentation.
 37. Patch 4.11C.7 Validation, Regression Audit, and Documentation Closure.
@@ -1801,14 +1801,13 @@ The scheduling architecture is successful when:
 
 The permanent performance foundation remains accepted: named profiler phases, one-phase-per-frame staged initialization, and queued/coalesced dirty rebuilds.
 
-The current gate is focused Unity validation of **Patch 4.11C.3 — Source Quantity and Birth-Merge Correction**. Its code changes emitter Amount into deterministic coherent birth area, fixes source union and manual obstacle validity, removes the diagnostic Amount-to-life coupling, and preserves the current trajectory and old persistent packing temporarily.
+The current gate is focused Unity validation of **Patch 4.11C.4 — Persistent Material-State Migration**. Its code atomically installs Presence/Life/Pattern packing across every source and persistent-state writer/reader, removes active Integrity and material Phase, prevents disturbance fields from adding Presence or rejuvenating Remaining Life, and adds Presence/Life/Pattern diagnostics. Existing multiplicative transport and bank attenuation remain visible known limitations assigned to C.5.
 
 After user acceptance, implementation continues with:
 
-1. 4.11C.4 atomic Presence/Life/Pattern state migration;
-2. 4.11C.5 transport and idempotent valid-fluid correction;
-3. 4.11C.6 lifetime authority, renderer fade, reservations, metrics, and Local Aging Response;
-4. 4.11C.7 invariant checks, full regression matrix, and documentation closure.
+1. 4.11C.5 transport and idempotent valid-fluid correction;
+2. 4.11C.6 lifetime authority, renderer fade, reservations, metrics, and Local Aging Response;
+3. 4.11C.7 invariant checks, full regression matrix, and documentation closure.
 
 Performance safeguards for these patches:
 

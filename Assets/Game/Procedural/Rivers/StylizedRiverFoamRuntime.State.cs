@@ -13,8 +13,7 @@ namespace ProgrammaticStylized3D.Rivers
                 float radius,
                 float sourceAmount,
                 float remainingLife,
-                float integrity,
-                float phase,
+                float patternSeed,
                 float elongation,
                 bool isManual,
                 float sourceFillSeed,
@@ -37,8 +36,7 @@ namespace ProgrammaticStylized3D.Rivers
                 Radius = radius;
                 SourceAmount = sourceAmount;
                 RemainingLife = remainingLife;
-                Integrity = integrity;
-                Phase = phase;
+                PatternSeed = patternSeed;
                 Elongation = elongation;
                 IsManual = isManual;
                 SourceFillSeed = sourceFillSeed;
@@ -78,8 +76,7 @@ namespace ProgrammaticStylized3D.Rivers
             public float Radius { get; }
             public float SourceAmount { get; }
             public float RemainingLife { get; }
-            public float Integrity { get; }
-            public float Phase { get; }
+            public float PatternSeed { get; }
             public float Elongation { get; }
             public bool IsManual { get; }
             public float SourceFillSeed { get; }
@@ -111,8 +108,7 @@ namespace ProgrammaticStylized3D.Rivers
             public float BaseRadius;
             public float SourceAmount;
             public float RemainingLife;
-            public float Integrity;
-            public float Phase;
+            public float PatternSeed;
             public float ShapeSeed;
             public float SourceFillSeed;
             public float SourceFillFeatureSize;
@@ -130,7 +126,6 @@ namespace ProgrammaticStylized3D.Rivers
         {
             public float CentreGlobalDistance;
             public float AlongRadius;
-            public float RemainingAmount;
             public float Elapsed;
             public float MaximumLifetime;
         }

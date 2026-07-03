@@ -22,13 +22,7 @@ float4 SampleStateBilinear(float2 pixelCoordinate)
         lerp(c, d, blend.x),
         blend.y);
 
-    float phaseNumerator = lerp(
-        lerp(a.w * a.x, b.w * b.x, blend.x),
-        lerp(c.w * c.x, d.w * d.x, blend.x),
-        blend.y);
-    state.w = state.x > 0.0001
-        ? saturate(phaseNumerator / state.x)
-        : 0.0;
+    state.w = 0.0;
     return state;
 }
 
@@ -71,13 +65,7 @@ float4 SampleAdvectedBilinear(float2 pixelCoordinate)
         lerp(c, d, blend.x),
         blend.y);
 
-    float phaseNumerator = lerp(
-        lerp(a.w * a.x, b.w * b.x, blend.x),
-        lerp(c.w * c.x, d.w * d.x, blend.x),
-        blend.y);
-    state.w = state.x > 0.0001
-        ? saturate(phaseNumerator / state.x)
-        : 0.0;
+    state.w = 0.0;
     return state;
 }
 

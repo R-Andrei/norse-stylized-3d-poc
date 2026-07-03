@@ -83,7 +83,7 @@ void ApplyBoundary(uint3 dispatchId : SV_DispatchThreadID)
         state = 0.0.xxxx;
     }
 
-    _FoamStateWrite[coordinate] = saturate(state);
+    _FoamStateWrite[coordinate] = FoamClampPackedMaterialState(state);
 }
 
 [numthreads(8, 8, 1)]
@@ -219,54 +219,25 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
         _FoamInjectionSourceFillSeed,
         _FoamInjectionSourceFillFeatureSize,
         physicalCellSpacing);
-    float injectedAmount = saturate(shape * sourceFill * validFluid);
-    if (injectedAmount <= 0.0001)
+    float injectedPresence = saturate(shape * sourceFill * validFluid);
+    if (injectedPresence <= FoamMaterialStateEpsilon)
     {
         return;
     }
 
-    float4 previous = _FoamStateWrite[coordinate];
-    float previousAmount = saturate(previous.x);
-    float previousRemainingLife = previousAmount > 0.0001
-        ? saturate(previous.y / previousAmount)
-        : 0.0;
-    float previousIntegrity = previousAmount > 0.0001
-        ? saturate(previous.z / previousAmount)
-        : 0.0;
-    float combinedAmount = max(previousAmount, injectedAmount);
-    float addedAmount = max(0.0, combinedAmount - previousAmount);
-    if (addedAmount <= 0.0001)
-    {
-        return;
-    }
+    FoamMaterialState sourceState;
+    sourceState.presence = injectedPresence;
+    sourceState.remainingLife = saturate(_FoamInjectionRemainingLife);
+    sourceState.materialPattern = EvaluateFoamMaterialPattern(
+        physicalPosition,
+        _FoamInjectionPatternSeed,
+        _FoamInjectionSourceFillFeatureSize,
+        physicalCellSpacing);
+    float4 sourcePacked = FoamEncodeMaterialState(sourceState);
+    _FoamStateWrite[coordinate] = FoamMergeBornPresence(
+        _FoamStateWrite[coordinate],
+        sourcePacked);
 
-    float injectedRemainingLife = saturate(
-        _FoamInjectionRemainingLife);
-    float injectedIntegrity = saturate(
-        _FoamInjectionIntegrity);
-    float remainingLife = saturate(
-        (previousRemainingLife * previousAmount +
-         injectedRemainingLife * addedAmount) /
-        max(0.0001, combinedAmount));
-    float integrity = saturate(
-        (previousIntegrity * previousAmount +
-         injectedIntegrity * addedAmount) /
-        max(0.0001, combinedAmount));
-
-    float phase = saturate(_FoamInjectionPhase);
-    if (previousAmount > 0.001)
-    {
-        phase = MixPhaseShortest(
-            saturate(previous.w),
-            phase,
-            saturate(addedAmount / combinedAmount));
-    }
-
-    _FoamStateWrite[coordinate] = saturate(float4(
-        combinedAmount,
-        combinedAmount * remainingLife,
-        combinedAmount * integrity,
-        phase));
 }
 
 [numthreads(8, 8, 1)]
@@ -359,53 +330,26 @@ void PaintProgressiveBirthSourceSegment(
         _FoamInjectionSourceFillSeed,
         _FoamInjectionSourceFillFeatureSize,
         physicalCellSpacing);
-    float incomingSourceAmount = saturate(
+    float incomingSourcePresence = saturate(
         segmentShape * sourceFill * validFluid);
-    if (incomingSourceAmount <= 0.0001)
+    if (incomingSourcePresence <= FoamMaterialStateEpsilon)
     {
         return;
     }
 
-    float4 previousSource =
-        _FoamProgressiveBirthSourceWrite[coordinate];
-    float previousSourceAmount = saturate(previousSource.x);
-    float combinedSourceAmount = max(
-        previousSourceAmount,
-        incomingSourceAmount);
-    float addedSourceAmount = max(
-        0.0,
-        combinedSourceAmount - previousSourceAmount);
-    if (addedSourceAmount <= 0.0001)
-    {
-        return;
-    }
+    FoamMaterialState incomingState;
+    incomingState.presence = incomingSourcePresence;
+    incomingState.remainingLife = saturate(_FoamInjectionRemainingLife);
+    incomingState.materialPattern = EvaluateFoamMaterialPattern(
+        physicalPosition,
+        _FoamInjectionPatternSeed,
+        _FoamInjectionSourceFillFeatureSize,
+        physicalCellSpacing);
+    float4 incomingPacked = FoamEncodeMaterialState(incomingState);
+    _FoamProgressiveBirthSourceWrite[coordinate] = FoamMergeBornPresence(
+        _FoamProgressiveBirthSourceWrite[coordinate],
+        incomingPacked);
 
-    float incomingRemainingLife = saturate(
-        _FoamInjectionRemainingLife);
-    float incomingIntegrity = saturate(
-        _FoamInjectionIntegrity);
-    float combinedRemainingLife = saturate(
-        (previousSource.y +
-         incomingRemainingLife * addedSourceAmount) /
-        max(0.0001, combinedSourceAmount));
-    float combinedIntegrity = saturate(
-        (previousSource.z +
-         incomingIntegrity * addedSourceAmount) /
-        max(0.0001, combinedSourceAmount));
-    float combinedPhase = saturate(_FoamInjectionPhase);
-    if (previousSourceAmount > 0.001)
-    {
-        combinedPhase = MixPhaseShortest(
-            saturate(previousSource.w),
-            combinedPhase,
-            saturate(addedSourceAmount / combinedSourceAmount));
-    }
-
-    _FoamProgressiveBirthSourceWrite[coordinate] = saturate(float4(
-        combinedSourceAmount,
-        combinedSourceAmount * combinedRemainingLife,
-        combinedSourceAmount * combinedIntegrity,
-        combinedPhase));
 }
 
 [numthreads(8, 8, 1)]
@@ -1199,8 +1143,8 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float amount = SampleStateAtUV(uv).x;
-    bool visible = amount >= _FoamVisibleThreshold;
+    float presence = SampleStateAtUV(uv).x;
+    bool visible = presence >= _FoamPresenceMetricThreshold;
     bool major = materialTopology.majorSupport >= 0.15;
     bool connector = materialTopology.connectorSupport >= 0.12;
     bool negativeAging =
@@ -1213,10 +1157,10 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     float2 texel = 1.0 /
         max(float2(2.0, 2.0), (float2)_FoamTopologyDimensions);
     bool perimeter = visible && (
-        SampleStateAtUV(saturate(uv + float2(texel.x, 0.0))).x < _FoamVisibleThreshold ||
-        SampleStateAtUV(saturate(uv - float2(texel.x, 0.0))).x < _FoamVisibleThreshold ||
-        SampleStateAtUV(saturate(uv + float2(0.0, texel.y))).x < _FoamVisibleThreshold ||
-        SampleStateAtUV(saturate(uv - float2(0.0, texel.y))).x < _FoamVisibleThreshold);
+        SampleStateAtUV(saturate(uv + float2(texel.x, 0.0))).x < _FoamPresenceMetricThreshold ||
+        SampleStateAtUV(saturate(uv - float2(texel.x, 0.0))).x < _FoamPresenceMetricThreshold ||
+        SampleStateAtUV(saturate(uv + float2(0.0, texel.y))).x < _FoamPresenceMetricThreshold ||
+        SampleStateAtUV(saturate(uv - float2(0.0, texel.y))).x < _FoamPresenceMetricThreshold);
 
     uint originalValue;
     _FoamTopologyMetrics.InterlockedAdd(0u, 1u, originalValue);
@@ -1349,7 +1293,7 @@ void AdvectForward(uint3 dispatchId : SV_DispatchThreadID)
         y - motion.velocity.y * _FoamDeltaTime / lateralSpacing);
     float4 state = SampleStateBilinear(backPixel);
     state.xyz *= coverage;
-    _FoamAdvectionWrite[coordinate] = saturate(state);
+    _FoamAdvectionWrite[coordinate] = FoamClampPackedMaterialState(state);
 }
 
 [numthreads(8, 8, 1)]
@@ -1394,7 +1338,7 @@ void AdvectReverse(uint3 dispatchId : SV_DispatchThreadID)
         y + motion.velocity.y * _FoamDeltaTime / lateralSpacing);
     float4 state = SampleAdvectedBilinear(forwardPixel);
     state.xyz *= coverage;
-    _FoamAdvectionWrite[coordinate] = saturate(state);
+    _FoamAdvectionWrite[coordinate] = FoamClampPackedMaterialState(state);
 }
 
 [numthreads(8, 8, 1)]
@@ -1421,8 +1365,7 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float2 boundary = LoadBoundary(coordinate);
-    float coverage = boundary.x;
+    float coverage = LoadBoundary(coordinate).x;
     if (coverage <= 0.001)
     {
         _FoamStateWrite[coordinate] = 0.0.xxxx;
@@ -1436,11 +1379,6 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     float2 fieldUV = FoamTexelCentreUV(
         uint2(x, y),
         _FoamDimensions);
-    float globalDistance = _FoamGlobalStart + fieldUV.x * _FoamFieldLength;
-    float lateralMetres = FoamAcross01ToMetres(
-        fieldUV.y,
-        metric.widthsAndSpacing.x,
-        metric.widthsAndSpacing.y);
 
     FoamMotionSample motion = ResolveMotion(float2(x, y), fieldUV);
     float2 backPixel = float2(
@@ -1456,38 +1394,14 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     float3 corrected = forward.xyz + 0.5 * (original.xyz - reverse.xyz);
     corrected = clamp(corrected, minimumOriginal, maximumOriginal);
 
-    // One-sided causal limiter: anti-diffusion may sharpen material already
-    // carried from an upstream/lateral donor, but it may not advance a front
-    // beyond the physically sampled donor region.
-    // ResolveOriginalBounds already inspected the four bilinear donor texels.
-    // Reuse that bound rather than resampling the same neighbourhood four more
-    // times; it is both causal and materially cheaper in the heaviest kernel.
+    // Keep the existing causal limiter until C.5 rewrites the transport and
+    // valid-fluid stages around geometric Presence.
     float donorMaximum = max(forward.x, maximumOriginal.x);
     corrected.x = min(corrected.x, donorMaximum + 0.0005);
 
-    float amount = saturate(corrected.x);
-    float remainingLife = amount > 0.0001
-        ? saturate(corrected.y / amount)
-        : 0.0;
-    float integrity = amount > 0.0001
-        ? saturate(corrected.z / amount)
-        : 0.0;
-    float phase = saturate(forward.w);
-
-    float agitation = saturate(_FoamEvolution / 1.8);
-    float directionalAverage;
-    float broadAmount;
-    float neighbourPhase;
-    ResolveFoamMaterialNeighbourhood(
-        x,
-        y,
-        globalDistance,
-        lateralMetres,
-        phase,
-        agitation,
-        directionalAverage,
-        broadAmount,
-        neighbourPhase);
+    float4 transportedPacked = FoamClampPackedMaterialState(
+        float4(corrected, 0.0));
+    FoamMaterialState material = FoamDecodeMaterialState(transportedPacked);
 
     float4 topologyState = _FoamTopologyRead.Load(
         int3(coordinate, 0));
@@ -1512,137 +1426,38 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         max(1.0, _FoamNegativeAgeMultiplier),
         materialTopology.negativeAgingPressure);
     float localAgeRate = positiveAgeFactor * negativeAgeFactor;
-    remainingLife = max(
+    material.remainingLife = max(
         0.0,
-        remainingLife -
+        material.remainingLife -
         _FoamDeltaTime * localAgeRate /
         max(0.05, _FoamNeutralLifetime));
 
-    // Integrity is transported conservatively but deliberately does not evolve
-    // until Patch 4.12A introduces the approved state-backed integrity model.
+    // C.4 removes persistent density reinforcement and independent Amount
+    // decay. Disturbance fields still influence ResolveMotion, but they no
+    // longer create Presence or rejuvenate Remaining Life.
 
-    // Merging only mixes already overlapping material. No amount is inserted
-    // across a gap, so a connection requires real donor flux.
-    float phaseAgreement = 1.0 - smoothstep(0.16, 0.58, PhaseDistance(phase, neighbourPhase));
-    float physicalOverlap =
-        smoothstep(0.08, 0.34, amount) *
-        smoothstep(0.08, 0.30, directionalAverage);
-    float phaseMix =
-        saturate(_FoamCohesion + _FoamConnectivity * 0.25) *
-        phaseAgreement * physicalOverlap * _FoamDeltaTime;
-    phase = MixPhaseShortest(phase, neighbourPhase, phaseMix);
+    // Boundary attenuation is deliberately left in its old multiplicative
+    // form until C.5 replaces it with canonical idempotent valid-fluid clipping.
+    material.presence *= lerp(0.52, 1.0, coverage);
+    float4 persistentPacked = FoamEncodeMaterialState(material);
+    float persistentPresenceBeforeBirth = persistentPacked.x;
 
-    float wakeReinforcement = smoothstep(0.15, 0.72, motion.wakeEnergy) * max(0.0, _FoamWakeReinforcement);
-    float leeReinforcement = smoothstep(0.06, 0.70, motion.leeStrength) * max(0.0, _FoamWakeReinforcement);
-    float pressureReinforcement = smoothstep(0.08, 0.72, motion.pressureStrength) * max(0.0, _FoamWakeReinforcement);
-    float impactReinforcement = smoothstep(0.26, 0.86, motion.rippleIntensity) * max(0.0, _FoamImpactReinforcement);
-    float existingSupport = smoothstep(0.020, 0.20, max(amount, broadAmount));
-    float reinforcement =
-        (wakeReinforcement * 0.030 + leeReinforcement * 0.095 +
-         pressureReinforcement * 0.034 + impactReinforcement * 0.060) *
-        existingSupport * coverage;
-    if (reinforcement > 0.0)
-    {
-        float previousAmount = amount;
-        amount = saturate(amount + reinforcement * (1.0 - amount) * _FoamDeltaTime);
-        float added = max(0.0, amount - previousAmount);
-        if (amount > 0.0001)
-        {
-            remainingLife = saturate(
-                (remainingLife * previousAmount +
-                 saturate(0.54 + impactReinforcement * 0.28) * added) /
-                amount);
-            integrity = saturate(
-                (integrity * previousAmount +
-                 saturate(0.52 + leeReinforcement * 0.32) * added) /
-                amount);
-        }
-    }
-
-    float captureRetention = saturate(
-        motion.capture + boundary.y * max(0.0, _FoamShoreRetention));
-    float endOfLife = 1.0 - smoothstep(
+    float4 birthSource = materialTopology.validFluid > 0.001
+        ? FoamClampPackedMaterialState(
+            _FoamProgressiveBirthSourceRead.Load(int3(coordinate, 0)))
+        : 0.0.xxxx;
+    float sourcePresence = birthSource.x;
+    float acceptedPresence = max(
         0.0,
-        max(0.001, _FoamEndOfLifeDissipationStart),
-        remainingLife);
-    float amountDecay = max(
-        0.0,
-        _FoamEndOfLifeDissipationRate) *
-        endOfLife * endOfLife;
-    amountDecay *= lerp(1.0, 0.075, pow(captureRetention, 1.30));
-    amount *= exp(-amountDecay * _FoamDeltaTime);
-
-
-    amount *= lerp(0.52, 1.0, coverage);
-    // Boundary coverage scales transported material moments together with
-    // Amount. Do not independently shorten normalized Remaining Life near the
-    // shore; Shore Support already owns the material-facing aging response.
-
-    amount = saturate(amount);
-    remainingLife = saturate(remainingLife);
-    integrity = saturate(integrity);
-
-    // Patch 4.11C.3 integrates the per-step progressive birth source exactly
-    // once after ordinary transport, aging, reinforcement, and dissipation.
-    // Emitter Amount has already selected a deterministic spatial subset; the
-    // resulting source coverage is a geometric target rather than an additive
-    // quantity, so overlap and update cadence cannot repeatedly strengthen or
-    // rejuvenate material that already meets the source coverage.
-    float persistentAmountBeforeBirth = amount;
-    float4 birthSource = _FoamProgressiveBirthSourceRead.Load(
-        int3(coordinate, 0));
-    float sourceAmount = materialTopology.validFluid > 0.001
-        ? saturate(birthSource.x)
-        : 0.0;
-    float acceptedAmount = max(0.0, sourceAmount - amount);
-    if (acceptedAmount > 0.0001)
-    {
-        float sourceRemainingLife = sourceAmount > 0.0001
-            ? saturate(birthSource.y / sourceAmount)
-            : 0.0;
-        float sourceIntegrity = sourceAmount > 0.0001
-            ? saturate(birthSource.z / sourceAmount)
-            : 0.0;
-        float combinedAmount = saturate(amount + acceptedAmount);
-        remainingLife = combinedAmount > 0.0001
-            ? saturate(
-                (remainingLife * amount +
-                 sourceRemainingLife * acceptedAmount) /
-                combinedAmount)
-            : 0.0;
-        integrity = combinedAmount > 0.0001
-            ? saturate(
-                (integrity * amount +
-                 sourceIntegrity * acceptedAmount) /
-                combinedAmount)
-            : 0.0;
-        phase = amount > 0.001
-            ? MixPhaseShortest(
-                phase,
-                saturate(birthSource.w),
-                saturate(acceptedAmount / combinedAmount))
-            : saturate(birthSource.w);
-        amount = combinedAmount;
-    }
+        sourcePresence - persistentPresenceBeforeBirth);
+    float4 combinedPacked = FoamMergeBornPresence(
+        persistentPacked,
+        birthSource);
 
     _FoamBirthTransferDebugWrite[coordinate] = saturate(float4(
-        sourceAmount,
-        acceptedAmount,
-        persistentAmountBeforeBirth,
-        amount));
-
-    if (amount < 0.001)
-    {
-        _FoamStateWrite[coordinate] = 0.0.xxxx;
-        return;
-    }
-
-    float materialPresence = smoothstep(0.001, 0.035, amount);
-    remainingLife *= materialPresence;
-    integrity *= materialPresence;
-    _FoamStateWrite[coordinate] = saturate(float4(
-        amount,
-        amount * remainingLife,
-        amount * integrity,
-        phase));
+        sourcePresence,
+        acceptedPresence,
+        persistentPresenceBeforeBirth,
+        combinedPacked.x));
+    _FoamStateWrite[coordinate] = combinedPacked;
 }

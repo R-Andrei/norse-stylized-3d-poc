@@ -1803,7 +1803,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     if (GUILayout.Button(
                             new GUIContent(
                                 "Emit Thin Ribbon",
-                                "Injects a narrow elongated patch to test transport, Remaining Life loss, Integrity weakening, and crisp state extraction.")))
+                                "Injects a narrow elongated patch to test transport, Remaining Life loss, Presence extraction, and attached Material Pattern transport.")))
                     {
                         ApplyFoamTestProperties();
                         river.EmitFoamThinRibbon();
@@ -1823,7 +1823,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     if (GUILayout.Button(
                             new GUIContent(
                                 "Emit Fragment Chain",
-                                "Injects a staggered chain of small sources to compare independent phase, Remaining Life, and Integrity evolution.")))
+                                "Injects a staggered chain of small sources to compare independent Presence, Remaining Life, and Material Pattern transport.")))
                     {
                         ApplyFoamTestProperties();
                         river.EmitFoamFragmentChain();
@@ -1881,7 +1881,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Support and Negative Influence",
                 "Material Remaining Life",
                 "Progressive Birth Source",
-                "Progressive Birth Transfer"
+                "Progressive Birth Transfer",
+                "Material Presence",
+                "Material Pattern"
             };
             int[] foamDebugValues =
             {
@@ -1892,7 +1894,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.SupportAndNegativeInfluence,
                 (int)StylizedRiverFoamDebugView.MaterialRemainingLife,
                 (int)StylizedRiverFoamDebugView.ProgressiveBirthSource,
-                (int)StylizedRiverFoamDebugView.ProgressiveBirthTransfer
+                (int)StylizedRiverFoamDebugView.ProgressiveBirthTransfer,
+                (int)StylizedRiverFoamDebugView.MaterialPresence,
+                (int)StylizedRiverFoamDebugView.MaterialPattern
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -1906,7 +1910,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             int selectedDebugIndex = EditorGUILayout.Popup(
                 new GUIContent(
                     "Debug View",
-                    "Final Foam disables Foam diagnostics. Four topology diagnostics, one material-lifetime diagnostic, the source-isolation view, and the Patch 4.11C.2 source-to-material transfer view are available."),
+                    "Final Foam disables Foam diagnostics. Four topology diagnostics, Presence, Remaining Life, Material Pattern, source isolation, and source-to-material transfer views are available."),
                 currentDebugIndex,
                 foamDebugLabels);
             if (EditorGUI.EndChangeCheck())
@@ -3417,7 +3421,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 new GUIContent(
                     "Calculated Lifetimes",
-                    "Approximate time for normalized Remaining Life to reach zero. Supply, reinforcement, and amount-weighted merging can add younger material during runtime."),
+                    "Approximate time for normalized Remaining Life to reach zero. Overlapping sources preserve the age of already occupied Presence and assign fresh life only to newly added Presence."),
                 EditorStyles.boldLabel);
             EditorGUILayout.LabelField(
                 "Neutral Water",
@@ -3523,7 +3527,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.MaterialRemainingLife:
                     return
-                        "Persistent material Remaining Life after transport and amount-weighted merging. White/cyan is young material, amber is mid-life, red is near death, and black contains no visible Foam. Compare an injected patch while switching to the support/negative views to verify slower supported aging, neutral aging, accelerated negative aging, and continuous overlap response.";
+                        "Persistent material Remaining Life decoded from Presence-weighted storage. White/cyan is young material, amber is mid-life, red is near expiry, and black contains no Presence. Overlapping births preserve the age of already occupied material; only newly added Presence receives fresh life.";
 
                 case StylizedRiverFoamDebugView.ProgressiveBirthSource:
                     return
@@ -3531,7 +3535,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.ProgressiveBirthTransfer:
                     return
-                        "Patch 4.11C.3 source-to-material handoff. Red = current per-step source coverage after deterministic Amount-to-area selection and valid-fluid clipping. Green = source coverage newly accepted into the temporary old-format persistent material this update. Blue = persistent material Amount before transfer. Yellow means the source created new material; magenta means it overlapped material that already met or exceeded the source coverage and therefore did not strengthen or rejuvenate it.";
+                        "Patch 4.11C.4 source-to-material handoff. Red = current per-step Source Presence. Green = Presence newly accepted this update. Blue = persistent Presence before transfer. Yellow means the source created new material; magenta means it overlapped material that already met or exceeded the source coverage and therefore did not rejuvenate it.";
+
+                case StylizedRiverFoamDebugView.MaterialPresence:
+                    return
+                        "Persistent material Presence. Black = empty water, white = fully occupied Foam interior, and gray = fractional sub-texel edge coverage. This view isolates transported geometry from Remaining Life and Material Pattern.";
+
+                case StylizedRiverFoamDebugView.MaterialPattern:
+                    return
+                        "Material Pattern transported with persistent Presence. The false-colour gradient shows broad deterministic variation generated at birth; black contains no Presence. Pattern does not affect normal Foam visibility, colour, aging, or survival in Patch 4.11C.4.";
 
                 default:
                     return "Normal rendered Foam result. No Foam diagnostic colour encoding is active.";

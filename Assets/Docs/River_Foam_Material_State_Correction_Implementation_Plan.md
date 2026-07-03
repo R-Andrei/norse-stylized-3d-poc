@@ -2,7 +2,7 @@
 
 ## Document Status
 
-**Status:** Canonical implementation plan. Patch 4.11C.3 is implemented in code and awaits focused Unity validation; later correction patches remain unimplemented.
+**Status:** Canonical implementation plan. Patch 4.11C.3 is Unity-validated. Patch 4.11C.4 is implemented in code and awaits focused Unity validation; C.5–C.7 remain unimplemented.
 
 **Supersedes:** the former monolithic proposal named `Patch 4.11C.3 — Minimal Material State, Lifetime Authority, and Topology Aging Correction`.
 
@@ -14,7 +14,7 @@
 4. `4.11C.6 — Lifetime Authority and Presentation`;
 5. `4.11C.7 — Validation, Regression Audit, and Documentation Closure`.
 
-**Current gate:** validate `4.11C.3` in Unity. After user acceptance, the next implementation patch is `4.11C.4`.
+**Current gate:** validate `4.11C.4` in Unity. After user acceptance, the next implementation patch is `4.11C.5 — Transport and Valid-Fluid Correction`.
 
 **Blocked until 4.11C.7 passes:**
 
@@ -242,7 +242,7 @@ Explicit legal removal paths are:
 
 ## 5. Patch 4.11C.3 — Source Quantity and Birth-Merge Correction
 
-**Implementation status:** Implemented in code; focused Unity validation pending. The old persistent Amount/Life/Integrity/Phase packing is intentionally still active until 4.11C.4.
+**Implementation status:** Unity-validated and accepted. Its temporary old persistent packing was removed by 4.11C.4.
 
 ### 5.1 Purpose
 
@@ -356,6 +356,8 @@ Pass only if:
 ---
 
 ## 6. Patch 4.11C.4 — Persistent Material-State Migration
+
+**Implementation status:** Implemented in code; focused Unity validation pending. The atomic Presence/Life/Pattern contract is active. Transport and partial-boundary attenuation remain intentionally unchanged until 4.11C.5.
 
 ### 6.1 Purpose
 

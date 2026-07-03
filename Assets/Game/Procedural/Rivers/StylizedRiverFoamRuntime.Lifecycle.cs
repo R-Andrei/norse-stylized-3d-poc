@@ -422,11 +422,10 @@ namespace ProgrammaticStylized3D.Rivers
                 ManualSourceFillSeedSalt;
             float sourceFillFeatureSize =
                 ResolveSourceFillFeatureSize(resolvedRadius);
-            float phase = Mathf.Repeat(
-                river.VisualSeed * 0.000173f + injectionIndex * 0.6180339f,
-                1f);
-            float integrity = Mathf.Clamp01(
-                Mathf.Lerp(0.78f, 1f, resolvedRemainingLife));
+            float patternSeed =
+                river.VisualSeed * 0.613f +
+                injectionIndex * 109.731f +
+                ManualPatternSeedSalt;
 
             pendingInjections.Add(
                 new PendingInjection(
@@ -435,8 +434,7 @@ namespace ProgrammaticStylized3D.Rivers
                     resolvedRadius,
                     resolvedAmount,
                     resolvedRemainingLife,
-                    integrity,
-                    phase,
+                    patternSeed,
                     Mathf.Clamp(elongation, 0.25f, 8f),
                     true,
                     sourceFillSeed,

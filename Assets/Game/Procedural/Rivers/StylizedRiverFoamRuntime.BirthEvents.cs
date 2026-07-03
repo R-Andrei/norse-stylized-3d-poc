@@ -63,10 +63,11 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             int eventId = ++progressiveRibbonSequence;
-            float phase = Mathf.Repeat(
-                river.VisualSeed * 0.000173f + eventId * 0.6180339f,
-                1f);
             float shapeSeed = river.VisualSeed + eventId * 37.719f;
+            float patternSeed =
+                river.VisualSeed * 0.613f +
+                eventId * 97.217f +
+                ProgressivePatternSeedSalt;
             float sourceFillSeed =
                 river.VisualSeed * 0.431f +
                 eventId * 53.173f +
@@ -74,7 +75,6 @@ namespace ProgrammaticStylized3D.Rivers
             float bendSign = Hash01(shapeSeed + 11.3f) < 0.5f ? -1f : 1f;
             float widthPhase = Hash01(shapeSeed + 23.7f) * Mathf.PI * 2f;
             float resolvedRemainingLife = Mathf.Clamp01(remainingLife);
-            const float resolvedIntegrity = 1f;
             float startAcross = Mathf.Clamp(acrossNormalized, -1f, 1f);
             float resolvedHalfWidth = Mathf.Clamp(
                 ribbonHalfWidth,
@@ -104,8 +104,7 @@ namespace ProgrammaticStylized3D.Rivers
                 BaseRadius = resolvedHalfWidth,
                 SourceAmount = resolvedAmount,
                 RemainingLife = resolvedRemainingLife,
-                Integrity = resolvedIntegrity,
-                Phase = phase,
+                PatternSeed = patternSeed,
                 ShapeSeed = shapeSeed,
                 SourceFillSeed = sourceFillSeed,
                 SourceFillFeatureSize = sourceFillFeatureSize,
@@ -270,8 +269,7 @@ namespace ProgrammaticStylized3D.Rivers
                 maximumRadius,
                 maximumAmount,
                 ribbonEvent.RemainingLife,
-                ribbonEvent.Integrity,
-                ribbonEvent.Phase,
+                ribbonEvent.PatternSeed,
                 1f,
                 false,
                 ribbonEvent.SourceFillSeed,
@@ -304,7 +302,6 @@ namespace ProgrammaticStylized3D.Rivers
                         ribbonEvent.StartGlobalDistance +
                         ribbonEvent.TravelDistance * 0.5f,
                     AlongRadius = alongRadius,
-                    RemainingAmount = ribbonEvent.SourceAmount,
                     Elapsed = 0f,
                     MaximumLifetime = Mathf.Clamp(
                         ribbonEvent.RemainingLife *

@@ -776,12 +776,7 @@ Shader "PS3D/Stylized River Water"
                     _FoamGlobalStart,
                     _FoamFieldLength,
                     _FoamInterpolation,
-                    _FoamStrength,
-                    _FoamCoverage,
                     _FoamSharpness,
-                    _FoamDetailScale,
-                    _FoamDetailStrength,
-                    _FoamSeed,
                     _FreezeAmount);
 
 
@@ -793,9 +788,7 @@ Shader "PS3D/Stylized River Water"
                 float3 foamColour = RiverWaterResolveFoamColour(
                     _FoamColour.rgb,
                     lighting.combined,
-                    _MinimumNightVisibility,
-                    foam.remainingLife,
-                    foam.integrity);
+                    _MinimumNightVisibility);
                 // Foam Colour alpha is the single canonical opacity control.
                 // The hidden legacy _FoamOpacity property remains only so old
                 // material serialization does not lose a known property.
@@ -811,7 +804,7 @@ Shader "PS3D/Stylized River Water"
                     float materialPresence = smoothstep(
                         0.001,
                         0.035,
-                        foam.amount);
+                        foam.presence);
                     float lowerLifeBlend = smoothstep(
                         0.0,
                         0.5,
@@ -833,6 +826,23 @@ Shader "PS3D/Stylized River Water"
                         lifetimeColour,
                         materialPresence);
                     return half4(lifetimeColour, 1.0);
+                }
+
+                if (foamDebug == 12)
+                {
+                    float presence = saturate(foam.presence);
+                    return half4(presence.xxx, 1.0);
+                }
+
+                if (foamDebug == 13)
+                {
+                    float materialPresence = smoothstep(
+                        0.001,
+                        0.035,
+                        foam.presence);
+                    float3 patternColour = RiverWaterFoamPatternDebugColour(
+                        foam.materialPattern) * materialPresence;
+                    return half4(patternColour, 1.0);
                 }
 
                 if (foamDebug == 10)

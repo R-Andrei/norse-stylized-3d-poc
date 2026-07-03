@@ -104,12 +104,12 @@ FoamMotionSample ResolveMotion(float2 pixelCoordinate, float2 fieldUV)
 
     float2 wakeVelocity =
         (wakeGradient * 0.42 + leeGradient * 1.35) *
-        max(0.0, _FoamWakeReinforcement);
+        max(0.0, _FoamWakeMotionInfluence);
     float2 pressureVelocity =
         pressureGradient *
         max(0.0, _FoamBoundaryAttraction) *
         0.08;
-    float impactInfluence = max(0.0, _FoamImpactReinforcement);
+    float impactInfluence = max(0.0, _FoamImpactMotionInfluence);
     float2 rippleVelocity = float2(
         -rippleState.b,
         -rippleState.a) *

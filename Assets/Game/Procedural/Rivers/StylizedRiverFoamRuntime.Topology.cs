@@ -772,8 +772,8 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat("_FoamValidLength", validFieldLength);
             computeShader.SetFloat("_FoamFieldLength", fieldLength);
             computeShader.SetFloat(
-                "_FoamVisibleThreshold",
-                ProvisionalMaterialVisibleThreshold);
+                "_FoamPresenceMetricThreshold",
+                PresenceMetricThreshold);
             computeShader.SetTexture(
                 measureTopologyMetricsKernel,
                 "_FoamTopologyRead",

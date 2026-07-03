@@ -99,7 +99,9 @@ namespace ProgrammaticStylized3D.Rivers
         NegativeInfluenceClasses = 8,
         MaterialRemainingLife = 9,
         ProgressiveBirthSource = 10,
-        ProgressiveBirthTransfer = 11
+        ProgressiveBirthTransfer = 11,
+        MaterialPresence = 12,
+        MaterialPattern = 13
     }
 
     public enum StylizedRiverDisturbanceDebugView
@@ -1617,6 +1619,10 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.ProgressiveBirthSource;
                 case (int)StylizedRiverFoamDebugView.ProgressiveBirthTransfer:
                     return StylizedRiverFoamDebugView.ProgressiveBirthTransfer;
+                case (int)StylizedRiverFoamDebugView.MaterialPresence:
+                    return StylizedRiverFoamDebugView.MaterialPresence;
+                case (int)StylizedRiverFoamDebugView.MaterialPattern:
+                    return StylizedRiverFoamDebugView.MaterialPattern;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }
