@@ -71,9 +71,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             Vector3 dimensions = ResolveDimensions(recipe);
 
-            TriangleSoup soup = UsesRadialBuilder(recipe.Archetype)
-                ? BuildRadialMass(recipe)
-                : BuildPlaneCutMass(recipe);
+            TriangleSoup soup = BuildMassSoup(recipe);
 
             ApplyDimensions(soup.Positions, dimensions);
             ApplyLean(soup.Positions, recipe.Lean, recipe.ShapeSeed);
@@ -86,6 +84,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private static bool UsesRadialBuilder(MassArchetype archetype)
         {
             return archetype == MassArchetype.PolishedStone;
+        }
+
+        private static TriangleSoup BuildMassSoup(MassRecipe recipe)
+        {
+            return recipe.Archetype switch
+            {
+                MassArchetype.LayeredStone => BuildLayeredStoneMass(recipe),
+                MassArchetype.CarvedMarkerStone => BuildCarvedMarkerMass(recipe),
+                _ => UsesRadialBuilder(recipe.Archetype)
+                    ? BuildRadialMass(recipe)
+                    : BuildPlaneCutMass(recipe)
+            };
         }
 
         #region Plane-cut mass
@@ -113,6 +123,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 profile,
                 shapeRandom,
                 recipe);
+
+            if (recipe.Archetype == MassArchetype.FracturedPillar)
+            {
+                ApplyFracturedPillarCuts(
+                    faces,
+                    shapeRandom,
+                    recipe);
+            }
 
             GetMajorCutCountRange(
                 recipe.FormComplexity,
@@ -212,6 +230,99 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 negativeZ);
         }
 
+        private static TriangleSoup BuildLayeredStoneMass(MassRecipe recipe)
+        {
+            System.Random random =
+                CreateRandom(recipe.ShapeSeed, 0x4C617965);
+
+            TriangleSoup soup = new TriangleSoup();
+            int layerCount = recipe.FormComplexity switch
+            {
+                FormComplexity.Primitive => 3,
+                FormComplexity.Simple => 4,
+                FormComplexity.Moderate => 5,
+                _ => 6
+            };
+
+            List<RectRing> rings = new List<RectRing>();
+            Vector2 centre = Vector2.zero;
+            float width = RandomRange(random, 0.95f, 1.18f);
+            float depth = RandomRange(random, 0.78f, 1.08f);
+            rings.Add(new RectRing(-1f, centre, width, depth));
+
+            for (int level = 1; level <= layerCount; level++)
+            {
+                float y = Mathf.Lerp(-1f, 1f, level / (float)layerCount);
+                float taper = level / (float)layerCount;
+
+                centre.x += RandomRange(random, -0.08f, 0.08f);
+                centre.y += RandomRange(random, -0.06f, 0.06f);
+
+                width *= Mathf.Lerp(0.92f, 0.74f, taper) *
+                    RandomRange(random, 0.94f, 1.06f);
+
+                depth *= Mathf.Lerp(0.94f, 0.78f, taper) *
+                    RandomRange(random, 0.94f, 1.07f);
+
+                rings.Add(new RectRing(y, centre, width, depth));
+            }
+
+            Vector3 solidCentre = Vector3.zero;
+            AddRectRingCap(
+                soup,
+                rings[0],
+                solidCentre);
+
+            for (int i = 0; i < rings.Count - 1; i++)
+            {
+                AddRectRingBridge(
+                    soup,
+                    rings[i],
+                    rings[i + 1],
+                    solidCentre);
+            }
+
+            AddRectRingCap(
+                soup,
+                rings[rings.Count - 1],
+                solidCentre);
+
+            return soup;
+        }
+
+        private static TriangleSoup BuildCarvedMarkerMass(MassRecipe recipe)
+        {
+            System.Random random =
+                CreateRandom(recipe.ShapeSeed, 0x4D41524B);
+
+            TriangleSoup soup = new TriangleSoup();
+            float frontSign = random.NextDouble() < 0.5 ? 1f : -1f;
+            float back = -frontSign * 0.24f;
+            float front = frontSign * 0.24f;
+            float crownLean = RandomRange(random, -0.18f, 0.18f);
+
+            Vector2[] silhouette =
+            {
+                new Vector2(-0.72f, -1.00f),
+                new Vector2( 0.72f, -1.00f),
+                new Vector2( 0.58f, -0.64f),
+                new Vector2( 0.48f,  0.50f),
+                new Vector2( 0.64f + crownLean,  0.86f),
+                new Vector2( 0.12f + crownLean,  1.08f),
+                new Vector2(-0.42f + crownLean,  1.02f),
+                new Vector2(-0.70f,  0.38f),
+                new Vector2(-0.60f, -0.62f)
+            };
+
+            AddExtrudedPolygon(
+                soup,
+                silhouette,
+                Mathf.Min(back, front),
+                Mathf.Max(back, front));
+
+            return soup;
+        }
+
         private static List<PolygonFace> CreateBoxFaces(BoxExtents box)
         {
             Vector3 nnn = new Vector3(-box.NegativeX, -box.NegativeY, -box.NegativeZ);
@@ -244,6 +355,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return random.NextDouble() < 0.5
                     ? MacroProfile.Wedge
                     : MacroProfile.Block;
+            }
+
+            if (archetype == MassArchetype.LayeredStone)
+            {
+                return random.NextDouble() < 0.65
+                    ? MacroProfile.Block
+                    : MacroProfile.Shoulder;
             }
 
             if (archetype == MassArchetype.StandingStone)
@@ -352,6 +470,44 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     (Vector3.up + RandomHorizontalDirection(random) * 0.25f).normalized,
                     baseDepth * 0.45f);
             }
+        }
+
+        private static void ApplyFracturedPillarCuts(
+            List<PolygonFace> faces,
+            System.Random random,
+            MassRecipe recipe)
+        {
+            Vector3 splitAxis = RandomHorizontalDirection(random);
+            Vector3 sideAxis =
+                Vector3.Cross(Vector3.up, splitAxis).normalized;
+
+            float aggression = recipe.ShapeDiversity switch
+            {
+                ShapeDiversity.Restrained => 0.92f,
+                ShapeDiversity.Broad => 1.08f,
+                ShapeDiversity.Wild => 1.28f,
+                _ => 1.08f
+            };
+
+            ApplyCut(
+                faces,
+                (splitAxis * 0.78f + Vector3.up * 0.62f).normalized,
+                0.30f * aggression);
+
+            ApplyCut(
+                faces,
+                (-splitAxis * 0.70f + Vector3.up * 0.42f).normalized,
+                0.20f * aggression);
+
+            ApplyCut(
+                faces,
+                (sideAxis * 0.95f + Vector3.up * 0.14f).normalized,
+                0.17f * aggression);
+
+            ApplyCut(
+                faces,
+                (-sideAxis * 0.95f + Vector3.up * 0.08f).normalized,
+                0.13f * aggression);
         }
 
         private static CutRegion SelectCutRegion(
@@ -1007,6 +1163,36 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         minimumHorizontal * 0.42f);
                     break;
 
+                case MassArchetype.LayeredStone:
+                    dimensions.y = Mathf.Min(
+                        dimensions.y,
+                        minimumHorizontal * 0.56f);
+                    break;
+
+                case MassArchetype.CarvedMarkerStone:
+                    dimensions.y = Mathf.Max(
+                        dimensions.y,
+                        dimensions.x * 1.95f);
+                    dimensions.z = Mathf.Min(
+                        dimensions.z,
+                        dimensions.x * 0.58f);
+                    dimensions.z = Mathf.Max(
+                        dimensions.z,
+                        dimensions.x * 0.28f);
+                    break;
+
+                case MassArchetype.FracturedPillar:
+                    dimensions.y = Mathf.Max(
+                        dimensions.y,
+                        maximumHorizontal * 2.18f);
+                    dimensions.x = Mathf.Min(
+                        dimensions.x,
+                        dimensions.y * 0.46f);
+                    dimensions.z = Mathf.Min(
+                        dimensions.z,
+                        dimensions.y * 0.38f);
+                    break;
+
                 case MassArchetype.SquatBoulder:
                     dimensions.y = Mathf.Min(
                         dimensions.y,
@@ -1175,6 +1361,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Bounds bounds = CalculateBounds(soup.Positions);
 
             float safeWidth = Mathf.Max(0.001f, bounds.size.x);
+            float safeHeight = Mathf.Max(0.001f, bounds.size.y);
             float safeDepth = Mathf.Max(0.001f, bounds.size.z);
 
             for (int i = 0; i < soup.Positions.Count; i += 3)
@@ -1191,7 +1378,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     Vector3 temporary = b;
                     b = c;
                     c = temporary;
+                    normal = -normal;
                 }
+
+                Vector3 faceNormal = normal.sqrMagnitude > MinimumEdgeLengthSqr
+                    ? normal.normalized
+                    : Vector3.up;
 
                 int indexA = AddRenderedVertex(
                     meshData,
@@ -1199,7 +1391,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     i,
                     bounds,
                     safeWidth,
+                    safeHeight,
                     safeDepth,
+                    faceNormal,
                     recipe);
 
                 int indexB = AddRenderedVertex(
@@ -1208,7 +1402,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     i + 1,
                     bounds,
                     safeWidth,
+                    safeHeight,
                     safeDepth,
+                    faceNormal,
                     recipe);
 
                 int indexC = AddRenderedVertex(
@@ -1217,7 +1413,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     i + 2,
                     bounds,
                     safeWidth,
+                    safeHeight,
                     safeDepth,
+                    faceNormal,
                     recipe);
 
                 meshData.AddTriangle(indexA, indexB, indexC);
@@ -1232,7 +1430,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             int vertexIndex,
             Bounds bounds,
             float width,
+            float height,
             float depth,
+            Vector3 faceNormal,
             MassRecipe recipe)
         {
             Vector2 uv = new Vector2(
@@ -1248,10 +1448,67 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 (randomValue - 0.5f) *
                 recipe.SurfaceVariation);
 
+            float vertical01 = Mathf.Clamp01(
+                (position.y - bounds.min.y) / height);
+
+            float green = ResolveExposureMask(
+                faceNormal,
+                vertical01,
+                randomValue);
+
+            float blue = ResolveCreviceMask(
+                faceNormal,
+                vertical01,
+                green,
+                randomValue);
+
             return meshData.AddVertex(
                 position,
                 uv,
-                new Color(red, 0.5f, 0.5f, 1f));
+                new Color(red, green, blue, 1f));
+        }
+
+        // Vertex colour material contract:
+        // R = existing deterministic surface variation.
+        // G = upward/flat exposure mask for lighter worn or frosted planes.
+        // B = base/side/occlusion mask for darker crevice-like response.
+        // A = reserved for future material-state blending.
+        private static float ResolveExposureMask(
+            Vector3 faceNormal,
+            float vertical01,
+            float randomValue)
+        {
+            float upward = Mathf.Clamp01(faceNormal.y);
+            float flatness = Mathf.Pow(upward, 1.65f);
+            float upperSurface = Mathf.SmoothStep(0.08f, 0.82f, vertical01);
+            float surfaceBreakup = (randomValue - 0.5f) * 0.08f;
+
+            return Mathf.Clamp01(
+                flatness *
+                Mathf.Lerp(0.45f, 1f, upperSurface) +
+                surfaceBreakup);
+        }
+
+        private static float ResolveCreviceMask(
+            Vector3 faceNormal,
+            float vertical01,
+            float exposure,
+            float randomValue)
+        {
+            float baseContact =
+                1f - Mathf.SmoothStep(0f, 0.24f, vertical01);
+
+            float sideOcclusion =
+                Mathf.SmoothStep(0.18f, 0.92f, 1f - Mathf.Abs(faceNormal.y));
+
+            float shelteredSurface = 1f - exposure;
+            float surfaceBreakup = (randomValue - 0.5f) * 0.06f;
+
+            return Mathf.Clamp01(
+                baseContact * 0.52f +
+                sideOcclusion * 0.28f +
+                shelteredSurface * 0.16f +
+                surfaceBreakup);
         }
 
         #endregion
@@ -1443,6 +1700,208 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             soup.Positions.Add(a);
             soup.Positions.Add(b);
             soup.Positions.Add(c);
+        }
+
+        private static void AddRectRingCap(
+            TriangleSoup soup,
+            RectRing ring,
+            Vector3 solidCentre)
+        {
+            Vector3[] corners = ResolveRectRingCorners(ring);
+
+            AddQuadAroundCenter(
+                soup,
+                corners[0],
+                corners[1],
+                corners[2],
+                corners[3],
+                solidCentre);
+        }
+
+        private static void AddRectRingBridge(
+            TriangleSoup soup,
+            RectRing lower,
+            RectRing upper,
+            Vector3 solidCentre)
+        {
+            Vector3[] lowerCorners = ResolveRectRingCorners(lower);
+            Vector3[] upperCorners = ResolveRectRingCorners(upper);
+            bool isShelf =
+                Mathf.Abs(lower.Y - upper.Y) <= PointMergeDistance;
+
+            for (int i = 0; i < lowerCorners.Length; i++)
+            {
+                int next = (i + 1) % lowerCorners.Length;
+
+                if (isShelf)
+                {
+                    AddOrientedTriangle(
+                        soup,
+                        lowerCorners[i],
+                        lowerCorners[next],
+                        upperCorners[next],
+                        Vector3.up);
+
+                    AddOrientedTriangle(
+                        soup,
+                        lowerCorners[i],
+                        upperCorners[next],
+                        upperCorners[i],
+                        Vector3.up);
+
+                    continue;
+                }
+
+                AddQuadAroundCenter(
+                    soup,
+                    lowerCorners[i],
+                    lowerCorners[next],
+                    upperCorners[next],
+                    upperCorners[i],
+                    solidCentre);
+            }
+        }
+
+        private static Vector3[] ResolveRectRingCorners(RectRing ring)
+        {
+            return new[]
+            {
+                new Vector3(
+                    ring.Centre.x - ring.HalfWidth,
+                    ring.Y,
+                    ring.Centre.y - ring.HalfDepth),
+                new Vector3(
+                    ring.Centre.x + ring.HalfWidth,
+                    ring.Y,
+                    ring.Centre.y - ring.HalfDepth),
+                new Vector3(
+                    ring.Centre.x + ring.HalfWidth,
+                    ring.Y,
+                    ring.Centre.y + ring.HalfDepth),
+                new Vector3(
+                    ring.Centre.x - ring.HalfWidth,
+                    ring.Y,
+                    ring.Centre.y + ring.HalfDepth)
+            };
+        }
+
+        private static void AddExtrudedPolygon(
+            TriangleSoup soup,
+            Vector2[] points,
+            float minimumZ,
+            float maximumZ)
+        {
+            if (points == null || points.Length < 3)
+            {
+                return;
+            }
+
+            Vector2 centre2D = Vector2.zero;
+            for (int i = 0; i < points.Length; i++)
+            {
+                centre2D += points[i];
+            }
+
+            centre2D /= points.Length;
+
+            Vector3 solidCentre = new Vector3(
+                centre2D.x,
+                centre2D.y,
+                (minimumZ + maximumZ) * 0.5f);
+
+            Vector3 frontCentre = new Vector3(
+                centre2D.x,
+                centre2D.y,
+                maximumZ);
+
+            Vector3 backCentre = new Vector3(
+                centre2D.x,
+                centre2D.y,
+                minimumZ);
+
+            for (int i = 0; i < points.Length; i++)
+            {
+                int next = (i + 1) % points.Length;
+
+                Vector3 frontA = new Vector3(
+                    points[i].x,
+                    points[i].y,
+                    maximumZ);
+
+                Vector3 frontB = new Vector3(
+                    points[next].x,
+                    points[next].y,
+                    maximumZ);
+
+                Vector3 backA = new Vector3(
+                    points[i].x,
+                    points[i].y,
+                    minimumZ);
+
+                Vector3 backB = new Vector3(
+                    points[next].x,
+                    points[next].y,
+                    minimumZ);
+
+                AddTriangleAroundCenter(
+                    soup,
+                    frontCentre,
+                    frontA,
+                    frontB,
+                    solidCentre);
+
+                AddTriangleAroundCenter(
+                    soup,
+                    backCentre,
+                    backB,
+                    backA,
+                    solidCentre);
+
+                AddQuadAroundCenter(
+                    soup,
+                    backA,
+                    backB,
+                    frontB,
+                    frontA,
+                    solidCentre);
+            }
+        }
+
+        private static void AddQuadAroundCenter(
+            TriangleSoup soup,
+            Vector3 a,
+            Vector3 b,
+            Vector3 c,
+            Vector3 d,
+            Vector3 solidCentre)
+        {
+            AddTriangleAroundCenter(soup, a, b, c, solidCentre);
+            AddTriangleAroundCenter(soup, a, c, d, solidCentre);
+        }
+
+        private static void AddTriangleAroundCenter(
+            TriangleSoup soup,
+            Vector3 a,
+            Vector3 b,
+            Vector3 c,
+            Vector3 solidCentre)
+        {
+            Vector3 normal = Vector3.Cross(b - a, c - a);
+            Vector3 faceCentre = (a + b + c) / 3f;
+
+            if (Vector3.Dot(normal, faceCentre - solidCentre) < 0f)
+            {
+                Vector3 temporary = b;
+                b = c;
+                c = temporary;
+            }
+
+            AddOrientedTriangle(
+                soup,
+                a,
+                b,
+                c,
+                Vector3.Cross(b - a, c - a));
         }
 
         private static void AddOrientedTriangle(
@@ -1776,6 +2235,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 MassArchetype.FlatSlab => new Vector3(2.4f, 0.62f, 1.7f),
                 MassArchetype.BrokenChunk => new Vector3(1.75f, 1.55f, 1.45f),
                 MassArchetype.PolishedStone => new Vector3(2f, 1.35f, 1.7f),
+                MassArchetype.LayeredStone => new Vector3(2.25f, 0.86f, 1.75f),
+                MassArchetype.CarvedMarkerStone => new Vector3(1.28f, 3.05f, 0.62f),
+                MassArchetype.FracturedPillar => new Vector3(0.96f, 3.15f, 0.82f),
                 _ => Vector3.one
             };
         }
@@ -1865,6 +2327,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 MassArchetype.StandingStone => 0.82f,
                 MassArchetype.FlatSlab => 0.74f,
                 MassArchetype.BrokenChunk => 1.16f,
+                MassArchetype.LayeredStone => 0.68f,
+                MassArchetype.CarvedMarkerStone => 1.25f,
+                MassArchetype.FracturedPillar => 1.34f,
                 _ => 1f
             };
         }
@@ -2107,6 +2572,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private sealed class TriangleSoup
         {
             public readonly List<Vector3> Positions = new List<Vector3>();
+        }
+
+        private readonly struct RectRing
+        {
+            public readonly float Y;
+            public readonly Vector2 Centre;
+            public readonly float HalfWidth;
+            public readonly float HalfDepth;
+
+            public RectRing(
+                float y,
+                Vector2 centre,
+                float halfWidth,
+                float halfDepth)
+            {
+                Y = y;
+                Centre = centre;
+                HalfWidth = halfWidth;
+                HalfDepth = halfDepth;
+            }
         }
 
         private sealed class PolygonFace

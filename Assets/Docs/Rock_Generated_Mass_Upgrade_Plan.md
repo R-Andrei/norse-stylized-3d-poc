@@ -69,16 +69,17 @@ Shape language:
 
 - broad rectangular base;
 - flatter stacked proportions;
-- 2-4 horizontal or near-horizontal bias cuts;
-- subtly stepped side planes;
-- occasional thin cap plane;
-- restrained vertical relief.
+- tapered stacked silhouette;
+- subtle stepped side planes;
+- physical stratum shelves deferred until the mesh can be kept watertight;
+- moderate vertical relief so it does not collapse back into `FlatSlab`.
 
 Implementation direction:
 
-- reuse the plane-cut builder;
-- add an archetype-specific macro profile or post-profile cut pass;
-- bias cut normals toward horizontal layering;
+- use a dedicated stacked-ring builder rather than only plane cuts;
+- build 3-6 block strata with deterministic width/depth offsets;
+- keep the first implementation as one closed shell;
+- defer raised shelf geometry until proper face inset/extrusion or mesh merging is available;
 - keep `SurfaceFacetDensity` low or medium;
 - keep `EdgeCharacter` sharp or chipped depending on defaults.
 
@@ -113,41 +114,64 @@ Implementation direction:
 
 Suggested defaults:
 
-- `FormComplexity.Simple`
+- `FormComplexity.Moderate`
 - `SurfaceFacetDensity.Low`
-- `EdgeCharacter.Sharp`
-- `ShapeDiversity.Broad`
+- `EdgeCharacter.Chipped`
+- `ShapeDiversity.Wild`
 - `GroundingStyle.Stable`
-- `LeanStyle.Subtle`
+- `LeanStyle.Pronounced`
 
 ### 3. `CarvedMarkerStone`
 
-Purpose: a simple rune/shrine/story marker archetype that stays within the mass system but creates a usable face for later decals, carvings, or glowing symbols.
+Purpose: an aggressive rune/shrine/story marker archetype that stays within the mass system but reads as deliberately ritual, carved, and unlike the ordinary rock families.
 
 Shape language:
 
-- upright block or squat monolith;
-- one intentionally broad, flatter front face;
-- restrained side cuts;
-- mild crown or wedge top;
-- slightly ceremonial symmetry without becoming perfectly artificial.
+- tall, narrow marker-stone body;
+- one intentionally broad, flatter presentation face;
+- deep back and side bites;
+- sharp asymmetric crown or broken ritual top;
+- silhouette notches and an asymmetric crown that frame the presentation face;
+- raised cross/bar geometry deferred until it can be merged or rendered as material/decal detail;
+- strong silhouette difference from `StandingStone`, `BrokenChunk`, and `LayeredStone`.
 
 Implementation direction:
 
-- reuse the plane-cut builder;
-- introduce an archetype-specific "presentation face" bias;
-- keep one side from receiving deep random cuts;
+- use a dedicated single-shell marker builder rather than only plane cuts;
+- preserve a wide front/back presentation plane;
+- build an asymmetric crown, flared base, and side bite into one closed extruded silhouette;
+- defer shallow raised face bars until a watertight inset/extrusion or decal/material path exists;
 - optionally write a future vertex/UV mask that identifies the presentation face;
 - do not implement actual runes in this patch unless a separate carving system is approved.
 
 Suggested defaults:
 
-- `FormComplexity.Simple`
+- `FormComplexity.Complex`
 - `SurfaceFacetDensity.Low`
-- `EdgeCharacter.Worn` or `Sharp`
-- `ShapeDiversity.Restrained`
+- `EdgeCharacter.Sharp`
+- `ShapeDiversity.Wild`
 - `GroundingStyle.Stable`
 - `LeanStyle.None`
+
+## Deferred Physical Detail
+
+The first attempt at physical shelves and raised marker bars showed an important constraint: stacked or attached volumes can leave visible gaps, internal faces, or non-watertight seams when used as generated mass geometry.
+
+Deferred details:
+
+- raised cross/bar geometry on `CarvedMarkerStone`;
+- deep inset/engraved marker symbols;
+- physical layer shelves on `LayeredStone`;
+- any other protruding detail that is separate from the main shell.
+
+These should return through one of the following safer paths:
+
+- true face inset/extrusion on an existing closed face;
+- a deliberate mesh-merge or CSG-like operation;
+- decal or material detail projected onto a closed shell;
+- shader-side masks once the HLSL pixel surface path exists.
+
+Until then, `LayeredStone` and `CarvedMarkerStone` should prioritize watertight closed silhouettes over physical relief.
 
 ## Surface Data Upgrade
 
@@ -177,6 +201,40 @@ Expected material result:
 - lower/base areas can darken subtly;
 - chipped edges and tight cut regions can receive darker tones;
 - random pixel noise remains present but no longer carries all surface meaning.
+
+## Inspector-Owned Base Colour
+
+Generated masses should support a per-object base colour selected directly on the `GeneratedMass` component.
+
+Purpose:
+
+- allow different coloured stones without duplicating materials;
+- keep `M_PixelStone` and later HLSL stone shaders as shared material assets;
+- let individual generated objects vary by region, biome, placement, or authored scene composition;
+- match the river pattern where visual tuning is owned by the object and supplied to the renderer at runtime.
+
+Important distinction:
+
+- this is a base colour or base tint, not the final guaranteed pixel colour;
+- later effects such as snow, wetness, moss, soot, rune glow, crevice darkening, exposure brightening, or biome overlays may still modify the final rendered colour;
+- the Inspector colour should be the starting stone colour that those effects layer over.
+
+Implementation direction:
+
+- add a serialized `Color baseColor` field to `GeneratedMass`;
+- apply it with a `MaterialPropertyBlock` on the object's `MeshRenderer`;
+- target `_BaseColor` for the current Shader Graph and the future HLSL shader;
+- the current Shader Graph already exposes `Base Color` as `_BaseColor`, so the HLSL transition is not required for the initial per-object base-colour patch;
+- do not instantiate or duplicate materials for per-object colour;
+- refresh the property block after regeneration, validation, enable, and inspector changes;
+- preserve shared material assignment and river interaction behaviour.
+
+Acceptance:
+
+- two `GeneratedMass` objects using the same shared stone material can show different base colours;
+- changing the colour in the Inspector updates that object only;
+- generating a new shape or surface does not reset the selected colour;
+- future material effects can still layer on top of the selected base colour.
 
 ## Pixel Surface Rendering Upgrade
 
@@ -308,7 +366,8 @@ Work:
 - add archetype defaults;
 - add dimensions in `GetBaseDimensions`;
 - add cut-depth and dimension constraints if needed;
-- implement a layered macro profile or archetype-specific cut pass;
+- implement a watertight stacked-ring silhouette;
+- defer physical shelf relief until proper inset/extrusion or mesh merging exists;
 - validate at several seeds and size steps.
 
 Acceptance:
@@ -352,8 +411,8 @@ Work:
 
 - append `CarvedMarkerStone` to `MassArchetype`;
 - add defaults and dimensions;
-- bias generation around one broad presentation face;
-- optionally reserve a future mask for that face, but do not implement carvings yet.
+- build a single-shell marker silhouette around one broad presentation face;
+- defer raised face-bar geometry until it can be added without daylight gaps through the marker.
 
 Acceptance:
 
@@ -361,7 +420,32 @@ Acceptance:
 - remains a generated mass, not a bespoke shrine system;
 - no carving dependency is introduced.
 
-### Patch 6 - HLSL Pixel Surface Baseline
+### Patch 6 - Inspector-Owned Base Colour
+
+Status: implemented for the current Shader Graph path through `_BaseColor`.
+
+Primary files:
+
+- `GeneratedMass.cs`
+- `GeneratedMassEditor.cs` only if the default inspector is not enough
+- current and future stone shaders
+
+Work:
+
+- add a serialized base-colour field to `GeneratedMass`;
+- apply the selected colour through a `MaterialPropertyBlock`;
+- bind the colour to `_BaseColor`;
+- refresh the property block during enable, validation, regeneration, and inspector changes;
+- keep using the shared stone material.
+
+Acceptance:
+
+- multiple generated masses can share one material while showing different base colours;
+- changing the colour on one object does not affect other objects;
+- the selected colour survives shape and surface regeneration;
+- later effects are still allowed to modify the final rendered colour.
+
+### Patch 7 - HLSL Pixel Surface Baseline
 
 Primary files:
 
@@ -388,7 +472,7 @@ Rollback:
 - switch material back to `SG_PixelSurfaceLit`;
 - leave HLSL shader file unused until fixed.
 
-### Patch 7 - HLSL Semantic Surface Response
+### Patch 8 - HLSL Semantic Surface Response
 
 Primary files:
 
@@ -410,7 +494,7 @@ Acceptance:
 - pixel noise remains visible but less evenly distributed;
 - no material setting breaks non-rock users of the shader.
 
-### Patch 8 - Material Variants
+### Patch 9 - Material Variants
 
 Primary files:
 

@@ -11,7 +11,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         StandingStone,
         FlatSlab,
         BrokenChunk,
-        PolishedStone
+        PolishedStone,
+        LayeredStone,
+        CarvedMarkerStone,
+        FracturedPillar
     }
 
     public enum MassScaleStep
@@ -238,6 +241,36 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     lean = LeanStyle.None;
                     break;
 
+                case MassArchetype.LayeredStone:
+                    size = MassScaleStep.M;
+                    formComplexity = FormComplexity.Simple;
+                    surfaceFacetDensity = SurfaceFacetDensity.Low;
+                    edgeCharacter = EdgeCharacter.Chipped;
+                    shapeDiversity = ShapeDiversity.Broad;
+                    grounding = GroundingStyle.Embedded;
+                    lean = LeanStyle.None;
+                    break;
+
+                case MassArchetype.CarvedMarkerStone:
+                    size = MassScaleStep.M;
+                    formComplexity = FormComplexity.Complex;
+                    surfaceFacetDensity = SurfaceFacetDensity.Low;
+                    edgeCharacter = EdgeCharacter.Sharp;
+                    shapeDiversity = ShapeDiversity.Wild;
+                    grounding = GroundingStyle.Stable;
+                    lean = LeanStyle.None;
+                    break;
+
+                case MassArchetype.FracturedPillar:
+                    size = MassScaleStep.M;
+                    formComplexity = FormComplexity.Moderate;
+                    surfaceFacetDensity = SurfaceFacetDensity.Low;
+                    edgeCharacter = EdgeCharacter.Chipped;
+                    shapeDiversity = ShapeDiversity.Wild;
+                    grounding = GroundingStyle.Stable;
+                    lean = LeanStyle.Pronounced;
+                    break;
+
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -262,12 +295,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
     {
         private const string LegacyRiverFoamProxyObjectName =
             "RiverFoamProxy";
+        private static readonly int BaseColorId =
+            Shader.PropertyToID("_BaseColor");
+        private static readonly int LegacyBaseColorId =
+            Shader.PropertyToID("_Base_Color");
 
         [SerializeField]
         private MassRecipe recipe = new MassRecipe();
 
         [SerializeField]
         private bool regenerateOnValidate = true;
+
+        [Header("Rendering")]
+        [Tooltip("Per-object starting stone colour. The shared material can still layer pixel, exposure, crevice, or biome effects over this base.")]
+        [SerializeField]
+        private Color baseColor =
+            new Color(0.33423817f, 0.3410176f, 0.3490566f, 1f);
 
         [Header("River Interaction")]
         [SerializeField]
@@ -281,7 +324,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private MassArchetype lastAppliedArchetype;
 
         private MeshFilter meshFilter;
+        private MeshRenderer meshRenderer;
         private MeshCollider meshCollider;
+        private MaterialPropertyBlock materialProperties;
         private Mesh generatedMesh;
         private bool stableWorldGeometryFingerprintValid;
         private GeneratedGeometryStableFingerprint
@@ -302,6 +347,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         }
         public bool IsSolidGeometry => true;
         public bool IsStaticGeometry => true;
+        public Color BaseColor => baseColor;
         public MeshFilter GeometryMeshFilter
         {
             get
@@ -358,6 +404,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             if (!regenerateOnValidate)
             {
+                CacheComponents();
+                ApplyMaterialProperties();
                 GeneratedGeometryRegistry.NotifyChanged(this);
                 return;
             }
@@ -396,6 +444,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             if (recipe == null)
             {
                 ClearGeneratedAssignments();
+                ApplyMaterialProperties();
                 InvalidateStableWorldGeometryFingerprint();
                 NotifyGeometryChanged();
                 return;
@@ -419,6 +468,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             meshCollider.sharedMesh = generatedMesh;
             meshCollider.convex = false;
 
+            ApplyMaterialProperties();
             RefreshStableWorldGeometryFingerprint();
             RemoveLegacyRiverFoamProxy();
             NotifyGeometryChanged();
@@ -511,10 +561,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 meshFilter = GetComponent<MeshFilter>();
             }
 
+            if (meshRenderer == null)
+            {
+                meshRenderer = GetComponent<MeshRenderer>();
+            }
+
             if (meshCollider == null)
             {
                 meshCollider = GetComponent<MeshCollider>();
             }
+        }
+
+        private void ApplyMaterialProperties()
+        {
+            if (meshRenderer == null)
+            {
+                return;
+            }
+
+            materialProperties ??= new MaterialPropertyBlock();
+            meshRenderer.GetPropertyBlock(materialProperties);
+            materialProperties.SetColor(BaseColorId, baseColor);
+            materialProperties.SetColor(LegacyBaseColorId, baseColor);
+            meshRenderer.SetPropertyBlock(materialProperties);
         }
 
         private void EnsureGeneratedMesh()
