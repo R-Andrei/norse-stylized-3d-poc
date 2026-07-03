@@ -296,13 +296,13 @@ Add new properties only after the baseline material visually matches:
 
 ### Migration Requirements
 
-The HLSL shader must:
+The full HLSL shader migration must:
 
 - compile in URP;
 - support forward lit rendering;
 - receive shadows;
 - respect base colour, smoothness, and pixel variation;
-- consume vertex colours using the new contract;
+- consume vertex colour red in the baseline shader and the full green/blue semantic contract in the follow-up response patch;
 - keep material instances easy to migrate;
 - provide visual parity with `M_PixelStone` before extra features are enabled.
 
@@ -310,9 +310,28 @@ Do not delete the Shader Graph in the same patch. First switch only the test sto
 
 ## Rough Implementation Plan
 
+Checklist:
+
+- [x] Patch 1 - Document and baseline capture
+- [x] Patch 2 - Vertex colour semantic contract
+- [x] Patch 3 - Add `LayeredStone` closed-shell archetype
+- [x] Patch 4 - Add `FracturedPillar`
+- [x] Patch 5 - Add `CarvedMarkerStone` closed-shell archetype
+- [x] Patch 6 - Inspector-owned base colour
+- [x] Patch 7 - HLSL pixel surface baseline, provisional until Unity shader import/visual validation
+- [ ] Patch 8 - HLSL semantic surface response
+- [ ] Patch 9 - Material variants
+
 ### Patch 1 - Document and Baseline Capture
 
-Status: this document.
+Status: implemented.
+
+Checklist status:
+
+- [x] document current constraints and desired changes;
+- [ ] capture before screenshots of representative rocks;
+- [x] record current `M_PixelStone` property values;
+- [ ] identify existing scene masses that cover small, large, standing, slab, broken, and polished shapes.
 
 Work:
 
@@ -327,6 +346,16 @@ Acceptance:
 - no runtime or scene behaviour changes.
 
 ### Patch 2 - Vertex Colour Semantic Contract
+
+Status: implemented.
+
+Checklist status:
+
+- [x] preserve red channel behaviour as much as possible;
+- [x] calculate green exposure mask;
+- [x] calculate blue crevice/base/contact mask;
+- [x] keep alpha at `1` until a real consumer exists;
+- [x] add comments documenting the channel contract close to generation code.
 
 Primary files:
 
@@ -355,6 +384,18 @@ Rollback:
 
 ### Patch 3 - Add `LayeredStone`
 
+Status: implemented provisionally as a closed-shell silhouette; physical shelves are deferred.
+
+Checklist status:
+
+- [x] append `LayeredStone` to `MassArchetype`;
+- [x] add archetype defaults;
+- [x] add dimensions in `GetBaseDimensions`;
+- [x] add cut-depth and dimension constraints if needed;
+- [x] implement a watertight stacked-ring silhouette;
+- [x] defer physical shelf relief until proper inset/extrusion or mesh merging exists;
+- [ ] validate at several seeds and size steps in Unity.
+
 Primary files:
 
 - `GeneratedMass.cs`
@@ -382,6 +423,16 @@ Rollback:
 
 ### Patch 4 - Add `FracturedPillar`
 
+Status: implemented provisionally.
+
+Checklist status:
+
+- [x] append `FracturedPillar` to `MassArchetype`;
+- [x] add defaults and dimensions;
+- [x] add a dominant cleave/diagonal top profile;
+- [x] keep the result mostly convex and collision-safe;
+- [ ] validate visual distinction from `StandingStone` in Unity.
+
 Primary files:
 
 - `GeneratedMass.cs`
@@ -401,6 +452,16 @@ Acceptance:
 - remains usable beside the river and as a landmark.
 
 ### Patch 5 - Add `CarvedMarkerStone`
+
+Status: implemented provisionally as a closed-shell silhouette; physical carved relief is deferred.
+
+Checklist status:
+
+- [x] append `CarvedMarkerStone` to `MassArchetype`;
+- [x] add defaults and dimensions;
+- [x] build a single-shell marker silhouette around one broad presentation face;
+- [x] defer raised face-bar geometry until it can be added without daylight gaps through the marker;
+- [ ] validate readability across several seeds in Unity.
 
 Primary files:
 
@@ -424,6 +485,14 @@ Acceptance:
 
 Status: implemented for the current Shader Graph path through `_BaseColor`.
 
+Checklist status:
+
+- [x] add a serialized base-colour field to `GeneratedMass`;
+- [x] apply the selected colour through a `MaterialPropertyBlock`;
+- [x] bind the colour to `_BaseColor`;
+- [x] refresh the property block during enable, validation, regeneration, and inspector changes;
+- [x] keep using the shared stone material.
+
 Primary files:
 
 - `GeneratedMass.cs`
@@ -446,6 +515,16 @@ Acceptance:
 - later effects are still allowed to modify the final rendered colour.
 
 ### Patch 7 - HLSL Pixel Surface Baseline
+
+Status: implemented provisionally with `SH_PixelSurfaceLit.shader` and a duplicate test material. Needs Unity import, compile, and visual comparison before switching the main stone material.
+
+Checklist status:
+
+- [x] create HLSL URP forward-lit shader;
+- [x] preserve current material properties where practical;
+- [x] include or port the current pixel hash logic;
+- [ ] match current `M_PixelStone` before adding new effects;
+- [x] create a temporary or duplicate stone material for visual comparison.
 
 Primary files:
 
@@ -474,6 +553,16 @@ Rollback:
 
 ### Patch 8 - HLSL Semantic Surface Response
 
+Status: not started.
+
+Checklist status:
+
+- [ ] consume vertex colour `G` for exposure brightening;
+- [ ] consume vertex colour `B` for crevice/base darkening;
+- [ ] add low-frequency blotch variation;
+- [ ] add optional cell-position warp;
+- [ ] expose conservative controls.
+
 Primary files:
 
 - `SH_PixelSurfaceLit.shader`
@@ -495,6 +584,14 @@ Acceptance:
 - no material setting breaks non-rock users of the shader.
 
 ### Patch 9 - Material Variants
+
+Status: not started.
+
+Checklist status:
+
+- [ ] create a small set of material instances after the HLSL shader is accepted;
+- [ ] keep all variants on the same shader;
+- [ ] tune palette and semantic response rather than importing textures.
 
 Primary files:
 
