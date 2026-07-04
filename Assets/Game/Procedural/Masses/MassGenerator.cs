@@ -1396,6 +1396,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     meshData,
                     a,
                     i,
+                    0,
                     faceIndex,
                     bounds,
                     safeWidth,
@@ -1409,6 +1410,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     meshData,
                     b,
                     i + 1,
+                    1,
                     faceIndex,
                     bounds,
                     safeWidth,
@@ -1422,6 +1424,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     meshData,
                     c,
                     i + 2,
+                    2,
                     faceIndex,
                     bounds,
                     safeWidth,
@@ -1441,6 +1444,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             MeshData meshData,
             Vector3 position,
             int vertexIndex,
+            int cornerIndex,
             int faceIndex,
             Bounds bounds,
             float width,
@@ -1494,17 +1498,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     faceIndex,
                     position));
 
+            Vector2 barycentricXY = ResolveBarycentricXY(cornerIndex);
             Vector4 materialMasks = new Vector4(
                 concaveCrease,
                 dirtDeposit,
-                0f,
-                0f);
+                barycentricXY.x,
+                barycentricXY.y);
 
             return meshData.AddVertex(
                 position,
                 uv,
                 new Color(red, green, blue, edgeWear),
                 materialMasks);
+        }
+
+        private static Vector2 ResolveBarycentricXY(int cornerIndex)
+        {
+            return cornerIndex switch
+            {
+                0 => new Vector2(1f, 0f),
+                1 => new Vector2(0f, 1f),
+                _ => Vector2.zero
+            };
         }
 
         // Vertex colour material contract:
@@ -1516,7 +1531,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         // UV2 material contract:
         // X = concave crease or selected crack-darkening mask.
         // Y = dirty deposit / mineral stain mask.
-        // ZW = reserved for future biome-specific material state.
+        // ZW = triangle-local barycentric helper used by the shader to localize
+        //      edge/crease debug response near actual mesh edges.
         private static float ResolveExposureMask(
             Vector3 faceNormal,
             float vertical01,
@@ -1540,21 +1556,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float randomValue)
         {
             float baseContact =
-                1f - Mathf.SmoothStep(0.01f, 0.20f, vertical01);
+                1f - Mathf.SmoothStep(0.018f, 0.145f, vertical01);
 
-            float sideOcclusion =
-                Mathf.SmoothStep(0.24f, 0.90f, 1f - Mathf.Abs(faceNormal.y)) *
-                (1f - Mathf.SmoothStep(0.28f, 0.86f, vertical01));
+            float sideAmount = Mathf.SmoothStep(
+                0.22f,
+                0.84f,
+                1f - Mathf.Abs(faceNormal.y));
+            float lowSideGate =
+                1f - Mathf.SmoothStep(0.20f, 0.68f, vertical01);
+            float sideOcclusion = sideAmount * lowSideGate;
 
             float shelteredSurface =
                 (1f - exposure) *
-                (1f - Mathf.SmoothStep(0.46f, 0.96f, vertical01));
-            float surfaceBreakup = (randomValue - 0.5f) * 0.045f;
+                (1f - Mathf.SmoothStep(0.18f, 0.58f, vertical01));
+            float surfaceBreakup = (randomValue - 0.5f) * 0.028f;
 
             return Mathf.Clamp01(
-                baseContact * 0.58f +
-                sideOcclusion * 0.24f +
-                shelteredSurface * 0.12f +
+                baseContact * 0.66f +
+                sideOcclusion * 0.22f +
+                shelteredSurface * 0.10f +
                 surfaceBreakup);
         }
 
@@ -1565,26 +1585,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float randomValue,
             float authoredDepositBoost)
         {
-            float lowerArea =
-                1f - Mathf.SmoothStep(0.10f, 0.58f, vertical01);
-            float lowerBand =
-                Mathf.SmoothStep(0.02f, 0.18f, vertical01) *
-                (1f - Mathf.SmoothStep(0.34f, 0.86f, vertical01));
+            float baseBand =
+                1f - Mathf.SmoothStep(0.025f, 0.24f, vertical01);
+            float lowShelterBand =
+                Mathf.SmoothStep(0.015f, 0.16f, vertical01) *
+                (1f - Mathf.SmoothStep(0.28f, 0.62f, vertical01));
             float sheltered =
-                Mathf.Clamp01(crevice * 0.65f + (1f - exposure) * 0.35f);
+                Mathf.Clamp01(crevice * 0.72f + (1f - exposure) * 0.28f);
             float depositCore =
-                lowerArea * 0.48f +
-                sheltered * 0.28f +
-                crevice * 0.14f +
-                authoredDepositBoost * 0.32f;
+                baseBand * 0.46f +
+                lowShelterBand * sheltered * 0.24f +
+                crevice * 0.16f +
+                authoredDepositBoost * 0.34f;
             float breakup = Mathf.Lerp(
-                0.58f,
-                1.18f,
+                0.42f,
+                1.22f,
                 Mathf.SmoothStep(0.18f, 0.92f, randomValue));
 
             return Mathf.Clamp01(
                 depositCore * breakup +
-                lowerBand * authoredDepositBoost * 0.24f);
+                lowShelterBand * authoredDepositBoost * 0.26f);
         }
 
         #endregion
@@ -2847,7 +2867,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
                 if (edge.FaceIndices.Count <= 1)
                 {
-                    convexCandidate = 0.38f * readableLength;
+                    convexCandidate = 0.54f;
+                    fractureCandidate = 0.22f;
                 }
                 else
                 {
@@ -2864,8 +2885,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                                 1f);
                             float angleAmount = 1f - normalDot;
                             float angleScore = Mathf.SmoothStep(
-                                0.16f,
-                                0.58f,
+                                0.045f,
+                                0.34f,
                                 angleAmount);
 
                             if (angleScore <= 0.001f)
@@ -2873,34 +2894,33 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                                 continue;
                             }
 
-                            Vector3 centreDelta = second.Centre - first.Centre;
+                            float upwardSupport = Mathf.Max(
+                                Mathf.Clamp01(first.Normal.y * 0.55f + 0.45f),
+                                Mathf.Clamp01(second.Normal.y * 0.55f + 0.45f));
 
-                            if (centreDelta.sqrMagnitude <= MinimumEdgeLengthSqr)
-                            {
-                                continue;
-                            }
-
-                            Vector3 direction = centreDelta.normalized;
-                            float firstSide = Vector3.Dot(
-                                direction,
-                                first.Normal);
-                            float secondSide = Vector3.Dot(
-                                -direction,
-                                second.Normal);
-                            float convexness = Mathf.Clamp01(
-                                (-firstSide - secondSide) * 0.5f);
-                            float concaveness = Mathf.Clamp01(
-                                (firstSide + secondSide) * 0.5f);
-
+                            // Most generated masses are intentionally closed convex shells.
+                            // Trying to strictly classify convex/concave topology leaves almost no useful
+                            // data on those shapes. For material authoring, a sharp readable edge is a
+                            // convex-wear candidate unless later selected as a sparse dark fracture seam.
                             convexCandidate = Mathf.Max(
                                 convexCandidate,
-                                angleScore * convexness);
-                            concaveCandidate = Mathf.Max(
-                                concaveCandidate,
-                                angleScore * concaveness);
+                                angleScore * Mathf.Lerp(0.72f, 1.10f, upwardSupport));
                             fractureCandidate = Mathf.Max(
                                 fractureCandidate,
                                 angleScore);
+
+                            Vector3 centreDelta = second.Centre - first.Centre;
+                            if (centreDelta.sqrMagnitude > MinimumEdgeLengthSqr)
+                            {
+                                Vector3 direction = centreDelta.normalized;
+                                float firstInset = Vector3.Dot(direction, first.Normal);
+                                float secondInset = Vector3.Dot(-direction, second.Normal);
+                                float concaveLike = Mathf.Clamp01(
+                                    (firstInset + secondInset) * 0.5f);
+                                concaveCandidate = Mathf.Max(
+                                    concaveCandidate,
+                                    angleScore * concaveLike);
+                            }
                         }
                     }
                 }
@@ -2916,11 +2936,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     convexCandidate *
                     readableLength *
                     baseSuppression *
-                    Mathf.Lerp(0.72f, 1.12f, exposedHeight) *
+                    Mathf.Lerp(0.82f, 1.22f, exposedHeight) *
                     wearBreakup;
                 convexEdgeWear = Mathf.SmoothStep(
-                    0.16f,
-                    0.78f,
+                    0.045f,
+                    0.46f,
                     convexEdgeWear);
 
                 float selectionThreshold = GetCreaseSelectionThreshold(recipe);
@@ -2929,23 +2949,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     edgeHash);
                 float selectedFracture = creaseRandom <= selectionThreshold ? 1f : 0f;
                 float longReadableEdge = Mathf.SmoothStep(
-                    0.07f,
-                    0.24f,
+                    0.045f,
+                    0.18f,
                     edgeLength01);
                 float upperCutoff =
-                    1f - Mathf.SmoothStep(0.88f, 1.0f, vertical01) * 0.55f;
+                    1f - Mathf.SmoothStep(0.90f, 1.0f, vertical01) * 0.42f;
                 float concaveCrease =
-                    concaveCandidate * 0.95f +
+                    concaveCandidate * 0.80f +
                     fractureCandidate *
                     longReadableEdge *
                     selectedFracture *
-                    0.52f;
+                    0.82f;
                 concaveCrease *=
-                    Mathf.SmoothStep(0.045f, 0.18f, vertical01) *
+                    Mathf.SmoothStep(0.035f, 0.14f, vertical01) *
                     upperCutoff;
                 concaveCrease = Mathf.SmoothStep(
-                    0.18f,
-                    0.76f,
+                    0.045f,
+                    0.42f,
                     concaveCrease);
 
                 float dirtBreakup = Mathf.Lerp(

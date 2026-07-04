@@ -123,14 +123,6 @@ namespace ProgrammaticStylized3D.Rivers
             public bool DebugTrajectoryPending;
         }
 
-        private sealed class FoamReservation
-        {
-            public float CentreGlobalDistance;
-            public float AlongRadius;
-            public float Elapsed;
-            public float ScheduleLifetime;
-        }
-
         [StructLayout(LayoutKind.Sequential)]
         private struct FoamMetricRow
         {

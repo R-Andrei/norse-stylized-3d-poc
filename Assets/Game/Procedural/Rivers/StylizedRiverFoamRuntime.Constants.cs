@@ -397,8 +397,6 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamCurrent");
         private static readonly int FoamBirthDebugId =
             Shader.PropertyToID("_FoamBirthDebug");
-        private static readonly int FoamBirthTransferDebugId =
-            Shader.PropertyToID("_FoamBirthTransferDebug");
         private static readonly int FoamTopologyId =
             Shader.PropertyToID("_FoamTopology");
         private static readonly int FoamTopologySourcesId =

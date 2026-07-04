@@ -16,10 +16,6 @@ namespace ProgrammaticStylized3D.Rivers
         private ComputeShader computeShader;
         private RenderTexture stateA;
         private RenderTexture stateB;
-        private RenderTexture transportPredictorState;
-        private RenderTexture transportCorrectedState;
-        private RenderTexture progressiveBirthSourceTexture;
-        private RenderTexture progressiveBirthTransferDebugTexture;
         private RenderTexture progressiveBirthDebugTexture;
         private RenderTexture previousState;
         private RenderTexture currentState;
@@ -59,6 +55,7 @@ namespace ProgrammaticStylized3D.Rivers
             new uint[TopologyMetricCount];
         private bool topologyMetricsReadbackPending;
         private bool topologyMetricsAvailable;
+        private double topologyMetricsLastCompletedAt = -1.0;
         private int topologyMetricsGeneration;
         private float integratedPresenceArea;
         private float visiblePresenceCoreArea;
@@ -172,7 +169,7 @@ namespace ProgrammaticStylized3D.Rivers
         private int topologyStartupValidationPocketBuildCount;
 
         private readonly List<PendingInjection> pendingInjections = new();
-        private readonly List<FoamReservation> reservations = new();
+        private readonly List<PendingInjection> pendingMaterialBirths = new();
         private readonly ProgressiveRibbonEvent[] progressiveRibbonEvents =
             new ProgressiveRibbonEvent[ProgressiveRibbonEventCapacity];
         private readonly uint[] progressiveBirthDebugCounterReadback =
@@ -287,8 +284,6 @@ namespace ProgrammaticStylized3D.Rivers
         private double majorEvolutionLastCpuMilliseconds;
         private long majorEvolutionLastAllocatedBytes;
 
-        private bool[] chunkActive = Array.Empty<bool>();
-        private double[] chunkActiveUntil = Array.Empty<double>();
         private bool resourcesDirty = true;
         private bool boundaryDirty = true;
         private InitializationPhase initializationPhase =
@@ -354,8 +349,6 @@ namespace ProgrammaticStylized3D.Rivers
         private float phaseCommitCounterAccumulator;
         private float lastFoamRenderTravelMetres;
         private float lastEstimatedTransportCellsPerStep;
-        private int lastTransportSubstepsUsed = 1;
-        private int lastCompressionPassesUsed;
         private float initializationMotionTime;
         private float lastRuntimeTime;
         private double idleSince;
@@ -364,7 +357,6 @@ namespace ProgrammaticStylized3D.Rivers
         private int clearProgressiveBirthDebugAllKernel = -1;
         private int clearProgressiveBirthDebugTransientKernel = -1;
         private int paintProgressiveBirthDebugSegmentKernel = -1;
-        private int paintProgressiveBirthSourceSegmentKernel = -1;
         private int buildCurrentShoreEdgesKernel = -1;
         private int composeTopologyKernel = -1;
         private int captureGeneratedTopologyKernel = -1;
@@ -373,9 +365,6 @@ namespace ProgrammaticStylized3D.Rivers
         private int updateObstacleExclusionKernel = -1;
         private int resetTopologyMetricsKernel = -1;
         private int measureTopologyMetricsKernel = -1;
-        private int transportPredictorKernel = -1;
-        private int transportCorrectorKernel = -1;
-        private int compressTransportInterfaceKernel = -1;
         private int phaseCommitKernel = -1;
         private int simulateKernel = -1;
         private int applyBoundaryKernel = -1;
@@ -414,7 +403,6 @@ namespace ProgrammaticStylized3D.Rivers
         private int progressiveBirthDebugSessionGeneration;
         private uint progressiveBirthDebugLatestAffectedTexels;
         private uint progressiveBirthDebugCumulativeAffectedTexels;
-        private bool progressiveBirthSourceContainsData;
 
         private bool HasQueuedRebuildWork =>
             rebuildPhase != RebuildPhase.Idle ||

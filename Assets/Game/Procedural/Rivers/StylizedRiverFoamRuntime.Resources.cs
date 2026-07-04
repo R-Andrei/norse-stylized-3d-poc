@@ -72,10 +72,6 @@ namespace ProgrammaticStylized3D.Rivers
         {
             return !resourcesDirty &&
                 currentState != null &&
-                transportPredictorState != null &&
-                transportCorrectedState != null &&
-                progressiveBirthSourceTexture != null &&
-                progressiveBirthTransferDebugTexture != null &&
                 topologyTexture != null &&
                 topologySourcesTexture != null &&
                 topologyGeneratedTexture != null &&
@@ -179,15 +175,6 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         stateA = CreateFieldTexture("PS3D_RiverFoam_A");
                         stateB = CreateFieldTexture("PS3D_RiverFoam_B");
-                        transportPredictorState = CreateFieldTexture(
-                            "PS3D_RiverFoam_TransportPredictor");
-                        transportCorrectedState = CreateFieldTexture(
-                            "PS3D_RiverFoam_TransportCorrected");
-                        progressiveBirthSourceTexture = CreateFieldTexture(
-                            "PS3D_RiverFoam_ProgressiveBirthSource");
-                        progressiveBirthTransferDebugTexture =
-                            CreateFieldTexture(
-                                "PS3D_RiverFoam_ProgressiveBirthTransferDebug");
                     }
 
                     initializationPhase =
@@ -270,9 +257,6 @@ namespace ProgrammaticStylized3D.Rivers
                             TopologyMetricCount,
                             sizeof(uint),
                             ComputeBufferType.Raw);
-
-                        chunkActive = new bool[chunkCount];
-                        chunkActiveUntil = new double[chunkCount];
                     }
 
                     initializationPhase =
@@ -439,16 +423,6 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         DispatchClear(stateA, 0, fieldWidth);
                         DispatchClear(stateB, 0, fieldWidth);
-                        DispatchClear(transportPredictorState, 0, fieldWidth);
-                        DispatchClear(transportCorrectedState, 0, fieldWidth);
-                        DispatchClear(
-                            progressiveBirthSourceTexture,
-                            0,
-                            fieldWidth);
-                        DispatchClear(
-                            progressiveBirthTransferDebugTexture,
-                            0,
-                            fieldWidth);
                     }
 
                     initializationPhase =
@@ -876,11 +850,6 @@ namespace ProgrammaticStylized3D.Rivers
             }
             ReleaseTexture(ref stateA);
             ReleaseTexture(ref stateB);
-            ReleaseTexture(ref transportPredictorState);
-            ReleaseTexture(ref transportCorrectedState);
-            ReleaseTexture(ref progressiveBirthSourceTexture);
-            ReleaseTexture(ref progressiveBirthTransferDebugTexture);
-            progressiveBirthSourceContainsData = false;
             ReleaseProgressiveBirthDiagnosticResources();
             ReleaseTexture(ref topologyTexture);
             ReleaseTexture(ref topologySourcesTexture);
@@ -959,6 +928,7 @@ namespace ProgrammaticStylized3D.Rivers
             topologyMetricsGeneration++;
             topologyMetricsReadbackPending = false;
             topologyMetricsAvailable = false;
+            topologyMetricsLastCompletedAt = -1.0;
             integratedPresenceArea = 0f;
             visiblePresenceCoreArea = 0f;
             manualProofReferenceArea = 0f;
@@ -979,9 +949,6 @@ namespace ProgrammaticStylized3D.Rivers
             updateObstacleExclusionKernel = -1;
             resetTopologyMetricsKernel = -1;
             measureTopologyMetricsKernel = -1;
-            transportPredictorKernel = -1;
-            transportCorrectorKernel = -1;
-            compressTransportInterfaceKernel = -1;
             phaseCommitKernel = -1;
             simulateKernel = -1;
             applyBoundaryKernel = -1;
@@ -997,8 +964,6 @@ namespace ProgrammaticStylized3D.Rivers
             minimumTransportLongitudinalSpacing = 0f;
             allocatedGlobalStart = 0f;
             initializationMotionTime = 0f;
-            chunkActive = Array.Empty<bool>();
-            chunkActiveUntil = Array.Empty<double>();
             resourcesDirty = true;
             boundaryDirty = true;
             rebuildPhase = RebuildPhase.Idle;

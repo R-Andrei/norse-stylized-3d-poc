@@ -39,9 +39,6 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(
                 FoamBirthDebugId,
                 ResolveBoundTexture(progressiveBirthDebugTexture));
-            propertyBlock.SetTexture(
-                FoamBirthTransferDebugId,
-                ResolveBoundTexture(progressiveBirthTransferDebugTexture));
             propertyBlock.SetTexture(FoamTopologyId, snapshot.Topology);
             propertyBlock.SetTexture(
                 FoamTopologySourcesId,
@@ -88,9 +85,6 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamBirthDebugId,
                 ResolveBoundTexture(progressiveBirthDebugTexture));
             propertyBlock.SetTexture(
-                FoamBirthTransferDebugId,
-                ResolveBoundTexture(progressiveBirthTransferDebugTexture));
-            propertyBlock.SetTexture(
                 FoamTopologyId,
                 ResolveBoundTexture(topologyTexture));
             propertyBlock.SetTexture(
@@ -129,9 +123,6 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(FoamPreviousId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamCurrentId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamBirthDebugId, Texture2D.blackTexture);
-            propertyBlock.SetTexture(
-                FoamBirthTransferDebugId,
-                Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamTopologyId, Texture2D.blackTexture);
             propertyBlock.SetTexture(
                 FoamTopologySourcesId,

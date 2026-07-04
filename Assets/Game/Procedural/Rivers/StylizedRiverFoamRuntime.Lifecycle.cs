@@ -71,7 +71,7 @@ namespace ProgrammaticStylized3D.Rivers
             BindDisabled();
             ReleaseResources();
             pendingInjections.Clear();
-            reservations.Clear();
+            pendingMaterialBirths.Clear();
             ClearProgressiveRibbonEvents();
         }
 
@@ -101,7 +101,6 @@ namespace ProgrammaticStylized3D.Rivers
                 BindDisabled();
                 ReleaseResources();
                 pendingInjections.Clear();
-                reservations.Clear();
                 ClearProgressiveRibbonEvents();
                 ResetManualInjectionSequence();
                 return;
@@ -135,7 +134,6 @@ namespace ProgrammaticStylized3D.Rivers
             if (fullyFrozen)
             {
                 pendingInjections.Clear();
-                reservations.Clear();
                 ClearProgressiveRibbonEvents();
                 ResetManualInjectionSequence();
 
@@ -155,16 +153,13 @@ namespace ProgrammaticStylized3D.Rivers
             bool topologyDebugActive = IsTopologyDebugActive;
             bool progressiveBirthDebugActive =
                 IsProgressiveBirthSourceDebugActive;
-            bool progressiveBirthTransferDebugActive =
-                IsProgressiveBirthTransferDebugActive;
             bool materialWork =
+                materialLifetimeAuthorityActive ||
                 pendingInjections.Count > 0 ||
-                activeProgressiveRibbonEventCount > 0 ||
-                reservations.Count > 0 ||
-                CountActiveChunks() > 0;
+                pendingMaterialBirths.Count > 0 ||
+                activeProgressiveRibbonEventCount > 0;
             bool hasWork = materialWork || topologyDebugActive ||
-                progressiveBirthDebugActive ||
-                progressiveBirthTransferDebugActive;
+                progressiveBirthDebugActive;
 
             if (!hasWork && currentState == null &&
                 !HasTopologyTransitionVisibleHold)
@@ -224,11 +219,6 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             bool manualInjectedThisUpdate = ProcessPendingInjections(now);
-            if (manualProofReferencePending &&
-                !topologyMetricsReadbackPending)
-            {
-                MeasureTopologyMetrics(true);
-            }
 
             float updateRate = ResolveUpdateRate();
             float stepDuration = 1f / Mathf.Max(1f, updateRate);
@@ -248,137 +238,120 @@ namespace ProgrammaticStylized3D.Rivers
 
             if (manualInjectedThisUpdate)
             {
-                // Manual diagnostics remain immediately visible. Birth writes
-                // into phase-compensated storage coordinates, so the visible
-                // source appears at the requested world position without
-                // resetting existing Foam phase.
-                simulationAccumulator = 0f;
-                simulationInterpolation = 1f;
-                foamRenderTravelMetres = foamPhaseTransportMetres;
-                lastRenderInterpolationAlpha = simulationInterpolation;
-                lastFoamPhaseTransportMetres = foamPhaseTransportMetres;
-                lastFoamPhaseCellFraction =
-                    minimumTransportLongitudinalSpacing > 0.0001f
-                        ? Mathf.Clamp01(
-                            Mathf.Abs(foamPhaseTransportMetres) /
-                            minimumTransportLongitudinalSpacing)
-                        : 0f;
-                lastFoamRenderTravelMetres = foamRenderTravelMetres;
+                simulationAccumulator = Mathf.Max(
+                    simulationAccumulator,
+                    stepDuration);
             }
-            else
+
+            bool phaseMaterialActive =
+                materialLifetimeAuthorityActive ||
+                activeProgressiveRibbonEventCount > 0 ||
+                pendingMaterialBirths.Count > 0;
+            AdvanceFoamPhaseTransport(
+                deltaTime,
+                signedDownstreamSpeed,
+                phaseMaterialActive);
+
+            simulationAccumulator = Mathf.Min(
+                simulationAccumulator + deltaTime,
+                stepDuration * 2f);
+
+            while (simulationAccumulator >= stepDuration)
             {
-                bool phaseMaterialActive =
-                    materialLifetimeAuthorityActive ||
-                    activeProgressiveRibbonEventCount > 0 ||
-                    reservations.Count > 0 ||
-                    CountActiveChunks() > 0;
-                AdvanceFoamPhaseTransport(
-                    deltaTime,
-                    signedDownstreamSpeed,
-                    phaseMaterialActive);
-
-                simulationAccumulator = Mathf.Min(
-                    simulationAccumulator + deltaTime,
-                    stepDuration * 2f);
-
-                while (simulationAccumulator >= stepDuration)
+                simulationAccumulator -= stepDuration;
+                lastMaterialStepsThisFrame++;
+                if (progressiveBirthDebugActive)
                 {
-                    simulationAccumulator -= stepDuration;
-                    lastMaterialStepsThisFrame++;
-                    BeginProgressiveBirthSourceStep();
-                    if (progressiveBirthDebugActive)
-                    {
-                        BeginProgressiveBirthDebugStep();
-                    }
+                    BeginProgressiveBirthDebugStep();
+                }
 
-                    bool progressiveRibbonDeposited =
-                        AdvanceProgressiveRibbonEvents(stepDuration, now);
-                    bool materialStepActive =
+                bool progressiveRibbonDeposited =
+                    AdvanceProgressiveRibbonEvents(stepDuration, now);
+                bool materialStepActive =
+                    materialLifetimeAuthorityActive ||
+                    progressiveRibbonDeposited ||
+                    activeProgressiveRibbonEventCount > 0 ||
+                    pendingMaterialBirths.Count > 0;
+
+                if (materialStepActive)
+                {
+                    ConfigureSharedComputeParameters(stepDuration);
+                }
+
+                if ((materialStepActive || topologyDebugActive) &&
+                    !topologyMaintenanceBlocked)
+                {
+                    // Material aging consumes the single composite topology
+                    // field. Topology generation internals remain quarantined:
+                    // they provide only this sampled input and never own
+                    // material lifetime directly.
+                    bool footprintMetricsActive =
                         materialLifetimeAuthorityActive ||
-                        progressiveRibbonDeposited ||
-                        activeProgressiveRibbonEventCount > 0 ||
-                        reservations.Count > 0 ||
-                        CountActiveChunks() > 0;
-
-                    if (materialStepActive)
+                        topologyDebugActive ||
+                        manualProofReferencePending ||
+                        manualProofReferenceArea > 0.0001f;
+                    bool measureTopology = false;
+                    float topologyMetricsInterval = 1f /
+                        TopologyMetricsUpdateRate;
+                    if (footprintMetricsActive)
                     {
-                        UpdateReservations(stepDuration, now);
-                        UpdateActiveChunks(now);
-                        ConfigureSharedComputeParameters(stepDuration);
+                        topologyMetricsAccumulator += stepDuration;
+                        measureTopology =
+                            topologyMetricsAccumulator >=
+                            topologyMetricsInterval;
                     }
 
-                    if ((materialStepActive || topologyDebugActive) &&
-                        !topologyMaintenanceBlocked)
+                    if (measureTopology)
                     {
-                        // Material aging must consume current topology even
-                        // when the exact Final Foam view is selected. Compose
-                        // evolving Major/Connector/negative fields with live
-                        // Pressure, Lee, and Shore sources for every active
-                        // material step; the composite debug view merely makes
-                        // that same authoritative input visible.
-                        bool footprintMetricsActive =
-                            materialLifetimeAuthorityActive ||
-                            topologyDebugActive ||
-                            manualProofReferencePending ||
-                            manualProofReferenceArea > 0.0001f;
-                        bool measureTopology = false;
-                        float topologyMetricsInterval = 1f /
-                            TopologyMetricsUpdateRate;
-                        if (footprintMetricsActive)
+                        if (evolvingTopologyRebuilt)
                         {
-                            topologyMetricsAccumulator += stepDuration;
-                            measureTopology =
-                                topologyMetricsAccumulator >=
-                                topologyMetricsInterval;
+                            MeasureTopologyMetrics();
+                        }
+                        else
+                        {
+                            RefreshDynamicTopologySources(true);
                         }
 
-                        if (measureTopology)
-                        {
-                            if (evolvingTopologyRebuilt)
-                            {
-                                MeasureTopologyMetrics();
-                            }
-                            else
-                            {
-                                RefreshDynamicTopologySources(true);
-                            }
-
-                            topologyMetricsAccumulator %=
-                                topologyMetricsInterval;
-                        }
-                        else if (!evolvingTopologyRebuilt)
-                        {
-                            RefreshDynamicTopologySources(false);
-                        }
+                        topologyMetricsAccumulator %= topologyMetricsInterval;
                     }
-
-                    if (materialStepActive)
+                    else if (!evolvingTopologyRebuilt)
                     {
-                        SimulateMaterialAuthority(stepDuration);
-                    }
-
-                    if (progressiveBirthDebugActive)
-                    {
-                        EndProgressiveBirthDebugStep();
+                        RefreshDynamicTopologySources(false);
                     }
                 }
 
-                // Normal Foam rendering presents the latest committed material
-                // state plus the bounded residual phase. The residual no longer
-                // resets on material ticks; it resets only when a whole material
-                // cell has been committed into the persistent texture.
-                simulationInterpolation = 1f;
-                foamRenderTravelMetres = foamPhaseTransportMetres;
-                lastRenderInterpolationAlpha = simulationInterpolation;
-                lastFoamPhaseTransportMetres = foamPhaseTransportMetres;
-                lastFoamRenderTravelMetres = foamRenderTravelMetres;
-                lastFoamPhaseCellFraction =
-                    minimumTransportLongitudinalSpacing > 0.0001f
-                        ? Mathf.Clamp01(
-                            Mathf.Abs(foamPhaseTransportMetres) /
-                            minimumTransportLongitudinalSpacing)
-                        : 0f;
+                if (materialStepActive)
+                {
+                    SimulateFullField(stepDuration);
+                }
+
+                if (progressiveBirthDebugActive)
+                {
+                    EndProgressiveBirthDebugStep();
+                }
             }
+
+            if (manualProofReferencePending &&
+                !topologyMetricsReadbackPending)
+            {
+                MeasureTopologyMetrics(true);
+            }
+
+            // Normal Foam rendering presents the latest committed material
+            // state plus the bounded residual phase. The residual resets only
+            // when a whole material cell has been committed into the persistent
+            // texture.
+            simulationInterpolation = 1f;
+            foamRenderTravelMetres = foamPhaseTransportMetres;
+            lastRenderInterpolationAlpha = simulationInterpolation;
+            lastFoamPhaseTransportMetres = foamPhaseTransportMetres;
+            lastFoamRenderTravelMetres = foamRenderTravelMetres;
+            lastFoamPhaseCellFraction =
+                minimumTransportLongitudinalSpacing > 0.0001f
+                    ? Mathf.Clamp01(
+                        Mathf.Abs(foamPhaseTransportMetres) /
+                        minimumTransportLongitudinalSpacing)
+                    : 0f;
 
             if (IsSleeping)
             {
@@ -554,7 +527,7 @@ namespace ProgrammaticStylized3D.Rivers
         public void ClearFoam()
         {
             pendingInjections.Clear();
-            reservations.Clear();
+            pendingMaterialBirths.Clear();
             ClearProgressiveRibbonEvents();
             ResetManualInjectionSequence();
             lastInjectionBoundaryCoverage = -1f;
@@ -590,36 +563,6 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 DispatchClear(stateB, 0, fieldWidth);
             }
-
-            if (transportPredictorState != null)
-            {
-                DispatchClear(transportPredictorState, 0, fieldWidth);
-            }
-
-            if (transportCorrectedState != null)
-            {
-                DispatchClear(transportCorrectedState, 0, fieldWidth);
-            }
-
-            if (progressiveBirthSourceTexture != null)
-            {
-                DispatchClear(
-                    progressiveBirthSourceTexture,
-                    0,
-                    fieldWidth);
-            }
-
-            if (progressiveBirthTransferDebugTexture != null)
-            {
-                DispatchClear(
-                    progressiveBirthTransferDebugTexture,
-                    0,
-                    fieldWidth);
-            }
-
-            progressiveBirthSourceContainsData = false;
-            Array.Clear(chunkActive, 0, chunkActive.Length);
-            Array.Clear(chunkActiveUntil, 0, chunkActiveUntil.Length);
         }
 
         public void ResetRecentPeaks()

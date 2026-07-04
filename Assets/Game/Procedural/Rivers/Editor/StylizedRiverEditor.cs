@@ -1019,7 +1019,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         impactRippleDecayProperty,
                         new GUIContent(
                             "Decay",
-                            "Base exponential loss per second. Effective Decay = Decay + abs(Flow Speed) × Flow Dissipation. Higher values shorten visible lifetime and chunk reservations even in still water."));
+                            "Base exponential loss per second. Effective Decay = Decay + abs(Flow Speed) × Flow Dissipation. Higher values shorten the legacy surface overlay lifetime in still water."));
                 }
                 if (impactRippleFlowDissipationProperty != null)
                 {
@@ -1851,7 +1851,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     if (GUILayout.Button(
                             new GUIContent(
                                 "Clear Foam",
-                                "Clears the four-channel Foam state, pending manual injections, active progressive-ribbon events, and material reservations. The river remains empty until another explicit diagnostic or later approved automatic birth event.")))
+                                "Clears the four-channel Foam state, pending manual injections, and active progressive-ribbon events. The river remains empty until another explicit diagnostic or later approved automatic birth event.")))
                     {
                         ApplyFoamTestProperties();
                         river.ClearFoam();
@@ -1972,15 +1972,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 "Final Foam",
                 "Foam + Aging Topology",
-                "Progressive Birth Source",
-                "Progressive Birth Transfer"
+                "Progressive Birth Source"
             };
             int[] foamDebugValues =
             {
                 (int)StylizedRiverFoamDebugView.Final,
                 (int)StylizedRiverFoamDebugView.FoamAndAgingTopology,
-                (int)StylizedRiverFoamDebugView.ProgressiveBirthSource,
-                (int)StylizedRiverFoamDebugView.ProgressiveBirthTransfer
+                (int)StylizedRiverFoamDebugView.ProgressiveBirthSource
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -2092,8 +2090,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 return;
             }
 
+            bool hasFreshMetrics = runtime.TopologyMetricsFresh;
             bool hasVisibleFoam =
-                runtime.TopologyMetricsAvailable &&
+                hasFreshMetrics &&
                 runtime.VisibleFoamPresenceArea > 0.0001f;
             float hiddenArea = Mathf.Max(
                 0f,
@@ -2102,7 +2101,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 "Lifetime Authority",
                 runtime.MaterialLifetimeAuthorityActive
-                    ? "Remaining Life / full-field lifecycle"
+                    ? "Remaining Life / full-field direct sim"
                     : runtime.LifetimeAuthorityStatus);
             EditorGUILayout.LabelField(
                 "Visible Life",
@@ -2127,6 +2126,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 "Foam Area",
                 $"visible {runtime.VisiblePresenceCoreArea:0.000} m² / hidden {hiddenArea:0.000} m²");
+            EditorGUILayout.LabelField(
+                "Sample Freshness",
+                runtime.TopologyMetricsAgeSeconds < 0f
+                    ? "no completed sample yet"
+                    : hasFreshMetrics
+                        ? $"live {runtime.TopologyMetricsAgeSeconds:0.00}s old"
+                        : $"stale {runtime.TopologyMetricsAgeSeconds:0.00}s old");
 
             EditorGUILayout.HelpBox(
                 "Single-authority mode: chunk/reservation timers no longer clear material. Visible death should now come from per-cell Remaining Life only.",
@@ -2358,11 +2364,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 return "Phase cells per material step high";
             }
-            if (runtime.CompressionPassesUsed > 0 &&
-                runtime.CompressionPassesUsed % 4 != 0)
-            {
-                return "Compression cadence irregular";
-            }
             if (runtime.PhaseCommitCellsLastFrame > 0)
             {
                 return "Integer phase commit this frame";
@@ -2387,9 +2388,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 return "Open Runtime";
             }
             if (runtime.MaterialStepsLastFrame > 1 ||
-                runtime.EstimatedTransportCellsPerStep > 1.25f ||
-                (runtime.CompressionPassesUsed > 0 &&
-                 runtime.CompressionPassesUsed % 4 != 0))
+                runtime.EstimatedTransportCellsPerStep > 1.25f)
             {
                 return "Open Motion";
             }
@@ -2428,13 +2427,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 EditorGUILayout.HelpBox(
                     "Estimated phase cells per material step is high. Base motion should still be committed by integer shifts, but very fast authored flow may move through several cells between material lifecycle ticks.",
-                    MessageType.Warning);
-            }
-            if (runtime.CompressionPassesUsed > 0 &&
-                runtime.CompressionPassesUsed % 4 != 0)
-            {
-                EditorGUILayout.HelpBox(
-                    "Compression pass cadence may be visible. Foam may appear to pulse or snap even when transport timing is stable.",
                     MessageType.Warning);
             }
             if (runtime.IntegratedPresenceArea > 0.0001f &&
@@ -2882,24 +2874,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 return;
             }
 
-            bool hasLegacyFoam =
-                river.GetComponent<StylizedRiverFoamSimulation>() != null;
             bool hasReflection =
                 river.GetComponent<StylizedRiverPlanarReflection>() != null;
 
-            if (!hasLegacyFoam && !hasReflection)
+            if (!hasReflection)
             {
                 return;
             }
 
             EditorGUILayout.Space(8f);
-
-            if (hasLegacyFoam)
-            {
-                EditorGUILayout.HelpBox(
-                    "A legacy StylizedRiverFoamSimulation migration stub remains attached. Remove that component; Stage 6 Foam is now owned by the hidden StylizedRiverFoamRuntime and the controls above.",
-                    MessageType.Warning);
-            }
 
             if (hasReflection)
             {
@@ -3053,10 +3036,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 case StylizedRiverFoamDebugView.ProgressiveBirthSource:
                     return
                         "Source isolation before persistent transport and aging. Blue is the complete planned accepted source, green is cumulative accepted source geometry since the latest idle start, red is source submitted during the latest material update, and yellow is the current emission head. Amount selects deterministic coherent area rather than persistent intensity.";
-
-                case StylizedRiverFoamDebugView.ProgressiveBirthTransfer:
-                    return
-                        "Source-to-material handoff. Red is current Source Presence, green is newly accepted Presence, and blue is persistent Presence before transfer. Yellow is newly created material; magenta is source overlapping existing material without rejuvenating it.";
 
                 default:
                     return

@@ -86,7 +86,6 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamPrevious("Foam Previous", 2D) = "black" {}
         [HideInInspector] _FoamCurrent("Foam Current", 2D) = "black" {}
         [HideInInspector] _FoamBirthDebug("Foam Progressive Birth Debug", 2D) = "black" {}
-        [HideInInspector] _FoamBirthTransferDebug("Foam Progressive Birth Transfer Debug", 2D) = "black" {}
         [HideInInspector] _FoamTopology("Foam Topology", 2D) = "black" {}
         [HideInInspector] _FoamTopologySources("Foam Topology Sources", 2D) = "black" {}
         [HideInInspector] _FoamObstacleExclusion("Foam Obstacle Footprint", 2D) = "black" {}
@@ -246,7 +245,6 @@ Shader "PS3D/Stylized River Water"
                 float _FoamSharpness;
                 float _FoamDebugView;
                 float4 _FoamBirthDebug_TexelSize;
-                float4 _FoamBirthTransferDebug_TexelSize;
                 float4 _FoamObstacleExclusion_TexelSize;
 
                 float _DomainFallbackDepth;
@@ -274,7 +272,6 @@ Shader "PS3D/Stylized River Water"
             TEXTURE2D(_FoamCurrent);
             SAMPLER(sampler_FoamCurrent);
             TEXTURE2D(_FoamBirthDebug);
-            TEXTURE2D(_FoamBirthTransferDebug);
             // Topology diagnostics reuse sampler_FoamCurrent, which is already
             // allocated by the normal Foam path, so no extra fragment sampler
             // is required.
@@ -804,27 +801,6 @@ Shader "PS3D/Stylized River Water"
                         float3(1.00, 0.95, 0.08),
                         birthDebug.a);
                     return half4(saturate(debugColour), 1.0);
-                }
-
-                if (foamDebug == 3)
-                {
-                    int2 transferDimensions = int2(
-                        max(1.0, _FoamBirthTransferDebug_TexelSize.z),
-                        max(1.0, _FoamBirthTransferDebug_TexelSize.w));
-                    int2 transferCoordinate = clamp(
-                        (int2)floor(
-                            foam.fieldUV *
-                            (float2)transferDimensions),
-                        int2(0, 0),
-                        transferDimensions - 1);
-                    float4 transferDebug = saturate(
-                        _FoamBirthTransferDebug.Load(
-                            int3(transferCoordinate, 0)));
-                    float3 transferColour =
-                        transferDebug.r * float3(1.00, 0.08, 0.03) +
-                        transferDebug.g * float3(0.05, 0.90, 0.12) +
-                        transferDebug.b * float3(0.08, 0.22, 0.90);
-                    return half4(saturate(transferColour), 1.0);
                 }
 
                 if (foamDebug == 1)

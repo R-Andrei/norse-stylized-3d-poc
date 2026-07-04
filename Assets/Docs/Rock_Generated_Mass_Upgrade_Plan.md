@@ -738,7 +738,7 @@ Proposed extended material contract:
 - `Color.a`: convex edge wear or authored ridge intensity;
 - `UV2.x`: concave crease or selected crack-darkening mask;
 - `UV2.y`: dirty deposit / mineral stain mask;
-- `UV2.zw`: reserved for future biome-specific material state.
+- `UV2.zw`: triangle-local barycentric helper used by the shader to keep edge/crease debug and later edge response localized near actual mesh edges.
 
 If `UV2` support is too large for the first pass, use `Color.a` for convex edge wear first and leave concave cracks to a later patch. Do not overload the current red variation channel; it already drives the accepted pixel/noise look.
 
@@ -793,7 +793,7 @@ Decision: do not wire the first-pass convex mask into final shader response. Fir
 
 ### Patch 12A - Surface Mask Authoring Correction
 
-Status: implemented, pending Unity import and mask-debug validation.
+Status: Patch 12A.1 produced poor Unity validation and was corrected by Patch 12A.2.
 
 Checklist status:
 
@@ -807,6 +807,7 @@ Checklist status:
 Primary files:
 
 - `MassGenerator.cs`
+- `SH_PixelSurfaceLit.shader`
 - `Rock_Generated_Mass_Upgrade_Plan.md`
 
 Work:
@@ -825,6 +826,24 @@ Acceptance:
 - `DirtDeposit` debug should still prefer lower/sheltered regions but should be less like a simple side gradient;
 - `CreviceBase` should remain a broad base/contact darkening mask;
 - normal rendering should remain close to the accepted Patch 10/11 look because the shader has not yet been made to strongly consume the new masks.
+
+Patch 12A.1 Unity validation notes:
+
+- `CreviceBase` still read as too flat/pale and did not clearly communicate base/contact darkening on the tested boulder.
+- `ConvexEdgeWear` became an almost uniform mid-value instead of readable ridge/edge data.
+- `ConcaveCrease` still did not produce useful sparse seams.
+- `DirtDeposit` remained mostly a broad side/base gradient.
+- Most importantly, the shader was reading the generated mask vector from `TEXCOORD1`, while `MeshBuilder` writes its `UV2` list to Unity UV channel 2 / `TEXCOORD2`. This meant the new `UV2.x/y` mask debug modes were not reading the generated data reliably.
+
+Patch 12A.2 correction:
+
+- keep `MeshBuilder` unchanged to avoid disturbing river/ground systems that already use Unity channel 2;
+- make `SH_PixelSurfaceLit.shader` read generated material masks from `TEXCOORD2`;
+- write triangle-local barycentric coordinates into `UV2.zw` for generated masses;
+- use the barycentric helper only in mask debug for `ConvexEdgeWear` and `ConcaveCrease`, so these modes display line/edge-localized candidates instead of whole-face fills;
+- loosen and simplify the edge candidate calculation so readable sharp edges on mostly convex generated shells produce useful wear data;
+- keep `CreviceBase` and `DirtDeposit` tighter and lower/base-biased;
+- still defer final visible material response until this corrected debug pass is validated.
 
 ### Patch 12B - Profile-Aware Convex Edge and Concave Crease Material Response
 

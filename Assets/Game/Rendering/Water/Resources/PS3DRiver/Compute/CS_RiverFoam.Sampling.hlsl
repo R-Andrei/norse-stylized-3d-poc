@@ -1,4 +1,19 @@
 
+float FoamValidFluidAt(int2 coordinate)
+{
+    if (coordinate.x < 0 || coordinate.x >= _FoamDimensions.x ||
+        coordinate.y < 0 || coordinate.y >= _FoamDimensions.y ||
+        !IsFoamColumnInsideSimulation(coordinate.x))
+    {
+        return 0.0;
+    }
+
+    float boundaryCoverage = LoadBoundaryCoverage(coordinate);
+    float obstacleFootprint = LoadObstacleExclusionCell(coordinate);
+    return saturate(boundaryCoverage * (1.0 - obstacleFootprint));
+}
+
+
 float4 SampleStateBilinear(float2 pixelCoordinate)
 {
     float2 clamped = clamp(
@@ -144,27 +159,6 @@ void ResolveExternalBilinearCoordinates(
         baseCoordinate + int2(1, 1),
         safeDimensions - int2(1, 1));
     blend = frac(coordinate);
-}
-
-
-float4 SampleWakeBilinear(float2 uv)
-{
-    int2 baseCoordinate;
-    int2 nextCoordinate;
-    float2 blend;
-    ResolveExternalBilinearCoordinates(
-        _FoamWakeDimensions,
-        uv,
-        baseCoordinate,
-        nextCoordinate,
-        blend);
-    float4 a = _FoamWakeField.Load(int3(baseCoordinate, 0));
-    float4 b = _FoamWakeField.Load(
-        int3(nextCoordinate.x, baseCoordinate.y, 0));
-    float4 c = _FoamWakeField.Load(
-        int3(baseCoordinate.x, nextCoordinate.y, 0));
-    float4 d = _FoamWakeField.Load(int3(nextCoordinate, 0));
-    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
 }
 
 

@@ -125,7 +125,7 @@ namespace ProgrammaticStylized3D.Rivers
             materialLifetimeAuthorityActive = true;
             materialLifetimeEmptyMetricReadbacks = 0;
             lifetimeAuthorityStatus =
-                "Remaining Life owns survival; scheduler is non-destructive";
+                "Remaining Life / full-field direct simulation";
             activeProgressiveRibbonEventCount++;
             progressiveRibbonStartedCount++;
             latestProgressiveRibbonEventId = eventId;
@@ -209,21 +209,14 @@ namespace ProgrammaticStylized3D.Rivers
                             headRadius,
                             headAmount);
                     progressiveRibbonSegmentDispatchAttemptCount++;
-                    ActivateInjectionRange(segment, now);
-                    if (PaintProgressiveBirthSourceSegment(segment))
-                    {
-                        materialLifetimeAuthorityActive = true;
-                        materialLifetimeEmptyMetricReadbacks = 0;
-                        lifetimeAuthorityStatus =
-                            "Remaining Life owns survival; scheduler is non-destructive";
-                        progressiveRibbonSegmentDispatchSubmittedCount++;
-                        progressiveRibbonCumulativeCentrelineDistance +=
-                            segmentLength;
-                        PaintProgressiveBirthDebugSegment(segment);
-                        injectedLastUpdate++;
-                        depositedAny = true;
-                        lastProgressiveRibbonSegmentLength = segmentLength;
-                    }
+                    QueueMaterialBirth(segment);
+                    progressiveRibbonSegmentDispatchSubmittedCount++;
+                    progressiveRibbonCumulativeCentrelineDistance +=
+                        segmentLength;
+                    PaintProgressiveBirthDebugSegment(segment);
+                    injectedLastUpdate++;
+                    depositedAny = true;
+                    lastProgressiveRibbonSegmentLength = segmentLength;
                 }
 
                 UpdateLatestProgressiveRibbonDiagnostics(
@@ -304,33 +297,9 @@ namespace ProgrammaticStylized3D.Rivers
             ProgressiveRibbonEvent ribbonEvent,
             float now)
         {
-            float alongRadius =
-                ribbonEvent.TravelDistance * 0.5f +
-                ribbonEvent.BaseRadius * 1.2f;
-            reservations.Add(
-                new FoamReservation
-                {
-                    CentreGlobalDistance =
-                        ribbonEvent.StartGlobalDistance +
-                        ribbonEvent.FlowDirection *
-                        ribbonEvent.TravelDistance * 0.5f,
-                    AlongRadius = alongRadius,
-                    Elapsed = 0f,
-                    ScheduleLifetime = ResolveReservationScheduleSeconds()
-                });
-            float endGlobalDistance =
-                ribbonEvent.StartGlobalDistance +
-                ribbonEvent.FlowDirection * ribbonEvent.TravelDistance;
-            ActivateTransportSafeRange(
-                Mathf.Min(
-                    ribbonEvent.StartGlobalDistance,
-                    endGlobalDistance) - ribbonEvent.BaseRadius,
-                Mathf.Max(
-                    ribbonEvent.StartGlobalDistance,
-                    endGlobalDistance) + ribbonEvent.BaseRadius,
-                now + Mathf.Min(
-                    5f,
-                    ResolveReservationScheduleSeconds()));
+            // No reservation or scheduler side effect remains. Progressive
+            // segments have already queued direct material births, and the
+            // full-field lifecycle owns all subsequent survival.
         }
 
         private void ResolveProgressiveRibbonHead(

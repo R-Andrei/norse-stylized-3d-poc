@@ -92,8 +92,7 @@ namespace ProgrammaticStylized3D.Rivers
         // Zero is the exact normal rendered result and debug-off state.
         Final = 0,
         FoamAndAgingTopology = 1,
-        ProgressiveBirthSource = 2,
-        ProgressiveBirthTransfer = 3
+        ProgressiveBirthSource = 2
     }
 
     public enum StylizedRiverDisturbanceDebugView
@@ -651,7 +650,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0.2f, 2.5f)]
         [SerializeField] private float impactRipplePropagation = 1.05f;
 
-        [Tooltip("Base exponential Impact Ripple loss per second. Effective Decay = Decay + abs(Flow Speed) × Flow Dissipation. Higher values shorten visible lifetime and chunk reservations even in still water.")]
+        [Tooltip("Base exponential Impact Ripple loss per second. Effective Decay = Decay + abs(Flow Speed) × Flow Dissipation. Higher values shorten visible ripple lifetime even in still water.")]
         [Range(0.1f, 3f)]
         [SerializeField] private float impactRippleDecay = 0.85f;
 
@@ -1613,8 +1612,6 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.FoamAndAgingTopology;
                 case (int)StylizedRiverFoamDebugView.ProgressiveBirthSource:
                     return StylizedRiverFoamDebugView.ProgressiveBirthSource;
-                case (int)StylizedRiverFoamDebugView.ProgressiveBirthTransfer:
-                    return StylizedRiverFoamDebugView.ProgressiveBirthTransfer;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }

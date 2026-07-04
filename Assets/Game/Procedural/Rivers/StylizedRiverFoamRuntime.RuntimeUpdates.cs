@@ -56,37 +56,12 @@ namespace ProgrammaticStylized3D.Rivers
                     fieldLength);
         }
 
-        private int GlobalDistanceToChunk(float globalDistance)
-        {
-            float local = globalDistance - river.Domain.GlobalDistanceMinimum;
-            return Mathf.Clamp(
-                Mathf.FloorToInt(local / ChunkLengthMetres),
-                0,
-                Mathf.Max(0, chunkCount - 1));
-        }
-
-        private int CountActiveChunks()
-        {
-            int count = 0;
-            for (int index = 0; index < chunkActive.Length; index++)
-            {
-                if (chunkActive[index])
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
-
         private void ResetLastUpdateDiagnostics()
         {
             lastUpdateDispatches = 0;
             lastUpdateCellIterations = 0;
             injectedLastUpdate = 0;
             lastMaterialStepsThisFrame = 0;
-            lastCompressionPassesUsed = 0;
-            lastTransportSubstepsUsed = 1;
             lastPhaseCommitCellsThisFrame = 0;
         }
 

@@ -867,6 +867,8 @@ namespace ProgrammaticStylized3D.Rivers
                     topologyMetricsAvailable = count == TopologyMetricCount;
                     if (topologyMetricsAvailable)
                     {
+                        topologyMetricsLastCompletedAt =
+                            Time.realtimeSinceStartupAsDouble;
                         integratedPresenceArea =
                             latestTopologyMetrics[
                                 TopologyMetricIntegratedPresenceArea] /
@@ -894,7 +896,7 @@ namespace ProgrammaticStylized3D.Rivers
                         {
                             materialLifetimeEmptyMetricReadbacks = 0;
                             lifetimeAuthorityStatus =
-                                "Remaining Life owns survival; scheduler is non-destructive";
+                                "Remaining Life / full-field direct simulation";
                         }
 
                         if (captureManualReference &&

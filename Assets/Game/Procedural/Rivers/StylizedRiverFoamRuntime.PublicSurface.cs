@@ -541,6 +541,16 @@ namespace ProgrammaticStylized3D.Rivers
             ? currentShoreEdgesTexture.width
             : 0;
         public bool TopologyMetricsAvailable => topologyMetricsAvailable;
+        public float TopologyMetricsAgeSeconds =>
+            topologyMetricsAvailable && topologyMetricsLastCompletedAt >= 0.0
+                ? Mathf.Max(
+                    0f,
+                    (float)(Time.realtimeSinceStartupAsDouble -
+                        topologyMetricsLastCompletedAt))
+                : -1f;
+        public bool TopologyMetricsFresh =>
+            TopologyMetricsAgeSeconds >= 0f &&
+            TopologyMetricsAgeSeconds <= 0.75f;
         public float MajorSupportCoverage => TopologyCoverageRatio(TopologyMetricMajorSupport);
         public float ConnectorSupportCoverage => TopologyCoverageRatio(TopologyMetricConnectorSupport);
         public float NegativeAgingPressureCoverage => TopologyCoverageRatio(TopologyMetricNegativeAgingPressure);
@@ -601,9 +611,9 @@ namespace ProgrammaticStylized3D.Rivers
             materialLifetimeAuthorityActive;
         public string LifetimeProofStatus => ResolveLifetimeProofStatus();
         public string TopologyAgingProofStatus => ResolveTopologyAgingProofStatus();
-        public int ActiveChunkCount => CountActiveChunks();
+        public int ActiveChunkCount => 0;
         public int PendingInjectionCount => pendingInjections.Count;
-        public int ActiveReservationCount => reservations.Count;
+        public int ActiveReservationCount => 0;
         public int ProgressiveRibbonPoolCapacity =>
             ProgressiveRibbonEventCapacity;
         public int ActiveProgressiveRibbonEventCount =>
@@ -667,35 +677,24 @@ namespace ProgrammaticStylized3D.Rivers
             phaseCommitCellsInCurrentSecond);
         public float EstimatedTransportCellsPerStep =>
             lastEstimatedTransportCellsPerStep;
-        public int TransportSubstepsUsed => lastTransportSubstepsUsed;
-        public int CompressionPassesUsed => lastCompressionPassesUsed;
+        public int TransportSubstepsUsed => 0;
         public bool InitializationComplete =>
             initializationPhase == InitializationPhase.Ready;
         public bool ResourcesAllocated =>
             InitializationComplete && currentState != null;
-        public bool ConservativeTransportActive =>
-            InitializationComplete &&
-            currentState != null &&
-            transportPredictorState != null &&
-            transportCorrectedState != null;
+        public bool ConservativeTransportActive => false;
         public bool IsSleeping =>
             !TopologyReplacementInProgress &&
             !TopologyTransitionActive &&
             !IsTopologyDebugActive &&
             !IsProgressiveBirthSourceDebugActive &&
-            !IsProgressiveBirthTransferDebugActive &&
             !materialLifetimeAuthorityActive &&
             pendingInjections.Count == 0 &&
             activeProgressiveRibbonEventCount == 0 &&
-            reservations.Count == 0 &&
-            CountActiveChunks() == 0;
+            pendingMaterialBirths.Count == 0;
         public long EstimatedMemoryBytes =>
             EstimateTextureBytes(stateA) +
             EstimateTextureBytes(stateB) +
-            EstimateTextureBytes(transportPredictorState) +
-            EstimateTextureBytes(transportCorrectedState) +
-            EstimateTextureBytes(progressiveBirthSourceTexture) +
-            EstimateTextureBytes(progressiveBirthTransferDebugTexture) +
             EstimateTextureBytes(progressiveBirthDebugTexture) +
             EstimateTextureBytes(topologyTexture) +
             EstimateTextureBytes(topologySourcesTexture) +

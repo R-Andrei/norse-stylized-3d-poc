@@ -149,7 +149,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
                 float2 uv : TEXCOORD0;
-                float4 uv2 : TEXCOORD1;
+                float4 uv2 : TEXCOORD2;
                 half4 color : COLOR;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
@@ -191,6 +191,21 @@ Shader "PS3D/Pixel Surface Lit"
                 return output;
             }
 
+            float ResolveBarycentricEdgeLine(Varyings input)
+            {
+                float2 baryXY = saturate(input.materialMasks.zw);
+                float3 barycentric = float3(
+                    baryXY.x,
+                    baryXY.y,
+                    saturate(1.0 - baryXY.x - baryXY.y));
+                float nearestEdge = min(
+                    min(barycentric.x, barycentric.y),
+                    barycentric.z);
+
+                // Fixed barycentric width keeps debug readable on low-poly mass faces.
+                return 1.0 - smoothstep(0.028, 0.105, nearestEdge);
+            }
+
             half3 ResolveMaskDebugColor(Varyings input)
             {
                 int mode = (int)round(_MaskDebugMode);
@@ -215,11 +230,11 @@ Shader "PS3D/Pixel Surface Lit"
                 }
                 else if (mode == 4)
                 {
-                    mask = saturate((float)input.color.a);
+                    mask = saturate((float)input.color.a * ResolveBarycentricEdgeLine(input));
                 }
                 else if (mode == 5)
                 {
-                    mask = saturate(input.materialMasks.x);
+                    mask = saturate(input.materialMasks.x * ResolveBarycentricEdgeLine(input));
                 }
                 else if (mode == 6)
                 {
