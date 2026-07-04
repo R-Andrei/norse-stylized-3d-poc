@@ -122,6 +122,10 @@ namespace ProgrammaticStylized3D.Rivers
                 DebugTrajectoryPending = true
             };
 
+            materialLifetimeAuthorityActive = true;
+            materialLifetimeEmptyMetricReadbacks = 0;
+            lifetimeAuthorityStatus =
+                "Remaining Life owns survival; scheduler is non-destructive";
             activeProgressiveRibbonEventCount++;
             progressiveRibbonStartedCount++;
             latestProgressiveRibbonEventId = eventId;
@@ -208,6 +212,10 @@ namespace ProgrammaticStylized3D.Rivers
                     ActivateInjectionRange(segment, now);
                     if (PaintProgressiveBirthSourceSegment(segment))
                     {
+                        materialLifetimeAuthorityActive = true;
+                        materialLifetimeEmptyMetricReadbacks = 0;
+                        lifetimeAuthorityStatus =
+                            "Remaining Life owns survival; scheduler is non-destructive";
                         progressiveRibbonSegmentDispatchSubmittedCount++;
                         progressiveRibbonCumulativeCentrelineDistance +=
                             segmentLength;
@@ -308,11 +316,7 @@ namespace ProgrammaticStylized3D.Rivers
                         ribbonEvent.TravelDistance * 0.5f,
                     AlongRadius = alongRadius,
                     Elapsed = 0f,
-                    MaximumLifetime = Mathf.Clamp(
-                        ribbonEvent.RemainingLife *
-                        ResolveMaximumMaterialReservationSeconds(),
-                        0.05f,
-                        MaximumManualReservationSeconds)
+                    ScheduleLifetime = ResolveReservationScheduleSeconds()
                 });
             float endGlobalDistance =
                 ribbonEvent.StartGlobalDistance +
@@ -326,7 +330,7 @@ namespace ProgrammaticStylized3D.Rivers
                     endGlobalDistance) + ribbonEvent.BaseRadius,
                 now + Mathf.Min(
                     5f,
-                    ResolveMaximumMaterialReservationSeconds()));
+                    ResolveReservationScheduleSeconds()));
         }
 
         private void ResolveProgressiveRibbonHead(

@@ -268,6 +268,7 @@ namespace ProgrammaticStylized3D.Rivers
             else
             {
                 bool phaseMaterialActive =
+                    materialLifetimeAuthorityActive ||
                     activeProgressiveRibbonEventCount > 0 ||
                     reservations.Count > 0 ||
                     CountActiveChunks() > 0;
@@ -293,6 +294,7 @@ namespace ProgrammaticStylized3D.Rivers
                     bool progressiveRibbonDeposited =
                         AdvanceProgressiveRibbonEvents(stepDuration, now);
                     bool materialStepActive =
+                        materialLifetimeAuthorityActive ||
                         progressiveRibbonDeposited ||
                         activeProgressiveRibbonEventCount > 0 ||
                         reservations.Count > 0 ||
@@ -315,6 +317,7 @@ namespace ProgrammaticStylized3D.Rivers
                         // material step; the composite debug view merely makes
                         // that same authoritative input visible.
                         bool footprintMetricsActive =
+                            materialLifetimeAuthorityActive ||
                             topologyDebugActive ||
                             manualProofReferencePending ||
                             manualProofReferenceArea > 0.0001f;
@@ -351,7 +354,7 @@ namespace ProgrammaticStylized3D.Rivers
 
                     if (materialStepActive)
                     {
-                        SimulateActiveChunks(stepDuration);
+                        SimulateMaterialAuthority(stepDuration);
                     }
 
                     if (progressiveBirthDebugActive)
@@ -571,6 +574,9 @@ namespace ProgrammaticStylized3D.Rivers
             visiblePresenceCoreArea = 0f;
             manualProofReferenceArea = 0f;
             manualProofReferencePending = false;
+            materialLifetimeAuthorityActive = false;
+            materialLifetimeEmptyMetricReadbacks = 0;
+            lifetimeAuthorityStatus = "No live material known";
             simulationInterpolation = 1f;
             lastRenderInterpolationAlpha = simulationInterpolation;
             idleSince = Time.realtimeSinceStartupAsDouble;

@@ -775,6 +775,15 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat("_FoamValidLength", validFieldLength);
             computeShader.SetFloat("_FoamFieldLength", fieldLength);
             computeShader.SetFloat(
+                "_FoamPhaseTransportMetres",
+                foamPhaseTransportMetres);
+            computeShader.SetFloat(
+                "_FoamPositiveAgeMultiplier",
+                river != null ? river.FoamSupportedAgingRate : 1f);
+            computeShader.SetFloat(
+                "_FoamNegativeAgeMultiplier",
+                river != null ? river.FoamNegativeAgingRate : 1f);
+            computeShader.SetFloat(
                 "_FoamPresenceMetricThreshold",
                 PresenceMetricThreshold);
             computeShader.SetFloat(
@@ -867,6 +876,27 @@ namespace ProgrammaticStylized3D.Rivers
                                 TopologyMetricPresenceCoreArea] /
                             IntegratedAreaFixedPointScale;
 
+                        if (materialLifetimeAuthorityActive &&
+                            integratedPresenceArea <= 0.0001f &&
+                            visiblePresenceCoreArea <= 0.0001f &&
+                            pendingInjections.Count == 0 &&
+                            activeProgressiveRibbonEventCount == 0)
+                        {
+                            materialLifetimeEmptyMetricReadbacks++;
+                            if (materialLifetimeEmptyMetricReadbacks >= 3)
+                            {
+                                materialLifetimeAuthorityActive = false;
+                                lifetimeAuthorityStatus =
+                                    "No live material measured; runtime may sleep";
+                            }
+                        }
+                        else if (materialLifetimeAuthorityActive)
+                        {
+                            materialLifetimeEmptyMetricReadbacks = 0;
+                            lifetimeAuthorityStatus =
+                                "Remaining Life owns survival; scheduler is non-destructive";
+                        }
+
                         if (captureManualReference &&
                             integratedPresenceArea > 0.0001f)
                         {
@@ -899,6 +929,92 @@ namespace ProgrammaticStylized3D.Rivers
             return denominator > 0u
                 ? latestTopologyMetrics[numeratorIndex] / (float)denominator
                 : 0f;
+        }
+
+        private float TopologyAreaMetric(int index)
+        {
+            if (!topologyMetricsAvailable || index < 0 ||
+                index >= TopologyMetricCount)
+            {
+                return 0f;
+            }
+
+            return latestTopologyMetrics[index] /
+                IntegratedAreaFixedPointScale;
+        }
+
+        private float TopologyWeightedMetricAverage(
+            int valueAreaIndex,
+            int weightAreaIndex)
+        {
+            if (!topologyMetricsAvailable ||
+                valueAreaIndex < 0 || valueAreaIndex >= TopologyMetricCount ||
+                weightAreaIndex < 0 || weightAreaIndex >= TopologyMetricCount)
+            {
+                return 0f;
+            }
+
+            uint denominator = latestTopologyMetrics[weightAreaIndex];
+            return denominator > 0u
+                ? latestTopologyMetrics[valueAreaIndex] / (float)denominator
+                : 0f;
+        }
+
+        private float TopologyFixedTenThousandMetric(int index)
+        {
+            if (!topologyMetricsAvailable || index < 0 ||
+                index >= TopologyMetricCount)
+            {
+                return 0f;
+            }
+
+            return latestTopologyMetrics[index] / 10000f;
+        }
+
+        private string ResolveLifetimeProofStatus()
+        {
+            if (!topologyMetricsAvailable)
+            {
+                return "Awaiting metrics";
+            }
+
+            if (VisibleFoamPresenceArea <= 0.0001f)
+            {
+                return "No visible foam to measure";
+            }
+
+            float averageLife = AverageVisibleRemainingLife;
+            if (averageLife <= 0.02f)
+            {
+                return "Near expiry — visible material should disappear soon";
+            }
+
+            return $"Measured: avg life {averageLife:0.00}; death is per-cell Remaining Life";
+        }
+
+        private string ResolveTopologyAgingProofStatus()
+        {
+            if (!topologyMetricsAvailable)
+            {
+                return "Awaiting metrics";
+            }
+
+            if (VisibleFoamPresenceArea <= 0.0001f)
+            {
+                return "No visible foam to measure";
+            }
+
+            float positive = AveragePositiveSupportUnderVisibleFoam;
+            float negative = AverageNegativeAgingUnderVisibleFoam;
+            float rate = AverageLocalAgingRateUnderVisibleFoam;
+            if (positive < 0.05f && negative < 0.05f)
+            {
+                return rate > 0.0001f
+                    ? $"Neutral under visible foam: {rate:0.00}×"
+                    : "Neutral under visible foam";
+            }
+
+            return $"Visible foam samples support {positive:0.00}, negative {negative:0.00}, aging {rate:0.00}×";
         }
     }
 }

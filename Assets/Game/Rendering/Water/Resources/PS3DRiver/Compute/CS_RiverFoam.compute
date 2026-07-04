@@ -1135,7 +1135,13 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float presence = SampleStateAtUV(uv).x;
+    float phaseU = _FoamFieldLength > 0.0001
+        ? _FoamPhaseTransportMetres / _FoamFieldLength
+        : 0.0;
+    float2 storageUVForVisibleWorld = float2(uv.x - phaseU, uv.y);
+    FoamMaterialState visibleMaterial = FoamDecodeMaterialState(
+        SampleStateAtUV(storageUVForVisibleWorld));
+    float presence = visibleMaterial.presence;
     bool visible = presence >= _FoamPresenceMetricThreshold;
     bool major = materialTopology.majorSupport >= 0.15;
     bool connector = materialTopology.connectorSupport >= 0.12;
@@ -1145,14 +1151,24 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     bool pressureLeeSupported = max(
         materialTopology.pressureSupport,
         materialTopology.leeSupport) >= 0.15;
+    float positiveSupport = FoamCombinedMaterialSupport(materialTopology);
+    float positiveAgeFactor = lerp(
+        1.0,
+        max(0.01, _FoamPositiveAgeMultiplier),
+        positiveSupport);
+    float negativeAgeFactor = lerp(
+        1.0,
+        max(1.0, _FoamNegativeAgeMultiplier),
+        materialTopology.negativeAgingPressure);
+    float localAgeRate = positiveAgeFactor * negativeAgeFactor;
 
     float2 texel = 1.0 /
         max(float2(2.0, 2.0), (float2)_FoamTopologyDimensions);
     bool perimeter = visible && (
-        SampleStateAtUV(saturate(uv + float2(texel.x, 0.0))).x < _FoamPresenceMetricThreshold ||
-        SampleStateAtUV(saturate(uv - float2(texel.x, 0.0))).x < _FoamPresenceMetricThreshold ||
-        SampleStateAtUV(saturate(uv + float2(0.0, texel.y))).x < _FoamPresenceMetricThreshold ||
-        SampleStateAtUV(saturate(uv - float2(0.0, texel.y))).x < _FoamPresenceMetricThreshold);
+        SampleStateAtUV(saturate(storageUVForVisibleWorld + float2(texel.x, 0.0))).x < _FoamPresenceMetricThreshold ||
+        SampleStateAtUV(saturate(storageUVForVisibleWorld - float2(texel.x, 0.0))).x < _FoamPresenceMetricThreshold ||
+        SampleStateAtUV(saturate(storageUVForVisibleWorld + float2(0.0, texel.y))).x < _FoamPresenceMetricThreshold ||
+        SampleStateAtUV(saturate(storageUVForVisibleWorld - float2(0.0, texel.y))).x < _FoamPresenceMetricThreshold);
 
     uint originalValue;
     _FoamTopologyMetrics.InterlockedAdd(FoamMetricValidFluidOffset, 1u, originalValue);
@@ -1215,6 +1231,62 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
         FoamMetricConnectorMajorOverlapOffset,
         connector && materialTopology.majorSupport >= 0.24 ? 1u : 0u,
         originalValue);
+
+    if (visible)
+    {
+        uint visiblePresenceAreaFixed = (uint)round(
+            saturate(presence) * representedArea *
+            max(1.0, _FoamIntegratedAreaFixedPointScale));
+        uint visibleLifeAreaFixed = (uint)round(
+            saturate(presence) * saturate(visibleMaterial.remainingLife) *
+            representedArea * max(1.0, _FoamIntegratedAreaFixedPointScale));
+        uint positiveAreaFixed = (uint)round(
+            saturate(presence) * saturate(positiveSupport) *
+            representedArea * max(1.0, _FoamIntegratedAreaFixedPointScale));
+        uint negativeAreaFixed = (uint)round(
+            saturate(presence) * saturate(materialTopology.negativeAgingPressure) *
+            representedArea * max(1.0, _FoamIntegratedAreaFixedPointScale));
+        uint agingRateAreaFixed = (uint)round(
+            saturate(presence) * min(localAgeRate, 16.0) *
+            representedArea * max(1.0, _FoamIntegratedAreaFixedPointScale));
+        uint maxPositiveFixed = (uint)round(
+            saturate(positiveSupport) * 10000.0);
+        uint maxNegativeFixed = (uint)round(
+            saturate(materialTopology.negativeAgingPressure) * 10000.0);
+
+        _FoamTopologyMetrics.InterlockedAdd(
+            FoamMetricVisiblePresenceAreaOffset,
+            visiblePresenceAreaFixed,
+            originalValue);
+        _FoamTopologyMetrics.InterlockedAdd(
+            FoamMetricVisibleLifeAreaOffset,
+            visibleLifeAreaFixed,
+            originalValue);
+        _FoamTopologyMetrics.InterlockedAdd(
+            FoamMetricVisiblePositiveSupportAreaOffset,
+            positiveAreaFixed,
+            originalValue);
+        _FoamTopologyMetrics.InterlockedAdd(
+            FoamMetricVisibleNegativeAgingAreaOffset,
+            negativeAreaFixed,
+            originalValue);
+        _FoamTopologyMetrics.InterlockedAdd(
+            FoamMetricVisibleLocalAgingRateAreaOffset,
+            agingRateAreaFixed,
+            originalValue);
+        _FoamTopologyMetrics.InterlockedAdd(
+            FoamMetricFoamSupportNegativeOverlapOffset,
+            positiveSupport >= 0.15 && negativeAging ? 1u : 0u,
+            originalValue);
+        _FoamTopologyMetrics.InterlockedMax(
+            FoamMetricMaxPositiveSupportUnderFoamOffset,
+            maxPositiveFixed,
+            originalValue);
+        _FoamTopologyMetrics.InterlockedMax(
+            FoamMetricMaxNegativeAgingUnderFoamOffset,
+            maxNegativeFixed,
+            originalValue);
+    }
 }
 
 [numthreads(8, 8, 1)]
@@ -1443,16 +1515,33 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         validFluid);
     FoamMaterialState material = FoamDecodeMaterialState(correctedPacked);
 
-    float4 topologyState = _FoamTopologyRead.Load(int3(coordinate, 0));
-    float4 anchoredSources = _FoamTopologySourcesRead.Load(
-        int3(coordinate, 0));
-    float obstacleFootprint = _FoamObstacleExclusionRead.Load(
-        int3(coordinate, 0));
+    // Foam storage is phase-shifted relative to the visible river after
+    // 4.11C.5.2d. Lifetime/topology must sample the world location where this
+    // stored material is currently displayed, otherwise support/negative zones
+    // appear to do nothing while the rendered foam glides across them.
+    float phaseCells = _FoamFieldLength > 0.0001
+        ? _FoamPhaseTransportMetres / _FoamFieldLength *
+          (float)_FoamDimensions.x
+        : 0.0;
+    float2 worldSampleCoordinate = float2((float)x + phaseCells, (float)y);
+    float2 topologySampleCoordinate = float2(
+        worldSampleCoordinate.x /
+            max(1.0, (float)_FoamDimensions.x) *
+            (float)_FoamTopologyDimensions.x,
+        worldSampleCoordinate.y /
+            max(1.0, (float)_FoamDimensions.y) *
+            (float)_FoamTopologyDimensions.y);
+
+    float4 topologyState = SampleTopologyBilinear(topologySampleCoordinate);
+    float4 anchoredSources = SampleTopologySourcesBilinear(
+        topologySampleCoordinate);
+    float obstacleFootprint = SampleObstacleExclusionBilinear(
+        worldSampleCoordinate);
     FoamMaterialTopologySample materialTopology =
         FoamResolveMaterialTopology(
             topologyState,
             anchoredSources,
-            LoadBoundaryCoverage(coordinate),
+            SampleBoundaryCoverageBilinear(worldSampleCoordinate),
             obstacleFootprint);
     float positiveInfluence = FoamCombinedMaterialSupport(
         materialTopology);

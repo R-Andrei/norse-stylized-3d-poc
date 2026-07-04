@@ -36,6 +36,12 @@ Material:
     - _DiffuseWrap: 0.12
     - _DirectStrength: 1.15
     - _ExposureTintStrength: 0.04
+    - _HighlightCompressStrength: 0.08
+    - _HighlightCompressStart: 0.72
+    - _BottomDarkenStrength: 0.1
+    - _BottomDarkenHeight: 0.55
+    - _EdgeDarkenStrength: 0.05
+    - _EdgeDarkenPower: 2.5
     - _FlatNormalStrength: 0
     - _PixelBroadVariation: 0.022
     - _PixelCellSize: 0.058

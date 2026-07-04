@@ -3406,6 +3406,176 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 793915790}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &799756163
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 799756168}
+  - component: {fileID: 799756167}
+  - component: {fileID: 799756166}
+  - component: {fileID: 799756165}
+  - component: {fileID: 799756164}
+  m_Layer: 0
+  m_Name: Generated Mass Test (2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &799756164
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 799756163}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a9d6af0b3d05b941a278eca7294e877, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Masses.GeneratedMass
+  recipe:
+    archetype: 0
+    shapeSeed: 5727
+    surfaceSeed: 3930
+    size: 2
+    formComplexity: 2
+    surfaceFacetDensity: 2
+    edgeCharacter: 2
+    shapeDiversity: 1
+    grounding: 1
+    lean: 1
+    fineScale: 1
+    widthBias: 1
+    heightBias: 1
+    depthBias: 1
+    surfaceVariation: 0.35
+  regenerateOnValidate: 1
+  baseColor: {r: 0.33333334, g: 0.34117648, b: 0.34901962, a: 1}
+  riverInteraction:
+    participation: 0
+    staticPressureMode: 0
+    staticPressureStrength: 0.65
+    staticPressureContactSharpness: 2.8
+    staticPressureWaveResponse: 1
+    staticPressureProfileChangeIntervalMin: 0.75
+    staticPressureProfileChangeIntervalMax: 1.75
+    obstructionWakeMode: 0
+    obstructionWakeStrength: 1.5
+    obstructionWakeReach: 1
+    obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
+    responseProfile: 0
+    pressureStrength: 0.55
+    strengthMultiplier: 1
+    geometryAmplitude: 1
+    surfaceDetail: 1
+    responseStiffness: 1
+    wakeLength: 1
+    unsteadiness: 1
+    footprintPadding: 0.12
+    featureModelInitialized: 1
+  recipeInitialized: 1
+  lastAppliedArchetype: 0
+--- !u!64 &799756165
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 799756163}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 0}
+--- !u!23 &799756166
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 799756163}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: af31c1ab9bb218240a8a169357ee2113, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &799756167
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 799756163}
+  m_Mesh: {fileID: 0}
+--- !u!4 &799756168
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 799756163}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -9.213, y: -0.08, z: -8.506}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &805796054
 GameObject:
   m_ObjectHideFlags: 0
@@ -7213,6 +7383,176 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1584708027}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1595308776
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1595308781}
+  - component: {fileID: 1595308780}
+  - component: {fileID: 1595308779}
+  - component: {fileID: 1595308778}
+  - component: {fileID: 1595308777}
+  m_Layer: 0
+  m_Name: Generated Mass Test (1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1595308777
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1595308776}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a9d6af0b3d05b941a278eca7294e877, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Masses.GeneratedMass
+  recipe:
+    archetype: 0
+    shapeSeed: 5727
+    surfaceSeed: 3930
+    size: 2
+    formComplexity: 2
+    surfaceFacetDensity: 2
+    edgeCharacter: 2
+    shapeDiversity: 1
+    grounding: 1
+    lean: 1
+    fineScale: 1
+    widthBias: 1
+    heightBias: 1
+    depthBias: 1
+    surfaceVariation: 0.35
+  regenerateOnValidate: 1
+  baseColor: {r: 0.33333334, g: 0.34117648, b: 0.34901962, a: 1}
+  riverInteraction:
+    participation: 0
+    staticPressureMode: 0
+    staticPressureStrength: 0.65
+    staticPressureContactSharpness: 2.8
+    staticPressureWaveResponse: 1
+    staticPressureProfileChangeIntervalMin: 0.75
+    staticPressureProfileChangeIntervalMax: 1.75
+    obstructionWakeMode: 0
+    obstructionWakeStrength: 1.5
+    obstructionWakeReach: 1
+    obstructionWakeSpread: 1
+    obstructionWakeVariation: 0.35
+    impactRippleCollisionMode: 0
+    responseProfile: 0
+    pressureStrength: 0.55
+    strengthMultiplier: 1
+    geometryAmplitude: 1
+    surfaceDetail: 1
+    responseStiffness: 1
+    wakeLength: 1
+    unsteadiness: 1
+    footprintPadding: 0.12
+    featureModelInitialized: 1
+  recipeInitialized: 1
+  lastAppliedArchetype: 0
+--- !u!64 &1595308778
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1595308776}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 0}
+--- !u!23 &1595308779
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1595308776}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 003eeac564864bbaa4b5c637ec767f97, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!33 &1595308780
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1595308776}
+  m_Mesh: {fileID: 0}
+--- !u!4 &1595308781
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1595308776}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -8.091, y: -0.08, z: -6.973}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1611485499
 GameObject:
   m_ObjectHideFlags: 0
@@ -7961,7 +8301,7 @@ MonoBehaviour:
   foamEdgeCavityAmount: 0.423
   foamConnectorWeakSpanAmount: 0.443
   foamFreeWaterEventAmount: 0.409
-  foamNeutralLifetime: 4
+  foamNeutralLifetime: 1.43
   foamSupportedAgingRate: 0.2
   foamNegativeAgingRate: 4
   foamMaterialFlowSpeedMultiplier: 1
@@ -7969,16 +8309,16 @@ MonoBehaviour:
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}
   foamDebugView: 1
   foamTestDistanceNormalized: 0.5
-  foamTestAcrossNormalized: 0
+  foamTestAcrossNormalized: -0.357
   foamTestRadius: 0.8
   foamTestAmount: 0.85
   foamTestRemainingLife: 1
   foamTestElongation: 1.5
   foamTestProgressiveRibbonHalfWidth: 0.2
   foamTestProgressiveRibbonDuration: 1.5
-  foamTestProgressiveRibbonTravelDistance: 3
-  foamTestProgressiveRibbonAcrossDrift: 0.25
-  foamTestProgressiveRibbonPathWander: 0.35
+  foamTestProgressiveRibbonTravelDistance: 7.54
+  foamTestProgressiveRibbonAcrossDrift: 0.848
+  foamTestProgressiveRibbonPathWander: 0.973
   bodyDebugView: 0
   horizonColor: {r: 0.58, g: 0.91, b: 0.94, a: 0.35}
   specularColor: {r: 1, g: 1, b: 1, a: 0.35}
@@ -10227,4 +10567,6 @@ SceneRoots:
   - {fileID: 1928155051}
   - {fileID: 906572523}
   - {fileID: 1374330463}
+  - {fileID: 1595308781}
+  - {fileID: 799756168}
   - {fileID: 2034979427}

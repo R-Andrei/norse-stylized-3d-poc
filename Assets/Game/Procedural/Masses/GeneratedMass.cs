@@ -56,6 +56,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         Polished
     }
 
+    public enum StoneSurfaceProfile
+    {
+        RendererMaterial,
+        ColdGreyStone,
+        DarkWetRiverStone,
+        PaleFrostStone,
+        BlackSacredStone
+    }
+
+    public enum StoneSurfaceMaskDebug
+    {
+        None,
+        SurfaceVariation,
+        Exposure,
+        CreviceBase,
+        ConvexEdgeWear,
+        ConcaveCrease,
+        DirtDeposit
+    }
+
     public enum ShapeDiversity
     {
         Restrained,
@@ -299,6 +319,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Shader.PropertyToID("_BaseColor");
         private static readonly int LegacyBaseColorId =
             Shader.PropertyToID("_Base_Color");
+        private static readonly int MaskDebugModeId =
+            Shader.PropertyToID("_MaskDebugMode");
 
         [SerializeField]
         private MassRecipe recipe = new MassRecipe();
@@ -307,10 +329,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private bool regenerateOnValidate = true;
 
         [Header("Rendering")]
+        [Tooltip("Chooses a named HLSL stone material profile for this generated mass. Renderer Material leaves the current renderer material untouched.")]
+        [SerializeField]
+        private StoneSurfaceProfile stoneSurfaceProfile =
+            StoneSurfaceProfile.RendererMaterial;
+
         [Tooltip("Per-object starting stone colour. The shared material can still layer pixel, exposure, crevice, or biome effects over this base.")]
         [SerializeField]
         private Color baseColor =
             new Color(0.33423817f, 0.3410176f, 0.3490566f, 1f);
+
+        [Tooltip("Temporarily visualizes generated material masks on this object. Leave disabled for normal rendering.")]
+        [SerializeField]
+        private StoneSurfaceMaskDebug surfaceMaskDebug =
+            StoneSurfaceMaskDebug.None;
+
+        [SerializeField, HideInInspector]
+        private Material coldGreyStoneMaterial;
+
+        [SerializeField, HideInInspector]
+        private Material darkWetRiverStoneMaterial;
+
+        [SerializeField, HideInInspector]
+        private Material paleFrostStoneMaterial;
+
+        [SerializeField, HideInInspector]
+        private Material blackSacredStoneMaterial;
 
         [Header("River Interaction")]
         [SerializeField]
@@ -347,6 +391,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         }
         public bool IsSolidGeometry => true;
         public bool IsStaticGeometry => true;
+        public StoneSurfaceProfile StoneSurfaceProfile => stoneSurfaceProfile;
+        public StoneSurfaceMaskDebug SurfaceMaskDebug => surfaceMaskDebug;
         public Color BaseColor => baseColor;
         public MeshFilter GeometryMeshFilter
         {
@@ -579,11 +625,41 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return;
             }
 
+            ApplyStoneSurfaceProfileMaterial();
+
             materialProperties ??= new MaterialPropertyBlock();
             meshRenderer.GetPropertyBlock(materialProperties);
             materialProperties.SetColor(BaseColorId, baseColor);
             materialProperties.SetColor(LegacyBaseColorId, baseColor);
+            materialProperties.SetFloat(
+                MaskDebugModeId,
+                (float)surfaceMaskDebug);
             meshRenderer.SetPropertyBlock(materialProperties);
+        }
+
+        private void ApplyStoneSurfaceProfileMaterial()
+        {
+            Material selectedMaterial =
+                stoneSurfaceProfile switch
+                {
+                    StoneSurfaceProfile.ColdGreyStone =>
+                        coldGreyStoneMaterial,
+                    StoneSurfaceProfile.DarkWetRiverStone =>
+                        darkWetRiverStoneMaterial,
+                    StoneSurfaceProfile.PaleFrostStone =>
+                        paleFrostStoneMaterial,
+                    StoneSurfaceProfile.BlackSacredStone =>
+                        blackSacredStoneMaterial,
+                    _ => null
+                };
+
+            if (selectedMaterial == null ||
+                meshRenderer.sharedMaterial == selectedMaterial)
+            {
+                return;
+            }
+
+            meshRenderer.sharedMaterial = selectedMaterial;
         }
 
         private void EnsureGeneratedMesh()

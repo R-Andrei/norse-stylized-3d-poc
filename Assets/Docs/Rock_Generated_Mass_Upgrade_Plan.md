@@ -339,6 +339,11 @@ Checklist:
 - [x] Patch 7 - HLSL pixel surface baseline, provisional until Unity shader import/visual validation
 - [x] Patch 8 - HLSL semantic surface response
 - [x] Patch 9 - Shader-driven material profiles and variants, provisional until Unity shader import/visual validation
+- [x] Patch 10 - Stylized value shaping for HLSL rocks, provisional until Unity visual tuning
+- [x] Patch 11 - Mesh-authored edge and crease mask contract, provisional until Unity mask debug validation
+- [ ] Patch 12 - Convex edge wear and concave crevice response
+- [ ] Patch 13 - Dirty surface mottle and material breakup
+- [ ] Patch 14 - Crack and seam language
 
 ### Patch 1 - Document and Baseline Capture
 
@@ -620,6 +625,7 @@ Checklist status:
 - [x] replace the custom HLSL lighting pass with URP PBR evaluation to match the old Shader Graph material family;
 - [x] keep the HLSL shader in URP specular workflow to match the old Shader Graph stone material;
 - [x] keep flat-normal lighting control available but default it to `0`, because the old Shader Graph does not feed a custom normal into the Lit surface;
+- [x] add an object-level stone surface profile dropdown on `GeneratedMass` that can select the HLSL profile material without manually replacing renderer materials;
 - [ ] verify each variant reads differently at gameplay camera distance.
 
 Primary files:
@@ -642,6 +648,7 @@ Work:
 - keep all variants on the same shader;
 - tune palette and behavioural response rather than importing textures;
 - keep per-object `GeneratedMass` base colour meaningful by treating material variants as response profiles, not just fixed colours.
+- expose the accepted variants through `GeneratedMass.StoneSurfaceProfile`, with hidden material references auto-filled by the custom inspector from the existing HLSL material assets.
 
 Suggested variants:
 
@@ -657,6 +664,19 @@ Variant characteristics:
 - `Pale Frost Stone`: pale/cool exposed buildup, especially on upward or broad exposed faces; stronger dark crevices; drier/sharper surface response; subtle frost patterning from smooth broad noise.
 - `Black Sacred Stone`: dark, monolithic, and controlled. It should reduce noisy colour range, flatten variation toward one strong tone, and optionally read smoother or more polished than ordinary fractured stone.
 
+Inspector workflow:
+
+- leave `Stone Surface Profile` on `Renderer Material` to preserve the current renderer assignment;
+- choose `Cold Grey Stone`, `Dark Wet River Stone`, `Pale Frost Stone`, or `Black Sacred Stone` on the `GeneratedMass` component to apply the matching HLSL profile material;
+- continue using `Base Color` for the object's starting tint; the selected profile controls how wetness, frost, smoothness, pixel contrast, semantic masks, and future authored masks alter that tint.
+
+Interaction with the higher-quality material phase:
+
+- convex edge wear should be strongest and cleanest on pale/frost and sacred profiles, moderate on cold grey, and softer/glossier on wet river stone;
+- concave crease darkening should be strongest on pale frost, moderate on cold grey and sacred stone, and softened on wet river stone so damp rocks do not look sharply carved;
+- dirty mottle and mineral deposits should be profile-aware: more visible on cold grey, cold/frost patterned on pale frost, lower and smoother on wet river stone, and restrained on black sacred stone;
+- crack/seam language should share the same masks but use profile-specific contrast, with sacred stone favoring controlled dark lines and frost stone allowing brighter worn lips.
+
 Acceptance:
 
 - variants are meaningfully distinct at gameplay camera distance;
@@ -665,6 +685,192 @@ Acceptance:
 - pale frost stone has readable exposed frost buildup and darker crevices;
 - black sacred stone is controlled, dark, and comparatively monolithic;
 - existing default stone remains available.
+
+### Patch 10 - Stylized Value Shaping
+
+Status: implemented provisionally in the HLSL shader and HLSL stone materials. Needs Unity import, compile, and visual tuning against the old Shader Graph material.
+
+Checklist status:
+
+- [x] keep URP PBR lighting as the final lighting model;
+- [x] add pre-lighting highlight compression so bright faces keep more pixel detail;
+- [x] add object-space bottom darkening for subtle grounded rock weight;
+- [x] add a broad lower-side edge darkening approximation;
+- [x] expose conservative material controls for all three effects;
+- [x] add tuned defaults to the baseline and four HLSL material variants;
+- [x] add a `DepthNormals` pass so the HLSL rocks participate in URP SSAO/contact occlusion like the old Shader Graph material;
+- [x] add the `_SCREEN_SPACE_OCCLUSION` forward-pass variant so HLSL rocks receive SSAO on their own surfaces;
+- [ ] validate the defaults against the old Shader Graph stone material in Unity;
+- [ ] decide whether broad edge darkening should later move to generated vertex colours for mesh-aware edge weighting.
+
+Primary files:
+
+- `Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelSurfaceLit.shader`
+- `Assets/Game/Demo/Materials/Stone/`
+
+Work:
+
+- keep stylized value shaping in albedo response before `UniversalFragmentPBR`;
+- restore camera-normal output for SSAO before further tuning, because the old Shader Graph material received a generated depth-normals pass automatically;
+- compile the screen-space occlusion forward variant so `UniversalFragmentPBR` can consume SSAO on the rock mesh itself;
+- avoid weakening global shadows, because that would affect the whole lit/shadow relationship rather than the rock surface response;
+- use `_HighlightCompressStrength` and `_HighlightCompressStart` to slightly darken only strongly lit faces;
+- use `_BottomDarkenStrength` and `_BottomDarkenHeight` to recreate a softer version of the old material's lower darkening;
+- use `_EdgeDarkenStrength` and `_EdgeDarkenPower` to darken broad lower side faces as a shader-side approximation of edge weight.
+
+Acceptance:
+
+- bright/top faces retain visible pixel and broad-noise detail;
+- lower rock areas gain subtle grounded darkening without looking dirty or painted-on;
+- shadowed faces remain readable and are not made globally flat;
+- the HLSL baseline moves closer to the old Shader Graph material without reintroducing the earlier streak artifacts.
+
+## Higher-Quality Rock Material Phase
+
+The next quality jump should come from authored procedural masks, not from trying to infer everything in the shader from world position and normals. The reference rocks gain most of their richness from worn convex ridges, dark recessed cracks, dirty nonuniform surface breakup, and face-aware deposits.
+
+Proposed extended material contract:
+
+- `Color.r`: deterministic surface variation, already implemented;
+- `Color.g`: exposed/upward wear and frost buildup, already implemented;
+- `Color.b`: base, sheltered side, crevice, and contact darkening, already implemented;
+- `Color.a`: convex edge wear or authored ridge intensity;
+- `UV2.x`: concave crease or crack-darkening mask, neutral until Patch 12;
+- `UV2.y`: dirty deposit / mineral stain mask;
+- `UV2.zw`: reserved for future biome-specific material state.
+
+If `UV2` support is too large for the first pass, use `Color.a` for convex edge wear first and leave concave cracks to a later patch. Do not overload the current red variation channel; it already drives the accepted pixel/noise look.
+
+### Patch 11 - Mesh-Authored Edge and Crease Mask Contract
+
+Status: implemented provisionally. The mesh now emits the extended mask channels, and the HLSL shader can visualize them through the per-object `Surface Mask Debug` control. Concave crease/crack remains neutral until Patch 12.
+
+Checklist status:
+
+- [x] inspect generated mesh data flow and confirm whether `UV2` can be emitted safely by `MeshBuilder`;
+- [x] decide final channel ownership for convex edge wear, concave crease, and dirt masks;
+- [x] preserve current `Color.r/g/b` semantics;
+- [x] write neutral defaults for meshes/materials without the new channels;
+- [x] document the channel contract near generation and shader code;
+- [x] add a debug material/control path if needed to visualize masks in Unity;
+- [ ] validate the debug masks in Unity across representative archetypes and seeds.
+
+Primary files:
+
+- `Assets/Game/Procedural/Masses/MassGenerator.cs`
+- `Assets/Game/Procedural/Masses/GeneratedMass.cs`
+- `Assets/Game/Procedural/Core/MeshData.cs`
+- `Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelSurfaceLit.shader`
+- `Assets/Game/Procedural/Core/MeshBuilder.cs`
+
+Work:
+
+- introduce a stable contract for mesh-authored material masks;
+- extend `MeshData.AddVertex` so generated meshes can emit UV2 masks safely;
+- write a first-pass convex ridge candidate into `Color.a` by comparing face normals against the shared-position average normal;
+- write a lower/sheltered dirt-deposit candidate into `UV2.y`;
+- keep `UV2.x` neutral for Patch 12's real concave crease/crack work;
+- expose `GeneratedMass.SurfaceMaskDebug` so individual rocks can visualize surface variation, exposure, crevice/base, convex edge wear, concave crease, or dirt deposit masks;
+- avoid shader-only fake edge detection as the main solution;
+- keep all new masks optional and neutral so existing generated meshes remain valid.
+
+Acceptance:
+
+- existing rocks still render with the current accepted look when new masks are neutral;
+- the shader can read at least one new authored mask without compile/runtime errors;
+- masks can be visually inspected or temporarily exaggerated for tuning.
+
+### Patch 12 - Convex Edge Wear and Concave Crevice Response
+
+Status: planned.
+
+Checklist status:
+
+- [ ] calculate convex ridge/edge intensity during mass generation;
+- [ ] calculate concave crease or sheltered seam intensity where available;
+- [ ] brighten convex ridges with a controllable worn-edge colour and strength;
+- [ ] darken concave creases with a separate controllable strength;
+- [ ] keep ridge highlighting subtle enough to preserve the simple low-poly style;
+- [ ] validate on squat boulders, slabs, standing stones, fractured pillars, and broken chunks.
+
+Primary files:
+
+- `MassGenerator.cs`
+- `SH_PixelSurfaceLit.shader`
+- HLSL stone materials
+
+Work:
+
+- prefer light worn ridges over blanket edge darkening;
+- separate convex edge wear from concave crack darkening;
+- make controls profile-aware so frost, wet, sacred, and cold-grey stones can respond differently.
+
+Acceptance:
+
+- major silhouette and facet edges read as intentionally worn or polished;
+- inward seams/cracks read darker without looking like holes;
+- the effect remains visible at gameplay camera distance;
+- it does not require adding complex geometry to every rock.
+
+### Patch 13 - Dirty Surface Mottle and Material Breakup
+
+Status: planned.
+
+Checklist status:
+
+- [ ] add a smooth, irregular grime/mineral stain layer separate from square pixel variation;
+- [ ] bias dirt toward lower, sheltered, or less exposed areas;
+- [ ] add profile controls for dirty, wet, frost, sacred, and default stones;
+- [ ] preserve the current pixel-like texture as the base style;
+- [ ] avoid making the rocks look noisy, photographic, or too high-frequency.
+
+Primary files:
+
+- `SH_PixelSurfaceLit.shader`
+- HLSL stone materials
+- optionally `MassGenerator.cs` if dirt masks become mesh-authored
+
+Work:
+
+- layer broad cloudy variation, fine speckle, and subtle colour temperature shifts;
+- treat dirt as material response, not a replacement for the base colour;
+- support future biomes by keeping the controls generic.
+
+Acceptance:
+
+- rock faces no longer look uniformly flat or purely square-noise based;
+- dirt/mottle helps faces read as stone without overwhelming the blocky geometry;
+- material variants become more distinct without requiring new textures.
+
+### Patch 14 - Crack and Seam Language
+
+Status: planned.
+
+Checklist status:
+
+- [ ] choose whether cracks are mesh-authored masks, shader-procedural lines, or special archetype features;
+- [ ] add thin dark crack response with optional bright worn lip;
+- [ ] keep cracks sparse and large enough to read at gameplay distance;
+- [ ] avoid actual holes or non-watertight geometry unless a later mesh system supports it;
+- [ ] validate that cracks do not fight with SSAO, edge wear, or pixel variation.
+
+Primary files:
+
+- `MassGenerator.cs`
+- `SH_PixelSurfaceLit.shader`
+- possibly future archetype-specific helpers
+
+Work:
+
+- introduce controlled crack/seam language similar to the reference assets;
+- use visual cracks before physical carved geometry;
+- reserve complex carved/relief geometry for a later mesh-generation pass.
+
+Acceptance:
+
+- cracks make selected rocks feel authored rather than random;
+- cracks are sparse, readable, and stable across seeds;
+- no daylight gaps or open mesh faces are introduced.
 
 ## Validation Matrix
 

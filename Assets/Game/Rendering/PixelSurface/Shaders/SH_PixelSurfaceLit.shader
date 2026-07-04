@@ -20,6 +20,16 @@ Shader "PS3D/Pixel Surface Lit"
         _ExposureTintStrength("Exposure Brighten Strength", Range(0, 0.5)) = 0.04
         _CreviceDarkenStrength("Crevice Darken Strength", Range(0, 0.75)) = 0.075
         _BaseDarkenStrength("Base Darken Strength", Range(0, 0.75)) = 0.04
+        [Enum(None,0,SurfaceVariation,1,Exposure,2,CreviceBase,3,ConvexEdgeWear,4,ConcaveCrease,5,DirtDeposit,6)]
+        _MaskDebugMode("Mask Debug Mode", Float) = 0
+
+        [Header(Stylized Value Shaping)]
+        _HighlightCompressStrength("Highlight Compress Strength", Range(0, 0.5)) = 0.08
+        _HighlightCompressStart("Highlight Compress Start", Range(0, 1)) = 0.72
+        _BottomDarkenStrength("Bottom Darken Strength", Range(0, 0.5)) = 0.1
+        _BottomDarkenHeight("Bottom Darken Height", Range(0.01, 4)) = 0.55
+        _EdgeDarkenStrength("Broad Edge Darken Strength", Range(0, 0.5)) = 0.05
+        _EdgeDarkenPower("Broad Edge Darken Power", Range(0.5, 8)) = 2.5
 
         [Header(Material Profile)]
         _ProfileContrast("Profile Contrast", Range(0, 2)) = 1
@@ -77,6 +87,7 @@ Shader "PS3D/Pixel Surface Lit"
             #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile _ _FORWARD_PLUS
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
+            #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
 
             #define _SPECULAR_SETUP 1
 
@@ -99,6 +110,13 @@ Shader "PS3D/Pixel Surface Lit"
                 float _ExposureTintStrength;
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
+                float _MaskDebugMode;
+                float _HighlightCompressStrength;
+                float _HighlightCompressStart;
+                float _BottomDarkenStrength;
+                float _BottomDarkenHeight;
+                float _EdgeDarkenStrength;
+                float _EdgeDarkenPower;
                 float _ProfileContrast;
                 float _ProfilePixelContrast;
                 float _Wetness;
@@ -131,6 +149,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
                 float2 uv : TEXCOORD0;
+                float4 uv2 : TEXCOORD1;
                 half4 color : COLOR;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
@@ -143,6 +162,8 @@ Shader "PS3D/Pixel Surface Lit"
                 float2 uv : TEXCOORD2;
                 half4 color : COLOR;
                 half fogFactor : TEXCOORD3;
+                float positionOSY : TEXCOORD4;
+                float4 materialMasks : TEXCOORD5;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -165,7 +186,50 @@ Shader "PS3D/Pixel Surface Lit"
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
                 output.color = input.color;
                 output.fogFactor = ComputeFogFactor(output.positionCS.z);
+                output.positionOSY = input.positionOS.y;
+                output.materialMasks = input.uv2;
                 return output;
+            }
+
+            half3 ResolveMaskDebugColor(Varyings input)
+            {
+                int mode = (int)round(_MaskDebugMode);
+
+                if (mode <= 0)
+                {
+                    return half3(-1.0h, -1.0h, -1.0h);
+                }
+
+                float mask = 0.0;
+                if (mode == 1)
+                {
+                    mask = saturate((float)input.color.r);
+                }
+                else if (mode == 2)
+                {
+                    mask = saturate((float)input.color.g);
+                }
+                else if (mode == 3)
+                {
+                    mask = saturate((float)input.color.b);
+                }
+                else if (mode == 4)
+                {
+                    mask = saturate((float)input.color.a);
+                }
+                else if (mode == 5)
+                {
+                    mask = saturate(input.materialMasks.x);
+                }
+                else if (mode == 6)
+                {
+                    mask = saturate(input.materialMasks.y);
+                }
+
+                return (half3)lerp(
+                    float3(0.025, 0.025, 0.035),
+                    float3(1.0, 0.92, 0.55),
+                    mask);
             }
 
             half3 ResolvePixelSurfaceColor(Varyings input)
@@ -279,6 +343,44 @@ Shader "PS3D/Pixel Surface Lit"
                 return albedo;
             }
 
+            half3 ApplyStylizedValueShaping(
+                half3 albedo,
+                Varyings input,
+                half3 normalWS)
+            {
+                Light mainLight = GetMainLight();
+                half litMask = saturate(dot(normalWS, mainLight.direction));
+                half highlightMask = saturate(
+                    (litMask - (half)_HighlightCompressStart) /
+                    max(0.001h, 1.0h - (half)_HighlightCompressStart));
+                half highlightScale =
+                    1.0h -
+                    highlightMask *
+                    saturate((half)_HighlightCompressStrength);
+
+                half bottomMask =
+                    1.0h -
+                    smoothstep(
+                        0.0h,
+                        max(0.001h, (half)_BottomDarkenHeight),
+                        (half)max(0.0, input.positionOSY));
+                half sideMask = pow(
+                    saturate(1.0h - abs(normalWS.y)),
+                    max(0.5h, (half)_EdgeDarkenPower));
+                half bottomDarken =
+                    bottomMask *
+                    saturate((half)_BottomDarkenStrength);
+                half broadEdgeDarken =
+                    bottomMask *
+                    sideMask *
+                    saturate((half)_EdgeDarkenStrength);
+                half valueScale =
+                    highlightScale *
+                    (1.0h - saturate(bottomDarken + broadEdgeDarken));
+
+                return albedo * valueScale;
+            }
+
             half ResolveProfileSmoothness()
             {
                 return saturate(
@@ -360,6 +462,13 @@ Shader "PS3D/Pixel Surface Lit"
                             flatNormalStrength));
                 }
                 half3 albedo = ResolvePixelSurfaceColor(input);
+                half3 debugColor = ResolveMaskDebugColor(input);
+                if (debugColor.r >= 0.0h)
+                {
+                    return half4(debugColor, 1.0h);
+                }
+
+                albedo = ApplyStylizedValueShaping(albedo, input, normalWS);
                 InputData inputData = BuildInputData(input, normalWS);
                 SurfaceData surfaceData = BuildSurfaceData(albedo);
                 half4 color = UniversalFragmentPBR(inputData, surfaceData);
@@ -403,6 +512,13 @@ Shader "PS3D/Pixel Surface Lit"
                 float _ExposureTintStrength;
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
+                float _MaskDebugMode;
+                float _HighlightCompressStrength;
+                float _HighlightCompressStart;
+                float _BottomDarkenStrength;
+                float _BottomDarkenHeight;
+                float _EdgeDarkenStrength;
+                float _EdgeDarkenPower;
                 float _ProfileContrast;
                 float _ProfilePixelContrast;
                 float _Wetness;
@@ -496,6 +612,130 @@ Shader "PS3D/Pixel Surface Lit"
 
         Pass
         {
+            Name "DepthNormals"
+            Tags { "LightMode" = "DepthNormals" }
+
+            Cull [_Cull]
+            ZWrite On
+            ZTest LEqual
+
+            HLSLPROGRAM
+            #pragma target 3.5
+            #pragma vertex DepthNormalsVertex
+            #pragma fragment DepthNormalsFragment
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RenderingLayers.hlsl"
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            CBUFFER_START(UnityPerMaterial)
+                half4 _BaseColor;
+                float4 _BaseMap_ST;
+                float _PixelCellSize;
+                float _PixelSeed;
+                float _PixelToneCount;
+                float _PixelClusterStrength;
+                float _PixelVariation;
+                float _PixelVertexVariation;
+                float _PixelEffectStrength;
+                float _PixelBroadVariation;
+                float _PixelWarpStrength;
+                float _ExposureTintStrength;
+                float _CreviceDarkenStrength;
+                float _BaseDarkenStrength;
+                float _MaskDebugMode;
+                float _HighlightCompressStrength;
+                float _HighlightCompressStart;
+                float _BottomDarkenStrength;
+                float _BottomDarkenHeight;
+                float _EdgeDarkenStrength;
+                float _EdgeDarkenPower;
+                float _ProfileContrast;
+                float _ProfilePixelContrast;
+                float _Wetness;
+                float _WetDarkenStrength;
+                float _WetPixelSoftening;
+                float _WetSmoothnessBoost;
+                float _FrostStrength;
+                float _FrostCoverage;
+                float _FrostContrast;
+                float _FrostCreviceDarken;
+                half4 _FrostColor;
+                float _MonolithicFlatten;
+                float _MonolithicSmoothnessBoost;
+                float _Smoothness;
+                float _SpecularStrength;
+                float _AmbientStrength;
+                float _DirectStrength;
+                float _DiffuseWrap;
+                float _ShadowAmbientStrength;
+                float _FlatNormalStrength;
+                float _ReceiveShadows;
+                float _Cull;
+            CBUFFER_END
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float3 normalWS : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
+
+            Varyings DepthNormalsVertex(Attributes input)
+            {
+                Varyings output = (Varyings)0;
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
+
+                output.positionCS =
+                    TransformObjectToHClip(input.positionOS.xyz);
+                output.normalWS =
+                    NormalizeNormalPerVertex(
+                        TransformObjectToWorldNormal(input.normalOS));
+                return output;
+            }
+
+            void DepthNormalsFragment(
+                Varyings input,
+                out half4 outNormalWS : SV_Target0
+                #ifdef _WRITE_RENDERING_LAYERS
+                , out uint outRenderingLayers : SV_Target1
+                #endif
+            )
+            {
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+                #if defined(_GBUFFER_NORMALS_OCT)
+                    float3 normalWS = normalize(input.normalWS);
+                    float2 octNormalWS = PackNormalOctQuadEncode(normalWS);
+                    float2 remappedOctNormalWS =
+                        saturate(octNormalWS * 0.5 + 0.5);
+                    half3 packedNormalWS =
+                        PackFloat2To888(remappedOctNormalWS);
+                    outNormalWS = half4(packedNormalWS, 0.0);
+                #else
+                    float3 normalWS = NormalizeNormalPerPixel(input.normalWS);
+                    outNormalWS = half4(normalWS, 0.0);
+                #endif
+
+                #ifdef _WRITE_RENDERING_LAYERS
+                    outRenderingLayers = EncodeMeshRenderingLayer();
+                #endif
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
             Name "DepthOnly"
             Tags { "LightMode" = "DepthOnly" }
 
@@ -526,6 +766,13 @@ Shader "PS3D/Pixel Surface Lit"
                 float _ExposureTintStrength;
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
+                float _MaskDebugMode;
+                float _HighlightCompressStrength;
+                float _HighlightCompressStart;
+                float _BottomDarkenStrength;
+                float _BottomDarkenHeight;
+                float _EdgeDarkenStrength;
+                float _EdgeDarkenPower;
                 float _ProfileContrast;
                 float _ProfilePixelContrast;
                 float _Wetness;

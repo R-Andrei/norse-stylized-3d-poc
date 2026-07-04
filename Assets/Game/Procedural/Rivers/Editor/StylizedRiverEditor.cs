@@ -15,10 +15,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private bool showFoamDiagnostics;
         private bool showFoamCacheDiagnostics;
         private bool showFoamValidationOverview = true;
-        private bool showFoamViewModes = true;
-        private bool showFoamTransportDiagnostics = true;
+        private bool showFoamViewModes;
+        private bool showFoamTransportDiagnostics;
         private bool showFoamLifetimeDiagnostics;
-        private bool showFoamTopologyInteractionDiagnostics;
         private bool showFoamBirthSourceDiagnostics;
         private bool showFoamShapeResidueDiagnostics;
         private bool showFoamRuntimeResourceDiagnostics;
@@ -1596,10 +1595,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent(
                     "Material Flow Speed",
                     "Multiplier for persistent Foam transport relative to the river Flow Speed. One follows the water, higher values move existing Foam downstream faster, and zero freezes ordinary downstream material drift without changing birth Amount or Remaining Life."));
-            DrawFoamLifecycleTimingSummary(
-                Find("foamNeutralLifetime"),
-                Find("foamSupportedAgingRate"),
-                Find("foamNegativeAgingRate"));
             EditorGUILayout.PropertyField(
                 Find("foamColour"),
                 new GUIContent(
@@ -1885,17 +1880,16 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
-                "Foam Debug Layer",
+                "Foam Debug",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Patch 4.11C.5.2b reorganizes Foam validation into purpose-built sections. Open the section that matches the problem being tested instead of scrolling through one flat topology/runtime dump. The first three sections are the normal workflow for the current transport-continuity investigation.",
-                MessageType.Info);
+                "Compact workflow: Overview for status, View for display mode, Motion for downstream travel, Lifetime + Topology for aging/support, Birth for source controls, Shape for footprint issues. Each section is intentionally small; advanced internals stay collapsed unless a compile/runtime failure points there.",
+                MessageType.None);
 
             DrawFoamValidationOverview(river, runtime);
             DrawFoamViewModeSection(river);
             DrawFoamTransportMotionSection(river, runtime);
             DrawFoamLifetimeSection(river, runtime);
-            DrawFoamTopologyInteractionSection(runtime);
             DrawFoamBirthSourceSection(river, runtime);
             DrawFoamShapeResidueSection(runtime);
             DrawFoamRuntimeResourceSection(runtime);
@@ -1908,7 +1902,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             showFoamValidationOverview = EditorGUILayout.Foldout(
                 showFoamValidationOverview,
-                "Foam Validation Overview",
+                "Overview",
                 true);
             if (!showFoamValidationOverview)
             {
@@ -1916,66 +1910,43 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             EditorGUI.indentLevel++;
-            EditorGUILayout.HelpBox(
-                "Use this section first. It summarizes whether Foam is enabled, whether persistent material exists, whether it is visible, whether transport timing looks suspicious, and which specialized section should be opened next. It does not replace the detailed sections below.",
-                MessageType.None);
 
             bool runtimeAvailable = runtime != null;
             bool resourcesAvailable = runtimeAvailable && runtime.ResourcesAllocated;
             float integratedArea = runtimeAvailable ? runtime.IntegratedPresenceArea : 0f;
             float visibleArea = runtimeAvailable ? runtime.VisiblePresenceCoreArea : 0f;
             float hiddenArea = Mathf.Max(0f, integratedArea - visibleArea);
-            string smoothnessStatus = runtimeAvailable
-                ? ResolveFoamTransportSmoothnessStatus(runtime)
-                : "Runtime unavailable";
-            string likelyProblem = ResolveFoamLikelyProblem(runtime);
 
             EditorGUILayout.LabelField(
-                "Current Validation Target",
-                "Transport Continuity");
+                "State",
+                river.FoamEnabled
+                    ? runtimeAvailable
+                        ? resourcesAvailable
+                            ? runtime.IsSleeping ? "Ready / sleeping" : "Active"
+                            : "Runtime present / no resources"
+                        : "No runtime"
+                    : "Disabled");
             EditorGUILayout.LabelField(
-                "Current Debug View",
+                "View",
                 ObjectNames.NicifyVariableName(
                     ((StylizedRiverFoamDebugView)Find("foamDebugView").intValue)
                     .ToString()));
             EditorGUILayout.LabelField(
-                "Foam Enabled",
-                river.FoamEnabled ? "Yes" : "No");
+                "Foam Area",
+                runtimeAvailable
+                    ? $"visible {visibleArea:0.000} m² / stored {integratedArea:0.000} m² / hidden {hiddenArea:0.000} m²"
+                    : "—");
             EditorGUILayout.LabelField(
-                "Runtime Available",
-                runtimeAvailable ? "Yes" : "No");
+                "Motion",
+                runtimeAvailable ? ResolveFoamTransportSmoothnessStatus(runtime) : "Runtime unavailable");
             EditorGUILayout.LabelField(
-                "Persistent Foam Simulation Active",
-                resourcesAvailable && !runtime.IsSleeping ? "Yes" : "No");
-            EditorGUILayout.LabelField(
-                "Final Visible Foam Area",
-                runtimeAvailable ? $"{visibleArea:0.000} m²" : "—");
-            EditorGUILayout.LabelField(
-                "Integrated Stored Presence Area",
-                runtimeAvailable ? $"{integratedArea:0.000} m²" : "—");
-            EditorGUILayout.LabelField(
-                "Live Hidden Foam Area",
-                runtimeAvailable ? $"{hiddenArea:0.000} m²" : "—");
-            EditorGUILayout.LabelField(
-                "Average Visible Remaining Life",
-                "Not measured yet — owned by 4.11C.5.4");
-            EditorGUILayout.LabelField(
-                "Average Local Aging Rate Under Visible Foam",
-                "Not measured yet — owned by 4.11C.5.4");
-            EditorGUILayout.LabelField(
-                "Last Material Steps",
-                runtimeAvailable ? runtime.MaterialStepsLastFrame.ToString() : "—");
-            EditorGUILayout.LabelField(
-                "Transport Smoothness Status",
-                smoothnessStatus);
-            EditorGUILayout.LabelField(
-                "Likely Problem Category",
-                likelyProblem);
+                "Next Debug Section",
+                ResolveFoamLikelyProblem(runtime));
 
             if (runtimeAvailable && hiddenArea > Mathf.Max(0.05f, visibleArea * 0.25f))
             {
                 EditorGUILayout.HelpBox(
-                    "Live stored Foam is significantly larger than final visible Foam. The current failure is probably transport visibility, residue suppression, clipping, or final-mask suppression rather than Remaining Life expiry.",
+                    "Stored Foam is much larger than visible Foam. Open Shape if the visible mask looks wrong, or Lifetime + Topology if Foam should have died but remains stored.",
                     MessageType.Warning);
             }
 
@@ -1987,7 +1958,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             showFoamViewModes = EditorGUILayout.Foldout(
                 showFoamViewModes,
-                "Foam View Modes",
+                "View",
                 true);
             if (!showFoamViewModes)
             {
@@ -1995,9 +1966,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             EditorGUI.indentLevel++;
-            EditorGUILayout.HelpBox(
-                "Select what the river displays. Use Final Foam for player-facing validation. Use Foam + Aging Topology to see the exact visible Foam over positive support, negative pressure, overlap, and obstacles. Raw state views are intentionally absent from the normal workflow.",
-                MessageType.None);
 
             SerializedProperty foamDebugProperty = Find("foamDebugView");
             string[] foamDebugLabels =
@@ -2026,7 +1994,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             int selectedDebugIndex = EditorGUILayout.Popup(
                 new GUIContent(
                     "Debug View",
-                    "Workflow-level Foam views only. Raw texture/state views are not part of the normal validation workflow."),
+                    "Final Foam for normal validation. Foam + Aging Topology for support/negative/obstacle checks. Birth views only for source debugging."),
                 currentDebugIndex,
                 foamDebugLabels);
             if (EditorGUI.EndChangeCheck())
@@ -2037,9 +2005,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             StylizedRiverFoamDebugView selectedFoamDebug =
                 (StylizedRiverFoamDebugView)foamDebugProperty.intValue;
-            EditorGUILayout.HelpBox(
-                GetFoamDebugViewDescription(selectedFoamDebug),
-                MessageType.None);
+            EditorGUILayout.LabelField(
+                "Use For",
+                GetFoamDebugViewDescription(selectedFoamDebug));
 
             EditorGUI.indentLevel--;
         }
@@ -2050,7 +2018,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             showFoamTransportDiagnostics = EditorGUILayout.Foldout(
                 showFoamTransportDiagnostics,
-                "Transport / Motion",
+                "Motion",
                 true);
             if (!showFoamTransportDiagnostics)
             {
@@ -2058,15 +2026,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             EditorGUI.indentLevel++;
-            EditorGUILayout.HelpBox(
-                "This section diagnoses persistent Foam movement after birth. Base downstream travel is phase-driven: the shader slides the latest material state by a bounded residual phase, and compute commits whole foam-grid cells only when that phase crosses a texel. Material ticks now own lifecycle, source transfer, topology aging, and retained disturbance deformation rather than tiny fractional base-flow transport.",
-                MessageType.None);
 
             EditorGUILayout.PropertyField(
                 Find("foamMaterialFlowSpeedMultiplier"),
                 new GUIContent(
                     "Material Flow Speed",
-                    "Multiplier for persistent Foam transport relative to the river Flow Speed. This is repeated here because transport validation needs it visible without scrolling."));
+                    "Multiplier for persistent Foam downstream travel."));
 
             if (runtime == null)
             {
@@ -2076,61 +2041,19 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             EditorGUILayout.LabelField(
-                "Material Update Rate",
-                $"{runtime.UpdateRate:0.0} Hz");
-            EditorGUILayout.LabelField(
-                "Material Step Duration",
-                $"{runtime.MaterialStepDuration:0.0000} s");
-            EditorGUILayout.LabelField(
-                "Material Steps Last Frame",
-                runtime.MaterialStepsLastFrame.ToString());
-            EditorGUILayout.LabelField(
-                "Render State Blend",
-                runtime.RenderInterpolationAlpha.ToString("0.000"));
-            EditorGUILayout.LabelField(
-                "Phase Transport Mode",
-                "Active");
-            EditorGUILayout.LabelField(
-                "Foam Phase",
-                $"{runtime.FoamPhaseTransportMetres:0.000} m");
-            EditorGUILayout.LabelField(
-                "Foam Phase / Cell",
-                runtime.FoamPhaseCellFraction.ToString("0.000"));
-            EditorGUILayout.LabelField(
-                "Committed Cells Last Frame",
-                runtime.PhaseCommitCellsLastFrame.ToString());
-            EditorGUILayout.LabelField(
-                "Committed Cells Last Second",
-                runtime.PhaseCommitCellsLastSecond.ToString());
-            EditorGUILayout.LabelField(
-                "Base Downstream Transport",
+                "Transport Mode",
                 "Phase + integer commit");
             EditorGUILayout.LabelField(
-                "Fractional Base Advection",
-                "Disabled");
+                "Phase",
+                $"{runtime.FoamPhaseCellFraction:0.00} cell / {runtime.FoamPhaseTransportMetres:0.000} m");
             EditorGUILayout.LabelField(
-                "Estimated Phase Cells / Material Step",
-                runtime.EstimatedTransportCellsPerStep.ToString("0.000"));
+                "Committed Cells",
+                $"{runtime.PhaseCommitCellsLastFrame} last frame / {runtime.PhaseCommitCellsLastSecond} last second");
             EditorGUILayout.LabelField(
-                "Disturbance Transport",
-                "Conservative finite-volume");
+                "Material Tick",
+                $"{runtime.UpdateRate:0.#} Hz / {runtime.MaterialStepsLastFrame} steps last frame");
             EditorGUILayout.LabelField(
-                "Transport Substeps Used",
-                runtime.TransportSubstepsUsed.ToString());
-            EditorGUILayout.LabelField(
-                "Compression Passes Last Frame",
-                runtime.CompressionPassesUsed.ToString());
-            EditorGUILayout.LabelField(
-                "Wake / Lee Velocity Contribution",
-                "Retained disturbance motion only");
-            EditorGUILayout.LabelField(
-                "Pressure Velocity Contribution",
-                "Retained disturbance motion only");
-            EditorGUILayout.LabelField(
-                "Lateral Velocity Contribution",
-                "Not implemented yet — owned by 4.11C.5.5");
-            EditorGUILayout.LabelField(
-                "Transport Smoothness Status",
+                "Status",
                 ResolveFoamTransportSmoothnessStatus(runtime));
 
             DrawFoamTransportWarnings(runtime);
@@ -2143,7 +2066,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             showFoamLifetimeDiagnostics = EditorGUILayout.Foldout(
                 showFoamLifetimeDiagnostics,
-                "Material Lifetime",
+                "Lifetime + Topology",
                 true);
             if (!showFoamLifetimeDiagnostics)
             {
@@ -2151,9 +2074,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             EditorGUI.indentLevel++;
-            EditorGUILayout.HelpBox(
-                "This section validates whether Foam disappears because Remaining Life reaches zero. Remaining Life is the only ordinary survival clock. If Final Foam disappears while Live Hidden Foam Area remains high, the failure is visibility, transport, residue suppression, or clipping rather than lifetime.",
-                MessageType.None);
 
             EditorGUILayout.PropertyField(
                 Find("foamNeutralLifetime"),
@@ -2164,75 +2084,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.PropertyField(
                 Find("foamNegativeAgingRate"),
                 new GUIContent("Negative Aging Rate"));
-            DrawFoamLifecycleTimingSummary(
-                Find("foamNeutralLifetime"),
-                Find("foamSupportedAgingRate"),
-                Find("foamNegativeAgingRate"));
-
-            if (runtime != null)
-            {
-                float hiddenArea = Mathf.Max(
-                    0f,
-                    runtime.IntegratedPresenceArea -
-                    runtime.VisiblePresenceCoreArea);
-                EditorGUILayout.LabelField(
-                    "Average Visible Remaining Life",
-                    "Not measured yet — owned by 4.11C.5.4");
-                EditorGUILayout.LabelField(
-                    "Minimum Visible Remaining Life",
-                    "Not measured yet — owned by 4.11C.5.4");
-                EditorGUILayout.LabelField(
-                    "Maximum Visible Remaining Life",
-                    "Not measured yet — owned by 4.11C.5.4");
-                EditorGUILayout.LabelField(
-                    "Average Hidden Remaining Life",
-                    "Not measured yet — owned by 4.11C.5.4");
-                EditorGUILayout.LabelField(
-                    "Expired Area Last Step",
-                    "Not measured yet");
-                EditorGUILayout.LabelField(
-                    "Final Visible Foam Area",
-                    $"{runtime.VisiblePresenceCoreArea:0.000} m²");
-                EditorGUILayout.LabelField(
-                    "Live Hidden Foam Area",
-                    $"{hiddenArea:0.000} m²");
-                EditorGUILayout.LabelField(
-                    "Lifetime Status",
-                    hiddenArea > Mathf.Max(0.05f, runtime.VisiblePresenceCoreArea * 0.25f)
-                        ? "Live hidden material present — visibility/transport failure likely"
-                        : "No high-level lifetime warning from current metrics");
-
-                if (hiddenArea > Mathf.Max(0.05f, runtime.VisiblePresenceCoreArea * 0.25f))
-                {
-                    EditorGUILayout.HelpBox(
-                        "Live Foam exists but is not final-visible. Do not blame Remaining Life until transport visibility and residue/clipping are checked.",
-                        MessageType.Warning);
-                }
-            }
-            else
-            {
-                EditorGUILayout.LabelField("Runtime", "Unavailable");
-            }
-
-            EditorGUI.indentLevel--;
-        }
-
-        private void DrawFoamTopologyInteractionSection(
-            StylizedRiverFoamRuntime runtime)
-        {
-            showFoamTopologyInteractionDiagnostics = EditorGUILayout.Foldout(
-                showFoamTopologyInteractionDiagnostics,
-                "Topology Interaction",
-                true);
-            if (!showFoamTopologyInteractionDiagnostics)
-            {
-                return;
-            }
-
-            EditorGUI.indentLevel++;
-            EditorGUILayout.HelpBox(
-                "This section explains how topology affects the Foam currently visible on the river. Positive support slows the Remaining Life clock. Negative Aging Pressure speeds that same clock. Topology does not directly move, create, or erase Foam.",
-                MessageType.None);
 
             if (runtime == null)
             {
@@ -2241,68 +2092,45 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 return;
             }
 
-            EditorGUILayout.LabelField(
-                "Topology Available",
-                runtime.TopologyMetricsAvailable ? "Yes" : "No");
-            EditorGUILayout.LabelField(
-                "Average Positive Support Under Visible Foam",
-                "Not measured yet — owned by 4.11C.5.4");
-            EditorGUILayout.LabelField(
-                "Average Negative Aging Pressure Under Visible Foam",
-                "Not measured yet — owned by 4.11C.5.4");
-            EditorGUILayout.LabelField(
-                "Average Local Aging Rate Under Visible Foam",
-                "Not measured yet — owned by 4.11C.5.4");
-            EditorGUILayout.LabelField(
-                "Foam Area in Neutral Water",
-                "Not measured yet — owned by 4.11C.5.4");
-            EditorGUILayout.LabelField(
-                "Foam Area in Positive Support",
-                FormatPercent(
-                    Mathf.Max(
-                        runtime.FoamWithinShoreSupport,
-                        runtime.FoamWithinPressureLeeSupport)));
-            EditorGUILayout.LabelField(
-                "Foam Area in Negative Pressure",
-                FormatPercent(runtime.FoamWithinNegativeAgingPressure));
-            EditorGUILayout.LabelField(
-                "Foam Area in Support + Negative Overlap",
-                "Not measured yet — owned by 4.11C.5.4");
-            EditorGUILayout.LabelField(
-                "Foam Area in Obstacles",
-                "Not measured yet");
-            EditorGUILayout.LabelField(
-                "Strongest Positive Support Under Foam",
-                "Not measured yet — owned by 4.11C.5.4");
-            EditorGUILayout.LabelField(
-                "Strongest Negative Pressure Under Foam",
-                "Not measured yet — owned by 4.11C.5.4");
+            bool hasVisibleFoam =
+                runtime.TopologyMetricsAvailable &&
+                runtime.VisibleFoamPresenceArea > 0.0001f;
+            float hiddenArea = Mathf.Max(
+                0f,
+                runtime.IntegratedPresenceArea - runtime.VisiblePresenceCoreArea);
 
-            EditorGUILayout.Space(3f);
             EditorGUILayout.LabelField(
-                "Whole-River Topology Coverage",
-                EditorStyles.miniBoldLabel);
+                "Lifetime Authority",
+                runtime.MaterialLifetimeAuthorityActive
+                    ? "Remaining Life / full-field lifecycle"
+                    : runtime.LifetimeAuthorityStatus);
             EditorGUILayout.LabelField(
-                "Major Support Coverage",
-                FormatPercent(runtime.MajorSupportCoverage));
+                "Visible Life",
+                hasVisibleFoam
+                    ? $"avg {runtime.AverageVisibleRemainingLife:0.00}"
+                    : "No visible foam sample");
             EditorGUILayout.LabelField(
-                "Connector Support Coverage",
-                FormatPercent(runtime.ConnectorSupportCoverage));
+                "Local Aging",
+                hasVisibleFoam
+                    ? $"{runtime.AverageLocalAgingRateUnderVisibleFoam:0.00}× avg"
+                    : "No visible foam sample");
             EditorGUILayout.LabelField(
-                "Connector / Major Overlap",
-                FormatPercent(runtime.ConnectorMajorOverlap));
+                "Topology Under Foam",
+                hasVisibleFoam
+                    ? $"support {runtime.AveragePositiveSupportUnderVisibleFoam:0.00} avg / negative {runtime.AverageNegativeAgingUnderVisibleFoam:0.00} avg"
+                    : "No visible foam sample");
             EditorGUILayout.LabelField(
-                "Negative Aging Pressure Coverage",
-                FormatPercent(runtime.NegativeAgingPressureCoverage));
+                "Strongest Sample",
+                hasVisibleFoam
+                    ? $"support {runtime.StrongestPositiveSupportUnderFoam:0.00} / negative {runtime.StrongestNegativeAgingUnderFoam:0.00}"
+                    : "No visible foam sample");
             EditorGUILayout.LabelField(
-                "Foam Within Negative Aging Pressure",
-                FormatPercent(runtime.FoamWithinNegativeAgingPressure));
-            EditorGUILayout.LabelField(
-                "Foam Within Shore Support",
-                FormatPercent(runtime.FoamWithinShoreSupport));
-            EditorGUILayout.LabelField(
-                "Foam Within Pressure-Lee Support",
-                FormatPercent(runtime.FoamWithinPressureLeeSupport));
+                "Foam Area",
+                $"visible {runtime.VisiblePresenceCoreArea:0.000} m² / hidden {hiddenArea:0.000} m²");
+
+            EditorGUILayout.HelpBox(
+                "Single-authority mode: chunk/reservation timers no longer clear material. Visible death should now come from per-cell Remaining Life only.",
+                MessageType.None);
 
             EditorGUI.indentLevel--;
         }
@@ -2313,7 +2141,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             showFoamBirthSourceDiagnostics = EditorGUILayout.Foldout(
                 showFoamBirthSourceDiagnostics,
-                "Birth / Source Debugging",
+                "Birth",
                 true);
             if (!showFoamBirthSourceDiagnostics)
             {
@@ -2321,70 +2149,43 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             EditorGUI.indentLevel++;
-            EditorGUILayout.HelpBox(
-                "This section validates Foam at birth. Amount is source-only: it controls how much of the candidate area becomes occupied Foam. It does not make accepted Foam weaker, younger, older, more durable, or less durable.",
-                MessageType.None);
 
             EditorGUILayout.PropertyField(
                 Find("foamTestRadius"),
-                new GUIContent("Manual Source Width / Radius"));
+                new GUIContent("Manual Width / Radius"));
             EditorGUILayout.PropertyField(
                 Find("foamTestElongation"),
-                new GUIContent("Manual Source Length Multiplier"));
+                new GUIContent("Manual Length Multiplier"));
             EditorGUILayout.PropertyField(
                 Find("foamTestAmount"),
-                new GUIContent("Manual Source Amount"));
+                new GUIContent("Source Amount"));
             EditorGUILayout.PropertyField(
                 Find("foamTestRemainingLife"),
-                new GUIContent("Manual Initial Remaining Life"));
+                new GUIContent("Initial Remaining Life"));
             EditorGUILayout.PropertyField(
                 Find("foamTestProgressiveRibbonDuration"),
-                new GUIContent("Progressive Event Duration"));
+                new GUIContent("Progressive Duration"));
             EditorGUILayout.PropertyField(
                 Find("foamTestProgressiveRibbonTravelDistance"),
-                new GUIContent("Progressive Travel Distance"));
+                new GUIContent("Progressive Travel"));
             EditorGUILayout.PropertyField(
                 Find("foamTestProgressiveRibbonHalfWidth"),
-                new GUIContent("Progressive Width / Half-Width"));
-            EditorGUILayout.PropertyField(
-                Find("foamTestAmount"),
-                new GUIContent("Progressive Amount"));
+                new GUIContent("Progressive Half-Width"));
 
             if (runtime != null)
             {
                 EditorGUILayout.LabelField(
-                    "Current Source Presence Area",
-                    runtime.ProgressiveBirthDebugReadbackAvailable
-                        ? $"{runtime.ProgressiveBirthDebugLatestAffectedTexels:N0} latest source texels"
-                        : "No source readback available");
-                EditorGUILayout.LabelField(
-                    "Newly Accepted Presence Area",
-                    "Use Progressive Birth Transfer view");
-                EditorGUILayout.LabelField(
-                    "Existing Overlapped Presence Area",
-                    "Use Progressive Birth Transfer view");
-                EditorGUILayout.LabelField(
-                    "Rejected Source Area",
-                    "Not measured yet");
-                EditorGUILayout.LabelField(
-                    "Last Source Event ID",
+                    "Progressive State",
                     runtime.LatestProgressiveRibbonEventId > 0
-                        ? runtime.LatestProgressiveRibbonEventId.ToString()
-                        : "—");
+                        ? $"event {runtime.LatestProgressiveRibbonEventId}, active {runtime.ActiveProgressiveRibbonEventCount}/{runtime.ProgressiveRibbonPoolCapacity}"
+                        : "No active event");
                 EditorGUILayout.LabelField(
-                    "Progressive Active / Capacity",
-                    $"{runtime.ActiveProgressiveRibbonEventCount} / " +
-                    runtime.ProgressiveRibbonPoolCapacity);
-                EditorGUILayout.LabelField(
-                    "Progressive Started / Completed / Rejected",
-                    $"{runtime.ProgressiveRibbonStartedCount} / " +
-                    $"{runtime.ProgressiveRibbonCompletedCount} / " +
-                    runtime.ProgressiveRibbonRejectedCount);
+                    "Source Texels",
+                    runtime.ProgressiveBirthDebugReadbackAvailable
+                        ? $"{runtime.ProgressiveBirthDebugLatestAffectedTexels:N0} latest"
+                        : "No source readback");
             }
 
-            EditorGUILayout.HelpBox(
-                "If Final Foam later expands, smears, travels in pulses, or leaves trails, that is no longer a birth/source problem. Open Transport / Motion or Shape Conservation / Residue.",
-                MessageType.Info);
             EditorGUI.indentLevel--;
         }
 
@@ -2393,7 +2194,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             showFoamShapeResidueDiagnostics = EditorGUILayout.Foldout(
                 showFoamShapeResidueDiagnostics,
-                "Shape Conservation / Residue",
+                "Shape",
                 true);
             if (!showFoamShapeResidueDiagnostics)
             {
@@ -2401,9 +2202,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             EditorGUI.indentLevel++;
-            EditorGUILayout.HelpBox(
-                "This section diagnoses whether transported Foam preserves its footprint or leaves grid artifacts behind. A soft trailing edge attached to the main body can be acceptable. Detached streaks or crumbs are not acceptable unless future fracture explicitly creates them.",
-                MessageType.None);
 
             if (runtime == null)
             {
@@ -2413,54 +2211,26 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             EditorGUILayout.LabelField(
-                "Integrated Presence Area",
-                $"{runtime.IntegratedPresenceArea:0.000} m²");
+                "Stored / Visible Area",
+                $"{runtime.IntegratedPresenceArea:0.000} m² / {runtime.VisiblePresenceCoreArea:0.000} m²");
             EditorGUILayout.LabelField(
-                "Final Foam Core Area",
-                $"{runtime.VisiblePresenceCoreArea:0.000} m²");
-            EditorGUILayout.LabelField(
-                "Manual Proof Initial Area",
+                "Manual Proof Ratio",
                 runtime.ManualProofReferenceAvailable
-                    ? $"{runtime.ManualProofReferenceArea:0.000} m²"
-                    : "No manual proof reference");
+                    ? runtime.ManualProofPresenceRatio.ToString("0.00")
+                    : "No manual proof");
             EditorGUILayout.LabelField(
-                "Manual Proof Current Area",
-                $"{runtime.IntegratedPresenceArea:0.000} m²");
-            EditorGUILayout.LabelField(
-                "Manual Proof Area Ratio",
-                runtime.ManualProofReferenceAvailable
-                    ? runtime.ManualProofPresenceRatio.ToString("0.000")
-                    : "Inject a manual proof");
-            EditorGUILayout.LabelField(
-                "Detached Residue Estimate",
-                "Not measured yet — owned by 4.11C.5.3");
-            EditorGUILayout.LabelField(
-                "Low-Coverage Fragment Area",
-                "Not measured yet — owned by 4.11C.5.3");
-            EditorGUILayout.LabelField(
-                "Largest Connected Visible Foam Area",
-                "Not measured yet — owned by 4.11C.5.3");
-            EditorGUILayout.LabelField(
-                "Visible Foam Perimeter / Area Ratio",
+                "Perimeter Ratio",
                 FormatPercent(runtime.PerimeterRatio));
             EditorGUILayout.LabelField(
-                "Residue Status",
-                runtime.PerimeterRatio > 0.85f
-                    ? "High perimeter ratio — detached streaks or crumbs possible"
-                    : "No high-level residue warning from current metrics");
+                "Known Shape Issue",
+                "Line/ribbon shape and no morphing remain unsolved");
 
             if (runtime.ManualProofReferenceAvailable &&
-                runtime.ManualProofPresenceRatio > 1.25f)
+                (runtime.ManualProofPresenceRatio > 1.25f ||
+                 runtime.ManualProofPresenceRatio < 0.65f))
             {
                 EditorGUILayout.HelpBox(
-                    "Integrated Presence has grown beyond the proof-source tolerance. Material may be expanding during transport.",
-                    MessageType.Warning);
-            }
-            if (runtime.ManualProofReferenceAvailable &&
-                runtime.ManualProofPresenceRatio < 0.65f)
-            {
-                EditorGUILayout.HelpBox(
-                    "Integrated Presence has collapsed quickly relative to the manual proof source. Material may be disappearing through transport or clipping.",
+                    "Manual proof area changed outside tolerance. Shape/transport state needs investigation.",
                     MessageType.Warning);
             }
 
@@ -2472,7 +2242,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             showFoamRuntimeResourceDiagnostics = EditorGUILayout.Foldout(
                 showFoamRuntimeResourceDiagnostics,
-                "Runtime State and Resources",
+                "Runtime",
                 true);
             if (!showFoamRuntimeResourceDiagnostics)
             {
@@ -2480,9 +2250,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             EditorGUI.indentLevel++;
-            EditorGUILayout.HelpBox(
-                "This section is for runtime and resource health. It is not the first place to debug visual Foam behavior. Use it when Foam is missing entirely, resources were reallocated, quality changed, chunks froze, or compute resources failed to bind.",
-                MessageType.None);
 
             if (runtime == null)
             {
@@ -2492,62 +2259,27 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             EditorGUILayout.LabelField(
-                "Runtime Available",
-                "Yes");
-            EditorGUILayout.LabelField(
-                "Foam Enabled",
-                runtime.enabled ? "Yes" : "Component disabled");
-            EditorGUILayout.LabelField(
-                "Current Quality",
-                "Uses river Foam quality setting");
-            EditorGUILayout.LabelField(
-                "State Texture Size",
-                runtime.ResourcesAllocated
-                    ? $"{runtime.FieldWidth} × {runtime.FieldHeight}"
-                    : "Not allocated");
-            EditorGUILayout.LabelField(
-                "Source Texture Size",
-                runtime.ResourcesAllocated
-                    ? $"{runtime.FieldWidth} × {runtime.FieldHeight}"
-                    : "Not allocated");
-            EditorGUILayout.LabelField(
-                "Active Chunk Count",
-                runtime.ActiveChunkCount.ToString());
-            EditorGUILayout.LabelField(
-                "Reserved Chunk Count",
-                runtime.ActiveReservationCount.ToString());
-            EditorGUILayout.LabelField(
-                "Frozen Chunk Count",
-                "Not exposed yet");
-            EditorGUILayout.LabelField(
-                "Last Reallocation Reason",
-                "Not exposed yet");
-            EditorGUILayout.LabelField(
-                "Clear Foam Requested",
-                "Button state only");
-            EditorGUILayout.LabelField(
-                "Compute Kernels Available",
-                runtime.ConservativeTransportActive ? "Yes" : "Waiting / unavailable");
-            EditorGUILayout.LabelField(
-                "Neutral Texture Bound",
-                runtime.ResourcesAllocated ? "Expected" : "Not allocated");
-            EditorGUILayout.LabelField(
                 "State",
-                runtime.IsSleeping ? "Sleeping" : "Active");
+                runtime.enabled ? runtime.IsSleeping ? "Sleeping" : "Active" : "Component disabled");
             EditorGUILayout.LabelField(
-                "Compute Dispatches",
-                $"{runtime.LastUpdateDispatches} last / {runtime.RecentPeakDispatches} recent peak");
+                "Texture",
+                runtime.ResourcesAllocated
+                    ? $"{runtime.FieldWidth} × {runtime.FieldHeight}"
+                    : "Not allocated");
             EditorGUILayout.LabelField(
-                "Estimated Cell-Iterations",
-                $"{runtime.LastUpdateCellIterations:N0} last / {runtime.RecentPeakCellIterations:N0} recent peak");
+                "Chunks",
+                $"active {runtime.ActiveChunkCount} / reserved {runtime.ActiveReservationCount}");
+            EditorGUILayout.LabelField(
+                "Dispatch",
+                $"{runtime.LastUpdateDispatches} last / {runtime.RecentPeakDispatches} peak");
             DrawMemoryDiagnostic(
-                "Allocated Foam Memory",
+                "Memory",
                 runtime.EstimatedMemoryBytes,
-                "Estimated persistent material, conservative transport scratch textures, progressive source/debug textures, topology, boundary, obstacle, metrics, and local river buffers. Deleted procedural guidance/network resources are absent.");
+                "Estimated Foam runtime memory.");
 
             if (GUILayout.Button(
                     new GUIContent(
-                        "Reset Foam Peaks",
+                        "Reset Runtime Peaks",
                         "Resets recent dispatch and cell-iteration peaks to the current update.")))
             {
                 runtime.ResetRecentPeaks();
@@ -2561,7 +2293,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             showFoamAdvancedInternalDiagnostics = EditorGUILayout.Foldout(
                 showFoamAdvancedInternalDiagnostics,
-                "Advanced Internal Diagnostics",
+                "Advanced Internals",
                 true);
             if (!showFoamAdvancedInternalDiagnostics)
             {
@@ -2569,78 +2301,32 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             EditorGUI.indentLevel++;
-            EditorGUILayout.HelpBox(
-                "This section contains low-level internal diagnostics and retained topology preparation controls. It is not meant for normal Foam behavior validation. If this section contradicts Final Foam or Foam + Aging Topology, treat the higher-level view as the behavior source of truth and use this section only to locate the implementation mistake.",
-                MessageType.None);
-
-            EditorGUILayout.LabelField(
-                "Raw Material Presence View",
-                "Advanced shader view intentionally not in normal dropdown");
-            EditorGUILayout.LabelField(
-                "Raw Remaining Life View",
-                "Advanced shader view intentionally not in normal dropdown");
-            EditorGUILayout.LabelField(
-                "Raw Material Pattern View",
-                "Advanced shader view intentionally not in normal dropdown");
-            EditorGUILayout.LabelField(
-                "Raw Obstacle Footprint View",
-                "Use Foam + Aging Topology unless raw texture debugging is required");
-            EditorGUILayout.LabelField(
-                "Packed-State Invariant Counters",
-                "Not implemented yet");
-            EditorGUILayout.LabelField(
-                "A Channel Non-Zero Count",
-                "Not implemented yet");
-            EditorGUILayout.LabelField(
-                "Life Moment Greater Than Presence Count",
-                "Not implemented yet");
-            EditorGUILayout.LabelField(
-                "Pattern Moment Greater Than Presence Count",
-                "Not implemented yet");
 
             DrawMajorCandidatePreview();
 
             if (runtime != null)
             {
-                EditorGUILayout.Space(4f);
                 showFoamCacheDiagnostics = EditorGUILayout.Foldout(
                     showFoamCacheDiagnostics,
-                    "Topology Cache / Startup Internals",
+                    "Topology Cache",
                     true);
                 if (showFoamCacheDiagnostics)
                 {
                     EditorGUI.indentLevel++;
                     EditorGUILayout.LabelField(
-                        "Replacement Build State",
-                        runtime.TopologyReplacementState);
+                        "Build",
+                        $"{runtime.TopologyReplacementState} / ready {(runtime.TopologyReplacementReady ? "yes" : "no")}");
                     EditorGUILayout.LabelField(
-                        "Replacement Ready",
-                        runtime.TopologyReplacementReady ? "Yes" : "No");
+                        "Transition",
+                        $"{runtime.TopologyTransitionState} / {FormatPercent(runtime.TopologyTransitionProgress)}");
                     EditorGUILayout.LabelField(
-                        "Transition State",
-                        runtime.TopologyTransitionState);
+                        "Startup",
+                        runtime.TopologyStartupValidationComplete
+                            ? $"complete — {runtime.TopologyStartupTotalMilliseconds:0.000} ms"
+                            : runtime.TopologyCacheStartupState);
                     EditorGUILayout.LabelField(
-                        "Transition Progress",
-                        FormatPercent(runtime.TopologyTransitionProgress));
-                    EditorGUILayout.LabelField(
-                        "Cache Startup State",
-                        runtime.TopologyCacheStartupState);
-                    EditorGUILayout.LabelField(
-                        "Cache Startup Hits / Misses",
+                        "Cache Hits / Misses",
                         $"{runtime.TopologyCacheStartupHitCount} / {runtime.TopologyCacheStartupMissCount}");
-                    EditorGUILayout.LabelField(
-                        "Automatic Persistence",
-                        runtime.AutomaticTopologyCachePersistenceState);
-                    EditorGUILayout.LabelField(
-                        "Topology Startup Validation",
-                        runtime.TopologyStartupValidationComplete
-                            ? $"Complete — {runtime.TopologyStartupTotalMilliseconds:0.000} ms"
-                            : "Not complete");
-                    EditorGUILayout.LabelField(
-                        "Slowest Startup Step",
-                        runtime.TopologyStartupValidationComplete
-                            ? $"{runtime.TopologyStartupSlowestStep} — {runtime.TopologyStartupSlowestStepMilliseconds:0.000} ms"
-                            : "—");
                     EditorGUI.indentLevel--;
                 }
             }
@@ -2694,18 +2380,18 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             if (runtime == null)
             {
-                return "Open Runtime State and Resources";
+                return "Open Runtime";
             }
             if (!runtime.ResourcesAllocated)
             {
-                return "Open Runtime State and Resources";
+                return "Open Runtime";
             }
             if (runtime.MaterialStepsLastFrame > 1 ||
                 runtime.EstimatedTransportCellsPerStep > 1.25f ||
                 (runtime.CompressionPassesUsed > 0 &&
                  runtime.CompressionPassesUsed % 4 != 0))
             {
-                return "Open Transport / Motion";
+                return "Open Motion";
             }
             float hiddenArea = Mathf.Max(
                 0f,
@@ -2713,13 +2399,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 runtime.VisiblePresenceCoreArea);
             if (hiddenArea > Mathf.Max(0.05f, runtime.VisiblePresenceCoreArea * 0.25f))
             {
-                return "Open Material Lifetime or Shape Conservation / Residue";
+                return "Open Lifetime + Topology or Shape";
             }
             if (runtime.ManualProofReferenceAvailable &&
                 (runtime.ManualProofPresenceRatio < 0.65f ||
                  runtime.ManualProofPresenceRatio > 1.25f))
             {
-                return "Open Shape Conservation / Residue";
+                return "Open Shape";
             }
             return "No obvious diagnostic failure";
         }
@@ -3298,62 +2984,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUIUtility.PingObject(asset);
         }
 
-        private static void DrawFoamLifecycleTimingSummary(
-            SerializedProperty neutralLifetimeProperty,
-            SerializedProperty supportedAgingRateProperty,
-            SerializedProperty negativeAgingRateProperty)
-        {
-            EditorGUILayout.Space(2f);
-
-            if (neutralLifetimeProperty.hasMultipleDifferentValues ||
-                supportedAgingRateProperty.hasMultipleDifferentValues ||
-                negativeAgingRateProperty.hasMultipleDifferentValues)
-            {
-                EditorGUILayout.HelpBox(
-                    "Calculated lifetimes require the selected rivers to use the same lifecycle values.",
-                    MessageType.Info);
-                return;
-            }
-
-            float neutralLifetime = Mathf.Max(0.0001f, neutralLifetimeProperty.floatValue);
-            float supportedAgingRate = Mathf.Max(0.0001f, supportedAgingRateProperty.floatValue);
-            float negativeAgingRate = Mathf.Max(0.0001f, negativeAgingRateProperty.floatValue);
-
-            float supportedLifetime = neutralLifetime / supportedAgingRate;
-            float negativeLifetime = neutralLifetime / negativeAgingRate;
-            float overlapLifetime =
-                neutralLifetime / (supportedAgingRate * negativeAgingRate);
-
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            EditorGUILayout.LabelField(
-                new GUIContent(
-                    "Calculated Lifetimes",
-                    "Approximate time for normalized Remaining Life to reach zero. Overlapping sources preserve the age of already occupied Presence and assign fresh life only to newly added Presence."),
-                EditorStyles.boldLabel);
-            EditorGUILayout.LabelField(
-                "Neutral Water",
-                FormatFoamLifetime(neutralLifetime));
-            EditorGUILayout.LabelField(
-                "Full Positive Support",
-                FormatFoamLifetime(supportedLifetime));
-            EditorGUILayout.LabelField(
-                "Full Negative Aging Pressure",
-                FormatFoamLifetime(negativeLifetime));
-            EditorGUILayout.LabelField(
-                "Full Support + Full Negative",
-                FormatFoamLifetime(overlapLifetime));
-            EditorGUILayout.LabelField(
-                "Calculation",
-                "Neutral lifetime ÷ combined aging-rate multiplier",
-                EditorStyles.miniLabel);
-            EditorGUILayout.EndVertical();
-        }
-
-        private static string FormatFoamLifetime(float seconds)
-        {
-            return $"{seconds:0.##} s";
-        }
-
         private void DrawStatus()
         {
             if (targets.Length != 1)
@@ -3418,7 +3048,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.FoamAndAgingTopology:
                     return
-                        "One combined lifecycle-validation view. Dark water is neutral valid fluid. Green is the maximum positive lifespan support from Major, Connector, Pressure, Lee, and Shore Support. Red is Negative Aging Pressure. Yellow is their overlap. Blue is the canonical current-water Obstacle Footprint. Bright cyan/white is the exact final Foam mask used by normal rendering; its brightness decreases with Remaining Life so the material, its age, and the topology it currently occupies can be judged together.";
+                        "One combined lifecycle-validation view. Dark water is neutral valid fluid. Green is the maximum positive lifespan support from Major, Connector, Pressure, Lee, and Shore Support. Red is Negative Aging Pressure. Yellow is their overlap. Blue is the canonical current-water Obstacle Footprint. Bright cyan/white is the exact final Foam mask used by normal rendering. Remaining Life is verified through the Material Lifetime and Topology Interaction summaries, not by broad Foam opacity.";
 
                 case StylizedRiverFoamDebugView.ProgressiveBirthSource:
                     return

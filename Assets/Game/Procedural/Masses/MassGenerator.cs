@@ -1359,6 +1359,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             MeshData meshData = new MeshData();
             Vector3 centre = CalculateAverage(soup.Positions);
             Bounds bounds = CalculateBounds(soup.Positions);
+            FaceMaterialMaskLookup materialMaskLookup =
+                FaceMaterialMaskLookup.Build(soup, centre);
 
             float safeWidth = Mathf.Max(0.001f, bounds.size.x);
             float safeHeight = Mathf.Max(0.001f, bounds.size.y);
@@ -1394,6 +1396,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     safeHeight,
                     safeDepth,
                     faceNormal,
+                    materialMaskLookup,
                     recipe);
 
                 int indexB = AddRenderedVertex(
@@ -1405,6 +1408,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     safeHeight,
                     safeDepth,
                     faceNormal,
+                    materialMaskLookup,
                     recipe);
 
                 int indexC = AddRenderedVertex(
@@ -1416,6 +1420,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     safeHeight,
                     safeDepth,
                     faceNormal,
+                    materialMaskLookup,
                     recipe);
 
                 meshData.AddTriangle(indexA, indexB, indexC);
@@ -1433,6 +1438,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float height,
             float depth,
             Vector3 faceNormal,
+            FaceMaterialMaskLookup materialMaskLookup,
             MassRecipe recipe)
         {
             Vector2 uv = new Vector2(
@@ -1462,17 +1468,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 green,
                 randomValue);
 
+            float edgeWear = materialMaskLookup.ResolveConvexEdgeWear(
+                position,
+                faceNormal);
+
+            float dirtDeposit = ResolveDirtDepositMask(
+                vertical01,
+                green,
+                blue,
+                randomValue);
+
+            Vector4 materialMasks = new Vector4(
+                0f,
+                dirtDeposit,
+                0f,
+                0f);
+
             return meshData.AddVertex(
                 position,
                 uv,
-                new Color(red, green, blue, 1f));
+                new Color(red, green, blue, edgeWear),
+                materialMasks);
         }
 
         // Vertex colour material contract:
         // R = existing deterministic surface variation.
         // G = upward/flat exposure mask for lighter worn or frosted planes.
         // B = base/side/occlusion mask for darker crevice-like response.
-        // A = reserved for future material-state blending.
+        // A = convex ridge/edge wear intensity.
+        //
+        // UV2 material contract:
+        // X = concave crease or crack-darkening mask; neutral until Patch 12.
+        // Y = dirty deposit / mineral stain mask.
+        // ZW = reserved for future biome-specific material state.
         private static float ResolveExposureMask(
             Vector3 faceNormal,
             float vertical01,
@@ -1509,6 +1537,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 sideOcclusion * 0.28f +
                 shelteredSurface * 0.16f +
                 surfaceBreakup);
+        }
+
+        private static float ResolveDirtDepositMask(
+            float vertical01,
+            float exposure,
+            float crevice,
+            float randomValue)
+        {
+            float lowerArea =
+                1f - Mathf.SmoothStep(0.08f, 0.62f, vertical01);
+            float sheltered =
+                Mathf.Clamp01(crevice * 0.75f + (1f - exposure) * 0.25f);
+            float breakup = (randomValue - 0.5f) * 0.12f;
+
+            return Mathf.Clamp01(
+                lowerArea * 0.45f +
+                sheltered * 0.40f +
+                crevice * 0.20f +
+                breakup);
         }
 
         #endregion
@@ -2572,6 +2619,102 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private sealed class TriangleSoup
         {
             public readonly List<Vector3> Positions = new List<Vector3>();
+        }
+
+        private sealed class FaceMaterialMaskLookup
+        {
+            private readonly Dictionary<VertexKey, VertexNormalAggregate>
+                aggregates;
+
+            private FaceMaterialMaskLookup(
+                Dictionary<VertexKey, VertexNormalAggregate> aggregates)
+            {
+                this.aggregates = aggregates;
+            }
+
+            public static FaceMaterialMaskLookup Build(
+                TriangleSoup soup,
+                Vector3 centre)
+            {
+                Dictionary<VertexKey, VertexNormalAggregate> aggregates =
+                    new Dictionary<VertexKey, VertexNormalAggregate>();
+
+                for (int i = 0; i < soup.Positions.Count; i += 3)
+                {
+                    Vector3 a = soup.Positions[i];
+                    Vector3 b = soup.Positions[i + 1];
+                    Vector3 c = soup.Positions[i + 2];
+                    Vector3 normal = Vector3.Cross(b - a, c - a);
+                    Vector3 faceCentre = (a + b + c) / 3f;
+
+                    if (Vector3.Dot(normal, faceCentre - centre) < 0f)
+                    {
+                        normal = -normal;
+                    }
+
+                    if (normal.sqrMagnitude <= MinimumEdgeLengthSqr)
+                    {
+                        continue;
+                    }
+
+                    Vector3 faceNormal = normal.normalized;
+                    AddFaceNormal(aggregates, a, faceNormal);
+                    AddFaceNormal(aggregates, b, faceNormal);
+                    AddFaceNormal(aggregates, c, faceNormal);
+                }
+
+                return new FaceMaterialMaskLookup(aggregates);
+            }
+
+            public float ResolveConvexEdgeWear(
+                Vector3 position,
+                Vector3 faceNormal)
+            {
+                VertexKey key = new VertexKey(position);
+
+                if (!aggregates.TryGetValue(
+                        key,
+                        out VertexNormalAggregate aggregate) ||
+                    aggregate.Count <= 1 ||
+                    aggregate.NormalSum.sqrMagnitude <=
+                    MinimumEdgeLengthSqr)
+                {
+                    return 0f;
+                }
+
+                Vector3 averageNormal = aggregate.NormalSum.normalized;
+                float normalDisagreement =
+                    1f - Mathf.Clamp01(
+                        Vector3.Dot(faceNormal, averageNormal));
+
+                return Mathf.SmoothStep(
+                    0f,
+                    1f,
+                    Mathf.InverseLerp(
+                        0.035f,
+                        0.34f,
+                        normalDisagreement));
+            }
+
+            private static void AddFaceNormal(
+                Dictionary<VertexKey, VertexNormalAggregate> aggregates,
+                Vector3 position,
+                Vector3 faceNormal)
+            {
+                VertexKey key = new VertexKey(position);
+                aggregates.TryGetValue(
+                    key,
+                    out VertexNormalAggregate aggregate);
+                aggregate.NormalSum += faceNormal;
+                aggregate.Count++;
+                aggregates[key] = aggregate;
+            }
+        }
+
+        private struct VertexNormalAggregate
+        {
+            public Vector3 NormalSum;
+            public int Count;
         }
 
         private readonly struct RectRing

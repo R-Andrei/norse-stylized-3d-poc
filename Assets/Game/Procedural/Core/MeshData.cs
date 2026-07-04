@@ -50,6 +50,24 @@ namespace ProgrammaticStylized3D.Geometry
             return index;
         }
 
+        public int AddVertex(
+            Vector3 position,
+            Vector2 uv,
+            Color color,
+            Vector4 uv2)
+        {
+            int index = AddVertex(position, uv, color);
+
+            if (UV2.Count != index)
+            {
+                throw new InvalidOperationException(
+                    "UV2 must be supplied for every vertex when using the UV2 AddVertex overload.");
+            }
+
+            UV2.Add(uv2);
+            return index;
+        }
+
         public void AddTriangle(int a, int b, int c)
         {
             ValidateVertexIndex(a);

@@ -568,6 +568,39 @@ namespace ProgrammaticStylized3D.Rivers
         public float ConnectorMajorOverlap => TopologyRegionRatio(
             TopologyMetricConnectorMajorOverlap,
             TopologyMetricConnectorSupport);
+        public float VisibleFoamPresenceArea => TopologyAreaMetric(
+            TopologyMetricVisiblePresenceArea);
+        public float AverageVisibleRemainingLife =>
+            TopologyWeightedMetricAverage(
+                TopologyMetricVisibleLifeArea,
+                TopologyMetricVisiblePresenceArea);
+        public float AveragePositiveSupportUnderVisibleFoam =>
+            TopologyWeightedMetricAverage(
+                TopologyMetricVisiblePositiveSupportArea,
+                TopologyMetricVisiblePresenceArea);
+        public float AverageNegativeAgingUnderVisibleFoam =>
+            TopologyWeightedMetricAverage(
+                TopologyMetricVisibleNegativeAgingArea,
+                TopologyMetricVisiblePresenceArea);
+        public float AverageLocalAgingRateUnderVisibleFoam =>
+            TopologyWeightedMetricAverage(
+                TopologyMetricVisibleLocalAgingRateArea,
+                TopologyMetricVisiblePresenceArea);
+        public float FoamSupportNegativeOverlapRatio =>
+            TopologyRegionRatio(
+                TopologyMetricFoamSupportNegativeOverlap,
+                TopologyMetricVisibleMaterial);
+        public float StrongestPositiveSupportUnderFoam =>
+            TopologyFixedTenThousandMetric(
+                TopologyMetricMaxPositiveSupportUnderFoam);
+        public float StrongestNegativeAgingUnderFoam =>
+            TopologyFixedTenThousandMetric(
+                TopologyMetricMaxNegativeAgingUnderFoam);
+        public string LifetimeAuthorityStatus => lifetimeAuthorityStatus;
+        public bool MaterialLifetimeAuthorityActive =>
+            materialLifetimeAuthorityActive;
+        public string LifetimeProofStatus => ResolveLifetimeProofStatus();
+        public string TopologyAgingProofStatus => ResolveTopologyAgingProofStatus();
         public int ActiveChunkCount => CountActiveChunks();
         public int PendingInjectionCount => pendingInjections.Count;
         public int ActiveReservationCount => reservations.Count;
@@ -651,6 +684,7 @@ namespace ProgrammaticStylized3D.Rivers
             !IsTopologyDebugActive &&
             !IsProgressiveBirthSourceDebugActive &&
             !IsProgressiveBirthTransferDebugActive &&
+            !materialLifetimeAuthorityActive &&
             pendingInjections.Count == 0 &&
             activeProgressiveRibbonEventCount == 0 &&
             reservations.Count == 0 &&

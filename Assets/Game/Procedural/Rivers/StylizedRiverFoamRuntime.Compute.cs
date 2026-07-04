@@ -46,6 +46,10 @@ namespace ProgrammaticStylized3D.Rivers
         private void ConfigureSharedComputeParameters(float deltaTime)
         {
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetInts(
+                "_FoamTopologyDimensions",
+                structuralWidth,
+                structuralHeight);
             computeShader.SetFloat("_FoamValidLength", validFieldLength);
             computeShader.SetFloat(
                 "_FoamSimulationLength",

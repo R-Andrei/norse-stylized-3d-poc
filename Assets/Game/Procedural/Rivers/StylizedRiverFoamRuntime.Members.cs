@@ -64,6 +64,14 @@ namespace ProgrammaticStylized3D.Rivers
         private float visiblePresenceCoreArea;
         private float manualProofReferenceArea;
         private bool manualProofReferencePending;
+        // Patch 4.11C.5.4b: Remaining Life in the material texture is
+        // the only foam survival authority. This flag keeps lifecycle
+        // simulation running while material may still be alive, independent
+        // of reservation/chunk scheduling windows.
+        private bool materialLifetimeAuthorityActive;
+        private int materialLifetimeEmptyMetricReadbacks;
+        private string lifetimeAuthorityStatus =
+            "Remaining Life owns survival";
         private StylizedRiverFoamMajorTopology majorTopology;
         private StylizedRiverFoamConnectorTopology connectorTopology;
         private StylizedRiverFoamPocketTopology pocketTopology;

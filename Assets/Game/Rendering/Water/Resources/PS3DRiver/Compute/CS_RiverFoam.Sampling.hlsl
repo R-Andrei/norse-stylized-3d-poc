@@ -58,6 +58,76 @@ float4 SampleStateAtUV(float2 uv)
 }
 
 
+float4 SampleTopologyBilinear(float2 pixelCoordinate)
+{
+    float2 clamped = clamp(
+        pixelCoordinate,
+        float2(0.0, 0.0),
+        float2(
+            (float)(_FoamTopologyDimensions.x - 1),
+            (float)(_FoamTopologyDimensions.y - 1)));
+    int2 baseCoordinate = int2(floor(clamped));
+    int2 nextCoordinate = min(
+        baseCoordinate + int2(1, 1),
+        _FoamTopologyDimensions - int2(1, 1));
+    float2 blend = frac(clamped);
+
+    float4 a = _FoamTopologyRead.Load(int3(baseCoordinate, 0));
+    float4 b = _FoamTopologyRead.Load(
+        int3(nextCoordinate.x, baseCoordinate.y, 0));
+    float4 c = _FoamTopologyRead.Load(
+        int3(baseCoordinate.x, nextCoordinate.y, 0));
+    float4 d = _FoamTopologyRead.Load(int3(nextCoordinate, 0));
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+float4 SampleTopologySourcesBilinear(float2 pixelCoordinate)
+{
+    float2 clamped = clamp(
+        pixelCoordinate,
+        float2(0.0, 0.0),
+        float2(
+            (float)(_FoamTopologyDimensions.x - 1),
+            (float)(_FoamTopologyDimensions.y - 1)));
+    int2 baseCoordinate = int2(floor(clamped));
+    int2 nextCoordinate = min(
+        baseCoordinate + int2(1, 1),
+        _FoamTopologyDimensions - int2(1, 1));
+    float2 blend = frac(clamped);
+
+    float4 a = _FoamTopologySourcesRead.Load(int3(baseCoordinate, 0));
+    float4 b = _FoamTopologySourcesRead.Load(
+        int3(nextCoordinate.x, baseCoordinate.y, 0));
+    float4 c = _FoamTopologySourcesRead.Load(
+        int3(baseCoordinate.x, nextCoordinate.y, 0));
+    float4 d = _FoamTopologySourcesRead.Load(int3(nextCoordinate, 0));
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+float SampleObstacleExclusionBilinear(float2 pixelCoordinate)
+{
+    float2 clamped = clamp(
+        pixelCoordinate,
+        float2(0.0, 0.0),
+        float2(
+            (float)(_FoamDimensions.x - 1),
+            (float)(_FoamDimensions.y - 1)));
+    int2 baseCoordinate = int2(floor(clamped));
+    int2 nextCoordinate = min(
+        baseCoordinate + int2(1, 1),
+        _FoamDimensions - int2(1, 1));
+    float2 blend = frac(clamped);
+
+    float a = LoadObstacleExclusionCell(baseCoordinate);
+    float b = LoadObstacleExclusionCell(
+        int2(nextCoordinate.x, baseCoordinate.y));
+    float c = LoadObstacleExclusionCell(
+        int2(baseCoordinate.x, nextCoordinate.y));
+    float d = LoadObstacleExclusionCell(nextCoordinate);
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+
 
 void ResolveExternalBilinearCoordinates(
     int2 dimensions,

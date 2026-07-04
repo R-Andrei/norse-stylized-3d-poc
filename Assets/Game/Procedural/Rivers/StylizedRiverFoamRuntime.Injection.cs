@@ -28,6 +28,10 @@ namespace ProgrammaticStylized3D.Rivers
                 PendingInjection injection = pendingInjections[index];
                 ActivateInjectionRange(injection, now);
                 DispatchInjection(injection);
+                materialLifetimeAuthorityActive = true;
+                materialLifetimeEmptyMetricReadbacks = 0;
+                lifetimeAuthorityStatus =
+                    "Remaining Life owns survival; scheduler is non-destructive";
                 reservations.Add(CreateReservation(injection));
                 if (injection.IsManual)
                 {
@@ -52,11 +56,7 @@ namespace ProgrammaticStylized3D.Rivers
                     injection.Radius * injection.Elongation *
                     (injection.CompoundShape ? 1.25f : 1f),
                 Elapsed = 0f,
-                MaximumLifetime = Mathf.Clamp(
-                    injection.RemainingLife *
-                    ResolveMaximumMaterialReservationSeconds(),
-                    0.05f,
-                    MaximumManualReservationSeconds)
+                ScheduleLifetime = ResolveReservationScheduleSeconds()
             };
         }
 
@@ -75,7 +75,7 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamReservation reservation = reservations[index];
                 reservation.Elapsed += deltaTime;
                 reservation.CentreGlobalDistance += speed * deltaTime;
-                if (reservation.Elapsed >= reservation.MaximumLifetime)
+                if (reservation.Elapsed >= reservation.ScheduleLifetime)
                 {
                     reservations.RemoveAt(index);
                     continue;
@@ -85,22 +85,21 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
-        private float ResolveMaximumMaterialReservationSeconds()
+        private float ResolveReservationScheduleSeconds()
         {
+            // Reservations are now only a work-scheduling hint. They must not
+            // estimate, extend, or terminate visible Foam lifetime. Keep them
+            // short enough to wake nearby transport while the single
+            // Remaining-Life authority keeps live material simulated.
             if (river == null)
             {
-                return MaximumManualReservationSeconds;
+                return 2f;
             }
 
-            float slowestAgeRate = Mathf.Max(
-                0.05f,
-                river.FoamSupportedAgingRate);
-            float supportedLifetime =
-                river.FoamNeutralLifetime / slowestAgeRate;
             return Mathf.Clamp(
-                supportedLifetime,
-                river.FoamNeutralLifetime,
-                MaximumManualReservationSeconds);
+                Mathf.Max(1f, river.FoamNeutralLifetime),
+                1f,
+                4f);
         }
 
         private void ActivateInjectionRange(PendingInjection injection, float now)
@@ -129,7 +128,7 @@ namespace ProgrammaticStylized3D.Rivers
                 maximumGlobal + padding,
                 now + Mathf.Min(
                     5f,
-                    ResolveMaximumMaterialReservationSeconds()));
+                    ResolveReservationScheduleSeconds()));
         }
 
         private void ActivateReservationRange(FoamReservation reservation, float now)
@@ -181,9 +180,8 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 if (!chunkActive[chunk])
                 {
-                    // Inactive chunks are already cleared by allocation or
-                    // the existing sleep path; reactivation needs no extra
-                    // clear dispatch.
+                    // Reactivation only changes scheduling. Material state is
+                    // never cleared by chunk sleep/wake transitions.
                     chunkActive[chunk] = true;
                 }
 
@@ -203,10 +201,29 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
+                // Chunk timers are scheduling hints only. They must never
+                // delete material; per-cell Remaining Life inside the foam
+                // texture is the single survival/death authority.
                 chunkActive[chunk] = false;
                 chunkActiveUntil[chunk] = 0.0;
-                ClearChunk(chunk);
             }
+        }
+
+        private void SimulateMaterialAuthority(float deltaTime)
+        {
+            // Correctness first: once material may exist, lifecycle runs over
+            // the whole persistent foam field. Chunk/reservation windows remain
+            // only scheduling hints for future optimization; they cannot make
+            // live material stop aging or die as a batch.
+            if (materialLifetimeAuthorityActive)
+            {
+                previousState = currentState;
+                DispatchSimulation(0, fieldWidth);
+                (currentState, writeState) = (writeState, currentState);
+                return;
+            }
+
+            SimulateActiveChunks(deltaTime);
         }
 
         private void SimulateActiveChunks(float deltaTime)

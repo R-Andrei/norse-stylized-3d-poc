@@ -9,6 +9,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
     [CanEditMultipleObjects]
     public sealed class GeneratedMassEditor : UnityEditor.Editor
     {
+        private const string ColdGreyStoneMaterialPath =
+            "Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_ColdGrey.mat";
+        private const string DarkWetRiverStoneMaterialPath =
+            "Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_WetRiver.mat";
+        private const string PaleFrostStoneMaterialPath =
+            "Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_PaleFrost.mat";
+        private const string BlackSacredStoneMaterialPath =
+            "Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_BlackSacred.mat";
+
+        private SerializedProperty coldGreyStoneMaterial;
+        private SerializedProperty darkWetRiverStoneMaterial;
+        private SerializedProperty paleFrostStoneMaterial;
+        private SerializedProperty blackSacredStoneMaterial;
         private SerializedProperty riverInteraction;
         private SerializedProperty participation;
         private SerializedProperty staticPressureMode;
@@ -27,6 +40,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
         private void OnEnable()
         {
+            coldGreyStoneMaterial = serializedObject.FindProperty(
+                "coldGreyStoneMaterial");
+            darkWetRiverStoneMaterial = serializedObject.FindProperty(
+                "darkWetRiverStoneMaterial");
+            paleFrostStoneMaterial = serializedObject.FindProperty(
+                "paleFrostStoneMaterial");
+            blackSacredStoneMaterial = serializedObject.FindProperty(
+                "blackSacredStoneMaterial");
             riverInteraction = serializedObject.FindProperty(
                 "riverInteraction");
             participation = riverInteraction?.FindPropertyRelative(
@@ -65,6 +86,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
+            EnsureDefaultStoneMaterials();
 
             DrawPropertiesExcluding(
                 serializedObject,
@@ -128,6 +150,53 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "Surface Seed changes surface triangulation, subtle facet relief " +
                 "and vertex-colour variation.",
                 MessageType.Info);
+        }
+
+        private void EnsureDefaultStoneMaterials()
+        {
+            bool changed = false;
+
+            changed |= AssignDefaultMaterialIfMissing(
+                coldGreyStoneMaterial,
+                ColdGreyStoneMaterialPath);
+            changed |= AssignDefaultMaterialIfMissing(
+                darkWetRiverStoneMaterial,
+                DarkWetRiverStoneMaterialPath);
+            changed |= AssignDefaultMaterialIfMissing(
+                paleFrostStoneMaterial,
+                PaleFrostStoneMaterialPath);
+            changed |= AssignDefaultMaterialIfMissing(
+                blackSacredStoneMaterial,
+                BlackSacredStoneMaterialPath);
+
+            if (changed)
+            {
+                serializedObject.ApplyModifiedPropertiesWithoutUndo();
+                serializedObject.Update();
+            }
+        }
+
+        private static bool AssignDefaultMaterialIfMissing(
+            SerializedProperty property,
+            string assetPath)
+        {
+            if (property == null ||
+                property.hasMultipleDifferentValues ||
+                property.objectReferenceValue != null)
+            {
+                return false;
+            }
+
+            Material material =
+                AssetDatabase.LoadAssetAtPath<Material>(assetPath);
+
+            if (material == null)
+            {
+                return false;
+            }
+
+            property.objectReferenceValue = material;
+            return true;
         }
 
         private void DrawRiverInteraction()

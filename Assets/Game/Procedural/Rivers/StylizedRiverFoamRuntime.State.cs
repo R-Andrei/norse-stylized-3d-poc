@@ -128,7 +128,7 @@ namespace ProgrammaticStylized3D.Rivers
             public float CentreGlobalDistance;
             public float AlongRadius;
             public float Elapsed;
-            public float MaximumLifetime;
+            public float ScheduleLifetime;
         }
 
         [StructLayout(LayoutKind.Sequential)]
