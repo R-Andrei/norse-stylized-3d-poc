@@ -6,8 +6,8 @@ namespace ProgrammaticStylized3D.Rivers
     {
         public int FieldWidth => currentState != null ? currentState.width : 0;
         public int FieldHeight => currentState != null ? currentState.height : 0;
-        public int GuidanceWidth => guidanceTexture != null ? guidanceTexture.width : 0;
-        public int GuidanceHeight => guidanceTexture != null ? guidanceTexture.height : 0;
+        public int StructuralWidth => structuralWidth;
+        public int StructuralHeight => structuralHeight;
         public int TopologyWidth => topologyTexture != null ? topologyTexture.width : 0;
         public int TopologyHeight => topologyTexture != null ? topologyTexture.height : 0;
         public bool MajorTopologyAvailable => majorTopology != null;
@@ -541,17 +541,33 @@ namespace ProgrammaticStylized3D.Rivers
             ? currentShoreEdgesTexture.width
             : 0;
         public bool TopologyMetricsAvailable => topologyMetricsAvailable;
-        public float MajorSupportCoverage => TopologyCoverageRatio(1);
-        public float ConnectorSupportCoverage => TopologyCoverageRatio(2);
-        public float NegativeAgingPressureCoverage => TopologyCoverageRatio(3);
+        public float MajorSupportCoverage => TopologyCoverageRatio(TopologyMetricMajorSupport);
+        public float ConnectorSupportCoverage => TopologyCoverageRatio(TopologyMetricConnectorSupport);
+        public float NegativeAgingPressureCoverage => TopologyCoverageRatio(TopologyMetricNegativeAgingPressure);
         public float FoamWithinNegativeAgingPressure =>
-            TopologyRegionRatio(4, 3);
-        public float VisibleMaterialCoverage => TopologyCoverageRatio(5);
-        public float FoamWithinShoreSupport => TopologyRegionRatio(9, 8);
-        public float FoamWithinPressureLeeSupport => TopologyRegionRatio(13, 12);
-        public float PerimeterRatio => TopologyRegionRatio(14, 5);
-        public float ConnectorMajorOverlap => TopologyRegionRatio(15, 2);
-        public float GuidanceUpdateRate => ResolveGuidanceUpdateRate();
+            TopologyRegionRatio(
+                TopologyMetricFoamInNegativeAgingPressure,
+                TopologyMetricNegativeAgingPressure);
+        public float VisibleMaterialCoverage => TopologyCoverageRatio(TopologyMetricVisibleMaterial);
+        public float IntegratedPresenceArea => integratedPresenceArea;
+        public float VisiblePresenceCoreArea => visiblePresenceCoreArea;
+        public bool ManualProofReferenceAvailable => manualProofReferenceArea > 0.0001f;
+        public float ManualProofReferenceArea => manualProofReferenceArea;
+        public float ManualProofPresenceRatio => manualProofReferenceArea > 0.0001f
+            ? integratedPresenceArea / manualProofReferenceArea
+            : 0f;
+        public float FoamWithinShoreSupport => TopologyRegionRatio(
+            TopologyMetricFoamInShoreSupport,
+            TopologyMetricShoreSupport);
+        public float FoamWithinPressureLeeSupport => TopologyRegionRatio(
+            TopologyMetricFoamInPressureLeeSupport,
+            TopologyMetricPressureLeeSupport);
+        public float PerimeterRatio => TopologyRegionRatio(
+            TopologyMetricPerimeterVisible,
+            TopologyMetricVisibleMaterial);
+        public float ConnectorMajorOverlap => TopologyRegionRatio(
+            TopologyMetricConnectorMajorOverlap,
+            TopologyMetricConnectorSupport);
         public int ActiveChunkCount => CountActiveChunks();
         public int PendingInjectionCount => pendingInjections.Count;
         public int ActiveReservationCount => reservations.Count;
@@ -606,15 +622,29 @@ namespace ProgrammaticStylized3D.Rivers
         public long LastUpdateCellIterations => lastUpdateCellIterations;
         public long RecentPeakCellIterations => recentPeakCellIterations;
         public float UpdateRate => ResolveUpdateRate();
+        public float MaterialStepDuration => lastMaterialStepDuration;
+        public int MaterialStepsLastFrame => lastMaterialStepsThisFrame;
+        public float RenderInterpolationAlpha => lastRenderInterpolationAlpha;
+        public float RenderTravelMetres => lastFoamRenderTravelMetres;
+        public float FoamPhaseTransportMetres => lastFoamPhaseTransportMetres;
+        public float FoamPhaseCellFraction => lastFoamPhaseCellFraction;
+        public int PhaseCommitCellsLastFrame => lastPhaseCommitCellsThisFrame;
+        public int PhaseCommitCellsLastSecond => Mathf.Max(
+            lastPhaseCommitCellsThisSecond,
+            phaseCommitCellsInCurrentSecond);
+        public float EstimatedTransportCellsPerStep =>
+            lastEstimatedTransportCellsPerStep;
+        public int TransportSubstepsUsed => lastTransportSubstepsUsed;
+        public int CompressionPassesUsed => lastCompressionPassesUsed;
         public bool InitializationComplete =>
             initializationPhase == InitializationPhase.Ready;
         public bool ResourcesAllocated =>
             InitializationComplete && currentState != null;
-        public bool CorrectedAdvectionActive =>
+        public bool ConservativeTransportActive =>
             InitializationComplete &&
             currentState != null &&
-            advectedState != null &&
-            reverseState != null;
+            transportPredictorState != null &&
+            transportCorrectedState != null;
         public bool IsSleeping =>
             !TopologyReplacementInProgress &&
             !TopologyTransitionActive &&
@@ -628,12 +658,11 @@ namespace ProgrammaticStylized3D.Rivers
         public long EstimatedMemoryBytes =>
             EstimateTextureBytes(stateA) +
             EstimateTextureBytes(stateB) +
-            EstimateTextureBytes(advectedState) +
-            EstimateTextureBytes(reverseState) +
+            EstimateTextureBytes(transportPredictorState) +
+            EstimateTextureBytes(transportCorrectedState) +
             EstimateTextureBytes(progressiveBirthSourceTexture) +
             EstimateTextureBytes(progressiveBirthTransferDebugTexture) +
             EstimateTextureBytes(progressiveBirthDebugTexture) +
-            EstimateTextureBytes(guidanceTexture) +
             EstimateTextureBytes(topologyTexture) +
             EstimateTextureBytes(topologySourcesTexture) +
             EstimateTextureBytes(topologyGeneratedTexture) +
@@ -722,11 +751,8 @@ namespace ProgrammaticStylized3D.Rivers
                     return false;
                 }
 
-                StylizedRiverFoamDebugView view = river.FoamDebugView;
-                return view == StylizedRiverFoamDebugView.AnchoredSupport ||
-                    view == StylizedRiverFoamDebugView.SupportAndNegativeInfluence ||
-                    view == StylizedRiverFoamDebugView.SupportClasses ||
-                    view == StylizedRiverFoamDebugView.NegativeInfluenceClasses;
+                return river.FoamDebugView ==
+                    StylizedRiverFoamDebugView.FoamAndAgingTopology;
             }
         }
 

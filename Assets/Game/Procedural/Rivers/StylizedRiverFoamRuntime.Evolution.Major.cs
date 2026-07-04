@@ -1102,8 +1102,8 @@ namespace ProgrammaticStylized3D.Rivers
                     evolvingWeakSpanNegativeTexture);
                 Dispatch(
                     buildEvolvingMajorSupportKernel,
-                    guidanceWidth,
-                    guidanceHeight);
+                    structuralWidth,
+                    structuralHeight);
             }
 
             majorEvolutionReconstructionTicks++;

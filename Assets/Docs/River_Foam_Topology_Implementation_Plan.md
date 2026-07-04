@@ -1447,7 +1447,7 @@ On a valid hit the runtime:
 - deserializes the complete immutable Major, Connector, and four-class Negative Aging Pressure graph;
 - uploads the exact cached obstacle scalar field directly;
 - initializes the existing Major/hosted-negative/Free-Water/Connector/Weak-Span reconstruction resources;
-- reuses the accepted generated-topology upload, evolving-field, guidance, and renderer-composition paths;
+- reuses the accepted generated-topology upload, evolving-field, and renderer-composition paths;
 - skips transformed-mesh rescanning, obstacle interval baking, forced GPU readback, candidate generation, cleanup, pathfinding, replacement-catalogue construction, and negative-region searches.
 
 A release build remains strict: an unassigned, empty, unsupported, corrupt, metadata-mismatched, stale-domain, stale-obstacle, stale-settings, incomplete, or provider-unavailable cache remains neutral and never silently runs the expensive preparation path. Editor and Development orchestration is refined separately by Patch 4.9C.1.
@@ -1522,7 +1522,7 @@ Declare exactly what later Foam-material work may read, who owns each value, how
 | `_FoamTopology` | R | Major Support | generated, evolving topology |
 |  | G | Connector Support | generated, evolving topology |
 |  | B | aggregate Negative Aging Pressure | generated, evolving topology |
-|  | A | same-grid Obstacle Footprint copy | compatibility and diagnostics only |
+|  | A | reserved zero | no current owner |
 | `_FoamTopologySources` | R | Pressure Support | live anchored source |
 |  | G | Lee Support | live anchored source |
 |  | B | Shore Support | live anchored source |
@@ -1554,7 +1554,7 @@ The topology runtime does not spawn or erase material, implement fragmentation o
 - Rendering, diagnostics, and differently mapped consumers should sample through the canonical Foam field mapping and physical river-space coordinates.
 - Major Support, Connector Support, Anchored Support, and aggregate Negative Aging Pressure remain independent inputs.
 - The destructive composition `Positive × (1 - Negative)` is forbidden as a material-facing pre-pass.
-- `_FoamObstacleExclusion` is the canonical obstacle source. `_FoamTopology.a` is a compatibility/debug copy and must not be applied as a second independent exclusion.
+- `_FoamObstacleExclusion` is the canonical obstacle source. `_FoamTopology.a` is reserved zero and has no obstacle compatibility role.
 - Valid-water decisions remain owned by the boundary/domain contract rather than inferred from topology support.
 
 #### Replacement and binding contract
@@ -1583,10 +1583,10 @@ Pass only if the canonical Stage 6 architecture, topology plan, river roadmap, a
 
 #### Implemented changes
 
-- added one canonical HLSL semantic sampling representation for Major Support, Connector Support, aggregate Negative Aging Pressure, Pressure Support, Lee Support, Shore Support, combined Anchored Support, canonical Obstacle Footprint, its compatibility copy, and valid fluid;
+- added one canonical HLSL semantic sampling representation for Major Support, Connector Support, aggregate Negative Aging Pressure, Pressure Support, Lee Support, Shore Support, combined Anchored Support, canonical Obstacle Footprint, and valid fluid;
 - preserved the frozen texture packing rather than adding a speculative negative-subtype texture;
-- hardened renderer binding paths so previous/current material state, guidance, topology, sources, fracture, boundary, obstacle, mapping, interpolation, and material parameters are valid or neutral before resource release and after disable/shutdown;
-- declared `_FoamObstacleExclusion` canonical while retaining `_FoamTopology.a` only for compatibility/diagnostics;
+- hardened renderer binding paths so previous/current material state, topology, sources, boundary, obstacle, mapping, interpolation, and material parameters are valid or neutral before resource release and after disable/shutdown;
+- declared `_FoamObstacleExclusion` canonical. Patch 4.11C.5 later removes the obsolete `_FoamTopology.a` compatibility copy and reserves alpha as zero;
 - removed the obsolete destructive `LegacyNetSupport` proof helper and only the diagnostics that depended exclusively upon it;
 - preserved removed metric-buffer slots as reserved to avoid unrelated layout churn;
 - updated aggregate-negative comments, Inspector labels, public diagnostic names, and the completed debug-gating TODO;
@@ -1729,11 +1729,26 @@ A topology patch that cannot answer these questions is not ready.
 
 ---
 
+## 12.1 Patch 4.11C.5 Material-Integration Correction
+
+Patch 4.11C.5 changes no topology generator, cache payload, identity, evolution rule, or replacement transition. It removes obsolete material-side behaviour that had violated the topology ownership boundary:
+
+- topology and shore fields no longer steer persistent material;
+- there is no procedural material-guidance network;
+- positive support and Negative Aging Pressure modify Remaining Life only;
+- `_FoamTopology.a` is written as zero and never copied into obstacle validity;
+- exact `_FoamObstacleExclusion` remains the sole solid mask;
+- the combined `Foam + Aging Topology` view displays green positive support, red negative pressure, yellow overlap, blue obstacles, and the exact cyan/white final Foam mask.
+
+This clarification is material integration only. Topology generation remains closed.
+
+---
+
 ## 13. Immediate Next Step
 
 Topology generation remains complete and closed after Patch 4.10B.
 
-Material-owned **Patch 4.11C.3 — Source Quantity and Birth-Merge Correction** is Unity-validated. **Patch 4.11C.4 — Persistent Material-State Migration** is implemented and awaits focused Unity validation. After acceptance, work continues with C.5 transport/valid-fluid correction, C.6 lifetime authority/presentation, and C.7 validation/closure.
+Material-owned **Patch 4.11C.3 — Source Quantity and Birth-Merge Correction** is Unity-validated. **Patch 4.11C.4 — Persistent Material-State Migration** completed the atomic channel migration but failed visual acceptance because obsolete material transport overrode the source footprint and visible lifetime. **Patch 4.11C.5 — Material Footprint Preservation and Unified Lifecycle Diagnostics** removes those obsolete systems and has passed the major lifetime validation gate. **Patch 4.11C.5.1 — Material Flow Speed and Visual Residue Cleanup** adds material-speed control and suppresses low-coverage transport crumbs without changing topology ownership. **Patch 4.11C.5.2 — Transport Temporal Continuity** raises the material cadence and adds timing diagnostics without changing topology ownership. C.6 lifetime authority/presentation and C.7 closure remain blocked.
 
 These patches may sample the accepted topology outputs but may not:
 
@@ -1741,7 +1756,22 @@ These patches may sample the accepted topology outputs but may not:
 - change cache payloads, fingerprints, or versions;
 - reinterpret topology identities as continuous emitters;
 - collapse positive support and Negative Aging Pressure;
-- treat `_FoamTopology.a` as a second obstacle exclusion;
+- write or treat `_FoamTopology.a` as obstacle data; alpha is reserved zero;
 - change topology evolution or replacement transitions.
 
 Detailed implementation requirements belong to `River_Foam_Material_State_Correction_Implementation_Plan.md`. Patch 4.11D remains blocked until C.7 is accepted.
+
+---
+
+# Patch 4.11C.5.2b Note — Debug Layer Reorganization
+
+C.5.2b reorganizes the Foam Inspector diagnostics into named explanatory foldouts instead of one flat topology/runtime list. This is a validation-workflow correction only. It does not change Foam simulation, transport, lifetime, topology generation, source birth, residue handling, or rendering behaviour.
+
+The current recovery sequence remains:
+
+1. transport temporal continuity;
+2. residue suppression and shape conservation;
+3. topology aging proof and interaction calibration;
+4. controlled lateral drift and obstacle tangential flow.
+
+Transport debugging now begins in the `Transport / Motion` foldout, where material step duration, steps last frame, render interpolation alpha, estimated cells per step, transport substeps, compression passes, and material flow speed are visible near the top of the Foam Inspector.

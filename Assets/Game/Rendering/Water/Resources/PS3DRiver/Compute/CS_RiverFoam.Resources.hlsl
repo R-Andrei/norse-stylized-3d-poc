@@ -1,4 +1,4 @@
-// Canonical Patch 4.11C.4 persistent and per-step source state:
+// Canonical persistent and per-step source state (4.11C.4+, preserved by 4.11C.5):
 // R = Presence
 // G = Presence * normalized Remaining Life
 // B = Presence * normalized Material Pattern
@@ -13,14 +13,14 @@ RWTexture2D<float4> _FoamProgressiveBirthSourceWrite;
 Texture2D<float4> _FoamProgressiveBirthSourceRead;
 RWTexture2D<float4> _FoamBirthTransferDebugWrite;
 RWStructuredBuffer<uint> _FoamBirthDebugCounters;
-RWTexture2D<float4> _FoamAdvectionWrite;
-Texture2D<float4> _FoamAdvectedRead;
-Texture2D<float4> _FoamReverseRead;
+RWTexture2D<float4> _FoamTransportWrite;
+Texture2D<float4> _FoamTransportPredictorRead;
+Texture2D<float4> _FoamTransportCorrectedRead;
+Texture2D<float4> _FoamCompressionStateRead;
+RWTexture2D<float4> _FoamCompressionStateWrite;
 Texture2D<float4> _FoamBoundary;
 RWTexture2D<float> _FoamObstacleExclusionWrite;
 Texture2D<float> _FoamObstacleExclusionRead;
-RWTexture2D<float4> _FoamGuidanceWrite;
-Texture2D<float4> _FoamGuidanceRead;
 Texture2D<float4> _FoamTopologyGeneratedRead;
 Texture2D<float4> _FoamTopologyTransitionFromRead;
 Texture2D<float> _FoamEvolvingMajorRead;
@@ -44,7 +44,6 @@ Texture2D<float2> _FoamCurrentShoreEdgesRead;
 Texture2D<float4> _FoamTopologyRead;
 Texture2D<float4> _FoamTopologySourcesRead;
 Texture2D<float4> _FoamWakeField;
-Texture2D<float4> _FoamRippleField;
 Texture2D<float4> _FoamStaticWakeField;
 Texture2D<float4> _FoamStaticPressureField;
 StructuredBuffer<FoamMetricRow> _FoamMetricRows;
@@ -63,26 +62,32 @@ StructuredBuffer<FoamWeakSpanIdentityData>
     _FoamWeakSpanIdentityRecords;
 
 
-// One global topology diagnostic record. Values are uint counters.
-//  0 valid-fluid cells                    8 shore-support cells
-//  1 major-support cells                  9 foam within shore support
-//  2 connector-support cells             10 reserved
-//  3 negative-aging-pressure cells       11 reserved
-//  4 foam within negative aging pressure 12 Pressure/Lee-support cells
-//  5 visible material cells              13 foam within Pressure/Lee support
-//  6 reserved                            14 perimeter-visible cells
-//  7 reserved                            15 Connector/Major overlap cells
+// One compact global topology/material diagnostic record. Values are uint
+// counters except integrated/core area, which store fixed-point square metres.
+static const uint FoamMetricValidFluidOffset = 0u;
+static const uint FoamMetricMajorSupportOffset = 4u;
+static const uint FoamMetricConnectorSupportOffset = 8u;
+static const uint FoamMetricNegativeAgingPressureOffset = 12u;
+static const uint FoamMetricFoamInNegativeOffset = 16u;
+static const uint FoamMetricVisibleMaterialOffset = 20u;
+static const uint FoamMetricShoreSupportOffset = 24u;
+static const uint FoamMetricFoamInShoreOffset = 28u;
+static const uint FoamMetricIntegratedPresenceAreaOffset = 32u;
+static const uint FoamMetricPresenceCoreAreaOffset = 36u;
+static const uint FoamMetricPressureLeeSupportOffset = 40u;
+static const uint FoamMetricFoamInPressureLeeOffset = 44u;
+static const uint FoamMetricPerimeterVisibleOffset = 48u;
+static const uint FoamMetricConnectorMajorOverlapOffset = 52u;
+static const uint FoamMetricCount = 14u;
 RWByteAddressBuffer _FoamTopologyMetrics;
 
 int2 _FoamDimensions;
-int2 _FoamGuidanceDimensions;
 int2 _FoamTopologyDimensions;
 int2 _FoamTopologyTransitionDimensions;
 int2 _FoamMajorMaskDimensions;
 int2 _FoamHostedNegativeMaskDimensions;
 int2 _FoamFreeWaterMaskDimensions;
 int2 _FoamWakeDimensions;
-int2 _FoamRippleDimensions;
 int2 _FoamStaticWakeDimensions;
 int2 _FoamStaticPressureDimensions;
 int _FoamRangeStart;
@@ -93,27 +98,27 @@ int _FoamHostedNegativeEvolutionCount;
 int _FoamFreeWaterEvolutionCount;
 int _FoamConnectorIdentityCount;
 int _FoamWeakSpanIdentityCount;
-int _FoamResolutionPerChunk;
-int _FoamChunkCount;
+int _FoamCompressionAxis;
+int _FoamCompressionParity;
+int _FoamPhaseCommitCells;
 float _FoamDeltaTime;
+float _FoamPhaseTransportMetres;
 float _FoamGlobalStart;
 float _FoamFieldLength;
 float _FoamValidLength;
 float _FoamSimulationLength;
 float _FoamFlowSpeed;
 float _FoamFlowDirection;
-float _FoamEvolution;
-float _FoamSpread;
 float _FoamNeutralLifetime;
 float _FoamPositiveAgeMultiplier;
 float _FoamNegativeAgeMultiplier;
 float _FoamTime;
 float _FoamSeed;
 float _FoamPresenceMetricThreshold;
-float _FoamGuidanceStrength;
-float _FoamBoundaryAttraction;
-float _FoamWakeMotionInfluence;
-float _FoamImpactMotionInfluence;
+float2 _FoamWakeMotionInfluence;
+float2 _FoamPressureMotionInfluence;
+float _FoamTransportMaximumAxisCourant;
+float _FoamIntegratedAreaFixedPointScale;
 float _FoamDisturbanceEnabled;
 float _FoamMotionFlowSpeed;
 float _FoamMotionWaveHeight;

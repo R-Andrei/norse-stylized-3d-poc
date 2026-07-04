@@ -89,19 +89,11 @@ namespace ProgrammaticStylized3D.Rivers
 
     public enum StylizedRiverFoamDebugView
     {
-        // Zero is the normal rendered result and acts as the debug-off state.
+        // Zero is the exact normal rendered result and debug-off state.
         Final = 0,
-        // Numeric values 3, 6, 7, and 8 are retained so existing serialized
-        // selections survive the removal of obsolete Foam diagnostics.
-        AnchoredSupport = 3,
-        SupportAndNegativeInfluence = 6,
-        SupportClasses = 7,
-        NegativeInfluenceClasses = 8,
-        MaterialRemainingLife = 9,
-        ProgressiveBirthSource = 10,
-        ProgressiveBirthTransfer = 11,
-        MaterialPresence = 12,
-        MaterialPattern = 13
+        FoamAndAgingTopology = 1,
+        ProgressiveBirthSource = 2,
+        ProgressiveBirthTransfer = 3
     }
 
     public enum StylizedRiverDisturbanceDebugView
@@ -190,6 +182,9 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamNegativeAgingRate = 1f;
         private const float MaximumFoamNegativeAgingRate = 8f;
         private const float DefaultFoamNegativeAgingRate = 4f;
+        private const float MinimumFoamMaterialFlowSpeedMultiplier = 0f;
+        private const float MaximumFoamMaterialFlowSpeedMultiplier = 6f;
+        private const float DefaultFoamMaterialFlowSpeedMultiplier = 1f;
         private const float MinimumFoamProgressiveRibbonDuration = 0.5f;
         private const float MaximumFoamProgressiveRibbonDuration = 3f;
         private const float DefaultFoamProgressiveRibbonDuration = 1.5f;
@@ -779,6 +774,14 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField]
         private float foamNegativeAgingRate = DefaultFoamNegativeAgingRate;
 
+        [Tooltip("Multiplier for persistent Foam material transport speed relative to the authored river Flow Speed. One follows the visible water speed, values above one make existing Foam travel faster downstream, and zero freezes ordinary downstream material drift while still allowing explicit source birth and valid-fluid clipping.")]
+        [Range(
+            MinimumFoamMaterialFlowSpeedMultiplier,
+            MaximumFoamMaterialFlowSpeedMultiplier)]
+        [SerializeField]
+        private float foamMaterialFlowSpeedMultiplier =
+            DefaultFoamMaterialFlowSpeedMultiplier;
+
         [SerializeField, HideInInspector]
         private int foamMaterialLifecycleTuningVersion;
 
@@ -803,14 +806,13 @@ namespace ProgrammaticStylized3D.Rivers
         [HideInInspector, SerializeField, Range(0f, 1f)]
         private float foamTestAmount = 0.85f;
 
-        [FormerlySerializedAs("foamTestFreshness")]
         [HideInInspector, SerializeField, Range(0f, 1f)]
         private float foamTestRemainingLife = 1f;
 
         [HideInInspector, SerializeField, Range(0.25f, 8f)]
         private float foamTestElongation = 1.5f;
 
-        [Tooltip("Half-width in world metres used only by the progressive-ribbon birth source. The legacy one-frame diagnostic Radius remains separate.")]
+        [Tooltip("Half-width in world metres used only by the progressive-ribbon birth source. The manual one-frame diagnostic Radius remains separate.")]
         [HideInInspector, SerializeField]
         [Range(
             MinimumFoamProgressiveRibbonHalfWidth,
@@ -1302,6 +1304,11 @@ namespace ProgrammaticStylized3D.Rivers
                 foamNegativeAgingRate,
                 MinimumFoamNegativeAgingRate,
                 MaximumFoamNegativeAgingRate);
+        public float FoamMaterialFlowSpeedMultiplier =>
+            Mathf.Clamp(
+                foamMaterialFlowSpeedMultiplier,
+                MinimumFoamMaterialFlowSpeedMultiplier,
+                MaximumFoamMaterialFlowSpeedMultiplier);
         public Color FoamColour => foamColour;
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
         public float FoamTestDistanceNormalized =>
@@ -1311,9 +1318,6 @@ namespace ProgrammaticStylized3D.Rivers
         public float FoamTestRadius => foamTestRadius;
         public float FoamTestAmount => foamTestAmount;
         public float FoamTestRemainingLife => foamTestRemainingLife;
-        // Compatibility alias for integrations compiled against the former
-        // provisional Freshness name. The value now means normalized Remaining Life.
-        public float FoamTestFreshness => foamTestRemainingLife;
         public float FoamTestElongation => foamTestElongation;
         public float FoamTestProgressiveRibbonHalfWidth =>
             Mathf.Clamp(
@@ -1605,24 +1609,12 @@ namespace ProgrammaticStylized3D.Rivers
         {
             switch ((int)value)
             {
-                case (int)StylizedRiverFoamDebugView.AnchoredSupport:
-                    return StylizedRiverFoamDebugView.AnchoredSupport;
-                case (int)StylizedRiverFoamDebugView.SupportAndNegativeInfluence:
-                    return StylizedRiverFoamDebugView.SupportAndNegativeInfluence;
-                case (int)StylizedRiverFoamDebugView.SupportClasses:
-                    return StylizedRiverFoamDebugView.SupportClasses;
-                case (int)StylizedRiverFoamDebugView.NegativeInfluenceClasses:
-                    return StylizedRiverFoamDebugView.NegativeInfluenceClasses;
-                case (int)StylizedRiverFoamDebugView.MaterialRemainingLife:
-                    return StylizedRiverFoamDebugView.MaterialRemainingLife;
+                case (int)StylizedRiverFoamDebugView.FoamAndAgingTopology:
+                    return StylizedRiverFoamDebugView.FoamAndAgingTopology;
                 case (int)StylizedRiverFoamDebugView.ProgressiveBirthSource:
                     return StylizedRiverFoamDebugView.ProgressiveBirthSource;
                 case (int)StylizedRiverFoamDebugView.ProgressiveBirthTransfer:
                     return StylizedRiverFoamDebugView.ProgressiveBirthTransfer;
-                case (int)StylizedRiverFoamDebugView.MaterialPresence:
-                    return StylizedRiverFoamDebugView.MaterialPresence;
-                case (int)StylizedRiverFoamDebugView.MaterialPattern:
-                    return StylizedRiverFoamDebugView.MaterialPattern;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }
@@ -1639,6 +1631,8 @@ namespace ProgrammaticStylized3D.Rivers
             foamNeutralLifetime = DefaultFoamNeutralLifetime;
             foamSupportedAgingRate = DefaultFoamSupportedAgingRate;
             foamNegativeAgingRate = DefaultFoamNegativeAgingRate;
+            foamMaterialFlowSpeedMultiplier =
+                DefaultFoamMaterialFlowSpeedMultiplier;
             foamMaterialLifecycleTuningVersion =
                 CurrentFoamMaterialLifecycleTuningVersion;
         }
@@ -3035,6 +3029,10 @@ namespace ProgrammaticStylized3D.Rivers
                 foamNegativeAgingRate,
                 MinimumFoamNegativeAgingRate,
                 MaximumFoamNegativeAgingRate);
+            foamMaterialFlowSpeedMultiplier = Mathf.Clamp(
+                foamMaterialFlowSpeedMultiplier,
+                MinimumFoamMaterialFlowSpeedMultiplier,
+                MaximumFoamMaterialFlowSpeedMultiplier);
             foamColour.a = Mathf.Clamp01(foamColour.a);
             foamTestDistanceNormalized = Mathf.Clamp01(
                 foamTestDistanceNormalized);

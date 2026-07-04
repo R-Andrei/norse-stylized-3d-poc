@@ -54,15 +54,21 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
+            float storageSegmentStartGlobalDistance =
+                WorldGlobalDistanceToFoamStorageGlobalDistance(
+                    segment.SegmentStartGlobalDistance);
+            float storageSegmentEndGlobalDistance =
+                WorldGlobalDistanceToFoamStorageGlobalDistance(
+                    segment.SegmentEndGlobalDistance);
             float segmentPadding = Mathf.Max(
                 segment.SegmentStartRadius,
                 segment.SegmentEndRadius);
             float minimumGlobal = Mathf.Min(
-                segment.SegmentStartGlobalDistance,
-                segment.SegmentEndGlobalDistance) - segmentPadding;
+                storageSegmentStartGlobalDistance,
+                storageSegmentEndGlobalDistance) - segmentPadding;
             float maximumGlobal = Mathf.Max(
-                segment.SegmentStartGlobalDistance,
-                segment.SegmentEndGlobalDistance) + segmentPadding;
+                storageSegmentStartGlobalDistance,
+                storageSegmentEndGlobalDistance) + segmentPadding;
             int startX = Mathf.Clamp(
                 GlobalDistanceToX(minimumGlobal) - 2,
                 0,
@@ -107,7 +113,7 @@ namespace ProgrammaticStylized3D.Rivers
                 segment.PatternSeed);
             computeShader.SetFloat(
                 "_FoamInjectionSegmentStartGlobalDistance",
-                segment.SegmentStartGlobalDistance);
+                storageSegmentStartGlobalDistance);
             computeShader.SetFloat(
                 "_FoamInjectionSegmentStartAcrossNormalized",
                 segment.SegmentStartAcrossNormalized);
@@ -119,7 +125,7 @@ namespace ProgrammaticStylized3D.Rivers
                 segment.SegmentStartSourceAmount);
             computeShader.SetFloat(
                 "_FoamInjectionSegmentEndGlobalDistance",
-                segment.SegmentEndGlobalDistance);
+                storageSegmentEndGlobalDistance);
             computeShader.SetFloat(
                 "_FoamInjectionSegmentEndAcrossNormalized",
                 segment.SegmentEndAcrossNormalized);

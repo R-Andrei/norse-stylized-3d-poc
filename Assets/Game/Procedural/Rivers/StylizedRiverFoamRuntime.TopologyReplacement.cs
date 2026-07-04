@@ -362,7 +362,7 @@ namespace ProgrammaticStylized3D.Rivers
                 false,
                 false);
 
-            build.GeneratedTexture = CreateGuidanceTexture(
+            build.GeneratedTexture = CreateStructuralTexture(
                 $"PS3D_RiverFoam_TopologyGenerated_Replacement_{build.RequestId}");
             Texture2D upload = new Texture2D(
                 build.FieldWidth,
@@ -486,7 +486,7 @@ namespace ProgrammaticStylized3D.Rivers
             return computeShader != null &&
                 captureGeneratedTopologyKernel >= 0 &&
                 fieldWidth > 0 && fieldHeight > 0 &&
-                guidanceWidth > 0 && guidanceHeight > 0 &&
+                structuralWidth > 0 && structuralHeight > 0 &&
                 metricBuffer != null &&
                 metricRows.Length == fieldWidth &&
                 topologyGeneratedTexture != null &&
@@ -509,8 +509,8 @@ namespace ProgrammaticStylized3D.Rivers
             using var profilerScope =
                 TopologyTransitionCaptureProfilerMarker.Auto();
             RenderTexture capture = CreateTopologyTexture(
-                guidanceWidth,
-                guidanceHeight,
+                structuralWidth,
+                structuralHeight,
                 $"PS3D_RiverFoam_TopologyTransition_{Time.frameCount}");
             ComputeBuffer capturedMetricBuffer = new ComputeBuffer(
                 fieldWidth,
@@ -533,8 +533,8 @@ namespace ProgrammaticStylized3D.Rivers
                 capture);
             Dispatch(
                 captureGeneratedTopologyKernel,
-                guidanceWidth,
-                guidanceHeight);
+                structuralWidth,
+                structuralHeight);
 
             TopologyTransitionSnapshot previousSnapshot =
                 topologyTransitionSnapshot;
@@ -542,8 +542,8 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 GeneratedTexture = capture,
                 MetricBuffer = capturedMetricBuffer,
-                Width = guidanceWidth,
-                Height = guidanceHeight,
+                Width = structuralWidth,
+                Height = structuralHeight,
                 DomainVersion = domainVersion,
                 GlobalStart = allocatedGlobalStart,
                 FieldLength = fieldLength,
@@ -631,8 +631,8 @@ namespace ProgrammaticStylized3D.Rivers
                     1f);
                 computeShader.SetInts(
                     "_FoamTopologyTransitionDimensions",
-                    guidanceWidth,
-                    guidanceHeight);
+                    structuralWidth,
+                    structuralHeight);
                 computeShader.SetFloat(
                     "_FoamTopologyTransitionGlobalStart",
                     allocatedGlobalStart);
@@ -654,8 +654,8 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             bool sameMapping = snapshot.DomainVersion == domainVersion &&
-                snapshot.Width == guidanceWidth &&
-                snapshot.Height == guidanceHeight &&
+                snapshot.Width == structuralWidth &&
+                snapshot.Height == structuralHeight &&
                 Mathf.Abs(snapshot.GlobalStart - allocatedGlobalStart) <
                     0.0001f &&
                 Mathf.Abs(snapshot.FieldLength - fieldLength) < 0.0001f &&
@@ -733,7 +733,6 @@ namespace ProgrammaticStylized3D.Rivers
 
             snapshot.PreviousState = previousState;
             snapshot.CurrentState = currentState;
-            snapshot.Guidance = guidanceTexture;
             snapshot.Topology = topologyTexture;
             snapshot.TopologySources = topologySourcesTexture;
             snapshot.ObstacleExclusion = obstacleExclusionTexture;
@@ -752,7 +751,6 @@ namespace ProgrammaticStylized3D.Rivers
             previousState = null;
             currentState = null;
             writeState = null;
-            guidanceTexture = null;
             topologyTexture = null;
             topologySourcesTexture = null;
             obstacleExclusionTexture = null;
@@ -807,15 +805,12 @@ namespace ProgrammaticStylized3D.Rivers
             snapshot.PreviousState = null;
             snapshot.CurrentState = null;
 
-            RenderTexture guidance = snapshot.Guidance;
             RenderTexture topology = snapshot.Topology;
             RenderTexture sources = snapshot.TopologySources;
             RenderTexture obstacle = snapshot.ObstacleExclusion;
-            ReleaseTexture(ref guidance);
             ReleaseTexture(ref topology);
             ReleaseTexture(ref sources);
             ReleaseTexture(ref obstacle);
-            snapshot.Guidance = null;
             snapshot.Topology = null;
             snapshot.TopologySources = null;
             snapshot.ObstacleExclusion = null;
@@ -909,7 +904,6 @@ namespace ProgrammaticStylized3D.Rivers
             return EstimateTextureBytes(snapshot.GeneratedTexture) +
                 EstimateTextureBytes(snapshot.PreviousState) +
                 EstimateTextureBytes(snapshot.CurrentState) +
-                EstimateTextureBytes(snapshot.Guidance) +
                 EstimateTextureBytes(snapshot.Topology) +
                 EstimateTextureBytes(snapshot.TopologySources) +
                 EstimateTextureBytes(snapshot.ObstacleExclusion) +

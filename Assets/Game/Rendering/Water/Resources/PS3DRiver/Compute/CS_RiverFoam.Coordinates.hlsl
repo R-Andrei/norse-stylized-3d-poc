@@ -115,16 +115,10 @@ float4 LoadState(int2 coordinate)
 }
 
 
-float4 LoadBoundaryClasses(int2 coordinate)
+float LoadBoundaryCoverage(int2 coordinate)
 {
     return saturate(_FoamBoundary.Load(
-        int3(ClampX(coordinate.x), ClampY(coordinate.y), 0)));
-}
-
-
-float2 LoadBoundary(int2 coordinate)
-{
-    return LoadBoundaryClasses(coordinate).rg;
+        int3(ClampX(coordinate.x), ClampY(coordinate.y), 0)).r);
 }
 
 

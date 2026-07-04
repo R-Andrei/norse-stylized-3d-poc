@@ -94,9 +94,11 @@ Further performance engineering is paused because the free-water topology pipeli
 36. Patch 4.11C.1 source-only progressive-birth diagnostics — implemented and Unity-validated.
 37. Patch 4.11C.2 dedicated per-step source transfer and diagnostics — implemented; persistent material-state/lifetime failure exposed.
 38. Patch 4.11C.3 Source Quantity and Birth-Merge Correction — Unity-validated and accepted.
-39. Patch 4.11C.4 Persistent Material-State Migration — implemented; focused Unity validation pending.
-40. Patch 4.11C.5 Transport and Valid-Fluid Correction.
-41. Patch 4.11C.6 Lifetime Authority and Presentation.
+39. Patch 4.11C.4 Persistent Material-State Migration — atomic channel migration complete; visual validation failed because obsolete material transport overrode source footprint and visible lifetime.
+40. Patch 4.11C.5 Material Footprint Preservation and Unified Lifecycle Diagnostics — implemented; major lifetime/footprint validation passed with follow-up speed/residue work.
+41. Patch 4.11C.5.1 Material Flow Speed and Visual Residue Cleanup — installed; Unity validation exposed remaining stepwise transport.
+42. Patch 4.11C.5.2 Transport Temporal Continuity — implemented; Unity validation pending.
+42. Patch 4.11C.6 Lifetime Authority and Presentation.
 42. Patch 4.11C.7 Validation, Regression Audit, and Documentation Closure.
 
 The old distributed-supply controller, population-reduction work, forced whole-river activation, and provisional fracture field are no longer runtime work categories. No automatic material source exists yet. Corrected material state, event-driven population, age/Pattern-driven breakup, rendering, and performance closure remain separate bounded patches.
@@ -175,7 +177,7 @@ The historical sequence included, in one synchronous call path:
 23. resetting all accumulators;
 24. returning the runtime as ready.
 
-Patch 4.11B.1 later removes the historical fracture allocation/clear phases, population metrics allocation/measurement, and autonomous whole-river supply activation. They remain listed above only because this subsection records the old measured baseline.
+Patch 4.11B.1 later removes the historical fracture allocation/clear phases, population metrics allocation/measurement, and autonomous whole-river supply activation. Patch 4.11C.5 later deletes the guidance texture, guidance kernel, guidance build phase, and all associated scheduling/binding work. They remain listed above only because this subsection records the old measured baseline.
 
 The topology bootstrap invoked from this path is itself composite. `BuildTopologyField(0f)` currently performs:
 
@@ -454,73 +456,64 @@ private bool IsFullyReady { get; }
 
 The exact names are not approved by this document; they are illustrative. The implementation step must first inspect existing naming and choose the smallest consistent change.
 
-### 8.2 Proposed initialization states
+### 8.2 Current initialization states
 
-The state machine should be explicit rather than inferred from null texture checks.
+The runtime uses explicit dependency-ordered phases:
 
 ```text
-Inactive
-ValidatePrerequisites
-LoadComputeAsset
-ResolveKernelHandles
-ResolveDomainAndDimensions
+NotStarted
+ReleaseOldResources
+LoadCompute
+ResolveKernels
+ResolveDimensions
 AllocateMaterialTextures
-AllocateGuidanceAndTopologyTextures
+AllocateTopologyTextures
 AllocateAuxiliaryTextures
-InitializeNeutralResources
+ClearTopology
 AllocateBuffers
 BuildMetricBuffer
-BuildBoundaryData
-WaitForObstacleSourceSettle
+BuildBoundary
+WaitForObstacleStability
+ResolveTopologyCache
+AwaitExplicitTopologyGeneration
+InstallCachedTopology
 BuildObstacleExclusion
-ClearTopologyResources
-ClearMaterialStateA
-ClearMaterialStateB
-ClearAdvectedState
-ClearReverseState
-BuildGuidance
-BuildCurrentShoreEdges
-ComposeAnchoredSources
-BuildMajorDescriptors
-RasterizeMajor
-CleanupMajor
-BuildPocket
-ComposeFinalTopology
-InitializeMetrics
+BuildMajorTopology
+BuildConnectorTopology
+BuildPocketTopology
+ClearMaterial
+RefreshInitialTopologySources
+Finalize
 Ready
 Failed
 ```
 
-Not every state must consume a separate frame forever. The key is that the states exist independently so profiling can prove which ones are cheap enough to combine.
+Patch 4.11C.5 contains no `BuildGuidance` phase. Material transport intermediates are allocated with material textures and are cleared with material state.
 
 ### 8.3 Detailed phase table
 
-| Phase | Main work | Depends on | Produces | Initial classification |
+| Phase | Main work | Depends on | Produces | Classification |
 |---|---|---|---|---|
 | Validate prerequisites | Confirm river, domain, hardware formats, Foam enabled | River component | Valid/failed decision | Light |
 | Load compute asset | Load current compute resource | Supported hardware | Compute asset reference | Potential cold/medium |
-| Resolve kernels | Resolve all kernel indices | Compute asset | Valid kernel table | Potential cold/medium |
-| Resolve dimensions | Calculate chunks, resolutions, lengths | Valid domain | Field dimensions | Light |
-| Allocate material textures | Create state A/B, advected, reverse | Dimensions | Material textures | Heavy allocation |
-| Allocate guidance/topology textures | Create guidance, topology, sources, generated positive fields, aggregate negative field, and required class working resources | Dimensions | Topology textures | Heavy allocation |
-| Allocate auxiliary textures | Create shore-edge and obstacle resources | Dimensions | Auxiliary textures | Heavy allocation |
-| Initialize neutral resources | Create neutral disturbance fallback | Texture support | Safe fallback texture | Light/medium |
-| Allocate buffers | Metrics, exact obstacle intervals, and accepted topology metadata buffers | Capacities | GPU/CPU buffers | Medium allocation |
+| Resolve kernels | Resolve all current kernel indices | Compute asset | Valid kernel table | Potential cold/medium |
+| Resolve dimensions | Calculate chunks, material/structural resolution, lengths | Valid domain | Field dimensions | Light |
+| Allocate material textures | Create state A/B, conservative transport predictor/corrected textures, source, transfer, and source-debug textures | Dimensions | Material textures | Heavy allocation |
+| Allocate topology textures | Create topology, sources, generated positive/negative fields, class working resources, shore edges, boundary, and canonical obstacle exclusion | Dimensions | Structural textures | Heavy allocation |
+| Allocate auxiliary textures | Create neutral disturbance fallback and transition resources when required | Dimensions/support | Auxiliary textures | Medium allocation |
+| Clear topology resources | Clear topology/source/generated fields | Allocated textures | Known zero topology | Heavy group; may split |
+| Allocate buffers | Metrics, exact obstacle intervals, topology metadata, evolution records | Capacities | GPU/CPU buffers | Medium allocation |
 | Build metric buffer | Build and upload river metric rows | Domain/dimensions | Metric buffer contents | CPU/upload heavy |
-| Build boundary data | Build and upload valid-water mask | Domain/metric data | Boundary texture contents | CPU/upload heavy |
-| Wait for obstacle settle | Observe disturbance geometry version stability | Disturbance runtime | Stable-enough version | No heavy work |
-| Build obstacle exclusion | Prepare exact transformed-mesh solid intervals, evaluate current-water mask, and capture the topology-generation snapshot | Stable final placed sources, boundary | Cached interval buffers, obstacle texture, CPU scalar snapshot | Temporary CPU-heavy pre-gameplay preparation |
-| Clear topology resources | Clear topology/source/generated positive/aggregate negative textures | Allocated textures | Known zero topology | Heavy group; may split |
-| Clear material states | Clear each material-state texture | Allocated material textures | Known empty material | GPU dispatch per field |
-| Build guidance | Dispatch guidance kernel | Metric/boundary resources | Guidance field | Full-grid heavy |
-| Build current shore edges | Dispatch shoreline evaluator | Metric data | Current shore-edge texture | Medium/full-width |
-| Compose anchored sources | Update obstacle mask and compose shore/Pressure/Lee sources | Shore, disturbance, obstacle | Topology source field | Full-grid heavy |
-| Build Major topology | Run accepted preparation generator or load cached result, then upload | Metrics, boundary, sources | Major Support and metadata | Temporary CPU-heavy proof work / cached production load |
-| Build Connector topology | Run bounded relationship preparation or load cached result, then upload | Major, boundary, obstacles | Connector Support and metadata | Temporary CPU-heavy proof work / cached production load |
-| Build Negative Aging Pressure | Run active class generators or load cached result, then upload aggregate field and subtype metadata | Major, Connector, anchored cores, obstacles | Aggregate negative field and class metadata | Temporary CPU-heavy proof work / cached production load |
-| Compose final topology | Compose all current topology classes | All topology inputs | Final topology field | Full-grid heavy |
-| Initialize metrics | Reset and optionally measure topology diagnostics | Ready fields | Initial counters | Optional/deferred |
-| Ready | Mark complete and enter normal scheduling | Required phases complete | Runtime active | Light |
+| Build boundary | Build and upload valid-water coverage | Domain/metric data | Boundary texture | CPU/upload heavy |
+| Wait for obstacle stability | Observe geometry registration/version stability | Disturbance/generated geometry runtime | Stable source version | No heavy work |
+| Resolve topology cache | Validate exact cache or choose development generation path | Domain, settings, obstacle fingerprints | Cache decision | CPU validation |
+| Install cached topology | Deserialize/upload complete cached topology and exact obstacle data | Valid cache | Ready generated topology | CPU/upload heavy |
+| Build obstacle exclusion | Prepare/load exact transformed-solid intervals and evaluate current-water obstacle mask | Stable sources, boundary | Obstacle texture and compact intervals | Temporary development CPU-heavy / cached production load |
+| Build Major/Connector/Pocket topology | Run bounded preparation or install cached payload | Metrics, boundary, obstacles | Generated identities and fields | Temporary development CPU-heavy / cached production load |
+| Clear material | Clear both states, both conservative transport intermediates, source and transfer diagnostics | Material textures | Known empty material | GPU dispatch group |
+| Refresh initial topology sources | Build current shore edges and compose live Pressure/Lee/Shore sources | Metrics, boundary, disturbance, obstacles | Live source topology | Full-grid bounded |
+| Finalize | Bind complete neutral-safe resource set and reset scheduling state | Required resources | Runtime readiness | Light |
+| Ready | Enter normal scheduling | Finalize | Runtime active | Light |
 
 ### 8.4 No visual activation changes in the first staged patch
 
@@ -562,7 +555,6 @@ DomainDataReady
 BoundaryReady
 ObstacleReady
 MaterialStateReady
-GuidanceReady
 AnchoredTopologyReady
 MajorReady
 DependentTopologyReady
@@ -745,7 +737,6 @@ Obstacle source changed
 - `ConnectorField`
 - `FinalTopology`
 - `TopologyMetrics`
-- `GuidanceField`
 
 The implementation does not need a general-purpose graph library. A small explicit dependency table is preferable and easier to audit.
 
@@ -770,15 +761,33 @@ It should schedule:
 
 1. boundary rebuild;
 2. obstacle revalidation if obstacle masking depends on boundary validity;
-3. guidance rebuild;
-4. current-shore rebuild;
-5. anchored-source composition;
-6. generated topology validation or rebuild;
-7. dependent topology rebuild;
-8. final composition;
-9. optional diagnostics.
+3. current-shore rebuild;
+4. anchored-source composition;
+5. generated topology validation or rebuild;
+6. dependent topology rebuild;
+7. final composition;
+8. optional diagnostics.
 
 Each dependency may occur on a different frame.
+
+---
+
+## 12.6 Patch 4.11C.5 Scheduling Consequences
+
+C.5 physically removes the material-guidance system, so scheduling no longer owns:
+
+- a guidance texture allocation;
+- a guidance clear or build dispatch;
+- a guidance refresh accumulator;
+- a guidance profiler marker;
+- guidance dirty dependencies;
+- guidance transition/binding state.
+
+Each active material update now performs a fixed predictor, corrector, and lifecycle/source-merge sequence. The transport update rate is quality-based and increases only when authored signed downstream speed requires a smaller Courant step. Wake/Lee and Pressure velocity are sampled as existing fixed-cost disturbance fields; no per-event transport work is introduced.
+
+Each live material reservation schedules one downstream chunk beyond its known geometric range as a conservative-transport work halo. This is required because donor and receiver cells on a shared chunk-boundary face must both execute the same flux. The halo changes work coverage only; it does not enlarge Presence, extend Remaining Life, or revive inactive material.
+
+The development footprint metrics run only when the combined `Foam + Aging Topology` view, explicit profiling, or a captured manual footprint proof requires them. A manual proof keeps its low-rate ratio current even in Final Foam; ordinary Final Foam does not request the readback. These metrics never drive production scheduling or material population.
 
 ---
 
@@ -787,6 +796,8 @@ Each dependency may occur on a different frame.
 ### 13.1 Current topology maintenance grouping
 
 When Major evolution or cleanup becomes due, the current runtime can perform, within one simulation iteration:
+
+Dynamic topology refresh is material work, not debug work. Pressure, Lee, Shore, and evolving generated topology are composed for every active material step regardless of which Foam view is selected. The combined view only exposes the same state.
 
 1. refresh dynamic topology sources;
 2. evolve Major;
@@ -822,7 +833,6 @@ Periodic systems should not share the same accumulator phase by default.
 
 Systems to offset include:
 
-- guidance refresh;
 - Major evolution;
 - Major cleanup;
 - Pocket update;
@@ -875,7 +885,6 @@ The Major Support failure established a preferred direction:
 After the scheduler exists, first-use dispatches may be ordered deliberately:
 
 - clear kernel;
-- guidance kernel;
 - shoreline/source kernels;
 - any remaining generated-topology upload/composition kernel;
 - Major raster kernel;
@@ -897,8 +906,9 @@ A possible target is:
 CS_RiverFoam_Core.compute
     clears
     injection
-    advection
-    simulation
+    conservative transport predictor
+    conservative transport corrector
+    simulation/lifecycle/source merge
     boundaries
 
 CS_RiverFoam_TopologySources.compute
@@ -960,7 +970,6 @@ The scheduler can then process:
 Potential candidates include:
 
 - material and topology clears;
-- guidance construction;
 - Major rasterization;
 - Major cleanup;
 - Pocket construction;
@@ -1053,7 +1062,6 @@ RiverFoam.Init.BuildBoundary
 RiverFoam.Init.WaitObstacleStability
 RiverFoam.Init.BuildObstacleExclusion
 RiverFoam.Init.ClearMaterial
-RiverFoam.Init.BuildGuidance
 RiverFoam.Init.BuildTopology.Total
 RiverFoam.Topology.RefreshSources
 RiverFoam.Topology.BuildMajorDescriptors
@@ -1388,12 +1396,11 @@ Any material or shader file change must be stated explicitly before implementati
 
 Possible sequence:
 
-1. material state becomes available;
-2. guidance becomes available;
-3. anchored sources appear;
-4. Major appears;
-5. dependent topology appears;
-6. metrics remain last and invisible.
+1. material state and conservative transport intermediates become available;
+2. anchored sources appear;
+3. Major appears;
+4. dependent topology appears;
+5. metrics remain last and invisible.
 
 ### Explicit exclusions
 
@@ -1723,10 +1730,12 @@ Accepted/implemented topology work:
 31. Patch 4.11C.1 source-only progressive-birth diagnostics — implemented and Unity-validated.
 32. Patch 4.11C.2 dedicated per-step source transfer and transfer diagnostics — implemented; persistent state/lifetime failure exposed.
 33. Patch 4.11C.3 Source Quantity and Birth-Merge Correction — Unity-validated and accepted.
-34. Patch 4.11C.4 Persistent Material-State Migration — implemented; focused Unity validation pending.
-35. Patch 4.11C.5 Transport and Valid-Fluid Correction.
-36. Patch 4.11C.6 Lifetime Authority and Presentation.
-37. Patch 4.11C.7 Validation, Regression Audit, and Documentation Closure.
+34. Patch 4.11C.4 Persistent Material-State Migration — atomic migration complete; visual acceptance failed because obsolete transport overrode source footprint and visible lifetime.
+35. Patch 4.11C.5 Material Footprint Preservation and Unified Lifecycle Diagnostics — implemented; major lifetime/footprint validation passed with follow-up speed/residue work.
+36. Patch 4.11C.5.1 Material Flow Speed and Visual Residue Cleanup — installed; Unity validation exposed remaining stepwise transport.
+37. Patch 4.11C.5.2 Transport Temporal Continuity — implemented; Unity validation pending.
+37. Patch 4.11C.6 Lifetime Authority and Presentation.
+38. Patch 4.11C.7 Validation, Regression Audit, and Documentation Closure.
 
 Topology generation is closed. Scheduling optimisation remains paused until the corrected Presence/Life/Pattern material state, event-driven birth, breakup, and mature-render pipeline produces measured steady-state and cold-start evidence.
 
@@ -1801,13 +1810,16 @@ The scheduling architecture is successful when:
 
 The permanent performance foundation remains accepted: named profiler phases, one-phase-per-frame staged initialization, and queued/coalesced dirty rebuilds.
 
-The current gate is focused Unity validation of **Patch 4.11C.4 — Persistent Material-State Migration**. Its code atomically installs Presence/Life/Pattern packing across every source and persistent-state writer/reader, removes active Integrity and material Phase, prevents disturbance fields from adding Presence or rejuvenating Remaining Life, and adds Presence/Life/Pattern diagnostics. Existing multiplicative transport and bank attenuation remain visible known limitations assigned to C.5.
+The current gate is focused Unity validation of **Patch 4.11C.5.2 — Transport Temporal Continuity**.
 
-After user acceptance, implementation continues with:
+C.4's atomic Presence/Life/Pattern packing remains active, but C.4 failed behavioural validation because obsolete procedural guidance, hidden spreading/shore attraction, non-footprint-preserving transport, repeated boundary attenuation, and raw-state diagnostics overrode the intended source and lifetime semantics.
 
-1. 4.11C.5 transport and idempotent valid-fluid correction;
-2. 4.11C.6 lifetime authority, renderer fade, reservations, metrics, and Local Aging Response;
-3. 4.11C.7 invariant checks, full regression matrix, and documentation closure.
+C.5 physically removes those systems. The runtime now schedules a fixed conservative predictor/corrector followed by lifecycle/source merge; valid-fluid clipping is idempotent; material velocity is signed downstream flow plus accepted Wake/Lee and Pressure motion; and the primary workflow uses Final Foam plus Foam + Aging Topology.
+
+After C.5.1 user acceptance, implementation continues with:
+
+1. 4.11C.6 life-derived renderer fade, Local Aging Response, reservation-safety validation, and final timing closure;
+2. 4.11C.7 invariant checks, full regression matrix, and documentation closure.
 
 Performance safeguards for these patches:
 
@@ -1820,3 +1832,18 @@ Performance safeguards for these patches:
 - no topology cache or initialization-state-machine change unless a measured integration defect requires a separately approved patch.
 
 Further scheduling optimisation and Patch 4.11D remain blocked until C.7 passes and the corrected steady-state work graph is measurable.
+
+---
+
+# Patch 4.11C.5.2b Note — Debug Layer Reorganization
+
+C.5.2b reorganizes the Foam Inspector diagnostics into named explanatory foldouts instead of one flat topology/runtime list. This is a validation-workflow correction only. It does not change Foam simulation, transport, lifetime, topology generation, source birth, residue handling, or rendering behaviour.
+
+The current recovery sequence remains:
+
+1. transport temporal continuity;
+2. residue suppression and shape conservation;
+3. topology aging proof and interaction calibration;
+4. controlled lateral drift and obstacle tangential flow.
+
+Transport debugging now begins in the `Transport / Motion` foldout, where material step duration, steps last frame, render interpolation alpha, estimated cells per step, transport substeps, compression passes, and material flow speed are visible near the top of the Foam Inspector.

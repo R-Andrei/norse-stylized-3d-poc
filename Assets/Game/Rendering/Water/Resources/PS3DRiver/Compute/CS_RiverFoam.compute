@@ -4,7 +4,6 @@
 #pragma kernel ClearProgressiveBirthDebugTransient
 #pragma kernel PaintProgressiveBirthDebugSegment
 #pragma kernel PaintProgressiveBirthSourceSegment
-#pragma kernel BuildGuidance
 #pragma kernel BuildCurrentShoreEdges
 #pragma kernel ComposeTopology
 #pragma kernel CaptureGeneratedTopology
@@ -13,8 +12,10 @@
 #pragma kernel UpdateObstacleExclusion
 #pragma kernel ResetTopologyMetrics
 #pragma kernel MeasureTopologyMetrics
-#pragma kernel AdvectForward
-#pragma kernel AdvectReverse
+#pragma kernel TransportPredictor
+#pragma kernel TransportCorrector
+#pragma kernel CompressTransportInterface
+#pragma kernel CommitPhaseTransport
 #pragma kernel SimulateFoam
 #pragma kernel ApplyBoundary
 #pragma target 5.0
@@ -27,9 +28,9 @@
 #include "CS_RiverFoam.Noise.hlsl"
 #include "CS_RiverFoam.Topology.hlsl"
 #include "CS_RiverFoam.Support.hlsl"
-#include "CS_RiverFoam.Network.hlsl"
 #include "CS_RiverFoam.Motion.hlsl"
 #include "CS_RiverFoam.Simulation.hlsl"
+#include "CS_RiverFoam.Transport.hlsl"
 #include "CS_RiverFoam.Evolution.hlsl"
 #include "CS_RiverFoam.TopologyTransition.hlsl"
 
@@ -74,16 +75,11 @@ void ApplyBoundary(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float coverage = LoadBoundary(coordinate).x;
+    float validFluid = FoamValidFluidAt(coordinate);
     float4 state = _FoamStateWrite[coordinate];
-    state.xyz *= coverage;
-
-    if (coverage <= 0.001 || state.x < 0.001)
-    {
-        state = 0.0.xxxx;
-    }
-
-    _FoamStateWrite[coordinate] = FoamClampPackedMaterialState(state);
+    _FoamStateWrite[coordinate] = FoamClipPackedToValidFluid(
+        state,
+        validFluid);
 }
 
 [numthreads(8, 8, 1)]
@@ -109,7 +105,7 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float coverage = LoadBoundary(coordinate).x;
+    float coverage = LoadBoundaryCoverage(coordinate);
     float obstacleFootprint = saturate(
         _FoamObstacleExclusionRead.Load(int3(coordinate, 0)));
     float validFluid = coverage * (1.0 - obstacleFootprint);
@@ -259,7 +255,7 @@ void PaintProgressiveBirthSourceSegment(
     }
 
     int2 coordinate = int2(x, y);
-    float coverage = LoadBoundary(coordinate).x;
+    float coverage = LoadBoundaryCoverage(coordinate);
     float obstacleFootprint = saturate(
         _FoamObstacleExclusionRead.Load(int3(coordinate, 0)));
     float validFluid = coverage * (1.0 - obstacleFootprint);
@@ -423,7 +419,7 @@ void PaintProgressiveBirthDebugSegment(
     }
 
     int2 coordinate = int2(x, y);
-    float coverage = LoadBoundary(coordinate).x;
+    float coverage = LoadBoundaryCoverage(coordinate);
     float obstacleFootprint = saturate(
         _FoamObstacleExclusionRead.Load(int3(coordinate, 0)));
     float validFluid = coverage * (1.0 - obstacleFootprint);
@@ -527,10 +523,6 @@ void PaintProgressiveBirthDebugSegment(
     debugState.a = max(debugState.a, headShape * validFluid);
     _FoamBirthDebugWrite[coordinate] = saturate(debugState);
 }
-
-// Compatibility helper for provisional metrics/guidance only. The accepted
-// soft-lifecycle material response must keep support and negative influence
-// separate rather than using this destructive composition.
 
 [numthreads(64, 1, 1)]
 void BuildCurrentShoreEdges(uint3 dispatchId : SV_DispatchThreadID)
@@ -687,7 +679,7 @@ void BuildEvolvingMajorSupport(uint3 dispatchId : SV_DispatchThreadID)
 
     float2 fullPixel = FoamUVToTexelCoordinate(uv, _FoamDimensions);
     float fluidCoverage = saturate(
-        SampleBoundaryClassesBilinear(fullPixel).r);
+        SampleBoundaryCoverageBilinear(fullPixel));
     int2 obstacleCoordinate = int2(
         FoamUVToContainingTexel(uv.x, _FoamDimensions.x),
         FoamUVToContainingTexel(uv.y, _FoamDimensions.y));
@@ -925,8 +917,8 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     float2 fullPixel = FoamUVToTexelCoordinate(uv, _FoamDimensions);
-    float4 boundaryClasses = SampleBoundaryClassesBilinear(fullPixel);
-    float fluidCoverage = saturate(boundaryClasses.r);
+    float fluidCoverage = saturate(
+        SampleBoundaryCoverageBilinear(fullPixel));
 
     int metricX = FoamUVToContainingTexel(
         uv.x,
@@ -1078,14 +1070,14 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
         (1.0 - obstacleFootprint);
 
     // Topology RGBA = Major, Connector, aggregate Negative Aging Pressure,
-    // and the derived
-    // guidance-resolution copy of the conservative current-water solid mask.
+    // and reserved zero. Canonical obstacle geometry lives only in the
+    // dedicated obstacle-exclusion texture.
     // Anchored source RGBA = Pressure Support, Lee Support, Shore Support, zero.
     float4 topology = saturate(float4(
         majorSupport * staticFluidMask,
         connectorSupport * staticFluidMask,
         negativeAgingPressure * staticFluidMask,
-        obstacleFootprint));
+        0.0));
     float4 sources = saturate(float4(
         pressureSupport * staticFluidMask,
         leeSupport * staticFluidMask,
@@ -1099,7 +1091,7 @@ void ComposeTopology(uint3 dispatchId : SV_DispatchThreadID)
 [numthreads(64, 1, 1)]
 void ResetTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
 {
-    if (dispatchId.x >= 16u)
+    if (dispatchId.x >= FoamMetricCount)
     {
         return;
     }
@@ -1123,7 +1115,7 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     float2 fullPixel = FoamUVToTexelCoordinate(uv, _FoamDimensions);
-    float boundaryCoverage = SampleBoundaryBilinear(fullPixel).x;
+    float boundaryCoverage = SampleBoundaryCoverageBilinear(fullPixel);
     int2 obstacleCoordinate = int2(
         FoamUVToContainingTexel(uv.x, _FoamDimensions.x),
         FoamUVToContainingTexel(uv.y, _FoamDimensions.y));
@@ -1163,96 +1155,70 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
         SampleStateAtUV(saturate(uv - float2(0.0, texel.y))).x < _FoamPresenceMetricThreshold);
 
     uint originalValue;
-    _FoamTopologyMetrics.InterlockedAdd(0u, 1u, originalValue);
-    _FoamTopologyMetrics.InterlockedAdd(4u, major ? 1u : 0u, originalValue);
-    _FoamTopologyMetrics.InterlockedAdd(8u, connector ? 1u : 0u, originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(FoamMetricValidFluidOffset, 1u, originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(FoamMetricMajorSupportOffset, major ? 1u : 0u, originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(FoamMetricConnectorSupportOffset, connector ? 1u : 0u, originalValue);
     _FoamTopologyMetrics.InterlockedAdd(
-        12u,
+        FoamMetricNegativeAgingPressureOffset,
         negativeAging ? 1u : 0u,
         originalValue);
     _FoamTopologyMetrics.InterlockedAdd(
-        16u,
+        FoamMetricFoamInNegativeOffset,
         negativeAging && visible ? 1u : 0u,
         originalValue);
-    _FoamTopologyMetrics.InterlockedAdd(20u, visible ? 1u : 0u, originalValue);
-    // Metric slots 6 and 7 remain reserved after removal of the obsolete
-    // destructive net-support proof diagnostics.
+    _FoamTopologyMetrics.InterlockedAdd(FoamMetricVisibleMaterialOffset, visible ? 1u : 0u, originalValue);
     _FoamTopologyMetrics.InterlockedAdd(
-        32u,
+        FoamMetricShoreSupportOffset,
         shoreSupported ? 1u : 0u,
         originalValue);
     _FoamTopologyMetrics.InterlockedAdd(
-        36u,
+        FoamMetricFoamInShoreOffset,
         shoreSupported && visible ? 1u : 0u,
         originalValue);
-    // Metric slots 10 and 11 remain reserved after removal of the
-    // former positive obstacle-source metric.
+    FoamMetricRow metric = _FoamMetricRows[obstacleCoordinate.x];
+    float fullCellArea = max(
+        0.000001,
+        metric.widthsAndSpacing.z * metric.widthsAndSpacing.w);
+    float representedCellCount =
+        ((float)_FoamDimensions.x /
+         max(1.0, (float)_FoamTopologyDimensions.x)) *
+        ((float)_FoamDimensions.y /
+         max(1.0, (float)_FoamTopologyDimensions.y));
+    float representedArea = fullCellArea * representedCellCount;
+    uint integratedAreaFixed = (uint)round(
+        saturate(presence) * representedArea *
+        max(1.0, _FoamIntegratedAreaFixedPointScale));
+    uint visibleCoreAreaFixed = (uint)round(
+        (presence >= 0.5 ? representedArea : 0.0) *
+        max(1.0, _FoamIntegratedAreaFixedPointScale));
     _FoamTopologyMetrics.InterlockedAdd(
-        48u,
+        FoamMetricIntegratedPresenceAreaOffset,
+        integratedAreaFixed,
+        originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(
+        FoamMetricPresenceCoreAreaOffset,
+        visibleCoreAreaFixed,
+        originalValue);
+    _FoamTopologyMetrics.InterlockedAdd(
+        FoamMetricPressureLeeSupportOffset,
         pressureLeeSupported ? 1u : 0u,
         originalValue);
     _FoamTopologyMetrics.InterlockedAdd(
-        52u,
+        FoamMetricFoamInPressureLeeOffset,
         pressureLeeSupported && visible ? 1u : 0u,
         originalValue);
     _FoamTopologyMetrics.InterlockedAdd(
-        56u,
+        FoamMetricPerimeterVisibleOffset,
         perimeter ? 1u : 0u,
         originalValue);
     _FoamTopologyMetrics.InterlockedAdd(
-        60u,
+        FoamMetricConnectorMajorOverlapOffset,
         connector && materialTopology.majorSupport >= 0.24 ? 1u : 0u,
         originalValue);
 }
 
 [numthreads(8, 8, 1)]
-void BuildGuidance(uint3 dispatchId : SV_DispatchThreadID)
-{
-    if (dispatchId.x >= (uint)_FoamGuidanceDimensions.x ||
-        dispatchId.y >= (uint)_FoamGuidanceDimensions.y)
-    {
-        return;
-    }
-
-    float2 uv = FoamTexelCentreUV(dispatchId.xy, _FoamGuidanceDimensions);
-    float2 epsilon = 1.0 /
-        max(float2(2.0, 2.0), (float2)_FoamGuidanceDimensions);
-
-    if (!IsFoamUInsideDomain(uv.x))
-    {
-        _FoamGuidanceWrite[int2(dispatchId.xy)] = 0.0.xxxx;
-        return;
-    }
-
-    float4 centreSample = EvaluateNetworkSample(uv);
-    float left = EvaluateNetworkDistance(saturate(uv - float2(epsilon.x, 0.0)));
-    float right = EvaluateNetworkDistance(saturate(uv + float2(epsilon.x, 0.0)));
-    float down = EvaluateNetworkDistance(saturate(uv - float2(0.0, epsilon.y)));
-    float up = EvaluateNetworkDistance(saturate(uv + float2(0.0, epsilon.y)));
-
-    int metricX = FoamUVToContainingTexel(uv.x, _FoamDimensions.x);
-    FoamMetricRow metric = _FoamMetricRows[metricX];
-    float dxMetres = max(0.01, _FoamFieldLength * epsilon.x * 2.0);
-    float totalWidth = max(
-        0.05,
-        metric.widthsAndSpacing.x + metric.widthsAndSpacing.y);
-    float dyMetres = max(0.01, totalWidth * epsilon.y * 2.0);
-    float2 distanceGradient = float2(
-        (right - left) / dxMetres,
-        (up - down) / dyMetres);
-    float gradientLength = length(distanceGradient);
-    float2 directionToLane = gradientLength > 0.00001
-        ? -distanceGradient / gradientLength
-        : float2(0.0, 0.0);
-
-    _FoamGuidanceWrite[int2(dispatchId.xy)] = float4(
-        directionToLane,
-        saturate(centreSample.y),
-        saturate(centreSample.z));
-}
-
-[numthreads(8, 8, 1)]
-void AdvectForward(uint3 dispatchId : SV_DispatchThreadID)
+void TransportPredictor(uint3 dispatchId : SV_DispatchThreadID)
 {
     if (dispatchId.x >= (uint)_FoamRangeCount ||
         dispatchId.y >= (uint)_FoamDimensions.y)
@@ -1268,36 +1234,26 @@ void AdvectForward(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 coordinate = int2(x, y);
-    if (!IsFoamColumnInsideSimulation(x))
+    float validFluid = FoamValidFluidAt(coordinate);
+    if (validFluid <= 0.0001)
     {
-        _FoamAdvectionWrite[coordinate] = 0.0.xxxx;
+        _FoamTransportWrite[coordinate] = 0.0.xxxx;
         return;
     }
 
-    float coverage = LoadBoundary(coordinate).x;
-    if (coverage <= 0.001)
-    {
-        _FoamAdvectionWrite[coordinate] = 0.0.xxxx;
-        return;
-    }
-
-    FoamMetricRow metric = _FoamMetricRows[x];
-    float longitudinalSpacing = max(0.01, metric.widthsAndSpacing.z);
-    float lateralSpacing = max(0.01, metric.widthsAndSpacing.w);
-    float2 fieldUV = FoamTexelCentreUV(
-        uint2(x, y),
-        _FoamDimensions);
-    FoamMotionSample motion = ResolveMotion(float2(x, y), fieldUV);
-    float2 backPixel = float2(
-        x - motion.velocity.x * _FoamDeltaTime / longitudinalSpacing,
-        y - motion.velocity.y * _FoamDeltaTime / lateralSpacing);
-    float4 state = SampleStateBilinear(backPixel);
-    state.xyz *= coverage;
-    _FoamAdvectionWrite[coordinate] = FoamClampPackedMaterialState(state);
+    float4 original = FoamClampPackedMaterialState(
+        _FoamStateRead.Load(int3(coordinate, 0)));
+    float3 predicted = original.xyz +
+        _FoamDeltaTime * FoamStateTransportDerivative(coordinate);
+    float4 packed = FoamClampPackedMaterialState(
+        float4(predicted, 0.0));
+    _FoamTransportWrite[coordinate] = FoamClipPackedToValidFluid(
+        packed,
+        validFluid);
 }
 
 [numthreads(8, 8, 1)]
-void AdvectReverse(uint3 dispatchId : SV_DispatchThreadID)
+void TransportCorrector(uint3 dispatchId : SV_DispatchThreadID)
 {
     if (dispatchId.x >= (uint)_FoamRangeCount ||
         dispatchId.y >= (uint)_FoamDimensions.y)
@@ -1313,32 +1269,148 @@ void AdvectReverse(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 coordinate = int2(x, y);
-    if (!IsFoamColumnInsideSimulation(x))
+    float validFluid = FoamValidFluidAt(coordinate);
+    if (validFluid <= 0.0001)
     {
-        _FoamAdvectionWrite[coordinate] = 0.0.xxxx;
+        _FoamTransportWrite[coordinate] = 0.0.xxxx;
         return;
     }
 
-    float coverage = LoadBoundary(coordinate).x;
-    if (coverage <= 0.001)
+    float4 original = FoamClampPackedMaterialState(
+        _FoamStateRead.Load(int3(coordinate, 0)));
+    float4 predictor = FoamClampPackedMaterialState(
+        _FoamTransportPredictorRead.Load(int3(coordinate, 0)));
+    float3 corrected = 0.5 * (
+        original.xyz +
+        predictor.xyz +
+        _FoamDeltaTime * FoamPredictorTransportDerivative(coordinate));
+    float4 packed = FoamClampPackedMaterialState(
+        float4(corrected, 0.0));
+    _FoamTransportWrite[coordinate] = FoamClipPackedToValidFluid(
+        packed,
+        validFluid);
+}
+
+[numthreads(8, 8, 1)]
+void CompressTransportInterface(uint3 dispatchId : SV_DispatchThreadID)
+{
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    int y = (int)dispatchId.y;
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y ||
+        x < 0 || x >= _FoamDimensions.x)
     {
-        _FoamAdvectionWrite[coordinate] = 0.0.xxxx;
         return;
     }
 
-    FoamMetricRow metric = _FoamMetricRows[x];
-    float longitudinalSpacing = max(0.01, metric.widthsAndSpacing.z);
-    float lateralSpacing = max(0.01, metric.widthsAndSpacing.w);
-    float2 fieldUV = FoamTexelCentreUV(
-        uint2(x, y),
-        _FoamDimensions);
-    FoamMotionSample motion = ResolveMotion(float2(x, y), fieldUV);
-    float2 forwardPixel = float2(
-        x + motion.velocity.x * _FoamDeltaTime / longitudinalSpacing,
-        y + motion.velocity.y * _FoamDeltaTime / lateralSpacing);
-    float4 state = SampleAdvectedBilinear(forwardPixel);
-    state.xyz *= coverage;
-    _FoamAdvectionWrite[coordinate] = FoamClampPackedMaterialState(state);
+    int2 coordinate = int2(x, y);
+    uint compressionParity = (uint)_FoamCompressionParity;
+    if (_FoamCompressionAxis == 0)
+    {
+        uint localX = dispatchId.x;
+        if (localX < compressionParity)
+        {
+            _FoamCompressionStateWrite[coordinate] =
+                FoamClipPackedToValidFluid(
+                    _FoamCompressionStateRead.Load(int3(coordinate, 0)),
+                    FoamValidFluidAt(coordinate));
+            return;
+        }
+
+        uint pairLocalStartU = compressionParity +
+            (((localX - compressionParity) >> 1u) << 1u);
+        if (pairLocalStartU + 1u >= (uint)_FoamRangeCount)
+        {
+            _FoamCompressionStateWrite[coordinate] =
+                FoamClipPackedToValidFluid(
+                    _FoamCompressionStateRead.Load(int3(coordinate, 0)),
+                    FoamValidFluidAt(coordinate));
+            return;
+        }
+
+        int pairLocalStart = (int)pairLocalStartU;
+        int2 a = int2(_FoamRangeStart + pairLocalStart, y);
+        int2 b = int2(a.x + 1, y);
+        _FoamCompressionStateWrite[coordinate] =
+            FoamResolveCompressedInterfacePairValue(
+                a,
+                b,
+                localX == pairLocalStartU);
+        return;
+    }
+
+    uint yU = dispatchId.y;
+    if (yU < compressionParity)
+    {
+        _FoamCompressionStateWrite[coordinate] =
+            FoamClipPackedToValidFluid(
+                _FoamCompressionStateRead.Load(int3(coordinate, 0)),
+                FoamValidFluidAt(coordinate));
+        return;
+    }
+
+    uint pairStartYU = compressionParity +
+        (((yU - compressionParity) >> 1u) << 1u);
+    if (pairStartYU + 1u >= (uint)_FoamDimensions.y)
+    {
+        _FoamCompressionStateWrite[coordinate] =
+            FoamClipPackedToValidFluid(
+                _FoamCompressionStateRead.Load(int3(coordinate, 0)),
+                FoamValidFluidAt(coordinate));
+        return;
+    }
+
+    int pairStartY = (int)pairStartYU;
+    int2 a = int2(x, pairStartY);
+    int2 b = int2(x, pairStartY + 1);
+    _FoamCompressionStateWrite[coordinate] =
+        FoamResolveCompressedInterfacePairValue(
+            a,
+            b,
+            yU == pairStartYU);
+}
+
+
+[numthreads(8, 8, 1)]
+void CommitPhaseTransport(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    int y = (int)dispatchId.y;
+    if (x < 0 || x >= _FoamDimensions.x)
+    {
+        return;
+    }
+
+    int2 destination = int2(x, y);
+    float destinationValidFluid = FoamValidFluidAt(destination);
+    if (destinationValidFluid <= FoamMaterialStateEpsilon ||
+        !IsFoamColumnInsideSimulation(x))
+    {
+        _FoamStateWrite[destination] = 0.0.xxxx;
+        return;
+    }
+
+    int sourceX = x - _FoamPhaseCommitCells;
+    int2 source = int2(sourceX, y);
+    if (sourceX < 0 || sourceX >= _FoamDimensions.x ||
+        !IsFoamColumnInsideSimulation(sourceX) ||
+        FoamValidFluidAt(source) <= FoamMaterialStateEpsilon)
+    {
+        _FoamStateWrite[destination] = 0.0.xxxx;
+        return;
+    }
+
+    float4 packed = FoamClampPackedMaterialState(
+        _FoamStateRead.Load(int3(source, 0)));
+    _FoamStateWrite[destination] = FoamClipPackedToValidFluid(
+        packed,
+        destinationValidFluid);
 }
 
 [numthreads(8, 8, 1)]
@@ -1358,53 +1430,20 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int2 coordinate = int2(x, y);
-    if (!IsFoamColumnInsideSimulation(x))
+    float validFluid = FoamValidFluidAt(coordinate);
+    if (validFluid <= 0.0001)
     {
         _FoamStateWrite[coordinate] = 0.0.xxxx;
         _FoamBirthTransferDebugWrite[coordinate] = 0.0.xxxx;
         return;
     }
 
-    float coverage = LoadBoundary(coordinate).x;
-    if (coverage <= 0.001)
-    {
-        _FoamStateWrite[coordinate] = 0.0.xxxx;
-        _FoamBirthTransferDebugWrite[coordinate] = 0.0.xxxx;
-        return;
-    }
+    float4 correctedPacked = FoamClipPackedToValidFluid(
+        _FoamTransportCorrectedRead.Load(int3(coordinate, 0)),
+        validFluid);
+    FoamMaterialState material = FoamDecodeMaterialState(correctedPacked);
 
-    FoamMetricRow metric = _FoamMetricRows[x];
-    float longitudinalSpacing = max(0.01, metric.widthsAndSpacing.z);
-    float lateralSpacing = max(0.01, metric.widthsAndSpacing.w);
-    float2 fieldUV = FoamTexelCentreUV(
-        uint2(x, y),
-        _FoamDimensions);
-
-    FoamMotionSample motion = ResolveMotion(float2(x, y), fieldUV);
-    float2 backPixel = float2(
-        x - motion.velocity.x * _FoamDeltaTime / longitudinalSpacing,
-        y - motion.velocity.y * _FoamDeltaTime / lateralSpacing);
-
-    float4 original = _FoamStateRead.Load(int3(coordinate, 0));
-    float4 forward = _FoamAdvectedRead.Load(int3(coordinate, 0));
-    float4 reverse = _FoamReverseRead.Load(int3(coordinate, 0));
-    float3 minimumOriginal;
-    float3 maximumOriginal;
-    ResolveOriginalBounds(backPixel, minimumOriginal, maximumOriginal);
-    float3 corrected = forward.xyz + 0.5 * (original.xyz - reverse.xyz);
-    corrected = clamp(corrected, minimumOriginal, maximumOriginal);
-
-    // Keep the existing causal limiter until C.5 rewrites the transport and
-    // valid-fluid stages around geometric Presence.
-    float donorMaximum = max(forward.x, maximumOriginal.x);
-    corrected.x = min(corrected.x, donorMaximum + 0.0005);
-
-    float4 transportedPacked = FoamClampPackedMaterialState(
-        float4(corrected, 0.0));
-    FoamMaterialState material = FoamDecodeMaterialState(transportedPacked);
-
-    float4 topologyState = _FoamTopologyRead.Load(
-        int3(coordinate, 0));
+    float4 topologyState = _FoamTopologyRead.Load(int3(coordinate, 0));
     float4 anchoredSources = _FoamTopologySourcesRead.Load(
         int3(coordinate, 0));
     float obstacleFootprint = _FoamObstacleExclusionRead.Load(
@@ -1413,7 +1452,7 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         FoamResolveMaterialTopology(
             topologyState,
             anchoredSources,
-            coverage,
+            LoadBoundaryCoverage(coordinate),
             obstacleFootprint);
     float positiveInfluence = FoamCombinedMaterialSupport(
         materialTopology);
@@ -1432,19 +1471,13 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         _FoamDeltaTime * localAgeRate /
         max(0.05, _FoamNeutralLifetime));
 
-    // C.4 removes persistent density reinforcement and independent Amount
-    // decay. Disturbance fields still influence ResolveMotion, but they no
-    // longer create Presence or rejuvenate Remaining Life.
-
-    // Boundary attenuation is deliberately left in its old multiplicative
-    // form until C.5 replaces it with canonical idempotent valid-fluid clipping.
-    material.presence *= lerp(0.52, 1.0, coverage);
     float4 persistentPacked = FoamEncodeMaterialState(material);
     float persistentPresenceBeforeBirth = persistentPacked.x;
 
     float4 birthSource = materialTopology.validFluid > 0.001
-        ? FoamClampPackedMaterialState(
-            _FoamProgressiveBirthSourceRead.Load(int3(coordinate, 0)))
+        ? FoamClipPackedToValidFluid(
+            _FoamProgressiveBirthSourceRead.Load(int3(coordinate, 0)),
+            validFluid)
         : 0.0.xxxx;
     float sourcePresence = birthSource.x;
     float acceptedPresence = max(
@@ -1459,5 +1492,7 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         acceptedPresence,
         persistentPresenceBeforeBirth,
         combinedPacked.x));
-    _FoamStateWrite[coordinate] = combinedPacked;
+    _FoamStateWrite[coordinate] = FoamClipPackedToValidFluid(
+        combinedPacked,
+        validFluid);
 }

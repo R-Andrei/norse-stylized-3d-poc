@@ -1,4 +1,6 @@
 # Codebase Monolith Refactor Checklist
+> **Historical refactor checklist only.** Some kernel names below record pre-4.11C.5 structure and are not current runtime instructions. Current Foam material ownership is defined by `River_Foam_Stage6_Architecture.md` and `River_Foam_Material_State_Correction_Implementation_Plan.md`.
+
 
 ## Document Status
 

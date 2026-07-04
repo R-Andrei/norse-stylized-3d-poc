@@ -18,6 +18,7 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
                     fieldLength,
                     fieldWidth);
+            minimumTransportLongitudinalSpacing = longitudinalSpacing;
             float curvatureSampleDistance = Mathf.Max(
                 0.5f,
                 longitudinalSpacing * 2f);
@@ -538,8 +539,8 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
             computeShader.SetInts(
                 "_FoamTopologyDimensions",
-                guidanceWidth,
-                guidanceHeight);
+                structuralWidth,
+                structuralHeight);
             computeShader.SetFloat("_FoamValidLength", validFieldLength);
             computeShader.SetFloat(
                 "_FoamGlobalStart",
@@ -688,7 +689,7 @@ namespace ProgrammaticStylized3D.Rivers
                     currentShoreEdgesTexture);
                 DispatchOneDimensional(
                     buildCurrentShoreEdgesKernel,
-                    guidanceWidth,
+                    structuralWidth,
                     64);
 
                 UpdateObstacleExclusionMask();
@@ -732,8 +733,8 @@ namespace ProgrammaticStylized3D.Rivers
                     topologySourcesTexture);
                 Dispatch(
                     composeTopologyKernel,
-                    guidanceWidth,
-                    guidanceHeight);
+                    structuralWidth,
+                    structuralHeight);
             }
 
             if (measureMetrics)
@@ -742,17 +743,19 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
-        private void MeasureTopologyMetrics()
+        private bool MeasureTopologyMetrics(
+            bool captureManualReference = false)
         {
             using var profilerScope = DiagnosticsMeasureTopologyProfilerMarker.Auto();
-            if (computeShader == null || currentState == null ||
+            if (topologyMetricsReadbackPending ||
+                computeShader == null || currentState == null ||
                 topologyTexture == null || topologySourcesTexture == null ||
                 boundaryTexture == null || obstacleExclusionTexture == null ||
-                topologyMetricsBuffer == null ||
+                metricBuffer == null || topologyMetricsBuffer == null ||
                 resetTopologyMetricsKernel < 0 ||
                 measureTopologyMetricsKernel < 0)
             {
-                return;
+                return false;
             }
 
             computeShader.SetBuffer(
@@ -767,13 +770,20 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
             computeShader.SetInts(
                 "_FoamTopologyDimensions",
-                guidanceWidth,
-                guidanceHeight);
+                structuralWidth,
+                structuralHeight);
             computeShader.SetFloat("_FoamValidLength", validFieldLength);
             computeShader.SetFloat("_FoamFieldLength", fieldLength);
             computeShader.SetFloat(
                 "_FoamPresenceMetricThreshold",
                 PresenceMetricThreshold);
+            computeShader.SetFloat(
+                "_FoamIntegratedAreaFixedPointScale",
+                IntegratedAreaFixedPointScale);
+            computeShader.SetBuffer(
+                measureTopologyMetricsKernel,
+                "_FoamMetricRows",
+                metricBuffer);
             computeShader.SetTexture(
                 measureTopologyMetricsKernel,
                 "_FoamTopologyRead",
@@ -800,18 +810,20 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyMetricsBuffer);
             Dispatch(
                 measureTopologyMetricsKernel,
-                guidanceWidth,
-                guidanceHeight);
-            RequestTopologyMetricsReadback();
+                structuralWidth,
+                structuralHeight);
+            return RequestTopologyMetricsReadback(
+                captureManualReference);
         }
 
-        private void RequestTopologyMetricsReadback()
+        private bool RequestTopologyMetricsReadback(
+            bool captureManualReference)
         {
             if (!SystemInfo.supportsAsyncGPUReadback ||
                 topologyMetricsReadbackPending ||
                 topologyMetricsBuffer == null)
             {
-                return;
+                return false;
             }
 
             topologyMetricsReadbackPending = true;
@@ -844,7 +856,27 @@ namespace ProgrammaticStylized3D.Rivers
                     }
 
                     topologyMetricsAvailable = count == TopologyMetricCount;
+                    if (topologyMetricsAvailable)
+                    {
+                        integratedPresenceArea =
+                            latestTopologyMetrics[
+                                TopologyMetricIntegratedPresenceArea] /
+                            IntegratedAreaFixedPointScale;
+                        visiblePresenceCoreArea =
+                            latestTopologyMetrics[
+                                TopologyMetricPresenceCoreArea] /
+                            IntegratedAreaFixedPointScale;
+
+                        if (captureManualReference &&
+                            integratedPresenceArea > 0.0001f)
+                        {
+                            manualProofReferenceArea =
+                                integratedPresenceArea;
+                            manualProofReferencePending = false;
+                        }
+                    }
                 });
+            return true;
         }
 
         private float TopologyCoverageRatio(int numeratorIndex)

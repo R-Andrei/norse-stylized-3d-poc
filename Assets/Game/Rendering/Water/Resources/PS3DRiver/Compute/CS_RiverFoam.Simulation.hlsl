@@ -83,3 +83,10 @@ float4 FoamMergeBornPresence(float4 existingPacked, float4 sourcePacked)
         combinedPresence);
     return FoamEncodeMaterialState(combined);
 }
+
+float4 FoamClipPackedToValidFluid(float4 packed, float validFluid)
+{
+    FoamMaterialState state = FoamDecodeMaterialState(packed);
+    state.presence = min(state.presence, saturate(validFluid));
+    return FoamEncodeMaterialState(state);
+}

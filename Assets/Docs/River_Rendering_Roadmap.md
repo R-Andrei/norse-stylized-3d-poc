@@ -320,7 +320,7 @@ Material-facing topology resources remain frozen:
 | `_FoamTopology.r` | Major Support |
 | `_FoamTopology.g` | Connector Support |
 | `_FoamTopology.b` | aggregate Negative Aging Pressure |
-| `_FoamTopology.a` | compatibility/debug Obstacle copy only |
+| `_FoamTopology.a` | reserved zero |
 | `_FoamTopologySources.r/g/b` | Pressure / Lee / Shore Support |
 | `_FoamObstacleExclusion.r` | canonical exact Obstacle Footprint |
 
@@ -373,30 +373,44 @@ Final-life visibility uses Remaining Life inside the selected time budget; no se
 
 #### 4.11C.4 — Persistent Material-State Migration
 
-**Status:** Implemented in code; focused Unity validation pending. C.5 remains the next patch after acceptance.
+**Status:** Atomic state migration completed, but visual acceptance failed. Presence/Life/Pattern remains the canonical packed contract; the behaviour around it was invalid.
 
-- atomically install Presence/Life/Pattern packing;
-- centralize semantic encode/decode;
-- generate transported Material Pattern;
-- remove active Integrity, material Phase, circular mixing, Amount neighbourhood logic, material reinforcement, and life rejuvenation;
-- preserve disturbance-driven motion;
-- render the base shape from Presence;
-- add Presence/Life/Pattern diagnostics.
+Unity evidence showed that a tiny source expanded into a river-wide patch and that visibly supported Foam disappeared after only several seconds despite much longer calculated life. The causes were obsolete procedural material guidance, hidden lateral attraction/spread, non-footprint-preserving scalar transport, repeated bank attenuation, and raw-state diagnostics that did not show the actual final material/topology interaction.
 
-#### 4.11C.5 — Transport and Valid-Fluid Correction
+#### 4.11C.5 — Material Footprint Preservation and Unified Lifecycle Diagnostics
 
-- advect premultiplied state without repeated bank attenuation;
-- clamp MacCormack moments;
-- stabilize Presence contour with the smooth cubic remap;
-- use `Valid Fluid = Boundary × (1 - canonical obstacle)`;
-- clip partial coverage with idempotent `min(Presence, Valid Fluid)`.
+**Status:** Implemented in code; focused Unity validation pending.
+
+- physically delete the procedural guidance runtime and network shader include;
+- remove guidance textures, kernels, allocations, scheduling, profiler labels, bindings, serialized shader properties, and status text;
+- restrict material velocity to signed downstream river flow plus accepted Wake/Lee and Pressure disturbance motion;
+- remove bank attraction, shore suction, generic spread/evolution, ripple material motion, and all topology steering;
+- replace forward/reverse MacCormack scalar advection with conservative two-stage finite-volume transport plus pairwise conservative interface compression;
+- use bounded THINC sharp-interface Presence reconstruction with bounded MC fallback, carrying Life and Pattern with the same upwind Presence flux;
+- remove the rejected non-conservative cubic/local Presence sharpening path;
+- use a scalar boundary-coverage contract plus `Valid Fluid = Boundary × (1 - canonical obstacle)` and idempotent `min(Presence, Valid Fluid)` clipping; the former boundary-attraction payload is removed;
+- reserve `_FoamTopology.a` as zero and use only `_FoamObstacleExclusion` for solid geometry;
+- expose only Final Foam, Foam + Aging Topology, Progressive Birth Source, and Progressive Birth Transfer in the normal workflow;
+- add Integrated Presence Area, Final Foam Core Area, and a manual post-birth area ratio for footprint validation.
+
+#### 4.11C.5.1 — Material Flow Speed and Visual Residue Cleanup
+
+Adds a serialized persistent-Foam Material Flow Speed multiplier after C.5 Unity validation showed the corrected material now lives correctly but moves too slowly for authoring. The multiplier changes Foam-material downstream transport only; it does not change water-surface motion, source Amount, Remaining Life, or topology aging. The conservative transport update rate and CPU material reservations use the same multiplier so fast Foam remains stable and scheduled.
+
+Also suppresses low-coverage transport crumbs in the exact Final Foam result and strengthens conservative interface compression slightly so the main footprint reabsorbs numerical edge residue instead of leaving a faint stale tail. This is not a return to Amount thresholding or an independent death clock; it targets sub-useful coverage that should not appear as player-facing Foam.
+
+#### 4.11C.5.2 — Transport Temporal Continuity
+
+Raises the internal material transport cadence to make persistent Foam move smoothly rather than in visible fixed-step bursts. Low/Medium/High quality now use higher temporal minima, and the conservative transport Courant target is tightened so a single material step moves a smaller fraction of a grid cell before compression and lifecycle evaluation.
+
+Adds Inspector readouts for material step duration, steps last frame, render interpolation alpha, estimated cells per step, transport substeps, and compression passes. These diagnostics prove whether stepping comes from cadence, catch-up bursts, stuck interpolation, too-large displacement, or compression pulsing. No deleted C.5 guidance, spreading, shore suction, topology steering, reinforcement, rejuvenation, or old advection code is restored.
 
 #### 4.11C.6 — Lifetime Authority and Presentation
 
 - make the approved topology equation the sole ordinary clock;
 - derive final fade from Remaining Life inside its last normalized `0.35`;
-- rewrite CPU reservations without Amount decay or a post-life tail;
-- change metrics from Amount to Presence;
+- retain and validate C.5's time-only CPU reservations and downstream transport work halo;
+- retain C.5's Presence-based footprint metrics as timing evidence;
 - add Local Aging Response;
 - correct Inspector semantics and transfer legend.
 
@@ -421,18 +435,14 @@ Final-life visibility uses Remaining Life inside the selected time budget; no se
 
 ### Diagnostics
 
-Required material views after C.6:
+The primary material workflow contains exactly four views:
 
-- Final Foam;
-- Material Presence;
-- Material Remaining Life;
-- Material Pattern;
-- Local Aging Response;
-- Progressive Birth Source;
-- Progressive Birth Transfer;
-- retained topology and obstacle views.
+- **Final Foam** — exact player-facing result;
+- **Foam + Aging Topology** — exact final Foam over green positive support, red Negative Aging Pressure, yellow overlap, blue obstacle footprint, and near-black neutral water; Foam brightness reflects Remaining Life;
+- **Progressive Birth Source**;
+- **Progressive Birth Transfer**.
 
-New serialized debug values are appended, never renumbered.
+Raw Presence, Remaining Life, Material Pattern, and individual topology-class views are no longer primary Inspector modes. Material Pattern remains internal state until an approved breakup feature gives it a visible purpose.
 
 ### Public Controls
 
@@ -492,3 +502,18 @@ Do not compensate for a failed state boundary with automatic births, fracture, o
 ## Working Rule
 
 Before implementing a stage or sub-feature, define its acceptance tests. After approval, record a conservative summary under **Implemented** or **Validated**. Later work may consume earlier outputs, but it must not change an approved feature's contract unless that change is discussed and approved first.
+
+---
+
+# Patch 4.11C.5.2b Note — Debug Layer Reorganization
+
+C.5.2b reorganizes the Foam Inspector diagnostics into named explanatory foldouts instead of one flat topology/runtime list. This is a validation-workflow correction only. It does not change Foam simulation, transport, lifetime, topology generation, source birth, residue handling, or rendering behaviour.
+
+The current recovery sequence remains:
+
+1. transport temporal continuity;
+2. residue suppression and shape conservation;
+3. topology aging proof and interaction calibration;
+4. controlled lateral drift and obstacle tangential flow.
+
+Transport debugging now begins in the `Transport / Motion` foldout, where material step duration, steps last frame, render interpolation alpha, estimated cells per step, transport substeps, compression passes, and material flow speed are visible near the top of the Foam Inspector.

@@ -103,6 +103,7 @@ namespace ProgrammaticStylized3D.Rivers
             public float StartAcrossNormalized;
             public float Duration;
             public float TravelDistance;
+            public float FlowDirection;
             public float AcrossDrift;
             public float PathWander;
             public float BaseRadius;

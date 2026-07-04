@@ -9,12 +9,13 @@ using UnityEngine.Rendering;
 namespace ProgrammaticStylized3D.Rivers
 {
     /// <summary>
-    /// Hidden Stage 6 runtime that owns the complete shared Foam network.
-    /// Presence, Presence-weighted Remaining Life, and Presence-weighted
-    /// Material Pattern are transported in one persistent state while a
-    /// shared structural-resolution guidance field,
-    /// GPU-only population controller, boundaries, Wake, and Impact activity organise
-    /// that material into an evolving web-like tracer network.
+    /// Hidden Stage 6 runtime that owns transient Foam material, topology,
+    /// event-driven birth, conservative downstream transport, and lifecycle
+    /// diagnostics. Persistent state stores Presence, Presence-weighted
+    /// Remaining Life, and Presence-weighted Material Pattern. Topology changes
+    /// the life clock; it does not continuously create, erase, spread, or steer
+    /// material. Existing Foam follows river flow plus accepted physical
+    /// wake/pressure disturbance motion.
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]

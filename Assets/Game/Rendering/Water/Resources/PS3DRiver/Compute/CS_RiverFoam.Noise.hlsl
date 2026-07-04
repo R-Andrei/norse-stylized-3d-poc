@@ -5,15 +5,6 @@ float FoamHash11(float value)
 }
 
 
-float2 FoamHash22(float2 value)
-{
-    float2 result;
-    result.x = frac(sin(dot(value, float2(127.1, 311.7))) * 43758.5453123);
-    result.y = frac(sin(dot(value, float2(269.5, 183.3))) * 43758.5453123);
-    return result;
-}
-
-
 float FoamSourceFillValueNoise(float2 position, float seed)
 {
     float2 baseCell = floor(position);
@@ -80,7 +71,7 @@ float EvaluateFoamSourceFillCoverage(
 
     // Keep coherent source islands at least a few structural texels wide on
     // every quality tier. This is source rasterization only, not persistent
-    // material evolution.
+    // transport behaviour.
     float maximumCellSpacing = max(
         max(0.01, physicalCellSpacing.x),
         max(0.01, physicalCellSpacing.y));
@@ -221,86 +212,4 @@ float EvaluateCompoundInjectionShape(float alongDistance, float acrossDistance)
             lerp(0.12, 0.26, FoamHash11(seed + 22.0))));
     combined = saturate(combined - cut * variety * 0.58);
     return combined;
-}
-
-
-
-float FoamValueNoise(float2 position)
-{
-    float2 baseCell = floor(position);
-    float2 local = frac(position);
-    local = local * local * (3.0 - 2.0 * local);
-
-    float a = FoamHash11(dot(baseCell, float2(17.17, 61.73)) + _FoamSeed * 0.011);
-    float b = FoamHash11(dot(baseCell + float2(1.0, 0.0), float2(17.17, 61.73)) + _FoamSeed * 0.011);
-    float c = FoamHash11(dot(baseCell + float2(0.0, 1.0), float2(17.17, 61.73)) + _FoamSeed * 0.011);
-    float d = FoamHash11(dot(baseCell + float2(1.0, 1.0), float2(17.17, 61.73)) + _FoamSeed * 0.011);
-    return lerp(lerp(a, b, local.x), lerp(c, d, local.x), local.y);
-}
-
-
-float FoamFbm(float2 position)
-{
-    float value = 0.0;
-    float amplitude = 0.55;
-    float2 samplePosition = position;
-
-    [unroll]
-    for (int octave = 0; octave < 4; octave++)
-    {
-        value += FoamValueNoise(samplePosition) * amplitude;
-        samplePosition = mul(
-            float2x2(1.37, -1.11, 1.11, 1.37),
-            samplePosition) + float2(13.7, 29.3);
-        amplitude *= 0.48;
-    }
-
-    return saturate(value);
-}
-
-
-float VoronoiEdgeDistance(float2 position, float timeValue, float seedValue)
-{
-    float2 baseCell = floor(position);
-    float2 local = frac(position);
-    float nearest = 1000.0;
-    float secondNearest = 1000.0;
-
-    [unroll]
-    for (int offsetY = -1; offsetY <= 1; offsetY++)
-    {
-        [unroll]
-        for (int offsetX = -1; offsetX <= 1; offsetX++)
-        {
-            float2 offset = float2((float)offsetX, (float)offsetY);
-            float2 hashValue = FoamHash22(baseCell + offset + seedValue);
-            float regionalPhase = FoamHash11(
-                dot(baseCell + offset, float2(23.71, 47.13)) +
-                seedValue * 0.91);
-            float2 centre = 0.5 + (hashValue - 0.5) * 0.78;
-            centre += float2(
-                sin(timeValue * lerp(0.19, 0.43, regionalPhase) +
-                    hashValue.x * 6.2831853),
-                cos(timeValue * lerp(0.17, 0.39, 1.0 - regionalPhase) +
-                    hashValue.y * 6.2831853)) *
-                lerp(0.055, 0.14, regionalPhase);
-            float2 delta = offset + centre - local;
-            delta.x *= 0.78;
-            float distanceSquared = dot(delta, delta);
-
-            if (distanceSquared < nearest)
-            {
-                secondNearest = nearest;
-                nearest = distanceSquared;
-            }
-            else if (distanceSquared < secondNearest)
-            {
-                secondNearest = distanceSquared;
-            }
-        }
-    }
-
-    return max(
-        0.0,
-        sqrt(max(0.0, secondNearest)) - sqrt(max(0.0, nearest)));
 }

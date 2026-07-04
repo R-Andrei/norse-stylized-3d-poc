@@ -6251,16 +6251,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Masses.GeneratedMass
   recipe:
-    archetype: 6
-    shapeSeed: 5019
+    archetype: 0
+    shapeSeed: 5727
     surfaceSeed: 3930
     size: 2
-    formComplexity: 1
-    surfaceFacetDensity: 1
-    edgeCharacter: 1
+    formComplexity: 2
+    surfaceFacetDensity: 2
+    edgeCharacter: 2
     shapeDiversity: 1
-    grounding: 2
-    lean: 0
+    grounding: 1
+    lean: 1
     fineScale: 1
     widthBias: 1
     heightBias: 1
@@ -6292,7 +6292,7 @@ MonoBehaviour:
     footprintPadding: 0.12
     featureModelInitialized: 1
   recipeInitialized: 1
-  lastAppliedArchetype: 6
+  lastAppliedArchetype: 0
 --- !u!64 &1374330460
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -7943,23 +7943,14 @@ MonoBehaviour:
   foamEdgeCavityAmount: 0.423
   foamConnectorWeakSpanAmount: 0.443
   foamFreeWaterEventAmount: 0.409
-  foamNeutralLifetime: 10
-  foamSupportedAgingRate: 0.1
-  foamNegativeAgingRate: 1
-  foamMaterialLifecycleTuningVersion: 1
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}
-  foamDebugView: 10
+  foamDebugView: 0
   foamTestDistanceNormalized: 0.5
   foamTestAcrossNormalized: 0
   foamTestRadius: 0.8
   foamTestAmount: 0.85
   foamTestRemainingLife: 1
   foamTestElongation: 1.5
-  foamTestProgressiveRibbonHalfWidth: 0.2
-  foamTestProgressiveRibbonDuration: 1.5
-  foamTestProgressiveRibbonTravelDistance: 3
-  foamTestProgressiveRibbonAcrossDrift: 0.25
-  foamTestProgressiveRibbonPathWander: 0.35
   bodyDebugView: 0
   horizonColor: {r: 0.58, g: 0.91, b: 0.94, a: 0.35}
   specularColor: {r: 1, g: 1, b: 1, a: 0.35}

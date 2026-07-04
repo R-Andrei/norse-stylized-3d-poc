@@ -16,7 +16,6 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.FindKernel("PaintProgressiveBirthDebugSegment");
             paintProgressiveBirthSourceSegmentKernel =
                 computeShader.FindKernel("PaintProgressiveBirthSourceSegment");
-            buildGuidanceKernel = computeShader.FindKernel("BuildGuidance");
             buildCurrentShoreEdgesKernel =
                 computeShader.FindKernel("BuildCurrentShoreEdges");
             composeTopologyKernel =
@@ -33,14 +32,16 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.FindKernel("ResetTopologyMetrics");
             measureTopologyMetricsKernel =
                 computeShader.FindKernel("MeasureTopologyMetrics");
-            advectForwardKernel =
-                computeShader.FindKernel("AdvectForward");
-            advectReverseKernel =
-                computeShader.FindKernel("AdvectReverse");
+            transportPredictorKernel =
+                computeShader.FindKernel("TransportPredictor");
+            transportCorrectorKernel =
+                computeShader.FindKernel("TransportCorrector");
+            compressTransportInterfaceKernel =
+                computeShader.FindKernel("CompressTransportInterface");
+            phaseCommitKernel = computeShader.FindKernel("CommitPhaseTransport");
             simulateKernel = computeShader.FindKernel("SimulateFoam");
             applyBoundaryKernel = computeShader.FindKernel("ApplyBoundary");
         }
-
 
         private void ConfigureSharedComputeParameters(float deltaTime)
         {
@@ -49,15 +50,10 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamSimulationLength",
                 simulationFieldLength);
-            computeShader.SetInts(
-                "_FoamGuidanceDimensions",
-                guidanceWidth,
-                guidanceHeight);
-            computeShader.SetInt(
-                "_FoamResolutionPerChunk",
-                resolutionPerChunk);
-            computeShader.SetInt("_FoamChunkCount", chunkCount);
             computeShader.SetFloat("_FoamDeltaTime", deltaTime);
+            computeShader.SetFloat(
+                "_FoamPhaseTransportMetres",
+                foamPhaseTransportMetres);
             computeShader.SetFloat(
                 "_FoamGlobalStart",
                 river.Domain.GlobalDistanceMinimum);
@@ -65,19 +61,12 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamFlowSpeed",
                 river.FlowSpeedMetresPerSecond *
-                ProvisionalMaterialFlowFollow *
-                river.LiquidFactor);
-            // Pressure Support builds its fail-closed upstream support
-            // envelope from the exact obstacle mask. Flow direction selects
-            // which side of each solid cell is the object-facing front on both
-            // normal-flow and reverse-flow rivers.
+                river.LiquidFactor *
+                river.FoamMaterialFlowSpeedMultiplier *
+                river.FlowDirection);
             computeShader.SetFloat(
                 "_FoamFlowDirection",
                 river.FlowDirection);
-            computeShader.SetFloat(
-                "_FoamEvolution",
-                ProvisionalMaterialEvolution);
-            computeShader.SetFloat("_FoamSpread", ProvisionalMaterialSpread);
             computeShader.SetFloat(
                 "_FoamNeutralLifetime",
                 river.FoamNeutralLifetime);
@@ -93,17 +82,14 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamPresenceMetricThreshold",
                 PresenceMetricThreshold);
             computeShader.SetFloat(
-                "_FoamGuidanceStrength",
-                ProvisionalMaterialGuidanceStrength);
-            computeShader.SetFloat(
-                "_FoamBoundaryAttraction",
-                ProvisionalMaterialBoundaryAttraction);
-            computeShader.SetFloat(
+                "_FoamTransportMaximumAxisCourant",
+                TransportMaximumAxisCourant);
+            computeShader.SetVector(
                 "_FoamWakeMotionInfluence",
-                ProvisionalWakeMotionInfluence);
-            computeShader.SetFloat(
-                "_FoamImpactMotionInfluence",
-                ProvisionalImpactMotionInfluence);
+                WakeMotionInfluence);
+            computeShader.SetVector(
+                "_FoamPressureMotionInfluence",
+                PressureMotionInfluence);
 
             bool disturbanceAvailable =
                 disturbanceRuntime != null &&
@@ -111,9 +97,6 @@ namespace ProgrammaticStylized3D.Rivers
 
             RenderTexture wakeSource = disturbanceAvailable
                 ? disturbanceRuntime.CurrentWakeTexture
-                : null;
-            RenderTexture rippleSource = disturbanceAvailable
-                ? disturbanceRuntime.CurrentRippleTexture
                 : null;
             RenderTexture staticWakeSource = disturbanceAvailable
                 ? disturbanceRuntime.StaticWakeSourceTexture
@@ -123,22 +106,12 @@ namespace ProgrammaticStylized3D.Rivers
                 : null;
 
             bool wakeAvailable = IsCreatedTexture(wakeSource);
-            bool rippleAvailable = IsCreatedTexture(rippleSource);
             bool staticWakeAvailable = IsCreatedTexture(staticWakeSource);
             bool staticPressureAvailable =
                 IsCreatedTexture(staticPressureSource);
 
-            // Every texture declared by a compute kernel must be bound for
-            // every dispatch. Stage 5 allocates its optional fields
-            // independently, so an allocated disturbance runtime does not
-            // guarantee that each individual texture is already created.
-            // Bind one explicit zero-valued RenderTexture for every missing
-            // input rather than relying on a built-in Texture2D fallback.
             Texture wakeTexture = wakeAvailable
                 ? wakeSource
-                : neutralDisturbanceTexture;
-            Texture rippleTexture = rippleAvailable
-                ? rippleSource
                 : neutralDisturbanceTexture;
             Texture staticWakeTexture = staticWakeAvailable
                 ? staticWakeSource
@@ -150,11 +123,10 @@ namespace ProgrammaticStylized3D.Rivers
             Vector2Int wakeDimensions = wakeAvailable
                 ? new Vector2Int(wakeSource.width, wakeSource.height)
                 : Vector2Int.one;
-            Vector2Int rippleDimensions = rippleAvailable
-                ? new Vector2Int(rippleSource.width, rippleSource.height)
-                : Vector2Int.one;
             Vector2Int staticWakeDimensions = staticWakeAvailable
-                ? new Vector2Int(staticWakeSource.width, staticWakeSource.height)
+                ? new Vector2Int(
+                    staticWakeSource.width,
+                    staticWakeSource.height)
                 : Vector2Int.one;
             Vector2Int staticPressureDimensions = staticPressureAvailable
                 ? new Vector2Int(
@@ -170,10 +142,6 @@ namespace ProgrammaticStylized3D.Rivers
                 wakeDimensions.x,
                 wakeDimensions.y);
             computeShader.SetInts(
-                "_FoamRippleDimensions",
-                rippleDimensions.x,
-                rippleDimensions.y);
-            computeShader.SetInts(
                 "_FoamStaticWakeDimensions",
                 staticWakeDimensions.x,
                 staticWakeDimensions.y);
@@ -182,55 +150,53 @@ namespace ProgrammaticStylized3D.Rivers
                 staticPressureDimensions.x,
                 staticPressureDimensions.y);
 
-            BindMotionKernel(
-                advectForwardKernel,
+            BindTransportKernel(
+                transportPredictorKernel,
                 wakeTexture,
-                rippleTexture,
                 staticWakeTexture,
                 staticPressureTexture);
-            BindMotionKernel(
-                advectReverseKernel,
+            BindTransportKernel(
+                transportCorrectorKernel,
                 wakeTexture,
-                rippleTexture,
-                staticWakeTexture,
-                staticPressureTexture);
-            BindMotionKernel(
-                simulateKernel,
-                wakeTexture,
-                rippleTexture,
                 staticWakeTexture,
                 staticPressureTexture);
 
             computeShader.SetTexture(
-                advectForwardKernel,
+                transportPredictorKernel,
                 "_FoamStateRead",
                 currentState);
             computeShader.SetTexture(
-                advectForwardKernel,
-                "_FoamAdvectionWrite",
-                advectedState);
+                transportPredictorKernel,
+                "_FoamTransportWrite",
+                transportPredictorState);
 
             computeShader.SetTexture(
-                advectReverseKernel,
-                "_FoamAdvectedRead",
-                advectedState);
-            computeShader.SetTexture(
-                advectReverseKernel,
-                "_FoamAdvectionWrite",
-                reverseState);
-
-            computeShader.SetTexture(
-                simulateKernel,
+                transportCorrectorKernel,
                 "_FoamStateRead",
                 currentState);
             computeShader.SetTexture(
+                transportCorrectorKernel,
+                "_FoamTransportPredictorRead",
+                transportPredictorState);
+            computeShader.SetTexture(
+                transportCorrectorKernel,
+                "_FoamTransportWrite",
+                transportCorrectedState);
+
+            BindCompressionKernel();
+
+            computeShader.SetBuffer(
                 simulateKernel,
-                "_FoamAdvectedRead",
-                advectedState);
+                "_FoamMetricRows",
+                metricBuffer);
             computeShader.SetTexture(
                 simulateKernel,
-                "_FoamReverseRead",
-                reverseState);
+                "_FoamBoundary",
+                boundaryTexture);
+            computeShader.SetTexture(
+                simulateKernel,
+                "_FoamTransportCorrectedRead",
+                transportCorrectedState);
             computeShader.SetTexture(
                 simulateKernel,
                 "_FoamTopologyRead",
@@ -257,10 +223,9 @@ namespace ProgrammaticStylized3D.Rivers
                 writeState);
         }
 
-        private void BindMotionKernel(
+        private void BindTransportKernel(
             int kernel,
             Texture wakeTexture,
-            Texture rippleTexture,
             Texture staticWakeTexture,
             Texture staticPressureTexture)
         {
@@ -274,16 +239,12 @@ namespace ProgrammaticStylized3D.Rivers
                 boundaryTexture);
             computeShader.SetTexture(
                 kernel,
-                "_FoamGuidanceRead",
-                guidanceTexture);
+                "_FoamObstacleExclusionRead",
+                obstacleExclusionTexture);
             computeShader.SetTexture(
                 kernel,
                 "_FoamWakeField",
                 wakeTexture);
-            computeShader.SetTexture(
-                kernel,
-                "_FoamRippleField",
-                rippleTexture);
             computeShader.SetTexture(
                 kernel,
                 "_FoamStaticWakeField",
@@ -294,22 +255,152 @@ namespace ProgrammaticStylized3D.Rivers
                 staticPressureTexture);
         }
 
+        private void BindCompressionKernel()
+        {
+            computeShader.SetBuffer(
+                compressTransportInterfaceKernel,
+                "_FoamMetricRows",
+                metricBuffer);
+            computeShader.SetTexture(
+                compressTransportInterfaceKernel,
+                "_FoamBoundary",
+                boundaryTexture);
+            computeShader.SetTexture(
+                compressTransportInterfaceKernel,
+                "_FoamObstacleExclusionRead",
+                obstacleExclusionTexture);
+        }
+
         private void DispatchSimulation(int startX, int countX)
         {
             computeShader.SetInt("_FoamRangeStart", startX);
             computeShader.SetInt("_FoamRangeCount", countX);
 
-            // Corrected transport is intentionally a three-dispatch sequence:
-            // forward advection, reverse error estimate, then bounded correction
-            // plus lifecycle aging, topology response, capture, and reinforcement.
-            Dispatch(advectForwardKernel, countX, fieldHeight);
-            Dispatch(advectReverseKernel, countX, fieldHeight);
+            // SSP-RK2 conservative finite-volume transport now owns only the
+            // retained disturbance-derived material motion. Patch 4.11C.5.2d
+            // moved base downstream travel to phase transport plus integer
+            // commits, so this path no longer spends material cadence on tiny
+            // sub-cell downstream shifts.
+            Dispatch(transportPredictorKernel, countX, fieldHeight);
+            Dispatch(transportCorrectorKernel, countX, fieldHeight);
+            DispatchInterfaceCompressionPasses(countX);
             Dispatch(simulateKernel, countX, fieldHeight);
+        }
+
+        private bool DispatchPhaseCommit(int committedCells)
+        {
+            if (computeShader == null || currentState == null ||
+                writeState == null || boundaryTexture == null ||
+                obstacleExclusionTexture == null || phaseCommitKernel < 0 ||
+                fieldWidth <= 0 || fieldHeight <= 0 || committedCells == 0)
+            {
+                return false;
+            }
+
+            computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetFloat("_FoamValidLength", validFieldLength);
+            computeShader.SetFloat(
+                "_FoamSimulationLength",
+                simulationFieldLength);
+            computeShader.SetInt("_FoamRangeStart", 0);
+            computeShader.SetInt("_FoamRangeCount", fieldWidth);
+            computeShader.SetInt("_FoamPhaseCommitCells", committedCells);
+            computeShader.SetFloat(
+                "_FoamPhaseTransportMetres",
+                foamPhaseTransportMetres);
+            computeShader.SetTexture(
+                phaseCommitKernel,
+                "_FoamBoundary",
+                boundaryTexture);
+            computeShader.SetTexture(
+                phaseCommitKernel,
+                "_FoamObstacleExclusionRead",
+                obstacleExclusionTexture);
+            computeShader.SetTexture(
+                phaseCommitKernel,
+                "_FoamStateRead",
+                currentState);
+            computeShader.SetTexture(
+                phaseCommitKernel,
+                "_FoamStateWrite",
+                writeState);
+
+            previousState = currentState;
+            Dispatch(phaseCommitKernel, fieldWidth, fieldHeight);
+            (currentState, writeState) = (writeState, currentState);
+            return true;
+        }
+
+        private void DispatchInterfaceCompressionPasses(int countX)
+        {
+            // Conservative pairwise interface compression runs after transport
+            // and before lifecycle/source transfer. It moves packed material
+            // moments from lower-Presence cells toward adjacent higher-Presence
+            // cells without changing total Presence, Remaining-Life moment, or
+            // Pattern moment for each disjoint pair. This restores a resolved
+            // visible contour to small proof sources without reintroducing the
+            // deleted autonomous network or inventing material area.
+            DispatchInterfaceCompressionPass(
+                axis: 0,
+                parity: 0,
+                read: transportCorrectedState,
+                write: transportPredictorState,
+                width: countX,
+                height: fieldHeight);
+            DispatchInterfaceCompressionPass(
+                axis: 0,
+                parity: 1,
+                read: transportPredictorState,
+                write: transportCorrectedState,
+                width: countX,
+                height: fieldHeight);
+            DispatchInterfaceCompressionPass(
+                axis: 1,
+                parity: 0,
+                read: transportCorrectedState,
+                write: transportPredictorState,
+                width: countX,
+                height: fieldHeight);
+            DispatchInterfaceCompressionPass(
+                axis: 1,
+                parity: 1,
+                read: transportPredictorState,
+                write: transportCorrectedState,
+                width: countX,
+                height: fieldHeight);
+        }
+
+        private void DispatchInterfaceCompressionPass(
+            int axis,
+            int parity,
+            RenderTexture read,
+            RenderTexture write,
+            int width,
+            int height)
+        {
+            if (width <= 0 || height <= 0)
+            {
+                return;
+            }
+
+            computeShader.SetInt("_FoamCompressionAxis", axis);
+            computeShader.SetInt("_FoamCompressionParity", parity);
+            computeShader.SetTexture(
+                compressTransportInterfaceKernel,
+                "_FoamCompressionStateRead",
+                read);
+            computeShader.SetTexture(
+                compressTransportInterfaceKernel,
+                "_FoamCompressionStateWrite",
+                write);
+            lastCompressionPassesUsed++;
+            Dispatch(compressTransportInterfaceKernel, width, height);
         }
 
         private void DispatchClear(RenderTexture target, int startX, int countX)
         {
-            if (computeShader == null || target == null || clearKernel < 0 || countX <= 0)
+            if (computeShader == null || target == null ||
+                clearKernel < 0 || countX <= 0)
             {
                 return;
             }
@@ -325,12 +416,11 @@ namespace ProgrammaticStylized3D.Rivers
             Dispatch(clearKernel, countX, fieldHeight);
         }
 
-
         private void ApplyBoundaryToState(RenderTexture target)
         {
             if (computeShader == null || target == null ||
-                boundaryTexture == null || applyBoundaryKernel < 0 ||
-                fieldWidth <= 0 || fieldHeight <= 0)
+                boundaryTexture == null || obstacleExclusionTexture == null ||
+                applyBoundaryKernel < 0 || fieldWidth <= 0 || fieldHeight <= 0)
             {
                 return;
             }
@@ -348,6 +438,10 @@ namespace ProgrammaticStylized3D.Rivers
                 boundaryTexture);
             computeShader.SetTexture(
                 applyBoundaryKernel,
+                "_FoamObstacleExclusionRead",
+                obstacleExclusionTexture);
+            computeShader.SetTexture(
+                applyBoundaryKernel,
                 "_FoamStateWrite",
                 target);
             Dispatch(applyBoundaryKernel, fieldWidth, fieldHeight);
@@ -355,7 +449,8 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void ClearChunk(int chunk)
         {
-            if (stateA == null || stateB == null || chunk < 0 || chunk >= chunkCount)
+            if (stateA == null || stateB == null ||
+                chunk < 0 || chunk >= chunkCount)
             {
                 return;
             }
@@ -364,9 +459,8 @@ namespace ProgrammaticStylized3D.Rivers
             int countX = Mathf.Min(resolutionPerChunk, fieldWidth - startX);
             DispatchClear(stateA, startX, countX);
             DispatchClear(stateB, startX, countX);
-            DispatchClear(advectedState, startX, countX);
-            DispatchClear(reverseState, startX, countX);
-
+            DispatchClear(transportPredictorState, startX, countX);
+            DispatchClear(transportCorrectedState, startX, countX);
         }
 
         private void Dispatch(int kernel, int width, int height)
@@ -394,6 +488,5 @@ namespace ProgrammaticStylized3D.Rivers
             lastUpdateDispatches++;
             lastUpdateCellIterations += count;
         }
-
     }
 }

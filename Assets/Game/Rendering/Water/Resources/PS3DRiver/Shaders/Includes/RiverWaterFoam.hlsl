@@ -3,9 +3,7 @@
 
 struct RiverWaterFoamResult
 {
-    float presence;
     float remainingLife;
-    float materialPattern;
     float mask;
     float2 fieldUV;
 };
@@ -20,13 +18,12 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float globalStart,
     float fieldLength,
     float interpolation,
+    float renderTravelMetres,
     float sharpness,
     float freezeAmount)
 {
     RiverWaterFoamResult result;
-    result.presence = 0.0;
     result.remainingLife = 0.0;
-    result.materialPattern = 0.0;
     result.mask = 0.0;
     result.fieldUV = 0.0;
 
@@ -35,50 +32,52 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         return result;
     }
 
-    float2 uv = float2(
+    float2 fieldUV = float2(
         saturate((globalDistance - globalStart) / fieldLength),
         saturate(lateralMetres / max(0.001, surfaceHalfWidth) * 0.5 + 0.5));
-    float4 previousState = SAMPLE_TEXTURE2D_LOD(
-        previousFoam,
-        previousFoamSampler,
-        uv,
-        0.0);
+    float2 foamUV = float2(
+        saturate(((globalDistance - renderTravelMetres) - globalStart) / fieldLength),
+        fieldUV.y);
+
+    float blend = saturate(interpolation);
     float4 currentState = SAMPLE_TEXTURE2D_LOD(
         currentFoam,
         currentFoamSampler,
-        uv,
+        foamUV,
         0.0);
-    float4 state = lerp(
-        previousState,
-        currentState,
-        saturate(interpolation));
+    float4 state = currentState;
+    if (blend < 0.999)
+    {
+        float4 previousState = SAMPLE_TEXTURE2D_LOD(
+            previousFoam,
+            previousFoamSampler,
+            foamUV,
+            0.0);
+        state = lerp(
+            previousState,
+            currentState,
+            blend);
+    }
 
     float presence = saturate(state.x);
     float remainingLife = presence > 0.0001
         ? saturate(state.y / presence)
         : 0.0;
-    float materialPattern = presence > 0.0001
-        ? saturate(state.z / presence)
-        : 0.0;
-
-    // Presence is geometric coverage, not emitter strength. The proof
-    // renderer extracts its central contour directly and deliberately leaves
-    // Material Pattern visually inert until fracture work begins.
-    float signedPresence = presence - 0.5;
-    float derivativeWidth = max(fwidth(signedPresence), 0.0001);
-    float edgeWidth = derivativeWidth * lerp(
-        1.75,
-        0.35,
-        saturate(sharpness));
-    float mask = smoothstep(-edgeWidth, edgeWidth, signedPresence);
+    // Presence is geometric coverage, not emitter strength. Render the
+    // transported coverage itself, but suppress the very low-coverage crumbs
+    // that finite-volume transport can leave behind after the main footprint
+    // has moved on. This is a visual residue floor only: it is far below the
+    // useful body coverage of a resolved proof source and does not alter the
+    // stored Remaining Life state.
+    float contrast = lerp(1.15, 0.82, saturate(sharpness));
+    float residueGate = smoothstep(0.025, 0.115, presence);
+    float mask = pow(max(0.0, presence), contrast) * residueGate;
     mask *= step(0.0001, remainingLife);
     mask *= 1.0 - saturate(freezeAmount);
 
-    result.presence = presence;
     result.remainingLife = remainingLife;
-    result.materialPattern = materialPattern;
     result.mask = saturate(mask);
-    result.fieldUV = uv;
+    result.fieldUV = fieldUV;
     return result;
 }
 
@@ -94,17 +93,6 @@ float3 RiverWaterResolveFoamColour(
             minimumNightVisibility),
         lighting);
     return max(0.0, foamColour * lit);
-}
-
-float3 RiverWaterFoamPatternDebugColour(float materialPattern)
-{
-    float value = saturate(materialPattern);
-    float3 low = float3(0.08, 0.20, 0.78);
-    float3 middle = float3(0.08, 0.92, 0.62);
-    float3 high = float3(1.00, 0.82, 0.08);
-    return value < 0.5
-        ? lerp(low, middle, value * 2.0)
-        : lerp(middle, high, (value - 0.5) * 2.0);
 }
 
 #endif

@@ -11,7 +11,7 @@ namespace ProgrammaticStylized3D.Rivers
             "PS3DRiver/Compute/CS_RiverFoam";
         private const float ChunkLengthMetres = 32f;
         // Stage 6 structural resolution is shared by persistent material,
-        // topology, guidance, and the authoritative obstacle mask. Medium is
+        // topology, and the authoritative obstacle mask. Medium is
         // the standard project tier; Low and High preserve the same physical
         // topology scale while changing only spatial precision and workload.
         private const int LowStructuralResolution = 64;
@@ -19,7 +19,6 @@ namespace ProgrammaticStylized3D.Rivers
         private const int HighStructuralResolution = 128;
         private const float ResourceReleaseDelaySeconds = 2f;
         private const float MaximumManualReservationSeconds = 300f;
-        private const float EndOfLifeDissipationSeconds = 4f;
         private const float TopologyMetricsUpdateRate = 2f;
         private const int ProgressiveRibbonEventCapacity = 8;
         private const int ProgressiveBirthDebugCounterCount = 2;
@@ -44,7 +43,21 @@ namespace ProgrammaticStylized3D.Rivers
         private const float ProgressivePatternSeedSalt = 191.447f;
         private const float ManualPatternSeedSalt = 233.719f;
         private const int ThreadGroupSize = 8;
-        private const int TopologyMetricCount = 16;
+        private const int TopologyMetricValidFluid = 0;
+        private const int TopologyMetricMajorSupport = 1;
+        private const int TopologyMetricConnectorSupport = 2;
+        private const int TopologyMetricNegativeAgingPressure = 3;
+        private const int TopologyMetricFoamInNegativeAgingPressure = 4;
+        private const int TopologyMetricVisibleMaterial = 5;
+        private const int TopologyMetricShoreSupport = 6;
+        private const int TopologyMetricFoamInShoreSupport = 7;
+        private const int TopologyMetricIntegratedPresenceArea = 8;
+        private const int TopologyMetricPresenceCoreArea = 9;
+        private const int TopologyMetricPressureLeeSupport = 10;
+        private const int TopologyMetricFoamInPressureLeeSupport = 11;
+        private const int TopologyMetricPerimeterVisible = 12;
+        private const int TopologyMetricConnectorMajorOverlap = 13;
+        private const int TopologyMetricCount = 14;
         // Canonical Stage 6 Shore Support band measured inward from the
         // instantaneous Stage 3 visible water edge. These metric widths remain
         // fixed while the accepted anchored-support contract is retained.
@@ -127,26 +140,32 @@ namespace ProgrammaticStylized3D.Rivers
         private const float ConnectorSelectionJitterMinimum = 0.90f;
         private const float ConnectorSelectionJitterMaximum = 1.10f;
 
-        // The old broad Foam authoring controls were removed in Patch 3.4.
-        // Persistent material behaviour remains on one fixed provisional
-        // baseline matching the supplied project state until the dedicated
-        // lifecycle pass proves and exposes a new canonical control set. These
-        // are implementation values, not public
-        // topology authoring controls.
-        private const float ProvisionalMaterialStrength = 1.342259f;
-        private const float ProvisionalMaterialCoverage = 0.394613f;
-        private const float ProvisionalMaterialSharpness = 0.78f;
-        private const float ProvisionalMaterialDetailScale = 0.5796f;
-        private const float ProvisionalMaterialDetailStrength = 0.637799f;
-        private const float ProvisionalMaterialShapeVariety = 0.763854f;
-        private const float ProvisionalMaterialFlowFollow = 1.02818f;
-        private const float ProvisionalMaterialEvolution = 1.26135f;
-        private const float ProvisionalMaterialSpread = 0.42858f;
+        // Patch 4.11C.5 removes the inherited autonomous material network and
+        // all of its spread/capture controls. The remaining constants have one
+        // explicit job each: rendering transported Presence coverage, generating manual
+        // proof shapes, keeping conservative transport stable, and applying
+        // accepted physical disturbance motion.
+        private const float MaterialContourSharpness = 0.78f;
+        // Patch 4.11C.5.2d keeps Foam material work at a deliberate
+        // animation cadence. Base downstream movement is phase-driven in the
+        // shader and committed as whole texture cells, while these rates own
+        // durable lifecycle, source transfer, topology aging, and disturbance
+        // transport.
+        private const float LowMaterialTemporalUpdateRate = 8f;
+        private const float MediumMaterialTemporalUpdateRate = 12f;
+        private const float HighMaterialTemporalUpdateRate = 16f;
+        private const float ManualTestShapeVariety = 0.763854f;
         private const float PresenceMetricThreshold = 0.16432f;
-        private const float ProvisionalMaterialGuidanceStrength = 1.15646f;
-        private const float ProvisionalMaterialBoundaryAttraction = 1.951f;
-        private const float ProvisionalWakeMotionInfluence = 1.047333f;
-        private const float ProvisionalImpactMotionInfluence = 0f;
+        // Preserve the accepted pre-C.5 wake/pressure deformation strength
+        // after removing the unrelated network, bank-attraction, spread, and
+        // capture terms that previously surrounded it. X is along-river and Y
+        // is across-river influence.
+        private static readonly Vector2 WakeMotionInfluence =
+            new(0.25135992f, 0.81691974f);
+        private static readonly Vector2 PressureMotionInfluence =
+            new(0.0280944f, 0.085844f);
+        private const float TransportMaximumAxisCourant = 0.28f;
+        private const float IntegratedAreaFixedPointScale = 4096f;
 
         private enum TopologyCacheStartupResolution
         {
@@ -186,7 +205,6 @@ namespace ProgrammaticStylized3D.Rivers
             BuildConnectorTopology,
             BuildPocketTopology,
             ClearMaterial,
-            BuildGuidance,
             RefreshInitialTopologySources,
             Finalize,
             Ready,
@@ -274,7 +292,6 @@ namespace ProgrammaticStylized3D.Rivers
             public bool HoldsVisibleResources;
             public RenderTexture PreviousState;
             public RenderTexture CurrentState;
-            public RenderTexture Guidance;
             public RenderTexture Topology;
             public RenderTexture TopologySources;
             public RenderTexture ObstacleExclusion;
@@ -323,8 +340,6 @@ namespace ProgrammaticStylized3D.Rivers
             new ProfilerMarker("RiverFoam.Init.BuildObstacleExclusion");
         private static readonly ProfilerMarker InitClearMaterialProfilerMarker =
             new ProfilerMarker("RiverFoam.Init.ClearMaterial");
-        private static readonly ProfilerMarker InitBuildGuidanceProfilerMarker =
-            new ProfilerMarker("RiverFoam.Init.BuildGuidance");
         private static readonly ProfilerMarker TopologyBuildMajorProfilerMarker =
             new ProfilerMarker("RiverFoam.Topology.BuildMajor");
         private static readonly ProfilerMarker TopologyBuildConnectorProfilerMarker =
@@ -376,37 +391,25 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamBirthDebug");
         private static readonly int FoamBirthTransferDebugId =
             Shader.PropertyToID("_FoamBirthTransferDebug");
-        private static readonly int FoamGuidanceId =
-            Shader.PropertyToID("_FoamGuidance");
         private static readonly int FoamTopologyId =
             Shader.PropertyToID("_FoamTopology");
         private static readonly int FoamTopologySourcesId =
             Shader.PropertyToID("_FoamTopologySources");
-        private static readonly int FoamBoundaryId =
-            Shader.PropertyToID("_FoamBoundary");
         private static readonly int FoamObstacleExclusionId =
             Shader.PropertyToID("_FoamObstacleExclusion");
         private static readonly int FoamInterpolationId =
             Shader.PropertyToID("_FoamInterpolation");
+        private static readonly int FoamRenderTravelMetresId =
+            Shader.PropertyToID("_FoamRenderTravelMetres");
         private static readonly int FoamGlobalStartId =
             Shader.PropertyToID("_FoamGlobalStart");
         private static readonly int FoamFieldLengthId =
             Shader.PropertyToID("_FoamFieldLength");
         private static readonly int FoamColourId =
             Shader.PropertyToID("_FoamColour");
-        private static readonly int FoamStrengthId =
-            Shader.PropertyToID("_FoamStrength");
-        private static readonly int FoamCoverageId =
-            Shader.PropertyToID("_FoamCoverage");
         private static readonly int FoamSharpnessId =
             Shader.PropertyToID("_FoamSharpness");
-        private static readonly int FoamDetailScaleId =
-            Shader.PropertyToID("_FoamDetailScale");
-        private static readonly int FoamDetailStrengthId =
-            Shader.PropertyToID("_FoamDetailStrength");
         private static readonly int FoamDebugViewId =
             Shader.PropertyToID("_FoamDebugView");
-        private static readonly int FoamSeedId =
-            Shader.PropertyToID("_FoamSeed");
     }
 }

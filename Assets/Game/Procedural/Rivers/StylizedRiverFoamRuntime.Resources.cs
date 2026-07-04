@@ -72,11 +72,10 @@ namespace ProgrammaticStylized3D.Rivers
         {
             return !resourcesDirty &&
                 currentState != null &&
-                advectedState != null &&
-                reverseState != null &&
+                transportPredictorState != null &&
+                transportCorrectedState != null &&
                 progressiveBirthSourceTexture != null &&
                 progressiveBirthTransferDebugTexture != null &&
-                guidanceTexture != null &&
                 topologyTexture != null &&
                 topologySourcesTexture != null &&
                 topologyGeneratedTexture != null &&
@@ -180,10 +179,10 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         stateA = CreateFieldTexture("PS3D_RiverFoam_A");
                         stateB = CreateFieldTexture("PS3D_RiverFoam_B");
-                        advectedState = CreateFieldTexture(
-                            "PS3D_RiverFoam_Advected");
-                        reverseState = CreateFieldTexture(
-                            "PS3D_RiverFoam_Reverse");
+                        transportPredictorState = CreateFieldTexture(
+                            "PS3D_RiverFoam_TransportPredictor");
+                        transportCorrectedState = CreateFieldTexture(
+                            "PS3D_RiverFoam_TransportCorrected");
                         progressiveBirthSourceTexture = CreateFieldTexture(
                             "PS3D_RiverFoam_ProgressiveBirthSource");
                         progressiveBirthTransferDebugTexture =
@@ -198,17 +197,15 @@ namespace ProgrammaticStylized3D.Rivers
                 case InitializationPhase.AllocateTopologyTextures:
                     using (InitAllocateTopologyTexturesProfilerMarker.Auto())
                     {
-                        guidanceTexture = CreateGuidanceTexture(
-                            "PS3D_RiverFoam_Guidance");
-                        topologyTexture = CreateGuidanceTexture(
+                        topologyTexture = CreateStructuralTexture(
                             "PS3D_RiverFoam_Topology");
-                        topologySourcesTexture = CreateGuidanceTexture(
+                        topologySourcesTexture = CreateStructuralTexture(
                             "PS3D_RiverFoam_TopologySources");
                         // Deterministic prepared topology is uploaded here.
                         // Connector and independent-negative classes remain only
                         // as complete static fallbacks when their prepared
                         // runtime reconstruction is unavailable.
-                        topologyGeneratedTexture = CreateGuidanceTexture(
+                        topologyGeneratedTexture = CreateStructuralTexture(
                             "PS3D_RiverFoam_TopologyGeneratedInput");
                         evolvingMajorTexture = CreateMajorEvolutionTexture(
                             "PS3D_RiverFoam_EvolvingMajorSupport");
@@ -442,8 +439,8 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         DispatchClear(stateA, 0, fieldWidth);
                         DispatchClear(stateB, 0, fieldWidth);
-                        DispatchClear(advectedState, 0, fieldWidth);
-                        DispatchClear(reverseState, 0, fieldWidth);
+                        DispatchClear(transportPredictorState, 0, fieldWidth);
+                        DispatchClear(transportCorrectedState, 0, fieldWidth);
                         DispatchClear(
                             progressiveBirthSourceTexture,
                             0,
@@ -454,11 +451,6 @@ namespace ProgrammaticStylized3D.Rivers
                             fieldWidth);
                     }
 
-                    initializationPhase = InitializationPhase.BuildGuidance;
-                    break;
-
-                case InitializationPhase.BuildGuidance:
-                    BuildGuidanceField(0f);
                     initializationPhase =
                         InitializationPhase.RefreshInitialTopologySources;
                     break;
@@ -505,14 +497,14 @@ namespace ProgrammaticStylized3D.Rivers
 
             fieldHeight = desiredStructuralResolution;
 
-            // Topology and guidance use the same structural grid as persistent
-            // material so narrow structures are not authored on a coarser
+            // Topology uses the same structural grid as persistent material so
+            // narrow structures are not authored on a coarser
             // hidden lattice and then upsampled.
-            guidanceWidth = fieldWidth;
-            guidanceHeight = fieldHeight;
+            structuralWidth = fieldWidth;
+            structuralHeight = fieldHeight;
             if (maximumTextureSize < 24 ||
                 fieldHeight > maximumTextureSize ||
-                guidanceHeight > maximumTextureSize)
+                structuralHeight > maximumTextureSize)
             {
                 ReportAllocationFailure(maximumTextureSize);
                 initializationPhase = InitializationPhase.Failed;
@@ -612,9 +604,18 @@ namespace ProgrammaticStylized3D.Rivers
             resourcesDirty = false;
             ReleaseTopologyTransitionVisibleHold();
             simulationAccumulator = 0f;
-            guidanceAccumulator = 0f;
+            foamPhaseTransportMetres = 0f;
+            foamRenderTravelMetres = 0f;
+            lastFoamPhaseTransportMetres = 0f;
+            lastFoamPhaseCellFraction = 0f;
+            lastPhaseCommitCellsThisFrame = 0;
+            lastPhaseCommitCellsThisSecond = 0;
+            phaseCommitCellsInCurrentSecond = 0;
+            phaseCommitCounterAccumulator = 0f;
+            lastFoamRenderTravelMetres = 0f;
             topologyMetricsAccumulator = 0f;
             simulationInterpolation = 1f;
+            lastRenderInterpolationAlpha = simulationInterpolation;
             lastRuntimeTime = Time.realtimeSinceStartup;
             rebuildPhase = RebuildPhase.Idle;
             pendingBoundaryRebuild = false;
@@ -733,11 +734,11 @@ namespace ProgrammaticStylized3D.Rivers
         }
 
 
-        private RenderTexture CreateGuidanceTexture(string textureName)
+        private RenderTexture CreateStructuralTexture(string textureName)
         {
             return CreateTopologyTexture(
-                guidanceWidth,
-                guidanceHeight,
+                structuralWidth,
+                structuralHeight,
                 textureName);
         }
 
@@ -768,7 +769,7 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture CreateShoreEdgesTexture(string textureName)
         {
             RenderTexture texture = new RenderTexture(
-                guidanceWidth,
+                structuralWidth,
                 1,
                 0,
                 RenderTextureFormat.RGHalf,
@@ -790,8 +791,8 @@ namespace ProgrammaticStylized3D.Rivers
             string textureName)
         {
             RenderTexture texture = new RenderTexture(
-                guidanceWidth,
-                guidanceHeight,
+                structuralWidth,
+                structuralHeight,
                 0,
                 RenderTextureFormat.RHalf,
                 RenderTextureReadWrite.Linear)
@@ -875,13 +876,12 @@ namespace ProgrammaticStylized3D.Rivers
             }
             ReleaseTexture(ref stateA);
             ReleaseTexture(ref stateB);
-            ReleaseTexture(ref advectedState);
-            ReleaseTexture(ref reverseState);
+            ReleaseTexture(ref transportPredictorState);
+            ReleaseTexture(ref transportCorrectedState);
             ReleaseTexture(ref progressiveBirthSourceTexture);
             ReleaseTexture(ref progressiveBirthTransferDebugTexture);
             progressiveBirthSourceContainsData = false;
             ReleaseProgressiveBirthDiagnosticResources();
-            ReleaseTexture(ref guidanceTexture);
             ReleaseTexture(ref topologyTexture);
             ReleaseTexture(ref topologySourcesTexture);
             ReleaseTexture(ref topologyGeneratedTexture);
@@ -959,6 +959,10 @@ namespace ProgrammaticStylized3D.Rivers
             topologyMetricsGeneration++;
             topologyMetricsReadbackPending = false;
             topologyMetricsAvailable = false;
+            integratedPresenceArea = 0f;
+            visiblePresenceCoreArea = 0f;
+            manualProofReferenceArea = 0f;
+            manualProofReferencePending = false;
             Array.Clear(
                 latestTopologyMetrics,
                 0,
@@ -967,7 +971,6 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader = null;
             clearKernel = -1;
             injectKernel = -1;
-            buildGuidanceKernel = -1;
             buildCurrentShoreEdgesKernel = -1;
             composeTopologyKernel = -1;
             captureGeneratedTopologyKernel = -1;
@@ -976,19 +979,22 @@ namespace ProgrammaticStylized3D.Rivers
             updateObstacleExclusionKernel = -1;
             resetTopologyMetricsKernel = -1;
             measureTopologyMetricsKernel = -1;
-            advectForwardKernel = -1;
-            advectReverseKernel = -1;
+            transportPredictorKernel = -1;
+            transportCorrectorKernel = -1;
+            compressTransportInterfaceKernel = -1;
+            phaseCommitKernel = -1;
             simulateKernel = -1;
             applyBoundaryKernel = -1;
             fieldWidth = 0;
             fieldHeight = 0;
-            guidanceWidth = 0;
-            guidanceHeight = 0;
+            structuralWidth = 0;
+            structuralHeight = 0;
             chunkCount = 0;
             resolutionPerChunk = 0;
             fieldLength = 0f;
             validFieldLength = 0f;
             simulationFieldLength = 0f;
+            minimumTransportLongitudinalSpacing = 0f;
             allocatedGlobalStart = 0f;
             initializationMotionTime = 0f;
             chunkActive = Array.Empty<bool>();
@@ -1020,7 +1026,6 @@ namespace ProgrammaticStylized3D.Rivers
                 topologyTransitionFlattenedCount = 0;
             }
             domainVersion = -1;
-            guidanceAccumulator = 0f;
             topologyMetricsAccumulator = 0f;
         }
 

@@ -25,36 +25,24 @@ namespace ProgrammaticStylized3D.Rivers
             boundaryDirty = true;
         }
 
-        private float ResolveGuidanceUpdateRate()
-        {
-            if (river == null)
-            {
-                return 6f;
-            }
-
-            return river.Quality switch
-            {
-                StylizedRiverQuality.Low => 4f,
-                StylizedRiverQuality.Medium => 6f,
-                StylizedRiverQuality.High => 8f,
-                _ => 6f
-            };
-        }
-
         private float ResolveUpdateRate()
         {
-            if (river == null)
-            {
-                return 20f;
-            }
+            float qualityRate = river == null
+                ? MediumMaterialTemporalUpdateRate
+                : river.Quality switch
+                {
+                    StylizedRiverQuality.Low => LowMaterialTemporalUpdateRate,
+                    StylizedRiverQuality.Medium => MediumMaterialTemporalUpdateRate,
+                    StylizedRiverQuality.High => HighMaterialTemporalUpdateRate,
+                    _ => MediumMaterialTemporalUpdateRate
+                };
 
-            return river.Quality switch
-            {
-                StylizedRiverQuality.Low => 12f,
-                StylizedRiverQuality.Medium => 20f,
-                StylizedRiverQuality.High => 30f,
-                _ => 20f
-            };
+            // Patch 4.11C.5.2d removed base downstream movement from the
+            // fractional transport solve. Material cadence now owns lifecycle,
+            // source transfer, topology aging, and disturbance deformation;
+            // base flow speed is handled by phase transport and whole-cell
+            // commits, so it must not raise the material update rate.
+            return qualityRate;
         }
 
         private int GlobalDistanceToX(float globalDistance)
@@ -96,6 +84,10 @@ namespace ProgrammaticStylized3D.Rivers
             lastUpdateDispatches = 0;
             lastUpdateCellIterations = 0;
             injectedLastUpdate = 0;
+            lastMaterialStepsThisFrame = 0;
+            lastCompressionPassesUsed = 0;
+            lastTransportSubstepsUsed = 1;
+            lastPhaseCommitCellsThisFrame = 0;
         }
 
         private void UpdateRecentPeaks()

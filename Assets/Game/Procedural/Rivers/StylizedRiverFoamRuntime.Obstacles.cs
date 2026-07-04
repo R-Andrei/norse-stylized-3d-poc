@@ -167,19 +167,13 @@ namespace ProgrammaticStylized3D.Rivers
                     float distanceInsideReach = foamReach - Mathf.Abs(lateral);
                     float coverage = Mathf.Clamp01(
                         distanceInsideReach / edgeWidth);
-                    float attraction = coverage *
-                        (1f - Mathf.SmoothStep(
-                            0f,
-                            1f,
-                            Mathf.InverseLerp(0.10f, 0.95f, coverage)));
-                    // R/G remain the legacy material-simulation fluid and
-                    // attraction contract. B/A are reserved zero: registered
-                    // solids now use the full-resolution Obstacle Footprint
-                    // mask. Canonical Shore Support comes from the
-                    // instantaneous Stage 3 edge.
+                    // The boundary texture stores valid-water coverage only.
+                    // Shore Support is reconstructed independently from the
+                    // instantaneous Stage 3 edge, and persistent material has
+                    // no boundary-attraction or shore-suction channel.
                     pixels[y * fieldWidth + x] = new Color(
                         coverage,
-                        attraction,
+                        0f,
                         0f,
                         0f);
                 }

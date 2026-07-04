@@ -59,7 +59,7 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _RefractionQuality("Refraction Quality", Float) = 1
         _RefractionDebugView("Refraction Debug View", Range(0, 6)) = 0
 
-        
+
         [Header(Runtime Disturbance Field)]
         [HideInInspector] _DisturbanceEnabled("Disturbance Enabled", Float) = 0
         [HideInInspector] _DisturbanceInterpolation("Disturbance Interpolation", Range(0, 1)) = 1
@@ -87,25 +87,16 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamCurrent("Foam Current", 2D) = "black" {}
         [HideInInspector] _FoamBirthDebug("Foam Progressive Birth Debug", 2D) = "black" {}
         [HideInInspector] _FoamBirthTransferDebug("Foam Progressive Birth Transfer Debug", 2D) = "black" {}
-        [HideInInspector] _FoamGuidance("Foam Guidance", 2D) = "black" {}
         [HideInInspector] _FoamTopology("Foam Topology", 2D) = "black" {}
         [HideInInspector] _FoamTopologySources("Foam Topology Sources", 2D) = "black" {}
-        [HideInInspector] _FoamBoundary("Foam Boundary", 2D) = "black" {}
         [HideInInspector] _FoamObstacleExclusion("Foam Obstacle Footprint", 2D) = "black" {}
         [HideInInspector] _FoamInterpolation("Foam Interpolation", Range(0, 1)) = 1
+        [HideInInspector] _FoamRenderTravelMetres("Foam Render Travel Metres", Float) = 0
         [HideInInspector] _FoamGlobalStart("Foam Global Start", Float) = 0
         [HideInInspector] _FoamFieldLength("Foam Field Length", Float) = 1
         [HideInInspector] _FoamColour("Foam Colour", Color) = (0.94, 0.97, 0.94, 1)
-        [HideInInspector] _FoamStrength("Foam Strength", Float) = 1
-        [HideInInspector] _FoamCoverage("Foam Coverage", Range(0, 1)) = 0.5
         [HideInInspector] _FoamSharpness("Foam Sharpness", Range(0, 1)) = 0.8
-        [HideInInspector] _FoamConnectivity("Foam Connectivity", Range(0, 1)) = 0.3
-        [HideInInspector] _FoamOpacity("Foam Opacity", Range(0, 1)) = 0.7
-        [HideInInspector] _FoamDetailScale("Foam Detail Scale", Float) = 0.65
-        [HideInInspector] _FoamDetailStrength("Foam Detail Strength", Range(0, 1)) = 0.35
         [HideInInspector] _FoamDebugView("Foam Debug View", Float) = 0
-        [HideInInspector] _FoamTime("Foam Time", Float) = 0
-        [HideInInspector] _FoamSeed("Foam Seed", Float) = 1731
 
         [Header(Lighting Response)]
         _LightDependence("Light Dependence", Range(0, 1)) = 1
@@ -248,16 +239,12 @@ Shader "PS3D/Stylized River Water"
 
                 float _FoamEnabled;
                 float _FoamInterpolation;
+                float _FoamRenderTravelMetres;
                 float _FoamGlobalStart;
                 float _FoamFieldLength;
                 half4 _FoamColour;
-                float _FoamStrength;
-                float _FoamCoverage;
                 float _FoamSharpness;
-                float _FoamDetailScale;
-                float _FoamDetailStrength;
                 float _FoamDebugView;
-                float _FoamSeed;
                 float4 _FoamBirthDebug_TexelSize;
                 float4 _FoamBirthTransferDebug_TexelSize;
                 float4 _FoamObstacleExclusion_TexelSize;
@@ -288,17 +275,11 @@ Shader "PS3D/Stylized River Water"
             SAMPLER(sampler_FoamCurrent);
             TEXTURE2D(_FoamBirthDebug);
             TEXTURE2D(_FoamBirthTransferDebug);
-            TEXTURE2D(_FoamGuidance);
-            // Guidance remains a bound compatibility/debug texture, but the
-            // compact Batch 1 debug menu no longer samples it in this pass.
             // Topology diagnostics reuse sampler_FoamCurrent, which is already
-            // recognized and allocated by the normal foam path. This adds zero
-            // fragment samplers and avoids Unity's requirement that a shared
-            // sampler name remain associated with an actively sampled texture.
+            // allocated by the normal Foam path, so no extra fragment sampler
+            // is required.
             TEXTURE2D(_FoamTopology);
             TEXTURE2D(_FoamTopologySources);
-            TEXTURE2D(_FoamBoundary);
-            SAMPLER(sampler_FoamBoundary);
             TEXTURE2D(_FoamObstacleExclusion);
 
             struct Attributes
@@ -776,6 +757,7 @@ Shader "PS3D/Stylized River Water"
                     _FoamGlobalStart,
                     _FoamFieldLength,
                     _FoamInterpolation,
+                    _FoamRenderTravelMetres,
                     _FoamSharpness,
                     _FreezeAmount);
 
@@ -790,8 +772,6 @@ Shader "PS3D/Stylized River Water"
                     lighting.combined,
                     _MinimumNightVisibility);
                 // Foam Colour alpha is the single canonical opacity control.
-                // The hidden legacy _FoamOpacity property remains only so old
-                // material serialization does not lose a known property.
                 float foamBlend = saturate(
                     foam.mask *
                     _FoamColour.a);
@@ -799,53 +779,7 @@ Shader "PS3D/Stylized River Water"
                 finalColour = MixFog(finalColour, input.motionData.w);
 
                 int foamDebug = (int)round(_FoamDebugView);
-                if (foamDebug == 9)
-                {
-                    float materialPresence = smoothstep(
-                        0.001,
-                        0.035,
-                        foam.presence);
-                    float lowerLifeBlend = smoothstep(
-                        0.0,
-                        0.5,
-                        foam.remainingLife);
-                    float upperLifeBlend = smoothstep(
-                        0.5,
-                        1.0,
-                        foam.remainingLife);
-                    float3 lifetimeColour = lerp(
-                        float3(0.95, 0.08, 0.02),
-                        float3(1.00, 0.58, 0.04),
-                        lowerLifeBlend);
-                    lifetimeColour = lerp(
-                        lifetimeColour,
-                        float3(0.65, 0.95, 1.00),
-                        upperLifeBlend);
-                    lifetimeColour = lerp(
-                        float3(0.0, 0.0, 0.0),
-                        lifetimeColour,
-                        materialPresence);
-                    return half4(lifetimeColour, 1.0);
-                }
-
-                if (foamDebug == 12)
-                {
-                    float presence = saturate(foam.presence);
-                    return half4(presence.xxx, 1.0);
-                }
-
-                if (foamDebug == 13)
-                {
-                    float materialPresence = smoothstep(
-                        0.001,
-                        0.035,
-                        foam.presence);
-                    float3 patternColour = RiverWaterFoamPatternDebugColour(
-                        foam.materialPattern) * materialPresence;
-                    return half4(patternColour, 1.0);
-                }
-
-                if (foamDebug == 10)
+                if (foamDebug == 2)
                 {
                     int2 birthDebugDimensions = int2(
                         max(1.0, _FoamBirthDebug_TexelSize.z),
@@ -870,7 +804,7 @@ Shader "PS3D/Stylized River Water"
                     return half4(saturate(debugColour), 1.0);
                 }
 
-                if (foamDebug == 11)
+                if (foamDebug == 3)
                 {
                     int2 transferDimensions = int2(
                         max(1.0, _FoamBirthTransferDebug_TexelSize.z),
@@ -891,13 +825,8 @@ Shader "PS3D/Stylized River Water"
                     return half4(saturate(transferColour), 1.0);
                 }
 
-                if (foamDebug == 3 || foamDebug == 6 ||
-                    foamDebug == 7 || foamDebug == 8)
+                if (foamDebug == 1)
                 {
-                    // Stage 6 support, negative-influence, and obstacle-footprint textures share
-                    // the same structural grid. Diagnostics deliberately use
-                    // point loads so a displayed boundary is the actual stored
-                    // topology boundary, not a bilinear visualization blur.
                     int2 structuralDimensions = int2(
                         max(1.0, _FoamObstacleExclusion_TexelSize.z),
                         max(1.0, _FoamObstacleExclusion_TexelSize.w));
@@ -907,68 +836,44 @@ Shader "PS3D/Stylized River Water"
                             (float2)structuralDimensions),
                         int2(0, 0),
                         structuralDimensions - 1);
-                    float4 topologyDebug = _FoamTopology.Load(
-                        int3(structuralCoordinate, 0));
-                    float4 anchoredSources = _FoamTopologySources.Load(
-                        int3(structuralCoordinate, 0));
-
-                    float freeWaterSupport = max(
-                        topologyDebug.r,
-                        topologyDebug.g);
-                    float combinedAnchoredSupport = max(
-                        max(anchoredSources.r, anchoredSources.g),
-                        anchoredSources.b);
+                    float4 topologyDebug = saturate(
+                        _FoamTopology.Load(
+                            int3(structuralCoordinate, 0)));
+                    float4 anchoredSources = saturate(
+                        _FoamTopologySources.Load(
+                            int3(structuralCoordinate, 0)));
                     float obstacleFootprint = saturate(
                         _FoamObstacleExclusion.Load(
                             int3(structuralCoordinate, 0)).r);
-                    float combinedNegativeInfluence = max(
-                        topologyDebug.b,
+
+                    float positiveSupport = max(
+                        max(topologyDebug.r, topologyDebug.g),
+                        max(
+                            max(anchoredSources.r, anchoredSources.g),
+                            anchoredSources.b));
+                    float negativePressure = topologyDebug.b;
+
+                    float3 topologyColour = float3(0.012, 0.016, 0.020);
+                    topologyColour +=
+                        positiveSupport * float3(0.04, 0.68, 0.08);
+                    topologyColour +=
+                        negativePressure * float3(0.88, 0.05, 0.02);
+                    topologyColour = lerp(
+                        saturate(topologyColour),
+                        float3(0.05, 0.22, 0.95),
                         obstacleFootprint);
 
-                    if (foamDebug == 3)
-                    {
-                        // Canonical independent Anchored Support classes.
-                        // Red = Pressure Support, green = Lee Support, blue = Shore Support.
-                        return half4(
-                            saturate(anchoredSources.r),
-                            saturate(anchoredSources.g),
-                            saturate(anchoredSources.b),
-                            1.0);
-                    }
-
-                    if (foamDebug == 8)
-                    {
-                        // Independent negative-influence inputs. Red = aggregate Negative Aging
-                        // Pressure, blue = the conservative current-water Obstacle
-                        // Footprint from the exact-mesh solid-interval mask.
-                        return half4(
-                            saturate(topologyDebug.b),
-                            0.0,
-                            obstacleFootprint,
-                            1.0);
-                    }
-
-                    if (foamDebug == 6)
-                    {
-                        // Green is combined lifespan support. Red is combined negative
-                        // influence. Additive overlap is yellow and does not imply
-                        // that either field has already erased the other.
-                        float combinedSupport = saturate(
-                            max(freeWaterSupport, combinedAnchoredSupport));
-                        return half4(
-                            saturate(combinedNegativeInfluence),
-                            combinedSupport,
-                            0.0,
-                            1.0);
-                    }
-
-                    // Red = independent Major Support, green = independent
-                    // Connector Support, and blue = combined Anchored Support.
-                    return half4(
-                        saturate(topologyDebug.r),
-                        saturate(topologyDebug.g),
-                        saturate(combinedAnchoredSupport),
-                        1.0);
+                    float life = saturate(foam.remainingLife);
+                    float3 foamOverlay = lerp(
+                        float3(0.05, 0.72, 1.00),
+                        float3(0.96, 1.00, 1.00),
+                        life);
+                    foamOverlay *= lerp(0.42, 1.0, life);
+                    float3 composite = lerp(
+                        topologyColour,
+                        foamOverlay,
+                        saturate(foam.mask * 0.92));
+                    return half4(saturate(composite), 1.0);
                 }
 
                 int disturbanceDebug =

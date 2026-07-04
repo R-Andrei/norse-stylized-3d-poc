@@ -86,15 +86,3 @@ struct FoamWeakSpanIdentityData
     // x = deterministic irregular-boundary noise seed.
     uint4 noiseAndFlags;
 };
-
-struct FoamMotionSample
-{
-    float2 velocity;
-    float capture;
-    float lane;
-    float junction;
-    float wakeEnergy;
-    float leeStrength;
-    float pressureStrength;
-    float rippleIntensity;
-};

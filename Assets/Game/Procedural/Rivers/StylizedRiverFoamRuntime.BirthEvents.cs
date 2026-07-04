@@ -40,9 +40,12 @@ namespace ProgrammaticStylized3D.Rivers
                 river.Domain.GlobalDistanceMinimum,
                 river.Domain.GlobalDistanceMaximum,
                 Mathf.Clamp01(distanceNormalized));
+            float flowDirection = river.FlowDirection >= 0f ? 1f : -1f;
             float availableDownstreamDistance = Mathf.Max(
                 0f,
-                river.Domain.GlobalDistanceMaximum - startGlobalDistance);
+                flowDirection > 0f
+                    ? river.Domain.GlobalDistanceMaximum - startGlobalDistance
+                    : startGlobalDistance - river.Domain.GlobalDistanceMinimum);
             float resolvedTravelDistance = Mathf.Min(
                 Mathf.Clamp(
                     travelDistance,
@@ -99,6 +102,7 @@ namespace ProgrammaticStylized3D.Rivers
                     ProgressiveRibbonMinimumDuration,
                     ProgressiveRibbonMaximumDuration),
                 TravelDistance = resolvedTravelDistance,
+                FlowDirection = flowDirection,
                 AcrossDrift = Mathf.Clamp(acrossDrift, -1f, 1f),
                 PathWander = Mathf.Clamp01(pathWander),
                 BaseRadius = resolvedHalfWidth,
@@ -300,21 +304,26 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     CentreGlobalDistance =
                         ribbonEvent.StartGlobalDistance +
+                        ribbonEvent.FlowDirection *
                         ribbonEvent.TravelDistance * 0.5f,
                     AlongRadius = alongRadius,
                     Elapsed = 0f,
                     MaximumLifetime = Mathf.Clamp(
                         ribbonEvent.RemainingLife *
-                        ResolveMaximumMaterialReservationSeconds() +
-                        EndOfLifeDissipationSeconds * 2f,
-                        EndOfLifeDissipationSeconds,
+                        ResolveMaximumMaterialReservationSeconds(),
+                        0.05f,
                         MaximumManualReservationSeconds)
                 });
-            ActivateGlobalRange(
-                ribbonEvent.StartGlobalDistance - ribbonEvent.BaseRadius,
+            float endGlobalDistance =
                 ribbonEvent.StartGlobalDistance +
-                    ribbonEvent.TravelDistance +
-                    ribbonEvent.BaseRadius,
+                ribbonEvent.FlowDirection * ribbonEvent.TravelDistance;
+            ActivateTransportSafeRange(
+                Mathf.Min(
+                    ribbonEvent.StartGlobalDistance,
+                    endGlobalDistance) - ribbonEvent.BaseRadius,
+                Mathf.Max(
+                    ribbonEvent.StartGlobalDistance,
+                    endGlobalDistance) + ribbonEvent.BaseRadius,
                 now + Mathf.Min(
                     5f,
                     ResolveMaximumMaterialReservationSeconds()));
@@ -327,6 +336,7 @@ namespace ProgrammaticStylized3D.Rivers
             out float acrossNormalized)
         {
             globalDistance = ribbonEvent.StartGlobalDistance +
+                ribbonEvent.FlowDirection *
                 ribbonEvent.TravelDistance * progress;
             float bend =
                 Mathf.Sin(progress * Mathf.PI) *

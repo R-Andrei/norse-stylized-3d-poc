@@ -224,20 +224,58 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             bool manualInjectedThisUpdate = ProcessPendingInjections(now);
+            if (manualProofReferencePending &&
+                !topologyMetricsReadbackPending)
+            {
+                MeasureTopologyMetrics(true);
+            }
 
             float updateRate = ResolveUpdateRate();
             float stepDuration = 1f / Mathf.Max(1f, updateRate);
+            lastMaterialStepDuration = stepDuration;
+            float signedDownstreamSpeed = river != null
+                ? river.FlowSpeedMetresPerSecond *
+                  river.LiquidFactor *
+                  river.FoamMaterialFlowSpeedMultiplier *
+                  river.FlowDirection
+                : 0f;
+            float downstreamSpeed = Mathf.Abs(signedDownstreamSpeed);
+            lastEstimatedTransportCellsPerStep =
+                minimumTransportLongitudinalSpacing > 0.0001f
+                    ? downstreamSpeed * stepDuration /
+                      minimumTransportLongitudinalSpacing
+                    : 0f;
 
             if (manualInjectedThisUpdate)
             {
-                // Manual diagnostics remain immediately visible, then enter
-                // the same transport, guidance, boundary, lifecycle, and
-                // disturbance-reinforcement solver on the following step.
+                // Manual diagnostics remain immediately visible. Birth writes
+                // into phase-compensated storage coordinates, so the visible
+                // source appears at the requested world position without
+                // resetting existing Foam phase.
                 simulationAccumulator = 0f;
                 simulationInterpolation = 1f;
+                foamRenderTravelMetres = foamPhaseTransportMetres;
+                lastRenderInterpolationAlpha = simulationInterpolation;
+                lastFoamPhaseTransportMetres = foamPhaseTransportMetres;
+                lastFoamPhaseCellFraction =
+                    minimumTransportLongitudinalSpacing > 0.0001f
+                        ? Mathf.Clamp01(
+                            Mathf.Abs(foamPhaseTransportMetres) /
+                            minimumTransportLongitudinalSpacing)
+                        : 0f;
+                lastFoamRenderTravelMetres = foamRenderTravelMetres;
             }
             else
             {
+                bool phaseMaterialActive =
+                    activeProgressiveRibbonEventCount > 0 ||
+                    reservations.Count > 0 ||
+                    CountActiveChunks() > 0;
+                AdvanceFoamPhaseTransport(
+                    deltaTime,
+                    signedDownstreamSpeed,
+                    phaseMaterialActive);
+
                 simulationAccumulator = Mathf.Min(
                     simulationAccumulator + deltaTime,
                     stepDuration * 2f);
@@ -245,6 +283,7 @@ namespace ProgrammaticStylized3D.Rivers
                 while (simulationAccumulator >= stepDuration)
                 {
                     simulationAccumulator -= stepDuration;
+                    lastMaterialStepsThisFrame++;
                     BeginProgressiveBirthSourceStep();
                     if (progressiveBirthDebugActive)
                     {
@@ -266,31 +305,30 @@ namespace ProgrammaticStylized3D.Rivers
                         ConfigureSharedComputeParameters(stepDuration);
                     }
 
-                    guidanceAccumulator += stepDuration;
-                    float guidanceInterval = 1f /
-                        Mathf.Max(1f, ResolveGuidanceUpdateRate());
-                    if (guidanceAccumulator >= guidanceInterval)
-                    {
-                        if (materialStepActive)
-                        {
-                            BuildGuidanceField(guidanceAccumulator);
-                        }
-
-                        guidanceAccumulator %= guidanceInterval;
-                    }
-
-                    if (topologyDebugActive &&
+                    if ((materialStepActive || topologyDebugActive) &&
                         !topologyMaintenanceBlocked)
                     {
-                        // Patch 4.6 composes evolving Major Support with the
-                        // accepted static Connector/negative fields and live
-                        // anchored sources.
-                        topologyMetricsAccumulator += stepDuration;
+                        // Material aging must consume current topology even
+                        // when the exact Final Foam view is selected. Compose
+                        // evolving Major/Connector/negative fields with live
+                        // Pressure, Lee, and Shore sources for every active
+                        // material step; the composite debug view merely makes
+                        // that same authoritative input visible.
+                        bool footprintMetricsActive =
+                            topologyDebugActive ||
+                            manualProofReferencePending ||
+                            manualProofReferenceArea > 0.0001f;
+                        bool measureTopology = false;
                         float topologyMetricsInterval = 1f /
                             TopologyMetricsUpdateRate;
-                        bool measureTopology =
-                            topologyMetricsAccumulator >=
-                            topologyMetricsInterval;
+                        if (footprintMetricsActive)
+                        {
+                            topologyMetricsAccumulator += stepDuration;
+                            measureTopology =
+                                topologyMetricsAccumulator >=
+                                topologyMetricsInterval;
+                        }
+
                         if (measureTopology)
                         {
                             if (evolvingTopologyRebuilt)
@@ -322,8 +360,21 @@ namespace ProgrammaticStylized3D.Rivers
                     }
                 }
 
-                simulationInterpolation = Mathf.Clamp01(
-                    simulationAccumulator / Mathf.Max(0.0001f, stepDuration));
+                // Normal Foam rendering presents the latest committed material
+                // state plus the bounded residual phase. The residual no longer
+                // resets on material ticks; it resets only when a whole material
+                // cell has been committed into the persistent texture.
+                simulationInterpolation = 1f;
+                foamRenderTravelMetres = foamPhaseTransportMetres;
+                lastRenderInterpolationAlpha = simulationInterpolation;
+                lastFoamPhaseTransportMetres = foamPhaseTransportMetres;
+                lastFoamRenderTravelMetres = foamRenderTravelMetres;
+                lastFoamPhaseCellFraction =
+                    minimumTransportLongitudinalSpacing > 0.0001f
+                        ? Mathf.Clamp01(
+                            Mathf.Abs(foamPhaseTransportMetres) /
+                            minimumTransportLongitudinalSpacing)
+                        : 0f;
             }
 
             if (IsSleeping)
@@ -347,6 +398,58 @@ namespace ProgrammaticStylized3D.Rivers
 
             BindField();
             UpdateRecentPeaks();
+        }
+
+        private void AdvanceFoamPhaseTransport(
+            float deltaTime,
+            float signedDownstreamSpeed,
+            bool materialActive)
+        {
+            lastPhaseCommitCellsThisFrame = 0;
+            phaseCommitCounterAccumulator += deltaTime;
+            if (phaseCommitCounterAccumulator >= 1f)
+            {
+                lastPhaseCommitCellsThisSecond = phaseCommitCellsInCurrentSecond;
+                phaseCommitCellsInCurrentSecond = 0;
+                phaseCommitCounterAccumulator %= 1f;
+            }
+
+            if (!materialActive || minimumTransportLongitudinalSpacing <= 0.0001f ||
+                Mathf.Abs(signedDownstreamSpeed) <= 0.0001f)
+            {
+                if (!materialActive)
+                {
+                    foamPhaseTransportMetres = 0f;
+                }
+
+                return;
+            }
+
+            foamPhaseTransportMetres += signedDownstreamSpeed * deltaTime;
+            float cellLength = Mathf.Max(
+                0.0001f,
+                minimumTransportLongitudinalSpacing);
+            int committedMagnitude = Mathf.FloorToInt(
+                Mathf.Abs(foamPhaseTransportMetres) / cellLength);
+            if (committedMagnitude <= 0)
+            {
+                return;
+            }
+
+            committedMagnitude = Mathf.Min(
+                committedMagnitude,
+                Mathf.Max(1, fieldWidth));
+            int committedCells = foamPhaseTransportMetres >= 0f
+                ? committedMagnitude
+                : -committedMagnitude;
+            if (!DispatchPhaseCommit(committedCells))
+            {
+                return;
+            }
+
+            foamPhaseTransportMetres -= committedCells * cellLength;
+            lastPhaseCommitCellsThisFrame = Mathf.Abs(committedCells);
+            phaseCommitCellsInCurrentSecond += lastPhaseCommitCellsThisFrame;
         }
 
         public void NotifyRiverChanged()
@@ -384,7 +487,7 @@ namespace ProgrammaticStylized3D.Rivers
             float acrossNormalized,
             float radius,
             float amount,
-            float freshness,
+            float initialRemainingLife,
             float elongation)
         {
             if (river == null)
@@ -411,9 +514,8 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             int injectionIndex = ++manualInjectionSequence;
-            // Keep the public parameter name for source compatibility; its
-            // canonical Patch 4.11A meaning is normalized initial Remaining Life.
-            float resolvedRemainingLife = Mathf.Clamp01(freshness);
+            float resolvedRemainingLife = Mathf.Clamp01(
+                initialRemainingLife);
             float resolvedRadius = Mathf.Clamp(radius, 0.05f, 8f);
             float shapeSeed = river.VisualSeed + injectionIndex * 17.371f;
             float sourceFillSeed =
@@ -440,7 +542,7 @@ namespace ProgrammaticStylized3D.Rivers
                     sourceFillSeed,
                     sourceFillFeatureSize,
                     shapeSeed,
-                    ProvisionalMaterialShapeVariety,
+                    ManualTestShapeVariety,
                     true));
             idleSince = 0.0;
             return true;
@@ -455,9 +557,22 @@ namespace ProgrammaticStylized3D.Rivers
             lastInjectionBoundaryCoverage = -1f;
             lastInjectionStateSynchronized = false;
             simulationAccumulator = 0f;
-            guidanceAccumulator = 0f;
+            foamPhaseTransportMetres = 0f;
+            foamRenderTravelMetres = 0f;
+            lastFoamPhaseTransportMetres = 0f;
+            lastFoamPhaseCellFraction = 0f;
+            lastPhaseCommitCellsThisFrame = 0;
+            lastPhaseCommitCellsThisSecond = 0;
+            phaseCommitCellsInCurrentSecond = 0;
+            phaseCommitCounterAccumulator = 0f;
+            lastFoamRenderTravelMetres = 0f;
             topologyMetricsAccumulator = 0f;
+            integratedPresenceArea = 0f;
+            visiblePresenceCoreArea = 0f;
+            manualProofReferenceArea = 0f;
+            manualProofReferencePending = false;
             simulationInterpolation = 1f;
+            lastRenderInterpolationAlpha = simulationInterpolation;
             idleSince = Time.realtimeSinceStartupAsDouble;
 
             if (stateA != null)
@@ -470,14 +585,14 @@ namespace ProgrammaticStylized3D.Rivers
                 DispatchClear(stateB, 0, fieldWidth);
             }
 
-            if (advectedState != null)
+            if (transportPredictorState != null)
             {
-                DispatchClear(advectedState, 0, fieldWidth);
+                DispatchClear(transportPredictorState, 0, fieldWidth);
             }
 
-            if (reverseState != null)
+            if (transportCorrectedState != null)
             {
-                DispatchClear(reverseState, 0, fieldWidth);
+                DispatchClear(transportCorrectedState, 0, fieldWidth);
             }
 
             if (progressiveBirthSourceTexture != null)
