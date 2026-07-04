@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f4fa9d7aa3946b8bc7a13ac3e8e3a78, type: 3}
+  m_Name: GSP_Snowfield
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Ground.GroundSurfaceProfile
+  displayName: Ground Surface
+  patchScale: 14
+  patchContrast: 0.65
+  patchEdgeSoftness: 0.45
+  exposureBias: 0.55
+  dampDepositBias: 0.35
+  vegetationSuitability: 0.2
+  rockyDrySuitability: 0.18
+  snowEligibility: 0.85
+  rainAbsorption: 0.5
+  footprintVisibility: 0.55
+  grassRecoverySpeed: 0.5

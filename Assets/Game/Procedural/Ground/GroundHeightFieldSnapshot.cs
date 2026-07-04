@@ -8,8 +8,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
     /// and Normal describe the immutable pre-river surface used for corridor
     /// fitting. RenderNormal describes the visible broad-ground shading normal.
     /// Hidden river-concealment geometry may change vertex positions without
-    /// changing this visible normal field. MaterialClassification is reserved
-    /// for future terrain material routing.
+    /// changing this visible normal field.
     /// </summary>
     public readonly struct GroundSurfaceSample
     {
@@ -18,15 +17,38 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Vector3 normal,
             Vector3 renderNormal,
             float surfaceVariation,
+            float exposure,
+            float dampDeposit,
+            float vegetationSuitability,
             float materialClassification)
         {
             Height = height;
             Normal = ResolveNormal(normal);
             RenderNormal = ResolveNormal(renderNormal);
             SurfaceVariation = Mathf.Clamp01(surfaceVariation);
+            Exposure = Mathf.Clamp01(exposure);
+            DampDeposit = Mathf.Clamp01(dampDeposit);
+            VegetationSuitability = Mathf.Clamp01(vegetationSuitability);
             MaterialClassification = materialClassification;
         }
-        
+
+        public GroundSurfaceSample(
+            float height,
+            Vector3 normal,
+            Vector3 renderNormal,
+            float surfaceVariation,
+            float materialClassification)
+            : this(
+                height,
+                normal,
+                renderNormal,
+                surfaceVariation,
+                0.5f,
+                0.5f,
+                1f,
+                materialClassification)
+        {
+        }
 
         public GroundSurfaceSample(
             float height,
@@ -45,7 +67,32 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public float Height { get; }
         public Vector3 Normal { get; }
         public Vector3 RenderNormal { get; }
+
+        /// <summary>
+        /// Vertex Color R. Broad tonal patch variation. Kept as the historical
+        /// surface variation value so older shader/material assumptions remain
+        /// compatible.
+        /// </summary>
         public float SurfaceVariation { get; }
+
+        /// <summary>
+        /// Vertex Color G. Up/high/exposed places that can hold snow, frost, or
+        /// light surface accumulation in future systems.
+        /// </summary>
+        public float Exposure { get; }
+
+        /// <summary>
+        /// Vertex Color B. Low/flat/shore-biased places that can collect damp
+        /// deposits, dark mud, or waterlogging in future systems.
+        /// </summary>
+        public float DampDeposit { get; }
+
+        /// <summary>
+        /// Vertex Color A. Static suitability for future grass, moss, or other
+        /// low vegetation. Runtime trampling/compression should remain separate.
+        /// </summary>
+        public float VegetationSuitability { get; }
+
         public float MaterialClassification { get; }
 
         private static Vector3 ResolveNormal(Vector3 value)
@@ -68,6 +115,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private readonly Vector3[] baseNormals;
         private readonly Vector3[] renderNormals;
         private readonly float[] surfaceVariations;
+        private readonly float[] exposureMasks;
+        private readonly float[] dampDepositMasks;
+        private readonly float[] vegetationSuitabilityMasks;
         private readonly float[] materialClassifications;
         private readonly int triangulationSeed;
 
@@ -81,11 +131,44 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float spacing,
             float halfSize,
             int triangulationSeed)
+            : this(
+                baseHeights,
+                baseNormals,
+                renderNormals,
+                surfaceVariations,
+                CreateFilled(baseHeights, 0.5f),
+                CreateFilled(baseHeights, 0.5f),
+                CreateFilled(baseHeights, 1f),
+                materialClassifications,
+                resolution,
+                spacing,
+                halfSize,
+                triangulationSeed)
+        {
+        }
+
+        public GroundHeightFieldSnapshot(
+            float[] baseHeights,
+            Vector3[] baseNormals,
+            Vector3[] renderNormals,
+            float[] surfaceVariations,
+            float[] exposureMasks,
+            float[] dampDepositMasks,
+            float[] vegetationSuitabilityMasks,
+            float[] materialClassifications,
+            int resolution,
+            float spacing,
+            float halfSize,
+            int triangulationSeed)
         {
             this.baseHeights = CloneOrEmpty(baseHeights);
             this.baseNormals = CloneOrEmpty(baseNormals);
             this.renderNormals = CloneOrEmpty(renderNormals);
             this.surfaceVariations = CloneOrEmpty(surfaceVariations);
+            this.exposureMasks = CloneOrEmpty(exposureMasks);
+            this.dampDepositMasks = CloneOrEmpty(dampDepositMasks);
+            this.vegetationSuitabilityMasks =
+                CloneOrEmpty(vegetationSuitabilityMasks);
             this.materialClassifications = CloneOrEmpty(materialClassifications);
 
             Resolution = Mathf.Max(0, resolution);
@@ -99,6 +182,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 Array.Empty<float>(),
                 Array.Empty<Vector3>(),
                 Array.Empty<Vector3>(),
+                Array.Empty<float>(),
+                Array.Empty<float>(),
+                Array.Empty<float>(),
                 Array.Empty<float>(),
                 Array.Empty<float>(),
                 0,
@@ -120,6 +206,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                        baseNormals.Length == expected &&
                        renderNormals.Length == expected &&
                        surfaceVariations.Length == expected &&
+                       exposureMasks.Length == expected &&
+                       dampDepositMasks.Length == expected &&
+                       vegetationSuitabilityMasks.Length == expected &&
                        materialClassifications.Length == expected;
             }
         }
@@ -154,6 +243,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 SampleTriangulated(baseNormals, gridX, gridZ),
                 SampleTriangulated(renderNormals, gridX, gridZ),
                 SampleTriangulated(surfaceVariations, gridX, gridZ),
+                SampleTriangulated(exposureMasks, gridX, gridZ),
+                SampleTriangulated(dampDepositMasks, gridX, gridZ),
+                SampleTriangulated(vegetationSuitabilityMasks, gridX, gridZ),
                 SampleTriangulated(materialClassifications, gridX, gridZ));
 
             return true;
@@ -296,6 +388,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return source != null
                 ? (Vector3[])source.Clone()
                 : Array.Empty<Vector3>();
+        }
+
+        private static float[] CreateFilled(float[] source, float value)
+        {
+            int length = source != null ? source.Length : 0;
+            float[] result = new float[length];
+
+            for (int index = 0; index < result.Length; index++)
+            {
+                result[index] = value;
+            }
+
+            return result;
         }
     }
 }

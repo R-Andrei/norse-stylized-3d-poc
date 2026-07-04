@@ -505,11 +505,11 @@ Shader "PS3D/Pixel Surface Lit"
                 }
                 else if (mode == 4)
                 {
-                    mask = 0.0;
+                    mask = saturate((float)input.color.a);
                 }
                 else if (mode == 5)
                 {
-                    mask = 0.0;
+                    mask = saturate((float)input.materialMasks.x);
                 }
                 else if (mode == 6)
                 {

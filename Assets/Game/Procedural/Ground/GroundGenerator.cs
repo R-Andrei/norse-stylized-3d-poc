@@ -15,14 +15,43 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         {
             return Generate(
                 recipe,
+                null,
                 modifiers,
                 rivers,
                 out _);
         }
-        
 
         public static MeshData Generate(
             GroundRecipe recipe,
+            GroundSurfaceProfile surfaceProfile,
+            IReadOnlyList<GroundModifierSnapshot> modifiers,
+            IReadOnlyList<StylizedRiverGroundSnapshot> rivers)
+        {
+            return Generate(
+                recipe,
+                surfaceProfile,
+                modifiers,
+                rivers,
+                out _);
+        }
+
+        public static MeshData Generate(
+            GroundRecipe recipe,
+            IReadOnlyList<GroundModifierSnapshot> modifiers,
+            IReadOnlyList<StylizedRiverGroundSnapshot> rivers,
+            out GroundHeightFieldSnapshot baseSurface)
+        {
+            return Generate(
+                recipe,
+                null,
+                modifiers,
+                rivers,
+                out baseSurface);
+        }
+
+        public static MeshData Generate(
+            GroundRecipe recipe,
+            GroundSurfaceProfile surfaceProfile,
             IReadOnlyList<GroundModifierSnapshot> modifiers,
             IReadOnlyList<StylizedRiverGroundSnapshot> rivers,
             out GroundHeightFieldSnapshot baseSurface)
@@ -131,9 +160,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             // than the hidden concealment trench.
             BuildSurfaceMetadata(
                 recipe,
+                surfaceProfile,
                 baseHeights,
+                baseNormals,
+                modifiers,
+                rivers,
+                resolution,
+                spacing,
+                halfSize,
                 out float[] surfaceVariations,
-                out float[] materialClassifications);
+                out float[] exposureMasks,
+                out float[] dampDepositMasks,
+                out float[] vegetationSuitabilityMasks,
+                out float[] materialClassifications,
+                out Vector4[] secondarySurfaceMasks);
 
             baseSurface =
                 new GroundHeightFieldSnapshot(
@@ -141,6 +181,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     baseNormals,
                     renderNormals,
                     surfaceVariations,
+                    exposureMasks,
+                    dampDepositMasks,
+                    vegetationSuitabilityMasks,
                     materialClassifications,
                     resolution,
                     spacing,
@@ -151,6 +194,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 heights,
                 renderNormals,
                 surfaceVariations,
+                exposureMasks,
+                dampDepositMasks,
+                vegetationSuitabilityMasks,
+                secondarySurfaceMasks,
                 resolution,
                 spacing,
                 halfSize,
@@ -682,12 +729,27 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         private static void BuildSurfaceMetadata(
             GroundRecipe recipe,
+            GroundSurfaceProfile surfaceProfile,
             float[] finalHeights,
+            Vector3[] normals,
+            IReadOnlyList<GroundModifierSnapshot> modifiers,
+            IReadOnlyList<StylizedRiverGroundSnapshot> rivers,
+            int resolution,
+            float spacing,
+            float halfSize,
             out float[] surfaceVariations,
-            out float[] materialClassifications)
+            out float[] exposureMasks,
+            out float[] dampDepositMasks,
+            out float[] vegetationSuitabilityMasks,
+            out float[] materialClassifications,
+            out Vector4[] secondarySurfaceMasks)
         {
             surfaceVariations = new float[finalHeights.Length];
+            exposureMasks = new float[finalHeights.Length];
+            dampDepositMasks = new float[finalHeights.Length];
+            vegetationSuitabilityMasks = new float[finalHeights.Length];
             materialClassifications = new float[finalHeights.Length];
+            secondarySurfaceMasks = new Vector4[finalHeights.Length];
 
             float minimumHeight = float.PositiveInfinity;
             float maximumHeight = float.NegativeInfinity;
@@ -706,41 +768,322 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     0.001f,
                     maximumHeight - minimumHeight);
 
-            for (int index = 0; index < finalHeights.Length; index++)
+            float patchScale =
+                GroundSurfaceProfile.ResolvePatchScale(surfaceProfile);
+
+            float patchContrast =
+                GroundSurfaceProfile.ResolvePatchContrast(surfaceProfile);
+
+            float patchSoftness =
+                GroundSurfaceProfile.ResolvePatchEdgeSoftness(surfaceProfile);
+
+            float exposureBias =
+                GroundSurfaceProfile.ResolveExposureBias(surfaceProfile);
+
+            float dampBias =
+                GroundSurfaceProfile.ResolveDampDepositBias(surfaceProfile);
+
+            float vegetationBias =
+                GroundSurfaceProfile.ResolveVegetationSuitability(surfaceProfile);
+
+            float rockyDryBias =
+                GroundSurfaceProfile.ResolveRockyDrySuitability(surfaceProfile);
+
+            float snowEligibility =
+                GroundSurfaceProfile.ResolveSnowEligibility(surfaceProfile);
+
+            float rainAbsorption =
+                GroundSurfaceProfile.ResolveRainAbsorption(surfaceProfile);
+
+            float profileTonalInfluence = surfaceProfile != null ? 0.35f : 0f;
+
+            Vector2 noiseOrigin = new Vector2(
+                recipe.PatchCoordinate.x * ResolvePatchSize(recipe.PatchSize),
+                recipe.PatchCoordinate.y * ResolvePatchSize(recipe.PatchSize));
+
+            for (int z = 0; z < resolution; z++)
             {
-                float randomValue =
-                    Hash01(
-                        recipe.ShapeSeed,
-                        index ^ 0x2F61);
+                float localZ = -halfSize + z * spacing;
 
-                float heightValue =
-                    Mathf.InverseLerp(
-                        minimumHeight,
-                        minimumHeight + heightRange,
-                        finalHeights[index]);
+                for (int x = 0; x < resolution; x++)
+                {
+                    float localX = -halfSize + x * spacing;
+                    int index = z * resolution + x;
 
-                float combinedVariation =
-                    Mathf.Lerp(
-                        randomValue,
-                        heightValue,
-                        0.28f);
+                    Vector2 point = new Vector2(localX, localZ);
+                    Vector2 samplePosition = noiseOrigin + point;
 
-                surfaceVariations[index] =
-                    Mathf.Clamp01(
-                        0.5f +
-                        (combinedVariation - 0.5f) *
-                        recipe.SurfaceVariation);
+                    float randomValue =
+                        Hash01(
+                            recipe.ShapeSeed,
+                            index ^ 0x2F61);
 
-                // Reserved for future terrain material routing. Keeping the
-                // channel explicit now prevents another snapshot/API refactor.
-                materialClassifications[index] = 0f;
+                    float heightValue =
+                        Mathf.InverseLerp(
+                            minimumHeight,
+                            minimumHeight + heightRange,
+                            finalHeights[index]);
+
+                    float combinedVariation =
+                        Mathf.Lerp(
+                            randomValue,
+                            heightValue,
+                            0.28f);
+
+                    float compatibleVariation =
+                        Mathf.Clamp01(
+                            0.5f +
+                            (combinedVariation - 0.5f) *
+                            recipe.SurfaceVariation);
+
+                    float broadPatch =
+                        EvaluateBroadSurfacePatch(
+                            samplePosition,
+                            patchScale,
+                            patchSoftness,
+                            recipe.ShapeSeed);
+
+                    float profiledVariation =
+                        Mathf.Clamp01(
+                            0.5f +
+                            (broadPatch - 0.5f) *
+                            recipe.SurfaceVariation *
+                            Mathf.Lerp(0.65f, 1.6f, patchContrast));
+
+                    surfaceVariations[index] =
+                        Mathf.Lerp(
+                            compatibleVariation,
+                            profiledVariation,
+                            profileTonalInfluence);
+
+                    Vector3 normal =
+                        normals != null && index < normals.Length
+                            ? normals[index]
+                            : Vector3.up;
+
+                    float upFacing =
+                        Mathf.Clamp01(normal.normalized.y);
+
+                    float slope = 1f - upFacing;
+
+                    float compaction =
+                        EvaluateCompactionInfluence(
+                            point,
+                            modifiers);
+
+                    float shore =
+                        EvaluateShoreInfluence(
+                            point,
+                            spacing,
+                            rivers);
+
+                    float dryPatch =
+                        EvaluateBroadSurfacePatch(
+                            samplePosition + new Vector2(37.7f, -19.3f),
+                            patchScale * 0.72f,
+                            patchSoftness,
+                            recipe.ShapeSeed ^ 0x4D91);
+
+                    float rockyDry =
+                        Mathf.Clamp01(
+                            rockyDryBias * 0.52f +
+                            dryPatch * rockyDryBias * 0.30f +
+                            slope * rockyDryBias * 0.18f);
+
+                    float lowArea = 1f - heightValue;
+                    float flatness = upFacing;
+
+                    float exposure =
+                        Mathf.Clamp01(
+                            upFacing * 0.44f +
+                            heightValue * 0.22f +
+                            broadPatch * 0.16f +
+                            exposureBias * 0.18f);
+
+                    exposure *= Mathf.Lerp(0.55f, 1.08f, snowEligibility);
+                    exposure *= Mathf.Lerp(1f, 0.78f, shore * rainAbsorption);
+                    exposure *= Mathf.Lerp(1f, 0.88f, compaction);
+                    exposureMasks[index] = Mathf.Clamp01(exposure);
+
+                    float dampDeposit =
+                        Mathf.Clamp01(
+                            lowArea * 0.34f +
+                            flatness * 0.12f +
+                            shore * 0.28f +
+                            compaction * 0.08f +
+                            dampBias * 0.18f);
+
+                    dampDeposit *= Mathf.Lerp(0.72f, 1.18f, rainAbsorption);
+                    dampDepositMasks[index] = Mathf.Clamp01(dampDeposit);
+
+                    float midMoisture =
+                        1f - Mathf.Abs(dampDepositMasks[index] - 0.56f) / 0.56f;
+
+                    float vegetation =
+                        Mathf.Clamp01(
+                            vegetationBias * 0.50f +
+                            flatness * vegetationBias * 0.18f +
+                            midMoisture * vegetationBias * 0.18f +
+                            broadPatch * vegetationBias * 0.14f);
+
+                    vegetation *= Mathf.Lerp(1f, 0.65f, compaction);
+                    vegetation *= Mathf.Lerp(1f, 0.72f, shore);
+                    vegetation *= Mathf.Lerp(1f, 0.58f, rockyDry);
+                    vegetationSuitabilityMasks[index] = Mathf.Clamp01(vegetation);
+
+                    // Reserved for future terrain material routing. Keeping the
+                    // channel explicit now prevents another snapshot/API refactor.
+                    materialClassifications[index] = 0f;
+
+                    // UV2 contract for future shader/runtime use:
+                    // X = compaction/path/flatten influence
+                    // Y = river/shore influence
+                    // Z = rocky/dry secondary patch
+                    // W = reserved authored mask or secondary profile blend
+                    secondarySurfaceMasks[index] =
+                        new Vector4(
+                            Mathf.Clamp01(compaction),
+                            Mathf.Clamp01(shore),
+                            Mathf.Clamp01(rockyDry),
+                            0f);
+                }
             }
+        }
+
+        private static float EvaluateBroadSurfacePatch(
+            Vector2 samplePosition,
+            float patchScale,
+            float edgeSoftness,
+            int seed)
+        {
+            float scale = Mathf.Max(2f, patchScale);
+            float baseFrequency = 1f / scale;
+
+            Vector2 warp = new Vector2(
+                SampleCenteredPerlin(
+                    samplePosition,
+                    baseFrequency * 0.47f,
+                    seed,
+                    0x32A1),
+                SampleCenteredPerlin(
+                    samplePosition,
+                    baseFrequency * 0.47f,
+                    seed,
+                    0x6A35));
+
+            Vector2 warpedPosition =
+                samplePosition + warp * scale * 0.24f;
+
+            float broad =
+                Sample01(
+                    warpedPosition,
+                    baseFrequency,
+                    seed,
+                    0x2387);
+
+            float secondary =
+                Sample01(
+                    warpedPosition,
+                    baseFrequency * 2.15f,
+                    seed,
+                    0x6B59);
+
+            float value =
+                Mathf.Clamp01(
+                    broad * 0.74f +
+                    secondary * 0.26f);
+
+            float smooth = value * value * (3f - 2f * value);
+            float posterized = Mathf.Round(value * 4f) * 0.25f;
+            float stylized = Mathf.Lerp(posterized, smooth, edgeSoftness);
+
+            return Mathf.Clamp01(
+                Mathf.Lerp(value, stylized, 0.55f));
+        }
+
+        private static float EvaluateCompactionInfluence(
+            Vector2 point,
+            IReadOnlyList<GroundModifierSnapshot> modifiers)
+        {
+            if (modifiers == null || modifiers.Count == 0)
+            {
+                return 0f;
+            }
+
+            float influence = 0f;
+
+            for (int index = 0; index < modifiers.Count; index++)
+            {
+                GroundModifierSnapshot modifier = modifiers[index];
+
+                if (modifier.Mode != GroundModifierMode.Flatten)
+                {
+                    continue;
+                }
+
+                influence =
+                    Mathf.Max(
+                        influence,
+                        modifier.EvaluateWeight(point) * modifier.Strength);
+            }
+
+            return Mathf.Clamp01(influence);
+        }
+
+        private static float EvaluateShoreInfluence(
+            Vector2 point,
+            float spacing,
+            IReadOnlyList<StylizedRiverGroundSnapshot> rivers)
+        {
+            if (rivers == null || rivers.Count == 0)
+            {
+                return 0f;
+            }
+
+            float influence = 0f;
+
+            for (int index = 0; index < rivers.Count; index++)
+            {
+                StylizedRiverGroundSnapshot river = rivers[index];
+
+                if (!river.IsValid ||
+                    !river.TryEvaluate(
+                        point,
+                        out float distance,
+                        out _,
+                        out _,
+                        out float surfaceHalfWidth))
+                {
+                    continue;
+                }
+
+                float handoffHalfWidth =
+                    river.ResolveHandoffHalfWidth(surfaceHalfWidth);
+
+                float outerWidth =
+                    handoffHalfWidth +
+                    Mathf.Max(spacing * 2f, river.BankBlend * 0.75f);
+
+                float riverInfluence =
+                    1f - SmoothStep(
+                        surfaceHalfWidth,
+                        outerWidth,
+                        distance);
+
+                influence = Mathf.Max(influence, riverInfluence);
+            }
+
+            return Mathf.Clamp01(influence);
         }
 
         private static MeshData BuildMeshData(
             float[] heights,
             Vector3[] normals,
             float[] surfaceVariations,
+            float[] exposureMasks,
+            float[] dampDepositMasks,
+            float[] vegetationSuitabilityMasks,
+            Vector4[] secondarySurfaceMasks,
             int resolution,
             float spacing,
             float halfSize,
@@ -767,9 +1110,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         new Vector2(u, v),
                         new Color(
                             surfaceVariations[index],
-                            0.5f,
-                            0.5f,
-                            1f));
+                            exposureMasks[index],
+                            dampDepositMasks[index],
+                            vegetationSuitabilityMasks[index]),
+                        secondarySurfaceMasks[index]);
 
                     meshData.Normals.Add(normals[index]);
                 }
@@ -801,6 +1145,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
 
             return meshData;
+        }
+
+        private static float Sample01(
+            Vector2 position,
+            float frequency,
+            int seed,
+            int salt)
+        {
+            return SampleCenteredPerlin(position, frequency, seed, salt) * 0.5f + 0.5f;
+        }
+
+        private static float SmoothStep(
+            float edge0,
+            float edge1,
+            float value)
+        {
+            float t = Mathf.InverseLerp(edge0, edge1, value);
+            return t * t * (3f - 2f * t);
         }
 
         private static float SampleCenteredPerlin(

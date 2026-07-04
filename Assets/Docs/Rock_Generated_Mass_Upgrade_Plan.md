@@ -352,7 +352,8 @@ Checklist:
 - [x] Patch 12F.3 - Contact/crawl area mask second tuning after Unity validation
 - [x] Patch 12F.4 - Contact/crawl structural correction with deposit skeleton
 - [x] Patch 12F.5 - Surface mask tuning controls
-- [ ] Patch 12G - Edge/crack representation decision and prototype
+- [x] Patch 12G.1 - Debug-only semantic surface feature lines
+- [ ] Patch 12G.2 - Feature-line visual tuning and batching plan
 - [ ] Patch 13 - Dirty surface mottle and material breakup
 - [ ] Patch 14 - Crack and seam language
 
@@ -1293,39 +1294,106 @@ Acceptance:
 - Raising `Dirt Coverage` should make dirt/deposit patches fuller; lowering it should make them sparser.
 - If these controls work as intended, the next stage can move to the currently black/deferred line-feature masks: `ConvexEdgeWear` and `ConcaveCrease`.
 
-### Patch 12G - Edge/Crack Representation Decision and Prototype
+### Patch 12G.1 - Debug-Only Semantic Surface Feature Lines
 
-Status: planned after `CreviceBase` and `DirtDeposit` reach a decent debug state.
+Status: implemented as the first real representation for the two previously black/deferred line-feature masks.
+
+Reason for patch:
+
+- `ConvexEdgeWear` and `ConcaveCrease` are line-language features, not area masks.
+- Previous scalar vertex/UV/barycentric approaches produced wireframe, triangle wedges, and raw topology artifacts on coarse generated rocks.
+- The reference rocks use sparse selected ridges, worn corners, deliberate cracks, and seams. They do not show every triangle edge.
+- The project expects many visible rocks, so any line-overlay solution must avoid permanent per-rock draw-call cost in normal rendering.
+
+Performance architecture:
+
+- Feature generation happens only when a generated mass regenerates.
+- Runtime CPU cost should remain effectively zero:
+  - no `Update`;
+  - no per-frame mesh rebuild;
+  - no collider;
+  - no physics;
+  - no runtime raycast/scanning.
+- Memory cost is acceptable because the feature overlay is a small strip mesh.
+- GPU geometry cost is low because the strips cover little screen area.
+- The main performance risk is draw calls.
+- Therefore Patch 12G.1 is debug-only:
+  - a generated child overlay mesh may exist per mass;
+  - the overlay renderer is disabled during normal rendering;
+  - the overlay renderer is enabled only when `Surface Mask Debug` is `ConvexEdgeWear` or `ConcaveCrease`.
+- Final visible line rendering must later support chunk-combined overlays or another batching strategy before many visible rocks use the effect permanently.
 
 Checklist status:
 
-- [ ] choose between generated overlay strips, true mesh-authored relief, or per-edge/per-triangle shader metadata for line-like features;
-- [ ] prototype convex ridge wear without flooding entire triangles;
-- [ ] prototype sparse concave cracks/seams without showing raw triangulation;
-- [ ] keep line features sparse, readable at gameplay distance, and consistent with the simple blocky low-poly style;
-- [ ] only after the representation works, add profile-aware visible material response.
+- [x] add a generated `GeneratedMass_SurfaceFeatures` child mesh for line features;
+- [x] keep the child renderer disabled outside the two line debug modes;
+- [x] generate sparse selected convex edge-wear strips from major mesh edges;
+- [x] generate sparse deliberate crease/crack strips across selected broad faces;
+- [x] route `ConvexEdgeWear` debug through vertex colour alpha on the feature overlay;
+- [x] route `ConcaveCrease` debug through UV2.x on the feature overlay;
+- [x] keep main mesh line channels neutral unless feature overlay is visible;
+- [x] add minimal feature controls;
+- [x] avoid final material response.
 
 Primary files:
 
-- likely `MassGenerator.cs`;
-- possibly a new generated overlay/line mesh helper if overlay strips are selected;
-- `SH_PixelSurfaceLit.shader` only after the representation is stable;
-- HLSL stone materials only when final visible response is added.
+- `GeneratedMass.cs`
+- `GeneratedMassEditor.cs`
+- `MassSurfaceFeatureGenerator.cs`
+- `SH_PixelSurfaceLit.shader`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
 
-Work:
+Added controls:
 
-- prefer light worn ridges over blanket edge darkening;
-- separate convex edge wear from concave crack darkening;
-- do not use every triangle edge or interpolated scalar wedge masks as the visual basis;
-- preserve the original simple blocky low-poly shape language;
-- make material profiles use the same future line data differently rather than generating unrelated profile-specific masks.
+- `Edge Wear Amount`
+  - controls how many selected convex ridge/corner strips are generated;
+  - zero disables generated edge-wear strips.
+- `Edge Wear Width`
+  - scales the width of generated `ConvexEdgeWear` debug strips.
+- `Crease Amount`
+  - controls how many selected crease/crack strips are generated;
+  - zero disables generated crease/crack strips.
+- `Crease Width`
+  - scales the width of generated `ConcaveCrease` debug strips.
+
+Generated feature contracts:
+
+- `ConvexEdgeWear` strips:
+  - vertex colour alpha = `1`;
+  - UV2.x = `0`.
+- `ConcaveCrease` strips:
+  - vertex colour alpha = `0`;
+  - UV2.x = `1`.
+
+Implementation notes:
+
+- Convex edge wear is selected from mesh edges with meaningful adjacent-face angle, sufficient length, sufficient height above the base, and reasonable exposure.
+- Candidate edges are thinned by deterministic seed logic so they do not become wireframe.
+- Concave crease debug currently combines sparse face-based crack paths rather than relying only on true concave geometry, because many current generated masses are mostly convex.
+- Crack paths are generated as jagged strips on selected broad faces and should read as deliberate seams, not topology.
+- The overlay has no collider and no gameplay role.
+- The overlay renderer disables shadows, probe usage, and motion vectors where configured.
 
 Acceptance:
 
-- major silhouette and facet edges read as intentionally worn or polished;
-- inward seams/cracks read darker without looking like holes;
-- the effect remains visible at gameplay camera distance;
-- it does not require making every rock highly detailed or realistic.
+- `Surface Mask Debug > ConvexEdgeWear` should show selected major ridge/corner strips, not every triangle edge.
+- `Surface Mask Debug > ConvexEdgeWear` should not look like wireframe or large triangle wedges.
+- `Surface Mask Debug > ConcaveCrease` should show sparse deliberate seam/crack paths.
+- `Surface Mask Debug > ConcaveCrease` should not look like random dirt noise or raw triangulation.
+- Normal rendering should not pay an active overlay draw call.
+- The next patch should tune line density, width, selection quality, and archetype bias based on Unity screenshots before any final material response.
+
+### Patch 12G.2 - Feature-Line Visual Tuning and Batching Plan
+
+Status: planned after Patch 12G.1 Unity validation.
+
+Checklist status:
+
+- [ ] tune edge wear amount/width defaults across boulders, slabs, standing stones, polished stones, and fractured pillars;
+- [ ] tune crease/crack density and path length;
+- [ ] decide whether true concave mesh edges should be added as a second crease source;
+- [ ] document chunk-combined overlay requirements for final visible rendering;
+- [ ] only after debug masks are accepted, design final material response for pale worn ridges and dark cracks.
 
 ### Patch 13 - Dirty Surface Mottle and Material Breakup
 

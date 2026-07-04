@@ -156,6 +156,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private GroundRecipe recipe = new GroundRecipe();
 
+        [Tooltip("Surface/material identity used to generate deterministic ground masks. When empty, built-in defaults are used so old scenes do not require a profile asset.")]
+        [SerializeField]
+        private GroundSurfaceProfile surfaceProfile;
+
         [Tooltip("Regenerate when recipe values change in the Inspector.")]
         [SerializeField]
         private bool regenerateOnValidate = true;
@@ -174,6 +178,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             GroundHeightFieldSnapshot.Empty;
 
         public GroundRecipe Recipe => recipe;
+        public GroundSurfaceProfile SurfaceProfile => surfaceProfile;
         public int ModifierCount => modifiers != null ? modifiers.Length : 0;
         public int RiverCount => rivers != null ? rivers.Length : 0;
         public Material SharedMaterial =>
@@ -246,6 +251,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             MeshData meshData = GroundGenerator.Generate(
                 recipe,
+                surfaceProfile,
                 snapshots,
                 riverSnapshots,
                 out baseSurface);
@@ -372,6 +378,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         .TransformDirection(localSample.RenderNormal)
                         .normalized,
                     localSample.SurfaceVariation,
+                    localSample.Exposure,
+                    localSample.DampDeposit,
+                    localSample.VegetationSuitability,
                     localSample.MaterialClassification);
 
             return true;

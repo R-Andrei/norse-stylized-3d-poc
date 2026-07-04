@@ -27,6 +27,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty creviceBreakup;
         private SerializedProperty dirtCrawlReach;
         private SerializedProperty dirtCoverage;
+        private SerializedProperty edgeWearAmount;
+        private SerializedProperty edgeWearWidth;
+        private SerializedProperty creaseAmount;
+        private SerializedProperty creaseWidth;
         private SerializedProperty riverInteraction;
         private SerializedProperty participation;
         private SerializedProperty staticPressureMode;
@@ -63,6 +67,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "dirtCrawlReach");
             dirtCoverage = serializedObject.FindProperty(
                 "dirtCoverage");
+            edgeWearAmount = serializedObject.FindProperty(
+                "edgeWearAmount");
+            edgeWearWidth = serializedObject.FindProperty(
+                "edgeWearWidth");
+            creaseAmount = serializedObject.FindProperty(
+                "creaseAmount");
+            creaseWidth = serializedObject.FindProperty(
+                "creaseWidth");
             riverInteraction = serializedObject.FindProperty(
                 "riverInteraction");
             participation = riverInteraction?.FindPropertyRelative(
@@ -111,9 +123,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "creviceBreakup",
                 "dirtCrawlReach",
                 "dirtCoverage",
+                "edgeWearAmount",
+                "edgeWearWidth",
+                "creaseAmount",
+                "creaseWidth",
                 "riverInteraction");
 
             DrawSurfaceMaskTuning();
+            DrawSurfaceFeatureLines();
             DrawRiverInteraction();
 
             serializedObject.ApplyModifiedProperties();
@@ -191,6 +208,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             EditorGUILayout.PropertyField(creviceBreakup);
             EditorGUILayout.PropertyField(dirtCrawlReach);
             EditorGUILayout.PropertyField(dirtCoverage);
+        }
+
+        private void DrawSurfaceFeatureLines()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Surface Feature Lines",
+                EditorStyles.boldLabel);
+
+            EditorGUILayout.HelpBox(
+                "Generates debug-only overlay strips for ConvexEdgeWear and " +
+                "ConcaveCrease. The child overlay renderer is disabled during " +
+                "normal rendering and enabled only for those two debug modes.",
+                MessageType.Info);
+
+            EditorGUILayout.PropertyField(edgeWearAmount);
+            EditorGUILayout.PropertyField(edgeWearWidth);
+            EditorGUILayout.PropertyField(creaseAmount);
+            EditorGUILayout.PropertyField(creaseWidth);
         }
 
         private void EnsureDefaultStoneMaterials()

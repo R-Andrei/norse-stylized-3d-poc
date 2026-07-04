@@ -958,7 +958,7 @@ Acceptance:
 
 ### Patch 2 - Separate Shape From Surface Profile
 
-Status: not started.
+Status: partially implemented on 2026-07-05.
 
 Goal:
 
@@ -966,14 +966,14 @@ Goal:
 
 Checklist:
 
-- [ ] Create `GroundSurfaceProfile.cs`.
-- [ ] Add a `GroundSurfaceProfile` serialized field to `GeneratedGround`.
-- [ ] Add a default/fallback profile behavior when no asset is assigned.
-- [ ] Update `GeneratedGroundEditor` with a `Surface Profile` section.
+- [x] Create `GroundSurfaceProfile.cs`.
+- [x] Add a `GroundSurfaceProfile` serialized field to `GeneratedGround`.
+- [x] Add a default/fallback profile behavior when no asset is assigned.
+- [x] Update `GeneratedGroundEditor` with a `Surface Profile` section.
 - [ ] Create a folder for demo ground profiles.
-- [ ] Create `GSP_Snowfield.asset` as the first profile.
-- [ ] Keep all existing `GroundRecipe` serialized fields valid.
-- [ ] Do not require profile assets for old scenes to load.
+- [ ] Create `GSP_Snowfield.asset` as the first profile through Unity asset creation.
+- [x] Keep all existing `GroundRecipe` serialized fields valid.
+- [x] Do not require profile assets for old scenes to load.
 
 Acceptance:
 
@@ -983,7 +983,7 @@ Acceptance:
 
 ### Patch 3 - Static Surface Mask Contract
 
-Status: not started.
+Status: mostly implemented on 2026-07-05; Unity compile/scene validation still required.
 
 Goal:
 
@@ -991,16 +991,16 @@ Goal:
 
 Checklist:
 
-- [ ] Add an internal `GroundSurfaceMaskData` or equivalent container.
-- [ ] Compute tonal patch variation from broad warped patch noise.
-- [ ] Compute exposure/snow-hold potential.
-- [ ] Compute damp/deposit potential.
-- [ ] Compute vegetation suitability.
-- [ ] Keep the old `SurfaceVariation` meaning approximately compatible through vertex color R.
-- [ ] Write semantic masks to vertex color G/B/A.
-- [ ] Optionally reserve UV2 for path, shore, rocky, and authored masks.
-- [ ] Update `GroundHeightFieldSnapshot` to retain at least the important mask values.
-- [ ] Update comments documenting the vertex color/UV2 contract.
+- [x] Add an internal mask-generation path inside `GroundGenerator`.
+- [x] Compute tonal patch variation from broad warped patch noise when a profile is assigned.
+- [x] Compute exposure/snow-hold potential.
+- [x] Compute damp/deposit potential.
+- [x] Compute vegetation suitability.
+- [x] Keep the old `SurfaceVariation` meaning approximately compatible through vertex color R.
+- [x] Write semantic masks to vertex color G/B/A.
+- [x] Reserve/write UV2 for path, shore, rocky, and authored masks.
+- [x] Update `GroundHeightFieldSnapshot` to retain the important vertex-color mask values.
+- [x] Update comments documenting the vertex color/UV2 contract.
 
 Acceptance:
 
@@ -1011,7 +1011,7 @@ Acceptance:
 
 ### Patch 4 - Modifier and River Surface Influence
 
-Status: not started.
+Status: partially implemented on 2026-07-05.
 
 Goal:
 
@@ -1019,14 +1019,14 @@ Goal:
 
 Checklist:
 
-- [ ] Track ground modifier influence during generation.
-- [ ] Distinguish physical height modification from surface compaction/path influence.
+- [x] Track flatten modifier influence during surface metadata generation.
+- [x] Keep physical height modification separate from surface compaction/path influence.
 - [ ] Add optional surface-only modifier mode or defer with a documented placeholder.
-- [ ] Compute river/shore influence separately from concealed trench height.
-- [ ] Reserve or write UV2 X for compaction/path influence.
-- [ ] Reserve or write UV2 Y for river/shore influence.
-- [ ] Make profile settings decide how shore and compaction affect masks.
-- [ ] Ensure river concealment still does not affect visible render normals incorrectly.
+- [x] Compute river/shore influence separately from concealed trench height.
+- [x] Reserve/write UV2 X for compaction/path influence.
+- [x] Reserve/write UV2 Y for river/shore influence.
+- [x] Make profile settings begin to bias shore and compaction mask response.
+- [x] Ensure river concealment still does not affect visible render normals incorrectly.
 
 Acceptance:
 
@@ -1427,9 +1427,9 @@ The first milestone is complete when:
 ## Working Checklist Summary
 
 - [ ] Patch 1 - Document, baseline, and safety values.
-- [ ] Patch 2 - Separate shape from surface profile.
-- [ ] Patch 3 - Static surface mask contract.
-- [ ] Patch 4 - Modifier and river surface influence.
+- [~] Patch 2 - Separate shape from surface profile. Core code implemented; demo asset still pending Unity asset creation.
+- [~] Patch 3 - Static surface mask contract. Core code implemented; Unity validation still required.
+- [~] Patch 4 - Modifier and river surface influence. Flatten and shore mask influence implemented; surface-only modifier mode still pending.
 - [ ] Patch 5 - Ground material property block.
 - [ ] Patch 6 - First ground shader response.
 - [ ] Patch 7 - Terrain profile asset set.

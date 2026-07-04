@@ -8,6 +8,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
     public sealed class GeneratedGroundEditor : UnityEditor.Editor
     {
         private SerializedProperty recipe;
+        private SerializedProperty surfaceProfile;
         private SerializedProperty regenerateOnValidate;
 
         private SerializedProperty shapeSeed;
@@ -31,6 +32,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         {
             recipe =
                 serializedObject.FindProperty("recipe");
+
+            surfaceProfile =
+                serializedObject.FindProperty("surfaceProfile");
 
             regenerateOnValidate =
                 serializedObject.FindProperty(
@@ -227,6 +231,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 "Surface",
                 EditorStyles.boldLabel);
 
+            EditorGUILayout.PropertyField(
+                surfaceProfile,
+                new GUIContent(
+                    "Surface Profile",
+                    "Optional terrain/material identity. Empty uses built-in mask defaults."));
+
+            EditorGUILayout.HelpBox(
+                "Shape controls still define playable height. The surface profile " +
+                "biases generated material masks: R tonal variation, G exposure, " +
+                "B damp/deposit, A vegetation suitability.",
+                MessageType.None);
+
             EditorGUILayout.Slider(
                 surfaceDetail,
                 0f,
@@ -241,7 +257,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 1f,
                 new GUIContent(
                     "Material Variation",
-                    "Variation written to vertex colour red."));
+                    "Overall strength of generated tonal variation written to vertex colour red."));
         }
 
         private void DrawModifierSection()
