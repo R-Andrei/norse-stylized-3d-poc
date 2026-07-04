@@ -983,6 +983,77 @@ namespace ProgrammaticStylized3D.Rivers
             return latestTopologyMetrics[index] / 10000f;
         }
 
+        private string ResolveMaterialClockStatus()
+        {
+            if (!materialClockSessionActive ||
+                materialClockSessionStartedAt < 0.0)
+            {
+                return "idle";
+            }
+
+            double wallSeconds = Mathf.Max(
+                0f,
+                (float)(Time.realtimeSinceStartupAsDouble -
+                        materialClockSessionStartedAt));
+            float stepRate = wallSeconds > 0.001
+                ? materialStepCountSinceSession / (float)wallSeconds
+                : 0f;
+            return $"wall {wallSeconds:0.0}s / " +
+                $"sim {materialSimulatedSecondsSinceSession:0.0}s / " +
+                $"{stepRate:0.#} Hz";
+        }
+
+        private string ResolveVisibleLifeRangeStatus()
+        {
+            if (!topologyMetricsAvailable)
+            {
+                return "no completed sample yet";
+            }
+
+            if (!VisibleLifeRangeAvailable)
+            {
+                return "completed sample found no visible foam";
+            }
+
+            float minimum = MinimumVisibleRemainingLife;
+            float average = AverageVisibleRemainingLife;
+            float maximum = MaximumVisibleRemainingLife;
+            string freshness = TopologyMetricsFresh ? string.Empty : "stale ";
+            if (maximum - minimum <= 0.02f)
+            {
+                return $"{freshness}flat avg {average:0.00}";
+            }
+
+            return $"{freshness}min {minimum:0.00} / " +
+                $"avg {average:0.00} / max {maximum:0.00}";
+        }
+
+        private string ResolveBirthActivityStatus()
+        {
+            int activeCommands = birthCommandsThisFrame +
+                pendingMaterialBirths.Count;
+            if (activeCommands > 0)
+            {
+                return $"active {activeCommands} cmds";
+            }
+
+            if (activeProgressiveRibbonEventCount > 0)
+            {
+                return "active ribbon / 0 cmds";
+            }
+
+            if (lastBirthCommandAt < 0.0)
+            {
+                return "idle / no birth yet";
+            }
+
+            double age = Mathf.Max(
+                0f,
+                (float)(Time.realtimeSinceStartupAsDouble -
+                        lastBirthCommandAt));
+            return $"idle / last {age:0.0}s ago";
+        }
+
         private string ResolveLifetimeProofStatus()
         {
             if (!topologyMetricsAvailable)

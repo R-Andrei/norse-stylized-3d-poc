@@ -555,6 +555,12 @@ namespace ProgrammaticStylized3D.Rivers
             materialLifetimeAuthorityActive = false;
             materialLifetimeEmptyMetricReadbacks = 0;
             lifetimeAuthorityStatus = "No live material known";
+            materialClockSessionActive = false;
+            materialClockSessionStartedAt = -1.0;
+            materialSimulatedSecondsSinceSession = 0f;
+            materialStepCountSinceSession = 0;
+            birthCommandsThisFrame = 0;
+            lastBirthCommandAt = -1.0;
             simulationInterpolation = 1f;
             lastRenderInterpolationAlpha = simulationInterpolation;
             idleSince = Time.realtimeSinceStartupAsDouble;

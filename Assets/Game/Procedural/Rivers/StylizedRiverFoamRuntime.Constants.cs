@@ -65,7 +65,9 @@ namespace ProgrammaticStylized3D.Rivers
         private const int TopologyMetricFoamSupportNegativeOverlap = 19;
         private const int TopologyMetricMaxPositiveSupportUnderFoam = 20;
         private const int TopologyMetricMaxNegativeAgingUnderFoam = 21;
-        private const int TopologyMetricCount = 22;
+        private const int TopologyMetricVisibleLifeMinimumFixed = 22;
+        private const int TopologyMetricVisibleLifeMaximumFixed = 23;
+        private const int TopologyMetricCount = 24;
         // Canonical Stage 6 Shore Support band measured inward from the
         // instantaneous Stage 3 visible water edge. These metric widths remain
         // fixed while the accepted anchored-support contract is retained.

@@ -778,6 +778,19 @@ Shader "PS3D/Stylized River Water"
                 finalColour = MixFog(finalColour, input.motionData.w);
 
                 int foamDebug = (int)round(_FoamDebugView);
+                if (foamDebug == 4)
+                {
+                    float life = saturate(foam.remainingLife) *
+                        step(0.001, foam.presence);
+                    return half4(life.xxx, 1.0);
+                }
+
+                if (foamDebug == 3)
+                {
+                    float presence = saturate(foam.presence);
+                    return half4(presence.xxx, 1.0);
+                }
+
                 if (foamDebug == 2)
                 {
                     int2 birthDebugDimensions = int2(

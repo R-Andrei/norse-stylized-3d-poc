@@ -62,6 +62,7 @@ namespace ProgrammaticStylized3D.Rivers
             lastUpdateCellIterations = 0;
             injectedLastUpdate = 0;
             lastMaterialStepsThisFrame = 0;
+            birthCommandsThisFrame = 0;
             lastPhaseCommitCellsThisFrame = 0;
         }
 

@@ -931,6 +931,15 @@ namespace ProgrammaticStylized3D.Rivers
             topologyMetricsLastCompletedAt = -1.0;
             integratedPresenceArea = 0f;
             visiblePresenceCoreArea = 0f;
+            materialLifetimeAuthorityActive = false;
+            materialLifetimeEmptyMetricReadbacks = 0;
+            lifetimeAuthorityStatus = "No live material known";
+            materialClockSessionActive = false;
+            materialClockSessionStartedAt = -1.0;
+            materialSimulatedSecondsSinceSession = 0f;
+            materialStepCountSinceSession = 0;
+            birthCommandsThisFrame = 0;
+            lastBirthCommandAt = -1.0;
             manualProofReferenceArea = 0f;
             manualProofReferencePending = false;
             Array.Clear(

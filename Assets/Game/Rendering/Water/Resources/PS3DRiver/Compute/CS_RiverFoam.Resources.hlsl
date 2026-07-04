@@ -77,7 +77,10 @@ static const uint FoamMetricVisibleLocalAgingRateAreaOffset = 72u;
 static const uint FoamMetricFoamSupportNegativeOverlapOffset = 76u;
 static const uint FoamMetricMaxPositiveSupportUnderFoamOffset = 80u;
 static const uint FoamMetricMaxNegativeAgingUnderFoamOffset = 84u;
-static const uint FoamMetricCount = 22u;
+static const uint FoamMetricVisibleLifeMinFixedOffset = 88u;
+static const uint FoamMetricVisibleLifeMaxFixedOffset = 92u;
+static const uint FoamMetricVisibleLifeMinFixedIndex = 22u;
+static const uint FoamMetricCount = 24u;
 RWByteAddressBuffer _FoamTopologyMetrics;
 
 int2 _FoamDimensions;

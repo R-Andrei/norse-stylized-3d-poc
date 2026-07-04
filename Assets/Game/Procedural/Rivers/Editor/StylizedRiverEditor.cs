@@ -18,6 +18,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private bool showFoamViewModes;
         private bool showFoamTransportDiagnostics;
         private bool showFoamLifetimeDiagnostics;
+        private bool showFoamMaterialProbe;
         private bool showFoamBirthSourceDiagnostics;
         private bool showFoamShapeResidueDiagnostics;
         private bool showFoamRuntimeResourceDiagnostics;
@@ -29,6 +30,32 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private StylizedRiverFoamMajorCandidatePreviewStage
             majorCandidatePreviewStage =
                 StylizedRiverFoamMajorCandidatePreviewStage.FinalSupport;
+
+        public override bool RequiresConstantRepaint()
+        {
+            if (!Application.isPlaying || targets.Length != 1 ||
+                target is not StylizedRiver river || !river.FoamEnabled)
+            {
+                return false;
+            }
+
+            StylizedRiverFoamRuntime runtime =
+                river.GetComponent<StylizedRiverFoamRuntime>();
+            if (runtime == null || !runtime.ShouldRepaintInspectorForFoamDebug)
+            {
+                return false;
+            }
+
+            return showFoamValidationOverview ||
+                showFoamViewModes ||
+                showFoamTransportDiagnostics ||
+                showFoamLifetimeDiagnostics ||
+                showFoamMaterialProbe ||
+                showFoamBirthSourceDiagnostics ||
+                showFoamShapeResidueDiagnostics ||
+                showFoamRuntimeResourceDiagnostics ||
+                showFoamAdvancedInternalDiagnostics;
+        }
 
         private void OnDisable()
         {
@@ -1890,6 +1917,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawFoamViewModeSection(river);
             DrawFoamTransportMotionSection(river, runtime);
             DrawFoamLifetimeSection(river, runtime);
+            DrawFoamMaterialProbeSection(river);
             DrawFoamBirthSourceSection(river, runtime);
             DrawFoamShapeResidueSection(runtime);
             DrawFoamRuntimeResourceSection(runtime);
@@ -1972,13 +2000,17 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 "Final Foam",
                 "Foam + Aging Topology",
-                "Progressive Birth Source"
+                "Progressive Birth Source",
+                "Material Presence",
+                "Material Remaining Life"
             };
             int[] foamDebugValues =
             {
                 (int)StylizedRiverFoamDebugView.Final,
                 (int)StylizedRiverFoamDebugView.FoamAndAgingTopology,
-                (int)StylizedRiverFoamDebugView.ProgressiveBirthSource
+                (int)StylizedRiverFoamDebugView.ProgressiveBirthSource,
+                (int)StylizedRiverFoamDebugView.MaterialPresence,
+                (int)StylizedRiverFoamDebugView.MaterialRemainingLife
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -2143,9 +2175,86 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     : hasFreshMetrics
                         ? $"live {runtime.TopologyMetricsAgeSeconds:0.00}s old"
                         : $"stale {runtime.TopologyMetricsAgeSeconds:0.00}s old");
+            EditorGUILayout.LabelField(
+                "Material Clock",
+                runtime.MaterialClockStatus);
+            EditorGUILayout.LabelField(
+                "Life Range",
+                runtime.VisibleLifeRangeStatus);
+            EditorGUILayout.LabelField(
+                "Birth Activity",
+                runtime.BirthActivityStatus);
 
             EditorGUILayout.HelpBox(
                 "Single-authority mode: chunk/reservation timers no longer clear material. Visible death should now come from per-cell Remaining Life only.",
+                MessageType.None);
+
+            EditorGUI.indentLevel--;
+        }
+
+        private void DrawFoamMaterialProbeSection(StylizedRiver river)
+        {
+            showFoamMaterialProbe = EditorGUILayout.Foldout(
+                showFoamMaterialProbe,
+                "Material Probe",
+                true);
+            if (!showFoamMaterialProbe)
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+            SerializedProperty foamDebugProperty = Find("foamDebugView");
+            string[] foamDebugLabels =
+            {
+                "Final Foam",
+                "Foam + Aging Topology",
+                "Progressive Birth Source",
+                "Material Presence",
+                "Material Remaining Life"
+            };
+            int[] foamDebugValues =
+            {
+                (int)StylizedRiverFoamDebugView.Final,
+                (int)StylizedRiverFoamDebugView.FoamAndAgingTopology,
+                (int)StylizedRiverFoamDebugView.ProgressiveBirthSource,
+                (int)StylizedRiverFoamDebugView.MaterialPresence,
+                (int)StylizedRiverFoamDebugView.MaterialRemainingLife
+            };
+            int currentDebugIndex = System.Array.IndexOf(
+                foamDebugValues,
+                foamDebugProperty.intValue);
+            if (currentDebugIndex < 0)
+            {
+                currentDebugIndex = 0;
+            }
+
+            EditorGUI.BeginChangeCheck();
+            int selectedDebugIndex = EditorGUILayout.Popup(
+                new GUIContent(
+                    "Debug View",
+                    "Raw material views show the persistent foam texture directly, not the beauty mask or topology overlay."),
+                currentDebugIndex,
+                foamDebugLabels);
+            if (EditorGUI.EndChangeCheck())
+            {
+                foamDebugProperty.intValue = foamDebugValues[selectedDebugIndex];
+            }
+
+            using (new EditorGUI.DisabledScope(!Application.isPlaying))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Emit Life Probe Strip",
+                            "Injects three adjacent persistent material regions with starting Remaining Life 1.00, 0.66, and 0.33 through the ordinary material birth path.")))
+                {
+                    ApplyFoamTestProperties();
+                    river.EmitFoamLifeProbeStrip();
+                }
+            }
+
+            EditorGUILayout.HelpBox(
+                "Expected with Neutral Lifetime 1 and both aging rates 1: the 0.33 section dies first, 0.66 second, and 1.00 last. If they vanish together, inspect lifecycle/render gating before changing topology.",
                 MessageType.None);
 
             EditorGUI.indentLevel--;
@@ -2239,7 +2348,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 FormatPercent(runtime.PerimeterRatio));
             EditorGUILayout.LabelField(
                 "Known Shape Issue",
-                "Line/ribbon shape and no morphing remain unsolved");
+                "Not just a simple line/ribbon now; morphing, breakup, lateral drift, and obstacle interaction remain unsolved");
 
             if (runtime.ManualProofReferenceAvailable &&
                 (runtime.ManualProofPresenceRatio > 1.25f ||
@@ -3046,6 +3155,14 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 case StylizedRiverFoamDebugView.ProgressiveBirthSource:
                     return
                         "Source isolation before persistent transport and aging. Blue is the complete planned accepted source, green is cumulative accepted source geometry since the latest idle start, red is source submitted during the latest material update, and yellow is the current emission head. Amount selects deterministic coherent area rather than persistent intensity.";
+
+                case StylizedRiverFoamDebugView.MaterialPresence:
+                    return
+                        "Raw persistent material Presence sampled through the same storage coordinate path used by normal Foam rendering. White means stored Foam coverage exists before beauty-mask breakup.";
+
+                case StylizedRiverFoamDebugView.MaterialRemainingLife:
+                    return
+                        "Raw normalized Remaining Life from the persistent material texture. This ignores beauty colour and shows whether cells actually age independently.";
 
                 default:
                     return

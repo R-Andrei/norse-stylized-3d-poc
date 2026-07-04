@@ -92,7 +92,9 @@ namespace ProgrammaticStylized3D.Rivers
         // Zero is the exact normal rendered result and debug-off state.
         Final = 0,
         FoamAndAgingTopology = 1,
-        ProgressiveBirthSource = 2
+        ProgressiveBirthSource = 2,
+        MaterialPresence = 3,
+        MaterialRemainingLife = 4
     }
 
     public enum StylizedRiverDisturbanceDebugView
@@ -1612,6 +1614,10 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.FoamAndAgingTopology;
                 case (int)StylizedRiverFoamDebugView.ProgressiveBirthSource:
                     return StylizedRiverFoamDebugView.ProgressiveBirthSource;
+                case (int)StylizedRiverFoamDebugView.MaterialPresence:
+                    return StylizedRiverFoamDebugView.MaterialPresence;
+                case (int)StylizedRiverFoamDebugView.MaterialRemainingLife:
+                    return StylizedRiverFoamDebugView.MaterialRemainingLife;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }
@@ -2142,6 +2148,50 @@ namespace ProgrammaticStylized3D.Rivers
                 foamTestRemainingLife,
                 foamTestElongation);
             return left || right;
+        }
+
+        public bool EmitFoamLifeProbeStrip()
+        {
+            StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
+            if (runtime == null)
+            {
+                return false;
+            }
+
+            float domainLength = Mathf.Max(0.25f, Domain.LocalLength);
+            float radius = Mathf.Clamp(foamTestRadius * 0.35f, 0.08f, 0.45f);
+            float alongStep = Mathf.Clamp(
+                radius * 2.65f / domainLength,
+                0.018f,
+                0.075f);
+            float amount = 1f;
+            float elongation = Mathf.Clamp(foamTestElongation, 0.75f, 2.25f);
+            float centre = Mathf.Clamp01(foamTestDistanceNormalized);
+            float across = Mathf.Clamp(foamTestAcrossNormalized, -0.72f, 0.72f);
+
+            bool emitted = false;
+            emitted |= runtime.EmitNormalized(
+                Mathf.Clamp01(centre - alongStep),
+                across,
+                radius,
+                amount,
+                1.00f,
+                elongation);
+            emitted |= runtime.EmitNormalized(
+                centre,
+                across,
+                radius,
+                amount,
+                0.66f,
+                elongation);
+            emitted |= runtime.EmitNormalized(
+                Mathf.Clamp01(centre + alongStep),
+                across,
+                radius,
+                amount,
+                0.33f,
+                elongation);
+            return emitted;
         }
 
         public bool EmitFoamThinRibbon()

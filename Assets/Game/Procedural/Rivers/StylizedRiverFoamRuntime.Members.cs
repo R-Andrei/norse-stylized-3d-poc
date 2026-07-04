@@ -70,6 +70,12 @@ namespace ProgrammaticStylized3D.Rivers
         private int materialLifetimeEmptyMetricReadbacks;
         private string lifetimeAuthorityStatus =
             "Remaining Life owns survival";
+        private bool materialClockSessionActive;
+        private double materialClockSessionStartedAt = -1.0;
+        private float materialSimulatedSecondsSinceSession;
+        private int materialStepCountSinceSession;
+        private int birthCommandsThisFrame;
+        private double lastBirthCommandAt = -1.0;
         private StylizedRiverFoamMajorTopology majorTopology;
         private StylizedRiverFoamConnectorTopology connectorTopology;
         private StylizedRiverFoamPocketTopology pocketTopology;

@@ -44,10 +44,36 @@ namespace ProgrammaticStylized3D.Rivers
         private void QueueMaterialBirth(PendingInjection injection)
         {
             pendingMaterialBirths.Add(injection);
+            RecordMaterialBirthCommand();
             materialLifetimeAuthorityActive = true;
             materialLifetimeEmptyMetricReadbacks = 0;
             lifetimeAuthorityStatus =
                 "Remaining Life / full-field direct simulation";
+        }
+
+        private void RecordMaterialBirthCommand()
+        {
+            double now = Time.realtimeSinceStartupAsDouble;
+            birthCommandsThisFrame++;
+            lastBirthCommandAt = now;
+            if (!materialClockSessionActive)
+            {
+                materialClockSessionActive = true;
+                materialClockSessionStartedAt = now;
+                materialSimulatedSecondsSinceSession = 0f;
+                materialStepCountSinceSession = 0;
+            }
+        }
+
+        private void RecordMaterialSimulationStep(float deltaTime)
+        {
+            if (!materialClockSessionActive)
+            {
+                return;
+            }
+
+            materialSimulatedSecondsSinceSession += Mathf.Max(0f, deltaTime);
+            materialStepCountSinceSession++;
         }
 
         private void SimulateFullField(float deltaTime)
@@ -63,6 +89,7 @@ namespace ProgrammaticStylized3D.Rivers
             DispatchSimulation(0, fieldWidth);
             DispatchQueuedMaterialBirths(writeState);
             (currentState, writeState) = (writeState, currentState);
+            RecordMaterialSimulationStep(deltaTime);
         }
 
         private void DispatchQueuedMaterialBirths(RenderTexture target)

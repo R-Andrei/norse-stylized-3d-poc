@@ -979,7 +979,10 @@ void ResetTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    _FoamTopologyMetrics.Store(dispatchId.x * 4u, 0u);
+    uint resetValue = dispatchId.x == FoamMetricVisibleLifeMinFixedIndex
+        ? 10000u
+        : 0u;
+    _FoamTopologyMetrics.Store(dispatchId.x * 4u, resetValue);
 }
 
 [numthreads(8, 8, 1)]
@@ -1136,6 +1139,8 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
             saturate(positiveSupport) * 10000.0);
         uint maxNegativeFixed = (uint)round(
             saturate(materialTopology.negativeAgingPressure) * 10000.0);
+        uint visibleLifeFixed = (uint)round(
+            saturate(visibleMaterial.remainingLife) * 10000.0);
 
         _FoamTopologyMetrics.InterlockedAdd(
             FoamMetricVisiblePresenceAreaOffset,
@@ -1168,6 +1173,14 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
         _FoamTopologyMetrics.InterlockedMax(
             FoamMetricMaxNegativeAgingUnderFoamOffset,
             maxNegativeFixed,
+            originalValue);
+        _FoamTopologyMetrics.InterlockedMin(
+            FoamMetricVisibleLifeMinFixedOffset,
+            visibleLifeFixed,
+            originalValue);
+        _FoamTopologyMetrics.InterlockedMax(
+            FoamMetricVisibleLifeMaxFixedOffset,
+            visibleLifeFixed,
             originalValue);
     }
 }

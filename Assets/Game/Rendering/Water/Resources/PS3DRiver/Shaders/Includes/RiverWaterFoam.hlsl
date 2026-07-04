@@ -163,6 +163,7 @@ float RiverWaterFoamPatternedMask(
 
 struct RiverWaterFoamResult
 {
+    float presence;
     float remainingLife;
     float mask;
     float2 fieldUV;
@@ -183,6 +184,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float freezeAmount)
 {
     RiverWaterFoamResult result;
+    result.presence = 0.0;
     result.remainingLife = 0.0;
     result.mask = 0.0;
     result.fieldUV = 0.0;
@@ -247,6 +249,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         sharpness);
     mask *= 1.0 - saturate(freezeAmount);
 
+    result.presence = presence;
     result.remainingLife = remainingLife;
     result.mask = saturate(mask);
     result.fieldUV = fieldUV;

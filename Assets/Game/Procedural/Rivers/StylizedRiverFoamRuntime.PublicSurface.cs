@@ -606,6 +606,34 @@ namespace ProgrammaticStylized3D.Rivers
         public float StrongestNegativeAgingUnderFoam =>
             TopologyFixedTenThousandMetric(
                 TopologyMetricMaxNegativeAgingUnderFoam);
+        public bool VisibleLifeRangeAvailable =>
+            topologyMetricsAvailable &&
+            latestTopologyMetrics[TopologyMetricVisibleMaterial] > 0u;
+        public float MinimumVisibleRemainingLife => VisibleLifeRangeAvailable
+            ? Mathf.Clamp01(
+                latestTopologyMetrics[TopologyMetricVisibleLifeMinimumFixed] /
+                10000f)
+            : 0f;
+        public float MaximumVisibleRemainingLife => VisibleLifeRangeAvailable
+            ? Mathf.Clamp01(
+                latestTopologyMetrics[TopologyMetricVisibleLifeMaximumFixed] /
+                10000f)
+            : 0f;
+        public string MaterialClockStatus => ResolveMaterialClockStatus();
+        public string VisibleLifeRangeStatus => ResolveVisibleLifeRangeStatus();
+        public string BirthActivityStatus => ResolveBirthActivityStatus();
+        public bool ShouldRepaintInspectorForFoamDebug =>
+            Application.isPlaying &&
+            (currentState != null ||
+             materialLifetimeAuthorityActive ||
+             topologyMetricsReadbackPending ||
+             pendingInjections.Count > 0 ||
+             pendingMaterialBirths.Count > 0 ||
+             activeProgressiveRibbonEventCount > 0 ||
+             IsTopologyDebugActive ||
+             IsProgressiveBirthSourceDebugActive ||
+             (topologyMetricsLastCompletedAt >= 0.0 &&
+              Time.realtimeSinceStartupAsDouble - topologyMetricsLastCompletedAt < 2.0));
         public string LifetimeAuthorityStatus => lifetimeAuthorityStatus;
         public bool MaterialLifetimeAuthorityActive =>
             currentState != null || materialLifetimeAuthorityActive;
