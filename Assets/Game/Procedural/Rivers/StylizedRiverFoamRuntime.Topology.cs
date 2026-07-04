@@ -1100,9 +1100,9 @@ namespace ProgrammaticStylized3D.Rivers
                 return $"active {activeCommands} cmds";
             }
 
-            if (activeProgressiveRibbonEventCount > 0)
+            if (activeFoamCompositionEventCount > 0)
             {
-                return "active ribbon / 0 cmds";
+                return "active composition / 0 cmds";
             }
 
             if (lastBirthCommandAt < 0.0)

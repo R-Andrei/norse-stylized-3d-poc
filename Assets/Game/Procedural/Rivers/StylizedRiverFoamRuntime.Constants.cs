@@ -20,10 +20,13 @@ namespace ProgrammaticStylized3D.Rivers
         private const float ResourceReleaseDelaySeconds = 2f;
         private const float MaximumManualReservationSeconds = 300f;
         private const float TopologyMetricsUpdateRate = 8f;
-        private const int ProgressiveRibbonEventCapacity = 8;
+        private const int FoamCompositionEventCapacity = 8;
+        private const int LowFoamCompositionBirthBudgetPerStep = 2;
+        private const int MediumFoamCompositionBirthBudgetPerStep = 4;
+        private const int HighFoamCompositionBirthBudgetPerStep = 6;
         private const int ProgressiveBirthDebugCounterCount = 2;
         private const float ProgressiveRibbonMinimumDuration = 0.5f;
-        private const float ProgressiveRibbonMaximumDuration = 3f;
+        private const float ProgressiveRibbonMaximumDuration = 5f;
         private const float ProgressiveRibbonMinimumTravelDistance = 0.5f;
         private const float ProgressiveRibbonMaximumTravelDistance = 8f;
         private const float ProgressiveRibbonMaximumBendAcross = 0.35f;

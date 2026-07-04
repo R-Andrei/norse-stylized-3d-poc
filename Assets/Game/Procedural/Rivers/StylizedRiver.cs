@@ -97,6 +97,16 @@ namespace ProgrammaticStylized3D.Rivers
         MaterialRemainingLife = 4
     }
 
+    public enum StylizedRiverFoamSpawnPreset
+    {
+        CompactDiagnostic = 0,
+        ThinScratchStreaks = 1,
+        FracturedRibbonBundle = 2,
+        ShoreSkirt = 3,
+        SmoothSurfaceLane = 4,
+        TornSheetRibbon = 5
+    }
+
     public enum StylizedRiverDisturbanceDebugView
     {
         Final = 0,
@@ -187,8 +197,8 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MaximumFoamMaterialFlowSpeedMultiplier = 6f;
         private const float DefaultFoamMaterialFlowSpeedMultiplier = 1f;
         private const float MinimumFoamProgressiveRibbonDuration = 0.5f;
-        private const float MaximumFoamProgressiveRibbonDuration = 3f;
-        private const float DefaultFoamProgressiveRibbonDuration = 1.5f;
+        private const float MaximumFoamProgressiveRibbonDuration = 5f;
+        private const float DefaultFoamProgressiveRibbonDuration = 2.4f;
         private const float MinimumFoamProgressiveRibbonTravelDistance = 0.5f;
         private const float MaximumFoamProgressiveRibbonTravelDistance = 8f;
         private const float DefaultFoamProgressiveRibbonTravelDistance = 3f;
@@ -198,9 +208,15 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamProgressiveRibbonPathWander = 0f;
         private const float MaximumFoamProgressiveRibbonPathWander = 1f;
         private const float DefaultFoamProgressiveRibbonPathWander = 0.35f;
-        private const float MinimumFoamProgressiveRibbonHalfWidth = 0.05f;
-        private const float MaximumFoamProgressiveRibbonHalfWidth = 1f;
-        private const float DefaultFoamProgressiveRibbonHalfWidth = 0.20f;
+        private const float MinimumFoamSpawnScale = 0.03f;
+        private const float MaximumFoamSpawnScale = 1.25f;
+        private const float DefaultFoamSpawnScale = 0.18f;
+        private const float MinimumFoamSpawnComplexity = 0f;
+        private const float MaximumFoamSpawnComplexity = 1f;
+        private const float DefaultFoamSpawnComplexity = 0.65f;
+        private const float MinimumFoamSpawnDensity = 0f;
+        private const float MaximumFoamSpawnDensity = 1f;
+        private const float DefaultFoamSpawnDensity = 0.55f;
 
 
         [Header("Setup")]
@@ -794,63 +810,81 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private StylizedRiverFoamDebugView foamDebugView =
             StylizedRiverFoamDebugView.Final;
 
+        [Tooltip("Canonical manual foam-spawn pattern. Each pattern now starts one budgeted composition event; internal strands or sheet fragments are resolved inside the bounded material birth pass instead of by spawning extra runtime writers.")]
+        [HideInInspector, SerializeField]
+        private StylizedRiverFoamSpawnPreset foamSpawnPreset =
+            StylizedRiverFoamSpawnPreset.FracturedRibbonBundle;
+
+        [FormerlySerializedAs("foamTestDistanceNormalized")]
         [HideInInspector, SerializeField, Range(0f, 1f)]
-        private float foamTestDistanceNormalized = 0.5f;
+        private float foamSpawnDistanceNormalized = 0.5f;
 
+        [FormerlySerializedAs("foamTestAcrossNormalized")]
         [HideInInspector, SerializeField, Range(-1f, 1f)]
-        private float foamTestAcrossNormalized;
+        private float foamSpawnAcrossNormalized;
 
-        [HideInInspector, SerializeField, Range(0.05f, 8f)]
-        private float foamTestRadius = 0.8f;
+        [Tooltip("Overall world-space size of the selected foam-spawn pattern. Pattern definitions interpret this as strand half-width, sheet half-width, or compact diagnostic radius.")]
+        [FormerlySerializedAs("foamSpawnRibbonHalfWidth")]
+        [FormerlySerializedAs("foamSpawnPatchRadius")]
+        [FormerlySerializedAs("foamTestProgressiveRibbonHalfWidth")]
+        [FormerlySerializedAs("foamTestRadius")]
+        [HideInInspector, SerializeField]
+        [Range(MinimumFoamSpawnScale, MaximumFoamSpawnScale)]
+        private float foamSpawnScale = DefaultFoamSpawnScale;
 
         [Tooltip("Source-only coefficient controlling how much of the candidate birth shape becomes occupied Foam. It does not modify Initial Remaining Life or durability.")]
+        [FormerlySerializedAs("foamTestAmount")]
         [HideInInspector, SerializeField, Range(0f, 1f)]
-        private float foamTestAmount = 0.85f;
+        private float foamSpawnAmount = 0.85f;
 
+        [FormerlySerializedAs("foamTestRemainingLife")]
         [HideInInspector, SerializeField, Range(0f, 1f)]
-        private float foamTestRemainingLife = 1f;
+        private float foamSpawnRemainingLife = 1f;
 
-        [HideInInspector, SerializeField, Range(0.25f, 8f)]
-        private float foamTestElongation = 1.5f;
-
-        [Tooltip("Half-width in world metres used only by the progressive-ribbon birth source. The manual one-frame diagnostic Radius remains separate.")]
+        [Tooltip("Pattern-level shape complexity. Higher values add more strands, gaps, offset fragments, width variation, and sheet tearing according to the selected pattern.")]
         [HideInInspector, SerializeField]
-        [Range(
-            MinimumFoamProgressiveRibbonHalfWidth,
-            MaximumFoamProgressiveRibbonHalfWidth)]
-        private float foamTestProgressiveRibbonHalfWidth =
-            DefaultFoamProgressiveRibbonHalfWidth;
+        [Range(MinimumFoamSpawnComplexity, MaximumFoamSpawnComplexity)]
+        private float foamSpawnComplexity = DefaultFoamSpawnComplexity;
 
-        [Tooltip("Duration of the Patch 4.11C manual progressive-ribbon event. The event deposits only the distance travelled during each material update.")]
+        [Tooltip("Pattern-level density. Higher values add more virtual strands or more continuous material inside the selected composition without increasing active runtime event count.")]
+        [HideInInspector, SerializeField]
+        [Range(MinimumFoamSpawnDensity, MaximumFoamSpawnDensity)]
+        private float foamSpawnDensity = DefaultFoamSpawnDensity;
+
+        [Tooltip("Duration of the budgeted moving-head composition birth event.")]
+        [FormerlySerializedAs("foamTestProgressiveRibbonDuration")]
         [HideInInspector, SerializeField]
         [Range(
             MinimumFoamProgressiveRibbonDuration,
             MaximumFoamProgressiveRibbonDuration)]
-        private float foamTestProgressiveRibbonDuration =
+        private float foamSpawnRibbonDuration =
             DefaultFoamProgressiveRibbonDuration;
 
-        [Tooltip("Net downstream distance travelled by the Patch 4.11C manual emission head while the event is active.")]
+        [Tooltip("Net downstream distance travelled by the progressive emission head while the event is active.")]
+        [FormerlySerializedAs("foamTestProgressiveRibbonTravelDistance")]
         [HideInInspector, SerializeField]
         [Range(
             MinimumFoamProgressiveRibbonTravelDistance,
             MaximumFoamProgressiveRibbonTravelDistance)]
-        private float foamTestProgressiveRibbonTravelDistance =
+        private float foamSpawnRibbonTravelDistance =
             DefaultFoamProgressiveRibbonTravelDistance;
 
         [Tooltip("Total normalized lateral drift from event start to event end. Negative moves toward the left river edge; positive moves toward the right river edge.")]
+        [FormerlySerializedAs("foamTestProgressiveRibbonAcrossDrift")]
         [HideInInspector, SerializeField]
         [Range(
             MinimumFoamProgressiveRibbonAcrossDrift,
             MaximumFoamProgressiveRibbonAcrossDrift)]
-        private float foamTestProgressiveRibbonAcrossDrift =
+        private float foamSpawnRibbonAcrossDrift =
             DefaultFoamProgressiveRibbonAcrossDrift;
 
-        [Tooltip("Strength of one deterministic smooth bend added to the manual progressive-ribbon path. Zero follows only the selected downstream travel and Across Drift; one uses the full bounded proof bend.")]
+        [Tooltip("Strength of deterministic smooth bend added to the composition path. Zero follows only downstream travel and Across Drift; one uses the full bounded bend.")]
+        [FormerlySerializedAs("foamTestProgressiveRibbonPathWander")]
         [HideInInspector, SerializeField]
         [Range(
             MinimumFoamProgressiveRibbonPathWander,
             MaximumFoamProgressiveRibbonPathWander)]
-        private float foamTestProgressiveRibbonPathWander =
+        private float foamSpawnRibbonPathWander =
             DefaultFoamProgressiveRibbonPathWander;
 
         [Header("Water Body Validation")]
@@ -1312,37 +1346,40 @@ namespace ProgrammaticStylized3D.Rivers
                 MaximumFoamMaterialFlowSpeedMultiplier);
         public Color FoamColour => foamColour;
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
-        public float FoamTestDistanceNormalized =>
-            foamTestDistanceNormalized;
-        public float FoamTestAcrossNormalized =>
-            foamTestAcrossNormalized;
-        public float FoamTestRadius => foamTestRadius;
-        public float FoamTestAmount => foamTestAmount;
-        public float FoamTestRemainingLife => foamTestRemainingLife;
-        public float FoamTestElongation => foamTestElongation;
-        public float FoamTestProgressiveRibbonHalfWidth =>
+        public StylizedRiverFoamSpawnPreset FoamSpawnPreset => foamSpawnPreset;
+        public float FoamSpawnDistanceNormalized =>
+            foamSpawnDistanceNormalized;
+        public float FoamSpawnAcrossNormalized =>
+            foamSpawnAcrossNormalized;
+        public float FoamSpawnScale =>
             Mathf.Clamp(
-                foamTestProgressiveRibbonHalfWidth,
-                MinimumFoamProgressiveRibbonHalfWidth,
-                MaximumFoamProgressiveRibbonHalfWidth);
-        public float FoamTestProgressiveRibbonDuration =>
+                foamSpawnScale,
+                MinimumFoamSpawnScale,
+                MaximumFoamSpawnScale);
+        public float FoamSpawnAmount => foamSpawnAmount;
+        public float FoamSpawnRemainingLife => foamSpawnRemainingLife;
+        public float FoamSpawnComplexity =>
+            Mathf.Clamp01(foamSpawnComplexity);
+        public float FoamSpawnDensity =>
+            Mathf.Clamp01(foamSpawnDensity);
+        public float FoamSpawnRibbonDuration =>
             Mathf.Clamp(
-                foamTestProgressiveRibbonDuration,
+                foamSpawnRibbonDuration,
                 MinimumFoamProgressiveRibbonDuration,
                 MaximumFoamProgressiveRibbonDuration);
-        public float FoamTestProgressiveRibbonTravelDistance =>
+        public float FoamSpawnRibbonTravelDistance =>
             Mathf.Clamp(
-                foamTestProgressiveRibbonTravelDistance,
+                foamSpawnRibbonTravelDistance,
                 MinimumFoamProgressiveRibbonTravelDistance,
                 MaximumFoamProgressiveRibbonTravelDistance);
-        public float FoamTestProgressiveRibbonAcrossDrift =>
+        public float FoamSpawnRibbonAcrossDrift =>
             Mathf.Clamp(
-                foamTestProgressiveRibbonAcrossDrift,
+                foamSpawnRibbonAcrossDrift,
                 MinimumFoamProgressiveRibbonAcrossDrift,
                 MaximumFoamProgressiveRibbonAcrossDrift);
-        public float FoamTestProgressiveRibbonPathWander =>
+        public float FoamSpawnRibbonPathWander =>
             Mathf.Clamp(
-                foamTestProgressiveRibbonPathWander,
+                foamSpawnRibbonPathWander,
                 MinimumFoamProgressiveRibbonPathWander,
                 MaximumFoamProgressiveRibbonPathWander);
 
@@ -2095,32 +2132,7 @@ namespace ProgrammaticStylized3D.Rivers
             return foamRuntime;
         }
 
-        public bool StartFoamProgressiveRibbonProof()
-        {
-            return GetOrCreateFoamRuntime()?.StartProgressiveRibbonNormalized(
-                foamTestDistanceNormalized,
-                foamTestAcrossNormalized,
-                foamTestProgressiveRibbonHalfWidth,
-                foamTestAmount,
-                foamTestRemainingLife,
-                foamTestProgressiveRibbonDuration,
-                foamTestProgressiveRibbonTravelDistance,
-                foamTestProgressiveRibbonAcrossDrift,
-                foamTestProgressiveRibbonPathWander) == true;
-        }
-
-        public bool EmitFoamTestPatch()
-        {
-            return GetOrCreateFoamRuntime()?.EmitNormalized(
-                foamTestDistanceNormalized,
-                foamTestAcrossNormalized,
-                foamTestRadius,
-                foamTestAmount,
-                foamTestRemainingLife,
-                foamTestElongation) == true;
-        }
-
-        public bool EmitFoamAdjacentPair()
+        public bool StartFoamSpawn()
         {
             StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
             if (runtime == null)
@@ -2128,195 +2140,42 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            float acrossOffset = Mathf.Clamp(
-                0.18f + foamTestRadius /
-                Mathf.Max(0.25f, ResolvedMaximumVisibleWidth),
-                0.12f,
-                0.45f);
-            bool left = runtime.EmitNormalized(
-                foamTestDistanceNormalized,
-                Mathf.Clamp(foamTestAcrossNormalized - acrossOffset, -1f, 1f),
-                foamTestRadius,
-                foamTestAmount,
-                foamTestRemainingLife,
-                foamTestElongation);
-            bool right = runtime.EmitNormalized(
-                foamTestDistanceNormalized,
-                Mathf.Clamp(foamTestAcrossNormalized + acrossOffset, -1f, 1f),
-                foamTestRadius,
-                foamTestAmount,
-                foamTestRemainingLife,
-                foamTestElongation);
-            return left || right;
-        }
+            float spawnAcross = foamSpawnAcrossNormalized;
+            if (foamSpawnPreset == StylizedRiverFoamSpawnPreset.ShoreSkirt)
+            {
+                spawnAcross = Mathf.Abs(foamSpawnAcrossNormalized) < 0.65f
+                    ? (foamSpawnAcrossNormalized < 0f ? -0.86f : 0.86f)
+                    : Mathf.Clamp(foamSpawnAcrossNormalized, -0.95f, 0.95f);
+            }
 
+            return runtime.StartFoamCompositionNormalized(
+                foamSpawnPreset,
+                foamSpawnDistanceNormalized,
+                spawnAcross,
+                FoamSpawnScale,
+                foamSpawnAmount,
+                foamSpawnRemainingLife,
+                FoamSpawnComplexity,
+                FoamSpawnDensity,
+                foamSpawnRibbonDuration,
+                foamSpawnRibbonTravelDistance,
+                foamSpawnRibbonAcrossDrift,
+                foamSpawnRibbonPathWander);
+        }
 
         public bool ClearAndEmitFoamIsolatedLifeProbe(
             bool absoluteAging = false)
         {
             StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
             return runtime != null && runtime.EmitIsolatedLifeProbe(
-                foamTestDistanceNormalized,
-                foamTestAcrossNormalized,
+                foamSpawnDistanceNormalized,
+                foamSpawnAcrossNormalized,
                 absoluteAging);
         }
 
         public bool ClearAndEmitFoamAbsoluteLifeProbe()
         {
             return ClearAndEmitFoamIsolatedLifeProbe(true);
-        }
-
-        public bool EmitFoamLifeProbeStrip()
-        {
-            StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
-            if (runtime == null)
-            {
-                return false;
-            }
-
-            float domainLength = Mathf.Max(0.25f, Domain.LocalLength);
-            float radius = Mathf.Clamp(foamTestRadius * 0.35f, 0.08f, 0.45f);
-            float alongStep = Mathf.Clamp(
-                radius * 2.65f / domainLength,
-                0.018f,
-                0.075f);
-            float amount = 1f;
-            float elongation = Mathf.Clamp(foamTestElongation, 0.75f, 2.25f);
-            float centre = Mathf.Clamp01(foamTestDistanceNormalized);
-            float across = Mathf.Clamp(foamTestAcrossNormalized, -0.72f, 0.72f);
-
-            bool emitted = false;
-            emitted |= runtime.EmitNormalized(
-                Mathf.Clamp01(centre - alongStep),
-                across,
-                radius,
-                amount,
-                1.00f,
-                elongation);
-            emitted |= runtime.EmitNormalized(
-                centre,
-                across,
-                radius,
-                amount,
-                0.66f,
-                elongation);
-            emitted |= runtime.EmitNormalized(
-                Mathf.Clamp01(centre + alongStep),
-                across,
-                radius,
-                amount,
-                0.33f,
-                elongation);
-            return emitted;
-        }
-
-        public bool EmitFoamThinRibbon()
-        {
-            return GetOrCreateFoamRuntime()?.EmitNormalized(
-                foamTestDistanceNormalized,
-                foamTestAcrossNormalized,
-                Mathf.Max(0.08f, foamTestRadius * 0.35f),
-                foamTestAmount,
-                foamTestRemainingLife,
-                Mathf.Max(3f, foamTestElongation * 2.5f)) == true;
-        }
-
-        public bool EmitFoamTongueCluster()
-        {
-            StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
-            if (runtime == null)
-            {
-                return false;
-            }
-
-            float width = Mathf.Max(0.25f, ResolvedMaximumVisibleWidth);
-            float acrossStep = Mathf.Clamp(
-                foamTestRadius / width * 0.75f,
-                0.05f,
-                0.22f);
-            float alongStep = Mathf.Clamp(
-                foamTestRadius * foamTestElongation /
-                Mathf.Max(0.25f, Domain.LocalLength),
-                0.015f,
-                0.12f);
-
-            bool emitted = false;
-            emitted |= runtime.EmitNormalized(
-                Mathf.Clamp01(foamTestDistanceNormalized - alongStep * 0.45f),
-                Mathf.Clamp(foamTestAcrossNormalized - acrossStep * 0.65f, -1f, 1f),
-                Mathf.Max(0.08f, foamTestRadius * 0.42f),
-                foamTestAmount,
-                foamTestRemainingLife,
-                Mathf.Max(2.4f, foamTestElongation * 1.9f));
-            emitted |= runtime.EmitNormalized(
-                foamTestDistanceNormalized,
-                foamTestAcrossNormalized,
-                Mathf.Max(0.08f, foamTestRadius * 0.55f),
-                foamTestAmount,
-                foamTestRemainingLife,
-                Mathf.Max(2.0f, foamTestElongation * 1.55f));
-            emitted |= runtime.EmitNormalized(
-                Mathf.Clamp01(foamTestDistanceNormalized + alongStep * 0.65f),
-                Mathf.Clamp(foamTestAcrossNormalized + acrossStep, -1f, 1f),
-                Mathf.Max(0.08f, foamTestRadius * 0.34f),
-                foamTestAmount * 0.82f,
-                foamTestRemainingLife,
-                Mathf.Max(2.8f, foamTestElongation * 2.25f));
-            return emitted;
-        }
-
-        public bool EmitFoamFragmentChain()
-        {
-            StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
-            if (runtime == null)
-            {
-                return false;
-            }
-
-            float width = Mathf.Max(0.25f, ResolvedMaximumVisibleWidth);
-            float acrossStep = Mathf.Clamp(
-                foamTestRadius / width * 0.85f,
-                0.05f,
-                0.20f);
-            float alongStep = Mathf.Clamp(
-                foamTestRadius * Mathf.Max(1f, foamTestElongation) /
-                Mathf.Max(0.25f, Domain.LocalLength) * 1.25f,
-                0.018f,
-                0.11f);
-
-            bool emitted = false;
-            for (int index = -2; index <= 2; index++)
-            {
-                float alternating = (index & 1) == 0 ? -1f : 1f;
-                float amountScale = 1f - Mathf.Abs(index) * 0.10f;
-                emitted |= runtime.EmitNormalized(
-                    Mathf.Clamp01(
-                        foamTestDistanceNormalized + index * alongStep),
-                    Mathf.Clamp(
-                        foamTestAcrossNormalized + alternating * acrossStep,
-                        -1f,
-                        1f),
-                    Mathf.Max(
-                        0.07f,
-                        foamTestRadius * (0.28f + 0.04f * (index + 2))),
-                    foamTestAmount * amountScale,
-                    foamTestRemainingLife,
-                    Mathf.Max(1.8f, foamTestElongation * 1.35f));
-            }
-
-            return emitted;
-        }
-
-        public bool EmitFoamNearShore()
-        {
-            float shoreAcross = foamTestAcrossNormalized < 0f ? -0.88f : 0.88f;
-            return GetOrCreateFoamRuntime()?.EmitNormalized(
-                foamTestDistanceNormalized,
-                shoreAcross,
-                foamTestRadius,
-                foamTestAmount,
-                foamTestRemainingLife,
-                foamTestElongation) == true;
         }
 
         public void ClearFoam()
@@ -3097,20 +2956,37 @@ namespace ProgrammaticStylized3D.Rivers
                 MinimumFoamMaterialFlowSpeedMultiplier,
                 MaximumFoamMaterialFlowSpeedMultiplier);
             foamColour.a = Mathf.Clamp01(foamColour.a);
-            foamTestDistanceNormalized = Mathf.Clamp01(
-                foamTestDistanceNormalized);
-            foamTestAcrossNormalized = Mathf.Clamp(
-                foamTestAcrossNormalized,
+            foamSpawnDistanceNormalized = Mathf.Clamp01(
+                foamSpawnDistanceNormalized);
+            foamSpawnAcrossNormalized = Mathf.Clamp(
+                foamSpawnAcrossNormalized,
                 -1f,
                 1f);
-            foamTestRadius = Mathf.Clamp(foamTestRadius, 0.05f, 8f);
-            foamTestAmount = Mathf.Clamp01(foamTestAmount);
-            foamTestRemainingLife = Mathf.Clamp01(
-                foamTestRemainingLife);
-            foamTestElongation = Mathf.Clamp(
-                foamTestElongation,
-                0.25f,
-                8f);
+            foamSpawnScale = Mathf.Clamp(
+                foamSpawnScale,
+                MinimumFoamSpawnScale,
+                MaximumFoamSpawnScale);
+            foamSpawnAmount = Mathf.Clamp01(foamSpawnAmount);
+            foamSpawnRemainingLife = Mathf.Clamp01(
+                foamSpawnRemainingLife);
+            foamSpawnComplexity = Mathf.Clamp01(foamSpawnComplexity);
+            foamSpawnDensity = Mathf.Clamp01(foamSpawnDensity);
+            foamSpawnRibbonDuration = Mathf.Clamp(
+                foamSpawnRibbonDuration,
+                MinimumFoamProgressiveRibbonDuration,
+                MaximumFoamProgressiveRibbonDuration);
+            foamSpawnRibbonTravelDistance = Mathf.Clamp(
+                foamSpawnRibbonTravelDistance,
+                MinimumFoamProgressiveRibbonTravelDistance,
+                MaximumFoamProgressiveRibbonTravelDistance);
+            foamSpawnRibbonAcrossDrift = Mathf.Clamp(
+                foamSpawnRibbonAcrossDrift,
+                MinimumFoamProgressiveRibbonAcrossDrift,
+                MaximumFoamProgressiveRibbonAcrossDrift);
+            foamSpawnRibbonPathWander = Mathf.Clamp(
+                foamSpawnRibbonPathWander,
+                MinimumFoamProgressiveRibbonPathWander,
+                MaximumFoamProgressiveRibbonPathWander);
 
             visualSeed = Mathf.Clamp(visualSeed, 1, 9999);
         }

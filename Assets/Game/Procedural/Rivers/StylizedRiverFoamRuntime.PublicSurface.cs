@@ -634,7 +634,7 @@ namespace ProgrammaticStylized3D.Rivers
              pendingInjections.Count > 0 ||
              pendingMaterialBirths.Count > 0 ||
              pendingIsolatedLifeProbe ||
-             activeProgressiveRibbonEventCount > 0 ||
+             activeFoamCompositionEventCount > 0 ||
              IsTopologyDebugActive ||
              IsProgressiveBirthSourceDebugActive ||
              (topologyMetricsLastCompletedAt >= 0.0 &&
@@ -647,38 +647,41 @@ namespace ProgrammaticStylized3D.Rivers
         public int ActiveChunkCount => 0;
         public int PendingInjectionCount => pendingInjections.Count;
         public int ActiveReservationCount => 0;
-        public int ProgressiveRibbonPoolCapacity =>
-            ProgressiveRibbonEventCapacity;
-        public int ActiveProgressiveRibbonEventCount =>
-            activeProgressiveRibbonEventCount;
-        public int ProgressiveRibbonStartedCount =>
-            progressiveRibbonStartedCount;
-        public int ProgressiveRibbonCompletedCount =>
-            progressiveRibbonCompletedCount;
-        public int ProgressiveRibbonRejectedCount =>
-            progressiveRibbonRejectedCount;
-        public int LatestProgressiveRibbonEventId =>
-            latestProgressiveRibbonEventId;
-        public float LatestProgressiveRibbonProgress =>
-            latestProgressiveRibbonProgress;
-        public float LatestProgressiveRibbonHeadDistanceNormalized =>
-            latestProgressiveRibbonHeadDistanceNormalized;
-        public float LatestProgressiveRibbonHeadAcrossNormalized =>
-            latestProgressiveRibbonHeadAcrossNormalized;
-        public float LatestProgressiveRibbonPreviousDistanceNormalized =>
-            latestProgressiveRibbonPreviousDistanceNormalized;
-        public float LatestProgressiveRibbonPreviousAcrossNormalized =>
-            latestProgressiveRibbonPreviousAcrossNormalized;
-        public float LastProgressiveRibbonSegmentLength =>
-            lastProgressiveRibbonSegmentLength;
-        public int ProgressiveRibbonEventUpdateCount =>
-            progressiveRibbonEventUpdateCount;
-        public int ProgressiveRibbonSegmentDispatchAttemptCount =>
-            progressiveRibbonSegmentDispatchAttemptCount;
-        public int ProgressiveRibbonSegmentDispatchSubmittedCount =>
-            progressiveRibbonSegmentDispatchSubmittedCount;
-        public float ProgressiveRibbonCumulativeCentrelineDistance =>
-            progressiveRibbonCumulativeCentrelineDistance;
+        public int FoamCompositionPoolCapacity =>
+            FoamCompositionEventCapacity;
+        public int ActiveFoamCompositionEventCount =>
+            activeFoamCompositionEventCount;
+        public int FoamCompositionBirthBudgetPerStep =>
+            ResolveFoamCompositionBirthBudgetPerStep();
+        public int FoamCompositionStartedCount =>
+            foamCompositionStartedCount;
+        public int FoamCompositionCompletedCount =>
+            foamCompositionCompletedCount;
+        public int FoamCompositionRejectedCount =>
+            foamCompositionRejectedCount;
+        public int LatestFoamCompositionEventId =>
+            latestFoamCompositionEventId;
+        public float LatestFoamCompositionProgress =>
+            latestFoamCompositionProgress;
+        public float LatestFoamCompositionHeadDistanceNormalized =>
+            latestFoamCompositionHeadDistanceNormalized;
+        public float LatestFoamCompositionHeadAcrossNormalized =>
+            latestFoamCompositionHeadAcrossNormalized;
+        public float LatestFoamCompositionPreviousDistanceNormalized =>
+            latestFoamCompositionPreviousDistanceNormalized;
+        public float LatestFoamCompositionPreviousAcrossNormalized =>
+            latestFoamCompositionPreviousAcrossNormalized;
+        public float LastFoamCompositionSegmentLength =>
+            lastFoamCompositionSegmentLength;
+        public int FoamCompositionEventUpdateCount =>
+            foamCompositionEventUpdateCount;
+        public int FoamCompositionSegmentDispatchAttemptCount =>
+            foamCompositionSegmentDispatchAttemptCount;
+        public int FoamCompositionSegmentDispatchSubmittedCount =>
+            foamCompositionSegmentDispatchSubmittedCount;
+        public float FoamCompositionCumulativeCentrelineDistance =>
+            foamCompositionCumulativeCentrelineDistance;
+
         public bool ProgressiveBirthDebugReadbackAvailable =>
             progressiveBirthDebugReadbackAvailable;
         public bool ProgressiveBirthDebugReadbackPending =>
@@ -725,7 +728,7 @@ namespace ProgrammaticStylized3D.Rivers
             !materialLifetimeAuthorityActive &&
             pendingInjections.Count == 0 &&
             !pendingIsolatedLifeProbe &&
-            activeProgressiveRibbonEventCount == 0 &&
+            activeFoamCompositionEventCount == 0 &&
             pendingMaterialBirths.Count == 0;
         public long EstimatedMemoryBytes =>
             EstimateTextureBytes(stateA) +

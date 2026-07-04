@@ -679,3 +679,62 @@ Full authority: `10_Project_Architecture_and_Asset_Organisation_Rules.md`.
 7. Then continue to the generated ground-patch milestone.
 
 Do not begin production terrain placement, dynamic rock physics, or a universal shader framework before these tests.
+
+## River Foam Patch 4.11C.5.4j — Spawn Consolidation and Ribbon Stroke Presets
+
+After 5.4h fixed material lifetime and 5.4i repaired the support/negative aging response, visual validation showed that the next blocker was not topology. The visible Foam was still born as short, vertical-ish, blob-like deposits that did not match the long, fractured, volatile ribbon language of the reference river.
+
+This pass consolidates manual Foam spawning into one canonical `Foam Debug > Spawning` section. The previous `Advanced Manual Foam Test Tools` foldout and one-frame button wall were removed from the editor UI, and the stale public wrappers for separate manual shapes were removed from `StylizedRiver`. The remaining manual source entry point is `StartFoamSpawn()`, backed by a `StylizedRiverFoamSpawnPreset` selector:
+
+- `Compact Patch` for one local diagnostic source;
+- `Smooth Ribbon Stroke` for cleaner flow-aligned lane tests;
+- `Fractured Ribbon Stroke` as the main reference-facing broken ribbon source;
+- `Shore Ribbon` for bank/edge support validation.
+
+The existing progressive moving-head emitter remains the foundation, but it now receives preset style parameters. Progressive segment births are expanded to a minimum stroke footprint length so they no longer depend purely on material tick cadence. Segment rasterization also has preset-driven fracture/gap/edge-bite modulation, so young ribbon sources can be broken at birth instead of waiting for later death erosion to make them interesting.
+
+Lifecycle probes remain under `Material Probe` temporarily because they are diagnostics, not production spawning. Automatic Foam spawning is still intentionally disabled.
+
+## River Foam Patch 4.11C.5.4k — Spawn Composition Grammar
+
+User testing of 5.4j confirmed that manual Foam spawning was now consolidated, but the visual language was still wrong. The presets were still based on one mostly linear progressive stroke, so even the fractured option produced fat capsule/slug shapes rather than the reference river's layered composition of thin scratch streaks, torn sheets, broken strands, partial branches, and shore-hugging skirts.
+
+5.4k changes the canonical manual spawn path from "preset = one stroke" to "pattern = foam composition." `Foam Debug > Spawning` now exposes `Spawn Pattern`, `Scale`, `Complexity`, and `Density` instead of the misleading single `Ribbon Half-Width` / patch-control split. One click can now start several coordinated progressive writers with per-writer offsets, scale multipliers, travel multipliers, staggered start delays, fragmentation, width variation, and optional sheet-style tearing. This remains the same canonical spawning path; it does not add another competing debug tool.
+
+Implemented patterns:
+
+- `Compact Diagnostic`: one simple local source for lifetime/support checks.
+- `Thin Scratch Streaks`: several narrow, staggered, broken strands for fast surface-line detail.
+- `Smooth Surface Lane`: cleaner calmer-water lanes with one primary and one supporting strand.
+- `Fractured Ribbon Bundle`: the main reference-facing bundle of multiple broken, offset strands.
+- `Torn Sheet Ribbon`: one broader torn sheet writer with thinner accompanying strand fragments.
+- `Shore Skirt`: an edge-oriented sheet/strand composition that starts near the selected shore and drifts inward.
+
+The progressive event pool was enlarged to support composition writers, and the old double-increment bug on active progressive event count was removed. Segment birth rasterization now distinguishes strand-style and sheet-style writes: strand writes receive stronger longitudinal gaps and edge bite, while sheet writes also receive internal holes/tearing. The lifecycle, support/negative aging, topology generation, material probes, and automatic obstacle behavior were intentionally left untouched.
+
+Validation target: begin with `Fractured Ribbon Bundle`, then compare `Thin Scratch Streaks`, `Torn Sheet Ribbon`, and `Shore Skirt` in `Final Foam` and `Foam + Aging Topology`. This patch is expected to improve source morphology and composition, not to complete final obstacle flow, drift, or beauty-shader erosion.
+
+## River Foam Patch 4.11C.5.4l — Spawn Budget and Composition Event Refactor
+
+5.4l corrects the hidden scaling problem left by 5.4k. The Inspector still exposes one canonical `Foam Debug > Spawning` section, but a selected spawn pattern now starts one budgeted composition event instead of several child progressive writer events.
+
+Why this patch exists:
+
+- 5.4k made the UI cleaner, but `Thin Scratch Streaks`, `Fractured Ribbon Bundle`, `Torn Sheet Ribbon`, and `Shore Skirt` still expanded into multiple active runtime writers.
+- The active event cap was therefore a writer cap, not a full-composition cap.
+- A full pattern could partially start under load if some child writers found slots and others did not.
+- Every active writer could queue one material birth dispatch per material step, so pattern complexity multiplied dispatch count.
+
+Implemented changes:
+
+- Replaced the multi-writer composition start path with `StartFoamCompositionNormalized(...)`.
+- Added a fixed `FoamCompositionEventCapacity` of 8 active composition events per river runtime.
+- Added internal per-material-step birth budgets: Low = 2, Medium = 4, High = 6 composition birth commands per chunk step.
+- Added a rotating scan cursor so budgeted emission is fair rather than always favoring the first active slot.
+- Skipped events keep their previous emitted head and bridge to the current head on their next budgeted emission, preserving continuity while reducing dispatch spikes.
+- Expanded the material-birth command with composition pattern, complexity, and density metadata.
+- Updated the compute injection path so virtual strands, sheet tearing, shore skirts, and smooth lanes are resolved inside one bounded segment injection instead of requiring multiple C# events.
+- Updated the Inspector state row to report `Composition State`, active composition count, pool capacity, and birth budget per material step.
+- Removed the old `FoamSpawnWriterSpec` / multi-writer start path from `StylizedRiver`.
+
+This patch is primarily architectural. It should make spawn cost scale by active composition count and quality budget, not by hidden pattern-writer count. Final visual quality still needs a later skeleton/strand/sheet pass once this bounded architecture is validated in Unity.

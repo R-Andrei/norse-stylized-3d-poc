@@ -2,8 +2,8 @@
 
 **Document type:** problem register and recovery plan  
 **Created after:** Patch `4.11C.5.1a` visual testing  
-**Last updated after:** Patch `4.11C.5.4h` lifecycle delta-time repair  
-**Current status:** base downstream Foam motion is visually smooth and the material lifetime failure has a concrete lifecycle delta-time repair pending validation. Remaining production failures are shape evolution, breakup/morphing, lateral drift, obstacle interaction, and final Foam rendering quality.
+**Last updated after:** Patch `4.11C.5.4l` spawn budget and composition-event refactor  
+**Current status:** base downstream Foam motion is visually smooth, material lifetime is repaired, and manual spawn composition now uses one budgeted composition event per pattern instead of multiple child runtime writers. Remaining production failures are source visual quality, shape evolution, breakup/morphing, lateral drift, obstacle interaction, and final Foam rendering quality.
 
 ---
 
@@ -18,6 +18,15 @@ The Foam system has recovered from the earlier catastrophic material-transport f
 - The old procedural guidance network, lane attraction, shore suction, material reinforcement, material rejuvenation, old Amount persistence, active Integrity, and active Phase systems must remain deleted.
 - Base downstream movement is no longer visibly laggy/stepwise after `4.11C.5.2d`.
 - Transport residue in the old sense — left-behind crumbs, stale streak fragments, or obvious trailing material remnants — appears fixed or at least no longer the main visible blocker after `4.11C.5.2d`.
+
+
+## Patch note — 4.11C.5.4l spawn budget / composition event refactor
+
+5.4l is a performance-safety correction for the 5.4k spawn composition grammar. The previous Inspector path looked consolidated, but each non-compact spawn pattern still started several active progressive writer events. That made the active event cap a writer cap, allowed partial pattern starts under load, and let birth dispatch count scale with hidden child-writer count.
+
+The runtime now starts one `FoamCompositionEvent` per manual spawn pattern. The composition event carries pattern, complexity, and density into the material birth command, and the compute injection kernel resolves bounded virtual strands/sheets/fragments inside one segment dispatch. Per-material-step birth dispatches are budgeted by quality tier: Low = 2, Medium = 4, High = 6. Skipped composition events keep their last emitted head and bridge on the next budgeted emission so visual continuity is preserved while dispatch spikes are avoided.
+
+This is not the final visual-shape pass. The next visual work should improve the skeleton/strand/sheet rasterization inside the bounded composition command, not reintroduce multiple runtime child writers.
 
 ## Still failing
 
@@ -611,3 +620,65 @@ With defaults such as Supported Aging Rate `0.20` and Negative Aging Rate `4.00`
 5.4i moves the response into one shared HLSL helper, `FoamResolveLocalAgeRate(...)`, used by both `SimulateFoam` and `MeasureTopologyMetrics`. The new response shapes support/negative inputs with a smoothstep, suppresses support preservation where negative pressure exists, then applies the negative multiplier. This keeps edges blended while making negative cores actually consume Foam.
 
 Validation target: use normal/progressive Foam, not the isolated probes. Supported regions should still preserve Foam, negative regions should now kill Foam even when they overlap support, and support-to-negative borders should look less like hard contradictory masks.
+
+## Patch 4.11C.5.4j — Spawn Consolidation and Ribbon Stroke Presets
+
+**Status:** implemented; Unity visual validation pending.
+
+After support/negative aging began behaving correctly, the dominant visual problem became source morphology. The topology could preserve or kill Foam, but the manual birth shapes were still too stamp-like: short, vertical-ish, and blob/tongue dominated rather than long, flow-aligned, fractured ribbons.
+
+This patch removes the competing manual spawn surface. The old top-level `Advanced Manual Foam Test Tools` section and its separate one-frame buttons are no longer exposed, and stale public wrapper methods for `Emit Foam Patch`, `Adjacent Pair`, `Thin Ribbon`, `Tongue Cluster`, `Fragment Chain`, `Near Shore`, and the old progressive proof entry point have been removed. Manual spawning now goes through one canonical preset path:
+
+```text
+Foam Debug > Spawning
+  Spawn Preset
+  Longitudinal Position
+  Across Position
+  Amount
+  Initial Remaining Life
+  patch controls or ribbon controls depending on preset
+  Start Spawn
+  Clear Foam
+```
+
+The existing progressive ribbon event system is retained and upgraded rather than replaced. Ribbon presets add controlled stroke aspect, fragmentation strength, width variation, and source-fill scale internally. Progressive segments now expand to a minimum stroke footprint length before rasterization, which prevents material update cadence from turning moving strokes into tick-sized capsules. The compute injection path also applies segment-specific coherent gaps and edge bite for ribbon presets.
+
+Validation target: use `Fractured Ribbon Stroke` first, then compare `Smooth Ribbon Stroke` and `Shore Ribbon`. The expected improvement is not final reference-quality Foam yet; it is that manual spawns now form longer, flow-aligned, broken ribbon lanes that can meaningfully exercise the support topology. Fine tuning of preset values, final visual death, drift, and obstacle flow remains later work.
+
+## Patch 4.11C.5.4k — Spawn Composition Grammar
+
+**Status:** implemented; Unity visual validation pending.
+
+5.4j removed competing manual spawn buttons, but user testing showed that the remaining presets were still too primitive. The reference river is not built from one better stroke. It uses a composition of broad torn sheets, thin scratch streaks, braided/broken strands, shore skirts, and detached fragments. A single mostly unidirectional capsule-like stroke could not produce that language.
+
+5.4k keeps the consolidated `Foam Debug > Spawning` surface but changes the internal model from stroke presets to composition patterns. The new user-facing controls are:
+
+```text
+Spawn Pattern
+Longitudinal Position
+Across Position
+Amount
+Initial Remaining Life
+Scale
+Complexity
+Density
+Event Duration
+Travel Distance
+Across Drift
+Path Wander
+Start Spawn
+Clear Foam
+```
+
+The first implemented patterns are:
+
+- `Compact Diagnostic`;
+- `Thin Scratch Streaks`;
+- `Smooth Surface Lane`;
+- `Fractured Ribbon Bundle`;
+- `Torn Sheet Ribbon`;
+- `Shore Skirt`.
+
+After 5.4l, one pattern starts one budgeted composition event. Internal strand/sheet/fragment structure is resolved by the bounded material birth command in compute instead of by starting multiple coordinated runtime writers. Complexity and Density now shape virtual internal structure without multiplying active event count.
+
+Do not evaluate support topology quality from compact blobs anymore. Use the composition patterns, especially `Fractured Ribbon Bundle`, `Thin Scratch Streaks`, and `Torn Sheet Ribbon`, before returning to support-edge fine tuning.

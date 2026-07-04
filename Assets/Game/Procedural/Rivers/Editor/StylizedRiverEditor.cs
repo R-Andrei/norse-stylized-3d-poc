@@ -11,7 +11,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private bool showAdvancedBody;
         private bool showAdvancedShoreline;
         private bool showPerformanceDiagnostics;
-        private bool showFoamTestTools;
         private bool showFoamDiagnostics;
         private bool showFoamCacheDiagnostics;
         private bool showFoamValidationOverview = true;
@@ -19,7 +18,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private bool showFoamTransportDiagnostics;
         private bool showFoamLifetimeDiagnostics;
         private bool showFoamMaterialProbe;
-        private bool showFoamBirthSourceDiagnostics;
+        private bool showFoamSpawning = true;
         private bool showFoamShapeResidueDiagnostics;
         private bool showFoamRuntimeResourceDiagnostics;
         private bool showFoamAdvancedInternalDiagnostics;
@@ -51,7 +50,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 showFoamTransportDiagnostics ||
                 showFoamLifetimeDiagnostics ||
                 showFoamMaterialProbe ||
-                showFoamBirthSourceDiagnostics ||
+                showFoamSpawning ||
                 showFoamShapeResidueDiagnostics ||
                 showFoamRuntimeResourceDiagnostics ||
                 showFoamAdvancedInternalDiagnostics;
@@ -1642,259 +1641,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     MessageType.Info);
             }
 
-            EditorGUILayout.Space(4f);
-            showFoamTestTools = EditorGUILayout.Foldout(
-                showFoamTestTools,
-                "Advanced Manual Foam Test Tools",
-                true);
-            if (showFoamTestTools)
-            {
-                EditorGUI.indentLevel++;
-                EditorGUILayout.PropertyField(
-                    Find("foamTestDistanceNormalized"),
-                    new GUIContent(
-                        "Longitudinal Position",
-                        "Normalized position from the logical upstream start (0) to downstream end (1)."));
-                EditorGUILayout.PropertyField(
-                    Find("foamTestAcrossNormalized"),
-                    new GUIContent(
-                        "Across Position",
-                        "Normalized lateral position. Minus one is the left surface edge, zero is centre, and one is the right surface edge."));
-                EditorGUILayout.PropertyField(
-                    Find("foamTestRadius"),
-                    new GUIContent(
-                        "Radius",
-                        "Initial across-river radius in world metres."));
-                EditorGUILayout.PropertyField(
-                    Find("foamTestAmount"),
-                    new GUIContent(
-                        "Amount",
-                        "Source-only coefficient controlling how much of the candidate birth shape becomes occupied Foam. Zero creates nothing; one accepts the complete valid shape. It does not change Initial Remaining Life or durability."));
-                EditorGUILayout.PropertyField(
-                    Find("foamTestRemainingLife"),
-                    new GUIContent(
-                        "Initial Remaining Life",
-                        "Normalized lifetime assigned equally to every accepted part of the source. One starts with a complete lifetime; lower values begin closer to expiry. In Patch 4.11C.5 the exact final transported Presence coverage remains visible until Remaining Life reaches zero; gradual life-derived dissolution belongs to 4.11C.6. Source Amount does not modify this value."));
-                EditorGUILayout.PropertyField(
-                    Find("foamTestElongation"),
-                    new GUIContent(
-                        "Along-Flow Elongation",
-                        "Multiplies only the manual one-frame diagnostic patch radius along the river. Progressive ribbons use their separate Ribbon Half-Width control and do not use this value."));
-
-                EditorGUILayout.Space(4f);
-                EditorGUILayout.LabelField(
-                    "Patch 4.11C Progressive Ribbon Proof",
-                    EditorStyles.boldLabel);
-                EditorGUILayout.PropertyField(
-                    Find("foamTestProgressiveRibbonHalfWidth"),
-                    new GUIContent(
-                        "Ribbon Half-Width",
-                        "Dedicated progressive-source half-width in world metres. This is independent of the manual one-frame patch Radius."));
-                EditorGUILayout.PropertyField(
-                    Find("foamTestProgressiveRibbonDuration"),
-                    new GUIContent(
-                        "Event Duration",
-                        "How long the manual emission head remains active. The approved proof range is 0.5–3 seconds."));
-                EditorGUILayout.PropertyField(
-                    Find("foamTestProgressiveRibbonTravelDistance"),
-                    new GUIContent(
-                        "Travel Distance",
-                        "Net downstream distance travelled by the emission head during the event. The approved proof range is 0.5–8 metres."));
-                EditorGUILayout.PropertyField(
-                    Find("foamTestProgressiveRibbonAcrossDrift"),
-                    new GUIContent(
-                        "Across Drift",
-                        "Total normalized lateral displacement from start to end. Negative moves toward the left river edge and positive toward the right."));
-                EditorGUILayout.PropertyField(
-                    Find("foamTestProgressiveRibbonPathWander"),
-                    new GUIContent(
-                        "Path Wander",
-                        "Strength of one deterministic smooth bend. This is coherent event shape, not frame-to-frame jitter."));
-
-                using (new EditorGUI.DisabledScope(!Application.isPlaying))
-                {
-                    if (GUILayout.Button(
-                            new GUIContent(
-                                "Start Progressive Ribbon",
-                                "Starts one corrected Patch 4.11C proof event. The proven trajectory is rasterized into a per-step birth source and transferred once into persistent material; no complete ribbon is stamped in one frame.")))
-                    {
-                        ApplyFoamTestProperties();
-                        river.StartFoamProgressiveRibbonProof();
-                    }
-                }
-
-                StylizedRiverFoamRuntime proofRuntime =
-                    river.GetComponent<StylizedRiverFoamRuntime>();
-                if (Application.isPlaying && proofRuntime != null)
-                {
-                    EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-                    EditorGUILayout.LabelField(
-                        "Progressive Event State",
-                        EditorStyles.boldLabel);
-                    EditorGUILayout.LabelField(
-                        "Source Family",
-                        "Manual Progressive Proof");
-                    EditorGUILayout.LabelField(
-                        "Active / Capacity",
-                        $"{proofRuntime.ActiveProgressiveRibbonEventCount} / " +
-                        proofRuntime.ProgressiveRibbonPoolCapacity);
-                    EditorGUILayout.LabelField(
-                        "Started / Completed / Rejected",
-                        $"{proofRuntime.ProgressiveRibbonStartedCount} / " +
-                        $"{proofRuntime.ProgressiveRibbonCompletedCount} / " +
-                        proofRuntime.ProgressiveRibbonRejectedCount);
-                    EditorGUILayout.LabelField(
-                        "Latest Event / Progress",
-                        proofRuntime.LatestProgressiveRibbonEventId > 0
-                            ? $"#{proofRuntime.LatestProgressiveRibbonEventId} / " +
-                              FormatPercent(
-                                  proofRuntime.LatestProgressiveRibbonProgress)
-                            : "—");
-                    EditorGUILayout.LabelField(
-                        "Previous Head",
-                        proofRuntime.LatestProgressiveRibbonEventId > 0
-                            ? $"Along " +
-                              $"{proofRuntime.LatestProgressiveRibbonPreviousDistanceNormalized:0.000}, " +
-                              $"Across {proofRuntime.LatestProgressiveRibbonPreviousAcrossNormalized:0.000}"
-                            : "—");
-                    EditorGUILayout.LabelField(
-                        "Current Head",
-                        proofRuntime.LatestProgressiveRibbonEventId > 0
-                            ? $"Along " +
-                              $"{proofRuntime.LatestProgressiveRibbonHeadDistanceNormalized:0.000}, " +
-                              $"Across {proofRuntime.LatestProgressiveRibbonHeadAcrossNormalized:0.000}"
-                            : "—");
-                    EditorGUILayout.LabelField(
-                        "Ribbon Half-Width",
-                        $"{river.FoamTestProgressiveRibbonHalfWidth:0.000} m");
-                    EditorGUILayout.LabelField(
-                        "Last Submitted Segment",
-                        $"{proofRuntime.LastProgressiveRibbonSegmentLength:0.000} m");
-                    EditorGUILayout.LabelField(
-                        "Event Updates",
-                        proofRuntime.ProgressiveRibbonEventUpdateCount.ToString());
-                    EditorGUILayout.LabelField(
-                        "Segment Dispatches",
-                        $"{proofRuntime.ProgressiveRibbonSegmentDispatchAttemptCount} attempted / " +
-                        $"{proofRuntime.ProgressiveRibbonSegmentDispatchSubmittedCount} submitted");
-                    EditorGUILayout.LabelField(
-                        "Cumulative Centreline",
-                        $"{proofRuntime.ProgressiveRibbonCumulativeCentrelineDistance:0.000} m");
-                    string sourceTexelState;
-                    if (!proofRuntime.ProgressiveBirthSourceDebugActive)
-                    {
-                        sourceTexelState =
-                            "Select Progressive Birth Source debug view";
-                    }
-                    else if (proofRuntime.ProgressiveBirthDebugReadbackPending &&
-                             !proofRuntime.ProgressiveBirthDebugReadbackAvailable)
-                    {
-                        sourceTexelState = "GPU readback pending";
-                    }
-                    else if (!proofRuntime.ProgressiveBirthDebugReadbackAvailable)
-                    {
-                        sourceTexelState = "No verified source write yet";
-                    }
-                    else
-                    {
-                        sourceTexelState =
-                            $"{proofRuntime.ProgressiveBirthDebugLatestAffectedTexels} latest / " +
-                            $"{proofRuntime.ProgressiveBirthDebugCumulativeAffectedTexels} cumulative unique";
-                    }
-
-                    EditorGUILayout.LabelField(
-                        "Verified Debug-Source Texels",
-                        sourceTexelState);
-                    EditorGUILayout.EndVertical();
-                }
-
-                EditorGUILayout.Space(4f);
-                EditorGUILayout.LabelField(
-                    "Manual One-Frame Diagnostics",
-                    EditorStyles.boldLabel);
-
-                using (new EditorGUI.DisabledScope(!Application.isPlaying))
-                {
-                    EditorGUILayout.BeginHorizontal();
-                    if (GUILayout.Button(
-                            new GUIContent(
-                                "Emit Foam Patch",
-                                "Injects the configured manual patch into the persistent Foam field.")))
-                    {
-                        ApplyFoamTestProperties();
-                        river.EmitFoamTestPatch();
-                    }
-
-                    if (GUILayout.Button(
-                            new GUIContent(
-                                "Emit Adjacent Pair",
-                                "Injects two nearby patches to test independent conservative transport and geometric overlap without hidden attraction or cohesion.")))
-                    {
-                        ApplyFoamTestProperties();
-                        river.EmitFoamAdjacentPair();
-                    }
-                    EditorGUILayout.EndHorizontal();
-
-                    EditorGUILayout.BeginHorizontal();
-                    if (GUILayout.Button(
-                            new GUIContent(
-                                "Emit Thin Ribbon",
-                                "Injects a narrow elongated patch to test transport, Remaining Life loss, Presence extraction, and attached Material Pattern transport.")))
-                    {
-                        ApplyFoamTestProperties();
-                        river.EmitFoamThinRibbon();
-                    }
-
-                    if (GUILayout.Button(
-                            new GUIContent(
-                                "Emit Tongue Cluster",
-                                "Injects three overlapping elongated sources to test Material Pattern carriage, non-rejuvenating Presence union, topology-adjusted Remaining Life, and temporal interpolation.")))
-                    {
-                        ApplyFoamTestProperties();
-                        river.EmitFoamTongueCluster();
-                    }
-                    EditorGUILayout.EndHorizontal();
-
-                    EditorGUILayout.BeginHorizontal();
-                    if (GUILayout.Button(
-                            new GUIContent(
-                                "Emit Fragment Chain",
-                                "Injects a staggered chain of small sources to compare independent Presence, Remaining Life, and Material Pattern transport.")))
-                    {
-                        ApplyFoamTestProperties();
-                        river.EmitFoamFragmentChain();
-                    }
-
-                    if (GUILayout.Button(
-                            new GUIContent(
-                                "Emit Near Shore",
-                                "Injects the configured patch close to a shore to test idempotent animated-edge clipping, Shore Support aging, downstream transport, and canonical obstacle exclusion.")))
-                    {
-                        ApplyFoamTestProperties();
-                        river.EmitFoamNearShore();
-                    }
-                    EditorGUILayout.EndHorizontal();
-
-                    if (GUILayout.Button(
-                            new GUIContent(
-                                "Clear Foam",
-                                "Clears the four-channel Foam state, pending manual injections, and active progressive-ribbon events. The river remains empty until another explicit diagnostic or later approved automatic birth event.")))
-                    {
-                        ApplyFoamTestProperties();
-                        river.ClearFoam();
-                    }
-                }
-
-                if (!Application.isPlaying)
-                {
-                    EditorGUILayout.HelpBox(
-                        "Enter Play Mode to start a manual progressive-ribbon proof or use the one-frame diagnostic shapes. The current correction sequence adds no automatic spawning.",
-                        MessageType.Info);
-                }
-
-                EditorGUI.indentLevel--;
-            }
-
             StylizedRiverFoamRuntime runtime =
                 river.GetComponent<StylizedRiverFoamRuntime>();
 
@@ -1910,7 +1656,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam Debug",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Compact workflow: Overview for status, View for display mode, Motion for downstream travel, Lifetime + Topology for aging/support, Birth for source controls, Shape for footprint issues. Each section is intentionally small; advanced internals stay collapsed unless a compile/runtime failure points there.",
+                "Compact workflow: Overview for status, View for display mode, Motion for downstream travel, Lifetime + Topology for aging/support, Spawning for manual source presets, Shape for footprint issues. Each section is intentionally small; advanced internals stay collapsed unless a compile/runtime failure points there.",
                 MessageType.None);
 
             DrawFoamValidationOverview(river, runtime);
@@ -1918,7 +1664,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawFoamTransportMotionSection(river, runtime);
             DrawFoamLifetimeSection(river, runtime);
             DrawFoamMaterialProbeSection(river, runtime);
-            DrawFoamBirthSourceSection(river, runtime);
+            DrawFoamSpawningSection(river, runtime);
             DrawFoamShapeResidueSection(runtime);
             DrawFoamRuntimeResourceSection(runtime);
             DrawFoamAdvancedInternalSection(runtime);
@@ -2024,7 +1770,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             int selectedDebugIndex = EditorGUILayout.Popup(
                 new GUIContent(
                     "Debug View",
-                    "Final Foam for normal validation. Foam + Aging Topology for support/negative/obstacle checks. Birth views only for source debugging."),
+                    "Final Foam for normal validation. Foam + Aging Topology for support/negative/obstacle checks. Progressive Birth Source is only for source debugging."),
                 currentDebugIndex,
                 foamDebugLabels);
             if (EditorGUI.EndChangeCheck())
@@ -2265,7 +2011,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                             "Clear + Emit Configured Life Probe",
                             "Clears persistent foam material, cancels active foam births, then writes three small non-overlapping raw material patches directly. Aging uses the current Neutral Lifetime and aging-rate compute parameters.")))
                 {
-                    ApplyFoamTestProperties();
+                    ApplyFoamSpawnProperties();
                     river.ClearAndEmitFoamIsolatedLifeProbe(false);
                 }
 
@@ -2274,7 +2020,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                             "Clear + Emit Absolute 1s Probe",
                             "Final lifecycle sanity check: clears material, writes the same three raw patches, then temporarily ignores topology and Neutral Lifetime for this isolated probe so Remaining Life subtracts raw deltaTime directly.")))
                 {
-                    ApplyFoamTestProperties();
+                    ApplyFoamSpawnProperties();
                     river.ClearAndEmitFoamAbsoluteLifeProbe();
                 }
             }
@@ -2286,50 +2032,130 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUI.indentLevel--;
         }
 
-        private void DrawFoamBirthSourceSection(
+        private void DrawFoamSpawningSection(
             StylizedRiver river,
             StylizedRiverFoamRuntime runtime)
         {
-            showFoamBirthSourceDiagnostics = EditorGUILayout.Foldout(
-                showFoamBirthSourceDiagnostics,
-                "Birth",
+            showFoamSpawning = EditorGUILayout.Foldout(
+                showFoamSpawning,
+                "Spawning",
                 true);
-            if (!showFoamBirthSourceDiagnostics)
+            if (!showFoamSpawning)
             {
                 return;
             }
 
             EditorGUI.indentLevel++;
 
+            SerializedProperty presetProperty = Find("foamSpawnPreset");
             EditorGUILayout.PropertyField(
-                Find("foamTestRadius"),
-                new GUIContent("Manual Width / Radius"));
+                presetProperty,
+                new GUIContent(
+                    "Spawn Pattern",
+                    "Single canonical manual foam-spawn pattern. Patterns are compositions: one click starts one budgeted composition event; internal strands, sheets, and fragments are resolved inside that event instead of by multiplying runtime writers."));
+            StylizedRiverFoamSpawnPreset selectedPreset =
+                (StylizedRiverFoamSpawnPreset)presetProperty.intValue;
+
             EditorGUILayout.PropertyField(
-                Find("foamTestElongation"),
-                new GUIContent("Manual Length Multiplier"));
+                Find("foamSpawnDistanceNormalized"),
+                new GUIContent(
+                    "Longitudinal Position",
+                    "Normalized position from logical upstream start (0) to downstream end (1)."));
             EditorGUILayout.PropertyField(
-                Find("foamTestAmount"),
-                new GUIContent("Source Amount"));
+                Find("foamSpawnAcrossNormalized"),
+                new GUIContent(
+                    "Across Position",
+                    "Normalized lateral position. Minus one is the left surface edge, zero is centre, and one is the right surface edge. Shore Skirt snaps centre-ish starts toward the nearest shore."));
             EditorGUILayout.PropertyField(
-                Find("foamTestRemainingLife"),
-                new GUIContent("Initial Remaining Life"));
+                Find("foamSpawnAmount"),
+                new GUIContent(
+                    "Amount",
+                    "Source-only coverage amount. It controls how much of the candidate birth shapes becomes occupied Foam, not Remaining Life or durability."));
             EditorGUILayout.PropertyField(
-                Find("foamTestProgressiveRibbonDuration"),
-                new GUIContent("Progressive Duration"));
+                Find("foamSpawnRemainingLife"),
+                new GUIContent(
+                    "Initial Remaining Life",
+                    "Normalized lifetime assigned to accepted source material. One starts with a complete lifetime; lower values begin closer to expiry."));
             EditorGUILayout.PropertyField(
-                Find("foamTestProgressiveRibbonTravelDistance"),
-                new GUIContent("Progressive Travel"));
-            EditorGUILayout.PropertyField(
-                Find("foamTestProgressiveRibbonHalfWidth"),
-                new GUIContent("Progressive Half-Width"));
+                Find("foamSpawnScale"),
+                new GUIContent(
+                    "Scale",
+                    "Overall world-space size of the selected pattern. Thin patterns interpret this as strand width; sheet patterns interpret it as sheet half-width; Compact Diagnostic interprets it as patch radius."));
+
+            if (selectedPreset != StylizedRiverFoamSpawnPreset.CompactDiagnostic)
+            {
+                EditorGUILayout.PropertyField(
+                    Find("foamSpawnComplexity"),
+                    new GUIContent(
+                        "Complexity",
+                        "Pattern-level shape complexity: more strands, gaps, width variation, sheet tearing, and offset fragments according to the selected pattern."));
+                EditorGUILayout.PropertyField(
+                    Find("foamSpawnDensity"),
+                    new GUIContent(
+                        "Density",
+                        "Pattern-level material density. Higher values make compositions more populated and more continuous without changing Remaining Life or active event count."));
+                EditorGUILayout.PropertyField(
+                    Find("foamSpawnRibbonDuration"),
+                    new GUIContent(
+                        "Event Duration",
+                        "Base duration for the moving-head composition event. Birth dispatches are internally budgeted per material step."));
+                EditorGUILayout.PropertyField(
+                    Find("foamSpawnRibbonTravelDistance"),
+                    new GUIContent(
+                        "Travel Distance",
+                        "Base downstream travel distance for the composition path. Virtual internal strands are resolved inside the single event."));
+                EditorGUILayout.PropertyField(
+                    Find("foamSpawnRibbonAcrossDrift"),
+                    new GUIContent(
+                        "Across Drift",
+                        "Base normalized lateral displacement. Patterns scale or invert this inside the single composition event."));
+                EditorGUILayout.PropertyField(
+                    Find("foamSpawnRibbonPathWander"),
+                    new GUIContent(
+                        "Path Wander",
+                        "Strength of deterministic smooth bend. Patterns scale this value internally without adding child runtime writers."));
+            }
+
+            using (new EditorGUI.DisabledScope(!Application.isPlaying))
+            {
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Start Spawn",
+                            "Starts the selected canonical foam-spawn pattern as one budgeted composition event. No legacy one-frame button wall remains.")))
+                {
+                    ApplyFoamSpawnProperties();
+                    river.StartFoamSpawn();
+                }
+
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Clear Foam",
+                            "Clears persistent Foam state, pending manual injections, and active foam composition events.")))
+                {
+                    ApplyFoamSpawnProperties();
+                    river.ClearFoam();
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+
+            if (!Application.isPlaying)
+            {
+                EditorGUILayout.HelpBox(
+                    "Enter Play Mode to start a manual foam spawn. Automatic spawning is still intentionally disabled; this section now drives only the canonical composition-pattern path.",
+                    MessageType.Info);
+            }
 
             if (runtime != null)
             {
                 EditorGUILayout.LabelField(
-                    "Progressive State",
-                    runtime.LatestProgressiveRibbonEventId > 0
-                        ? $"event {runtime.LatestProgressiveRibbonEventId}, active {runtime.ActiveProgressiveRibbonEventCount}/{runtime.ProgressiveRibbonPoolCapacity}"
-                        : "No active event");
+                    "Composition State",
+                    runtime.LatestFoamCompositionEventId > 0
+                        ? $"event {runtime.LatestFoamCompositionEventId}, active {runtime.ActiveFoamCompositionEventCount}/{runtime.FoamCompositionPoolCapacity}, budget {runtime.FoamCompositionBirthBudgetPerStep}/step"
+                        : $"No active event, budget {runtime.FoamCompositionBirthBudgetPerStep}/step");
+                EditorGUILayout.LabelField(
+                    "Last Segment",
+                    $"{runtime.LastFoamCompositionSegmentLength:0.000} m");
                 EditorGUILayout.LabelField(
                     "Source Texels",
                     runtime.ProgressiveBirthDebugReadbackAvailable
@@ -2721,7 +2547,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             majorCandidatePreviewTexture.Apply(false, false);
         }
 
-        private void ApplyFoamTestProperties()
+        private void ApplyFoamSpawnProperties()
         {
             serializedObject.ApplyModifiedProperties();
             serializedObject.Update();

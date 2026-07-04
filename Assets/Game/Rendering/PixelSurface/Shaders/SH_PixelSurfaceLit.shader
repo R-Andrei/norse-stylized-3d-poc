@@ -20,8 +20,15 @@ Shader "PS3D/Pixel Surface Lit"
         _ExposureTintStrength("Exposure Brighten Strength", Range(0, 0.5)) = 0.04
         _CreviceDarkenStrength("Crevice Darken Strength", Range(0, 0.75)) = 0.075
         _BaseDarkenStrength("Base Darken Strength", Range(0, 0.75)) = 0.04
-        [Enum(None,0,SurfaceVariation,1,Exposure,2,CreviceBase,3,ConvexEdgeWear,4,ConcaveCrease,5,DirtDeposit,6)]
+        [Enum(ProgrammaticStylized3D.Rendering.PixelSurfaceMaskDebugMode)]
         _MaskDebugMode("Mask Debug Mode", Float) = 0
+        [Enum(GeneratedMass,0,Ground,1)]
+        _SurfaceContract("Surface Contract", Float) = 0
+        _GroundSnowResponse("Ground Snow Response", Range(0, 2)) = 1
+        _GroundDampResponse("Ground Damp/Deposit Response", Range(0, 2)) = 1
+        _GroundVegetationResponse("Ground Vegetation Response", Range(0, 2)) = 0.25
+        _GroundRockyDryResponse("Ground Rocky/Dry Response", Range(0, 2)) = 0.5
+        _GroundShoreDampStrength("Ground Shore Damp Strength", Range(0, 2)) = 1
         [HideInInspector] _GeneratedMassLocalMinY("Generated Mass Local Min Y", Float) = 0
         [HideInInspector] _GeneratedMassLocalHeight("Generated Mass Local Height", Float) = 1
         [HideInInspector] _GeneratedMassMaskSeed("Generated Mass Mask Seed", Float) = 0
@@ -31,6 +38,12 @@ Shader "PS3D/Pixel Surface Lit"
         [HideInInspector] _GeneratedMassCreviceBreakup("Generated Mass Crevice Breakup", Float) = 1
         [HideInInspector] _GeneratedMassDirtCrawlReach("Generated Mass Dirt Crawl Reach", Float) = 1
         [HideInInspector] _GeneratedMassDirtCoverage("Generated Mass Dirt Coverage", Float) = 1
+        [HideInInspector] _GeneratedMassFeatureOverlayKind("Generated Mass Feature Overlay Kind", Float) = 0
+        [HideInInspector] _GeneratedMassEdgeWearCoverage("Generated Mass Edge Wear Coverage", Float) = 1
+        [HideInInspector] _GeneratedMassEdgeWearSoftness("Generated Mass Edge Wear Softness", Float) = 0.45
+        [HideInInspector] _GeneratedMassCreaseLength("Generated Mass Crease Length", Float) = 1
+        [HideInInspector] _GeneratedMassCreaseBranching("Generated Mass Crease Branching", Float) = 1
+        [HideInInspector] _GeneratedMassCreaseSoftness("Generated Mass Crease Softness", Float) = 0.35
 
         [Header(Stylized Value Shaping)]
         _HighlightCompressStrength("Highlight Compress Strength", Range(0, 0.5)) = 0.08
@@ -120,6 +133,12 @@ Shader "PS3D/Pixel Surface Lit"
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
                 float _MaskDebugMode;
+                float _SurfaceContract;
+                float _GroundSnowResponse;
+                float _GroundDampResponse;
+                float _GroundVegetationResponse;
+                float _GroundRockyDryResponse;
+                float _GroundShoreDampStrength;
                 float _GeneratedMassLocalMinY;
                 float _GeneratedMassLocalHeight;
                 float _GeneratedMassMaskSeed;
@@ -129,6 +148,12 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassCreviceBreakup;
                 float _GeneratedMassDirtCrawlReach;
                 float _GeneratedMassDirtCoverage;
+                float _GeneratedMassFeatureOverlayKind;
+                float _GeneratedMassEdgeWearCoverage;
+                float _GeneratedMassEdgeWearSoftness;
+                float _GeneratedMassCreaseLength;
+                float _GeneratedMassCreaseBranching;
+                float _GeneratedMassCreaseSoftness;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;
@@ -481,11 +506,119 @@ Shader "PS3D/Pixel Surface Lit"
                 return saturate(pow(mask, 1.06));
             }
 
+            float ResolveSurfaceContractIsGround()
+            {
+                return step(0.5, _SurfaceContract);
+            }
+
+            float ResolveGroundTonalMask(Varyings input)
+            {
+                return saturate((float)input.color.r);
+            }
+
+            float ResolveGroundExposureMask(Varyings input)
+            {
+                return saturate((float)input.color.g);
+            }
+
+            float ResolveGroundDampDepositMask(Varyings input)
+            {
+                return saturate((float)input.color.b);
+            }
+
+            float ResolveGroundVegetationMask(Varyings input)
+            {
+                return saturate((float)input.color.a);
+            }
+
+            float ResolveGroundCompactionMask(Varyings input)
+            {
+                return saturate(input.materialMasks.x);
+            }
+
+            float ResolveGroundShoreMask(Varyings input)
+            {
+                return saturate(input.materialMasks.y);
+            }
+
+            float ResolveGroundRockyDryMask(Varyings input)
+            {
+                return saturate(input.materialMasks.z);
+            }
+
+            float ResolveFeatureLineMask(
+                Varyings input,
+                float rawMask,
+                float softness)
+            {
+                rawMask = saturate(rawMask);
+                float across01 = saturate(abs(input.uv.y * 2.0 - 1.0));
+                float length01 = saturate(input.uv.x);
+                float sideEdge = lerp(0.72, 0.18, saturate(softness));
+                float sideFalloff =
+                    1.0 -
+                    smoothstep(
+                        sideEdge,
+                        1.0,
+                        across01);
+                // Softness intentionally affects cross-strip falloff only.
+                // End taper on every strip segment creates visible holes where
+                // generated segments meet or continue each other.
+                return saturate(rawMask * sideFalloff);
+            }
+
             half3 ResolveMaskDebugColor(Varyings input)
             {
                 int mode = (int)round(_MaskDebugMode);
 
                 if (mode <= 0)
+                {
+                    return half3(-1.0h, -1.0h, -1.0h);
+                }
+
+                float overlayKind = round(_GeneratedMassFeatureOverlayKind);
+                bool isEdgeWearOverlay = overlayKind == 1.0;
+                bool isCreaseOverlay = overlayKind == 2.0;
+
+                if (mode == 4)
+                {
+                    if (!isEdgeWearOverlay)
+                    {
+                        return half3(-1.0h, -1.0h, -1.0h);
+                    }
+
+                    float mask = ResolveFeatureLineMask(
+                        input,
+                        (float)input.color.a,
+                        _GeneratedMassEdgeWearSoftness);
+                    return (half3)lerp(
+                        float3(0.025, 0.025, 0.035),
+                        float3(1.0, 0.92, 0.55),
+                        mask);
+                }
+
+                if (mode == 5)
+                {
+                    if (!isCreaseOverlay)
+                    {
+                        return half3(-1.0h, -1.0h, -1.0h);
+                    }
+
+                    float mask = ResolveFeatureLineMask(
+                        input,
+                        (float)input.materialMasks.x,
+                        _GeneratedMassCreaseSoftness);
+                    return (half3)lerp(
+                        float3(0.025, 0.025, 0.035),
+                        float3(1.0, 0.92, 0.55),
+                        mask);
+                }
+
+                // Line-feature debug modes are overlay-only. The main generated
+                // mass remains normally shaded so geometry and facet placement
+                // stay readable during validation. Area and ground debug modes
+                // below still use the full-surface mask preview.
+                if (isEdgeWearOverlay || isCreaseOverlay)
                 {
                     return half3(-1.0h, -1.0h, -1.0h);
                 }
@@ -503,17 +636,52 @@ Shader "PS3D/Pixel Surface Lit"
                 {
                     mask = ResolveShaderCreviceBaseMask(input);
                 }
-                else if (mode == 4)
-                {
-                    mask = saturate((float)input.color.a);
-                }
-                else if (mode == 5)
-                {
-                    mask = saturate((float)input.materialMasks.x);
-                }
                 else if (mode == 6)
                 {
                     mask = ResolveShaderDirtDepositMask(input);
+                }
+                else if (mode == 7)
+                {
+                    mask = ResolveGroundTonalMask(input);
+                }
+                else if (mode == 8)
+                {
+                    mask = ResolveGroundExposureMask(input);
+                }
+                else if (mode == 9)
+                {
+                    mask = ResolveGroundDampDepositMask(input);
+                }
+                else if (mode == 10)
+                {
+                    mask = ResolveGroundVegetationMask(input);
+                }
+                else if (mode == 11)
+                {
+                    mask = ResolveGroundCompactionMask(input);
+                }
+                else if (mode == 12)
+                {
+                    mask = ResolveGroundShoreMask(input);
+                }
+                else if (mode == 13)
+                {
+                    mask = ResolveGroundRockyDryMask(input);
+                }
+                else if (mode == 14)
+                {
+                    float exposure = ResolveGroundExposureMask(input);
+                    float damp = saturate(
+                        ResolveGroundDampDepositMask(input) * 0.75 +
+                        ResolveGroundShoreMask(input) * 0.45);
+                    float vegetationOrDry = max(
+                        ResolveGroundVegetationMask(input),
+                        ResolveGroundRockyDryMask(input));
+
+                    return (half3)float3(
+                        exposure,
+                        damp,
+                        vegetationOrDry);
                 }
 
                 return (half3)lerp(
@@ -574,11 +742,29 @@ Shader "PS3D/Pixel Surface Lit"
                 half tonalScale =
                     (half)max(0.0, 1.0 + tonalOffset * _PixelEffectStrength);
 
+                float isGroundSurface = ResolveSurfaceContractIsGround();
                 float exposureMask =
                     saturate((float)input.color.g) * contractMask;
-                float creviceMask =
+                float massCreviceMask =
                     ResolveShaderCreviceBaseMask(input) * contractMask;
+                float creviceMask =
+                    lerp(massCreviceMask, 0.0, isGroundSurface);
                 float baseMask = creviceMask * (1.0 - exposureMask);
+                float groundDampDeposit = ResolveGroundDampDepositMask(input);
+                float groundShore = ResolveGroundShoreMask(input);
+                float groundRockyDry = ResolveGroundRockyDryMask(input);
+                float groundVegetation = ResolveGroundVegetationMask(input);
+                float groundDampVisual = saturate(
+                    (groundDampDeposit * 0.78 +
+                     groundShore * 0.52 * max(0.0, _GroundShoreDampStrength)) *
+                    max(0.0, _GroundDampResponse));
+                float groundSnowVisual = saturate(
+                    exposureMask * max(0.0, _GroundSnowResponse) *
+                    (1.0 - groundDampVisual * 0.42));
+                float groundRockyDryVisual = saturate(
+                    groundRockyDry * max(0.0, _GroundRockyDryResponse));
+                float groundVegetationVisual = saturate(
+                    groundVegetation * max(0.0, _GroundVegetationResponse));
                 float profileContrast =
                     max(0.0, _ProfileContrast) *
                     lerp(1.0, max(0.0, _FrostContrast), saturate(_FrostStrength));
@@ -589,18 +775,49 @@ Shader "PS3D/Pixel Surface Lit"
                 float baseDarken =
                     _BaseDarkenStrength *
                     lerp(1.0, 0.65, saturate(_Wetness));
-                float semanticScale =
+                float generatedMassSemanticScale =
                     1.0 +
                     (exposureMask * _ExposureTintStrength -
                      creviceMask * creviceDarken -
                      baseMask * baseDarken) *
                     profileContrast;
+                float groundSemanticScale =
+                    1.0 +
+                    (groundSnowVisual * 0.11 -
+                     groundDampVisual * 0.18 -
+                     groundRockyDryVisual * 0.035 +
+                     groundVegetationVisual * 0.025) *
+                    profileContrast;
+                float semanticScale = lerp(
+                    generatedMassSemanticScale,
+                    groundSemanticScale,
+                    isGroundSurface);
 
                 half3 albedo =
                     baseSample.rgb *
                     _BaseColor.rgb *
                     tonalScale *
                     (half)max(0.0, semanticScale);
+
+                half3 groundAlbedo = albedo;
+                groundAlbedo = lerp(
+                    groundAlbedo,
+                    _FrostColor.rgb,
+                    (half)(groundSnowVisual * 0.34));
+                groundAlbedo *=
+                    (half)max(0.0, 1.0 - groundDampVisual * 0.24);
+                groundAlbedo = lerp(
+                    groundAlbedo,
+                    groundAlbedo * half3(0.88h, 0.90h, 0.93h),
+                    (half)(groundRockyDryVisual * 0.22));
+                groundAlbedo = lerp(
+                    groundAlbedo,
+                    groundAlbedo * half3(0.94h, 1.00h, 0.90h),
+                    (half)(groundVegetationVisual * 0.18));
+                albedo = lerp(
+                    albedo,
+                    groundAlbedo,
+                    (half)isGroundSurface);
 
                 float frostNoise =
                     PS3D_ValueNoise31(broadCoordinate * 1.7 + 71.31);
@@ -803,6 +1020,12 @@ Shader "PS3D/Pixel Surface Lit"
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
                 float _MaskDebugMode;
+                float _SurfaceContract;
+                float _GroundSnowResponse;
+                float _GroundDampResponse;
+                float _GroundVegetationResponse;
+                float _GroundRockyDryResponse;
+                float _GroundShoreDampStrength;
                 float _GeneratedMassLocalMinY;
                 float _GeneratedMassLocalHeight;
                 float _GeneratedMassMaskSeed;
@@ -812,6 +1035,12 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassCreviceBreakup;
                 float _GeneratedMassDirtCrawlReach;
                 float _GeneratedMassDirtCoverage;
+                float _GeneratedMassFeatureOverlayKind;
+                float _GeneratedMassEdgeWearCoverage;
+                float _GeneratedMassEdgeWearSoftness;
+                float _GeneratedMassCreaseLength;
+                float _GeneratedMassCreaseBranching;
+                float _GeneratedMassCreaseSoftness;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;
@@ -942,6 +1171,12 @@ Shader "PS3D/Pixel Surface Lit"
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
                 float _MaskDebugMode;
+                float _SurfaceContract;
+                float _GroundSnowResponse;
+                float _GroundDampResponse;
+                float _GroundVegetationResponse;
+                float _GroundRockyDryResponse;
+                float _GroundShoreDampStrength;
                 float _GeneratedMassLocalMinY;
                 float _GeneratedMassLocalHeight;
                 float _GeneratedMassMaskSeed;
@@ -951,6 +1186,12 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassCreviceBreakup;
                 float _GeneratedMassDirtCrawlReach;
                 float _GeneratedMassDirtCoverage;
+                float _GeneratedMassFeatureOverlayKind;
+                float _GeneratedMassEdgeWearCoverage;
+                float _GeneratedMassEdgeWearSoftness;
+                float _GeneratedMassCreaseLength;
+                float _GeneratedMassCreaseBranching;
+                float _GeneratedMassCreaseSoftness;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;
@@ -1075,6 +1316,12 @@ Shader "PS3D/Pixel Surface Lit"
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
                 float _MaskDebugMode;
+                float _SurfaceContract;
+                float _GroundSnowResponse;
+                float _GroundDampResponse;
+                float _GroundVegetationResponse;
+                float _GroundRockyDryResponse;
+                float _GroundShoreDampStrength;
                 float _GeneratedMassLocalMinY;
                 float _GeneratedMassLocalHeight;
                 float _GeneratedMassMaskSeed;
@@ -1084,6 +1331,12 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassCreviceBreakup;
                 float _GeneratedMassDirtCrawlReach;
                 float _GeneratedMassDirtCoverage;
+                float _GeneratedMassFeatureOverlayKind;
+                float _GeneratedMassEdgeWearCoverage;
+                float _GeneratedMassEdgeWearSoftness;
+                float _GeneratedMassCreaseLength;
+                float _GeneratedMassCreaseBranching;
+                float _GeneratedMassCreaseSoftness;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;

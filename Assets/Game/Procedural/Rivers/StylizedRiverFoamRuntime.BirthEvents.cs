@@ -5,12 +5,15 @@ namespace ProgrammaticStylized3D.Rivers
 {
     public sealed partial class StylizedRiverFoamRuntime
     {
-        public bool StartProgressiveRibbonNormalized(
+        public bool StartFoamCompositionNormalized(
+            StylizedRiverFoamSpawnPreset pattern,
             float distanceNormalized,
             float acrossNormalized,
-            float ribbonHalfWidth,
+            float scale,
             float amount,
             float remainingLife,
+            float complexity,
+            float density,
             float duration,
             float travelDistance,
             float acrossDrift,
@@ -25,14 +28,14 @@ namespace ProgrammaticStylized3D.Rivers
                 river.FreezeAmount >= 0.999f ||
                 !river.Domain.IsValid)
             {
-                progressiveRibbonRejectedCount++;
+                foamCompositionRejectedCount++;
                 return false;
             }
 
-            int slotIndex = FindFreeProgressiveRibbonSlot();
+            int slotIndex = FindFreeFoamCompositionSlot();
             if (slotIndex < 0)
             {
-                progressiveRibbonRejectedCount++;
+                foamCompositionRejectedCount++;
                 return false;
             }
 
@@ -48,7 +51,9 @@ namespace ProgrammaticStylized3D.Rivers
                     : startGlobalDistance - river.Domain.GlobalDistanceMinimum);
             float resolvedTravelDistance = Mathf.Min(
                 Mathf.Clamp(
-                    travelDistance,
+                    ResolveFoamCompositionTravelDistance(
+                        pattern,
+                        travelDistance),
                     ProgressiveRibbonMinimumTravelDistance,
                     ProgressiveRibbonMaximumTravelDistance),
                 availableDownstreamDistance);
@@ -56,16 +61,16 @@ namespace ProgrammaticStylized3D.Rivers
             if (resolvedTravelDistance <= 0.01f ||
                 resolvedAmount <= 0.0001f)
             {
-                progressiveRibbonRejectedCount++;
+                foamCompositionRejectedCount++;
                 return false;
             }
 
-            if (activeProgressiveRibbonEventCount == 0)
+            if (activeFoamCompositionEventCount == 0)
             {
                 ResetProgressiveBirthDiagnosticSession();
             }
 
-            int eventId = ++progressiveRibbonSequence;
+            int eventId = ++foamCompositionSequence;
             float shapeSeed = river.VisualSeed + eventId * 37.719f;
             float patternSeed =
                 river.VisualSeed * 0.613f +
@@ -77,43 +82,79 @@ namespace ProgrammaticStylized3D.Rivers
                 ProgressiveSourceFillSeedSalt;
             float bendSign = Hash01(shapeSeed + 11.3f) < 0.5f ? -1f : 1f;
             float widthPhase = Hash01(shapeSeed + 23.7f) * Mathf.PI * 2f;
-            float resolvedRemainingLife = Mathf.Clamp01(remainingLife);
+            float resolvedComplexity = Mathf.Clamp01(complexity);
+            float resolvedDensity = Mathf.Clamp01(density);
             float startAcross = Mathf.Clamp(acrossNormalized, -1f, 1f);
             float resolvedHalfWidth = Mathf.Clamp(
-                ribbonHalfWidth,
+                ResolveFoamCompositionHalfWidth(pattern, scale),
                 ProgressiveRibbonMinimumHalfWidth,
                 ProgressiveRibbonMaximumHalfWidth);
+            float resolvedStrokeAspect = ResolveFoamCompositionStrokeAspect(
+                pattern,
+                resolvedComplexity,
+                resolvedDensity);
+            float resolvedFragmentStrength = ResolveFoamCompositionFragmentStrength(
+                pattern,
+                resolvedComplexity);
+            float resolvedWidthVariation = ResolveFoamCompositionWidthVariation(
+                pattern,
+                resolvedComplexity);
+            float resolvedSourceFillFeatureScale = ResolveFoamCompositionFeatureScale(
+                pattern,
+                resolvedComplexity,
+                resolvedDensity);
             float sourceFillFeatureSize =
-                ResolveSourceFillFeatureSize(resolvedHalfWidth);
+                ResolveSourceFillFeatureSize(resolvedHalfWidth) *
+                resolvedSourceFillFeatureScale;
+            float resolvedDuration = Mathf.Clamp(
+                ResolveFoamCompositionDuration(pattern, duration),
+                ProgressiveRibbonMinimumDuration,
+                ProgressiveRibbonMaximumDuration);
+            float resolvedDrift = Mathf.Clamp(
+                ResolveFoamCompositionAcrossDrift(
+                    pattern,
+                    acrossDrift,
+                    startAcross),
+                -1f,
+                1f);
+            float resolvedWander = Mathf.Clamp01(
+                pathWander * Mathf.Lerp(0.55f, 1.20f, resolvedComplexity));
+            bool sheetStyle = pattern == StylizedRiverFoamSpawnPreset.TornSheetRibbon ||
+                pattern == StylizedRiverFoamSpawnPreset.ShoreSkirt;
             float startRadius = ResolveProgressiveRibbonRadius(
                 resolvedHalfWidth,
                 0f,
                 widthPhase,
-                0f);
+                0f,
+                resolvedWidthVariation);
 
-            progressiveRibbonEvents[slotIndex] = new ProgressiveRibbonEvent
+            foamCompositionEvents[slotIndex] = new FoamCompositionEvent
             {
                 Active = true,
                 EventId = eventId,
+                Pattern = pattern,
                 StartGlobalDistance = startGlobalDistance,
                 StartAcrossNormalized = startAcross,
-                Duration = Mathf.Clamp(
-                    duration,
-                    ProgressiveRibbonMinimumDuration,
-                    ProgressiveRibbonMaximumDuration),
+                Duration = resolvedDuration,
                 TravelDistance = resolvedTravelDistance,
                 FlowDirection = flowDirection,
-                AcrossDrift = Mathf.Clamp(acrossDrift, -1f, 1f),
-                PathWander = Mathf.Clamp01(pathWander),
+                AcrossDrift = resolvedDrift,
+                PathWander = resolvedWander,
                 BaseRadius = resolvedHalfWidth,
-                SourceAmount = resolvedAmount,
-                RemainingLife = resolvedRemainingLife,
+                SourceAmount = resolvedAmount * Mathf.Lerp(0.45f, 1.15f, resolvedDensity),
+                RemainingLife = Mathf.Clamp01(remainingLife),
                 PatternSeed = patternSeed,
                 ShapeSeed = shapeSeed,
                 SourceFillSeed = sourceFillSeed,
                 SourceFillFeatureSize = sourceFillFeatureSize,
                 BendSign = bendSign,
                 WidthPhase = widthPhase,
+                StrokeAspect = resolvedStrokeAspect,
+                FragmentStrength = resolvedFragmentStrength,
+                WidthVariation = resolvedWidthVariation,
+                Complexity = resolvedComplexity,
+                Density = resolvedDensity,
+                SheetStyle = sheetStyle,
                 Elapsed = 0f,
                 PreviousGlobalDistance = startGlobalDistance,
                 PreviousAcrossNormalized = startAcross,
@@ -126,17 +167,17 @@ namespace ProgrammaticStylized3D.Rivers
             materialLifetimeEmptyMetricReadbacks = 0;
             lifetimeAuthorityStatus =
                 "Remaining Life / full-field direct simulation";
-            activeProgressiveRibbonEventCount++;
-            progressiveRibbonStartedCount++;
-            latestProgressiveRibbonEventId = eventId;
-            latestProgressiveRibbonProgress = 0f;
-            latestProgressiveRibbonHeadDistanceNormalized =
+            activeFoamCompositionEventCount++;
+            foamCompositionStartedCount++;
+            latestFoamCompositionEventId = eventId;
+            latestFoamCompositionProgress = 0f;
+            latestFoamCompositionHeadDistanceNormalized =
                 Mathf.Clamp01(distanceNormalized);
-            latestProgressiveRibbonPreviousDistanceNormalized =
-                latestProgressiveRibbonHeadDistanceNormalized;
-            latestProgressiveRibbonHeadAcrossNormalized = startAcross;
-            latestProgressiveRibbonPreviousAcrossNormalized = startAcross;
-            lastProgressiveRibbonSegmentLength = 0f;
+            latestFoamCompositionPreviousDistanceNormalized =
+                latestFoamCompositionHeadDistanceNormalized;
+            latestFoamCompositionHeadAcrossNormalized = startAcross;
+            latestFoamCompositionPreviousAcrossNormalized = startAcross;
+            lastFoamCompositionSegmentLength = 0f;
             simulationAccumulator = Mathf.Max(
                 simulationAccumulator,
                 1f / Mathf.Max(1f, ResolveUpdateRate()));
@@ -144,128 +185,171 @@ namespace ProgrammaticStylized3D.Rivers
             return true;
         }
 
-        private bool AdvanceProgressiveRibbonEvents(
+        private bool AdvanceFoamCompositionEvents(
             float deltaTime,
             float now)
         {
-            if (activeProgressiveRibbonEventCount <= 0)
+            if (activeFoamCompositionEventCount <= 0)
             {
                 return false;
             }
 
+            int budget = ResolveFoamCompositionBirthBudgetPerStep();
+            int slotCount = foamCompositionEvents.Length;
+            int startIndex = Mathf.Clamp(
+                foamCompositionScanCursor,
+                0,
+                Mathf.Max(0, slotCount - 1));
             bool depositedAny = false;
-            for (int slotIndex = 0;
-                 slotIndex < progressiveRibbonEvents.Length;
-                 slotIndex++)
+
+            for (int visited = 0; visited < slotCount; visited++)
             {
-                ProgressiveRibbonEvent ribbonEvent =
-                    progressiveRibbonEvents[slotIndex];
-                if (!ribbonEvent.Active)
+                int slotIndex = (startIndex + visited) % slotCount;
+                FoamCompositionEvent compositionEvent =
+                    foamCompositionEvents[slotIndex];
+                if (!compositionEvent.Active)
                 {
                     continue;
                 }
 
-                progressiveRibbonEventUpdateCount++;
-                PrepareProgressiveBirthDebugEvent(ref ribbonEvent);
+                foamCompositionEventUpdateCount++;
+                PrepareProgressiveBirthDebugEvent(ref compositionEvent);
 
-                ribbonEvent.Elapsed = Mathf.Min(
-                    ribbonEvent.Duration,
-                    ribbonEvent.Elapsed + deltaTime);
+                compositionEvent.Elapsed = Mathf.Min(
+                    compositionEvent.Duration,
+                    compositionEvent.Elapsed + deltaTime);
                 float progress = Mathf.Clamp01(
-                    ribbonEvent.Elapsed /
-                    Mathf.Max(0.0001f, ribbonEvent.Duration));
-                ResolveProgressiveRibbonHead(
-                    ribbonEvent,
+                    compositionEvent.Elapsed /
+                    Mathf.Max(0.0001f, compositionEvent.Duration));
+                ResolveFoamCompositionHead(
+                    compositionEvent,
                     progress,
                     out float headGlobalDistance,
                     out float headAcrossNormalized);
                 float envelope = ResolveProgressiveRibbonEnvelope(progress);
                 float headRadius = ResolveProgressiveRibbonRadius(
-                    ribbonEvent.BaseRadius,
+                    compositionEvent.BaseRadius,
                     progress,
-                    ribbonEvent.WidthPhase,
-                    envelope);
-                float headAmount = ribbonEvent.SourceAmount * envelope;
+                    compositionEvent.WidthPhase,
+                    envelope,
+                    compositionEvent.WidthVariation);
+                float headAmount = Mathf.Clamp01(
+                    compositionEvent.SourceAmount) * envelope;
 
                 float segmentLength = Vector2.Distance(
                     new Vector2(
-                        ribbonEvent.PreviousGlobalDistance,
+                        compositionEvent.PreviousGlobalDistance,
                         ResolveAcrossMetresApproximation(
-                            ribbonEvent.PreviousAcrossNormalized)),
+                            compositionEvent.PreviousAcrossNormalized)),
                     new Vector2(
                         headGlobalDistance,
                         ResolveAcrossMetresApproximation(
                             headAcrossNormalized)));
 
-                if (segmentLength > 0.0001f &&
-                    (ribbonEvent.PreviousEmissionAmount > 0.0001f ||
-                     headAmount > 0.0001f))
+                bool shouldEmit = segmentLength > 0.0001f &&
+                    (compositionEvent.PreviousEmissionAmount > 0.0001f ||
+                     headAmount > 0.0001f);
+                bool emitted = false;
+                if (shouldEmit)
+                {
+                    foamCompositionSegmentDispatchAttemptCount++;
+                }
+
+                if (shouldEmit && budget > 0)
                 {
                     PendingInjection segment =
-                        CreateProgressiveRibbonSegment(
-                            ribbonEvent,
+                        CreateFoamCompositionSegment(
+                            compositionEvent,
                             headGlobalDistance,
                             headAcrossNormalized,
                             headRadius,
                             headAmount);
-                    progressiveRibbonSegmentDispatchAttemptCount++;
                     QueueMaterialBirth(segment);
-                    progressiveRibbonSegmentDispatchSubmittedCount++;
-                    progressiveRibbonCumulativeCentrelineDistance +=
+                    foamCompositionSegmentDispatchSubmittedCount++;
+                    foamCompositionCumulativeCentrelineDistance +=
                         segmentLength;
                     PaintProgressiveBirthDebugSegment(segment);
                     injectedLastUpdate++;
                     depositedAny = true;
-                    lastProgressiveRibbonSegmentLength = segmentLength;
+                    emitted = true;
+                    budget--;
+                    lastFoamCompositionSegmentLength = segmentLength;
                 }
 
-                UpdateLatestProgressiveRibbonDiagnostics(
-                    ribbonEvent,
+                UpdateLatestFoamCompositionDiagnostics(
+                    compositionEvent,
                     progress,
                     headGlobalDistance,
                     headAcrossNormalized);
 
-                ribbonEvent.PreviousGlobalDistance = headGlobalDistance;
-                ribbonEvent.PreviousAcrossNormalized =
-                    headAcrossNormalized;
-                ribbonEvent.PreviousRadius = headRadius;
-                ribbonEvent.PreviousEmissionAmount = headAmount;
-
-                if (progress >= 0.999999f)
+                if (emitted)
                 {
-                    CompleteProgressiveRibbonEvent(ribbonEvent, now);
-                    progressiveRibbonEvents[slotIndex] = default;
-                    activeProgressiveRibbonEventCount = Mathf.Max(
+                    compositionEvent.PreviousGlobalDistance = headGlobalDistance;
+                    compositionEvent.PreviousAcrossNormalized =
+                        headAcrossNormalized;
+                    compositionEvent.PreviousRadius = headRadius;
+                    compositionEvent.PreviousEmissionAmount = headAmount;
+                }
+
+                if (progress >= 0.999999f && (!shouldEmit || emitted))
+                {
+                    CompleteFoamCompositionEvent(compositionEvent, now);
+                    foamCompositionEvents[slotIndex] = default;
+                    activeFoamCompositionEventCount = Mathf.Max(
                         0,
-                        activeProgressiveRibbonEventCount - 1);
-                    progressiveRibbonCompletedCount++;
+                        activeFoamCompositionEventCount - 1);
+                    foamCompositionCompletedCount++;
                     continue;
                 }
 
-                progressiveRibbonEvents[slotIndex] = ribbonEvent;
+                foamCompositionEvents[slotIndex] = compositionEvent;
             }
 
+            foamCompositionScanCursor = slotCount > 0
+                ? (startIndex + 1) % slotCount
+                : 0;
             return depositedAny;
         }
 
-        private PendingInjection CreateProgressiveRibbonSegment(
-            ProgressiveRibbonEvent ribbonEvent,
+        private PendingInjection CreateFoamCompositionSegment(
+            FoamCompositionEvent compositionEvent,
             float headGlobalDistance,
             float headAcrossNormalized,
             float headRadius,
             float headAmount)
         {
-            float centreGlobalDistance =
-                (ribbonEvent.PreviousGlobalDistance +
-                 headGlobalDistance) * 0.5f;
-            float centreAcross =
-                (ribbonEvent.PreviousAcrossNormalized +
-                 headAcrossNormalized) * 0.5f;
+            float previousAcrossMetres = ResolveAcrossMetresApproximation(
+                compositionEvent.PreviousAcrossNormalized);
+            float headAcrossMetres = ResolveAcrossMetresApproximation(
+                headAcrossNormalized);
+            Vector2 start = new Vector2(
+                compositionEvent.PreviousGlobalDistance,
+                previousAcrossMetres);
+            Vector2 end = new Vector2(
+                headGlobalDistance,
+                headAcrossMetres);
+            Vector2 axis = end - start;
             float maximumRadius = Mathf.Max(
-                ribbonEvent.PreviousRadius,
+                compositionEvent.PreviousRadius,
                 headRadius);
+            float minimumStrokeLength = Mathf.Max(
+                maximumRadius * 2f,
+                maximumRadius * compositionEvent.StrokeAspect);
+            if (axis.sqrMagnitude < minimumStrokeLength * minimumStrokeLength)
+            {
+                Vector2 direction = axis.sqrMagnitude > 0.000001f
+                    ? axis.normalized
+                    : new Vector2(compositionEvent.FlowDirection, 0f);
+                Vector2 centre = (start + end) * 0.5f;
+                start = centre - direction * (minimumStrokeLength * 0.5f);
+                end = centre + direction * (minimumStrokeLength * 0.5f);
+            }
+
+            float centreGlobalDistance = (start.x + end.x) * 0.5f;
+            float centreAcross = ResolveAcrossNormalizedApproximation(
+                (start.y + end.y) * 0.5f);
             float maximumAmount = Mathf.Max(
-                ribbonEvent.PreviousEmissionAmount,
+                compositionEvent.PreviousEmissionAmount,
                 headAmount);
 
             return new PendingInjection(
@@ -273,52 +357,55 @@ namespace ProgrammaticStylized3D.Rivers
                 centreAcross,
                 maximumRadius,
                 maximumAmount,
-                ribbonEvent.RemainingLife,
-                ribbonEvent.PatternSeed,
-                1f,
+                compositionEvent.RemainingLife,
+                compositionEvent.PatternSeed,
+                compositionEvent.StrokeAspect,
                 false,
-                ribbonEvent.SourceFillSeed,
-                ribbonEvent.SourceFillFeatureSize,
-                ribbonEvent.ShapeSeed,
-                0f,
+                compositionEvent.SourceFillSeed,
+                compositionEvent.SourceFillFeatureSize,
+                compositionEvent.ShapeSeed,
+                compositionEvent.FragmentStrength,
                 false,
                 true,
-                ribbonEvent.PreviousGlobalDistance,
-                ribbonEvent.PreviousAcrossNormalized,
-                ribbonEvent.PreviousRadius,
-                ribbonEvent.PreviousEmissionAmount,
-                headGlobalDistance,
-                headAcrossNormalized,
+                start.x,
+                ResolveAcrossNormalizedApproximation(start.y),
+                compositionEvent.PreviousRadius,
+                compositionEvent.PreviousEmissionAmount,
+                end.x,
+                ResolveAcrossNormalizedApproximation(end.y),
                 headRadius,
-                headAmount);
+                headAmount,
+                compositionEvent.SheetStyle,
+                compositionEvent.Pattern,
+                compositionEvent.Complexity,
+                compositionEvent.Density);
         }
 
-        private void CompleteProgressiveRibbonEvent(
-            ProgressiveRibbonEvent ribbonEvent,
+        private void CompleteFoamCompositionEvent(
+            FoamCompositionEvent compositionEvent,
             float now)
         {
-            // No reservation or scheduler side effect remains. Progressive
-            // segments have already queued direct material births, and the
-            // full-field lifecycle owns all subsequent survival.
+            // Composition events only own bounded source birth. Persistent
+            // material survival remains owned by the full-field lifecycle pass.
         }
 
-        private void ResolveProgressiveRibbonHead(
-            ProgressiveRibbonEvent ribbonEvent,
+        private void ResolveFoamCompositionHead(
+            FoamCompositionEvent compositionEvent,
             float progress,
             out float globalDistance,
             out float acrossNormalized)
         {
-            globalDistance = ribbonEvent.StartGlobalDistance +
-                ribbonEvent.FlowDirection *
-                ribbonEvent.TravelDistance * progress;
+            globalDistance = compositionEvent.StartGlobalDistance +
+                compositionEvent.FlowDirection *
+                compositionEvent.TravelDistance * progress;
             float bend =
                 Mathf.Sin(progress * Mathf.PI) *
-                ribbonEvent.BendSign *
+                compositionEvent.BendSign *
                 ProgressiveRibbonMaximumBendAcross *
-                ribbonEvent.PathWander;
+                compositionEvent.PathWander;
             acrossNormalized = Mathf.Clamp(
-                ribbonEvent.StartAcrossNormalized +
-                ribbonEvent.AcrossDrift * progress +
+                compositionEvent.StartAcrossNormalized +
+                compositionEvent.AcrossDrift * progress +
                 bend,
                 -1f,
                 1f);
@@ -355,38 +442,39 @@ namespace ProgrammaticStylized3D.Rivers
             float baseRadius,
             float progress,
             float widthPhase,
-            float envelope)
+            float envelope,
+            float widthVariation)
         {
             float coherentVariation = 1f +
                 Mathf.Sin(progress * Mathf.PI * 2f + widthPhase) *
-                ProgressiveRibbonWidthVariation;
+                Mathf.Clamp(widthVariation, 0f, 0.65f);
             float taperScale = Mathf.Lerp(0.25f, 1f, envelope);
             return Mathf.Max(
                 0.025f,
                 baseRadius * coherentVariation * taperScale);
         }
 
-        private void UpdateLatestProgressiveRibbonDiagnostics(
-            ProgressiveRibbonEvent ribbonEvent,
+        private void UpdateLatestFoamCompositionDiagnostics(
+            FoamCompositionEvent compositionEvent,
             float progress,
             float headGlobalDistance,
             float headAcrossNormalized)
         {
-            if (ribbonEvent.EventId < latestProgressiveRibbonEventId)
+            if (compositionEvent.EventId < latestFoamCompositionEventId)
             {
                 return;
             }
 
-            latestProgressiveRibbonEventId = ribbonEvent.EventId;
-            latestProgressiveRibbonProgress = progress;
-            latestProgressiveRibbonPreviousDistanceNormalized =
+            latestFoamCompositionEventId = compositionEvent.EventId;
+            latestFoamCompositionProgress = progress;
+            latestFoamCompositionPreviousDistanceNormalized =
                 GlobalDistanceToNormalized(
-                    ribbonEvent.PreviousGlobalDistance);
-            latestProgressiveRibbonPreviousAcrossNormalized =
-                ribbonEvent.PreviousAcrossNormalized;
-            latestProgressiveRibbonHeadDistanceNormalized =
+                    compositionEvent.PreviousGlobalDistance);
+            latestFoamCompositionPreviousAcrossNormalized =
+                compositionEvent.PreviousAcrossNormalized;
+            latestFoamCompositionHeadDistanceNormalized =
                 GlobalDistanceToNormalized(headGlobalDistance);
-            latestProgressiveRibbonHeadAcrossNormalized =
+            latestFoamCompositionHeadAcrossNormalized =
                 headAcrossNormalized;
         }
 
@@ -412,13 +500,21 @@ namespace ProgrammaticStylized3D.Rivers
             return Mathf.Clamp(acrossNormalized, -1f, 1f) * halfWidth;
         }
 
-        private int FindFreeProgressiveRibbonSlot()
+        private float ResolveAcrossNormalizedApproximation(float acrossMetres)
+        {
+            float halfWidth = river != null
+                ? Mathf.Max(0.25f, river.ResolvedMaximumVisibleWidth * 0.5f)
+                : 1f;
+            return Mathf.Clamp(acrossMetres / halfWidth, -1f, 1f);
+        }
+
+        private int FindFreeFoamCompositionSlot()
         {
             for (int index = 0;
-                 index < progressiveRibbonEvents.Length;
+                 index < foamCompositionEvents.Length;
                  index++)
             {
-                if (!progressiveRibbonEvents[index].Active)
+                if (!foamCompositionEvents[index].Active)
                 {
                     return index;
                 }
@@ -427,21 +523,180 @@ namespace ProgrammaticStylized3D.Rivers
             return -1;
         }
 
-        private void ClearProgressiveRibbonEvents()
+        private void ClearFoamCompositionEvents()
         {
             Array.Clear(
-                progressiveRibbonEvents,
+                foamCompositionEvents,
                 0,
-                progressiveRibbonEvents.Length);
-            activeProgressiveRibbonEventCount = 0;
-            latestProgressiveRibbonEventId = 0;
-            latestProgressiveRibbonProgress = 0f;
-            latestProgressiveRibbonHeadDistanceNormalized = 0f;
-            latestProgressiveRibbonHeadAcrossNormalized = 0f;
-            latestProgressiveRibbonPreviousDistanceNormalized = 0f;
-            latestProgressiveRibbonPreviousAcrossNormalized = 0f;
-            lastProgressiveRibbonSegmentLength = 0f;
+                foamCompositionEvents.Length);
+            activeFoamCompositionEventCount = 0;
+            foamCompositionScanCursor = 0;
+            latestFoamCompositionEventId = 0;
+            latestFoamCompositionProgress = 0f;
+            latestFoamCompositionHeadDistanceNormalized = 0f;
+            latestFoamCompositionHeadAcrossNormalized = 0f;
+            latestFoamCompositionPreviousDistanceNormalized = 0f;
+            latestFoamCompositionPreviousAcrossNormalized = 0f;
+            lastFoamCompositionSegmentLength = 0f;
             ResetProgressiveBirthDiagnosticSession();
+        }
+
+        private int ResolveFoamCompositionBirthBudgetPerStep()
+        {
+            StylizedRiverQuality quality = river != null
+                ? river.Quality
+                : StylizedRiverQuality.Medium;
+            return quality switch
+            {
+                StylizedRiverQuality.Low => LowFoamCompositionBirthBudgetPerStep,
+                StylizedRiverQuality.High => HighFoamCompositionBirthBudgetPerStep,
+                _ => MediumFoamCompositionBirthBudgetPerStep
+            };
+        }
+
+        private static float ResolveFoamCompositionHalfWidth(
+            StylizedRiverFoamSpawnPreset pattern,
+            float scale)
+        {
+            float multiplier = pattern switch
+            {
+                StylizedRiverFoamSpawnPreset.ThinScratchStreaks => 0.82f,
+                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 1.00f,
+                StylizedRiverFoamSpawnPreset.FracturedRibbonBundle => 1.10f,
+                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 1.85f,
+                StylizedRiverFoamSpawnPreset.ShoreSkirt => 1.35f,
+                _ => 1.00f
+            };
+            return scale * multiplier;
+        }
+
+        private static float ResolveFoamCompositionDuration(
+            StylizedRiverFoamSpawnPreset pattern,
+            float duration)
+        {
+            float multiplier = pattern switch
+            {
+                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 1.00f,
+                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 1.00f,
+                StylizedRiverFoamSpawnPreset.ShoreSkirt => 1.00f,
+                _ => 1.00f
+            };
+            return duration * multiplier;
+        }
+
+        private static float ResolveFoamCompositionTravelDistance(
+            StylizedRiverFoamSpawnPreset pattern,
+            float travelDistance)
+        {
+            float multiplier = pattern switch
+            {
+                StylizedRiverFoamSpawnPreset.ThinScratchStreaks => 0.58f,
+                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 0.75f,
+                StylizedRiverFoamSpawnPreset.FracturedRibbonBundle => 0.72f,
+                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 0.90f,
+                StylizedRiverFoamSpawnPreset.ShoreSkirt => 0.95f,
+                _ => 0.35f
+            };
+            return travelDistance * multiplier;
+        }
+
+        private static float ResolveFoamCompositionAcrossDrift(
+            StylizedRiverFoamSpawnPreset pattern,
+            float acrossDrift,
+            float startAcross)
+        {
+            if (pattern == StylizedRiverFoamSpawnPreset.ShoreSkirt)
+            {
+                float inwardSign = startAcross >= 0f ? -1f : 1f;
+                return inwardSign * Mathf.Abs(acrossDrift) * 0.35f;
+            }
+
+            float multiplier = pattern switch
+            {
+                StylizedRiverFoamSpawnPreset.ThinScratchStreaks => 0.30f,
+                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 0.12f,
+                StylizedRiverFoamSpawnPreset.FracturedRibbonBundle => 0.10f,
+                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 0.04f,
+                _ => 1.00f
+            };
+            return acrossDrift * multiplier;
+        }
+
+        private static float ResolveFoamCompositionStrokeAspect(
+            StylizedRiverFoamSpawnPreset pattern,
+            float complexity,
+            float density)
+        {
+            float baseAspect = pattern switch
+            {
+                StylizedRiverFoamSpawnPreset.ThinScratchStreaks => 8.75f,
+                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 7.50f,
+                StylizedRiverFoamSpawnPreset.FracturedRibbonBundle => 8.50f,
+                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 5.40f,
+                StylizedRiverFoamSpawnPreset.ShoreSkirt => 7.20f,
+                _ => 1.45f
+            };
+            return Mathf.Clamp(
+                baseAspect * Mathf.Lerp(0.88f, 1.15f, density) *
+                Mathf.Lerp(0.95f, 1.08f, complexity),
+                1f,
+                12f);
+        }
+
+        private static float ResolveFoamCompositionFragmentStrength(
+            StylizedRiverFoamSpawnPreset pattern,
+            float complexity)
+        {
+            float baseStrength = pattern switch
+            {
+                StylizedRiverFoamSpawnPreset.ThinScratchStreaks => 0.84f,
+                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 0.22f,
+                StylizedRiverFoamSpawnPreset.FracturedRibbonBundle => 0.78f,
+                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 0.86f,
+                StylizedRiverFoamSpawnPreset.ShoreSkirt => 0.58f,
+                _ => 0f
+            };
+            return Mathf.Clamp01(baseStrength * Mathf.Lerp(0.45f, 1.20f, complexity));
+        }
+
+        private static float ResolveFoamCompositionWidthVariation(
+            StylizedRiverFoamSpawnPreset pattern,
+            float complexity)
+        {
+            float baseVariation = pattern switch
+            {
+                StylizedRiverFoamSpawnPreset.ThinScratchStreaks => 0.42f,
+                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 0.18f,
+                StylizedRiverFoamSpawnPreset.FracturedRibbonBundle => 0.44f,
+                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 0.50f,
+                StylizedRiverFoamSpawnPreset.ShoreSkirt => 0.30f,
+                _ => ProgressiveRibbonWidthVariation
+            };
+            return Mathf.Clamp(
+                baseVariation * Mathf.Lerp(0.60f, 1.20f, complexity),
+                0f,
+                0.65f);
+        }
+
+        private static float ResolveFoamCompositionFeatureScale(
+            StylizedRiverFoamSpawnPreset pattern,
+            float complexity,
+            float density)
+        {
+            float baseScale = pattern switch
+            {
+                StylizedRiverFoamSpawnPreset.ThinScratchStreaks => 0.72f,
+                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 1.25f,
+                StylizedRiverFoamSpawnPreset.FracturedRibbonBundle => 0.72f,
+                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 0.50f,
+                StylizedRiverFoamSpawnPreset.ShoreSkirt => 0.64f,
+                _ => 1.00f
+            };
+            return Mathf.Clamp(
+                baseScale * Mathf.Lerp(1.20f, 0.85f, density) *
+                Mathf.Lerp(1.10f, 0.82f, complexity),
+                0.35f,
+                2.5f);
         }
 
         private static float Hash01(float value)

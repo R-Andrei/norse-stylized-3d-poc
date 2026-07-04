@@ -176,6 +176,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private Mesh generatedMesh;
         private GroundHeightFieldSnapshot baseSurface =
             GroundHeightFieldSnapshot.Empty;
+        private MaterialPropertyBlock materialProperties;
+
+        private static readonly int SurfaceContractId =
+            Shader.PropertyToID("_SurfaceContract");
+        private static readonly int ProfileContrastId =
+            Shader.PropertyToID("_ProfileContrast");
+        private static readonly int ProfilePixelContrastId =
+            Shader.PropertyToID("_ProfilePixelContrast");
+        private static readonly int GroundSnowResponseId =
+            Shader.PropertyToID("_GroundSnowResponse");
+        private static readonly int GroundDampResponseId =
+            Shader.PropertyToID("_GroundDampResponse");
+        private static readonly int GroundVegetationResponseId =
+            Shader.PropertyToID("_GroundVegetationResponse");
+        private static readonly int GroundRockyDryResponseId =
+            Shader.PropertyToID("_GroundRockyDryResponse");
+        private static readonly int GroundShoreDampStrengthId =
+            Shader.PropertyToID("_GroundShoreDampStrength");
 
         public GroundRecipe Recipe => recipe;
         public GroundSurfaceProfile SurfaceProfile => surfaceProfile;
@@ -220,12 +238,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         private void OnValidate()
         {
+            CacheComponents();
+
             if (!regenerateOnValidate)
             {
+                ApplySurfaceProfileMaterialProperties();
                 return;
             }
 
-            CacheComponents();
             RefreshModifiers();
             Regenerate();
         }
@@ -270,6 +290,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             meshCollider.sharedMesh = generatedMesh;
             meshCollider.convex = false;
 
+            ApplySurfaceProfileMaterialProperties();
             NotifyRiverCorridorsChanged();
         }
 
@@ -550,6 +571,69 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             {
                 meshCollider = GetComponent<MeshCollider>();
             }
+        }
+
+        private void ApplySurfaceProfileMaterialProperties()
+        {
+            if (meshRenderer == null)
+            {
+                return;
+            }
+
+            float patchContrast =
+                GroundSurfaceProfile.ResolvePatchContrast(surfaceProfile);
+
+            float exposureBias =
+                GroundSurfaceProfile.ResolveExposureBias(surfaceProfile);
+
+            float dampBias =
+                GroundSurfaceProfile.ResolveDampDepositBias(surfaceProfile);
+
+            float vegetationSuitability =
+                GroundSurfaceProfile.ResolveVegetationSuitability(surfaceProfile);
+
+            float rockyDrySuitability =
+                GroundSurfaceProfile.ResolveRockyDrySuitability(surfaceProfile);
+
+            float snowEligibility =
+                GroundSurfaceProfile.ResolveSnowEligibility(surfaceProfile);
+
+            float rainAbsorption =
+                GroundSurfaceProfile.ResolveRainAbsorption(surfaceProfile);
+
+            materialProperties ??= new MaterialPropertyBlock();
+            meshRenderer.GetPropertyBlock(materialProperties);
+
+            // Surface Contract: 0 = generated mass/rock, 1 = generated ground.
+            // The material may be shared with stones, so ground-specific response
+            // is selected per-renderer through a property block rather than by
+            // mutating or duplicating the material asset.
+            materialProperties.SetFloat(SurfaceContractId, 1f);
+            materialProperties.SetFloat(
+                ProfileContrastId,
+                Mathf.Lerp(0.85f, 1.35f, patchContrast));
+            materialProperties.SetFloat(
+                ProfilePixelContrastId,
+                Mathf.Lerp(0.80f, 1.35f, patchContrast));
+            materialProperties.SetFloat(
+                GroundSnowResponseId,
+                Mathf.Lerp(0.25f, 1.35f, snowEligibility) *
+                Mathf.Lerp(0.90f, 1.15f, exposureBias));
+            materialProperties.SetFloat(
+                GroundDampResponseId,
+                Mathf.Lerp(0.45f, 1.35f, dampBias) *
+                Mathf.Lerp(0.90f, 1.20f, rainAbsorption));
+            materialProperties.SetFloat(
+                GroundVegetationResponseId,
+                Mathf.Lerp(0.05f, 0.55f, vegetationSuitability));
+            materialProperties.SetFloat(
+                GroundRockyDryResponseId,
+                Mathf.Lerp(0.15f, 0.95f, rockyDrySuitability));
+            materialProperties.SetFloat(
+                GroundShoreDampStrengthId,
+                Mathf.Lerp(0.75f, 1.35f, rainAbsorption));
+
+            meshRenderer.SetPropertyBlock(materialProperties);
         }
 
         private void EnsureGeneratedMesh()

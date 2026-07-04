@@ -316,14 +316,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses
     {
         private const string LegacyRiverFoamProxyObjectName =
             "RiverFoamProxy";
-        private const string SurfaceFeatureObjectName =
+        private const string SurfaceFeatureRootObjectName =
             "GeneratedMass_SurfaceFeatures";
+        private const string EdgeWearFeatureObjectName =
+            "GeneratedMass_EdgeWearFeatures";
+        private const string CreaseFeatureObjectName =
+            "GeneratedMass_CreaseFeatures";
         private static readonly int BaseColorId =
             Shader.PropertyToID("_BaseColor");
         private static readonly int LegacyBaseColorId =
             Shader.PropertyToID("_Base_Color");
         private static readonly int MaskDebugModeId =
             Shader.PropertyToID("_MaskDebugMode");
+        private static readonly int SurfaceContractId =
+            Shader.PropertyToID("_SurfaceContract");
         private static readonly int GeneratedMassLocalMinYId =
             Shader.PropertyToID("_GeneratedMassLocalMinY");
         private static readonly int GeneratedMassLocalHeightId =
@@ -342,6 +348,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Shader.PropertyToID("_GeneratedMassDirtCrawlReach");
         private static readonly int GeneratedMassDirtCoverageId =
             Shader.PropertyToID("_GeneratedMassDirtCoverage");
+        private static readonly int GeneratedMassFeatureOverlayKindId =
+            Shader.PropertyToID("_GeneratedMassFeatureOverlayKind");
+        private static readonly int GeneratedMassEdgeWearCoverageId =
+            Shader.PropertyToID("_GeneratedMassEdgeWearCoverage");
+        private static readonly int GeneratedMassEdgeWearSoftnessId =
+            Shader.PropertyToID("_GeneratedMassEdgeWearSoftness");
+        private static readonly int GeneratedMassCreaseLengthId =
+            Shader.PropertyToID("_GeneratedMassCreaseLength");
+        private static readonly int GeneratedMassCreaseBranchingId =
+            Shader.PropertyToID("_GeneratedMassCreaseBranching");
+        private static readonly int GeneratedMassCreaseSoftnessId =
+            Shader.PropertyToID("_GeneratedMassCreaseSoftness");
 
         [SerializeField]
         private MassRecipe recipe = new MassRecipe();
@@ -402,6 +420,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float edgeWearWidth = 1f;
 
+        [Tooltip("Controls how much of each selected ridge edge is covered. Lower values create short broken fragments; higher values cover more of each selected edge.")]
+        [Range(0.1f, 2f)]
+        [SerializeField]
+        private float edgeWearCoverage = 1f;
+
+        [Tooltip("Controls cross-strip and end falloff for generated ConvexEdgeWear masks. Lower values are sharper; higher values are softer.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float edgeWearSoftness = 0.45f;
+
         [Tooltip("Controls how many selected seam/crack strips are generated for ConcaveCrease debug. Zero disables generated crease/crack strips.")]
         [Range(0f, 2f)]
         [SerializeField]
@@ -411,6 +439,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [Range(0.25f, 2f)]
         [SerializeField]
         private float creaseWidth = 1f;
+
+        [Tooltip("Scales generated crack path length. Higher values make cracks more connected and less scratch-like.")]
+        [Range(0.25f, 2f)]
+        [SerializeField]
+        private float creaseLength = 1f;
+
+        [Tooltip("Controls how often generated crack paths add short branches.")]
+        [Range(0f, 2f)]
+        [SerializeField]
+        private float creaseBranching = 1f;
+
+        [Tooltip("Controls cross-strip and end falloff for generated ConcaveCrease masks. Lower values are sharper; higher values are softer.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float creaseSoftness = 0.35f;
 
         [SerializeField, HideInInspector]
         private Material coldGreyStoneMaterial;
@@ -438,12 +481,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
         private MeshCollider meshCollider;
-        private MeshFilter surfaceFeatureMeshFilter;
-        private MeshRenderer surfaceFeatureMeshRenderer;
+        private Transform surfaceFeatureRoot;
+        private MeshFilter edgeWearFeatureMeshFilter;
+        private MeshRenderer edgeWearFeatureMeshRenderer;
+        private MeshFilter creaseFeatureMeshFilter;
+        private MeshRenderer creaseFeatureMeshRenderer;
         private MaterialPropertyBlock materialProperties;
         private MaterialPropertyBlock surfaceFeatureMaterialProperties;
         private Mesh generatedMesh;
-        private Mesh surfaceFeatureMesh;
+        private Mesh edgeWearFeatureMesh;
+        private Mesh creaseFeatureMesh;
         private bool stableWorldGeometryFingerprintValid;
         private GeneratedGeometryStableFingerprint
             stableWorldGeometryFingerprint;
@@ -473,8 +520,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public float DirtCoverage => dirtCoverage;
         public float EdgeWearAmount => edgeWearAmount;
         public float EdgeWearWidth => edgeWearWidth;
+        public float EdgeWearCoverage => edgeWearCoverage;
+        public float EdgeWearSoftness => edgeWearSoftness;
         public float CreaseAmount => creaseAmount;
         public float CreaseWidth => creaseWidth;
+        public float CreaseLength => creaseLength;
+        public float CreaseBranching => creaseBranching;
+        public float CreaseSoftness => creaseSoftness;
         public MeshFilter GeometryMeshFilter
         {
             get
@@ -699,16 +751,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 meshCollider = GetComponent<MeshCollider>();
             }
 
-            if (surfaceFeatureMeshFilter == null ||
-                surfaceFeatureMeshRenderer == null)
-            {
-                Transform featureTransform = transform.Find(SurfaceFeatureObjectName);
-                if (featureTransform != null)
-                {
-                    surfaceFeatureMeshFilter = featureTransform.GetComponent<MeshFilter>();
-                    surfaceFeatureMeshRenderer = featureTransform.GetComponent<MeshRenderer>();
-                }
-            }
+            CacheSurfaceFeatureReferences();
         }
 
         private void ApplyMaterialProperties()
@@ -727,6 +770,27 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             materialProperties.SetFloat(
                 MaskDebugModeId,
                 (float)surfaceMaskDebug);
+            materialProperties.SetFloat(
+                SurfaceContractId,
+                0f);
+            materialProperties.SetFloat(
+                GeneratedMassFeatureOverlayKindId,
+                0f);
+            materialProperties.SetFloat(
+                GeneratedMassEdgeWearCoverageId,
+                Mathf.Clamp(edgeWearCoverage, 0.1f, 2f));
+            materialProperties.SetFloat(
+                GeneratedMassEdgeWearSoftnessId,
+                Mathf.Clamp01(edgeWearSoftness));
+            materialProperties.SetFloat(
+                GeneratedMassCreaseLengthId,
+                Mathf.Clamp(creaseLength, 0.25f, 2f));
+            materialProperties.SetFloat(
+                GeneratedMassCreaseBranchingId,
+                Mathf.Clamp(creaseBranching, 0f, 2f));
+            materialProperties.SetFloat(
+                GeneratedMassCreaseSoftnessId,
+                Mathf.Clamp01(creaseSoftness));
 
             Bounds meshBounds = meshFilter != null &&
                 meshFilter.sharedMesh != null
@@ -781,18 +845,43 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float localHeight,
             float localXZScale)
         {
-            if (surfaceFeatureMeshRenderer == null)
+            ApplySingleSurfaceFeatureOverlayMaterialProperties(
+                edgeWearFeatureMeshRenderer,
+                1f,
+                surfaceMaskDebug == StoneSurfaceMaskDebug.ConvexEdgeWear,
+                meshBounds,
+                localHeight,
+                localXZScale);
+
+            ApplySingleSurfaceFeatureOverlayMaterialProperties(
+                creaseFeatureMeshRenderer,
+                2f,
+                surfaceMaskDebug == StoneSurfaceMaskDebug.ConcaveCrease,
+                meshBounds,
+                localHeight,
+                localXZScale);
+        }
+
+        private void ApplySingleSurfaceFeatureOverlayMaterialProperties(
+            MeshRenderer featureRenderer,
+            float overlayKind,
+            bool enabled,
+            Bounds meshBounds,
+            float localHeight,
+            float localXZScale)
+        {
+            if (featureRenderer == null)
             {
                 return;
             }
 
-            surfaceFeatureMeshRenderer.sharedMaterial = meshRenderer.sharedMaterial;
-            surfaceFeatureMeshRenderer.enabled = IsSurfaceFeatureDebugMode();
-            surfaceFeatureMeshRenderer.shadowCastingMode = ShadowCastingMode.Off;
-            surfaceFeatureMeshRenderer.receiveShadows = false;
-            surfaceFeatureMeshRenderer.lightProbeUsage = LightProbeUsage.Off;
-            surfaceFeatureMeshRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
-            surfaceFeatureMeshRenderer.motionVectorGenerationMode =
+            featureRenderer.sharedMaterial = meshRenderer.sharedMaterial;
+            featureRenderer.enabled = enabled;
+            featureRenderer.shadowCastingMode = ShadowCastingMode.Off;
+            featureRenderer.receiveShadows = false;
+            featureRenderer.lightProbeUsage = LightProbeUsage.Off;
+            featureRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            featureRenderer.motionVectorGenerationMode =
                 MotionVectorGenerationMode.ForceNoMotion;
 
             surfaceFeatureMaterialProperties ??= new MaterialPropertyBlock();
@@ -802,6 +891,27 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             surfaceFeatureMaterialProperties.SetFloat(
                 MaskDebugModeId,
                 (float)surfaceMaskDebug);
+            surfaceFeatureMaterialProperties.SetFloat(
+                SurfaceContractId,
+                0f);
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassFeatureOverlayKindId,
+                overlayKind);
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassEdgeWearCoverageId,
+                Mathf.Clamp(edgeWearCoverage, 0.1f, 2f));
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassEdgeWearSoftnessId,
+                Mathf.Clamp01(edgeWearSoftness));
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassCreaseLengthId,
+                Mathf.Clamp(creaseLength, 0.25f, 2f));
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassCreaseBranchingId,
+                Mathf.Clamp(creaseBranching, 0f, 2f));
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassCreaseSoftnessId,
+                Mathf.Clamp01(creaseSoftness));
             surfaceFeatureMaterialProperties.SetFloat(
                 GeneratedMassLocalMinYId,
                 meshBounds.min.y);
@@ -831,8 +941,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             surfaceFeatureMaterialProperties.SetFloat(
                 GeneratedMassDirtCoverageId,
                 Mathf.Clamp(dirtCoverage, 0.25f, 2f));
-            surfaceFeatureMeshRenderer.SetPropertyBlock(
-                surfaceFeatureMaterialProperties);
+            featureRenderer.SetPropertyBlock(surfaceFeatureMaterialProperties);
         }
 
         private bool IsSurfaceFeatureDebugMode()
@@ -868,10 +977,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private void RegenerateSurfaceFeatureOverlay()
         {
-            EnsureSurfaceFeatureObject();
+            EnsureSurfaceFeatureObjects();
 
-            if (surfaceFeatureMesh == null ||
-                surfaceFeatureMeshFilter == null ||
+            if (edgeWearFeatureMesh == null ||
+                edgeWearFeatureMeshFilter == null ||
+                creaseFeatureMesh == null ||
+                creaseFeatureMeshFilter == null ||
                 generatedMesh == null)
             {
                 return;
@@ -887,68 +998,180 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         : 0,
                     edgeWearAmount,
                     edgeWearWidth,
+                    edgeWearCoverage,
                     creaseAmount,
-                    creaseWidth);
+                    creaseWidth,
+                    creaseLength,
+                    creaseBranching);
 
             MassSurfaceFeatureGenerator.Generate(
                 generatedMesh,
-                surfaceFeatureMesh,
-                settings);
-            surfaceFeatureMeshFilter.sharedMesh = surfaceFeatureMesh;
+                edgeWearFeatureMesh,
+                settings,
+                MassSurfaceFeatureKind.EdgeWear);
+            MassSurfaceFeatureGenerator.Generate(
+                generatedMesh,
+                creaseFeatureMesh,
+                settings,
+                MassSurfaceFeatureKind.Crease);
+
+            edgeWearFeatureMeshFilter.sharedMesh = edgeWearFeatureMesh;
+            creaseFeatureMeshFilter.sharedMesh = creaseFeatureMesh;
         }
 
-        private void EnsureSurfaceFeatureObject()
+        private void CacheSurfaceFeatureReferences()
         {
-            if (surfaceFeatureMeshFilter == null ||
-                surfaceFeatureMeshRenderer == null)
+            if (surfaceFeatureRoot == null)
             {
-                Transform featureTransform = transform.Find(SurfaceFeatureObjectName);
-                if (featureTransform == null)
-                {
-                    GameObject featureObject =
-                        new GameObject(SurfaceFeatureObjectName);
-                    featureTransform = featureObject.transform;
-                    featureTransform.SetParent(transform, false);
-                }
-
-                surfaceFeatureMeshFilter =
-                    featureTransform.GetComponent<MeshFilter>();
-                if (surfaceFeatureMeshFilter == null)
-                {
-                    surfaceFeatureMeshFilter =
-                        featureTransform.gameObject.AddComponent<MeshFilter>();
-                }
-
-                surfaceFeatureMeshRenderer =
-                    featureTransform.GetComponent<MeshRenderer>();
-                if (surfaceFeatureMeshRenderer == null)
-                {
-                    surfaceFeatureMeshRenderer =
-                        featureTransform.gameObject.AddComponent<MeshRenderer>();
-                }
-
-                surfaceFeatureMeshRenderer.shadowCastingMode =
-                    ShadowCastingMode.Off;
-                surfaceFeatureMeshRenderer.receiveShadows = false;
-                surfaceFeatureMeshRenderer.lightProbeUsage = LightProbeUsage.Off;
-                surfaceFeatureMeshRenderer.reflectionProbeUsage =
-                    ReflectionProbeUsage.Off;
-                surfaceFeatureMeshRenderer.motionVectorGenerationMode =
-                    MotionVectorGenerationMode.ForceNoMotion;
-                surfaceFeatureMeshRenderer.enabled = IsSurfaceFeatureDebugMode();
+                surfaceFeatureRoot = transform.Find(SurfaceFeatureRootObjectName);
             }
 
-            if (surfaceFeatureMesh != null)
+            if (surfaceFeatureRoot == null)
             {
                 return;
             }
 
-            surfaceFeatureMesh = new Mesh
+            if (edgeWearFeatureMeshFilter == null ||
+                edgeWearFeatureMeshRenderer == null)
             {
-                name = "GeneratedMass_SurfaceFeatures_Temporary",
+                Transform edgeWearTransform =
+                    surfaceFeatureRoot.Find(EdgeWearFeatureObjectName);
+                if (edgeWearTransform != null)
+                {
+                    edgeWearFeatureMeshFilter =
+                        edgeWearTransform.GetComponent<MeshFilter>();
+                    edgeWearFeatureMeshRenderer =
+                        edgeWearTransform.GetComponent<MeshRenderer>();
+                }
+            }
+
+            if (creaseFeatureMeshFilter == null ||
+                creaseFeatureMeshRenderer == null)
+            {
+                Transform creaseTransform =
+                    surfaceFeatureRoot.Find(CreaseFeatureObjectName);
+                if (creaseTransform != null)
+                {
+                    creaseFeatureMeshFilter =
+                        creaseTransform.GetComponent<MeshFilter>();
+                    creaseFeatureMeshRenderer =
+                        creaseTransform.GetComponent<MeshRenderer>();
+                }
+            }
+        }
+
+        private void EnsureSurfaceFeatureObjects()
+        {
+            if (surfaceFeatureRoot == null)
+            {
+                surfaceFeatureRoot = transform.Find(SurfaceFeatureRootObjectName);
+                if (surfaceFeatureRoot == null)
+                {
+                    GameObject rootObject =
+                        new GameObject(SurfaceFeatureRootObjectName);
+                    surfaceFeatureRoot = rootObject.transform;
+                    surfaceFeatureRoot.SetParent(transform, false);
+                }
+            }
+
+            surfaceFeatureRoot.localPosition = Vector3.zero;
+            surfaceFeatureRoot.localRotation = Quaternion.identity;
+            surfaceFeatureRoot.localScale = Vector3.one;
+            DisableLegacySurfaceFeatureRenderer(surfaceFeatureRoot);
+
+            EnsureSingleSurfaceFeatureObject(
+                surfaceFeatureRoot,
+                EdgeWearFeatureObjectName,
+                ref edgeWearFeatureMeshFilter,
+                ref edgeWearFeatureMeshRenderer,
+                ref edgeWearFeatureMesh,
+                "GeneratedMass_EdgeWearFeatures_Temporary");
+
+            EnsureSingleSurfaceFeatureObject(
+                surfaceFeatureRoot,
+                CreaseFeatureObjectName,
+                ref creaseFeatureMeshFilter,
+                ref creaseFeatureMeshRenderer,
+                ref creaseFeatureMesh,
+                "GeneratedMass_CreaseFeatures_Temporary");
+        }
+
+        private static void DisableLegacySurfaceFeatureRenderer(Transform root)
+        {
+            MeshRenderer legacyRenderer = root.GetComponent<MeshRenderer>();
+            if (legacyRenderer != null)
+            {
+                legacyRenderer.enabled = false;
+            }
+
+            MeshFilter legacyFilter = root.GetComponent<MeshFilter>();
+            if (legacyFilter != null)
+            {
+                legacyFilter.sharedMesh = null;
+            }
+        }
+
+        private void EnsureSingleSurfaceFeatureObject(
+            Transform root,
+            string objectName,
+            ref MeshFilter featureMeshFilter,
+            ref MeshRenderer featureMeshRenderer,
+            ref Mesh featureMesh,
+            string meshName)
+        {
+            if (featureMeshFilter == null ||
+                featureMeshRenderer == null)
+            {
+                Transform featureTransform = root.Find(objectName);
+                if (featureTransform == null)
+                {
+                    GameObject featureObject = new GameObject(objectName);
+                    featureTransform = featureObject.transform;
+                    featureTransform.SetParent(root, false);
+                }
+
+                featureTransform.localPosition = Vector3.zero;
+                featureTransform.localRotation = Quaternion.identity;
+                featureTransform.localScale = Vector3.one;
+
+                featureMeshFilter =
+                    featureTransform.GetComponent<MeshFilter>();
+                if (featureMeshFilter == null)
+                {
+                    featureMeshFilter =
+                        featureTransform.gameObject.AddComponent<MeshFilter>();
+                }
+
+                featureMeshRenderer =
+                    featureTransform.GetComponent<MeshRenderer>();
+                if (featureMeshRenderer == null)
+                {
+                    featureMeshRenderer =
+                        featureTransform.gameObject.AddComponent<MeshRenderer>();
+                }
+
+                featureMeshRenderer.shadowCastingMode = ShadowCastingMode.Off;
+                featureMeshRenderer.receiveShadows = false;
+                featureMeshRenderer.lightProbeUsage = LightProbeUsage.Off;
+                featureMeshRenderer.reflectionProbeUsage =
+                    ReflectionProbeUsage.Off;
+                featureMeshRenderer.motionVectorGenerationMode =
+                    MotionVectorGenerationMode.ForceNoMotion;
+                featureMeshRenderer.enabled = false;
+            }
+
+            if (featureMesh != null)
+            {
+                featureMeshFilter.sharedMesh = featureMesh;
+                return;
+            }
+
+            featureMesh = new Mesh
+            {
+                name = meshName,
                 hideFlags = HideFlags.DontSave
             };
-            surfaceFeatureMeshFilter.sharedMesh = surfaceFeatureMesh;
+            featureMeshFilter.sharedMesh = featureMesh;
         }
 
         private void EnsureGeneratedMesh()
@@ -979,15 +1202,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 meshCollider.sharedMesh = null;
             }
 
-            if (surfaceFeatureMeshFilter != null &&
-                surfaceFeatureMeshFilter.sharedMesh == surfaceFeatureMesh)
+            if (edgeWearFeatureMeshFilter != null &&
+                edgeWearFeatureMeshFilter.sharedMesh == edgeWearFeatureMesh)
             {
-                surfaceFeatureMeshFilter.sharedMesh = null;
+                edgeWearFeatureMeshFilter.sharedMesh = null;
             }
 
-            if (surfaceFeatureMeshRenderer != null)
+            if (creaseFeatureMeshFilter != null &&
+                creaseFeatureMeshFilter.sharedMesh == creaseFeatureMesh)
             {
-                surfaceFeatureMeshRenderer.enabled = false;
+                creaseFeatureMeshFilter.sharedMesh = null;
+            }
+
+            if (edgeWearFeatureMeshRenderer != null)
+            {
+                edgeWearFeatureMeshRenderer.enabled = false;
+            }
+
+            if (creaseFeatureMeshRenderer != null)
+            {
+                creaseFeatureMeshRenderer.enabled = false;
             }
 
             RemoveLegacyRiverFoamProxy();
@@ -996,6 +1230,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private void NotifyGeometryChanged()
         {
             GeometryChanged?.Invoke();
+        }
+
+        private void DestroySurfaceFeatureMesh(ref Mesh mesh)
+        {
+            if (mesh == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(mesh);
+            }
+            else
+            {
+                DestroyImmediate(mesh);
+            }
+
+            mesh = null;
         }
 
         private void RemoveLegacyRiverFoamProxy()
@@ -1027,19 +1280,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ClearGeneratedAssignments();
             InvalidateStableWorldGeometryFingerprint();
 
-            if (surfaceFeatureMesh != null)
-            {
-                if (Application.isPlaying)
-                {
-                    Destroy(surfaceFeatureMesh);
-                }
-                else
-                {
-                    DestroyImmediate(surfaceFeatureMesh);
-                }
-
-                surfaceFeatureMesh = null;
-            }
+            DestroySurfaceFeatureMesh(ref edgeWearFeatureMesh);
+            DestroySurfaceFeatureMesh(ref creaseFeatureMesh);
 
             if (generatedMesh == null)
             {

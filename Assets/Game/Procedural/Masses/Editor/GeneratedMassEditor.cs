@@ -29,8 +29,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty dirtCoverage;
         private SerializedProperty edgeWearAmount;
         private SerializedProperty edgeWearWidth;
+        private SerializedProperty edgeWearCoverage;
+        private SerializedProperty edgeWearSoftness;
         private SerializedProperty creaseAmount;
         private SerializedProperty creaseWidth;
+        private SerializedProperty creaseLength;
+        private SerializedProperty creaseBranching;
+        private SerializedProperty creaseSoftness;
         private SerializedProperty riverInteraction;
         private SerializedProperty participation;
         private SerializedProperty staticPressureMode;
@@ -71,10 +76,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "edgeWearAmount");
             edgeWearWidth = serializedObject.FindProperty(
                 "edgeWearWidth");
+            edgeWearCoverage = serializedObject.FindProperty(
+                "edgeWearCoverage");
+            edgeWearSoftness = serializedObject.FindProperty(
+                "edgeWearSoftness");
             creaseAmount = serializedObject.FindProperty(
                 "creaseAmount");
             creaseWidth = serializedObject.FindProperty(
                 "creaseWidth");
+            creaseLength = serializedObject.FindProperty(
+                "creaseLength");
+            creaseBranching = serializedObject.FindProperty(
+                "creaseBranching");
+            creaseSoftness = serializedObject.FindProperty(
+                "creaseSoftness");
             riverInteraction = serializedObject.FindProperty(
                 "riverInteraction");
             participation = riverInteraction?.FindPropertyRelative(
@@ -125,8 +140,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "dirtCoverage",
                 "edgeWearAmount",
                 "edgeWearWidth",
+                "edgeWearCoverage",
+                "edgeWearSoftness",
                 "creaseAmount",
                 "creaseWidth",
+                "creaseLength",
+                "creaseBranching",
+                "creaseSoftness",
                 "riverInteraction");
 
             DrawSurfaceMaskTuning();
@@ -225,8 +245,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             EditorGUILayout.PropertyField(edgeWearAmount);
             EditorGUILayout.PropertyField(edgeWearWidth);
+            EditorGUILayout.PropertyField(edgeWearCoverage);
+            EditorGUILayout.PropertyField(edgeWearSoftness);
+            EditorGUILayout.Space(2f);
             EditorGUILayout.PropertyField(creaseAmount);
             EditorGUILayout.PropertyField(creaseWidth);
+            EditorGUILayout.PropertyField(creaseLength);
+            EditorGUILayout.PropertyField(creaseBranching);
+            EditorGUILayout.PropertyField(creaseSoftness);
         }
 
         private void EnsureDefaultStoneMaterials()

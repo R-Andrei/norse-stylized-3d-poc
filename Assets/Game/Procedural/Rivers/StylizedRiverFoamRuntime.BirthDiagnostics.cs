@@ -12,10 +12,10 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void ResetProgressiveBirthDiagnosticSession()
         {
-            progressiveRibbonEventUpdateCount = 0;
-            progressiveRibbonSegmentDispatchAttemptCount = 0;
-            progressiveRibbonSegmentDispatchSubmittedCount = 0;
-            progressiveRibbonCumulativeCentrelineDistance = 0f;
+            foamCompositionEventUpdateCount = 0;
+            foamCompositionSegmentDispatchAttemptCount = 0;
+            foamCompositionSegmentDispatchSubmittedCount = 0;
+            foamCompositionCumulativeCentrelineDistance = 0f;
             progressiveBirthDebugLatestAffectedTexels = 0;
             progressiveBirthDebugCumulativeAffectedTexels = 0;
             progressiveBirthDebugReadbackAvailable = false;
@@ -115,7 +115,7 @@ namespace ProgrammaticStylized3D.Rivers
         }
 
         private void PrepareProgressiveBirthDebugEvent(
-            ref ProgressiveRibbonEvent ribbonEvent)
+            ref FoamCompositionEvent ribbonEvent)
         {
             if (!IsProgressiveBirthSourceDebugActive ||
                 !ribbonEvent.DebugTrajectoryPending)
@@ -135,7 +135,7 @@ namespace ProgrammaticStylized3D.Rivers
         }
 
         private void PaintPlannedProgressiveBirthTrajectory(
-            ProgressiveRibbonEvent ribbonEvent)
+            FoamCompositionEvent ribbonEvent)
         {
             float longitudinalTexelSize = fieldWidth > 0
                 ? simulationFieldLength / fieldWidth
@@ -156,12 +156,12 @@ namespace ProgrammaticStylized3D.Rivers
                 float endProgress = (segmentIndex + 1) /
                     (float)segmentCount;
 
-                ResolveProgressiveRibbonHead(
+                ResolveFoamCompositionHead(
                     ribbonEvent,
                     startProgress,
                     out float startGlobalDistance,
                     out float startAcrossNormalized);
-                ResolveProgressiveRibbonHead(
+                ResolveFoamCompositionHead(
                     ribbonEvent,
                     endProgress,
                     out float endGlobalDistance,
@@ -175,12 +175,14 @@ namespace ProgrammaticStylized3D.Rivers
                     ribbonEvent.BaseRadius,
                     startProgress,
                     ribbonEvent.WidthPhase,
-                    startEnvelope);
+                    startEnvelope,
+                    ribbonEvent.WidthVariation);
                 float endRadius = ResolveProgressiveRibbonRadius(
                     ribbonEvent.BaseRadius,
                     endProgress,
                     ribbonEvent.WidthPhase,
-                    endEnvelope);
+                    endEnvelope,
+                    ribbonEvent.WidthVariation);
                 float startAmount = ribbonEvent.SourceAmount * startEnvelope;
                 float endAmount = ribbonEvent.SourceAmount * endEnvelope;
 
@@ -212,7 +214,7 @@ namespace ProgrammaticStylized3D.Rivers
         }
 
         private PendingInjection CreateProgressiveBirthDiagnosticSegment(
-            ProgressiveRibbonEvent ribbonEvent,
+            FoamCompositionEvent ribbonEvent,
             float startGlobalDistance,
             float startAcrossNormalized,
             float startRadius,
@@ -234,7 +236,7 @@ namespace ProgrammaticStylized3D.Rivers
                 ribbonEvent.SourceFillSeed,
                 ribbonEvent.SourceFillFeatureSize,
                 ribbonEvent.ShapeSeed,
-                0f,
+                ribbonEvent.FragmentStrength,
                 false,
                 true,
                 startGlobalDistance,
@@ -244,7 +246,11 @@ namespace ProgrammaticStylized3D.Rivers
                 endGlobalDistance,
                 endAcrossNormalized,
                 endRadius,
-                endAmount);
+                endAmount,
+                ribbonEvent.SheetStyle,
+                ribbonEvent.Pattern,
+                ribbonEvent.Complexity,
+                ribbonEvent.Density);
         }
 
         private void DispatchProgressiveBirthDebugSegment(
@@ -297,6 +303,24 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamInjectionSourceFillFeatureSize",
                 segment.SourceFillFeatureSize);
+            computeShader.SetFloat(
+                "_FoamInjectionShapeSeed",
+                segment.ShapeSeed);
+            computeShader.SetFloat(
+                "_FoamInjectionShapeVariety",
+                segment.ShapeVariety);
+            computeShader.SetFloat(
+                "_FoamInjectionCompound",
+                segment.SegmentSheetStyle ? 1f : 0f);
+            computeShader.SetFloat(
+                "_FoamInjectionCompositionPattern",
+                (float)segment.CompositionPattern);
+            computeShader.SetFloat(
+                "_FoamInjectionCompositionComplexity",
+                segment.CompositionComplexity);
+            computeShader.SetFloat(
+                "_FoamInjectionCompositionDensity",
+                segment.CompositionDensity);
             computeShader.SetFloat(
                 "_FoamInjectionSegmentStartGlobalDistance",
                 segment.SegmentStartGlobalDistance);

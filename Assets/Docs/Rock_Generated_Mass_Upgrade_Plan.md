@@ -353,7 +353,12 @@ Checklist:
 - [x] Patch 12F.4 - Contact/crawl structural correction with deposit skeleton
 - [x] Patch 12F.5 - Surface mask tuning controls
 - [x] Patch 12G.1 - Debug-only semantic surface feature lines
-- [ ] Patch 12G.2 - Feature-line visual tuning and batching plan
+- [x] Patch 12G.2 - Feature-line separation, distribution, and debug readability
+- [x] Patch 12G.3 - Feature-line mask refinement controls
+- [x] Patch 12G.4 - Feature-line control semantics fix
+- [x] Patch 12G.5 - Edge-wear ridge chain generation
+- [x] Patch 12G.6 - Final edge-wear mask refinement before material response
+- [ ] Patch 12H - Stone material response from accepted masks
 - [ ] Patch 13 - Dirty surface mottle and material breakup
 - [ ] Patch 14 - Crack and seam language
 
@@ -1383,17 +1388,373 @@ Acceptance:
 - Normal rendering should not pay an active overlay draw call.
 - The next patch should tune line density, width, selection quality, and archetype bias based on Unity screenshots before any final material response.
 
-### Patch 12G.2 - Feature-Line Visual Tuning and Batching Plan
+### Patch 12G.2 - Feature-Line Separation, Distribution, and Debug Readability
 
-Status: planned after Patch 12G.1 Unity validation.
+Status: implemented after Unity validation of Patch 12G.1 showed that the overlay representation was viable but the first feature-line implementation was semantically wrong.
+
+Validation findings from Patch 12G.1:
+
+- the generated overlay mesh existed and rendered;
+- `ConvexEdgeWear` and `ConcaveCrease` produced effectively identical visual results;
+- line features clustered onto only a couple of visible/front faces instead of distributing around the rock;
+- the main rock was almost black in both line debug modes, making the underlying geometry hard to read;
+- the visible lines read more like floating scratches than separated edge wear and crack/seam language.
+
+Reason for patch:
+
+- The representation choice remains correct: line features should use generated strips rather than scalar masks on the coarse main mesh.
+- The failure was in semantic separation, candidate distribution, and debug presentation.
+- `ConvexEdgeWear` should be generated from selected mesh ridge/corner edges.
+- `ConcaveCrease` should be generated separately from deliberate crack/crease paths.
+- Main-rock debug presentation must preserve normal rock readability in line debug modes.
 
 Checklist status:
 
-- [ ] tune edge wear amount/width defaults across boulders, slabs, standing stones, polished stones, and fractured pillars;
-- [ ] tune crease/crack density and path length;
-- [ ] decide whether true concave mesh edges should be added as a second crease source;
-- [ ] document chunk-combined overlay requirements for final visible rendering;
-- [ ] only after debug masks are accepted, design final material response for pale worn ridges and dark cracks.
+- [x] split feature overlays into separate generated child meshes/renderers:
+  - `GeneratedMass_SurfaceFeatures/GeneratedMass_EdgeWearFeatures`;
+  - `GeneratedMass_SurfaceFeatures/GeneratedMass_CreaseFeatures`;
+- [x] keep both feature renderers disabled during normal rendering;
+- [x] enable only the edge-wear renderer for `Surface Mask Debug > ConvexEdgeWear`;
+- [x] enable only the crease renderer for `Surface Mask Debug > ConcaveCrease`;
+- [x] add a hidden shader property, `_GeneratedMassFeatureOverlayKind`, so the shader can distinguish main surface, edge overlay, and crease overlay;
+- [x] make line-feature debug modes overlay-only so the main rock remains normally shaded and readable;
+- [x] make edge-wear generation use actual physical mesh-edge candidates, including quantized-position edge matching so duplicated flat-shaded vertices do not prevent adjacency detection;
+- [x] keep crease generation separate from edge-wear generation;
+- [x] add bucketed candidate selection by object-space sector, height band, and normal group to reduce clustering on only one side of the object;
+- [x] keep debug strips double-sided for validation;
+- [x] preserve the latest `SH_PixelSurfaceLit.shader` ground-contract/debug additions while applying these feature-line changes;
+- [x] keep final material response deferred.
+
+Primary files:
+
+- `GeneratedMass.cs`
+- `GeneratedMassEditor.cs`
+- `MassSurfaceFeatureGenerator.cs`
+- `SH_PixelSurfaceLit.shader`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+Work:
+
+- `GeneratedMass` now manages two separate feature child renderers instead of one combined overlay renderer.
+- The previous root child `GeneratedMass_SurfaceFeatures` remains the feature root; any legacy renderer/filter on that root is disabled, and the actual generated meshes now live under named children.
+- `GeneratedMass` now sends `_GeneratedMassFeatureOverlayKind` through the material property block:
+  - `0` for the main generated mass surface;
+  - `1` for edge-wear overlay strips;
+  - `2` for crease/crack overlay strips.
+- Generated mass material property blocks also explicitly set `_SurfaceContract = 0` so generated rocks keep the generated-mass contract even when using the latest shared shader that also supports ground rendering.
+- The shader now treats `ConvexEdgeWear` and `ConcaveCrease` as overlay-only debug modes:
+  - the main rock no longer becomes a black full-surface mask preview in modes 4 and 5;
+  - only the matching overlay renderer returns the bright debug colour.
+- `MassSurfaceFeatureGenerator` now generates one requested feature kind per call.
+- Edge wear uses selected physical edge candidates, with position-quantized edge matching to work better on flat-shaded/generated meshes where adjacent faces may not share vertex indices.
+- Creases/cracks use separately selected broad-face crack paths and no longer share the same overlay mesh as edge wear.
+- Candidate selection now uses spatial buckets to distribute features across sectors/height bands instead of simply taking the highest-scoring candidates.
+
+Performance architecture:
+
+- Normal rendering still has no active line-overlay draw calls because both child renderers remain disabled unless a line debug mode is selected.
+- Debug modes can pay the per-object overlay draw-call cost because they are validation/development modes.
+- This remains compatible with the later requirement that final visible line rendering must support chunk-combined overlays or another batching strategy before many visible rocks use the feature permanently.
+
+Acceptance:
+
+- `Surface Mask Debug > ConvexEdgeWear` should keep the main rock readable and show only selected edge/ridge/corner strips.
+- `Surface Mask Debug > ConvexEdgeWear` should no longer look like floating face scratches or full wireframe.
+- `Surface Mask Debug > ConcaveCrease` should keep the main rock readable and show only crease/crack paths.
+- `Surface Mask Debug > ConcaveCrease` should be visibly different from `ConvexEdgeWear`.
+- Feature lines should be distributed around the object more than Patch 12G.1 and should not all cluster on two front faces.
+- Normal rendering should not show the overlay.
+- The next patch should tune line density, width, crack style, and archetype bias based on screenshots before any final visible material response.
+
+### Patch 12G.3 - Feature-Line Mask Refinement Controls
+
+Status: implemented after Patch 12G.2 Unity validation showed that the overlay architecture, debug readability, and semantic separation were working, but the masks needed better art-direction controls and better crack path quality before final material response.
+
+Reason for patch:
+
+- These are still debug masks, not final render output.
+- However, the generated mask structure still needs to be good enough for final material response to interpret later.
+- `ConvexEdgeWear` was correctly edge-derived and sparse, but needed coverage control:
+  - amount should decide which edges participate;
+  - coverage should decide how much of each selected edge is covered.
+- `ConvexEdgeWear` and `ConcaveCrease` also needed mask falloff/softness data so the final response is not locked to hard rectangular strips.
+- `ConcaveCrease` was separated from edge wear, but still looked too much like isolated scratches. It needed longer, more connected, more branch-capable crack paths.
+
+Checklist status:
+
+- [x] add `Edge Wear Coverage`;
+- [x] add `Edge Wear Softness`;
+- [x] add `Crease Length`;
+- [x] add `Crease Branching`;
+- [x] add `Crease Softness`;
+- [x] preserve `Edge Wear Amount`, `Edge Wear Width`, `Crease Amount`, and `Crease Width`;
+- [x] make edge coverage affect trim length on selected edge strips rather than selecting unrelated extra edges;
+- [x] make crease length affect generated path reach;
+- [x] make crease branching affect branch probability;
+- [x] make the shader debug mask use UV-based side falloff and end taper for line overlays;
+- [x] keep the latest uploaded `SH_PixelSurfaceLit.shader` as the shader base;
+- [x] keep final material response deferred.
+
+Primary files:
+
+- `GeneratedMass.cs`
+- `GeneratedMassEditor.cs`
+- `MassSurfaceFeatureGenerator.cs`
+- `SH_PixelSurfaceLit.shader`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+Added controls:
+
+- `Edge Wear Coverage`
+  - controls how much of each selected ridge edge is covered;
+  - low values create short broken fragments;
+  - high values cover more of each selected edge.
+- `Edge Wear Softness`
+  - controls side and end falloff in the generated edge-wear mask.
+- `Crease Length`
+  - scales generated crack path reach;
+  - higher values should make cracks feel more connected and less scratch-like.
+- `Crease Branching`
+  - controls how often generated cracks emit short branches.
+- `Crease Softness`
+  - controls side and end falloff in the generated crease mask.
+
+Work:
+
+- `GeneratedMass` now serializes the five new controls and sends them to the shader through the existing material property block.
+- `GeneratedMassEditor` now exposes the new controls in the existing `Surface Feature Lines` inspector section.
+- `MassSurfaceFeatureGenerator` now stores edge coverage, crease length, and crease branching in `MassSurfaceFeatureSettings`.
+- Edge-wear strip trimming now responds to `Edge Wear Coverage`:
+  - lower coverage trims more of the selected edge;
+  - higher coverage leaves longer strips on selected edges.
+- Crease path generation now responds to `Crease Length`:
+  - path endpoints are allowed farther from the face center as length increases;
+  - jaggedness scales modestly with length.
+- Crease branching now responds to `Crease Branching`:
+  - lower branching makes mostly single crack paths;
+  - higher branching permits more short branches.
+- `SH_PixelSurfaceLit.shader` now uses overlay UVs to shape line debug masks:
+  - UV0.x is used for end taper;
+  - UV0.y is used for cross-strip side falloff;
+  - softness controls modify those falloffs.
+- The debug view remains a mask preview. Final colour, dark crack response, pale worn ridges, crack lips, and profile-specific interpretation remain deferred.
+
+Acceptance:
+
+- Increasing `Edge Wear Coverage` should cover more of each selected ridge edge without simply turning on unrelated random edges.
+- Decreasing `Edge Wear Coverage` should create shorter/broken edge fragments.
+- Increasing `Edge Wear Softness` should make edge-wear debug strips less hard/binary across width and at the ends.
+- Increasing `Crease Length` should make cracks longer and more connected.
+- Increasing `Crease Branching` should create more small branch paths without turning into spiderwebs at reasonable values.
+- Increasing `Crease Softness` should make crease debug strips less hard/binary across width and at the ends.
+- `ConvexEdgeWear` and `ConcaveCrease` should remain separate debug modes and should not become identical.
+- Normal rendering should still show no overlay.
+
+### Patch 12G.4 - Feature-Line Control Semantics Fix
+
+Status: implemented after Patch 12G.3 Unity validation showed that the added controls existed but did not yet behave according to their intended semantics.
+
+Validation findings from Patch 12G.3:
+
+- `Edge Wear Amount` and `Edge Wear Coverage` overlapped conceptually and did not produce the expected max-state behavior.
+- At maximum edge-wear amount and coverage, many major sharp edges were still not represented, and selected edges were still broken into multiple small capsules.
+- `Edge Wear Coverage` needed to control fragmentation/continuity along selected edges, not merely trim each emitted dash slightly.
+- `ConcaveCrease` still clustered too strongly on the same/front sectors because candidate scoring still dominated distribution.
+- `Crease Branching` above `1` had little visible effect.
+- `Softness` also softened line ends, which created holes where two generated strip segments met or continued each other.
+
+Reason for patch:
+
+- `Amount` and `Coverage` need separate meanings:
+  - `Amount` = how many valid major edges participate;
+  - `Coverage` = how continuous or fragmented each selected edge is.
+- Crease distribution needs to be sector-first rather than score-first.
+- Branching needs to affect visible branch probability/length, not just a weak chance gate.
+- Softness should affect cross-strip falloff, not automatically fade every segment endpoint.
+
+Checklist status:
+
+- [x] make `Edge Wear Amount` control selected valid edge coverage through rank/threshold semantics;
+- [x] make maximum `Edge Wear Amount` include nearly all valid major sharp edges, subject only to the main validity filters;
+- [x] make `Edge Wear Coverage` control segmentation along selected edges;
+- [x] make maximum `Edge Wear Coverage` emit one mostly continuous strip per selected edge;
+- [x] make lower `Edge Wear Coverage` emit shorter broken fragments;
+- [x] replace weak crease bucket limiting with sector-first crease selection;
+- [x] increase crease target count enough that moderate/high amount can populate multiple sectors;
+- [x] make `Crease Branching` visibly affect branch probability and allow a second branch at high values;
+- [x] keep `Crease Length` as the main path-reach control;
+- [x] change line softness to cross-strip side falloff only;
+- [x] remove automatic end taper from shader softness to avoid holes at internal joints;
+- [x] keep final material response deferred.
+
+Primary files:
+
+- `MassSurfaceFeatureGenerator.cs`
+- `SH_PixelSurfaceLit.shader`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+Work:
+
+- Edge-wear selection now treats `Edge Wear Amount` as an amount/threshold control over valid major edge candidates.
+- At high amount, the generator no longer tries to pick only a small target subset; it includes essentially all valid major candidates up to a generous safety cap.
+- Edge-wear coverage now emits different segment layouts:
+  - high coverage: one long mostly continuous strip on each selected edge;
+  - medium coverage: partial segmented strips;
+  - low coverage: short fragmented pieces.
+- Crease selection now groups candidates by object-space sector and selects round-robin by sector before filling additional paths.
+- Crease target count was increased so that `Crease Amount` has enough paths to distribute across multiple sides at moderate/high values.
+- Branching now uses a stronger probability curve:
+  - `0` means no branches;
+  - around `1` means occasional branches;
+  - near `2` means most eligible cracks can branch, with a possible second branch.
+- Shader line-mask softness now affects side falloff only. This preserves soft strip sides without creating dark holes at joints where connected strip segments meet.
+
+Acceptance:
+
+- At maximum `Edge Wear Amount`, all or nearly all obvious major sharp edges should participate, while raw triangulation junk should still be rejected.
+- At maximum `Edge Wear Coverage`, selected edges should become mostly continuous lines rather than repeated dash chains.
+- Lower `Edge Wear Coverage` should visibly fragment selected edges.
+- `Crease Amount` should distribute cracks across more sectors/sides instead of overwhelmingly favoring the front/highest-scoring face cluster.
+- `Crease Branching` should visibly change branch frequency between `0`, `1`, and `2`.
+- `Softness` should soften line sides without opening holes where line segments meet.
+- `ConvexEdgeWear` and `ConcaveCrease` remain debug masks only. Final worn-edge colour, dark crack response, lips, and profile interpretation remain deferred.
+
+### Patch 12G.5 - Edge-Wear Ridge Chain Generation
+
+Status: implemented after Patch 12G.4 Unity validation showed that `ConcaveCrease` was much improved, but `ConvexEdgeWear` still behaved like disconnected individual edge dashes.
+
+Validation findings from Patch 12G.4:
+
+- Creases became much more serviceable:
+  - better distribution;
+  - visible branching;
+  - more crack-like paths.
+- Edge wear still failed the max-state expectation:
+  - maximum `Edge Wear Amount` and maximum `Edge Wear Coverage` still missed too many obvious major edges;
+  - selected ridges were often emitted as separated edge records with holes between them;
+  - the generator treated each mesh edge as an isolated feature instead of understanding longer visual ridge paths.
+
+Reason for patch:
+
+- The reference rocks use worn ridge paths, not independent edge dashes.
+- The edge-wear mask should therefore be generated from semantic ridge chains:
+  - valid physical edge candidates are detected as before;
+  - adjacent compatible candidates are grouped into ordered chains;
+  - amount selects chains;
+  - coverage controls continuity/fragmentation along selected chains.
+
+Checklist status:
+
+- [x] keep the existing controls;
+- [x] do not add more inspector clutter;
+- [x] keep `ConcaveCrease` behavior from Patch 12G.4;
+- [x] loosen edge candidate thresholds slightly so max amount catches more visible major ridges;
+- [x] add edge-chain grouping for adjacent compatible ridge candidates;
+- [x] make `Edge Wear Amount` select ridge chains instead of isolated edge records;
+- [x] make maximum `Edge Wear Amount` include nearly all valid ridge chains;
+- [x] make `Edge Wear Coverage` operate on selected chains;
+- [x] make maximum `Edge Wear Coverage` emit mostly continuous strips along each selected chain;
+- [x] overlap internal chain segments slightly to avoid visible holes at chain joints;
+- [x] keep final material response deferred.
+
+Primary files:
+
+- `MassSurfaceFeatureGenerator.cs`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+Work:
+
+- Added chain-level edge-wear representation inside `MassSurfaceFeatureGenerator`.
+- `EdgeCandidate` now records quantized endpoint keys so compatible edge candidates can be grouped.
+- Adjacent candidates are joined into ordered ridge chains when they share an endpoint and have compatible direction/normal.
+- Chains are scored from their weighted candidate scores and length.
+- `Edge Wear Amount` now selects distributed ridge chains rather than isolated individual edge candidates.
+- `Edge Wear Coverage` now controls chain segmentation:
+  - high coverage emits continuous strips over all chain segments;
+  - lower coverage emits broken fragments along selected chains.
+- Internal chain segments overlap slightly at shared endpoints so max coverage does not create obvious holes at ridge joints.
+- The edge angle and length thresholds were loosened modestly so that high amount can catch more obvious major ridges without intentionally reviving raw wireframe behavior.
+
+Acceptance:
+
+- At maximum `Edge Wear Amount` and maximum `Edge Wear Coverage`, most obvious major sharp/worn ridges should be represented.
+- Adjacent pieces along the same ridge should read as continuous ridge paths rather than isolated dash chains.
+- Lowering `Edge Wear Coverage` should still fragment selected ridge chains.
+- Lowering `Edge Wear Amount` should reduce the number of participating ridge chains.
+- The result should still avoid full wireframe/topology spam.
+- `ConcaveCrease` should remain close to the Patch 12G.4 result.
+- Normal rendering should still show no overlay.
+
+### Patch 12G.6 - Final Edge-Wear Mask Refinement Before Material Response
+
+Status: implemented as the final incremental debug-mask patch before moving to material response.
+
+Validation findings from Patch 12G.5:
+
+- `ConcaveCrease` was considered serviceable enough for the next stage.
+- `ConvexEdgeWear` improved with ridge chains, but still missed some obvious major ridges at maximum amount and coverage.
+- Some high-coverage edge joints showed visible overlap/clumping from unconditional chain-segment overlap.
+- The edge-wear mask needed one last eligibility/chain cleanup pass before being accepted as mask data.
+
+Reason for patch:
+
+- The edge mask does not need to look like the final reference rocks in debug mode.
+- It does need trustworthy control semantics:
+  - max amount should catch nearly all visible major sharp ridges;
+  - max coverage should make selected ridges mostly continuous;
+  - lower coverage should fragment those ridges;
+  - the mask should still avoid raw wireframe/topology spam.
+- After this patch, remaining visual integration should happen through material response rather than endless debug-mask tuning.
+
+Checklist status:
+
+- [x] keep existing controls unchanged;
+- [x] avoid adding more inspector clutter;
+- [x] keep `ConcaveCrease` from Patch 12G.4/12G.5 intact;
+- [x] make edge candidate eligibility more inclusive for visually major ridges;
+- [x] preserve rejection of tiny topology junk;
+- [x] loosen candidate angle and length thresholds modestly;
+- [x] add a stronger "visible major ridge" acceptance path based on angle, length, height, and exposure;
+- [x] avoid discarding strong visual ridges only because their computed scalar score is low;
+- [x] reduce high-coverage chain-joint overlap and apply it only to near-continuous internal chain joints;
+- [x] document that this closes the debug-mask stage unless validation is catastrophic.
+
+Primary files:
+
+- `MassSurfaceFeatureGenerator.cs`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+Work:
+
+- Edge candidate filtering was adjusted:
+  - minimum candidate angle reduced from `18°` to `15°`;
+  - downward normal rejection loosened slightly;
+  - edge score now has explicit `strongGeometricRidge` and `weakButVisibleRidge` acceptance paths.
+- Strong/visible ridges are no longer discarded just because the combined scalar score falls below the old cutoff.
+- The maximum edge-wear safety cap was raised for normal generated-rock cases.
+- High-coverage ridge-chain overlap is now smaller and only applied when adjacent chain segments are directionally compatible.
+- This reduces joint clumping while still helping near-continuous edge chains stay visually connected.
+
+Acceptance:
+
+- At maximum `Edge Wear Amount` and `Edge Wear Coverage`, obvious major sharp/worn ridges should be substantially more complete than Patch 12G.5.
+- Some non-critical omissions are acceptable because final reference-style response does not require literal every-edge wireframe coverage.
+- Obvious raw triangulation spam is still a failure.
+- Small debug overlap at joints is acceptable only if it does not create large clumped artifacts; final material response should clamp/max masks rather than additively stacking brightness.
+- `ConcaveCrease` should remain close to the previously accepted result.
+- If this patch is serviceable, proceed to `Patch 12H - Stone Material Response From Accepted Masks`.
+
+### Patch 12H - Stone Material Response From Accepted Masks
+
+Status: planned after Patch 12G.6 validation.
+
+Checklist status:
+
+- [ ] convert accepted debug mask data into final stone material response;
+- [ ] make `ConvexEdgeWear` render as pale, soft, worn ridges rather than debug strips;
+- [ ] make `ConcaveCrease` render as dark cracks/creases with optional soft surrounding shadow or later bright lip;
+- [ ] combine `SurfaceVariation`, `Exposure`, `CreviceBase`, `DirtDeposit`, `ConvexEdgeWear`, and `ConcaveCrease` into coherent profile-specific stone response;
+- [ ] preserve performance architecture: debug per-mass overlays are acceptable, but final many-rock rendering should move toward chunk-combined overlays or another batching strategy.
 
 ### Patch 13 - Dirty Surface Mottle and Material Breakup
 

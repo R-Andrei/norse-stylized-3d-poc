@@ -1036,7 +1036,7 @@ Acceptance:
 
 ### Patch 5 - Ground Material Property Block
 
-Status: not started.
+Status: partially implemented on 2026-07-05.
 
 Goal:
 
@@ -1044,14 +1044,14 @@ Goal:
 
 Checklist:
 
-- [ ] Add `MaterialPropertyBlock` support to `GeneratedGround`.
+- [x] Add `MaterialPropertyBlock` support to `GeneratedGround`.
 - [ ] Bind base/profile colors.
-- [ ] Bind patch scale/contrast values.
-- [ ] Bind wetness/snow/grass defaults.
+- [~] Bind patch scale/contrast values. Contrast is bound; patch scale remains generated-data-only for now.
+- [~] Bind wetness/snow/grass defaults. Static snow/damp/vegetation/rocky response is bound; runtime wetness is still deferred.
 - [ ] Bind seed or patch coordinate values.
-- [ ] Refresh property block on enable, validate, regenerate, and profile change.
-- [ ] Keep shared material assignment intact.
-- [ ] Add debug mode binding if available.
+- [x] Refresh property block on enable, validate, regenerate, and profile change.
+- [x] Keep shared material assignment intact.
+- [ ] Add debug mode binding if available. Debug remains a material/shader setting for now.
 
 Acceptance:
 
@@ -1061,7 +1061,7 @@ Acceptance:
 
 ### Patch 6 - First Ground Shader Response
 
-Status: not started.
+Status: partially implemented on 2026-07-05.
 
 Goal:
 
@@ -1069,17 +1069,17 @@ Goal:
 
 Checklist:
 
-- [ ] Decide whether to add `SH_GroundSurfaceLit.shader` or a ground mode in `SH_PixelSurfaceLit.shader`.
-- [ ] Reuse `PixelCellVariation.hlsl` or split shared pixel helpers cleanly.
-- [ ] Read vertex color R/G/B/A.
-- [ ] Read UV2 X/Y if written.
-- [ ] Add broad profile patch color blending.
-- [ ] Add exposure/snow-hold tint.
-- [ ] Add damp/deposit darkening.
-- [ ] Add shore influence response.
-- [ ] Keep small pixel cell variation restrained.
-- [ ] Add mask debug modes.
-- [ ] Create or update a ground material for the new shader path.
+- [x] Decide whether to add `SH_GroundSurfaceLit.shader` or a ground mode in `SH_PixelSurfaceLit.shader`. Current implementation uses a ground mode in the shared pixel-surface shader.
+- [x] Reuse `PixelCellVariation.hlsl` or split shared pixel helpers cleanly.
+- [x] Read vertex color R/G/B/A.
+- [x] Read UV2 X/Y if written. UV2 Z is also read for rocky/dry response.
+- [x] Add broad profile patch color blending.
+- [x] Add exposure/snow-hold tint.
+- [x] Add damp/deposit darkening.
+- [x] Add shore influence response.
+- [x] Keep small pixel cell variation restrained.
+- [x] Add mask debug modes.
+- [ ] Create or update a ground material for the new shader path. The current patch uses per-renderer property blocks instead of duplicating material assets.
 
 Acceptance:
 
@@ -1430,8 +1430,8 @@ The first milestone is complete when:
 - [~] Patch 2 - Separate shape from surface profile. Core code implemented; demo asset still pending Unity asset creation.
 - [~] Patch 3 - Static surface mask contract. Core code implemented; Unity validation still required.
 - [~] Patch 4 - Modifier and river surface influence. Flatten and shore mask influence implemented; surface-only modifier mode still pending.
-- [ ] Patch 5 - Ground material property block.
-- [ ] Patch 6 - First ground shader response.
+- [~] Patch 5 - Ground material property block. First profile-to-material binding implemented; color/seed/debug binding still deferred.
+- [~] Patch 6 - First ground shader response. Shared shader ground mode, final response, and debug modes implemented; material asset tuning still pending.
 - [ ] Patch 7 - Terrain profile asset set.
 - [ ] Patch 8 - Runtime state design stub.
 - [ ] Patch 9 - Footprint prototype.

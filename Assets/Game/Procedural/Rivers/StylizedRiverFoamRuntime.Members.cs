@@ -177,8 +177,8 @@ namespace ProgrammaticStylized3D.Rivers
 
         private readonly List<PendingInjection> pendingInjections = new();
         private readonly List<PendingInjection> pendingMaterialBirths = new();
-        private readonly ProgressiveRibbonEvent[] progressiveRibbonEvents =
-            new ProgressiveRibbonEvent[ProgressiveRibbonEventCapacity];
+        private readonly FoamCompositionEvent[] foamCompositionEvents =
+            new FoamCompositionEvent[FoamCompositionEventCapacity];
         private readonly uint[] progressiveBirthDebugCounterReadback =
             new uint[ProgressiveBirthDebugCounterCount];
         private readonly List<MeshFilter> obstacleExclusionMeshFilters = new();
@@ -401,22 +401,23 @@ namespace ProgrammaticStylized3D.Rivers
         private float pendingIsolatedLifeProbeAcrossNormalized;
         private string isolatedLifeProbeStatus =
             "Not emitted this session";
-        private int progressiveRibbonSequence;
-        private int activeProgressiveRibbonEventCount;
-        private int progressiveRibbonStartedCount;
-        private int progressiveRibbonCompletedCount;
-        private int progressiveRibbonRejectedCount;
-        private float latestProgressiveRibbonProgress;
-        private float latestProgressiveRibbonHeadDistanceNormalized;
-        private float latestProgressiveRibbonHeadAcrossNormalized;
-        private float latestProgressiveRibbonPreviousDistanceNormalized;
-        private float latestProgressiveRibbonPreviousAcrossNormalized;
-        private float lastProgressiveRibbonSegmentLength;
-        private int latestProgressiveRibbonEventId;
-        private int progressiveRibbonEventUpdateCount;
-        private int progressiveRibbonSegmentDispatchAttemptCount;
-        private int progressiveRibbonSegmentDispatchSubmittedCount;
-        private float progressiveRibbonCumulativeCentrelineDistance;
+        private int foamCompositionSequence;
+        private int activeFoamCompositionEventCount;
+        private int foamCompositionScanCursor;
+        private int foamCompositionStartedCount;
+        private int foamCompositionCompletedCount;
+        private int foamCompositionRejectedCount;
+        private float latestFoamCompositionProgress;
+        private float latestFoamCompositionHeadDistanceNormalized;
+        private float latestFoamCompositionHeadAcrossNormalized;
+        private float latestFoamCompositionPreviousDistanceNormalized;
+        private float latestFoamCompositionPreviousAcrossNormalized;
+        private float lastFoamCompositionSegmentLength;
+        private int latestFoamCompositionEventId;
+        private int foamCompositionEventUpdateCount;
+        private int foamCompositionSegmentDispatchAttemptCount;
+        private int foamCompositionSegmentDispatchSubmittedCount;
+        private float foamCompositionCumulativeCentrelineDistance;
         private bool progressiveBirthDebugResetPending;
         private bool progressiveBirthDebugReadbackPending;
         private bool progressiveBirthDebugReadbackAvailable;

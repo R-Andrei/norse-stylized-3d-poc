@@ -29,7 +29,12 @@ namespace ProgrammaticStylized3D.Rivers
                 float segmentEndGlobalDistance = 0f,
                 float segmentEndAcrossNormalized = 0f,
                 float segmentEndRadius = 0f,
-                float segmentEndAmount = 0f)
+                float segmentEndAmount = 0f,
+                bool segmentSheetStyle = false,
+                StylizedRiverFoamSpawnPreset compositionPattern =
+                    StylizedRiverFoamSpawnPreset.CompactDiagnostic,
+                float compositionComplexity = 0f,
+                float compositionDensity = 0f)
             {
                 GlobalDistance = globalDistance;
                 AcrossNormalized = acrossNormalized;
@@ -69,6 +74,10 @@ namespace ProgrammaticStylized3D.Rivers
                 SegmentEndSourceAmount = segmentShape
                     ? segmentEndAmount
                     : sourceAmount;
+                SegmentSheetStyle = segmentShape && segmentSheetStyle;
+                CompositionPattern = compositionPattern;
+                CompositionComplexity = Mathf.Clamp01(compositionComplexity);
+                CompositionDensity = Mathf.Clamp01(compositionDensity);
             }
 
             public float GlobalDistance { get; }
@@ -93,12 +102,17 @@ namespace ProgrammaticStylized3D.Rivers
             public float SegmentEndAcrossNormalized { get; }
             public float SegmentEndRadius { get; }
             public float SegmentEndSourceAmount { get; }
+            public bool SegmentSheetStyle { get; }
+            public StylizedRiverFoamSpawnPreset CompositionPattern { get; }
+            public float CompositionComplexity { get; }
+            public float CompositionDensity { get; }
         }
 
-        private struct ProgressiveRibbonEvent
+        private struct FoamCompositionEvent
         {
             public bool Active;
             public int EventId;
+            public StylizedRiverFoamSpawnPreset Pattern;
             public float StartGlobalDistance;
             public float StartAcrossNormalized;
             public float Duration;
@@ -115,6 +129,12 @@ namespace ProgrammaticStylized3D.Rivers
             public float SourceFillFeatureSize;
             public float BendSign;
             public float WidthPhase;
+            public float StrokeAspect;
+            public float FragmentStrength;
+            public float WidthVariation;
+            public float Complexity;
+            public float Density;
+            public bool SheetStyle;
             public float Elapsed;
             public float PreviousGlobalDistance;
             public float PreviousAcrossNormalized;

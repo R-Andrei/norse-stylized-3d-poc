@@ -76,12 +76,12 @@ namespace ProgrammaticStylized3D.Rivers
             pendingIsolatedLifeProbeAbsoluteAging = false;
             isolatedLifeProbeAbsoluteAgingActive = false;
             isolatedLifeProbeWrittenAt = -1.0;
-            ClearProgressiveRibbonEvents();
+            ClearFoamCompositionEvents();
         }
 
         private void OnDestroy()
         {
-            ClearProgressiveRibbonEvents();
+            ClearFoamCompositionEvents();
             BindDisabled();
             ReleaseResources();
         }
@@ -106,7 +106,7 @@ namespace ProgrammaticStylized3D.Rivers
                 ReleaseResources();
                 pendingInjections.Clear();
                 pendingIsolatedLifeProbe = false;
-                ClearProgressiveRibbonEvents();
+                ClearFoamCompositionEvents();
                 ResetManualInjectionSequence();
                 return;
             }
@@ -140,7 +140,7 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 pendingInjections.Clear();
                 pendingIsolatedLifeProbe = false;
-                ClearProgressiveRibbonEvents();
+                ClearFoamCompositionEvents();
                 ResetManualInjectionSequence();
 
                 if (!fullyFrozenLastUpdate)
@@ -170,7 +170,7 @@ namespace ProgrammaticStylized3D.Rivers
                 pendingInjections.Count > 0 ||
                 pendingMaterialBirths.Count > 0 ||
                 pendingIsolatedLifeProbe ||
-                activeProgressiveRibbonEventCount > 0;
+                activeFoamCompositionEventCount > 0;
             bool hasWork = materialWork || topologyDebugActive ||
                 progressiveBirthDebugActive;
 
@@ -277,12 +277,12 @@ namespace ProgrammaticStylized3D.Rivers
                     BeginProgressiveBirthDebugStep();
                 }
 
-                bool progressiveRibbonDeposited =
-                    AdvanceProgressiveRibbonEvents(stepDuration, now);
+                bool foamCompositionDeposited =
+                    AdvanceFoamCompositionEvents(stepDuration, now);
                 bool materialStepActive = currentState != null ||
                     materialLifetimeAuthorityActive ||
-                    progressiveRibbonDeposited ||
-                    activeProgressiveRibbonEventCount > 0 ||
+                    foamCompositionDeposited ||
+                    activeFoamCompositionEventCount > 0 ||
                     pendingMaterialBirths.Count > 0;
 
                 bool measureTopology = false;
@@ -581,7 +581,7 @@ namespace ProgrammaticStylized3D.Rivers
             pendingIsolatedLifeProbeAbsoluteAging = false;
             isolatedLifeProbeAbsoluteAgingActive = false;
             isolatedLifeProbeWrittenAt = -1.0;
-            ClearProgressiveRibbonEvents();
+            ClearFoamCompositionEvents();
             ResetManualInjectionSequence();
             lastInjectionBoundaryCoverage = -1f;
             lastInjectionStateSynchronized = false;
