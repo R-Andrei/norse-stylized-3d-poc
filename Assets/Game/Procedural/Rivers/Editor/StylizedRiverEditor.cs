@@ -2091,9 +2091,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             bool hasFreshMetrics = runtime.TopologyMetricsFresh;
+            bool hasCompletedMetrics = runtime.TopologyMetricsAvailable;
             bool hasVisibleFoam =
-                hasFreshMetrics &&
+                hasCompletedMetrics &&
                 runtime.VisibleFoamPresenceArea > 0.0001f;
+            string metricFreshnessPrefix = hasFreshMetrics ? string.Empty : "stale ";
             float hiddenArea = Mathf.Max(
                 0f,
                 runtime.IntegratedPresenceArea - runtime.VisiblePresenceCoreArea);
@@ -2106,23 +2108,31 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.LabelField(
                 "Visible Life",
                 hasVisibleFoam
-                    ? $"avg {runtime.AverageVisibleRemainingLife:0.00}"
-                    : "No visible foam sample");
+                    ? $"{metricFreshnessPrefix}avg {runtime.AverageVisibleRemainingLife:0.00}"
+                    : hasCompletedMetrics
+                        ? "completed sample found no visible foam"
+                        : "no completed sample yet");
             EditorGUILayout.LabelField(
                 "Local Aging",
                 hasVisibleFoam
-                    ? $"{runtime.AverageLocalAgingRateUnderVisibleFoam:0.00}× avg"
-                    : "No visible foam sample");
+                    ? $"{metricFreshnessPrefix}{runtime.AverageLocalAgingRateUnderVisibleFoam:0.00}× avg"
+                    : hasCompletedMetrics
+                        ? "completed sample found no visible foam"
+                        : "no completed sample yet");
             EditorGUILayout.LabelField(
                 "Topology Under Foam",
                 hasVisibleFoam
-                    ? $"support {runtime.AveragePositiveSupportUnderVisibleFoam:0.00} avg / negative {runtime.AverageNegativeAgingUnderVisibleFoam:0.00} avg"
-                    : "No visible foam sample");
+                    ? $"{metricFreshnessPrefix}support {runtime.AveragePositiveSupportUnderVisibleFoam:0.00} avg / negative {runtime.AverageNegativeAgingUnderVisibleFoam:0.00} avg"
+                    : hasCompletedMetrics
+                        ? "completed sample found no visible foam"
+                        : "no completed sample yet");
             EditorGUILayout.LabelField(
                 "Strongest Sample",
                 hasVisibleFoam
-                    ? $"support {runtime.StrongestPositiveSupportUnderFoam:0.00} / negative {runtime.StrongestNegativeAgingUnderFoam:0.00}"
-                    : "No visible foam sample");
+                    ? $"{metricFreshnessPrefix}support {runtime.StrongestPositiveSupportUnderFoam:0.00} / negative {runtime.StrongestNegativeAgingUnderFoam:0.00}"
+                    : hasCompletedMetrics
+                        ? "completed sample found no visible foam"
+                        : "no completed sample yet");
             EditorGUILayout.LabelField(
                 "Foam Area",
                 $"visible {runtime.VisiblePresenceCoreArea:0.000} m² / hidden {hiddenArea:0.000} m²");

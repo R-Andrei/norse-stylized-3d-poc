@@ -747,6 +747,18 @@ namespace ProgrammaticStylized3D.Rivers
             bool captureManualReference = false)
         {
             using var profilerScope = DiagnosticsMeasureTopologyProfilerMarker.Auto();
+            if (topologyMetricsReadbackPending &&
+                topologyMetricsReadbackRequestedAt >= 0.0 &&
+                Time.realtimeSinceStartupAsDouble -
+                    topologyMetricsReadbackRequestedAt > 1.5)
+            {
+                // Async readback should normally complete quickly. If Unity
+                // drops or stalls a request, do not let the stale pending flag
+                // permanently blind diagnostics.
+                topologyMetricsReadbackPending = false;
+                topologyMetricsReadbackRequestedAt = -1.0;
+            }
+
             if (topologyMetricsReadbackPending ||
                 computeShader == null || currentState == null ||
                 topologyTexture == null || topologySourcesTexture == null ||
@@ -836,6 +848,8 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             topologyMetricsReadbackPending = true;
+            topologyMetricsReadbackRequestedAt =
+                Time.realtimeSinceStartupAsDouble;
             int generation = topologyMetricsGeneration;
             ComputeBuffer requestedBuffer = topologyMetricsBuffer;
             AsyncGPUReadback.Request(
@@ -849,6 +863,7 @@ namespace ProgrammaticStylized3D.Rivers
                     }
 
                     topologyMetricsReadbackPending = false;
+                    topologyMetricsReadbackRequestedAt = -1.0;
                     if (request.hasError)
                     {
                         topologyMetricsAvailable = false;
@@ -878,23 +893,18 @@ namespace ProgrammaticStylized3D.Rivers
                                 TopologyMetricPresenceCoreArea] /
                             IntegratedAreaFixedPointScale;
 
-                        if (materialLifetimeAuthorityActive &&
-                            integratedPresenceArea <= 0.0001f &&
-                            visiblePresenceCoreArea <= 0.0001f &&
-                            pendingInjections.Count == 0 &&
-                            activeProgressiveRibbonEventCount == 0)
+                        if (materialLifetimeAuthorityActive ||
+                            currentState != null)
                         {
-                            materialLifetimeEmptyMetricReadbacks++;
-                            if (materialLifetimeEmptyMetricReadbacks >= 3)
-                            {
-                                materialLifetimeAuthorityActive = false;
-                                lifetimeAuthorityStatus =
-                                    "No live material measured; runtime may sleep";
-                            }
-                        }
-                        else if (materialLifetimeAuthorityActive)
-                        {
-                            materialLifetimeEmptyMetricReadbacks = 0;
+                            materialLifetimeEmptyMetricReadbacks =
+                                integratedPresenceArea <= 0.0001f &&
+                                visiblePresenceCoreArea <= 0.0001f
+                                    ? materialLifetimeEmptyMetricReadbacks + 1
+                                    : 0;
+                            // Metrics observe lifecycle state. They must never
+                            // stop the lifecycle, even after repeated empty
+                            // samples; explicit ClearFoam/disable/rebuild is
+                            // the only non-material way out.
                             lifetimeAuthorityStatus =
                                 "Remaining Life / full-field direct simulation";
                         }

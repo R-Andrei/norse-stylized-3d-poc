@@ -153,7 +153,13 @@ namespace ProgrammaticStylized3D.Rivers
             bool topologyDebugActive = IsTopologyDebugActive;
             bool progressiveBirthDebugActive =
                 IsProgressiveBirthSourceDebugActive;
+            // Patch 4.11C.5.4d: no liveness scheduler remains. Once the
+            // runtime owns allocated material textures, the lifecycle ticks the
+            // full field every material step until an explicit ClearFoam,
+            // disable, rebuild, or resource release. Metrics may observe
+            // emptiness, but they no longer get to stop aging.
             bool materialWork =
+                currentState != null ||
                 materialLifetimeAuthorityActive ||
                 pendingInjections.Count > 0 ||
                 pendingMaterialBirths.Count > 0 ||
@@ -243,10 +249,7 @@ namespace ProgrammaticStylized3D.Rivers
                     stepDuration);
             }
 
-            bool phaseMaterialActive =
-                materialLifetimeAuthorityActive ||
-                activeProgressiveRibbonEventCount > 0 ||
-                pendingMaterialBirths.Count > 0;
+            bool phaseMaterialActive = materialWork;
             AdvanceFoamPhaseTransport(
                 deltaTime,
                 signedDownstreamSpeed,
@@ -267,12 +270,13 @@ namespace ProgrammaticStylized3D.Rivers
 
                 bool progressiveRibbonDeposited =
                     AdvanceProgressiveRibbonEvents(stepDuration, now);
-                bool materialStepActive =
+                bool materialStepActive = currentState != null ||
                     materialLifetimeAuthorityActive ||
                     progressiveRibbonDeposited ||
                     activeProgressiveRibbonEventCount > 0 ||
                     pendingMaterialBirths.Count > 0;
 
+                bool measureTopology = false;
                 if (materialStepActive)
                 {
                     ConfigureSharedComputeParameters(stepDuration);
@@ -284,13 +288,15 @@ namespace ProgrammaticStylized3D.Rivers
                     // Material aging consumes the single composite topology
                     // field. Topology generation internals remain quarantined:
                     // they provide only this sampled input and never own
-                    // material lifetime directly.
+                    // material lifetime directly. Metrics are now measured
+                    // after lifecycle/injection so the Inspector observes the
+                    // same state that is rendered, not the previous tick.
                     bool footprintMetricsActive =
+                        currentState != null ||
                         materialLifetimeAuthorityActive ||
                         topologyDebugActive ||
                         manualProofReferencePending ||
                         manualProofReferenceArea > 0.0001f;
-                    bool measureTopology = false;
                     float topologyMetricsInterval = 1f /
                         TopologyMetricsUpdateRate;
                     if (footprintMetricsActive)
@@ -301,20 +307,7 @@ namespace ProgrammaticStylized3D.Rivers
                             topologyMetricsInterval;
                     }
 
-                    if (measureTopology)
-                    {
-                        if (evolvingTopologyRebuilt)
-                        {
-                            MeasureTopologyMetrics();
-                        }
-                        else
-                        {
-                            RefreshDynamicTopologySources(true);
-                        }
-
-                        topologyMetricsAccumulator %= topologyMetricsInterval;
-                    }
-                    else if (!evolvingTopologyRebuilt)
+                    if (!evolvingTopologyRebuilt)
                     {
                         RefreshDynamicTopologySources(false);
                     }
@@ -323,6 +316,18 @@ namespace ProgrammaticStylized3D.Rivers
                 if (materialStepActive)
                 {
                     SimulateFullField(stepDuration);
+                    if (measureTopology && !topologyMaintenanceBlocked)
+                    {
+                        MeasureTopologyMetrics();
+                        topologyMetricsAccumulator %=
+                            1f / TopologyMetricsUpdateRate;
+                    }
+                }
+                else if (measureTopology && !topologyMaintenanceBlocked)
+                {
+                    MeasureTopologyMetrics();
+                    topologyMetricsAccumulator %=
+                        1f / TopologyMetricsUpdateRate;
                 }
 
                 if (progressiveBirthDebugActive)

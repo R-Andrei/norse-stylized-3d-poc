@@ -56,6 +56,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool topologyMetricsReadbackPending;
         private bool topologyMetricsAvailable;
         private double topologyMetricsLastCompletedAt = -1.0;
+        private double topologyMetricsReadbackRequestedAt = -1.0;
         private int topologyMetricsGeneration;
         private float integratedPresenceArea;
         private float visiblePresenceCoreArea;

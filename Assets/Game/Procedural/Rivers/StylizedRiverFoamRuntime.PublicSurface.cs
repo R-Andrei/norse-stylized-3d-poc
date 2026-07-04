@@ -608,7 +608,7 @@ namespace ProgrammaticStylized3D.Rivers
                 TopologyMetricMaxNegativeAgingUnderFoam);
         public string LifetimeAuthorityStatus => lifetimeAuthorityStatus;
         public bool MaterialLifetimeAuthorityActive =>
-            materialLifetimeAuthorityActive;
+            currentState != null || materialLifetimeAuthorityActive;
         public string LifetimeProofStatus => ResolveLifetimeProofStatus();
         public string TopologyAgingProofStatus => ResolveTopologyAgingProofStatus();
         public int ActiveChunkCount => 0;
@@ -684,6 +684,7 @@ namespace ProgrammaticStylized3D.Rivers
             InitializationComplete && currentState != null;
         public bool ConservativeTransportActive => false;
         public bool IsSleeping =>
+            currentState == null &&
             !TopologyReplacementInProgress &&
             !TopologyTransitionActive &&
             !IsTopologyDebugActive &&

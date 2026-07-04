@@ -19,7 +19,7 @@ namespace ProgrammaticStylized3D.Rivers
         private const int HighStructuralResolution = 128;
         private const float ResourceReleaseDelaySeconds = 2f;
         private const float MaximumManualReservationSeconds = 300f;
-        private const float TopologyMetricsUpdateRate = 2f;
+        private const float TopologyMetricsUpdateRate = 8f;
         private const int ProgressiveRibbonEventCapacity = 8;
         private const int ProgressiveBirthDebugCounterCount = 2;
         private const float ProgressiveRibbonMinimumDuration = 0.5f;

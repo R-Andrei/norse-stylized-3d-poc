@@ -1359,13 +1359,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             MeshData meshData = new MeshData();
             Vector3 centre = CalculateAverage(soup.Positions);
             Bounds bounds = CalculateBounds(soup.Positions);
-            FaceMaterialMaskLookup materialMaskLookup =
-                FaceMaterialMaskLookup.Build(
-                    soup,
-                    centre,
-                    bounds,
-                    recipe);
-
             float safeWidth = Mathf.Max(0.001f, bounds.size.x);
             float safeHeight = Mathf.Max(0.001f, bounds.size.y);
             float safeDepth = Mathf.Max(0.001f, bounds.size.z);
@@ -1403,7 +1396,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     safeHeight,
                     safeDepth,
                     faceNormal,
-                    materialMaskLookup,
                     recipe);
 
                 int indexB = AddRenderedVertex(
@@ -1417,7 +1409,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     safeHeight,
                     safeDepth,
                     faceNormal,
-                    materialMaskLookup,
                     recipe);
 
                 int indexC = AddRenderedVertex(
@@ -1431,7 +1422,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     safeHeight,
                     safeDepth,
                     faceNormal,
-                    materialMaskLookup,
                     recipe);
 
                 meshData.AddTriangle(indexA, indexB, indexC);
@@ -1451,7 +1441,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float height,
             float depth,
             Vector3 faceNormal,
-            FaceMaterialMaskLookup materialMaskLookup,
             MassRecipe recipe)
         {
             Vector2 uv = new Vector2(
@@ -1481,29 +1470,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 green,
                 randomValue);
 
-            float edgeWear = materialMaskLookup.ResolveConvexEdgeWear(
-                faceIndex,
-                position);
-
-            float concaveCrease = materialMaskLookup.ResolveConcaveCrease(
-                faceIndex,
-                position);
+            // Patch 12C deliberately keeps line-like masks neutral. The earlier
+            // scalar/edge-band attempts produced triangle wedges instead of
+            // readable stylized ridge wear or cracks. Convex edge wear and
+            // concave crease rendering need a later line/overlay representation.
+            float edgeWear = 0f;
+            float concaveCrease = 0f;
 
             float dirtDeposit = ResolveDirtDepositMask(
+                position,
                 vertical01,
                 green,
                 blue,
-                randomValue,
-                materialMaskLookup.ResolveDirtDepositBoost(
-                    faceIndex,
-                    position));
+                recipe,
+                0f);
 
-            Vector2 barycentricXY = ResolveBarycentricXY(cornerIndex);
             Vector4 materialMasks = new Vector4(
                 concaveCrease,
                 dirtDeposit,
-                barycentricXY.x,
-                barycentricXY.y);
+                0f,
+                0f);
 
             return meshData.AddVertex(
                 position,
@@ -1512,27 +1498,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 materialMasks);
         }
 
-        private static Vector2 ResolveBarycentricXY(int cornerIndex)
-        {
-            return cornerIndex switch
-            {
-                0 => new Vector2(1f, 0f),
-                1 => new Vector2(0f, 1f),
-                _ => Vector2.zero
-            };
-        }
-
         // Vertex colour material contract:
         // R = existing deterministic surface variation.
         // G = upward/flat exposure mask for lighter worn or frosted planes.
-        // B = base/side/occlusion mask for darker crevice-like response.
-        // A = convex ridge/edge wear intensity.
+        // B = base/side/occlusion mask for darker crevice-like broad grounding.
+        // A = reserved for future convex ridge/edge wear. Patch 12C writes it neutral
+        //     because interpolated scalar edge masks produced triangle wedges.
         //
         // UV2 material contract:
-        // X = concave crease or selected crack-darkening mask.
-        // Y = dirty deposit / mineral stain mask.
-        // ZW = triangle-local barycentric helper used by the shader to localize
-        //      edge/crease debug response near actual mesh edges.
+        // X = reserved for future concave crease or selected crack-darkening strength.
+        // Y = dirty deposit / mineral stain area mask.
+        // Z = reserved for future convex edge localization data.
+        // W = reserved for future concave crease localization data.
+        //
+        // Line-like features need a later line/overlay or per-edge representation.
+        // Broad area features remain safe as vertex/interpolated masks.
         private static float ResolveExposureMask(
             Vector3 faceNormal,
             float vertical01,
@@ -1555,56 +1535,114 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float exposure,
             float randomValue)
         {
-            float baseContact =
-                1f - Mathf.SmoothStep(0.018f, 0.145f, vertical01);
+            // Broad area mask only. Patch 12C.2 deliberately hard-clamps this
+            // to the base/lower sheltered portion of the mass; the previous
+            // versions left too much baseline value and debugged as a pale wash
+            // across the whole rock. This channel is broad grounding/contact
+            // darkness, not cracks.
+            float upperKill = Mathf.Pow(
+                1f - Mathf.SmoothStep(0.22f, 0.50f, vertical01),
+                1.85f);
+
+            float baseContact = Mathf.Pow(
+                1f - Mathf.SmoothStep(0.000f, 0.125f, vertical01),
+                2.40f);
 
             float sideAmount = Mathf.SmoothStep(
-                0.22f,
-                0.84f,
+                0.30f,
+                0.88f,
                 1f - Mathf.Abs(faceNormal.y));
-            float lowSideGate =
-                1f - Mathf.SmoothStep(0.20f, 0.68f, vertical01);
-            float sideOcclusion = sideAmount * lowSideGate;
+
+            float lowerSide = sideAmount * Mathf.Pow(
+                1f - Mathf.SmoothStep(0.045f, 0.285f, vertical01),
+                2.20f);
 
             float shelteredSurface =
-                (1f - exposure) *
-                (1f - Mathf.SmoothStep(0.18f, 0.58f, vertical01));
-            float surfaceBreakup = (randomValue - 0.5f) * 0.028f;
+                Mathf.Clamp01(1f - exposure) *
+                sideAmount *
+                Mathf.Pow(
+                    1f - Mathf.SmoothStep(0.030f, 0.265f, vertical01),
+                    2.55f);
 
-            return Mathf.Clamp01(
-                baseContact * 0.66f +
-                sideOcclusion * 0.22f +
-                shelteredSurface * 0.10f +
-                surfaceBreakup);
+            float underside = Mathf.Clamp01(-faceNormal.y) * Mathf.Pow(
+                1f - Mathf.SmoothStep(0.015f, 0.220f, vertical01),
+                2.10f);
+
+            float surfaceBreakup = (randomValue - 0.5f) * 0.006f;
+
+            float mask =
+                baseContact * 0.92f +
+                lowerSide * 0.24f +
+                shelteredSurface * 0.16f +
+                underside * 0.30f +
+                surfaceBreakup;
+
+            return Mathf.Clamp01(mask * upperKill);
         }
 
         private static float ResolveDirtDepositMask(
+            Vector3 position,
             float vertical01,
             float exposure,
             float crevice,
-            float randomValue,
+            MassRecipe recipe,
             float authoredDepositBoost)
         {
-            float baseBand =
-                1f - Mathf.SmoothStep(0.025f, 0.24f, vertical01);
-            float lowShelterBand =
-                Mathf.SmoothStep(0.015f, 0.16f, vertical01) *
-                (1f - Mathf.SmoothStep(0.28f, 0.62f, vertical01));
-            float sheltered =
-                Mathf.Clamp01(crevice * 0.72f + (1f - exposure) * 0.28f);
-            float depositCore =
-                baseBand * 0.46f +
-                lowShelterBand * sheltered * 0.24f +
-                crevice * 0.16f +
-                authoredDepositBoost * 0.34f;
-            float breakup = Mathf.Lerp(
-                0.42f,
-                1.22f,
-                Mathf.SmoothStep(0.18f, 0.92f, randomValue));
+            // Environmental area mask. Patch 12C.2 makes this primarily a
+            // lower-rim / lower-side buildup mask. It may crawl upward in
+            // broad irregular patches, but exposed upper and mid-body faces
+            // should remain mostly neutral in debug.
+            float upperKill = Mathf.Pow(
+                1f - Mathf.SmoothStep(0.245f, 0.470f, vertical01),
+                1.65f);
 
-            return Mathf.Clamp01(
-                depositCore * breakup +
-                lowShelterBand * authoredDepositBoost * 0.26f);
+            float baseBand = Mathf.Pow(
+                1f - Mathf.SmoothStep(0.000f, 0.185f, vertical01),
+                1.95f);
+
+            float crawlWindow =
+                Mathf.SmoothStep(0.030f, 0.125f, vertical01) *
+                (1f - Mathf.SmoothStep(0.170f, 0.355f, vertical01));
+
+            float sideShelter = Mathf.Clamp01(1f - exposure);
+
+            float broadNoiseA = HashPosition01(
+                unchecked(recipe.SurfaceSeed ^ 0x51A7E),
+                new Vector3(
+                    position.x * 0.58f,
+                    position.y * 0.24f,
+                    position.z * 0.58f));
+
+            float broadNoiseB = HashPosition01(
+                unchecked(recipe.SurfaceSeed ^ 0x6D3B1),
+                new Vector3(
+                    position.x * 1.05f + 2.17f,
+                    position.y * 0.42f - 1.31f,
+                    position.z * 1.05f + 0.43f));
+
+            float broadPatch = Mathf.SmoothStep(
+                0.46f,
+                0.86f,
+                broadNoiseA * 0.64f + broadNoiseB * 0.36f);
+
+            float fineBreakup = Mathf.Lerp(
+                0.55f,
+                1.08f,
+                HashPosition01(
+                    unchecked(recipe.SurfaceSeed ^ 0xD147),
+                    position * 2.05f));
+
+            float baseDeposit = baseBand * Mathf.Lerp(0.48f, 1.08f, broadPatch);
+            float upwardPatch = crawlWindow * Mathf.Pow(sideShelter, 1.25f) * broadPatch;
+            float creviceCatch = crevice * sideShelter * Mathf.Lerp(0.18f, 0.48f, broadPatch);
+
+            float depositCore =
+                baseDeposit * 0.86f +
+                upwardPatch * 0.64f +
+                creviceCatch +
+                authoredDepositBoost * 0.0f;
+
+            return Mathf.Clamp01(depositCore * fineBreakup * upperKill);
         }
 
         #endregion
@@ -2647,6 +2685,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return Hash01(seed, index) * 2f - 1f;
         }
 
+        private static float HashPosition01(int seed, Vector3 position)
+        {
+            unchecked
+            {
+                int x = Mathf.RoundToInt(position.x * 127.0f);
+                int y = Mathf.RoundToInt(position.y * 127.0f);
+                int z = Mathf.RoundToInt(position.z * 127.0f);
+                int index = x * 73856093 ^ y * 19349663 ^ z * 83492791;
+                return Hash01(seed, index);
+            }
+        }
+
+
         #endregion
 
         private enum MacroProfile
@@ -2735,35 +2786,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     bounds.size.z);
                 maximumDimension = Mathf.Max(0.001f, maximumDimension);
 
+                List<EdgeMaterialCandidate> candidates =
+                    new List<EdgeMaterialCandidate>(edges.Count);
+
                 foreach (EdgeMaterialAggregate edge in edges.Values)
                 {
-                    EdgeMaterialMask edgeMask = ResolveEdgeMaterialMask(
+                    EdgeMaterialCandidate candidate = ResolveEdgeMaterialCandidate(
                         edge,
                         faces,
+                        centre,
                         bounds,
                         maximumDimension,
                         recipe);
 
-                    if (edgeMask.IsNeutral)
+                    if (candidate.HasAnyMask)
                     {
-                        continue;
-                    }
-
-                    for (int i = 0; i < edge.FaceIndices.Count; i++)
-                    {
-                        int faceIndex = edge.FaceIndices[i];
-                        AddFaceVertexMask(
-                            masks,
-                            faceIndex,
-                            edge.Start,
-                            edgeMask);
-                        AddFaceVertexMask(
-                            masks,
-                            faceIndex,
-                            edge.End,
-                            edgeMask);
+                        candidates.Add(candidate);
                     }
                 }
+
+                ApplySelectedFeatureMasks(
+                    candidates,
+                    masks,
+                    recipe);
 
                 return new FaceMaterialMaskLookup(masks);
             }
@@ -2787,6 +2832,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Vector3 position)
             {
                 return ResolveFaceVertexMask(faceIndex, position).DirtDepositBoost;
+            }
+
+            public float ResolveConvexEdgeLine(
+                int faceIndex,
+                Vector3 position)
+            {
+                return ResolveFaceVertexMask(faceIndex, position).ConvexEdgeLine;
+            }
+
+            public float ResolveConcaveCreaseLine(
+                int faceIndex,
+                Vector3 position)
+            {
+                return ResolveFaceVertexMask(faceIndex, position).ConcaveCreaseLine;
             }
 
             private FaceVertexMaterialMask ResolveFaceVertexMask(
@@ -2819,16 +2878,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         key,
                         out EdgeMaterialAggregate edge))
                 {
-                    edge = new EdgeMaterialAggregate(start, end);
+                    edge = new EdgeMaterialAggregate(key, start, end);
                     edges.Add(key, edge);
                 }
 
                 edge.AddFace(faceIndex);
             }
 
-            private static EdgeMaterialMask ResolveEdgeMaterialMask(
+            private static EdgeMaterialCandidate ResolveEdgeMaterialCandidate(
                 EdgeMaterialAggregate edge,
                 Dictionary<int, FaceMaskRecord> faces,
+                Vector3 centre,
                 Bounds bounds,
                 float maximumDimension,
                 MassRecipe recipe)
@@ -2836,8 +2896,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 float edgeLength = (edge.End - edge.Start).magnitude;
                 float edgeLength01 = edgeLength / maximumDimension;
                 float readableLength = Mathf.SmoothStep(
-                    0.035f,
-                    0.16f,
+                    0.09f,
+                    0.28f,
                     edgeLength01);
 
                 if (readableLength <= 0.001f)
@@ -2846,29 +2906,50 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
 
                 Vector3 midpoint = (edge.Start + edge.End) * 0.5f;
+                Vector3 edgeDirection = (edge.End - edge.Start).normalized;
                 float safeHeight = Mathf.Max(0.001f, bounds.size.y);
                 float vertical01 = Mathf.Clamp01(
                     (midpoint.y - bounds.min.y) / safeHeight);
                 float baseSuppression = Mathf.SmoothStep(
-                    0.055f,
-                    0.20f,
+                    0.115f,
+                    0.285f,
                     vertical01);
                 float exposedHeight = Mathf.SmoothStep(
-                    0.14f,
-                    0.86f,
+                    0.16f,
+                    0.82f,
                     vertical01);
                 float lowerDepositBand =
-                    Mathf.SmoothStep(0.015f, 0.18f, vertical01) *
-                    (1f - Mathf.SmoothStep(0.42f, 0.90f, vertical01));
+                    (1f - Mathf.SmoothStep(0.03f, 0.36f, vertical01)) *
+                    Mathf.SmoothStep(0.005f, 0.10f, vertical01);
 
-                float convexCandidate = 0f;
-                float concaveCandidate = 0f;
-                float fractureCandidate = 0f;
+                float strongestAngleScore = 0f;
+                float concaveTopologyScore = 0f;
+                Vector3 averageNormal = Vector3.zero;
+
+                for (int i = 0; i < edge.FaceIndices.Count; i++)
+                {
+                    if (faces.TryGetValue(
+                            edge.FaceIndices[i],
+                            out FaceMaskRecord face))
+                    {
+                        averageNormal += face.Normal;
+                    }
+                }
+
+                if (averageNormal.sqrMagnitude <= MinimumEdgeLengthSqr)
+                {
+                    averageNormal = (midpoint - centre).sqrMagnitude > MinimumEdgeLengthSqr
+                        ? (midpoint - centre).normalized
+                        : Vector3.up;
+                }
+                else
+                {
+                    averageNormal.Normalize();
+                }
 
                 if (edge.FaceIndices.Count <= 1)
                 {
-                    convexCandidate = 0.54f;
-                    fractureCandidate = 0.22f;
+                    strongestAngleScore = 0.64f;
                 }
                 else
                 {
@@ -2885,28 +2966,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                                 1f);
                             float angleAmount = 1f - normalDot;
                             float angleScore = Mathf.SmoothStep(
-                                0.045f,
-                                0.34f,
+                                0.18f,
+                                0.64f,
                                 angleAmount);
 
-                            if (angleScore <= 0.001f)
-                            {
-                                continue;
-                            }
-
-                            float upwardSupport = Mathf.Max(
-                                Mathf.Clamp01(first.Normal.y * 0.55f + 0.45f),
-                                Mathf.Clamp01(second.Normal.y * 0.55f + 0.45f));
-
-                            // Most generated masses are intentionally closed convex shells.
-                            // Trying to strictly classify convex/concave topology leaves almost no useful
-                            // data on those shapes. For material authoring, a sharp readable edge is a
-                            // convex-wear candidate unless later selected as a sparse dark fracture seam.
-                            convexCandidate = Mathf.Max(
-                                convexCandidate,
-                                angleScore * Mathf.Lerp(0.72f, 1.10f, upwardSupport));
-                            fractureCandidate = Mathf.Max(
-                                fractureCandidate,
+                            strongestAngleScore = Mathf.Max(
+                                strongestAngleScore,
                                 angleScore);
 
                             Vector3 centreDelta = second.Centre - first.Centre;
@@ -2917,74 +2982,262 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                                 float secondInset = Vector3.Dot(-direction, second.Normal);
                                 float concaveLike = Mathf.Clamp01(
                                     (firstInset + secondInset) * 0.5f);
-                                concaveCandidate = Mathf.Max(
-                                    concaveCandidate,
+                                concaveTopologyScore = Mathf.Max(
+                                    concaveTopologyScore,
                                     angleScore * concaveLike);
                             }
                         }
                     }
                 }
 
-                int edgeHash = new EdgeKey(edge.Start, edge.End).GetHashCode();
+                if (strongestAngleScore <= 0.001f)
+                {
+                    return default;
+                }
+
+                int edgeHash = edge.Key.GetHashCode();
                 float wearBreakup = Mathf.Lerp(
                     0.72f,
-                    1.10f,
+                    1.12f,
                     Hash01(
                         unchecked(recipe.SurfaceSeed ^ 0x37A1D5),
                         edgeHash));
-                float convexEdgeWear =
-                    convexCandidate *
+                float outward = (midpoint - centre).sqrMagnitude > MinimumEdgeLengthSqr
+                    ? Mathf.Clamp01(Vector3.Dot(averageNormal, (midpoint - centre).normalized) * 0.5f + 0.5f)
+                    : 0.5f;
+                float upwardSupport = Mathf.Clamp01(averageNormal.y * 0.45f + 0.55f);
+                float convexScore =
+                    strongestAngleScore *
                     readableLength *
                     baseSuppression *
-                    Mathf.Lerp(0.82f, 1.22f, exposedHeight) *
+                    Mathf.Lerp(0.76f, 1.22f, exposedHeight) *
+                    Mathf.Lerp(0.74f, 1.08f, outward) *
+                    Mathf.Lerp(0.88f, 1.12f, upwardSupport) *
                     wearBreakup;
-                convexEdgeWear = Mathf.SmoothStep(
-                    0.045f,
-                    0.46f,
-                    convexEdgeWear);
+                convexScore = Mathf.SmoothStep(0.12f, 0.58f, convexScore);
 
-                float selectionThreshold = GetCreaseSelectionThreshold(recipe);
+                float sideScore = 1f - Mathf.SmoothStep(
+                    0.18f,
+                    0.70f,
+                    Mathf.Abs(averageNormal.y));
+                float verticalOrDiagonal = Mathf.SmoothStep(
+                    0.10f,
+                    0.72f,
+                    Mathf.Abs(edgeDirection.y));
+                float midHeightBand =
+                    Mathf.SmoothStep(0.12f, 0.30f, vertical01) *
+                    (1f - Mathf.SmoothStep(0.84f, 0.98f, vertical01));
                 float creaseRandom = Hash01(
                     unchecked(recipe.SurfaceSeed ^ 0x5EED5EA),
                     edgeHash);
-                float selectedFracture = creaseRandom <= selectionThreshold ? 1f : 0f;
-                float longReadableEdge = Mathf.SmoothStep(
-                    0.045f,
-                    0.18f,
-                    edgeLength01);
-                float upperCutoff =
-                    1f - Mathf.SmoothStep(0.90f, 1.0f, vertical01) * 0.42f;
-                float concaveCrease =
-                    concaveCandidate * 0.80f +
-                    fractureCandidate *
-                    longReadableEdge *
-                    selectedFracture *
-                    0.82f;
-                concaveCrease *=
-                    Mathf.SmoothStep(0.035f, 0.14f, vertical01) *
-                    upperCutoff;
-                concaveCrease = Mathf.SmoothStep(
-                    0.045f,
-                    0.42f,
-                    concaveCrease);
+                float selectedFracture = creaseRandom <= GetCreaseSelectionThreshold(recipe)
+                    ? 1f
+                    : 0f;
+                float authoredFractureScore =
+                    strongestAngleScore *
+                    readableLength *
+                    sideScore *
+                    midHeightBand *
+                    Mathf.Lerp(0.55f, 1.08f, verticalOrDiagonal) *
+                    selectedFracture;
+                float concaveScore = Mathf.Max(
+                    concaveTopologyScore * readableLength * midHeightBand,
+                    authoredFractureScore);
+                concaveScore = Mathf.SmoothStep(0.10f, 0.48f, concaveScore);
 
                 float dirtBreakup = Mathf.Lerp(
-                    0.68f,
-                    1.16f,
+                    0.72f,
+                    1.15f,
                     Hash01(
                         unchecked(recipe.SurfaceSeed ^ 0xD171),
                         edgeHash));
                 float dirtDepositBoost = Mathf.Clamp01(
                     lowerDepositBand *
+                    Mathf.Lerp(0.35f, 1.0f, sideScore) *
                     readableLength *
                     dirtBreakup *
-                    (0.20f + concaveCrease * 0.42f +
-                     (1f - convexEdgeWear) * 0.10f));
+                    (0.16f + concaveScore * 0.38f));
 
-                return new EdgeMaterialMask(
-                    convexEdgeWear,
-                    concaveCrease,
+                return new EdgeMaterialCandidate(
+                    edge,
+                    convexScore,
+                    concaveScore,
                     dirtDepositBoost);
+            }
+
+            private static void ApplySelectedFeatureMasks(
+                List<EdgeMaterialCandidate> candidates,
+                Dictionary<FaceVertexKey, FaceVertexMaterialMask> masks,
+                MassRecipe recipe)
+            {
+                List<EdgeMaterialCandidate> convexCandidates =
+                    new List<EdgeMaterialCandidate>(candidates.Count);
+                List<EdgeMaterialCandidate> concaveCandidates =
+                    new List<EdgeMaterialCandidate>(candidates.Count);
+
+                for (int i = 0; i < candidates.Count; i++)
+                {
+                    EdgeMaterialCandidate candidate = candidates[i];
+
+                    if (candidate.ConvexEdgeWear > 0.001f)
+                    {
+                        convexCandidates.Add(candidate);
+                    }
+
+                    if (candidate.ConcaveCrease > 0.001f)
+                    {
+                        concaveCandidates.Add(candidate);
+                    }
+
+                    if (candidate.DirtDepositBoost > 0.025f)
+                    {
+                        ApplyCandidateMask(
+                            masks,
+                            candidate,
+                            0f,
+                            0f,
+                            candidate.DirtDepositBoost,
+                            0f,
+                            0f);
+                    }
+                }
+
+                convexCandidates.Sort(
+                    (left, right) => right.ConvexEdgeWear.CompareTo(left.ConvexEdgeWear));
+                concaveCandidates.Sort(
+                    (left, right) => right.ConcaveCrease.CompareTo(left.ConcaveCrease));
+
+                HashSet<EdgeKey> convexSelected = new HashSet<EdgeKey>();
+                int convexBudget = ResolveConvexFeatureBudget(
+                    recipe,
+                    convexCandidates.Count);
+                int convexCount = 0;
+
+                for (int i = 0; i < convexCandidates.Count && convexCount < convexBudget; i++)
+                {
+                    EdgeMaterialCandidate candidate = convexCandidates[i];
+
+                    if (candidate.ConvexEdgeWear < 0.12f)
+                    {
+                        break;
+                    }
+
+                    convexSelected.Add(candidate.Edge.Key);
+                    ApplyCandidateMask(
+                        masks,
+                        candidate,
+                        candidate.ConvexEdgeWear,
+                        0f,
+                        0f,
+                        1f,
+                        0f);
+                    convexCount++;
+                }
+
+                int concaveBudget = ResolveConcaveFeatureBudget(
+                    recipe,
+                    concaveCandidates.Count);
+                int concaveCount = 0;
+
+                for (int i = 0; i < concaveCandidates.Count && concaveCount < concaveBudget; i++)
+                {
+                    EdgeMaterialCandidate candidate = concaveCandidates[i];
+
+                    if (candidate.ConcaveCrease < 0.10f)
+                    {
+                        break;
+                    }
+
+                    if (convexSelected.Contains(candidate.Edge.Key) &&
+                        candidate.ConcaveCrease <= candidate.ConvexEdgeWear * 1.15f)
+                    {
+                        continue;
+                    }
+
+                    ApplyCandidateMask(
+                        masks,
+                        candidate,
+                        0f,
+                        candidate.ConcaveCrease,
+                        0f,
+                        0f,
+                        1f);
+                    concaveCount++;
+                }
+            }
+
+            private static int ResolveConvexFeatureBudget(
+                MassRecipe recipe,
+                int candidateCount)
+            {
+                int budget = recipe.Archetype switch
+                {
+                    MassArchetype.BrokenChunk => 18,
+                    MassArchetype.FracturedPillar => 16,
+                    MassArchetype.LayeredStone => 14,
+                    MassArchetype.CarvedMarkerStone => 12,
+                    MassArchetype.StandingStone => 12,
+                    MassArchetype.FlatSlab => 10,
+                    MassArchetype.PolishedStone => 6,
+                    _ => 12
+                };
+
+                budget += recipe.FormComplexity switch
+                {
+                    FormComplexity.Primitive => -5,
+                    FormComplexity.Simple => -3,
+                    FormComplexity.Complex => 4,
+                    FormComplexity.HighlyComplex => 6,
+                    _ => 0
+                };
+
+                budget += recipe.EdgeCharacter switch
+                {
+                    EdgeCharacter.Chipped => 4,
+                    EdgeCharacter.Sharp => 2,
+                    EdgeCharacter.Worn => -1,
+                    EdgeCharacter.Polished => -3,
+                    _ => 0
+                };
+
+                return Mathf.Clamp(budget, 3, Mathf.Max(3, candidateCount));
+            }
+
+            private static int ResolveConcaveFeatureBudget(
+                MassRecipe recipe,
+                int candidateCount)
+            {
+                int budget = recipe.Archetype switch
+                {
+                    MassArchetype.BrokenChunk => 8,
+                    MassArchetype.FracturedPillar => 9,
+                    MassArchetype.CarvedMarkerStone => 7,
+                    MassArchetype.LayeredStone => 5,
+                    MassArchetype.StandingStone => 5,
+                    MassArchetype.FlatSlab => 4,
+                    MassArchetype.PolishedStone => 1,
+                    _ => 4
+                };
+
+                budget += recipe.FormComplexity switch
+                {
+                    FormComplexity.Primitive => -2,
+                    FormComplexity.Simple => -1,
+                    FormComplexity.Complex => 2,
+                    FormComplexity.HighlyComplex => 3,
+                    _ => 0
+                };
+
+                budget += recipe.EdgeCharacter switch
+                {
+                    EdgeCharacter.Chipped => 2,
+                    EdgeCharacter.Sharp => 1,
+                    EdgeCharacter.Worn => -1,
+                    EdgeCharacter.Polished => -2,
+                    _ => 0
+                };
+
+                return Mathf.Clamp(budget, 0, Mathf.Max(0, candidateCount));
             }
 
             private static float GetCreaseSelectionThreshold(
@@ -2992,42 +3245,79 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 float threshold = recipe.Archetype switch
                 {
-                    MassArchetype.BrokenChunk => 0.40f,
-                    MassArchetype.FracturedPillar => 0.42f,
-                    MassArchetype.CarvedMarkerStone => 0.34f,
-                    MassArchetype.LayeredStone => 0.30f,
-                    MassArchetype.StandingStone => 0.26f,
-                    MassArchetype.FlatSlab => 0.24f,
-                    MassArchetype.PolishedStone => 0.10f,
-                    _ => 0.22f
+                    MassArchetype.BrokenChunk => 0.34f,
+                    MassArchetype.FracturedPillar => 0.36f,
+                    MassArchetype.CarvedMarkerStone => 0.28f,
+                    MassArchetype.LayeredStone => 0.24f,
+                    MassArchetype.StandingStone => 0.22f,
+                    MassArchetype.FlatSlab => 0.20f,
+                    MassArchetype.PolishedStone => 0.06f,
+                    _ => 0.18f
                 };
 
                 threshold += recipe.FormComplexity switch
                 {
-                    FormComplexity.Primitive => -0.05f,
-                    FormComplexity.Simple => -0.02f,
-                    FormComplexity.Complex => 0.05f,
-                    FormComplexity.HighlyComplex => 0.08f,
+                    FormComplexity.Primitive => -0.06f,
+                    FormComplexity.Simple => -0.03f,
+                    FormComplexity.Complex => 0.04f,
+                    FormComplexity.HighlyComplex => 0.06f,
                     _ => 0f
                 };
 
                 threshold += recipe.EdgeCharacter switch
                 {
-                    EdgeCharacter.Chipped => 0.07f,
-                    EdgeCharacter.Sharp => 0.04f,
+                    EdgeCharacter.Chipped => 0.06f,
+                    EdgeCharacter.Sharp => 0.03f,
                     EdgeCharacter.Worn => -0.03f,
-                    EdgeCharacter.Polished => -0.08f,
+                    EdgeCharacter.Polished => -0.07f,
                     _ => 0f
                 };
 
-                return Mathf.Clamp(threshold, 0.04f, 0.48f);
+                return Mathf.Clamp(threshold, 0.02f, 0.42f);
+            }
+
+            private static void ApplyCandidateMask(
+                Dictionary<FaceVertexKey, FaceVertexMaterialMask> masks,
+                EdgeMaterialCandidate candidate,
+                float convexEdgeWear,
+                float concaveCrease,
+                float dirtDepositBoost,
+                float convexEdgeLine,
+                float concaveCreaseLine)
+            {
+                for (int i = 0; i < candidate.Edge.FaceIndices.Count; i++)
+                {
+                    int faceIndex = candidate.Edge.FaceIndices[i];
+                    AddFaceVertexMask(
+                        masks,
+                        faceIndex,
+                        candidate.Edge.Start,
+                        convexEdgeWear,
+                        concaveCrease,
+                        dirtDepositBoost,
+                        convexEdgeLine,
+                        concaveCreaseLine);
+                    AddFaceVertexMask(
+                        masks,
+                        faceIndex,
+                        candidate.Edge.End,
+                        convexEdgeWear,
+                        concaveCrease,
+                        dirtDepositBoost,
+                        convexEdgeLine,
+                        concaveCreaseLine);
+                }
             }
 
             private static void AddFaceVertexMask(
                 Dictionary<FaceVertexKey, FaceVertexMaterialMask> masks,
                 int faceIndex,
                 Vector3 position,
-                EdgeMaterialMask edgeMask)
+                float convexEdgeWear,
+                float concaveCrease,
+                float dirtDepositBoost,
+                float convexEdgeLine,
+                float concaveCreaseLine)
             {
                 FaceVertexKey key = new FaceVertexKey(
                     faceIndex,
@@ -3037,9 +3327,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     out FaceVertexMaterialMask existing);
 
                 masks[key] = new FaceVertexMaterialMask(
-                    Mathf.Max(existing.ConvexEdgeWear, edgeMask.ConvexEdgeWear),
-                    Mathf.Max(existing.ConcaveCrease, edgeMask.ConcaveCrease),
-                    Mathf.Max(existing.DirtDepositBoost, edgeMask.DirtDepositBoost));
+                    Mathf.Max(existing.ConvexEdgeWear, convexEdgeWear),
+                    Mathf.Max(existing.ConcaveCrease, concaveCrease),
+                    Mathf.Max(existing.DirtDepositBoost, dirtDepositBoost),
+                    Mathf.Max(existing.ConvexEdgeLine, convexEdgeLine),
+                    Mathf.Max(existing.ConcaveCreaseLine, concaveCreaseLine));
             }
         }
 
@@ -3071,14 +3363,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private sealed class EdgeMaterialAggregate
         {
+            public readonly EdgeKey Key;
             public readonly Vector3 Start;
             public readonly Vector3 End;
             public readonly List<int> FaceIndices = new List<int>(2);
 
             public EdgeMaterialAggregate(
+                EdgeKey key,
                 Vector3 start,
                 Vector3 end)
             {
+                Key = key;
                 Start = start;
                 End = end;
             }
@@ -3092,22 +3387,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
-        private readonly struct EdgeMaterialMask
+        private readonly struct EdgeMaterialCandidate
         {
+            public readonly EdgeMaterialAggregate Edge;
             public readonly float ConvexEdgeWear;
             public readonly float ConcaveCrease;
             public readonly float DirtDepositBoost;
 
-            public bool IsNeutral =>
-                ConvexEdgeWear <= 0.0001f &&
-                ConcaveCrease <= 0.0001f &&
-                DirtDepositBoost <= 0.0001f;
+            public bool HasAnyMask =>
+                ConvexEdgeWear > 0.0001f ||
+                ConcaveCrease > 0.0001f ||
+                DirtDepositBoost > 0.0001f;
 
-            public EdgeMaterialMask(
+            public EdgeMaterialCandidate(
+                EdgeMaterialAggregate edge,
                 float convexEdgeWear,
                 float concaveCrease,
                 float dirtDepositBoost)
             {
+                Edge = edge;
                 ConvexEdgeWear = convexEdgeWear;
                 ConcaveCrease = concaveCrease;
                 DirtDepositBoost = dirtDepositBoost;
@@ -3119,15 +3417,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public readonly float ConvexEdgeWear;
             public readonly float ConcaveCrease;
             public readonly float DirtDepositBoost;
+            public readonly float ConvexEdgeLine;
+            public readonly float ConcaveCreaseLine;
 
             public FaceVertexMaterialMask(
                 float convexEdgeWear,
                 float concaveCrease,
-                float dirtDepositBoost)
+                float dirtDepositBoost,
+                float convexEdgeLine,
+                float concaveCreaseLine)
             {
                 ConvexEdgeWear = convexEdgeWear;
                 ConcaveCrease = concaveCrease;
                 DirtDepositBoost = dirtDepositBoost;
+                ConvexEdgeLine = convexEdgeLine;
+                ConcaveCreaseLine = concaveCreaseLine;
             }
         }
 

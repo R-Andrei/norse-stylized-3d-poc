@@ -191,19 +191,13 @@ Shader "PS3D/Pixel Surface Lit"
                 return output;
             }
 
-            float ResolveBarycentricEdgeLine(Varyings input)
+            float ResolveSemanticEdgeBand(float band)
             {
-                float2 baryXY = saturate(input.materialMasks.zw);
-                float3 barycentric = float3(
-                    baryXY.x,
-                    baryXY.y,
-                    saturate(1.0 - baryXY.x - baryXY.y));
-                float nearestEdge = min(
-                    min(barycentric.x, barycentric.y),
-                    barycentric.z);
-
-                // Fixed barycentric width keeps debug readable on low-poly mass faces.
-                return 1.0 - smoothstep(0.028, 0.105, nearestEdge);
+                // Patch 12C keeps line-like masks neutral. This helper remains so
+                // old material/debug code compiles, but generated masses now write
+                // UV2.z/UV2.w as zero until a proper line/overlay representation
+                // replaces the failed interpolated edge-mask attempts.
+                return smoothstep(0.42, 0.92, saturate(band));
             }
 
             half3 ResolveMaskDebugColor(Varyings input)
@@ -230,11 +224,11 @@ Shader "PS3D/Pixel Surface Lit"
                 }
                 else if (mode == 4)
                 {
-                    mask = saturate((float)input.color.a * ResolveBarycentricEdgeLine(input));
+                    mask = saturate((float)input.color.a * ResolveSemanticEdgeBand(input.materialMasks.z));
                 }
                 else if (mode == 5)
                 {
-                    mask = saturate(input.materialMasks.x * ResolveBarycentricEdgeLine(input));
+                    mask = saturate(input.materialMasks.x * ResolveSemanticEdgeBand(input.materialMasks.w));
                 }
                 else if (mode == 6)
                 {
