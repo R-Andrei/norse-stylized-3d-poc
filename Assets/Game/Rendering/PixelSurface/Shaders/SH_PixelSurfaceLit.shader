@@ -26,6 +26,11 @@ Shader "PS3D/Pixel Surface Lit"
         [HideInInspector] _GeneratedMassLocalHeight("Generated Mass Local Height", Float) = 1
         [HideInInspector] _GeneratedMassMaskSeed("Generated Mass Mask Seed", Float) = 0
         [HideInInspector] _GeneratedMassLocalXZScale("Generated Mass Local XZ Scale", Float) = 1
+        [HideInInspector] _GeneratedMassMaskBaseLift("Generated Mass Mask Base Lift", Float) = 0
+        [HideInInspector] _GeneratedMassCreviceReach("Generated Mass Crevice Reach", Float) = 1
+        [HideInInspector] _GeneratedMassCreviceBreakup("Generated Mass Crevice Breakup", Float) = 1
+        [HideInInspector] _GeneratedMassDirtCrawlReach("Generated Mass Dirt Crawl Reach", Float) = 1
+        [HideInInspector] _GeneratedMassDirtCoverage("Generated Mass Dirt Coverage", Float) = 1
 
         [Header(Stylized Value Shaping)]
         _HighlightCompressStrength("Highlight Compress Strength", Range(0, 0.5)) = 0.08
@@ -119,6 +124,11 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassLocalHeight;
                 float _GeneratedMassMaskSeed;
                 float _GeneratedMassLocalXZScale;
+                float _GeneratedMassMaskBaseLift;
+                float _GeneratedMassCreviceReach;
+                float _GeneratedMassCreviceBreakup;
+                float _GeneratedMassDirtCrawlReach;
+                float _GeneratedMassDirtCoverage;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;
@@ -204,9 +214,13 @@ Shader "PS3D/Pixel Surface Lit"
             float ResolveGeneratedMassHeight01(Varyings input)
             {
                 float height = max(0.0001, _GeneratedMassLocalHeight);
-                return saturate(
+                float rawHeight01 = saturate(
                     (input.positionOS.y - _GeneratedMassLocalMinY) /
                     height);
+                float baseLift = saturate(_GeneratedMassMaskBaseLift);
+                return saturate(
+                    (rawHeight01 - baseLift) /
+                    max(0.0001, 1.0 - baseLift));
             }
 
             float ResolveNotUpwardMask(Varyings input)
@@ -285,6 +299,9 @@ Shader "PS3D/Pixel Surface Lit"
 
                 float tallness = ResolveGeneratedMassTallnessFactor();
                 float sizeFactor = ResolveGeneratedMassSizeFactor();
+                float creviceReach = max(0.05, _GeneratedMassCreviceReach);
+                float creviceBreakup = max(0.05, _GeneratedMassCreviceBreakup);
+                float creviceBreakupDelta = clamp(creviceBreakup - 1.0, -0.75, 1.0);
                 float xzScale = max(0.0001, _GeneratedMassLocalXZScale);
                 float2 normalizedXZ = input.positionOS.xz / xzScale;
                 float seed = _GeneratedMassMaskSeed;
@@ -310,12 +327,20 @@ Shader "PS3D/Pixel Surface Lit"
                     facetNoise * 0.18 +
                     planeBreakNoise * 0.22);
 
-                float baseRise = 0.078 + tallness * 0.026 + sizeFactor * 0.018;
+                float baseRise =
+                    (0.078 + tallness * 0.026 + sizeFactor * 0.018) *
+                    creviceReach;
                 float localBoundary = baseRise * lerp(0.34, 1.78, boundaryWarp);
-                float boundaryFeather = 0.044 + tallness * 0.016;
+                float boundaryFeather =
+                    (0.044 + tallness * 0.016) *
+                    lerp(0.85, 1.15, saturate((creviceReach - 0.25) / 1.75));
 
                 float contactCore =
-                    1.0 - smoothstep(0.0, 0.032 + tallness * 0.006, height01);
+                    1.0 - smoothstep(
+                        0.0,
+                        (0.032 + tallness * 0.006) *
+                            lerp(0.85, 1.12, saturate((creviceReach - 0.25) / 1.75)),
+                        height01);
                 float lowerRegion =
                     1.0 - smoothstep(
                         localBoundary,
@@ -333,8 +358,14 @@ Shader "PS3D/Pixel Surface Lit"
                     downward * 0.17);
                 float shelterGate = smoothstep(0.33, 0.80, shelter);
                 float facetBreakup = lerp(0.66, 1.00, facetNoise);
-                float regionCoverage = smoothstep(0.40, 0.86, patchField);
-                float interruption = lerp(0.16, 1.00, regionCoverage);
+                float regionCoverage = smoothstep(
+                    saturate(0.40 + creviceBreakupDelta * 0.08),
+                    saturate(0.86 + creviceBreakupDelta * 0.04),
+                    patchField);
+                float interruption = lerp(
+                    saturate(0.16 - creviceBreakupDelta * 0.08),
+                    1.00,
+                    regionCoverage);
 
                 float lowerSideShelter =
                     lowerRegion *
@@ -364,6 +395,10 @@ Shader "PS3D/Pixel Surface Lit"
                     notUpward * 0.18);
 
                 float tallness = ResolveGeneratedMassTallnessFactor();
+                float dirtReach = max(0.05, _GeneratedMassDirtCrawlReach);
+                float dirtCoverage = max(0.05, _GeneratedMassDirtCoverage);
+                float dirtCoverageDelta = clamp(dirtCoverage - 1.0, -0.75, 1.0);
+                float dirtCoverageMultiplier = clamp(dirtCoverage, 0.35, 1.45);
                 float xzScale = max(0.0001, _GeneratedMassLocalXZScale);
                 float2 normalizedXZ = input.positionOS.xz / xzScale;
                 float seed = _GeneratedMassMaskSeed;
@@ -388,9 +423,13 @@ Shader "PS3D/Pixel Surface Lit"
                 float crawlSkeleton = saturate(max(skeletonWaveA * 0.82, skeletonWaveB * 0.70));
                 crawlSkeleton *= smoothstep(0.30, 0.82, lowNoise * 0.56 + mediumNoise * 0.44);
 
-                float crawlHeight = 0.070 + 0.305 * pow(lowNoise, 1.42);
-                crawlHeight += crawlSkeleton * 0.070;
-                crawlHeight = min(crawlHeight + tallness * 0.040, 0.48);
+                float crawlHeight =
+                    (0.070 + 0.305 * pow(lowNoise, 1.42) +
+                    crawlSkeleton * 0.070) *
+                    dirtReach;
+                crawlHeight = min(
+                    crawlHeight + tallness * 0.040 * dirtReach,
+                    clamp(0.48 * dirtReach, 0.12, 0.86));
                 float connectedCrawl =
                     1.0 - smoothstep(
                         crawlHeight,
@@ -410,8 +449,8 @@ Shader "PS3D/Pixel Surface Lit"
 
                 float erosion =
                     smoothstep(
-                        0.34,
-                        0.72,
+                        saturate(0.34 - dirtCoverageDelta * 0.12),
+                        saturate(0.72 - dirtCoverageDelta * 0.10),
                         mediumNoise * 0.50 + highNoise * 0.34 + lowNoise * 0.16);
                 float fineBreakup = lerp(0.62, 1.06, highNoise);
                 float skeletonCoverage = lerp(0.42, 1.00, crawlSkeleton);
@@ -434,8 +473,10 @@ Shader "PS3D/Pixel Surface Lit"
                     depositShelter;
 
                 float upperSuppress = smoothstep(0.46, 0.66, height01);
-                float mask = max(baseConnection * rimBreakup * 0.30, brokenRim * 0.54);
-                mask = max(mask, crawlDeposit * 0.76);
+                float mask = max(
+                    baseConnection * rimBreakup * 0.30 * dirtCoverageMultiplier,
+                    brokenRim * 0.54 * dirtCoverageMultiplier);
+                mask = max(mask, crawlDeposit * 0.76 * dirtCoverageMultiplier);
                 mask *= 1.0 - upperSuppress;
                 return saturate(pow(mask, 1.06));
             }
@@ -766,6 +807,11 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassLocalHeight;
                 float _GeneratedMassMaskSeed;
                 float _GeneratedMassLocalXZScale;
+                float _GeneratedMassMaskBaseLift;
+                float _GeneratedMassCreviceReach;
+                float _GeneratedMassCreviceBreakup;
+                float _GeneratedMassDirtCrawlReach;
+                float _GeneratedMassDirtCoverage;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;
@@ -900,6 +946,11 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassLocalHeight;
                 float _GeneratedMassMaskSeed;
                 float _GeneratedMassLocalXZScale;
+                float _GeneratedMassMaskBaseLift;
+                float _GeneratedMassCreviceReach;
+                float _GeneratedMassCreviceBreakup;
+                float _GeneratedMassDirtCrawlReach;
+                float _GeneratedMassDirtCoverage;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;
@@ -1028,6 +1079,11 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassLocalHeight;
                 float _GeneratedMassMaskSeed;
                 float _GeneratedMassLocalXZScale;
+                float _GeneratedMassMaskBaseLift;
+                float _GeneratedMassCreviceReach;
+                float _GeneratedMassCreviceBreakup;
+                float _GeneratedMassDirtCrawlReach;
+                float _GeneratedMassDirtCoverage;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;

@@ -329,6 +329,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Shader.PropertyToID("_GeneratedMassMaskSeed");
         private static readonly int GeneratedMassLocalXZScaleId =
             Shader.PropertyToID("_GeneratedMassLocalXZScale");
+        private static readonly int GeneratedMassMaskBaseLiftId =
+            Shader.PropertyToID("_GeneratedMassMaskBaseLift");
+        private static readonly int GeneratedMassCreviceReachId =
+            Shader.PropertyToID("_GeneratedMassCreviceReach");
+        private static readonly int GeneratedMassCreviceBreakupId =
+            Shader.PropertyToID("_GeneratedMassCreviceBreakup");
+        private static readonly int GeneratedMassDirtCrawlReachId =
+            Shader.PropertyToID("_GeneratedMassDirtCrawlReach");
+        private static readonly int GeneratedMassDirtCoverageId =
+            Shader.PropertyToID("_GeneratedMassDirtCoverage");
 
         [SerializeField]
         private MassRecipe recipe = new MassRecipe();
@@ -351,6 +361,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private StoneSurfaceMaskDebug surfaceMaskDebug =
             StoneSurfaceMaskDebug.None;
+
+        [Header("Surface Mask Tuning")]
+        [Tooltip("Moves the generated lower/contact mask origin upward in normalized local height. Useful for flat slabs or rocks that are intentionally embedded below ground.")]
+        [Range(0f, 0.2f)]
+        [SerializeField]
+        private float surfaceMaskBaseLift;
+
+        [Tooltip("Scales how far the CreviceBase mask may climb from the generated base/contact area.")]
+        [Range(0.25f, 2f)]
+        [SerializeField]
+        private float creviceReach = 1f;
+
+        [Tooltip("Controls how interrupted the CreviceBase lower belt is. Lower values are smoother; higher values break the belt more aggressively.")]
+        [Range(0.25f, 2f)]
+        [SerializeField]
+        private float creviceBreakup = 1f;
+
+        [Tooltip("Scales how far DirtDeposit crawl paths may rise from the generated base/contact area.")]
+        [Range(0.25f, 2f)]
+        [SerializeField]
+        private float dirtCrawlReach = 1f;
+
+        [Tooltip("Controls how much of the DirtDeposit crawl field becomes visible. Lower values are sparse; higher values are fuller.")]
+        [Range(0.25f, 2f)]
+        [SerializeField]
+        private float dirtCoverage = 1f;
 
         [SerializeField, HideInInspector]
         private Material coldGreyStoneMaterial;
@@ -402,6 +438,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public StoneSurfaceProfile StoneSurfaceProfile => stoneSurfaceProfile;
         public StoneSurfaceMaskDebug SurfaceMaskDebug => surfaceMaskDebug;
         public Color BaseColor => baseColor;
+        public float SurfaceMaskBaseLift => surfaceMaskBaseLift;
+        public float CreviceReach => creviceReach;
+        public float CreviceBreakup => creviceBreakup;
+        public float DirtCrawlReach => dirtCrawlReach;
+        public float DirtCoverage => dirtCoverage;
         public MeshFilter GeometryMeshFilter
         {
             get
@@ -667,6 +708,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             materialProperties.SetFloat(
                 GeneratedMassLocalXZScaleId,
                 localXZScale);
+            materialProperties.SetFloat(
+                GeneratedMassMaskBaseLiftId,
+                Mathf.Clamp(surfaceMaskBaseLift, 0f, 0.2f));
+            materialProperties.SetFloat(
+                GeneratedMassCreviceReachId,
+                Mathf.Clamp(creviceReach, 0.25f, 2f));
+            materialProperties.SetFloat(
+                GeneratedMassCreviceBreakupId,
+                Mathf.Clamp(creviceBreakup, 0.25f, 2f));
+            materialProperties.SetFloat(
+                GeneratedMassDirtCrawlReachId,
+                Mathf.Clamp(dirtCrawlReach, 0.25f, 2f));
+            materialProperties.SetFloat(
+                GeneratedMassDirtCoverageId,
+                Mathf.Clamp(dirtCoverage, 0.25f, 2f));
 
             meshRenderer.SetPropertyBlock(materialProperties);
         }

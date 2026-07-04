@@ -351,6 +351,7 @@ Checklist:
 - [x] Patch 12F.2 - Contact/crawl area mask tuning after first Unity validation
 - [x] Patch 12F.3 - Contact/crawl area mask second tuning after Unity validation
 - [x] Patch 12F.4 - Contact/crawl structural correction with deposit skeleton
+- [x] Patch 12F.5 - Surface mask tuning controls
 - [ ] Patch 12G - Edge/crack representation decision and prototype
 - [ ] Patch 13 - Dirty surface mottle and material breakup
 - [ ] Patch 14 - Crack and seam language
@@ -1223,6 +1224,74 @@ Acceptance:
 - `SurfaceVariation` and `Exposure` should remain unchanged.
 - `ConvexEdgeWear` and `ConcaveCrease` should remain black/neutral.
 - Do not proceed to visible material response until these debug masks are accepted.
+
+### Patch 12F.5 - Surface Mask Tuning Controls
+
+Status: implemented after Patch 12F.4 validated that the `CreviceBase` and `DirtDeposit` models were broadly viable across multiple generated mass archetypes, but needed per-object/per-archetype art direction controls.
+
+Reason for patch:
+
+- The same global mask settings cannot serve squat boulders, embedded flat slabs, polished stones, standing stones, and fractured pillars equally well.
+- Flat slabs can be intentionally embedded below ground, which can hide masks tied strictly to the true mesh minimum Y.
+- Rounded and tall stones sometimes need masks to climb farther than squat or slab-like stones.
+- Another hardcoded global tuning pass would overfit one archetype and regress another.
+
+Checklist status:
+
+- [x] add per-generated-mass surface mask tuning controls;
+- [x] keep the controls small and meaningful rather than adding many raw shader constants;
+- [x] send the control values through the existing material property block;
+- [x] keep the current Patch 12F.4 mask model as the default baseline;
+- [x] preserve `SurfaceVariation` and `Exposure`;
+- [x] keep `ConvexEdgeWear` and `ConcaveCrease` black/neutral;
+- [x] avoid material-profile response until the controls are validated.
+
+Primary files:
+
+- `GeneratedMass.cs`
+- `GeneratedMassEditor.cs`
+- `SH_PixelSurfaceLit.shader`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+Added controls:
+
+- `Surface Mask Base Lift`
+  - moves the generated lower/contact mask origin upward in normalized local height;
+  - intended for flat slabs or other masses that are partially embedded below ground.
+- `Crevice Reach`
+  - scales how far `CreviceBase` may climb from the generated base/contact area.
+- `Crevice Breakup`
+  - controls how interrupted or continuous the `CreviceBase` lower belt is.
+- `Dirt Crawl Reach`
+  - scales how far `DirtDeposit` crawl paths may rise from the generated base/contact area.
+- `Dirt Coverage`
+  - controls how much of the dirt/deposit crawl field becomes visible.
+
+Default behavior:
+
+- Defaults preserve the Patch 12F.4 baseline:
+  - `Surface Mask Base Lift = 0`
+  - `Crevice Reach = 1`
+  - `Crevice Breakup = 1`
+  - `Dirt Crawl Reach = 1`
+  - `Dirt Coverage = 1`
+
+Work:
+
+- `GeneratedMass` now serializes the five tuning controls and sends them to the shader via the existing `MaterialPropertyBlock`.
+- The generated mass inspector now draws a dedicated `Surface Mask Tuning` section with a short explanation.
+- The shader keeps the Patch 12F.4 contact/crawl construction but uses the new controls to adjust height origin, crevice reach, crevice interruption, dirt crawl reach, and dirt coverage.
+- No geometry, material assets, edge-wear implementation, crack implementation, river logic, or ground logic were changed.
+
+Acceptance:
+
+- With default values, the masks should look like Patch 12F.4.
+- Raising `Surface Mask Base Lift` should make lower masks visible above the true local mesh base, especially on embedded flat slabs.
+- Raising `Crevice Reach` should let `CreviceBase` climb higher.
+- Raising `Crevice Breakup` should make `CreviceBase` less continuous; lowering it should make it smoother.
+- Raising `Dirt Crawl Reach` should make `DirtDeposit` climb higher.
+- Raising `Dirt Coverage` should make dirt/deposit patches fuller; lowering it should make them sparser.
+- If these controls work as intended, the next stage can move to the currently black/deferred line-feature masks: `ConvexEdgeWear` and `ConcaveCrease`.
 
 ### Patch 12G - Edge/Crack Representation Decision and Prototype
 

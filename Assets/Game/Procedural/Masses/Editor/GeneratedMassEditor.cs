@@ -22,6 +22,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty darkWetRiverStoneMaterial;
         private SerializedProperty paleFrostStoneMaterial;
         private SerializedProperty blackSacredStoneMaterial;
+        private SerializedProperty surfaceMaskBaseLift;
+        private SerializedProperty creviceReach;
+        private SerializedProperty creviceBreakup;
+        private SerializedProperty dirtCrawlReach;
+        private SerializedProperty dirtCoverage;
         private SerializedProperty riverInteraction;
         private SerializedProperty participation;
         private SerializedProperty staticPressureMode;
@@ -48,6 +53,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "paleFrostStoneMaterial");
             blackSacredStoneMaterial = serializedObject.FindProperty(
                 "blackSacredStoneMaterial");
+            surfaceMaskBaseLift = serializedObject.FindProperty(
+                "surfaceMaskBaseLift");
+            creviceReach = serializedObject.FindProperty(
+                "creviceReach");
+            creviceBreakup = serializedObject.FindProperty(
+                "creviceBreakup");
+            dirtCrawlReach = serializedObject.FindProperty(
+                "dirtCrawlReach");
+            dirtCoverage = serializedObject.FindProperty(
+                "dirtCoverage");
             riverInteraction = serializedObject.FindProperty(
                 "riverInteraction");
             participation = riverInteraction?.FindPropertyRelative(
@@ -91,8 +106,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             DrawPropertiesExcluding(
                 serializedObject,
                 "m_Script",
+                "surfaceMaskBaseLift",
+                "creviceReach",
+                "creviceBreakup",
+                "dirtCrawlReach",
+                "dirtCoverage",
                 "riverInteraction");
 
+            DrawSurfaceMaskTuning();
             DrawRiverInteraction();
 
             serializedObject.ApplyModifiedProperties();
@@ -150,6 +171,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "Surface Seed changes surface triangulation, subtle facet relief " +
                 "and vertex-colour variation.",
                 MessageType.Info);
+        }
+
+        private void DrawSurfaceMaskTuning()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Surface Mask Tuning",
+                EditorStyles.boldLabel);
+
+            EditorGUILayout.HelpBox(
+                "These controls tune generated CreviceBase and DirtDeposit " +
+                "debug masks per object. They do not implement edge wear, " +
+                "cracks, or final material response.",
+                MessageType.Info);
+
+            EditorGUILayout.PropertyField(surfaceMaskBaseLift);
+            EditorGUILayout.PropertyField(creviceReach);
+            EditorGUILayout.PropertyField(creviceBreakup);
+            EditorGUILayout.PropertyField(dirtCrawlReach);
+            EditorGUILayout.PropertyField(dirtCoverage);
         }
 
         private void EnsureDefaultStoneMaterials()

@@ -183,7 +183,18 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -388,7 +399,18 @@ MonoBehaviour:
     depthBias: 0.903
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -782,7 +804,18 @@ MonoBehaviour:
     depthBias: 0.761
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -952,7 +985,18 @@ MonoBehaviour:
     depthBias: 0.971
     surfaceVariation: 0.735
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -1122,7 +1166,18 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -1466,7 +1521,18 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -2270,7 +2336,18 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -2464,8 +2541,8 @@ MonoBehaviour:
     transitionDirection: 0
     transitionHeight: -12
     profile: 0
-    broadForm: 3.04
-    roughness: 0.755
+    broadForm: 0.91
+    roughness: 0.438
     surfaceDetail: 0.6
     edgeBlend: 1
     surfaceVariation: 0.42
@@ -3455,7 +3532,18 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33333334, g: 0.34117648, b: 0.34901962, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -3570,7 +3658,7 @@ Transform:
   m_GameObject: {fileID: 799756163}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -9.213, y: -0.08, z: -8.506}
+  m_LocalPosition: {x: -9.213, y: 0.01, z: -8.506}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3640,7 +3728,18 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -4265,7 +4364,18 @@ MonoBehaviour:
     depthBias: 0.95
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -4675,7 +4785,18 @@ MonoBehaviour:
     depthBias: 0.7
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -5069,7 +5190,18 @@ MonoBehaviour:
     depthBias: 0.7
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -5239,7 +5371,18 @@ MonoBehaviour:
     depthBias: 0.7
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -5452,7 +5595,18 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -5895,7 +6049,18 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -6185,7 +6350,18 @@ MonoBehaviour:
     depthBias: 1.073
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -6452,7 +6628,18 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.49056602, g: 0.47947407, b: 0.46511212, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -6785,7 +6972,18 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -7416,23 +7614,34 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Masses.GeneratedMass
   recipe:
-    archetype: 0
+    archetype: 5
     shapeSeed: 5727
-    surfaceSeed: 3930
+    surfaceSeed: 3778
     size: 2
-    formComplexity: 2
+    formComplexity: 1
     surfaceFacetDensity: 2
-    edgeCharacter: 2
+    edgeCharacter: 4
     shapeDiversity: 1
     grounding: 1
-    lean: 1
+    lean: 0
     fineScale: 1
     widthBias: 1
     heightBias: 1
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33333334, g: 0.34117648, b: 0.34901962, a: 1}
+  surfaceMaskDebug: 3
+  surfaceMaskBaseLift: 0.2
+  creviceReach: 1.21
+  creviceBreakup: 0.664
+  dirtCrawlReach: 1.577
+  dirtCoverage: 1.051
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -7458,7 +7667,7 @@ MonoBehaviour:
     footprintPadding: 0.12
     featureModelInitialized: 1
   recipeInitialized: 1
-  lastAppliedArchetype: 0
+  lastAppliedArchetype: 5
 --- !u!64 &1595308778
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -7506,7 +7715,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 003eeac564864bbaa4b5c637ec767f97, type: 2}
+  - {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -7547,7 +7756,7 @@ Transform:
   m_GameObject: {fileID: 1595308776}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -8.091, y: -0.08, z: -6.973}
+  m_LocalPosition: {x: -8.091, y: -0.064, z: -6.973}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -7733,7 +7942,18 @@ MonoBehaviour:
     depthBias: 1.3
     surfaceVariation: 0.237
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -8301,21 +8521,21 @@ MonoBehaviour:
   foamEdgeCavityAmount: 0.423
   foamConnectorWeakSpanAmount: 0.443
   foamFreeWaterEventAmount: 0.409
-  foamNeutralLifetime: 1.43
-  foamSupportedAgingRate: 0.2
-  foamNegativeAgingRate: 4
+  foamNeutralLifetime: 1
+  foamSupportedAgingRate: 1
+  foamNegativeAgingRate: 1
   foamMaterialFlowSpeedMultiplier: 1
   foamMaterialLifecycleTuningVersion: 1
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}
   foamDebugView: 1
-  foamTestDistanceNormalized: 0.5
-  foamTestAcrossNormalized: -0.357
+  foamTestDistanceNormalized: 0.744
+  foamTestAcrossNormalized: -0.412
   foamTestRadius: 0.8
-  foamTestAmount: 0.85
+  foamTestAmount: 0.838
   foamTestRemainingLife: 1
   foamTestElongation: 1.5
   foamTestProgressiveRibbonHalfWidth: 0.2
-  foamTestProgressiveRibbonDuration: 1.5
+  foamTestProgressiveRibbonDuration: 1.993
   foamTestProgressiveRibbonTravelDistance: 7.54
   foamTestProgressiveRibbonAcrossDrift: 0.848
   foamTestProgressiveRibbonPathWander: 0.973
@@ -9059,7 +9279,18 @@ MonoBehaviour:
     depthBias: 1.094
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -9229,7 +9460,18 @@ MonoBehaviour:
     depthBias: 0.7
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -9803,7 +10045,18 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -10005,7 +10258,18 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+  surfaceMaskDebug: 0
+  surfaceMaskBaseLift: 0
+  creviceReach: 1
+  creviceBreakup: 1
+  dirtCrawlReach: 1
+  dirtCoverage: 1
+  coldGreyStoneMaterial: {fileID: 0}
+  darkWetRiverStoneMaterial: {fileID: 0}
+  paleFrostStoneMaterial: {fileID: 0}
+  blackSacredStoneMaterial: {fileID: 0}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
