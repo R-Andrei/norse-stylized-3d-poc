@@ -341,7 +341,8 @@ Checklist:
 - [x] Patch 9 - Shader-driven material profiles and variants, provisional until Unity shader import/visual validation
 - [x] Patch 10 - Stylized value shaping for HLSL rocks, provisional until Unity visual tuning
 - [x] Patch 11 - Mesh-authored edge and crease mask contract, provisional until Unity mask debug validation
-- [ ] Patch 12 - Convex edge wear and concave crevice response
+- [x] Patch 12A - Surface mask authoring correction
+- [ ] Patch 12B - Profile-aware convex edge and concave crease material response
 - [ ] Patch 13 - Dirty surface mottle and material breakup
 - [ ] Patch 14 - Crack and seam language
 
@@ -735,7 +736,7 @@ Proposed extended material contract:
 - `Color.g`: exposed/upward wear and frost buildup, already implemented;
 - `Color.b`: base, sheltered side, crevice, and contact darkening, already implemented;
 - `Color.a`: convex edge wear or authored ridge intensity;
-- `UV2.x`: concave crease or crack-darkening mask, neutral until Patch 12;
+- `UV2.x`: concave crease or selected crack-darkening mask;
 - `UV2.y`: dirty deposit / mineral stain mask;
 - `UV2.zw`: reserved for future biome-specific material state.
 
@@ -780,30 +781,75 @@ Acceptance:
 - the shader can read at least one new authored mask without compile/runtime errors;
 - masks can be visually inspected or temporarily exaggerated for tuning.
 
-### Patch 12 - Convex Edge Wear and Concave Crevice Response
+Patch 11 Unity validation notes from mask screenshots:
 
-Status: planned.
+- `SurfaceVariation` and `Exposure` validated as useful and spatially readable.
+- `CreviceBase` was functional but too broad; it should remain a broad base/contact/side-darkening mask rather than being repurposed as crack data.
+- First-pass `ConvexEdgeWear` proved the channel plumbing worked, but the mask was too face-wide and triangular/blotchy to drive visible ridge highlights directly.
+- `ConcaveCrease` correctly remained neutral before Patch 12, but that means it cannot yet support reference-style dark seams.
+- `DirtDeposit` was usable as a lower/sheltered baseline, but it needed less uniform gradient behaviour before profile response is added.
+
+Decision: do not wire the first-pass convex mask into final shader response. First correct the generated masks, then validate debug views again, then add visible profile-specific edge/crease response.
+
+### Patch 12A - Surface Mask Authoring Correction
+
+Status: implemented, pending Unity import and mask-debug validation.
 
 Checklist status:
 
-- [ ] calculate convex ridge/edge intensity during mass generation;
-- [ ] calculate concave crease or sheltered seam intensity where available;
+- [x] keep `SurfaceVariation` and `Exposure` unchanged because validation showed they are already useful;
+- [x] tighten `CreviceBase` so it behaves more like broad base/contact/low-side darkening instead of a mostly uniform pale mask;
+- [x] replace the first-pass convex normal-average mask with topology/edge-based ridge candidates;
+- [x] populate `UV2.x` with selected concave/fracture seam candidates instead of leaving it neutral;
+- [x] add a modest authored boost into `UV2.y` so dirt/deposit remains lower/sheltered but has less uniform gradient behaviour;
+- [x] keep visible final material response deferred until the corrected debug masks are validated in Unity.
+
+Primary files:
+
+- `MassGenerator.cs`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+Work:
+
+- build an edge lookup from generated triangle topology;
+- compare neighbouring face normals and face-centre orientation to classify convex ridge candidates separately from concave crease candidates;
+- suppress tiny unreadable edges so incidental triangulation does not dominate the mask;
+- select sparse fracture/seam candidates from readable edges using deterministic seed-driven selection, with more allowance on broken/fractured/chipped archetypes and less on polished stones;
+- write corrected masks through the existing material contract: `Color.a` for convex wear, `UV2.x` for concave/selected seams, and `UV2.y` for dirt/deposit;
+- avoid adding physical shelves, carved gaps, holes, or new mesh-relief geometry in this patch.
+
+Acceptance:
+
+- `ConvexEdgeWear` debug should become more ridge/edge-biased and less broad triangular face soup;
+- `ConcaveCrease` debug should no longer be empty and should show sparse readable seam/crack candidates;
+- `DirtDeposit` debug should still prefer lower/sheltered regions but should be less like a simple side gradient;
+- `CreviceBase` should remain a broad base/contact darkening mask;
+- normal rendering should remain close to the accepted Patch 10/11 look because the shader has not yet been made to strongly consume the new masks.
+
+### Patch 12B - Profile-Aware Convex Edge and Concave Crease Material Response
+
+Status: planned after Patch 12A validation.
+
+Checklist status:
+
 - [ ] brighten convex ridges with a controllable worn-edge colour and strength;
 - [ ] darken concave creases with a separate controllable strength;
+- [ ] make controls profile-aware so frost, wet, sacred, and cold-grey stones respond differently;
 - [ ] keep ridge highlighting subtle enough to preserve the simple low-poly style;
 - [ ] validate on squat boulders, slabs, standing stones, fractured pillars, and broken chunks.
 
 Primary files:
 
-- `MassGenerator.cs`
 - `SH_PixelSurfaceLit.shader`
 - HLSL stone materials
+- optionally `MassGenerator.cs` only if mask tuning is still required
 
 Work:
 
 - prefer light worn ridges over blanket edge darkening;
 - separate convex edge wear from concave crack darkening;
-- make controls profile-aware so frost, wet, sacred, and cold-grey stones can respond differently.
+- preserve the original simple blocky low-poly shape language;
+- make the material profiles use the same masks differently rather than generating unrelated profile-specific masks.
 
 Acceptance:
 

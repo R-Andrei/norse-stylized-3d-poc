@@ -1360,7 +1360,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Vector3 centre = CalculateAverage(soup.Positions);
             Bounds bounds = CalculateBounds(soup.Positions);
             FaceMaterialMaskLookup materialMaskLookup =
-                FaceMaterialMaskLookup.Build(soup, centre);
+                FaceMaterialMaskLookup.Build(
+                    soup,
+                    centre,
+                    bounds,
+                    recipe);
 
             float safeWidth = Mathf.Max(0.001f, bounds.size.x);
             float safeHeight = Mathf.Max(0.001f, bounds.size.y);
@@ -1368,6 +1372,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             for (int i = 0; i < soup.Positions.Count; i += 3)
             {
+                int faceIndex = i / 3;
                 Vector3 a = soup.Positions[i];
                 Vector3 b = soup.Positions[i + 1];
                 Vector3 c = soup.Positions[i + 2];
@@ -1391,6 +1396,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     meshData,
                     a,
                     i,
+                    faceIndex,
                     bounds,
                     safeWidth,
                     safeHeight,
@@ -1403,6 +1409,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     meshData,
                     b,
                     i + 1,
+                    faceIndex,
                     bounds,
                     safeWidth,
                     safeHeight,
@@ -1415,6 +1422,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     meshData,
                     c,
                     i + 2,
+                    faceIndex,
                     bounds,
                     safeWidth,
                     safeHeight,
@@ -1433,6 +1441,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             MeshData meshData,
             Vector3 position,
             int vertexIndex,
+            int faceIndex,
             Bounds bounds,
             float width,
             float height,
@@ -1469,17 +1478,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 randomValue);
 
             float edgeWear = materialMaskLookup.ResolveConvexEdgeWear(
-                position,
-                faceNormal);
+                faceIndex,
+                position);
+
+            float concaveCrease = materialMaskLookup.ResolveConcaveCrease(
+                faceIndex,
+                position);
 
             float dirtDeposit = ResolveDirtDepositMask(
                 vertical01,
                 green,
                 blue,
-                randomValue);
+                randomValue,
+                materialMaskLookup.ResolveDirtDepositBoost(
+                    faceIndex,
+                    position));
 
             Vector4 materialMasks = new Vector4(
-                0f,
+                concaveCrease,
                 dirtDeposit,
                 0f,
                 0f);
@@ -1498,7 +1514,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         // A = convex ridge/edge wear intensity.
         //
         // UV2 material contract:
-        // X = concave crease or crack-darkening mask; neutral until Patch 12.
+        // X = concave crease or selected crack-darkening mask.
         // Y = dirty deposit / mineral stain mask.
         // ZW = reserved for future biome-specific material state.
         private static float ResolveExposureMask(
@@ -1524,18 +1540,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float randomValue)
         {
             float baseContact =
-                1f - Mathf.SmoothStep(0f, 0.24f, vertical01);
+                1f - Mathf.SmoothStep(0.01f, 0.20f, vertical01);
 
             float sideOcclusion =
-                Mathf.SmoothStep(0.18f, 0.92f, 1f - Mathf.Abs(faceNormal.y));
+                Mathf.SmoothStep(0.24f, 0.90f, 1f - Mathf.Abs(faceNormal.y)) *
+                (1f - Mathf.SmoothStep(0.28f, 0.86f, vertical01));
 
-            float shelteredSurface = 1f - exposure;
-            float surfaceBreakup = (randomValue - 0.5f) * 0.06f;
+            float shelteredSurface =
+                (1f - exposure) *
+                (1f - Mathf.SmoothStep(0.46f, 0.96f, vertical01));
+            float surfaceBreakup = (randomValue - 0.5f) * 0.045f;
 
             return Mathf.Clamp01(
-                baseContact * 0.52f +
-                sideOcclusion * 0.28f +
-                shelteredSurface * 0.16f +
+                baseContact * 0.58f +
+                sideOcclusion * 0.24f +
+                shelteredSurface * 0.12f +
                 surfaceBreakup);
         }
 
@@ -1543,19 +1562,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float vertical01,
             float exposure,
             float crevice,
-            float randomValue)
+            float randomValue,
+            float authoredDepositBoost)
         {
             float lowerArea =
-                1f - Mathf.SmoothStep(0.08f, 0.62f, vertical01);
+                1f - Mathf.SmoothStep(0.10f, 0.58f, vertical01);
+            float lowerBand =
+                Mathf.SmoothStep(0.02f, 0.18f, vertical01) *
+                (1f - Mathf.SmoothStep(0.34f, 0.86f, vertical01));
             float sheltered =
-                Mathf.Clamp01(crevice * 0.75f + (1f - exposure) * 0.25f);
-            float breakup = (randomValue - 0.5f) * 0.12f;
+                Mathf.Clamp01(crevice * 0.65f + (1f - exposure) * 0.35f);
+            float depositCore =
+                lowerArea * 0.48f +
+                sheltered * 0.28f +
+                crevice * 0.14f +
+                authoredDepositBoost * 0.32f;
+            float breakup = Mathf.Lerp(
+                0.58f,
+                1.18f,
+                Mathf.SmoothStep(0.18f, 0.92f, randomValue));
 
             return Mathf.Clamp01(
-                lowerArea * 0.45f +
-                sheltered * 0.40f +
-                crevice * 0.20f +
-                breakup);
+                depositCore * breakup +
+                lowerBand * authoredDepositBoost * 0.24f);
         }
 
         #endregion
@@ -2623,24 +2652,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private sealed class FaceMaterialMaskLookup
         {
-            private readonly Dictionary<VertexKey, VertexNormalAggregate>
-                aggregates;
+            private readonly Dictionary<FaceVertexKey, FaceVertexMaterialMask>
+                masks;
 
             private FaceMaterialMaskLookup(
-                Dictionary<VertexKey, VertexNormalAggregate> aggregates)
+                Dictionary<FaceVertexKey, FaceVertexMaterialMask> masks)
             {
-                this.aggregates = aggregates;
+                this.masks = masks;
             }
 
             public static FaceMaterialMaskLookup Build(
                 TriangleSoup soup,
-                Vector3 centre)
+                Vector3 centre,
+                Bounds bounds,
+                MassRecipe recipe)
             {
-                Dictionary<VertexKey, VertexNormalAggregate> aggregates =
-                    new Dictionary<VertexKey, VertexNormalAggregate>();
+                Dictionary<int, FaceMaskRecord> faces =
+                    new Dictionary<int, FaceMaskRecord>(soup.Positions.Count / 3);
+                Dictionary<EdgeKey, EdgeMaterialAggregate> edges =
+                    new Dictionary<EdgeKey, EdgeMaterialAggregate>();
 
                 for (int i = 0; i < soup.Positions.Count; i += 3)
                 {
+                    int faceIndex = i / 3;
                     Vector3 a = soup.Positions[i];
                     Vector3 b = soup.Positions[i + 1];
                     Vector3 c = soup.Positions[i + 2];
@@ -2649,6 +2683,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
                     if (Vector3.Dot(normal, faceCentre - centre) < 0f)
                     {
+                        Vector3 temporary = b;
+                        b = c;
+                        c = temporary;
                         normal = -normal;
                     }
 
@@ -2657,64 +2694,498 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         continue;
                     }
 
-                    Vector3 faceNormal = normal.normalized;
-                    AddFaceNormal(aggregates, a, faceNormal);
-                    AddFaceNormal(aggregates, b, faceNormal);
-                    AddFaceNormal(aggregates, c, faceNormal);
+                    FaceMaskRecord face = new FaceMaskRecord(
+                        faceIndex,
+                        a,
+                        b,
+                        c,
+                        normal.normalized,
+                        faceCentre);
+                    faces.Add(faceIndex, face);
+
+                    AddEdge(edges, faceIndex, a, b);
+                    AddEdge(edges, faceIndex, b, c);
+                    AddEdge(edges, faceIndex, c, a);
                 }
 
-                return new FaceMaterialMaskLookup(aggregates);
+                Dictionary<FaceVertexKey, FaceVertexMaterialMask> masks =
+                    new Dictionary<FaceVertexKey, FaceVertexMaterialMask>();
+                float maximumDimension = Mathf.Max(
+                    Mathf.Max(bounds.size.x, bounds.size.y),
+                    bounds.size.z);
+                maximumDimension = Mathf.Max(0.001f, maximumDimension);
+
+                foreach (EdgeMaterialAggregate edge in edges.Values)
+                {
+                    EdgeMaterialMask edgeMask = ResolveEdgeMaterialMask(
+                        edge,
+                        faces,
+                        bounds,
+                        maximumDimension,
+                        recipe);
+
+                    if (edgeMask.IsNeutral)
+                    {
+                        continue;
+                    }
+
+                    for (int i = 0; i < edge.FaceIndices.Count; i++)
+                    {
+                        int faceIndex = edge.FaceIndices[i];
+                        AddFaceVertexMask(
+                            masks,
+                            faceIndex,
+                            edge.Start,
+                            edgeMask);
+                        AddFaceVertexMask(
+                            masks,
+                            faceIndex,
+                            edge.End,
+                            edgeMask);
+                    }
+                }
+
+                return new FaceMaterialMaskLookup(masks);
             }
 
             public float ResolveConvexEdgeWear(
-                Vector3 position,
-                Vector3 faceNormal)
+                int faceIndex,
+                Vector3 position)
             {
-                VertexKey key = new VertexKey(position);
-
-                if (!aggregates.TryGetValue(
-                        key,
-                        out VertexNormalAggregate aggregate) ||
-                    aggregate.Count <= 1 ||
-                    aggregate.NormalSum.sqrMagnitude <=
-                    MinimumEdgeLengthSqr)
-                {
-                    return 0f;
-                }
-
-                Vector3 averageNormal = aggregate.NormalSum.normalized;
-                float normalDisagreement =
-                    1f - Mathf.Clamp01(
-                        Vector3.Dot(faceNormal, averageNormal));
-
-                return Mathf.SmoothStep(
-                    0f,
-                    1f,
-                    Mathf.InverseLerp(
-                        0.035f,
-                        0.34f,
-                        normalDisagreement));
+                return ResolveFaceVertexMask(faceIndex, position).ConvexEdgeWear;
             }
 
-            private static void AddFaceNormal(
-                Dictionary<VertexKey, VertexNormalAggregate> aggregates,
-                Vector3 position,
-                Vector3 faceNormal)
+            public float ResolveConcaveCrease(
+                int faceIndex,
+                Vector3 position)
             {
-                VertexKey key = new VertexKey(position);
-                aggregates.TryGetValue(
+                return ResolveFaceVertexMask(faceIndex, position).ConcaveCrease;
+            }
+
+            public float ResolveDirtDepositBoost(
+                int faceIndex,
+                Vector3 position)
+            {
+                return ResolveFaceVertexMask(faceIndex, position).DirtDepositBoost;
+            }
+
+            private FaceVertexMaterialMask ResolveFaceVertexMask(
+                int faceIndex,
+                Vector3 position)
+            {
+                FaceVertexKey key = new FaceVertexKey(
+                    faceIndex,
+                    position);
+
+                if (masks.TryGetValue(
+                        key,
+                        out FaceVertexMaterialMask mask))
+                {
+                    return mask;
+                }
+
+                return default;
+            }
+
+            private static void AddEdge(
+                Dictionary<EdgeKey, EdgeMaterialAggregate> edges,
+                int faceIndex,
+                Vector3 start,
+                Vector3 end)
+            {
+                EdgeKey key = new EdgeKey(start, end);
+
+                if (!edges.TryGetValue(
+                        key,
+                        out EdgeMaterialAggregate edge))
+                {
+                    edge = new EdgeMaterialAggregate(start, end);
+                    edges.Add(key, edge);
+                }
+
+                edge.AddFace(faceIndex);
+            }
+
+            private static EdgeMaterialMask ResolveEdgeMaterialMask(
+                EdgeMaterialAggregate edge,
+                Dictionary<int, FaceMaskRecord> faces,
+                Bounds bounds,
+                float maximumDimension,
+                MassRecipe recipe)
+            {
+                float edgeLength = (edge.End - edge.Start).magnitude;
+                float edgeLength01 = edgeLength / maximumDimension;
+                float readableLength = Mathf.SmoothStep(
+                    0.035f,
+                    0.16f,
+                    edgeLength01);
+
+                if (readableLength <= 0.001f)
+                {
+                    return default;
+                }
+
+                Vector3 midpoint = (edge.Start + edge.End) * 0.5f;
+                float safeHeight = Mathf.Max(0.001f, bounds.size.y);
+                float vertical01 = Mathf.Clamp01(
+                    (midpoint.y - bounds.min.y) / safeHeight);
+                float baseSuppression = Mathf.SmoothStep(
+                    0.055f,
+                    0.20f,
+                    vertical01);
+                float exposedHeight = Mathf.SmoothStep(
+                    0.14f,
+                    0.86f,
+                    vertical01);
+                float lowerDepositBand =
+                    Mathf.SmoothStep(0.015f, 0.18f, vertical01) *
+                    (1f - Mathf.SmoothStep(0.42f, 0.90f, vertical01));
+
+                float convexCandidate = 0f;
+                float concaveCandidate = 0f;
+                float fractureCandidate = 0f;
+
+                if (edge.FaceIndices.Count <= 1)
+                {
+                    convexCandidate = 0.38f * readableLength;
+                }
+                else
+                {
+                    for (int i = 0; i < edge.FaceIndices.Count; i++)
+                    {
+                        FaceMaskRecord first = faces[edge.FaceIndices[i]];
+
+                        for (int j = i + 1; j < edge.FaceIndices.Count; j++)
+                        {
+                            FaceMaskRecord second = faces[edge.FaceIndices[j]];
+                            float normalDot = Mathf.Clamp(
+                                Vector3.Dot(first.Normal, second.Normal),
+                                -1f,
+                                1f);
+                            float angleAmount = 1f - normalDot;
+                            float angleScore = Mathf.SmoothStep(
+                                0.16f,
+                                0.58f,
+                                angleAmount);
+
+                            if (angleScore <= 0.001f)
+                            {
+                                continue;
+                            }
+
+                            Vector3 centreDelta = second.Centre - first.Centre;
+
+                            if (centreDelta.sqrMagnitude <= MinimumEdgeLengthSqr)
+                            {
+                                continue;
+                            }
+
+                            Vector3 direction = centreDelta.normalized;
+                            float firstSide = Vector3.Dot(
+                                direction,
+                                first.Normal);
+                            float secondSide = Vector3.Dot(
+                                -direction,
+                                second.Normal);
+                            float convexness = Mathf.Clamp01(
+                                (-firstSide - secondSide) * 0.5f);
+                            float concaveness = Mathf.Clamp01(
+                                (firstSide + secondSide) * 0.5f);
+
+                            convexCandidate = Mathf.Max(
+                                convexCandidate,
+                                angleScore * convexness);
+                            concaveCandidate = Mathf.Max(
+                                concaveCandidate,
+                                angleScore * concaveness);
+                            fractureCandidate = Mathf.Max(
+                                fractureCandidate,
+                                angleScore);
+                        }
+                    }
+                }
+
+                int edgeHash = new EdgeKey(edge.Start, edge.End).GetHashCode();
+                float wearBreakup = Mathf.Lerp(
+                    0.72f,
+                    1.10f,
+                    Hash01(
+                        unchecked(recipe.SurfaceSeed ^ 0x37A1D5),
+                        edgeHash));
+                float convexEdgeWear =
+                    convexCandidate *
+                    readableLength *
+                    baseSuppression *
+                    Mathf.Lerp(0.72f, 1.12f, exposedHeight) *
+                    wearBreakup;
+                convexEdgeWear = Mathf.SmoothStep(
+                    0.16f,
+                    0.78f,
+                    convexEdgeWear);
+
+                float selectionThreshold = GetCreaseSelectionThreshold(recipe);
+                float creaseRandom = Hash01(
+                    unchecked(recipe.SurfaceSeed ^ 0x5EED5EA),
+                    edgeHash);
+                float selectedFracture = creaseRandom <= selectionThreshold ? 1f : 0f;
+                float longReadableEdge = Mathf.SmoothStep(
+                    0.07f,
+                    0.24f,
+                    edgeLength01);
+                float upperCutoff =
+                    1f - Mathf.SmoothStep(0.88f, 1.0f, vertical01) * 0.55f;
+                float concaveCrease =
+                    concaveCandidate * 0.95f +
+                    fractureCandidate *
+                    longReadableEdge *
+                    selectedFracture *
+                    0.52f;
+                concaveCrease *=
+                    Mathf.SmoothStep(0.045f, 0.18f, vertical01) *
+                    upperCutoff;
+                concaveCrease = Mathf.SmoothStep(
+                    0.18f,
+                    0.76f,
+                    concaveCrease);
+
+                float dirtBreakup = Mathf.Lerp(
+                    0.68f,
+                    1.16f,
+                    Hash01(
+                        unchecked(recipe.SurfaceSeed ^ 0xD171),
+                        edgeHash));
+                float dirtDepositBoost = Mathf.Clamp01(
+                    lowerDepositBand *
+                    readableLength *
+                    dirtBreakup *
+                    (0.20f + concaveCrease * 0.42f +
+                     (1f - convexEdgeWear) * 0.10f));
+
+                return new EdgeMaterialMask(
+                    convexEdgeWear,
+                    concaveCrease,
+                    dirtDepositBoost);
+            }
+
+            private static float GetCreaseSelectionThreshold(
+                MassRecipe recipe)
+            {
+                float threshold = recipe.Archetype switch
+                {
+                    MassArchetype.BrokenChunk => 0.40f,
+                    MassArchetype.FracturedPillar => 0.42f,
+                    MassArchetype.CarvedMarkerStone => 0.34f,
+                    MassArchetype.LayeredStone => 0.30f,
+                    MassArchetype.StandingStone => 0.26f,
+                    MassArchetype.FlatSlab => 0.24f,
+                    MassArchetype.PolishedStone => 0.10f,
+                    _ => 0.22f
+                };
+
+                threshold += recipe.FormComplexity switch
+                {
+                    FormComplexity.Primitive => -0.05f,
+                    FormComplexity.Simple => -0.02f,
+                    FormComplexity.Complex => 0.05f,
+                    FormComplexity.HighlyComplex => 0.08f,
+                    _ => 0f
+                };
+
+                threshold += recipe.EdgeCharacter switch
+                {
+                    EdgeCharacter.Chipped => 0.07f,
+                    EdgeCharacter.Sharp => 0.04f,
+                    EdgeCharacter.Worn => -0.03f,
+                    EdgeCharacter.Polished => -0.08f,
+                    _ => 0f
+                };
+
+                return Mathf.Clamp(threshold, 0.04f, 0.48f);
+            }
+
+            private static void AddFaceVertexMask(
+                Dictionary<FaceVertexKey, FaceVertexMaterialMask> masks,
+                int faceIndex,
+                Vector3 position,
+                EdgeMaterialMask edgeMask)
+            {
+                FaceVertexKey key = new FaceVertexKey(
+                    faceIndex,
+                    position);
+                masks.TryGetValue(
                     key,
-                    out VertexNormalAggregate aggregate);
-                aggregate.NormalSum += faceNormal;
-                aggregate.Count++;
-                aggregates[key] = aggregate;
+                    out FaceVertexMaterialMask existing);
+
+                masks[key] = new FaceVertexMaterialMask(
+                    Mathf.Max(existing.ConvexEdgeWear, edgeMask.ConvexEdgeWear),
+                    Mathf.Max(existing.ConcaveCrease, edgeMask.ConcaveCrease),
+                    Mathf.Max(existing.DirtDepositBoost, edgeMask.DirtDepositBoost));
             }
         }
 
-        private struct VertexNormalAggregate
+        private readonly struct FaceMaskRecord
         {
-            public Vector3 NormalSum;
-            public int Count;
+            public readonly int Index;
+            public readonly Vector3 A;
+            public readonly Vector3 B;
+            public readonly Vector3 C;
+            public readonly Vector3 Normal;
+            public readonly Vector3 Centre;
+
+            public FaceMaskRecord(
+                int index,
+                Vector3 a,
+                Vector3 b,
+                Vector3 c,
+                Vector3 normal,
+                Vector3 centre)
+            {
+                Index = index;
+                A = a;
+                B = b;
+                C = c;
+                Normal = normal;
+                Centre = centre;
+            }
+        }
+
+        private sealed class EdgeMaterialAggregate
+        {
+            public readonly Vector3 Start;
+            public readonly Vector3 End;
+            public readonly List<int> FaceIndices = new List<int>(2);
+
+            public EdgeMaterialAggregate(
+                Vector3 start,
+                Vector3 end)
+            {
+                Start = start;
+                End = end;
+            }
+
+            public void AddFace(int faceIndex)
+            {
+                if (!FaceIndices.Contains(faceIndex))
+                {
+                    FaceIndices.Add(faceIndex);
+                }
+            }
+        }
+
+        private readonly struct EdgeMaterialMask
+        {
+            public readonly float ConvexEdgeWear;
+            public readonly float ConcaveCrease;
+            public readonly float DirtDepositBoost;
+
+            public bool IsNeutral =>
+                ConvexEdgeWear <= 0.0001f &&
+                ConcaveCrease <= 0.0001f &&
+                DirtDepositBoost <= 0.0001f;
+
+            public EdgeMaterialMask(
+                float convexEdgeWear,
+                float concaveCrease,
+                float dirtDepositBoost)
+            {
+                ConvexEdgeWear = convexEdgeWear;
+                ConcaveCrease = concaveCrease;
+                DirtDepositBoost = dirtDepositBoost;
+            }
+        }
+
+        private readonly struct FaceVertexMaterialMask
+        {
+            public readonly float ConvexEdgeWear;
+            public readonly float ConcaveCrease;
+            public readonly float DirtDepositBoost;
+
+            public FaceVertexMaterialMask(
+                float convexEdgeWear,
+                float concaveCrease,
+                float dirtDepositBoost)
+            {
+                ConvexEdgeWear = convexEdgeWear;
+                ConcaveCrease = concaveCrease;
+                DirtDepositBoost = dirtDepositBoost;
+            }
+        }
+
+        private readonly struct FaceVertexKey : IEquatable<FaceVertexKey>
+        {
+            private readonly int faceIndex;
+            private readonly VertexKey vertexKey;
+
+            public FaceVertexKey(
+                int faceIndex,
+                Vector3 position)
+            {
+                this.faceIndex = faceIndex;
+                vertexKey = new VertexKey(position);
+            }
+
+            public bool Equals(FaceVertexKey other)
+            {
+                return faceIndex == other.faceIndex &&
+                    vertexKey.Equals(other.vertexKey);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is FaceVertexKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return (faceIndex * 397) ^ vertexKey.GetHashCode();
+                }
+            }
+        }
+
+        private readonly struct EdgeKey : IEquatable<EdgeKey>
+        {
+            private readonly VertexKey first;
+            private readonly VertexKey second;
+
+            public EdgeKey(
+                Vector3 start,
+                Vector3 end)
+            {
+                VertexKey startKey = new VertexKey(start);
+                VertexKey endKey = new VertexKey(end);
+
+                if (startKey.CompareTo(endKey) <= 0)
+                {
+                    first = startKey;
+                    second = endKey;
+                }
+                else
+                {
+                    first = endKey;
+                    second = startKey;
+                }
+            }
+
+            public bool Equals(EdgeKey other)
+            {
+                return first.Equals(other.first) &&
+                    second.Equals(other.second);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is EdgeKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return (first.GetHashCode() * 397) ^ second.GetHashCode();
+                }
+            }
         }
 
         private readonly struct RectRing
@@ -2842,6 +3313,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 x = Mathf.RoundToInt(position.x * Quantization);
                 y = Mathf.RoundToInt(position.y * Quantization);
                 z = Mathf.RoundToInt(position.z * Quantization);
+            }
+
+            public int CompareTo(VertexKey other)
+            {
+                int xComparison = x.CompareTo(other.x);
+
+                if (xComparison != 0)
+                {
+                    return xComparison;
+                }
+
+                int yComparison = y.CompareTo(other.y);
+
+                if (yComparison != 0)
+                {
+                    return yComparison;
+                }
+
+                return z.CompareTo(other.z);
             }
 
             public bool Equals(VertexKey other)
