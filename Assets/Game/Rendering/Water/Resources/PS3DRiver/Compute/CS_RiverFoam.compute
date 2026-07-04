@@ -1102,15 +1102,7 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
         materialTopology.pressureSupport,
         materialTopology.leeSupport) >= 0.15;
     float positiveSupport = FoamCombinedMaterialSupport(materialTopology);
-    float positiveAgeFactor = lerp(
-        1.0,
-        max(0.01, _FoamPositiveAgeMultiplier),
-        positiveSupport);
-    float negativeAgeFactor = lerp(
-        1.0,
-        max(1.0, _FoamNegativeAgeMultiplier),
-        materialTopology.negativeAgingPressure);
-    float localAgeRate = positiveAgeFactor * negativeAgeFactor;
+    float localAgeRate = FoamResolveLocalAgeRate(materialTopology);
 
     float2 texel = 1.0 /
         max(float2(2.0, 2.0), (float2)_FoamTopologyDimensions);
@@ -1348,17 +1340,7 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
             anchoredSources,
             SampleBoundaryCoverageBilinear(worldSampleCoordinate),
             obstacleFootprint);
-    float positiveInfluence = FoamCombinedMaterialSupport(
-        materialTopology);
-    float positiveAgeFactor = lerp(
-        1.0,
-        max(0.01, _FoamPositiveAgeMultiplier),
-        positiveInfluence);
-    float negativeAgeFactor = lerp(
-        1.0,
-        max(1.0, _FoamNegativeAgeMultiplier),
-        materialTopology.negativeAgingPressure);
-    float localAgeRate = positiveAgeFactor * negativeAgeFactor;
+    float localAgeRate = FoamResolveLocalAgeRate(materialTopology);
     float configuredAgeDelta = _FoamDeltaTime * localAgeRate /
         max(0.05, _FoamNeutralLifetime);
     float absoluteProbeAgeDelta = _FoamDeltaTime;

@@ -598,6 +598,15 @@ The probes showed that raw material patches were written correctly, topology was
 
 Use `Neutral Lifetime = 1`, both aging rates at `1`, and `Material Remaining Life` debug view. The absolute 1-second probe should now die in order: `0.33`, then `0.66`, then `1.00`, with no raw Remaining Life after roughly 1.1 seconds. If this passes, further work should move away from Inspector telemetry and back to actual Foam behavior: production birth, breakup, drift, and obstacle interaction.
 
+
+## River Foam Patch 4.11C.5.4i — Support/Negative Aging Response Repair
+
+After 5.4h restored real material aging, the next Foam pass addressed support/negative aging edge behavior rather than adding more diagnostics. Code inspection showed that topology fields were already scalar and bilinearly sampled, so the immediate issue was the local material aging formula.
+
+The compute path now uses a shared `FoamResolveLocalAgeRate(...)` helper for both simulation and metrics. Negative Aging Pressure now suppresses positive support preservation before applying the faster negative aging multiplier. This avoids the previous case where full support plus full negative pressure could still age slower than neutral Foam.
+
+No topology generation, transport, birth, obstacle flow, drift, or beauty shader behavior was changed in this pass.
+
 ---
 
 ## Architecture and folder rules now active

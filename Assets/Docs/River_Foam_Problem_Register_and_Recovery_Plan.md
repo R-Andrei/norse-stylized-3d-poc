@@ -591,3 +591,23 @@ Clear + Emit Absolute 1s Probe
 ```
 
 Expected result: the 0.33 probe patch dies first, the 0.66 patch second, the 1.00 patch last, and raw Material Remaining Life is gone after roughly 1.1 seconds. If this passes, stop adding lifetime telemetry and resume production Foam behavior fixes.
+
+
+## Patch 4.11C.5.4i — Support/Negative Aging Response Repair
+
+**Status:** implemented; Unity visual validation pending.
+
+After the material lifetime delta-time bug was fixed in 5.4h, normal progressive Foam could finally be judged against topology aging. Analysis of the compute path found that topology generation was not the immediate target: support and negative values are already scalar fields sampled bilinearly by the lifecycle pass. The problem was the local aging response formula.
+
+Before this patch, positive support and negative pressure were multiplied independently:
+
+```text
+localAgeRate = lerp(1, Supported Aging Rate, support)
+             * lerp(1, Negative Aging Rate, negative)
+```
+
+With defaults such as Supported Aging Rate `0.20` and Negative Aging Rate `4.00`, full support plus full negative pressure produced `0.80×` aging. That meant a fully hostile negative pocket inside strong support could still preserve Foam better than neutral water. It also made some overlap edges harsher than the negative core itself.
+
+5.4i moves the response into one shared HLSL helper, `FoamResolveLocalAgeRate(...)`, used by both `SimulateFoam` and `MeasureTopologyMetrics`. The new response shapes support/negative inputs with a smoothstep, suppresses support preservation where negative pressure exists, then applies the negative multiplier. This keeps edges blended while making negative cores actually consume Foam.
+
+Validation target: use normal/progressive Foam, not the isolated probes. Supported regions should still preserve Foam, negative regions should now kill Foam even when they overlap support, and support-to-negative borders should look less like hard contradictory masks.

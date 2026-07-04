@@ -1606,7 +1606,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("foamNeutralLifetime"),
                 new GUIContent(
                     "Neutral Lifetime (s)",
-                    "Normalized Remaining Life reaches zero after approximately this many seconds in neutral water. Support and Negative Aging Pressure continuously multiply the local aging rate."));
+                    "Normalized Remaining Life reaches zero after approximately this many seconds in neutral water. Support slows local aging; Negative Aging Pressure suppresses support preservation and accelerates local aging."));
             EditorGUILayout.PropertyField(
                 Find("foamSupportedAgingRate"),
                 new GUIContent(
@@ -1616,7 +1616,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("foamNegativeAgingRate"),
                 new GUIContent(
                     "Negative Aging Rate",
-                    "Aging-rate multiplier at full Negative Aging Pressure. Values above one shorten life. Positive and negative rates multiply rather than destructively erasing one another."));
+                    "Aging-rate multiplier at full Negative Aging Pressure. Values above one shorten life. Negative pressure first suppresses support preservation, then applies this faster aging response."));
             EditorGUILayout.PropertyField(
                 Find("foamMaterialFlowSpeedMultiplier"),
                 new GUIContent(

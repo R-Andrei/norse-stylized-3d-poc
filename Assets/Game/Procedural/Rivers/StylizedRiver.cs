@@ -756,7 +756,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterEventAmount = 0.5f;
 
-        [Tooltip("Lifetime in seconds for unsupported Foam in neutral water. Positive topology multiplies this aging rate downward; Negative Aging Pressure multiplies it upward. This controls persistent material life, not topology lifetime.")]
+        [Tooltip("Lifetime in seconds for unsupported Foam in neutral water. Positive topology slows local aging, while Negative Aging Pressure suppresses that preservation and then accelerates Remaining Life loss. This controls persistent material life, not topology lifetime.")]
         [Range(MinimumFoamNeutralLifetime, MaximumFoamNeutralLifetime)]
         [SerializeField]
         private float foamNeutralLifetime = DefaultFoamNeutralLifetime;
@@ -768,7 +768,7 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField]
         private float foamSupportedAgingRate = DefaultFoamSupportedAgingRate;
 
-        [Tooltip("Aging-rate multiplier at full Negative Aging Pressure. Values above one consume Remaining Life faster. Positive and negative multipliers remain independent and multiply continuously when they overlap.")]
+        [Tooltip("Aging-rate multiplier at full Negative Aging Pressure. Values above one consume Remaining Life faster. Negative pressure also suppresses positive support preservation before this multiplier is applied, so hostile overlap kills rather than merely weakens support.")]
         [Range(
             MinimumFoamNegativeAgingRate,
             MaximumFoamNegativeAgingRate)]

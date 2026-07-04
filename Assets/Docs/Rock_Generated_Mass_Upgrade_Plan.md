@@ -347,7 +347,11 @@ Checklist:
 - [x] Patch 12C.2 - Area mask hard clamp after Unity validation
 - [x] Patch 12D - Shader-space area mask debug
 - [x] Patch 12E - Irregular area mask shaping for `CreviceBase` and `DirtDeposit`
-- [ ] Patch 12F - Edge/crack representation decision and prototype
+- [x] Patch 12F - Contact/crawl area masks for `CreviceBase` and `DirtDeposit`
+- [x] Patch 12F.2 - Contact/crawl area mask tuning after first Unity validation
+- [x] Patch 12F.3 - Contact/crawl area mask second tuning after Unity validation
+- [x] Patch 12F.4 - Contact/crawl structural correction with deposit skeleton
+- [ ] Patch 12G - Edge/crack representation decision and prototype
 - [ ] Patch 13 - Dirty surface mottle and material breakup
 - [ ] Patch 14 - Crack and seam language
 
@@ -1055,7 +1059,172 @@ Acceptance:
 - `ConvexEdgeWear` and `ConcaveCrease` should remain black/neutral.
 - If Unity validation still shows straight bands, the next adjustment should target the shader-space noise/threshold shaping, not return to baked vertex masks.
 
-### Patch 12F - Edge/Crack Representation Decision and Prototype
+### Patch 12F - Contact/Crawl Area Masks
+
+Status: implemented as a shader-only correction after Patch 12E validation showed that `CreviceBase` and `DirtDeposit` were still technically working but not yet decent.
+
+Reason for patch:
+
+- `SurfaceVariation` and `Exposure` remain good enough and should not be touched during this patch.
+- `ConvexEdgeWear` and `ConcaveCrease` remain black/neutral until a real line-feature representation is designed.
+- Patch 12E still used warped height thresholds as the spine of both area masks, so it could only move or soften the lower band.
+- The next correction needed to change the model: `CreviceBase` should be contact plus lower sheltered side planes with an irregular boundary, while `DirtDeposit` should be broken base rim plus base-connected upward crawl.
+
+Checklist status:
+
+- [x] keep the existing hidden generated-mass shader inputs: local min Y, local height, local XZ scale, and mask seed;
+- [x] keep the patch shader-only, with no C# or mesh-generation changes;
+- [x] leave `SurfaceVariation` and `Exposure` logic unchanged;
+- [x] leave `ConvexEdgeWear` and `ConcaveCrease` debug output black/neutral;
+- [x] rewrite `CreviceBase` as contact core plus lower-side shelter with an object-size/tallness-aware irregular boundary;
+- [x] rewrite `DirtDeposit` as broken contact rim plus base-connected crawl patches using multi-scale deterministic noise;
+- [x] document that no material-profile response should be added until Unity validation accepts the debug masks.
+
+Primary files:
+
+- `SH_PixelSurfaceLit.shader`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+Work:
+
+- Added helper functions for generated-mass tallness and size factors so object height can influence how far the base/shelter effect may rise without making the whole rock bright.
+- `CreviceBase` now computes a narrow contact core, an irregular sine/noise boundary in normalized object-space XZ, side/downward/not-upward shelter weighting, and subtle broad/facet breakup. Height still gates the mask, but it is no longer the entire model.
+- `DirtDeposit` now computes a low-frequency crawl-height field per normalized object-space XZ area. Deposit is allowed below that local crawl frontier, then medium/high noise breaks the coverage so patches remain base-connected instead of becoming detached blobs.
+- `DirtDeposit` also keeps a broken contact rim, but suppresses exposed/upward regions through shelter weighting.
+- No material-profile colours, dirt tinting, moss, frost, wetness response, edge wear, or crack response were added. This remains debug-mask work only.
+
+Acceptance:
+
+- `SurfaceVariation` should remain unchanged: broad/faceted stone variation.
+- `Exposure` should remain unchanged: top/upward surfaces bright.
+- `CreviceBase` should show strongest values at contact/base, medium values on lower sheltered side planes, and an irregular non-horizontal upper boundary.
+- `CreviceBase` should not look like dirt, moss, isolated blobs, or a clean horizontal airbrushed band.
+- `DirtDeposit` should show broken lower-rim deposits and uneven upward crawl that remains visibly connected to the base/lower area.
+- `DirtDeposit` should not show detached round airbrush blobs, a continuous bright stripe, or full-body wash.
+- `ConvexEdgeWear` and `ConcaveCrease` should remain black/neutral.
+- If Unity validation still fails, the next correction should tune the contact/crawl model itself, not return these masks to baked vertex interpolation and not proceed to material response.
+
+### Patch 12F.2 - Contact/Crawl Area Mask Tuning
+
+Status: implemented as a follow-up shader-only tuning pass after Unity validation of Patch 12F showed that the model change was correct but the balance was still wrong.
+
+Reason for patch:
+
+- `CreviceBase` was still reading as a broad lower belt. The upper boundary was no longer perfectly straight, but the lower-side shelter component remained too generous and too soft.
+- `DirtDeposit` was too starved. Instead of showing base-connected crawl, it only produced a few small chips near the bottom.
+- The next step was therefore not a new system and not material response. It was a narrow tuning correction to the same shader-space contact/crawl model.
+
+Checklist status:
+
+- [x] keep the patch shader-only, with no C# or mesh-generation changes;
+- [x] keep `SurfaceVariation` and `Exposure` unchanged;
+- [x] keep `ConvexEdgeWear` and `ConcaveCrease` black/neutral;
+- [x] tune `CreviceBase` to reduce continuous lower-band coverage and strengthen irregular lower-side shaping;
+- [x] tune `DirtDeposit` to increase broken lower-rim presence and make the upward crawl field more visible while remaining base-connected;
+- [x] document that this is still debug-mask work only, not material-profile response.
+
+Primary files:
+
+- `SH_PixelSurfaceLit.shader`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+Work:
+
+- `CreviceBase` now uses a lower average rise, a sharper boundary feather, stronger shelter gating, reduced additive side-mid fill, and slightly stronger irregular coverage breakup. This is intended to stop the debug view from reading as one continuous pale belt around the rock.
+- `CreviceBase` contact remains present, but the mask should now rely less on broad lower-face fill and more on uneven sheltered lower planes.
+- `DirtDeposit` now raises the local crawl-height range, lowers the internal patch threshold, strengthens the broken contact rim, and removes the overly aggressive fade-in that was starving the crawl field right above the base.
+- `DirtDeposit` still remains governed by base-connected crawl plus shelter weighting, so the goal is more readable crawl, not a continuous bright stripe.
+
+Acceptance:
+
+- `CreviceBase` should no longer look like a mostly continuous soft lower band. It should break more unevenly and stay strongest at the immediate contact/base zone.
+- `DirtDeposit` should read more clearly as broken base deposits with visible upward crawl, rather than only a few tiny pale fragments.
+- `SurfaceVariation` and `Exposure` should remain unchanged.
+- `ConvexEdgeWear` and `ConcaveCrease` should remain black/neutral.
+- If Unity validation still fails after this tuning pass, the next conversation should reassess the contact/crawl construction again rather than proceeding to material response.
+
+### Patch 12F.3 - Contact/Crawl Area Mask Second Tuning
+
+Status: implemented as a second shader-only tuning pass after Unity validation of Patch 12F.2.
+
+Reason for patch:
+
+- `CreviceBase` improved but still read as a mostly continuous pale belt around the lower rock perimeter.
+- `DirtDeposit` became model-correct and base-connected, but the visible deposits were too large, heavy, and blobby.
+- The fix is still tuning, not a new representation and not material response.
+
+Checklist status:
+
+- [x] keep the patch shader-only, with no C# or mesh-generation changes;
+- [x] keep `SurfaceVariation` and `Exposure` unchanged;
+- [x] keep `ConvexEdgeWear` and `ConcaveCrease` black/neutral;
+- [x] reduce `CreviceBase` wraparound continuity by lowering broad lower-side fill and adding stronger interruption;
+- [x] preserve `DirtDeposit` base-connected crawl while reducing blob mass and increasing internal breakup;
+- [x] keep this as debug-mask work only.
+
+Primary files:
+
+- `SH_PixelSurfaceLit.shader`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+Work:
+
+- `CreviceBase` now has a slightly lower rise, sharper boundary feather, stronger shelter gate, lower side-shelter weight, reduced side-mid fill, and a stronger interruption field. The intended result is less continuous belt behavior and more uneven lower sheltered regions.
+- `DirtDeposit` now has a slightly lower crawl-height range, tighter patch threshold, more high-frequency breakup contribution, lower rim/crawl intensity, and stronger upper suppression. The intended result is to keep the successful base-connected crawl behavior while making the deposit shapes less massive.
+- No material-profile response, edge wear, crack response, geometry relief, or C# plumbing changes were added.
+
+Acceptance:
+
+- `CreviceBase` should still be strongest near the base/contact zone, but should no longer form a clean wraparound pale band.
+- `DirtDeposit` should remain readable as base-connected upward crawl, but with smaller and more broken visible patches than Patch 12F.2.
+- `SurfaceVariation` and `Exposure` should remain unchanged.
+- `ConvexEdgeWear` and `ConcaveCrease` should remain black/neutral.
+- Do not proceed to visible material response until these debug masks are accepted.
+
+### Patch 12F.4 - Contact/Crawl Structural Correction With Deposit Skeleton
+
+Status: implemented as a shader-only structural correction after Unity validation of Patch 12F.3.
+
+Reason for patch:
+
+- `CreviceBase` was thinner than earlier versions, but still visually dominated by a smooth lower height belt.
+- `DirtDeposit` had oscillated between two bad states: Patch 12F.2 was too chunky and blobby, while Patch 12F.3 became too sparse and chippy.
+- This indicated that `DirtDeposit` needed a clearer internal crawl skeleton instead of making the same area-noise field decide coverage, breakup, mass, and upward direction all at once.
+
+Checklist status:
+
+- [x] keep the patch shader-only, with no C# or mesh-generation changes;
+- [x] keep `SurfaceVariation` and `Exposure` unchanged;
+- [x] keep `ConvexEdgeWear` and `ConcaveCrease` black/neutral;
+- [x] make `CreviceBase` less dominated by smooth height by lowering broad fill and strengthening interruption;
+- [x] add a deterministic crawl-skeleton field to `DirtDeposit`;
+- [x] keep `DirtDeposit` base-connected while using erosion and fine breakup to avoid both huge blobs and tiny isolated chips;
+- [x] keep this as debug-mask work only.
+
+Primary files:
+
+- `SH_PixelSurfaceLit.shader`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+Work:
+
+- `CreviceBase` received another controlled reduction in broad lower fill: lower rise, sharper feather, stronger shelter gate, stronger patch interruption, lower lower-side weight, and stronger upper suppression.
+- `DirtDeposit` now separates responsibilities inside the mask:
+  - a broken base rim anchors deposits at contact;
+  - a deterministic object-space crawl skeleton creates upward paths;
+  - a crawl-height field keeps those paths base-connected;
+  - erosion and high-frequency breakup reduce mass without starving the whole mask.
+- The goal is to stop the previous oscillation between large blobs and tiny chips by giving the deposit mask a visible crawl structure.
+
+Acceptance:
+
+- `CreviceBase` should still ground the rock at the lower/contact area, but it should be less like a clean continuous belt than Patch 12F.3.
+- `DirtDeposit` should show base-connected upward crawl paths with broken internal edges, not broad solid blobs and not only tiny isolated chips.
+- `SurfaceVariation` and `Exposure` should remain unchanged.
+- `ConvexEdgeWear` and `ConcaveCrease` should remain black/neutral.
+- Do not proceed to visible material response until these debug masks are accepted.
+
+### Patch 12G - Edge/Crack Representation Decision and Prototype
 
 Status: planned after `CreviceBase` and `DirtDeposit` reach a decent debug state.
 

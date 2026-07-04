@@ -262,113 +262,182 @@ Shader "PS3D/Pixel Surface Lit"
                 return saturate(a * 0.52 + b * 0.33 + c * 0.15);
             }
 
+            float ResolveGeneratedMassTallnessFactor()
+            {
+                float height = max(0.0001, _GeneratedMassLocalHeight);
+                float xzScale = max(0.0001, _GeneratedMassLocalXZScale);
+                return saturate((height / xzScale - 0.65) * 0.58);
+            }
+
+            float ResolveGeneratedMassSizeFactor()
+            {
+                return saturate((_GeneratedMassLocalHeight - 0.75) * 0.16);
+            }
+
             float ResolveShaderCreviceBaseMask(Varyings input)
             {
                 float height01 = ResolveGeneratedMassHeight01(input);
-                float notUpward = ResolveNotUpwardMask(input);
                 float normalY = normalize((float3)input.normalOS).y;
-                float downward = saturate(-normalY * 1.25);
-                float sideFacing = 1.0 - smoothstep(0.32, 0.92, abs(normalY));
+                float up = saturate(normalY);
+                float downward = saturate(-normalY * 1.18);
+                float sideFacing = 1.0 - smoothstep(0.18, 0.90, abs(normalY));
+                float notUpward = 1.0 - smoothstep(0.08, 0.52, up);
+
+                float tallness = ResolveGeneratedMassTallnessFactor();
+                float sizeFactor = ResolveGeneratedMassSizeFactor();
+                float xzScale = max(0.0001, _GeneratedMassLocalXZScale);
+                float2 normalizedXZ = input.positionOS.xz / xzScale;
+                float seed = _GeneratedMassMaskSeed;
+
+                float waveA = sin(normalizedXZ.x * 8.4 + seed * 0.113);
+                float waveB = sin(normalizedXZ.y * 6.7 + seed * 0.071 + 1.73);
+                float waveC = sin(
+                    (normalizedXZ.x + normalizedXZ.y * 0.73) * 9.7 +
+                    seed * 0.097 - 0.61);
+                float irregularWave =
+                    (waveA * 0.44 + waveB * 0.35 + waveC * 0.21) * 0.5 + 0.5;
 
                 float broadNoise =
-                    ResolveGeneratedMassSoftPatchNoise(input, 1.35, 19.0);
-                float detailNoise =
-                    ResolveGeneratedMassPatchNoise(input, 3.15, 29.0);
-                float thresholdWarp =
-                    (broadNoise - 0.5) * 0.12 +
-                    (detailNoise - 0.5) * 0.035;
-                float warpedHeight = height01 - thresholdWarp;
+                    ResolveGeneratedMassSoftPatchNoise(input, 1.08, 19.0);
+                float planeBreakNoise =
+                    ResolveGeneratedMassPatchNoise(input, 1.95, 31.0);
+                float facetNoise =
+                    saturate((float)input.color.r * 0.50 + broadNoise * 0.28 + planeBreakNoise * 0.22);
+                float boundaryWarp = saturate(irregularWave * 0.74 + broadNoise * 0.26);
+                float patchField = saturate(
+                    irregularWave * 0.38 +
+                    broadNoise * 0.22 +
+                    facetNoise * 0.18 +
+                    planeBreakNoise * 0.22);
+
+                float baseRise = 0.078 + tallness * 0.026 + sizeFactor * 0.018;
+                float localBoundary = baseRise * lerp(0.34, 1.78, boundaryWarp);
+                float boundaryFeather = 0.044 + tallness * 0.016;
 
                 float contactCore =
-                    1.0 - smoothstep(0.0, 0.075, height01);
-                float contactFeather =
-                    1.0 - smoothstep(0.035, 0.18, warpedHeight);
-                float lowerShelf =
-                    1.0 - smoothstep(0.12, 0.42, warpedHeight);
+                    1.0 - smoothstep(0.0, 0.032 + tallness * 0.006, height01);
+                float lowerRegion =
+                    1.0 - smoothstep(
+                        localBoundary,
+                        localBoundary + boundaryFeather,
+                        height01);
                 float lowerShoulder =
-                    1.0 - smoothstep(0.24, 0.58, warpedHeight);
+                    1.0 - smoothstep(
+                        localBoundary + 0.018,
+                        localBoundary + 0.088,
+                        height01);
 
                 float shelter = saturate(
-                    notUpward * 0.68 +
-                    sideFacing * 0.28 +
-                    downward * 0.42);
+                    sideFacing * 0.54 +
+                    notUpward * 0.15 +
+                    downward * 0.17);
+                float shelterGate = smoothstep(0.33, 0.80, shelter);
+                float facetBreakup = lerp(0.66, 1.00, facetNoise);
+                float regionCoverage = smoothstep(0.40, 0.86, patchField);
+                float interruption = lerp(0.16, 1.00, regionCoverage);
 
-                float mask =
-                    contactCore * 0.38 +
-                    contactFeather * shelter * 0.34 +
-                    lowerShelf * shelter * 0.28 +
-                    lowerShoulder * sideFacing * 0.13;
+                float lowerSideShelter =
+                    lowerRegion *
+                    shelterGate *
+                    facetBreakup *
+                    interruption;
+                float sideMids = lowerShoulder * sideFacing * lerp(0.002, 0.018, broadNoise) * interruption;
+                float mask = max(contactCore * 0.90, lowerSideShelter * 0.54);
+                mask += sideMids;
 
-                float breakup = lerp(0.86, 1.12, broadNoise);
-                mask = mask * breakup;
-
-                float upperSuppress = smoothstep(0.44, 0.72, height01);
-                mask *= lerp(1.0, 0.18, upperSuppress);
-                return saturate(mask);
+                float upperSuppress = smoothstep(0.36, 0.56, height01);
+                mask *= lerp(1.0, 0.02, upperSuppress);
+                return saturate(pow(mask, 1.26));
             }
 
             float ResolveShaderDirtDepositMask(Varyings input)
             {
                 float height01 = ResolveGeneratedMassHeight01(input);
-                float notUpward = ResolveNotUpwardMask(input);
                 float normalY = normalize((float3)input.normalOS).y;
-                float sideFacing = 1.0 - smoothstep(0.28, 0.9, abs(normalY));
+                float up = saturate(normalY);
+                float downward = saturate(-normalY * 1.22);
+                float sideFacing = 1.0 - smoothstep(0.24, 0.92, abs(normalY));
+                float notUpward = 1.0 - smoothstep(0.09, 0.60, up);
+                float depositShelter = saturate(
+                    sideFacing * 0.74 +
+                    downward * 0.24 +
+                    notUpward * 0.18);
 
-                float broadNoise =
-                    ResolveGeneratedMassSoftPatchNoise(input, 1.05, 47.0);
-                float patchNoise =
-                    ResolveGeneratedMassPatchNoise(input, 2.55, 71.0);
-                float detailNoise =
-                    ResolveGeneratedMassPatchNoise(input, 5.2, 113.0);
-                float crawlNoise =
-                    ResolveGeneratedMassSoftPatchNoise(input, 1.65, 151.0);
+                float tallness = ResolveGeneratedMassTallnessFactor();
+                float xzScale = max(0.0001, _GeneratedMassLocalXZScale);
+                float2 normalizedXZ = input.positionOS.xz / xzScale;
+                float seed = _GeneratedMassMaskSeed;
 
-                float thresholdWarp =
-                    (broadNoise - 0.5) * 0.16 +
-                    (patchNoise - 0.5) * 0.055;
-                float warpedHeight = height01 - thresholdWarp;
+                float lowNoise =
+                    ResolveGeneratedMassSoftPatchNoise(input, 0.88, 47.0);
+                float mediumNoise =
+                    ResolveGeneratedMassPatchNoise(input, 2.80, 71.0);
+                float highNoise =
+                    ResolveGeneratedMassPatchNoise(input, 7.60, 113.0);
 
-                float lowerAllowed =
-                    1.0 - smoothstep(0.08, 0.34, warpedHeight);
-                float crawlCeiling = lerp(0.18, 0.55, crawlNoise);
-                float crawlAllowed =
-                    1.0 - smoothstep(0.10, crawlCeiling, height01);
+                float skeletonWaveA =
+                    1.0 - smoothstep(
+                        0.18,
+                        0.56,
+                        abs(sin(normalizedXZ.x * 10.5 + lowNoise * 2.4 + seed * 0.041)));
+                float skeletonWaveB =
+                    1.0 - smoothstep(
+                        0.14,
+                        0.52,
+                        abs(sin((normalizedXZ.x * 0.62 + normalizedXZ.y * 0.91) * 8.8 + mediumNoise * 1.8 + seed * 0.067)));
+                float crawlSkeleton = saturate(max(skeletonWaveA * 0.82, skeletonWaveB * 0.70));
+                crawlSkeleton *= smoothstep(0.30, 0.82, lowNoise * 0.56 + mediumNoise * 0.44);
 
-                float shelter = saturate(
-                    notUpward * 0.74 +
-                    sideFacing * 0.24 +
-                    saturate(-normalY) * 0.28);
+                float crawlHeight = 0.070 + 0.305 * pow(lowNoise, 1.42);
+                crawlHeight += crawlSkeleton * 0.070;
+                crawlHeight = min(crawlHeight + tallness * 0.040, 0.48);
+                float connectedCrawl =
+                    1.0 - smoothstep(
+                        crawlHeight,
+                        crawlHeight + 0.086,
+                        height01);
 
-                float patchCoverage = smoothstep(
-                    0.47,
-                    0.78,
-                    patchNoise * 0.76 + broadNoise * 0.24);
-                float crawlCoverage = smoothstep(
-                    0.58,
-                    0.86,
-                    patchNoise * 0.58 + crawlNoise * 0.31 + detailNoise * 0.11);
+                float baseConnection =
+                    1.0 - smoothstep(
+                        0.0,
+                        0.070 + tallness * 0.010,
+                        height01);
+                float heightTaper =
+                    1.0 - smoothstep(
+                        crawlHeight * 0.62,
+                        crawlHeight + 0.055,
+                        height01);
+
+                float erosion =
+                    smoothstep(
+                        0.34,
+                        0.72,
+                        mediumNoise * 0.50 + highNoise * 0.34 + lowNoise * 0.16);
+                float fineBreakup = lerp(0.62, 1.06, highNoise);
+                float skeletonCoverage = lerp(0.42, 1.00, crawlSkeleton);
+
+                float rimCore =
+                    1.0 - smoothstep(0.0, 0.050 + tallness * 0.010, height01);
                 float rimBreakup = smoothstep(
-                    0.26,
+                    0.30,
                     0.68,
-                    patchNoise * 0.55 + detailNoise * 0.45);
+                    mediumNoise * 0.50 + highNoise * 0.30 + lowNoise * 0.20);
+                float brokenRim =
+                    rimCore * rimBreakup * lerp(0.46, 0.96, depositShelter);
 
-                float contactRim =
-                    (1.0 - smoothstep(0.0, 0.095, height01)) *
-                    rimBreakup;
-                float lowerPatches =
-                    lowerAllowed * shelter * patchCoverage;
-                float upwardCrawl =
-                    crawlAllowed * shelter * crawlCoverage *
-                    smoothstep(0.08, 0.24, height01);
+                float crawlDeposit =
+                    connectedCrawl *
+                    heightTaper *
+                    erosion *
+                    fineBreakup *
+                    skeletonCoverage *
+                    depositShelter;
 
-                float mask =
-                    contactRim * 0.48 +
-                    lowerPatches * 0.72 +
-                    upwardCrawl * 0.42;
-
-                float upperSuppress = smoothstep(0.48, 0.68, height01);
+                float upperSuppress = smoothstep(0.46, 0.66, height01);
+                float mask = max(baseConnection * rimBreakup * 0.30, brokenRim * 0.54);
+                mask = max(mask, crawlDeposit * 0.76);
                 mask *= 1.0 - upperSuppress;
-                return saturate(pow(mask, 1.08));
+                return saturate(pow(mask, 1.06));
             }
 
             half3 ResolveMaskDebugColor(Varyings input)

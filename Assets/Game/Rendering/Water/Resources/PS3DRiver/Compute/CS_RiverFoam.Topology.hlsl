@@ -44,6 +44,38 @@ float FoamCombinedMaterialSupport(FoamMaterialTopologySample sample)
 }
 
 
+float FoamShapeAgingInfluence(float value)
+{
+    return smoothstep(0.08, 0.92, saturate(value));
+}
+
+
+float FoamResolveLocalAgeRate(FoamMaterialTopologySample materialTopology)
+{
+    float shapedSupport = FoamShapeAgingInfluence(
+        FoamCombinedMaterialSupport(materialTopology));
+    float shapedNegative = FoamShapeAgingInfluence(
+        materialTopology.negativeAgingPressure);
+
+    // Negative Aging Pressure should mean hostile water, not merely a
+    // multiplicative counterweight that can still leave full support aging
+    // slower than neutral. Suppress the preservation influence first, then
+    // apply the negative aging multiplier. This keeps overlap edges blended
+    // while making negative cores actually consume material.
+    float effectiveSupport = shapedSupport * (1.0 - shapedNegative);
+
+    float positiveAgeFactor = lerp(
+        1.0,
+        max(0.01, _FoamPositiveAgeMultiplier),
+        effectiveSupport);
+    float negativeAgeFactor = lerp(
+        1.0,
+        max(1.0, _FoamNegativeAgeMultiplier),
+        shapedNegative);
+    return positiveAgeFactor * negativeAgeFactor;
+}
+
+
 bool IsObstacleIntervalHeightInside(
     float4 intervals,
     float waterHeight)
