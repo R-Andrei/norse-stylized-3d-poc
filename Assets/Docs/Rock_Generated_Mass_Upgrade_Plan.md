@@ -294,6 +294,24 @@ Add new properties only after the baseline material visually matches:
 - `_CreviceDarkenStrength`
 - `_BaseDarkenStrength`
 
+Patch 9 material profiles may add:
+
+- `_Wetness`
+- `_WetDarkenStrength`
+- `_WetPixelSoftening`
+- `_WetSmoothnessBoost`
+- `_DirectStrength`
+- `_ShadowAmbientStrength`
+- `_FlatNormalStrength`
+- `_FrostStrength`
+- `_FrostCoverage`
+- `_FrostContrast`
+- `_FrostCreviceDarken`
+- `_MonolithicFlatten`
+- `_MonolithicSmoothnessBoost`
+- `_ProfileContrast`
+- `_ProfilePixelContrast`
+
 ### Migration Requirements
 
 The full HLSL shader migration must:
@@ -319,8 +337,8 @@ Checklist:
 - [x] Patch 5 - Add `CarvedMarkerStone` closed-shell archetype
 - [x] Patch 6 - Inspector-owned base colour
 - [x] Patch 7 - HLSL pixel surface baseline, provisional until Unity shader import/visual validation
-- [ ] Patch 8 - HLSL semantic surface response
-- [ ] Patch 9 - Material variants
+- [x] Patch 8 - HLSL semantic surface response
+- [x] Patch 9 - Shader-driven material profiles and variants, provisional until Unity shader import/visual validation
 
 ### Patch 1 - Document and Baseline Capture
 
@@ -553,15 +571,19 @@ Rollback:
 
 ### Patch 8 - HLSL Semantic Surface Response
 
-Status: not started.
+Status: implemented and visually accepted for the current baseline. Further tuning can happen while creating material profiles.
 
 Checklist status:
 
-- [ ] consume vertex colour `G` for exposure brightening;
-- [ ] consume vertex colour `B` for crevice/base darkening;
-- [ ] add low-frequency blotch variation;
-- [ ] add optional cell-position warp;
-- [ ] expose conservative controls.
+- [x] consume vertex colour `G` for exposure brightening;
+- [x] consume vertex colour `B` for crevice/base darkening;
+- [x] add low-frequency blotch variation;
+- [x] add optional cell-position warp;
+- [x] expose conservative controls;
+- [x] guard semantic response so plain white vertex colours remain neutral;
+- [x] replace hard broad-cell variation with smooth value noise after a visible axis-aligned strip appeared during Unity testing;
+- [x] tune HLSL baseline lighting toward the midpoint between the original bright Shader Graph material and the darker first HLSL material at base colour `#555759`;
+- [x] validate visual balance in Unity against the current Shader Graph stone material.
 
 Primary files:
 
@@ -583,25 +605,43 @@ Acceptance:
 - pixel noise remains visible but less evenly distributed;
 - no material setting breaks non-rock users of the shader.
 
-### Patch 9 - Material Variants
+### Patch 9 - Shader-Driven Material Profiles and Variants
 
-Status: not started.
+Status: implemented provisionally with shader profile controls and four HLSL material variants. The HLSL shader now uses URP's PBR lighting path for Shader Graph parity instead of the earlier custom lighting pass. Needs Unity import, compile, and visual tuning.
 
 Checklist status:
 
-- [ ] create a small set of material instances after the HLSL shader is accepted;
-- [ ] keep all variants on the same shader;
-- [ ] tune palette and semantic response rather than importing textures.
+- [x] add material-profile controls to `SH_PixelSurfaceLit.shader`;
+- [x] make profile controls affect surface behaviour, not only base colour;
+- [x] create a small set of material instances after the HLSL shader is accepted;
+- [x] keep all variants on the same shader;
+- [x] tune palette, lighting, smoothness, pixel response, semantic response, and profile effects rather than importing textures;
+- [x] test direct-light and shadowed-ambient controls; superseded by URP PBR parity after visual artifacts appeared;
+- [x] replace the custom HLSL lighting pass with URP PBR evaluation to match the old Shader Graph material family;
+- [x] keep the HLSL shader in URP specular workflow to match the old Shader Graph stone material;
+- [x] keep flat-normal lighting control available but default it to `0`, because the old Shader Graph does not feed a custom normal into the Lit surface;
+- [ ] verify each variant reads differently at gameplay camera distance.
 
 Primary files:
 
+- `Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelSurfaceLit.shader`
 - `Assets/Game/Demo/Materials/Stone/`
+
+Created materials:
+
+- `M_PixelStone_HLSL_ColdGrey`
+- `M_PixelStone_HLSL_WetRiver`
+- `M_PixelStone_HLSL_PaleFrost`
+- `M_PixelStone_HLSL_BlackSacred`
 
 Work:
 
+- add shader controls for wetness, frost buildup, monolithic flattening, profile contrast, and pixel contrast;
+- route those controls through albedo, smoothness/specular response, semantic masks, pixel variation, direct light, and shadowed ambient;
 - create a small set of material instances after the HLSL shader is accepted;
 - keep all variants on the same shader;
-- tune palette and semantic response rather than importing textures.
+- tune palette and behavioural response rather than importing textures;
+- keep per-object `GeneratedMass` base colour meaningful by treating material variants as response profiles, not just fixed colours.
 
 Suggested variants:
 
@@ -610,9 +650,20 @@ Suggested variants:
 - pale frost stone;
 - black sacred/fractured stone.
 
+Variant characteristics:
+
+- `Cold Grey Stone`: the balanced default profile. It should stay close to the current accepted HLSL baseline, with moderate pixel variation, moderate semantic response, and neutral smoothness.
+- `Dark Wet River Stone`: consistently darker across the whole surface, shinier, less crisp in pixel contrast, and less sharply crevice-carved. It should feel damp or slick rather than merely black.
+- `Pale Frost Stone`: pale/cool exposed buildup, especially on upward or broad exposed faces; stronger dark crevices; drier/sharper surface response; subtle frost patterning from smooth broad noise.
+- `Black Sacred Stone`: dark, monolithic, and controlled. It should reduce noisy colour range, flatten variation toward one strong tone, and optionally read smoother or more polished than ordinary fractured stone.
+
 Acceptance:
 
 - variants are meaningfully distinct at gameplay camera distance;
+- variants differ through surface behaviour, not just colour;
+- dark wet stone is shinier, more uniformly dark, and visually softer;
+- pale frost stone has readable exposed frost buildup and darker crevices;
+- black sacred stone is controlled, dark, and comparatively monolithic;
 - existing default stone remains available.
 
 ## Validation Matrix

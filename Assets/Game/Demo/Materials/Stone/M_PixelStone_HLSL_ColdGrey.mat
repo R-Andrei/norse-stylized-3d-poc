@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: M_PixelStone_HLSL_Baseline
+  m_Name: M_PixelStone_HLSL_ColdGrey
   m_Shader: {fileID: 4800000, guid: 4879e57ffb554608832b63954f182a9c, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -63,7 +63,7 @@ Material:
     - _MonolithicFlatten: 0
     - _MonolithicSmoothnessBoost: 0.18
     m_Colors:
-    - _BaseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
+    - _BaseColor: {r: 0.33333334, g: 0.34117648, b: 0.34901962, a: 1}
     - _FrostColor: {r: 0.72, g: 0.82, b: 0.88, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

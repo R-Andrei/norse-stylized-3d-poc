@@ -771,9 +771,11 @@ Shader "PS3D/Stylized River Water"
                     _FoamColour.rgb,
                     lighting.combined,
                     _MinimumNightVisibility);
-                // Foam Colour alpha is the single canonical opacity control.
+                // Foam lifetime no longer fades the whole patch. RiverWaterEvaluateFoam
+                // returns an erosion-shaped mask: surviving fragments should stay
+                // foam-coloured, with only a narrow fringe blending into water.
                 float foamBlend = saturate(
-                    foam.mask *
+                    smoothstep(0.08, 0.46, foam.mask) *
                     _FoamColour.a);
                 finalColour = lerp(finalColour, foamColour, foamBlend);
                 finalColour = MixFog(finalColour, input.motionData.w);
@@ -863,16 +865,14 @@ Shader "PS3D/Stylized River Water"
                         float3(0.05, 0.22, 0.95),
                         obstacleFootprint);
 
-                    float life = saturate(foam.remainingLife);
-                    float3 foamOverlay = lerp(
-                        float3(0.05, 0.72, 1.00),
-                        float3(0.96, 1.00, 1.00),
-                        life);
-                    foamOverlay *= lerp(0.42, 1.0, life);
+                    // Do not colour-code ordinary Foam by Remaining Life here.
+                    // That made aging look like a teal/blue hue shift. Life-specific
+                    // proof belongs in the later local-aging diagnostic.
+                    float3 foamOverlay = float3(0.96, 0.98, 0.92);
                     float3 composite = lerp(
                         topologyColour,
                         foamOverlay,
-                        saturate(foam.mask * 0.92));
+                        saturate(smoothstep(0.08, 0.46, foam.mask) * 0.96));
                     return half4(saturate(composite), 1.0);
                 }
 

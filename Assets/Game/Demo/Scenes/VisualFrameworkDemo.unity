@@ -183,6 +183,7 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -387,6 +388,7 @@ MonoBehaviour:
     depthBias: 0.903
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -780,6 +782,7 @@ MonoBehaviour:
     depthBias: 0.761
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -949,6 +952,7 @@ MonoBehaviour:
     depthBias: 0.971
     surfaceVariation: 0.735
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -1118,6 +1122,7 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -1461,6 +1466,7 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -2264,6 +2270,7 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -3463,6 +3470,7 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -4087,6 +4095,7 @@ MonoBehaviour:
     depthBias: 0.95
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -4496,6 +4505,7 @@ MonoBehaviour:
     depthBias: 0.7
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -4889,6 +4899,7 @@ MonoBehaviour:
     depthBias: 0.7
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -5058,6 +5069,7 @@ MonoBehaviour:
     depthBias: 0.7
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -5270,6 +5282,7 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -5712,6 +5725,7 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -6001,6 +6015,7 @@ MonoBehaviour:
     depthBias: 1.073
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -6267,6 +6282,7 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.49056602, g: 0.47947407, b: 0.46511212, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -6340,7 +6356,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: af31c1ab9bb218240a8a169357ee2113, type: 2}
+  - {fileID: 2100000, guid: 003eeac564864bbaa4b5c637ec767f97, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -6599,6 +6615,7 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -7376,6 +7393,7 @@ MonoBehaviour:
     depthBias: 1.3
     surfaceVariation: 0.237
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -7943,14 +7961,24 @@ MonoBehaviour:
   foamEdgeCavityAmount: 0.423
   foamConnectorWeakSpanAmount: 0.443
   foamFreeWaterEventAmount: 0.409
+  foamNeutralLifetime: 4
+  foamSupportedAgingRate: 0.2
+  foamNegativeAgingRate: 4
+  foamMaterialFlowSpeedMultiplier: 1
+  foamMaterialLifecycleTuningVersion: 1
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}
-  foamDebugView: 0
+  foamDebugView: 1
   foamTestDistanceNormalized: 0.5
   foamTestAcrossNormalized: 0
   foamTestRadius: 0.8
   foamTestAmount: 0.85
   foamTestRemainingLife: 1
   foamTestElongation: 1.5
+  foamTestProgressiveRibbonHalfWidth: 0.2
+  foamTestProgressiveRibbonDuration: 1.5
+  foamTestProgressiveRibbonTravelDistance: 3
+  foamTestProgressiveRibbonAcrossDrift: 0.25
+  foamTestProgressiveRibbonPathWander: 0.35
   bodyDebugView: 0
   horizonColor: {r: 0.58, g: 0.91, b: 0.94, a: 0.35}
   specularColor: {r: 1, g: 1, b: 1, a: 0.35}
@@ -8691,6 +8719,7 @@ MonoBehaviour:
     depthBias: 1.094
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -8860,6 +8889,7 @@ MonoBehaviour:
     depthBias: 0.7
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -9433,6 +9463,7 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -9634,6 +9665,7 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
   riverInteraction:
     participation: 0
     staticPressureMode: 0

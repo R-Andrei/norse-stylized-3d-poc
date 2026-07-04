@@ -8,6 +8,30 @@ float PS3D_Hash31(float3 value)
     return frac((value.x + value.y) * value.z);
 }
 
+float PS3D_ValueNoise31(float3 value)
+{
+    float3 cell = floor(value);
+    float3 local = frac(value);
+    float3 blend = local * local * (3.0 - 2.0 * local);
+
+    float c000 = PS3D_Hash31(cell + float3(0.0, 0.0, 0.0));
+    float c100 = PS3D_Hash31(cell + float3(1.0, 0.0, 0.0));
+    float c010 = PS3D_Hash31(cell + float3(0.0, 1.0, 0.0));
+    float c110 = PS3D_Hash31(cell + float3(1.0, 1.0, 0.0));
+    float c001 = PS3D_Hash31(cell + float3(0.0, 0.0, 1.0));
+    float c101 = PS3D_Hash31(cell + float3(1.0, 0.0, 1.0));
+    float c011 = PS3D_Hash31(cell + float3(0.0, 1.0, 1.0));
+    float c111 = PS3D_Hash31(cell + float3(1.0, 1.0, 1.0));
+
+    float x00 = lerp(c000, c100, blend.x);
+    float x10 = lerp(c010, c110, blend.x);
+    float x01 = lerp(c001, c101, blend.x);
+    float x11 = lerp(c011, c111, blend.x);
+    float y0 = lerp(x00, x10, blend.y);
+    float y1 = lerp(x01, x11, blend.y);
+    return lerp(y0, y1, blend.z);
+}
+
 void PixelCellVariation_float(
     float3 Position,
     float CellSize,

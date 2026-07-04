@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: M_PixelStone_HLSL_Baseline
+  m_Name: M_PixelStone_HLSL_PaleFrost
   m_Shader: {fileID: 4800000, guid: 4879e57ffb554608832b63954f182a9c, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -29,41 +29,41 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _AmbientStrength: 0.95
-    - _BaseDarkenStrength: 0.04
-    - _CreviceDarkenStrength: 0.075
+    - _AmbientStrength: 1.02
+    - _BaseDarkenStrength: 0.07
+    - _CreviceDarkenStrength: 0.12
     - _Cull: 2
-    - _DiffuseWrap: 0.12
-    - _DirectStrength: 1.15
-    - _ExposureTintStrength: 0.04
+    - _DiffuseWrap: 0.08
+    - _DirectStrength: 1.22
+    - _ExposureTintStrength: 0.09
     - _FlatNormalStrength: 0
-    - _PixelBroadVariation: 0.022
+    - _PixelBroadVariation: 0.032
     - _PixelCellSize: 0.058
-    - _PixelClusterStrength: 0.591
-    - _PixelEffectStrength: 1
-    - _PixelSeed: 906
-    - _PixelToneCount: 3.89
-    - _PixelVariation: 0.057
-    - _PixelVertexVariation: 0.09
-    - _PixelWarpStrength: 0.18
-    - _ProfileContrast: 1
-    - _ProfilePixelContrast: 1
+    - _PixelClusterStrength: 0.68
+    - _PixelEffectStrength: 1.12
+    - _PixelSeed: 2801
+    - _PixelToneCount: 4.55
+    - _PixelVariation: 0.064
+    - _PixelVertexVariation: 0.11
+    - _PixelWarpStrength: 0.16
+    - _ProfileContrast: 1.22
+    - _ProfilePixelContrast: 1.18
     - _ReceiveShadows: 1
-    - _Smoothness: 0.2
-    - _SpecularStrength: 0.16
-    - _ShadowAmbientStrength: 0.42
-    - _WetDarkenStrength: 0.22
-    - _WetPixelSoftening: 0.55
-    - _WetSmoothnessBoost: 0.35
+    - _Smoothness: 0.08
+    - _SpecularStrength: 0.11
+    - _ShadowAmbientStrength: 0.34
+    - _WetDarkenStrength: 0.05
+    - _WetPixelSoftening: 0.18
+    - _WetSmoothnessBoost: 0.05
     - _Wetness: 0
-    - _FrostStrength: 0
-    - _FrostCoverage: 0.45
-    - _FrostContrast: 1
-    - _FrostCreviceDarken: 0.22
+    - _FrostStrength: 0.78
+    - _FrostCoverage: 0.62
+    - _FrostContrast: 1.35
+    - _FrostCreviceDarken: 0.34
     - _MonolithicFlatten: 0
-    - _MonolithicSmoothnessBoost: 0.18
+    - _MonolithicSmoothnessBoost: 0.04
     m_Colors:
-    - _BaseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
-    - _FrostColor: {r: 0.72, g: 0.82, b: 0.88, a: 1}
+    - _BaseColor: {r: 0.43, g: 0.47, b: 0.48, a: 1}
+    - _FrostColor: {r: 0.77, g: 0.86, b: 0.90, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

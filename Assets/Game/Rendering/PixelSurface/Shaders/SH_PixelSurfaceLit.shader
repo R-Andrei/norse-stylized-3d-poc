@@ -13,11 +13,37 @@ Shader "PS3D/Pixel Surface Lit"
         _PixelVariation("Pixel Variation", Range(0, 0.25)) = 0.057
         _PixelVertexVariation("Vertex Variation", Range(0, 0.25)) = 0.09
         _PixelEffectStrength("Pixel Effect Strength", Range(0, 2)) = 1
+        _PixelBroadVariation("Broad Variation", Range(0, 0.25)) = 0.022
+        _PixelWarpStrength("Cell Warp Strength", Range(0, 2)) = 0.18
+
+        [Header(Semantic Surface Response)]
+        _ExposureTintStrength("Exposure Brighten Strength", Range(0, 0.5)) = 0.04
+        _CreviceDarkenStrength("Crevice Darken Strength", Range(0, 0.75)) = 0.075
+        _BaseDarkenStrength("Base Darken Strength", Range(0, 0.75)) = 0.04
+
+        [Header(Material Profile)]
+        _ProfileContrast("Profile Contrast", Range(0, 2)) = 1
+        _ProfilePixelContrast("Profile Pixel Contrast", Range(0, 2)) = 1
+        _Wetness("Wetness", Range(0, 1)) = 0
+        _WetDarkenStrength("Wet Darken Strength", Range(0, 0.75)) = 0.22
+        _WetPixelSoftening("Wet Pixel Softening", Range(0, 1)) = 0.55
+        _WetSmoothnessBoost("Wet Smoothness Boost", Range(0, 1)) = 0.35
+        _FrostStrength("Frost Strength", Range(0, 1)) = 0
+        _FrostCoverage("Frost Coverage", Range(0, 1)) = 0.45
+        _FrostContrast("Frost Contrast", Range(0, 2)) = 1
+        _FrostCreviceDarken("Frost Crevice Darken", Range(0, 1)) = 0.22
+        _FrostColor("Frost Color", Color) = (0.72, 0.82, 0.88, 1)
+        _MonolithicFlatten("Monolithic Flatten", Range(0, 1)) = 0
+        _MonolithicSmoothnessBoost("Monolithic Smoothness Boost", Range(0, 1)) = 0.18
 
         [Header(Lighting)]
         _Smoothness("Smoothness", Range(0, 1)) = 0.2
         _SpecularStrength("Specular Strength", Range(0, 1)) = 0.16
-        _AmbientStrength("Ambient Strength", Range(0, 2)) = 1
+        _AmbientStrength("Ambient Strength", Range(0, 2)) = 0.95
+        _DirectStrength("Direct Strength", Range(0, 2)) = 1.15
+        _DiffuseWrap("Diffuse Wrap", Range(0, 1)) = 0.12
+        _ShadowAmbientStrength("Shadow Ambient Strength", Range(0, 1)) = 0.42
+        _FlatNormalStrength("Flat Normal Strength", Range(0, 1)) = 0
         [Toggle] _ReceiveShadows("Receive Shadows", Float) = 1
         [Enum(UnityEngine.Rendering.CullMode)] _Cull("Cull", Float) = 2
     }
@@ -52,6 +78,8 @@ Shader "PS3D/Pixel Surface Lit"
             #pragma multi_compile _ _FORWARD_PLUS
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
 
+            #define _SPECULAR_SETUP 1
+
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "../Includes/PixelCellVariation.hlsl"
@@ -66,9 +94,31 @@ Shader "PS3D/Pixel Surface Lit"
                 float _PixelVariation;
                 float _PixelVertexVariation;
                 float _PixelEffectStrength;
+                float _PixelBroadVariation;
+                float _PixelWarpStrength;
+                float _ExposureTintStrength;
+                float _CreviceDarkenStrength;
+                float _BaseDarkenStrength;
+                float _ProfileContrast;
+                float _ProfilePixelContrast;
+                float _Wetness;
+                float _WetDarkenStrength;
+                float _WetPixelSoftening;
+                float _WetSmoothnessBoost;
+                float _FrostStrength;
+                float _FrostCoverage;
+                float _FrostContrast;
+                float _FrostCreviceDarken;
+                half4 _FrostColor;
+                float _MonolithicFlatten;
+                float _MonolithicSmoothnessBoost;
                 float _Smoothness;
                 float _SpecularStrength;
                 float _AmbientStrength;
+                float _DirectStrength;
+                float _DiffuseWrap;
+                float _ShadowAmbientStrength;
+                float _FlatNormalStrength;
                 float _ReceiveShadows;
                 float _Cull;
             CBUFFER_END
@@ -123,89 +173,164 @@ Shader "PS3D/Pixel Surface Lit"
                 half4 baseSample =
                     SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
 
+                float broadCellSize = max(_PixelCellSize * 8.0, 0.0001);
+                float3 broadCoordinate =
+                    input.positionWS / broadCellSize + _PixelSeed * 0.013;
+                float3 warp =
+                    float3(
+                        PS3D_ValueNoise31(broadCoordinate + 11.17),
+                        PS3D_ValueNoise31(broadCoordinate + 23.31),
+                        PS3D_ValueNoise31(broadCoordinate + 37.47)) *
+                    2.0 -
+                    1.0;
+                float3 pixelPositionWS =
+                    input.positionWS +
+                    warp * _PixelCellSize * _PixelWarpStrength;
+
                 float pixelVariation;
                 PixelCellVariation_float(
-                    input.positionWS,
+                    pixelPositionWS,
                     _PixelCellSize,
                     _PixelSeed,
                     _PixelToneCount,
                     _PixelClusterStrength,
                     pixelVariation);
 
-                float vertexVariation = ((float)input.color.r - 0.5) * 2.0;
+                float broadValue =
+                    PS3D_ValueNoise31(broadCoordinate + 53.29) * 2.0 - 1.0;
+                float contractMask =
+                    1.0 -
+                    step(
+                        0.995,
+                        min(
+                            min((float)input.color.r, (float)input.color.g),
+                            (float)input.color.b));
+                float vertexVariation =
+                    ((float)input.color.r - 0.5) * 2.0 * contractMask;
+                float pixelProfileContrast =
+                    max(0.0, _ProfilePixelContrast) *
+                    lerp(1.0, 1.0 - saturate(_WetPixelSoftening), saturate(_Wetness)) *
+                    lerp(1.0, max(0.0, _FrostContrast), saturate(_FrostStrength)) *
+                    lerp(1.0, 0.25, saturate(_MonolithicFlatten));
                 float tonalOffset =
-                    pixelVariation * _PixelVariation +
-                    vertexVariation * _PixelVertexVariation;
+                    (pixelVariation * _PixelVariation +
+                     vertexVariation * _PixelVertexVariation +
+                     broadValue * _PixelBroadVariation) *
+                    pixelProfileContrast;
                 half tonalScale =
                     (half)max(0.0, 1.0 + tonalOffset * _PixelEffectStrength);
 
-                return baseSample.rgb * _BaseColor.rgb * tonalScale;
+                float exposureMask =
+                    saturate((float)input.color.g) * contractMask;
+                float creviceMask =
+                    saturate((float)input.color.b) * contractMask;
+                float baseMask = creviceMask * (1.0 - exposureMask);
+                float profileContrast =
+                    max(0.0, _ProfileContrast) *
+                    lerp(1.0, max(0.0, _FrostContrast), saturate(_FrostStrength));
+                float creviceDarken =
+                    _CreviceDarkenStrength *
+                    lerp(1.0, 0.4, saturate(_Wetness)) +
+                    _FrostCreviceDarken * saturate(_FrostStrength);
+                float baseDarken =
+                    _BaseDarkenStrength *
+                    lerp(1.0, 0.65, saturate(_Wetness));
+                float semanticScale =
+                    1.0 +
+                    (exposureMask * _ExposureTintStrength -
+                     creviceMask * creviceDarken -
+                     baseMask * baseDarken) *
+                    profileContrast;
+
+                half3 albedo =
+                    baseSample.rgb *
+                    _BaseColor.rgb *
+                    tonalScale *
+                    (half)max(0.0, semanticScale);
+
+                float frostNoise =
+                    PS3D_ValueNoise31(broadCoordinate * 1.7 + 71.31);
+                float frostPattern =
+                    saturate(
+                        (frostNoise - (1.0 - saturate(_FrostCoverage))) /
+                        max(0.001, saturate(_FrostCoverage)));
+                float frostMask =
+                    saturate(
+                        exposureMask * 0.85 +
+                        frostPattern * 0.45 -
+                        creviceMask * 0.35) *
+                    saturate(_FrostStrength);
+                albedo = lerp(
+                    albedo,
+                    _FrostColor.rgb,
+                    (half)(frostMask * 0.62));
+
+                albedo *= (half)max(
+                    0.0,
+                    1.0 - saturate(_Wetness) * _WetDarkenStrength);
+
+                half3 monolithicTarget =
+                    _BaseColor.rgb * (half)(1.0 + broadValue * 0.025);
+                albedo = lerp(
+                    albedo,
+                    monolithicTarget,
+                    (half)saturate(_MonolithicFlatten));
+
+                return albedo;
             }
 
-            half3 ResolveLighting(
-                half3 albedo,
-                half3 normalWS,
-                float3 positionWS)
+            half ResolveProfileSmoothness()
             {
-                float4 shadowCoord = TransformWorldToShadowCoord(positionWS);
-                Light mainLight = GetMainLight(shadowCoord);
-                half mainShadow = lerp(
-                    (half)1.0,
-                    mainLight.shadowAttenuation,
-                    saturate((half)_ReceiveShadows));
-                half mainNdotL = saturate(dot(normalWS, mainLight.direction));
+                return saturate(
+                    (half)_Smoothness +
+                    (half)_Wetness * (half)_WetSmoothnessBoost +
+                    (half)_MonolithicFlatten *
+                    (half)_MonolithicSmoothnessBoost -
+                    (half)_FrostStrength * 0.06h);
+            }
 
-                half3 lighting =
-                    SampleSH(normalWS) * (half)_AmbientStrength;
-                lighting +=
-                    mainLight.color *
-                    mainNdotL *
-                    mainLight.distanceAttenuation *
-                    mainShadow;
+            InputData BuildInputData(Varyings input, half3 normalWS)
+            {
+                InputData inputData = (InputData)0;
+                inputData.positionWS = input.positionWS;
+                inputData.positionCS = input.positionCS;
+                inputData.normalWS = normalWS;
+                inputData.viewDirectionWS =
+                    SafeNormalize(GetWorldSpaceViewDir(input.positionWS));
+                inputData.shadowCoord =
+                    TransformWorldToShadowCoord(input.positionWS);
+                inputData.fogCoord = input.fogFactor;
+                inputData.vertexLighting = half3(0.0h, 0.0h, 0.0h);
+                inputData.bakedGI = SampleSH(normalWS);
+                inputData.normalizedScreenSpaceUV =
+                    GetNormalizedScreenSpaceUV(input.positionCS);
+                inputData.shadowMask = half4(1.0h, 1.0h, 1.0h, 1.0h);
+                return inputData;
+            }
 
-                half specularPower =
-                    lerp((half)8.0, (half)96.0, saturate((half)_Smoothness));
-                half3 viewDirectionWS =
-                    SafeNormalize(GetWorldSpaceViewDir(positionWS));
-                half3 halfDirection =
-                    SafeNormalize(mainLight.direction + viewDirectionWS);
-                half specular =
-                    pow(saturate(dot(normalWS, halfDirection)), specularPower) *
-                    (half)_SpecularStrength *
-                    mainLight.distanceAttenuation *
-                    mainShadow;
-
-                #if defined(_ADDITIONAL_LIGHTS)
-                uint lightCount = GetAdditionalLightsCount();
-                LIGHT_LOOP_BEGIN(lightCount)
-                    Light light = GetAdditionalLight(
-                        lightIndex,
-                        positionWS,
-                        half4(1.0, 1.0, 1.0, 1.0));
-                    half shadow = lerp(
-                        (half)1.0,
-                        light.shadowAttenuation,
-                        saturate((half)_ReceiveShadows));
-                    half ndotl = saturate(dot(normalWS, light.direction));
-                    lighting +=
-                        light.color *
-                        ndotl *
-                        light.distanceAttenuation *
-                        shadow;
-
-                    half3 additionalHalfDirection =
-                        SafeNormalize(light.direction + viewDirectionWS);
-                    specular +=
-                        pow(
-                            saturate(dot(normalWS, additionalHalfDirection)),
-                            specularPower) *
-                        (half)_SpecularStrength *
-                        light.distanceAttenuation *
-                        shadow;
-                LIGHT_LOOP_END
-                #endif
-
-                return albedo * lighting + specular;
+            SurfaceData BuildSurfaceData(half3 albedo)
+            {
+                SurfaceData surfaceData = (SurfaceData)0;
+                surfaceData.albedo = albedo;
+                surfaceData.specular =
+                    (half3)_SpecularStrength *
+                    lerp(
+                        1.0h,
+                        1.8h,
+                        saturate((half)_Wetness)) *
+                    lerp(
+                        1.0h,
+                        1.35h,
+                        saturate((half)_MonolithicFlatten));
+                surfaceData.metallic = 0.0h;
+                surfaceData.smoothness = ResolveProfileSmoothness();
+                surfaceData.normalTS = half3(0.0h, 0.0h, 1.0h);
+                surfaceData.emission = half3(0.0h, 0.0h, 0.0h);
+                surfaceData.occlusion = 1.0h;
+                surfaceData.alpha = _BaseColor.a;
+                surfaceData.clearCoatMask = 0.0h;
+                surfaceData.clearCoatSmoothness = 0.0h;
+                return surfaceData;
             }
 
             half4 Frag(Varyings input) : SV_Target
@@ -214,12 +339,32 @@ Shader "PS3D/Pixel Surface Lit"
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
                 half3 normalWS = normalize(input.normalWS);
+                half flatNormalStrength =
+                    saturate((half)_FlatNormalStrength);
+                if (flatNormalStrength > 0.001h)
+                {
+                    half3 viewDirectionWS =
+                        SafeNormalize(GetWorldSpaceViewDir(input.positionWS));
+                    half3 flatNormalWS = normalize(
+                        cross(
+                            ddy(input.positionWS),
+                            ddx(input.positionWS)));
+                    flatNormalWS = faceforward(
+                        flatNormalWS,
+                        -viewDirectionWS,
+                        flatNormalWS);
+                    normalWS = normalize(
+                        lerp(
+                            normalWS,
+                            flatNormalWS,
+                            flatNormalStrength));
+                }
                 half3 albedo = ResolvePixelSurfaceColor(input);
-                half3 color =
-                    ResolveLighting(albedo, normalWS, input.positionWS);
-                color = MixFog(color, input.fogFactor);
-
-                return half4(color, _BaseColor.a);
+                InputData inputData = BuildInputData(input, normalWS);
+                SurfaceData surfaceData = BuildSurfaceData(albedo);
+                half4 color = UniversalFragmentPBR(inputData, surfaceData);
+                color.rgb = MixFog(color.rgb, inputData.fogCoord);
+                return color;
             }
             ENDHLSL
         }
@@ -253,9 +398,31 @@ Shader "PS3D/Pixel Surface Lit"
                 float _PixelVariation;
                 float _PixelVertexVariation;
                 float _PixelEffectStrength;
+                float _PixelBroadVariation;
+                float _PixelWarpStrength;
+                float _ExposureTintStrength;
+                float _CreviceDarkenStrength;
+                float _BaseDarkenStrength;
+                float _ProfileContrast;
+                float _ProfilePixelContrast;
+                float _Wetness;
+                float _WetDarkenStrength;
+                float _WetPixelSoftening;
+                float _WetSmoothnessBoost;
+                float _FrostStrength;
+                float _FrostCoverage;
+                float _FrostContrast;
+                float _FrostCreviceDarken;
+                half4 _FrostColor;
+                float _MonolithicFlatten;
+                float _MonolithicSmoothnessBoost;
                 float _Smoothness;
                 float _SpecularStrength;
                 float _AmbientStrength;
+                float _DirectStrength;
+                float _DiffuseWrap;
+                float _ShadowAmbientStrength;
+                float _FlatNormalStrength;
                 float _ReceiveShadows;
                 float _Cull;
             CBUFFER_END
@@ -354,9 +521,31 @@ Shader "PS3D/Pixel Surface Lit"
                 float _PixelVariation;
                 float _PixelVertexVariation;
                 float _PixelEffectStrength;
+                float _PixelBroadVariation;
+                float _PixelWarpStrength;
+                float _ExposureTintStrength;
+                float _CreviceDarkenStrength;
+                float _BaseDarkenStrength;
+                float _ProfileContrast;
+                float _ProfilePixelContrast;
+                float _Wetness;
+                float _WetDarkenStrength;
+                float _WetPixelSoftening;
+                float _WetSmoothnessBoost;
+                float _FrostStrength;
+                float _FrostCoverage;
+                float _FrostContrast;
+                float _FrostCreviceDarken;
+                half4 _FrostColor;
+                float _MonolithicFlatten;
+                float _MonolithicSmoothnessBoost;
                 float _Smoothness;
                 float _SpecularStrength;
                 float _AmbientStrength;
+                float _DirectStrength;
+                float _DiffuseWrap;
+                float _ShadowAmbientStrength;
+                float _FlatNormalStrength;
                 float _ReceiveShadows;
                 float _Cull;
             CBUFFER_END
