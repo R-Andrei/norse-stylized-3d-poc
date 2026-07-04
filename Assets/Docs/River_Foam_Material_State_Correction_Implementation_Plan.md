@@ -1243,3 +1243,44 @@ The Foam Inspector now groups validation data into foldouts:
 Each foldout begins with an explanation. The active recovery workflow should use only the first few sections unless a specific issue points elsewhere. Transport timing values are visible in the Transport / Motion section near the top and must not be buried under whole-river topology coverage again.
 
 This patch intentionally does not change transport, lifetime, topology, source, residue, lateral motion, or rendering behaviour. It only reorganizes the debug layer and clarifies which values are implemented now versus assigned to future proof patches.
+
+
+## 15. Patch 4.11C.5.4e–5.4h — Lifetime Probe Findings and Lifecycle Commit Repair
+
+### 15.1 Why these patches existed
+
+After the material-state migration and lifecycle consolidation, user validation still showed Foam living far longer than the visible lifetime settings. With `Neutral Lifetime = 1`, `Supported Aging Rate = 1`, and `Negative Aging Rate = 1`, visible Foam survived well beyond one second. Several earlier theories were possible: stale Inspector repaint, birth refresh, synchronized material cells, topology interaction, renderer masking, or a broken lifecycle commit.
+
+### 15.2 Evidence gathered
+
+The minimal truth probes deliberately bypassed production shape/topology ambiguity. They showed that:
+
+- raw material patches could be written into the persistent material state;
+- the isolated probe did not depend on topology;
+- birth activity was idle during the relevant tests;
+- Inspector, runtime, and GPU lifetime values agreed at `1.00s`;
+- both configured and debug-only absolute 1-second probe modes failed to reduce Remaining Life.
+
+This made parameter value mismatch, topology support, and birth refresh unlikely. The failing absolute probe pointed at lifecycle dispatch/commit state instead.
+
+### 15.3 Root cause
+
+`_FoamDeltaTime` is shared between material lifecycle and topology maintenance kernels. In the lifecycle update loop, material code configured shared parameters with the correct step duration, but topology refresh could then call `ConfigureTopologyParameters(0f)` before `SimulateFoam`. That overwrote `_FoamDeltaTime` with zero. The simulation pass still dispatched, and CPU telemetry still counted a step, but the shader subtracted zero from Remaining Life.
+
+### 15.4 Implemented repair
+
+`SimulateFullField(deltaTime)` now calls `ConfigureSharedComputeParameters(deltaTime)` immediately before `DispatchSimulation(...)`. This is a narrow ordering repair, not a new architecture. It keeps topology generation untouched and ensures the material lifecycle pass binds its own current delta and authoritative read/write textures at the point of dispatch.
+
+### 15.5 Validation gate
+
+Before resuming shape, breakup, drift, or obstacle-flow work, validate:
+
+```text
+Neutral Lifetime = 1
+Supported Aging Rate = 1
+Negative Aging Rate = 1
+Debug View = Material Remaining Life
+Clear + Emit Absolute 1s Probe
+```
+
+Expected: `0.33` dies first, `0.66` second, `1.00` last, and the raw Remaining Life debug view is empty after approximately 1.1 seconds. If the absolute probe passes, also confirm the configured probe behaves the same under the same lifetime/rate settings.

@@ -938,6 +938,11 @@ namespace ProgrammaticStylized3D.Rivers
             materialClockSessionStartedAt = -1.0;
             materialSimulatedSecondsSinceSession = 0f;
             materialStepCountSinceSession = 0;
+            pendingIsolatedLifeProbeAbsoluteAging = false;
+            isolatedLifeProbeAbsoluteAgingActive = false;
+            isolatedLifeProbeWrittenAt = -1.0;
+            lastConfiguredFoamDeltaTime = 0f;
+            lastConfiguredAbsoluteLifeProbeActive = false;
             birthCommandsThisFrame = 0;
             lastBirthCommandAt = -1.0;
             manualProofReferenceArea = 0f;
@@ -950,6 +955,7 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader = null;
             clearKernel = -1;
             injectKernel = -1;
+            writeIsolatedLifeProbeKernel = -1;
             buildCurrentShoreEdgesKernel = -1;
             composeTopologyKernel = -1;
             captureGeneratedTopologyKernel = -1;

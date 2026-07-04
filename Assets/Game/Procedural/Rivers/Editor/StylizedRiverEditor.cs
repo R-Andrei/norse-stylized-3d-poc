@@ -1917,7 +1917,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawFoamViewModeSection(river);
             DrawFoamTransportMotionSection(river, runtime);
             DrawFoamLifetimeSection(river, runtime);
-            DrawFoamMaterialProbeSection(river);
+            DrawFoamMaterialProbeSection(river, runtime);
             DrawFoamBirthSourceSection(river, runtime);
             DrawFoamShapeResidueSection(runtime);
             DrawFoamRuntimeResourceSection(runtime);
@@ -2131,6 +2131,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             float hiddenArea = Mathf.Max(
                 0f,
                 runtime.IntegratedPresenceArea - runtime.VisiblePresenceCoreArea);
+            float inspectorNeutralLifetime =
+                Find("foamNeutralLifetime").floatValue;
 
             EditorGUILayout.LabelField(
                 "Lifetime Authority",
@@ -2179,6 +2181,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Material Clock",
                 runtime.MaterialClockStatus);
             EditorGUILayout.LabelField(
+                "Runtime Aging Params",
+                $"inspector {inspectorNeutralLifetime:0.00}s / " +
+                runtime.RuntimeAgingParameterStatus);
+            EditorGUILayout.LabelField(
+                "Probe Decay Check",
+                runtime.ProbeDecayCheckStatus);
+            EditorGUILayout.LabelField(
                 "Life Range",
                 runtime.VisibleLifeRangeStatus);
             EditorGUILayout.LabelField(
@@ -2192,7 +2201,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUI.indentLevel--;
         }
 
-        private void DrawFoamMaterialProbeSection(StylizedRiver river)
+        private void DrawFoamMaterialProbeSection(
+            StylizedRiver river,
+            StylizedRiverFoamRuntime runtime)
         {
             showFoamMaterialProbe = EditorGUILayout.Foldout(
                 showFoamMaterialProbe,
@@ -2241,20 +2252,35 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 foamDebugProperty.intValue = foamDebugValues[selectedDebugIndex];
             }
 
+            EditorGUILayout.LabelField(
+                "Probe State",
+                runtime != null
+                    ? runtime.IsolatedLifeProbeStatus
+                    : "runtime unavailable");
+
             using (new EditorGUI.DisabledScope(!Application.isPlaying))
             {
                 if (GUILayout.Button(
                         new GUIContent(
-                            "Emit Life Probe Strip",
-                            "Injects three adjacent persistent material regions with starting Remaining Life 1.00, 0.66, and 0.33 through the ordinary material birth path.")))
+                            "Clear + Emit Configured Life Probe",
+                            "Clears persistent foam material, cancels active foam births, then writes three small non-overlapping raw material patches directly. Aging uses the current Neutral Lifetime and aging-rate compute parameters.")))
                 {
                     ApplyFoamTestProperties();
-                    river.EmitFoamLifeProbeStrip();
+                    river.ClearAndEmitFoamIsolatedLifeProbe(false);
+                }
+
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Clear + Emit Absolute 1s Probe",
+                            "Final lifecycle sanity check: clears material, writes the same three raw patches, then temporarily ignores topology and Neutral Lifetime for this isolated probe so Remaining Life subtracts raw deltaTime directly.")))
+                {
+                    ApplyFoamTestProperties();
+                    river.ClearAndEmitFoamAbsoluteLifeProbe();
                 }
             }
 
             EditorGUILayout.HelpBox(
-                "Expected with Neutral Lifetime 1 and both aging rates 1: the 0.33 section dies first, 0.66 second, and 1.00 last. If they vanish together, inspect lifecycle/render gating before changing topology.",
+                "Configured probe uses the real production lifetime parameters. Absolute 1s probe is a debug-only sanity check that bypasses topology and lifetime scaling after the write; if absolute aging works but configured aging does not, the failure is in parameter/lifetime-scale plumbing rather than the texture ping-pong path.",
                 MessageType.None);
 
             EditorGUI.indentLevel--;

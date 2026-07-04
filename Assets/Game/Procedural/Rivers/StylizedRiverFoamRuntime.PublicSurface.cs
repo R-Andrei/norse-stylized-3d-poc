@@ -620,8 +620,12 @@ namespace ProgrammaticStylized3D.Rivers
                 10000f)
             : 0f;
         public string MaterialClockStatus => ResolveMaterialClockStatus();
+        public string RuntimeAgingParameterStatus =>
+            ResolveRuntimeAgingParameterStatus();
+        public string ProbeDecayCheckStatus => ResolveProbeDecayCheckStatus();
         public string VisibleLifeRangeStatus => ResolveVisibleLifeRangeStatus();
         public string BirthActivityStatus => ResolveBirthActivityStatus();
+        public string IsolatedLifeProbeStatus => isolatedLifeProbeStatus;
         public bool ShouldRepaintInspectorForFoamDebug =>
             Application.isPlaying &&
             (currentState != null ||
@@ -629,6 +633,7 @@ namespace ProgrammaticStylized3D.Rivers
              topologyMetricsReadbackPending ||
              pendingInjections.Count > 0 ||
              pendingMaterialBirths.Count > 0 ||
+             pendingIsolatedLifeProbe ||
              activeProgressiveRibbonEventCount > 0 ||
              IsTopologyDebugActive ||
              IsProgressiveBirthSourceDebugActive ||
@@ -719,6 +724,7 @@ namespace ProgrammaticStylized3D.Rivers
             !IsProgressiveBirthSourceDebugActive &&
             !materialLifetimeAuthorityActive &&
             pendingInjections.Count == 0 &&
+            !pendingIsolatedLifeProbe &&
             activeProgressiveRibbonEventCount == 0 &&
             pendingMaterialBirths.Count == 0;
         public long EstimatedMemoryBytes =>

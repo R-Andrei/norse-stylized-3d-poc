@@ -2,8 +2,8 @@
 
 **Document type:** problem register and recovery plan  
 **Created after:** Patch `4.11C.5.1a` visual testing  
-**Last updated after:** Patch `4.11C.5.2d` visual testing  
-**Current status:** base downstream Foam motion is now visually smooth, but the Foam material system is still not accepted. The remaining failures are now mostly shape definition, shape evolution, topology/lifetime proof, and obstacle/lateral movement.
+**Last updated after:** Patch `4.11C.5.4h` lifecycle delta-time repair  
+**Current status:** base downstream Foam motion is visually smooth and the material lifetime failure has a concrete lifecycle delta-time repair pending validation. Remaining production failures are shape evolution, breakup/morphing, lateral drift, obstacle interaction, and final Foam rendering quality.
 
 ---
 
@@ -23,9 +23,9 @@ The Foam system has recovered from the earlier catastrophic material-transport f
 
 1. Foam shape is static: once spawned, the visible body moves downstream in almost exactly the same silhouette instead of slowly changing, eroding, deforming, or breaking up.
 2. Foam is visually too blurry and too smear-like.
-3. Foam is still composed of obvious line/ribbon structures rather than reading as a coherent but organically broken material mass.
-4. Foam does not clearly or reliably respond to positive support and negative aging zones.
-5. Current diagnostics do not yet prove whether a specific visible Foam fragment is aging at the expected local rate.
+3. Foam is no longer just a simple line/ribbon, but it still needs better morphing, breakup, lateral chaotic drift, and a more organically broken material body.
+4. Foam support/negative aging response must be revalidated after the lifecycle delta-time repair.
+5. Current diagnostics have enough lifetime proof tooling; do not add more Inspector telemetry unless a new concrete failure demands it.
 6. Foam has no useful lateral drift, avoidance, or obstacle-aware sliding, so it can get stuck against rocks or obstacle boundaries.
 7. Obstacle interaction is still effectively an impermeable clip, not a flow-around behavior.
 8. The transport model may still be grid-visible/blocky in debug contexts, but this is no longer the leading visible problem after phase transport.
@@ -142,19 +142,19 @@ Patch `4.11C.5.3` passes this part only if:
 
 ---
 
-# 3. Problem C — Foam is too blurry and line/ribbon-based
+# 3. Problem C — Foam is too blurry and lacks organic breakup
 
 **Status:** active blocker.
 
 ## Symptom
 
-After `4.11C.5.2d`, Foam motion is smooth, but the visible result is too blurry. The material also reads as a stack of soft horizontal/linear ribbons rather than an organic Foam mass.
+After the latest material/lifetime work, Foam is no longer merely a simple line/ribbon in normal output, but the visible result still lacks convincing organic breakup, lateral chaotic drift, and evolving shape definition.
 
-The old residue problem is not the same thing. The old issue was stale material left behind during transport. This new issue is that the main Foam body itself is composed of visible line-like structures and excessive blur.
+The old residue problem is not the same thing. The old issue was stale material left behind during transport. This remaining issue is that the main Foam body still lacks enough definition, internal breakup, and time-varying deformation.
 
 ## Why this is bad
 
-Stylized Foam can be soft, but it cannot be so blurred that the shape loses definition. It also should not look like dragged paint strokes or a stack of translucent lines unless that is an intentional internal pattern.
+Stylized Foam can be soft, but it cannot be so blurred that the shape loses definition. It also needs controlled breakup and deformation instead of a mostly static blob or smear.
 
 A too-blurry Foam body makes every later test worse:
 
@@ -553,6 +553,41 @@ Implemented phase-driven movement plus integer cell commits. User validation con
 
 - the Foam shape is static;
 - the visible body is too blurry;
-- the Foam is still composed of line/ribbon structures;
-- topology aging response remains unproven or ineffective;
+- the Foam is no longer treated as a pure line/ribbon blocker, but still needs better morphing, breakup, and organic material definition;
+- topology aging response must be revalidated after the lifecycle delta-time repair;
 - Foam still lacks lateral/obstacle flow-around behavior.
+
+
+## Patch 4.11C.5.4e–5.4g — Minimal Material Lifetime Truth Probes
+
+**Status:** diagnostic evidence collected; do not expand Inspector further for this issue.
+
+These patches were added after user testing showed Foam surviving far longer than `Neutral Lifetime = 1`, dying in synchronized-looking regions, and Inspector values repainting only while hovered. The patches intentionally avoided topology rewrites and visual polish. They added compact rows for material clock, life range, birth activity, runtime aging parameters, and probe decay checks, plus raw material debug views for persistent Presence and Remaining Life.
+
+The probes established the following:
+
+- Inspector repaint was a real usability bug, but not the lifetime root cause.
+- The visible lifetime controls reached the runtime and GPU scalar setup (`inspector 1.00s / runtime 1.00s / gpu 1.00s`).
+- Manual raw material probes wrote correctly into the persistent material state.
+- Birth refresh was not responsible during the isolated probe tests.
+- Topology was not involved in the isolated raw probe path.
+- Both configured and absolute 1-second probes failed to decay, proving the lifecycle pass was attempting work without successfully applying age to the rendered/current state.
+
+## Patch 4.11C.5.4h — Material Lifecycle Delta-Time Rebind
+
+**Status:** implemented; Unity validation pending.
+
+Code analysis found a concrete lifecycle ordering bug. The main lifecycle loop configured `_FoamDeltaTime` with the material step duration, then topology maintenance could call `ConfigureTopologyParameters(0f)` before `SimulateFoam`. Because `_FoamDeltaTime` is a shared compute scalar, the topology refresh overwrote the material lifecycle delta with zero. `SimulateFoam` then dispatched with `ageDelta = 0`, so Remaining Life did not decrease even though CPU telemetry recorded attempted simulation steps.
+
+The repair is intentionally narrow: `SimulateFullField(deltaTime)` now rebinds shared lifecycle parameters immediately before `DispatchSimulation(...)`. This makes the lifecycle pass self-contained with respect to the current delta and read/write state textures, without adding a new kernel or changing topology semantics.
+
+Validation target:
+
+```text
+Neutral Lifetime = 1
+Supported Aging Rate = 1
+Negative Aging Rate = 1
+Clear + Emit Absolute 1s Probe
+```
+
+Expected result: the 0.33 probe patch dies first, the 0.66 patch second, the 1.00 patch last, and raw Material Remaining Life is gone after roughly 1.1 seconds. If this passes, stop adding lifetime telemetry and resume production Foam behavior fixes.

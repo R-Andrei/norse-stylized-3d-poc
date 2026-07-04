@@ -8,6 +8,8 @@ namespace ProgrammaticStylized3D.Rivers
         {
             clearKernel = computeShader.FindKernel("ClearRange");
             injectKernel = computeShader.FindKernel("InjectFoam");
+            writeIsolatedLifeProbeKernel =
+                computeShader.FindKernel("WriteIsolatedLifeProbe");
             clearProgressiveBirthDebugAllKernel =
                 computeShader.FindKernel("ClearProgressiveBirthDebugAll");
             clearProgressiveBirthDebugTransientKernel =
@@ -46,7 +48,19 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamSimulationLength",
                 simulationFieldLength);
+            lastConfiguredFoamDeltaTime = deltaTime;
+            lastConfiguredFoamNeutralLifetime = river.FoamNeutralLifetime;
+            lastConfiguredFoamPositiveAgeMultiplier =
+                river.FoamSupportedAgingRate;
+            lastConfiguredFoamNegativeAgeMultiplier =
+                river.FoamNegativeAgingRate;
+            lastConfiguredAbsoluteLifeProbeActive =
+                isolatedLifeProbeAbsoluteAgingActive;
+
             computeShader.SetFloat("_FoamDeltaTime", deltaTime);
+            computeShader.SetFloat(
+                "_FoamDebugAbsoluteLifeProbeActive",
+                isolatedLifeProbeAbsoluteAgingActive ? 1f : 0f);
             computeShader.SetFloat(
                 "_FoamPhaseTransportMetres",
                 foamPhaseTransportMetres);
@@ -65,13 +79,13 @@ namespace ProgrammaticStylized3D.Rivers
                 river.FlowDirection);
             computeShader.SetFloat(
                 "_FoamNeutralLifetime",
-                river.FoamNeutralLifetime);
+                lastConfiguredFoamNeutralLifetime);
             computeShader.SetFloat(
                 "_FoamPositiveAgeMultiplier",
-                river.FoamSupportedAgingRate);
+                lastConfiguredFoamPositiveAgeMultiplier);
             computeShader.SetFloat(
                 "_FoamNegativeAgeMultiplier",
-                river.FoamNegativeAgingRate);
+                lastConfiguredFoamNegativeAgeMultiplier);
             computeShader.SetFloat("_FoamTime", river.MotionTime);
             computeShader.SetFloat("_FoamSeed", river.VisualSeed);
             computeShader.SetFloat(

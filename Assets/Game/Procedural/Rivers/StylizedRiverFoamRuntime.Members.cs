@@ -358,9 +358,15 @@ namespace ProgrammaticStylized3D.Rivers
         private float lastEstimatedTransportCellsPerStep;
         private float initializationMotionTime;
         private float lastRuntimeTime;
+        private float lastConfiguredFoamDeltaTime;
+        private float lastConfiguredFoamNeutralLifetime = 4f;
+        private float lastConfiguredFoamPositiveAgeMultiplier = 1f;
+        private float lastConfiguredFoamNegativeAgeMultiplier = 1f;
+        private bool lastConfiguredAbsoluteLifeProbeActive;
         private double idleSince;
         private int clearKernel = -1;
         private int injectKernel = -1;
+        private int writeIsolatedLifeProbeKernel = -1;
         private int clearProgressiveBirthDebugAllKernel = -1;
         private int clearProgressiveBirthDebugTransientKernel = -1;
         private int paintProgressiveBirthDebugSegmentKernel = -1;
@@ -387,6 +393,14 @@ namespace ProgrammaticStylized3D.Rivers
         private float lastInjectionBoundaryCoverage = -1f;
         private bool lastInjectionStateSynchronized;
         private int manualInjectionSequence;
+        private bool pendingIsolatedLifeProbe;
+        private bool pendingIsolatedLifeProbeAbsoluteAging;
+        private bool isolatedLifeProbeAbsoluteAgingActive;
+        private double isolatedLifeProbeWrittenAt = -1.0;
+        private float pendingIsolatedLifeProbeDistanceNormalized = 0.5f;
+        private float pendingIsolatedLifeProbeAcrossNormalized;
+        private string isolatedLifeProbeStatus =
+            "Not emitted this session";
         private int progressiveRibbonSequence;
         private int activeProgressiveRibbonEventCount;
         private int progressiveRibbonStartedCount;

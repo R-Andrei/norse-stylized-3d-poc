@@ -43,6 +43,8 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void QueueMaterialBirth(PendingInjection injection)
         {
+            isolatedLifeProbeAbsoluteAgingActive = false;
+            isolatedLifeProbeWrittenAt = -1.0;
             pendingMaterialBirths.Add(injection);
             RecordMaterialBirthCommand();
             materialLifetimeAuthorityActive = true;
@@ -85,6 +87,14 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            // Topology maintenance kernels also use the shared
+            // _FoamDeltaTime scalar and may configure it with 0 when they
+            // rebuild static/debug inputs immediately before this pass.
+            // Rebind the lifecycle parameters here, directly before
+            // SimulateFoam, so material aging uses this step's real delta
+            // and the current authoritative read/write textures.
+            ConfigureSharedComputeParameters(deltaTime);
+
             previousState = currentState;
             DispatchSimulation(0, fieldWidth);
             DispatchQueuedMaterialBirths(writeState);
@@ -106,6 +116,199 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             pendingMaterialBirths.Clear();
+        }
+
+
+        private bool DispatchPendingIsolatedLifeProbe()
+        {
+            if (!pendingIsolatedLifeProbe)
+            {
+                return false;
+            }
+
+            bool absoluteAgingProbe = pendingIsolatedLifeProbeAbsoluteAging;
+            pendingIsolatedLifeProbe = false;
+            pendingIsolatedLifeProbeAbsoluteAging = false;
+            pendingInjections.Clear();
+            pendingMaterialBirths.Clear();
+            ClearProgressiveRibbonEvents();
+
+            if (computeShader == null || currentState == null ||
+                writeState == null || boundaryTexture == null ||
+                writeIsolatedLifeProbeKernel < 0 || fieldWidth <= 0 ||
+                fieldHeight <= 0)
+            {
+                isolatedLifeProbeAbsoluteAgingActive = false;
+                isolatedLifeProbeWrittenAt = -1.0;
+                isolatedLifeProbeStatus =
+                    "Failed: material resources are not ready";
+                return false;
+            }
+
+            int patchWidth = Mathf.Clamp(
+                Mathf.RoundToInt(fieldWidth * 0.035f),
+                3,
+                10);
+            int patchHeight = Mathf.Clamp(
+                Mathf.RoundToInt(fieldHeight * 0.075f),
+                3,
+                10);
+            int gap = Mathf.Clamp(
+                Mathf.RoundToInt(fieldWidth * 0.018f),
+                2,
+                8);
+            int step = patchWidth + gap;
+            int groupHalfWidth = patchWidth + gap + patchWidth / 2 + 2;
+
+            int centreX = Mathf.RoundToInt(
+                Mathf.Clamp01(pendingIsolatedLifeProbeDistanceNormalized) *
+                Mathf.Max(0, fieldWidth - 1));
+            centreX = Mathf.Clamp(
+                centreX,
+                groupHalfWidth,
+                Mathf.Max(groupHalfWidth, fieldWidth - 1 - groupHalfWidth));
+
+            int centreY = Mathf.RoundToInt(
+                Mathf.Clamp01(
+                    pendingIsolatedLifeProbeAcrossNormalized * 0.5f + 0.5f) *
+                Mathf.Max(0, fieldHeight - 1));
+            int halfHeight = Mathf.Max(1, patchHeight / 2);
+            centreY = Mathf.Clamp(
+                centreY,
+                halfHeight + 1,
+                Mathf.Max(halfHeight + 1, fieldHeight - halfHeight - 2));
+
+            LifeProbeRect rectA = MakeLifeProbeRect(
+                centreX - step,
+                centreY,
+                patchWidth,
+                patchHeight);
+            LifeProbeRect rectB = MakeLifeProbeRect(
+                centreX,
+                centreY,
+                patchWidth,
+                patchHeight);
+            LifeProbeRect rectC = MakeLifeProbeRect(
+                centreX + step,
+                centreY,
+                patchWidth,
+                patchHeight);
+
+            DispatchIsolatedLifeProbeToState(currentState, rectA, rectB, rectC);
+            DispatchIsolatedLifeProbeToState(writeState, rectA, rectB, rectC);
+            previousState = currentState;
+            simulationInterpolation = 1f;
+            foamRenderTravelMetres = foamPhaseTransportMetres;
+            lastRenderInterpolationAlpha = simulationInterpolation;
+            lastFoamPhaseTransportMetres = foamPhaseTransportMetres;
+            lastFoamRenderTravelMetres = foamRenderTravelMetres;
+            lastFoamPhaseCellFraction =
+                minimumTransportLongitudinalSpacing > 0.0001f
+                    ? Mathf.Clamp01(
+                        Mathf.Abs(foamPhaseTransportMetres) /
+                        minimumTransportLongitudinalSpacing)
+                    : 0f;
+
+            double now = Time.realtimeSinceStartupAsDouble;
+            birthCommandsThisFrame++;
+            lastBirthCommandAt = now;
+            materialClockSessionActive = true;
+            materialClockSessionStartedAt = now;
+            materialSimulatedSecondsSinceSession = 0f;
+            materialStepCountSinceSession = 0;
+            isolatedLifeProbeAbsoluteAgingActive = absoluteAgingProbe;
+            isolatedLifeProbeWrittenAt = now;
+            materialLifetimeAuthorityActive = true;
+            materialLifetimeEmptyMetricReadbacks = 0;
+            lifetimeAuthorityStatus =
+                "Remaining Life / isolated direct material probe";
+            manualProofReferenceArea = 0f;
+            manualProofReferencePending = true;
+            simulationAccumulator = 0f;
+            topologyMetricsAccumulator = 1f / Mathf.Max(1f, ResolveUpdateRate());
+            isolatedLifeProbeStatus =
+                absoluteAgingProbe
+                    ? $"Wrote 3 isolated patches ({patchWidth}x{patchHeight} texels), absolute 1s aging"
+                    : $"Wrote 3 isolated patches ({patchWidth}x{patchHeight} texels), configured aging";
+            return true;
+        }
+
+        private readonly struct LifeProbeRect
+        {
+            public readonly int X;
+            public readonly int Y;
+            public readonly int Z;
+            public readonly int W;
+
+            public LifeProbeRect(int x, int y, int z, int w)
+            {
+                X = x;
+                Y = y;
+                Z = z;
+                W = w;
+            }
+        }
+
+        private LifeProbeRect MakeLifeProbeRect(
+            int centreX,
+            int centreY,
+            int width,
+            int height)
+        {
+            int halfWidth = Mathf.Max(1, width / 2);
+            int halfHeight = Mathf.Max(1, height / 2);
+            int xMin = Mathf.Clamp(centreX - halfWidth, 0, fieldWidth - 1);
+            int xMax = Mathf.Clamp(centreX + halfWidth + 1, xMin + 1, fieldWidth);
+            int yMin = Mathf.Clamp(centreY - halfHeight, 0, fieldHeight - 1);
+            int yMax = Mathf.Clamp(centreY + halfHeight + 1, yMin + 1, fieldHeight);
+            return new LifeProbeRect(xMin, yMin, xMax, yMax);
+        }
+
+        private void DispatchIsolatedLifeProbeToState(
+            RenderTexture target,
+            LifeProbeRect rectA,
+            LifeProbeRect rectB,
+            LifeProbeRect rectC)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetFloat("_FoamValidLength", validFieldLength);
+            computeShader.SetFloat(
+                "_FoamSimulationLength",
+                simulationFieldLength);
+            computeShader.SetInt("_FoamRangeStart", 0);
+            computeShader.SetInt("_FoamRangeCount", fieldWidth);
+            computeShader.SetInts(
+                "_FoamLifeProbeRectA",
+                rectA.X,
+                rectA.Y,
+                rectA.Z,
+                rectA.W);
+            computeShader.SetInts(
+                "_FoamLifeProbeRectB",
+                rectB.X,
+                rectB.Y,
+                rectB.Z,
+                rectB.W);
+            computeShader.SetInts(
+                "_FoamLifeProbeRectC",
+                rectC.X,
+                rectC.Y,
+                rectC.Z,
+                rectC.W);
+            computeShader.SetTexture(
+                writeIsolatedLifeProbeKernel,
+                "_FoamBoundary",
+                boundaryTexture);
+            computeShader.SetTexture(
+                writeIsolatedLifeProbeKernel,
+                "_FoamStateWrite",
+                target);
+            Dispatch(writeIsolatedLifeProbeKernel, fieldWidth, fieldHeight);
         }
 
         private float WorldGlobalDistanceToFoamStorageGlobalDistance(

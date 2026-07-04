@@ -22,6 +22,10 @@ Shader "PS3D/Pixel Surface Lit"
         _BaseDarkenStrength("Base Darken Strength", Range(0, 0.75)) = 0.04
         [Enum(None,0,SurfaceVariation,1,Exposure,2,CreviceBase,3,ConvexEdgeWear,4,ConcaveCrease,5,DirtDeposit,6)]
         _MaskDebugMode("Mask Debug Mode", Float) = 0
+        [HideInInspector] _GeneratedMassLocalMinY("Generated Mass Local Min Y", Float) = 0
+        [HideInInspector] _GeneratedMassLocalHeight("Generated Mass Local Height", Float) = 1
+        [HideInInspector] _GeneratedMassMaskSeed("Generated Mass Mask Seed", Float) = 0
+        [HideInInspector] _GeneratedMassLocalXZScale("Generated Mass Local XZ Scale", Float) = 1
 
         [Header(Stylized Value Shaping)]
         _HighlightCompressStrength("Highlight Compress Strength", Range(0, 0.5)) = 0.08
@@ -111,6 +115,10 @@ Shader "PS3D/Pixel Surface Lit"
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
                 float _MaskDebugMode;
+                float _GeneratedMassLocalMinY;
+                float _GeneratedMassLocalHeight;
+                float _GeneratedMassMaskSeed;
+                float _GeneratedMassLocalXZScale;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;
@@ -162,8 +170,9 @@ Shader "PS3D/Pixel Surface Lit"
                 float2 uv : TEXCOORD2;
                 half4 color : COLOR;
                 half fogFactor : TEXCOORD3;
-                float positionOSY : TEXCOORD4;
+                float3 positionOS : TEXCOORD4;
                 float4 materialMasks : TEXCOORD5;
+                half3 normalOS : TEXCOORD6;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -186,18 +195,180 @@ Shader "PS3D/Pixel Surface Lit"
                 output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
                 output.color = input.color;
                 output.fogFactor = ComputeFogFactor(output.positionCS.z);
-                output.positionOSY = input.positionOS.y;
+                output.positionOS = input.positionOS.xyz;
                 output.materialMasks = input.uv2;
+                output.normalOS = normalize(input.normalOS);
                 return output;
             }
 
-            float ResolveSemanticEdgeBand(float band)
+            float ResolveGeneratedMassHeight01(Varyings input)
             {
-                // Patch 12C keeps line-like masks neutral. This helper remains so
-                // old material/debug code compiles, but generated masses now write
-                // UV2.z/UV2.w as zero until a proper line/overlay representation
-                // replaces the failed interpolated edge-mask attempts.
-                return smoothstep(0.42, 0.92, saturate(band));
+                float height = max(0.0001, _GeneratedMassLocalHeight);
+                return saturate(
+                    (input.positionOS.y - _GeneratedMassLocalMinY) /
+                    height);
+            }
+
+            float ResolveNotUpwardMask(Varyings input)
+            {
+                float normalY = normalize((float3)input.normalOS).y;
+                return 1.0 - smoothstep(0.18, 0.78, normalY);
+            }
+
+            float3 ResolveGeneratedMassMaskCoordinate(
+                Varyings input,
+                float scale,
+                float offset)
+            {
+                float height = max(0.0001, _GeneratedMassLocalHeight);
+                float xzScale = max(0.0001, _GeneratedMassLocalXZScale);
+                float3 normalizedPosition =
+                    float3(
+                        input.positionOS.x / xzScale,
+                        (input.positionOS.y - _GeneratedMassLocalMinY) / height,
+                        input.positionOS.z / xzScale);
+
+                return normalizedPosition * scale +
+                    float3(
+                        _GeneratedMassMaskSeed * 0.017 + offset,
+                        _GeneratedMassMaskSeed * 0.011 - offset * 0.37,
+                        _GeneratedMassMaskSeed * 0.019 + offset * 0.61);
+            }
+
+            float ResolveGeneratedMassPatchNoise(
+                Varyings input,
+                float scale,
+                float offset)
+            {
+                float3 coordinate =
+                    ResolveGeneratedMassMaskCoordinate(input, scale, offset);
+
+                float broad = PS3D_ValueNoise31(coordinate);
+                float detail = PS3D_ValueNoise31(coordinate * 2.23 + 17.31);
+                return saturate(broad * 0.68 + detail * 0.32);
+            }
+
+            float ResolveGeneratedMassSoftPatchNoise(
+                Varyings input,
+                float scale,
+                float offset)
+            {
+                float3 coordinate =
+                    ResolveGeneratedMassMaskCoordinate(input, scale, offset);
+
+                float a = PS3D_ValueNoise31(coordinate);
+                float b = PS3D_ValueNoise31(coordinate * 1.71 + 9.73);
+                float c = PS3D_ValueNoise31(coordinate * 3.11 + 27.19);
+                return saturate(a * 0.52 + b * 0.33 + c * 0.15);
+            }
+
+            float ResolveShaderCreviceBaseMask(Varyings input)
+            {
+                float height01 = ResolveGeneratedMassHeight01(input);
+                float notUpward = ResolveNotUpwardMask(input);
+                float normalY = normalize((float3)input.normalOS).y;
+                float downward = saturate(-normalY * 1.25);
+                float sideFacing = 1.0 - smoothstep(0.32, 0.92, abs(normalY));
+
+                float broadNoise =
+                    ResolveGeneratedMassSoftPatchNoise(input, 1.35, 19.0);
+                float detailNoise =
+                    ResolveGeneratedMassPatchNoise(input, 3.15, 29.0);
+                float thresholdWarp =
+                    (broadNoise - 0.5) * 0.12 +
+                    (detailNoise - 0.5) * 0.035;
+                float warpedHeight = height01 - thresholdWarp;
+
+                float contactCore =
+                    1.0 - smoothstep(0.0, 0.075, height01);
+                float contactFeather =
+                    1.0 - smoothstep(0.035, 0.18, warpedHeight);
+                float lowerShelf =
+                    1.0 - smoothstep(0.12, 0.42, warpedHeight);
+                float lowerShoulder =
+                    1.0 - smoothstep(0.24, 0.58, warpedHeight);
+
+                float shelter = saturate(
+                    notUpward * 0.68 +
+                    sideFacing * 0.28 +
+                    downward * 0.42);
+
+                float mask =
+                    contactCore * 0.38 +
+                    contactFeather * shelter * 0.34 +
+                    lowerShelf * shelter * 0.28 +
+                    lowerShoulder * sideFacing * 0.13;
+
+                float breakup = lerp(0.86, 1.12, broadNoise);
+                mask = mask * breakup;
+
+                float upperSuppress = smoothstep(0.44, 0.72, height01);
+                mask *= lerp(1.0, 0.18, upperSuppress);
+                return saturate(mask);
+            }
+
+            float ResolveShaderDirtDepositMask(Varyings input)
+            {
+                float height01 = ResolveGeneratedMassHeight01(input);
+                float notUpward = ResolveNotUpwardMask(input);
+                float normalY = normalize((float3)input.normalOS).y;
+                float sideFacing = 1.0 - smoothstep(0.28, 0.9, abs(normalY));
+
+                float broadNoise =
+                    ResolveGeneratedMassSoftPatchNoise(input, 1.05, 47.0);
+                float patchNoise =
+                    ResolveGeneratedMassPatchNoise(input, 2.55, 71.0);
+                float detailNoise =
+                    ResolveGeneratedMassPatchNoise(input, 5.2, 113.0);
+                float crawlNoise =
+                    ResolveGeneratedMassSoftPatchNoise(input, 1.65, 151.0);
+
+                float thresholdWarp =
+                    (broadNoise - 0.5) * 0.16 +
+                    (patchNoise - 0.5) * 0.055;
+                float warpedHeight = height01 - thresholdWarp;
+
+                float lowerAllowed =
+                    1.0 - smoothstep(0.08, 0.34, warpedHeight);
+                float crawlCeiling = lerp(0.18, 0.55, crawlNoise);
+                float crawlAllowed =
+                    1.0 - smoothstep(0.10, crawlCeiling, height01);
+
+                float shelter = saturate(
+                    notUpward * 0.74 +
+                    sideFacing * 0.24 +
+                    saturate(-normalY) * 0.28);
+
+                float patchCoverage = smoothstep(
+                    0.47,
+                    0.78,
+                    patchNoise * 0.76 + broadNoise * 0.24);
+                float crawlCoverage = smoothstep(
+                    0.58,
+                    0.86,
+                    patchNoise * 0.58 + crawlNoise * 0.31 + detailNoise * 0.11);
+                float rimBreakup = smoothstep(
+                    0.26,
+                    0.68,
+                    patchNoise * 0.55 + detailNoise * 0.45);
+
+                float contactRim =
+                    (1.0 - smoothstep(0.0, 0.095, height01)) *
+                    rimBreakup;
+                float lowerPatches =
+                    lowerAllowed * shelter * patchCoverage;
+                float upwardCrawl =
+                    crawlAllowed * shelter * crawlCoverage *
+                    smoothstep(0.08, 0.24, height01);
+
+                float mask =
+                    contactRim * 0.48 +
+                    lowerPatches * 0.72 +
+                    upwardCrawl * 0.42;
+
+                float upperSuppress = smoothstep(0.48, 0.68, height01);
+                mask *= 1.0 - upperSuppress;
+                return saturate(pow(mask, 1.08));
             }
 
             half3 ResolveMaskDebugColor(Varyings input)
@@ -220,19 +391,19 @@ Shader "PS3D/Pixel Surface Lit"
                 }
                 else if (mode == 3)
                 {
-                    mask = saturate((float)input.color.b);
+                    mask = ResolveShaderCreviceBaseMask(input);
                 }
                 else if (mode == 4)
                 {
-                    mask = saturate((float)input.color.a * ResolveSemanticEdgeBand(input.materialMasks.z));
+                    mask = 0.0;
                 }
                 else if (mode == 5)
                 {
-                    mask = saturate(input.materialMasks.x * ResolveSemanticEdgeBand(input.materialMasks.w));
+                    mask = 0.0;
                 }
                 else if (mode == 6)
                 {
-                    mask = saturate(input.materialMasks.y);
+                    mask = ResolveShaderDirtDepositMask(input);
                 }
 
                 return (half3)lerp(
@@ -296,7 +467,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float exposureMask =
                     saturate((float)input.color.g) * contractMask;
                 float creviceMask =
-                    saturate((float)input.color.b) * contractMask;
+                    ResolveShaderCreviceBaseMask(input) * contractMask;
                 float baseMask = creviceMask * (1.0 - exposureMask);
                 float profileContrast =
                     max(0.0, _ProfileContrast) *
@@ -372,7 +543,7 @@ Shader "PS3D/Pixel Surface Lit"
                     smoothstep(
                         0.0h,
                         max(0.001h, (half)_BottomDarkenHeight),
-                        (half)max(0.0, input.positionOSY));
+                        (half)max(0.0, input.positionOS.y));
                 half sideMask = pow(
                     saturate(1.0h - abs(normalWS.y)),
                     max(0.5h, (half)_EdgeDarkenPower));
@@ -522,6 +693,10 @@ Shader "PS3D/Pixel Surface Lit"
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
                 float _MaskDebugMode;
+                float _GeneratedMassLocalMinY;
+                float _GeneratedMassLocalHeight;
+                float _GeneratedMassMaskSeed;
+                float _GeneratedMassLocalXZScale;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;
@@ -652,6 +827,10 @@ Shader "PS3D/Pixel Surface Lit"
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
                 float _MaskDebugMode;
+                float _GeneratedMassLocalMinY;
+                float _GeneratedMassLocalHeight;
+                float _GeneratedMassMaskSeed;
+                float _GeneratedMassLocalXZScale;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;
@@ -776,6 +955,10 @@ Shader "PS3D/Pixel Surface Lit"
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
                 float _MaskDebugMode;
+                float _GeneratedMassLocalMinY;
+                float _GeneratedMassLocalHeight;
+                float _GeneratedMassMaskSeed;
+                float _GeneratedMassLocalXZScale;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;

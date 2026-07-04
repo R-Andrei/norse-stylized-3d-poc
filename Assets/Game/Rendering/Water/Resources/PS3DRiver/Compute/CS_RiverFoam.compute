@@ -1,5 +1,6 @@
 #pragma kernel ClearRange
 #pragma kernel InjectFoam
+#pragma kernel WriteIsolatedLifeProbe
 #pragma kernel ClearProgressiveBirthDebugAll
 #pragma kernel ClearProgressiveBirthDebugTransient
 #pragma kernel PaintProgressiveBirthDebugSegment
@@ -229,6 +230,69 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
         _FoamStateWrite[coordinate],
         sourcePacked);
 
+}
+
+
+bool IsInsideLifeProbeRect(int2 coordinate, int4 rect)
+{
+    return coordinate.x >= rect.x && coordinate.x < rect.z &&
+        coordinate.y >= rect.y && coordinate.y < rect.w;
+}
+
+[numthreads(8, 8, 1)]
+void WriteIsolatedLifeProbe(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    int y = (int)dispatchId.y;
+    if (x < 0 || x >= _FoamDimensions.x)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(x, y);
+    _FoamStateWrite[coordinate] = 0.0.xxxx;
+
+    if (!IsFoamColumnInsideDomain(x))
+    {
+        return;
+    }
+
+    float remainingLife = 0.0;
+    if (IsInsideLifeProbeRect(coordinate, _FoamLifeProbeRectA))
+    {
+        remainingLife = 1.00;
+    }
+    else if (IsInsideLifeProbeRect(coordinate, _FoamLifeProbeRectB))
+    {
+        remainingLife = 0.66;
+    }
+    else if (IsInsideLifeProbeRect(coordinate, _FoamLifeProbeRectC))
+    {
+        remainingLife = 0.33;
+    }
+
+    if (remainingLife <= FoamMaterialStateEpsilon)
+    {
+        return;
+    }
+
+    float validFluid = LoadBoundaryCoverage(coordinate);
+    if (validFluid <= FoamMaterialStateEpsilon)
+    {
+        return;
+    }
+
+    FoamMaterialState sourceState;
+    sourceState.presence = saturate(validFluid);
+    sourceState.remainingLife = remainingLife;
+    sourceState.materialPattern = 1.0;
+    _FoamStateWrite[coordinate] = FoamEncodeMaterialState(sourceState);
 }
 
 [numthreads(8, 8, 1)]
@@ -1295,11 +1359,15 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         max(1.0, _FoamNegativeAgeMultiplier),
         materialTopology.negativeAgingPressure);
     float localAgeRate = positiveAgeFactor * negativeAgeFactor;
+    float configuredAgeDelta = _FoamDeltaTime * localAgeRate /
+        max(0.05, _FoamNeutralLifetime);
+    float absoluteProbeAgeDelta = _FoamDeltaTime;
+    float ageDelta = _FoamDebugAbsoluteLifeProbeActive > 0.5
+        ? absoluteProbeAgeDelta
+        : configuredAgeDelta;
     material.remainingLife = max(
         0.0,
-        material.remainingLife -
-        _FoamDeltaTime * localAgeRate /
-        max(0.05, _FoamNeutralLifetime));
+        material.remainingLife - ageDelta);
 
     float4 persistentPacked = FoamEncodeMaterialState(material);
     _FoamStateWrite[coordinate] = FoamClipPackedToValidFluid(

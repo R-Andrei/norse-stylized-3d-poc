@@ -1003,6 +1003,69 @@ namespace ProgrammaticStylized3D.Rivers
                 $"{stepRate:0.#} Hz";
         }
 
+        private string ResolveRuntimeAgingParameterStatus()
+        {
+            float runtimeLifetime = river != null
+                ? river.FoamNeutralLifetime
+                : lastConfiguredFoamNeutralLifetime;
+            string mode = lastConfiguredAbsoluteLifeProbeActive
+                ? "probe absolute"
+                : isolatedLifeProbeAbsoluteAgingActive
+                    ? "probe absolute queued"
+                    : "configured";
+            return $"runtime {runtimeLifetime:0.00}s / " +
+                $"gpu {lastConfiguredFoamNeutralLifetime:0.00}s / " +
+                $"+ {lastConfiguredFoamPositiveAgeMultiplier:0.00}× / " +
+                $"- {lastConfiguredFoamNegativeAgeMultiplier:0.00}× / " +
+                $"dt {lastConfiguredFoamDeltaTime:0.000}s / {mode}";
+        }
+
+        private string ResolveProbeDecayCheckStatus()
+        {
+            if (isolatedLifeProbeWrittenAt < 0.0 &&
+                !isolatedLifeProbeAbsoluteAgingActive)
+            {
+                return "no isolated probe yet";
+            }
+
+            if (!materialClockSessionActive)
+            {
+                return "probe clock inactive";
+            }
+
+            if (!topologyMetricsAvailable)
+            {
+                return "awaiting metrics";
+            }
+
+            string freshness = TopologyMetricsFresh ? string.Empty : "stale ";
+            if (!VisibleLifeRangeAvailable)
+            {
+                return $"{freshness}no visible material";
+            }
+
+            float simulatedSeconds = Mathf.Max(
+                0f,
+                materialSimulatedSecondsSinceSession);
+            float expectedMax = isolatedLifeProbeAbsoluteAgingActive
+                ? Mathf.Clamp01(1f - simulatedSeconds)
+                : Mathf.Clamp01(
+                    1f - simulatedSeconds /
+                    Mathf.Max(0.05f, lastConfiguredFoamNeutralLifetime));
+            float observedMax = MaximumVisibleRemainingLife;
+            if (simulatedSeconds <= 0.0001f || observedMax >= 0.999f)
+            {
+                return $"{freshness}expected max {expectedMax:0.00} / " +
+                    $"observed max {observedMax:0.00}";
+            }
+
+            float impliedLife = simulatedSeconds /
+                Mathf.Max(0.0001f, 1f - observedMax);
+            return $"{freshness}expected max {expectedMax:0.00} / " +
+                $"observed max {observedMax:0.00} / " +
+                $"implied {impliedLife:0.0}s";
+        }
+
         private string ResolveVisibleLifeRangeStatus()
         {
             if (!topologyMetricsAvailable)

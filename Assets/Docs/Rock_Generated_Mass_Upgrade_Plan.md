@@ -345,7 +345,9 @@ Checklist:
 - [x] Patch 12B - Semantic surface mask rewrite
 - [x] Patch 12C - Area mask recovery and line-mask deferral
 - [x] Patch 12C.2 - Area mask hard clamp after Unity validation
-- [ ] Patch 12D - Edge/crack representation decision and prototype
+- [x] Patch 12D - Shader-space area mask debug
+- [x] Patch 12E - Irregular area mask shaping for `CreviceBase` and `DirtDeposit`
+- [ ] Patch 12F - Edge/crack representation decision and prototype
 - [ ] Patch 13 - Dirty surface mottle and material breakup
 - [ ] Patch 14 - Crack and seam language
 
@@ -970,9 +972,92 @@ Acceptance:
 - `DirtDeposit` debug should be mostly dark on exposed upper/mid faces, with lower-rim/lower-side patches.
 - `ConvexEdgeWear` and `ConcaveCrease` should remain black/neutral until a proper line representation is chosen.
 
-### Patch 12D - Edge/Crack Representation Decision and Prototype
+### Patch 12D - Shader-Space Area Mask Debug
 
-Status: planned after Patch 12C.2 area-mask validation.
+Status: implemented after Patch 12C.2 validation showed that baked vertex/interpolated area masks still smeared too much across large low-poly triangles.
+
+Reason for patch:
+
+- `ConvexEdgeWear` and `ConcaveCrease` were already correctly deferred/neutralized after the failed line-mask attempts.
+- `CreviceBase` and `DirtDeposit` were conceptually area masks, but storing tight lower/base features as coarse vertex data still caused whole-face interpolation and pale global washes.
+- The representation problem was smaller than the line-mask problem, but still real: a large triangular side face cannot hold a tight base band accurately if only its vertices carry the mask.
+
+Checklist status:
+
+- [x] add hidden per-object generated mass shader properties for local minimum Y, local height, and mask seed;
+- [x] set those properties from `GeneratedMass` through the existing `MaterialPropertyBlock`;
+- [x] compute `CreviceBase` in the shader from object-space height and local normal rather than from the baked vertex colour blue channel;
+- [x] compute `DirtDeposit` in the shader from object-space lower-rim/side logic plus deterministic object-space patch noise;
+- [x] keep `ConvexEdgeWear` and `ConcaveCrease` black/neutral until a proper line representation is chosen;
+- [x] keep the generated/baked channels intact as broad support data, but stop relying on them for tight area debug.
+
+Primary files:
+
+- `GeneratedMass.cs`
+- `SH_PixelSurfaceLit.shader`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+Work:
+
+- `GeneratedMass` now sends `_GeneratedMassLocalMinY`, `_GeneratedMassLocalHeight`, and `_GeneratedMassMaskSeed` to the material property block.
+- `SH_PixelSurfaceLit.shader` now uses object-space Y normalized by the generated mesh bounds to calculate per-pixel lower/base masks.
+- `CreviceBase` debug now displays the shader-space lower/contact/shelter calculation.
+- `DirtDeposit` debug now displays a shader-space lower-rim buildup with patchy upward crawl.
+- Normal semantic crevice/base darkening now uses the shader-space crevice/base mask, so broad over-darkening from bad vertex data should be reduced.
+
+Acceptance:
+
+- `CreviceBase` should be mostly dark on upper/mid body faces and visibly stronger near the base/lower sheltered sides.
+- `DirtDeposit` should be mostly dark on exposed upper/mid faces, with lower-rim/lower-side buildup and some irregular upward patches.
+- `ConvexEdgeWear` and `ConcaveCrease` should remain black/neutral.
+- No final profile-aware edge/crack response is added yet.
+
+### Patch 12E - Irregular Area Mask Shaping
+
+Status: implemented after Patch 12D validation showed that shader-space area masks had the correct broad location but still looked too much like clean horizontal height bands.
+
+Reason for patch:
+
+- `SurfaceVariation` and `Exposure` were accepted as good enough support masks.
+- `ConvexEdgeWear` and `ConcaveCrease` remain deliberately black/neutral until a proper line-feature representation exists.
+- `CreviceBase` and `DirtDeposit` were technically working after Patch 12D, but their visual debug output was too straight, two-tone, and height-band driven.
+- The desired reference direction needs lower/contact/shelter masks that are shaped by rock planes and irregular buildup, not a smooth stripe around the base.
+
+Checklist status:
+
+- [x] keep area masks shader-space instead of returning to coarse vertex/interpolated data;
+- [x] add hidden `_GeneratedMassLocalXZScale` so object-space noise scales more consistently across differently proportioned rocks;
+- [x] make `CreviceBase` combine a narrow contact component, wider lower-side shelter, normal/side weighting, and warped thresholds;
+- [x] make `DirtDeposit` use lower/base potential as a gate for positive patch buildup rather than displaying a continuous bright lower band;
+- [x] keep `ConvexEdgeWear` and `ConcaveCrease` neutral;
+- [x] document that these are still debug masks and require Unity validation before material response.
+
+Primary files:
+
+- `GeneratedMass.cs`
+- `SH_PixelSurfaceLit.shader`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+Work:
+
+- `GeneratedMass` now sends `_GeneratedMassLocalXZScale` through the existing material property block alongside local min Y, height, and seed.
+- `SH_PixelSurfaceLit.shader` now normalizes mask-noise coordinates by local XZ size and local height instead of height alone.
+- `CreviceBase` now uses threshold warping, side/shelter weighting, a narrow contact core, and a wider softer lower-side component.
+- `DirtDeposit` now treats lower/base/shelter as an allowed region and uses deterministic patch coverage to create positive deposit patches with irregular upward crawl.
+- The debug target is no longer a perfectly clean bright band; it should contain more midtones and a less-straight upper boundary.
+
+Acceptance:
+
+- `CreviceBase` upper/mid body should remain mostly dark, with a less-straight lower/base transition and visible midtones on lower sheltered sides.
+- `CreviceBase` should not turn into moss/dirt blobs; it should remain broad grounding/shelter information.
+- `DirtDeposit` should be mostly dark on exposed upper/mid faces, with positive irregular patches near the lower rim and some uneven upward crawl.
+- `DirtDeposit` should not look like a continuous bright base stripe with holes cut out of it.
+- `ConvexEdgeWear` and `ConcaveCrease` should remain black/neutral.
+- If Unity validation still shows straight bands, the next adjustment should target the shader-space noise/threshold shaping, not return to baked vertex masks.
+
+### Patch 12F - Edge/Crack Representation Decision and Prototype
+
+Status: planned after `CreviceBase` and `DirtDeposit` reach a decent debug state.
 
 Checklist status:
 

@@ -321,6 +321,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Shader.PropertyToID("_Base_Color");
         private static readonly int MaskDebugModeId =
             Shader.PropertyToID("_MaskDebugMode");
+        private static readonly int GeneratedMassLocalMinYId =
+            Shader.PropertyToID("_GeneratedMassLocalMinY");
+        private static readonly int GeneratedMassLocalHeightId =
+            Shader.PropertyToID("_GeneratedMassLocalHeight");
+        private static readonly int GeneratedMassMaskSeedId =
+            Shader.PropertyToID("_GeneratedMassMaskSeed");
+        private static readonly int GeneratedMassLocalXZScaleId =
+            Shader.PropertyToID("_GeneratedMassLocalXZScale");
 
         [SerializeField]
         private MassRecipe recipe = new MassRecipe();
@@ -634,6 +642,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             materialProperties.SetFloat(
                 MaskDebugModeId,
                 (float)surfaceMaskDebug);
+
+            Bounds meshBounds = meshFilter != null &&
+                meshFilter.sharedMesh != null
+                    ? meshFilter.sharedMesh.bounds
+                    : new Bounds(Vector3.up * 0.5f, Vector3.one);
+            float localHeight = Mathf.Max(
+                0.0001f,
+                meshBounds.size.y);
+            float localXZScale = Mathf.Max(
+                0.0001f,
+                Mathf.Max(meshBounds.size.x, meshBounds.size.z));
+            materialProperties.SetFloat(
+                GeneratedMassLocalMinYId,
+                meshBounds.min.y);
+            materialProperties.SetFloat(
+                GeneratedMassLocalHeightId,
+                localHeight);
+            materialProperties.SetFloat(
+                GeneratedMassMaskSeedId,
+                recipe != null
+                    ? recipe.SurfaceSeed
+                    : 0f);
+            materialProperties.SetFloat(
+                GeneratedMassLocalXZScaleId,
+                localXZScale);
+
             meshRenderer.SetPropertyBlock(materialProperties);
         }
 

@@ -2150,6 +2150,22 @@ namespace ProgrammaticStylized3D.Rivers
             return left || right;
         }
 
+
+        public bool ClearAndEmitFoamIsolatedLifeProbe(
+            bool absoluteAging = false)
+        {
+            StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
+            return runtime != null && runtime.EmitIsolatedLifeProbe(
+                foamTestDistanceNormalized,
+                foamTestAcrossNormalized,
+                absoluteAging);
+        }
+
+        public bool ClearAndEmitFoamAbsoluteLifeProbe()
+        {
+            return ClearAndEmitFoamIsolatedLifeProbe(true);
+        }
+
         public bool EmitFoamLifeProbeStrip()
         {
             StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();

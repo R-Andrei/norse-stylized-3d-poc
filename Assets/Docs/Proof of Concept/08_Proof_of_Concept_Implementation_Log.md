@@ -574,6 +574,32 @@ Do not use screen-space outlines or every-triangle wireframe accents as the prim
 
 ---
 
+## 2026-07-04 — River Foam Lifetime Probe and Lifecycle Delta Repair
+
+### Problem being investigated
+
+During river Foam validation, manual/progressive Foam survived far longer than `Neutral Lifetime = 1` and appeared to disappear in large synchronized regions. The Inspector also repainted inconsistently unless the mouse hovered over it.
+
+### Diagnostic work completed
+
+A compact Foam material probe workflow was added rather than another broad Foam rewrite. The Inspector now exposes raw material Presence / Remaining Life views and small probe buttons for configured and absolute 1-second lifetime tests. The absolute probe bypasses topology and configured lifetime scaling so it can prove whether the persistent material state itself ages.
+
+The probes showed that raw material patches were written correctly, topology was not involved, birth refresh was idle, and lifetime values reached runtime/GPU setup correctly. However, both configured and absolute probes failed to age.
+
+### Root cause found
+
+`_FoamDeltaTime` is shared by material lifecycle and topology maintenance compute paths. Topology refresh could configure it with `0` immediately before the material `SimulateFoam` dispatch. As a result, the lifecycle pass dispatched but subtracted zero Remaining Life each step. The material clock recorded attempted CPU steps, but the GPU material state did not actually age.
+
+### Implemented repair
+
+`StylizedRiverFoamRuntime.SimulateFullField(deltaTime)` now rebinds the lifecycle compute parameters immediately before `DispatchSimulation(...)`. This keeps the repair narrow: no new lifecycle kernel, no topology rewrite, and no new production Foam behavior.
+
+### Validation target
+
+Use `Neutral Lifetime = 1`, both aging rates at `1`, and `Material Remaining Life` debug view. The absolute 1-second probe should now die in order: `0.33`, then `0.66`, then `1.00`, with no raw Remaining Life after roughly 1.1 seconds. If this passes, further work should move away from Inspector telemetry and back to actual Foam behavior: production birth, breakup, drift, and obstacle interaction.
+
+---
+
 ## Architecture and folder rules now active
 
 Summary:

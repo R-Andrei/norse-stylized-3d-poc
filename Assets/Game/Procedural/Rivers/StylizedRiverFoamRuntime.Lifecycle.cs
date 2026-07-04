@@ -72,6 +72,10 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseResources();
             pendingInjections.Clear();
             pendingMaterialBirths.Clear();
+            pendingIsolatedLifeProbe = false;
+            pendingIsolatedLifeProbeAbsoluteAging = false;
+            isolatedLifeProbeAbsoluteAgingActive = false;
+            isolatedLifeProbeWrittenAt = -1.0;
             ClearProgressiveRibbonEvents();
         }
 
@@ -101,6 +105,7 @@ namespace ProgrammaticStylized3D.Rivers
                 BindDisabled();
                 ReleaseResources();
                 pendingInjections.Clear();
+                pendingIsolatedLifeProbe = false;
                 ClearProgressiveRibbonEvents();
                 ResetManualInjectionSequence();
                 return;
@@ -134,6 +139,7 @@ namespace ProgrammaticStylized3D.Rivers
             if (fullyFrozen)
             {
                 pendingInjections.Clear();
+                pendingIsolatedLifeProbe = false;
                 ClearProgressiveRibbonEvents();
                 ResetManualInjectionSequence();
 
@@ -163,6 +169,7 @@ namespace ProgrammaticStylized3D.Rivers
                 materialLifetimeAuthorityActive ||
                 pendingInjections.Count > 0 ||
                 pendingMaterialBirths.Count > 0 ||
+                pendingIsolatedLifeProbe ||
                 activeProgressiveRibbonEventCount > 0;
             bool hasWork = materialWork || topologyDebugActive ||
                 progressiveBirthDebugActive;
@@ -223,6 +230,8 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 RefreshDynamicTopologySources(false, false);
             }
+
+            DispatchPendingIsolatedLifeProbe();
 
             bool manualInjectedThisUpdate = ProcessPendingInjections(now);
 
@@ -433,6 +442,41 @@ namespace ProgrammaticStylized3D.Rivers
             phaseCommitCellsInCurrentSecond += lastPhaseCommitCellsThisFrame;
         }
 
+
+        public bool EmitIsolatedLifeProbe(
+            float distanceNormalized,
+            float acrossNormalized,
+            bool absoluteAging)
+        {
+            if (river == null)
+            {
+                river = GetComponent<StylizedRiver>();
+            }
+
+            if (river == null || !river.FoamEnabled ||
+                river.FreezeAmount >= 0.999f ||
+                !river.Domain.IsValid)
+            {
+                return false;
+            }
+
+            pendingIsolatedLifeProbe = true;
+            pendingIsolatedLifeProbeAbsoluteAging = absoluteAging;
+            pendingIsolatedLifeProbeDistanceNormalized =
+                Mathf.Clamp01(distanceNormalized);
+            pendingIsolatedLifeProbeAcrossNormalized =
+                Mathf.Clamp(acrossNormalized, -0.85f, 0.85f);
+            materialLifetimeAuthorityActive = true;
+            materialLifetimeEmptyMetricReadbacks = 0;
+            isolatedLifeProbeStatus = absoluteAging
+                ? "Queued isolated direct material probe, absolute 1s aging"
+                : "Queued isolated direct material probe, configured aging";
+            lifetimeAuthorityStatus =
+                "Queued isolated direct material probe";
+            idleSince = 0.0;
+            return true;
+        }
+
         public void NotifyRiverChanged()
         {
             topologyCacheValidationState = "Not Evaluated";
@@ -533,6 +577,10 @@ namespace ProgrammaticStylized3D.Rivers
         {
             pendingInjections.Clear();
             pendingMaterialBirths.Clear();
+            pendingIsolatedLifeProbe = false;
+            pendingIsolatedLifeProbeAbsoluteAging = false;
+            isolatedLifeProbeAbsoluteAgingActive = false;
+            isolatedLifeProbeWrittenAt = -1.0;
             ClearProgressiveRibbonEvents();
             ResetManualInjectionSequence();
             lastInjectionBoundaryCoverage = -1f;
@@ -559,6 +607,7 @@ namespace ProgrammaticStylized3D.Rivers
             materialClockSessionStartedAt = -1.0;
             materialSimulatedSecondsSinceSession = 0f;
             materialStepCountSinceSession = 0;
+            lastConfiguredAbsoluteLifeProbeActive = false;
             birthCommandsThisFrame = 0;
             lastBirthCommandAt = -1.0;
             simulationInterpolation = 1f;
