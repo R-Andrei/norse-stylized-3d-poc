@@ -740,3 +740,9 @@ Validation of 5.5b showed a project-breaking regression: Foam could disappear in
 
 Adjusted persistent Foam morphology after validation showed 5.5b/5.5c still tended to stretch/grow rather than wobble around a stable average footprint. The simulation morph pass now uses opposed, normalized intrinsic wobble samples instead of preserving current Presence as a union. This keeps lifecycle authority with Remaining Life while allowing visible back-and-forth bending, local widening/narrowing, and relaxation. River wave/static-pressure/lee/ripple/disturbance coupling remains a later dedicated patch layered on top of intrinsic morphology, not a substitute for it.
 
+
+## River Foam 4.11C.5.6 — Surface-Coupled Foam Rendering
+
+Intrinsic runtime Foam morphology from 5.5d is accepted as good enough for now. 5.6 adds the first render-layer coupling between Final Foam and the existing river surface systems. The Foam renderer now receives macro wave/current influence, disturbance height/gradients/velocity, and transported wake energy/gradients from the water shader path. These values warp, stretch, compress, and edge-modulate the Final Foam mask so existing material reads as attached to waves, static pressure, lee/depression, ripples, and wakes.
+
+This is presentation-only coupling. `Material Presence`, Remaining Life, manual birth, topology, and population are unchanged. A later dedicated patch may couple stored material motion to disturbances after render coupling is validated.

@@ -356,6 +356,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Shader.PropertyToID("_GeneratedMassDirtCrawlReach");
         private static readonly int GeneratedMassDirtCoverageId =
             Shader.PropertyToID("_GeneratedMassDirtCoverage");
+        private static readonly int GeneratedMassExposureResponseId =
+            Shader.PropertyToID("_GeneratedMassExposureResponse");
+        private static readonly int GeneratedMassCreviceResponseId =
+            Shader.PropertyToID("_GeneratedMassCreviceResponse");
+        private static readonly int GeneratedMassBaseResponseId =
+            Shader.PropertyToID("_GeneratedMassBaseResponse");
+        private static readonly int GeneratedMassDirtDepositResponseId =
+            Shader.PropertyToID("_GeneratedMassDirtDepositResponse");
         private static readonly int GeneratedMassFeatureOverlayKindId =
             Shader.PropertyToID("_GeneratedMassFeatureOverlayKind");
         private static readonly int GeneratedMassEdgeWearCoverageId =
@@ -421,6 +429,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [Range(0.25f, 2f)]
         [SerializeField]
         private float dirtCoverage = 1f;
+
+        [Tooltip("Scales how strongly the Exposure mask affects the final normal render. 0 disables exposed-plane response; 1 is the current default; 2 exaggerates it for tuning.")]
+        [Range(0f, 2f)]
+        [SerializeField]
+        private float exposureResponse = 1f;
+
+        [Tooltip("Scales how strongly the CreviceBase mask affects the final normal render. 0 disables crevice-specific response; 1 is the current default; 2 exaggerates it for tuning.")]
+        [Range(0f, 2f)]
+        [SerializeField]
+        private float creviceResponse = 1f;
+
+        [Tooltip("Scales how strongly the Base mask affects the final normal render. 0 disables base-contact response; 1 is the current default; 2 exaggerates it for tuning.")]
+        [Range(0f, 2f)]
+        [SerializeField]
+        private float baseResponse = 1f;
+
+        [Tooltip("Scales how strongly the DirtDeposit mask affects the final normal render. 0 disables deposit-specific response; 1 is the current default; 2 exaggerates it for tuning.")]
+        [Range(0f, 2f)]
+        [SerializeField]
+        private float dirtDepositResponse = 1f;
 
         [Header("Surface Feature Lines")]
         [Tooltip("Controls whether generated edge/crease overlay strips are debug-only or visible during normal rendering as profile-specific stone material response.")]
@@ -855,6 +883,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             materialProperties.SetFloat(
                 GeneratedMassDirtCoverageId,
                 Mathf.Clamp(dirtCoverage, 0.25f, 2f));
+            materialProperties.SetFloat(
+                GeneratedMassExposureResponseId,
+                Mathf.Clamp(exposureResponse, 0f, 2f));
+            materialProperties.SetFloat(
+                GeneratedMassCreviceResponseId,
+                Mathf.Clamp(creviceResponse, 0f, 2f));
+            materialProperties.SetFloat(
+                GeneratedMassBaseResponseId,
+                Mathf.Clamp(baseResponse, 0f, 2f));
+            materialProperties.SetFloat(
+                GeneratedMassDirtDepositResponseId,
+                Mathf.Clamp(dirtDepositResponse, 0f, 2f));
 
             meshRenderer.SetPropertyBlock(materialProperties);
 
@@ -973,6 +1013,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             surfaceFeatureMaterialProperties.SetFloat(
                 GeneratedMassDirtCoverageId,
                 Mathf.Clamp(dirtCoverage, 0.25f, 2f));
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassExposureResponseId,
+                Mathf.Clamp(exposureResponse, 0f, 2f));
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassCreviceResponseId,
+                Mathf.Clamp(creviceResponse, 0f, 2f));
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassBaseResponseId,
+                Mathf.Clamp(baseResponse, 0f, 2f));
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassDirtDepositResponseId,
+                Mathf.Clamp(dirtDepositResponse, 0f, 2f));
             featureRenderer.SetPropertyBlock(surfaceFeatureMaterialProperties);
         }
 

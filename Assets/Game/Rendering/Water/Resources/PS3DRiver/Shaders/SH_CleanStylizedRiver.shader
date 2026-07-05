@@ -740,6 +740,19 @@ Shader "PS3D/Stylized River Water"
                     liquidBodyLighting,
                     frozenBodyLighting);
 
+                RiverWaterFoamSurfaceInfluence foamSurface =
+                    RiverWaterCreateFoamSurfaceInfluence();
+                foamSurface.macroHeight = motion.macroHeight;
+                foamSurface.currentAccent = motion.currentAccent;
+                foamSurface.disturbanceHeight = motion.disturbanceHeight;
+                foamSurface.downstreamGradient = resolvedDisturbanceData.x;
+                foamSurface.lateralGradient = resolvedDisturbanceData.y;
+                foamSurface.disturbanceVelocity = resolvedDisturbanceData.w;
+                foamSurface.wakeEnergy = wake.energy;
+                foamSurface.wakeIntensity = wake.intensity;
+                foamSurface.wakeDownstreamGradient = wake.downstreamGradient;
+                foamSurface.wakeLateralGradient = wake.lateralGradient;
+
                 RiverWaterFoamResult foam = RiverWaterEvaluateFoam(
                     TEXTURE2D_ARGS(
                         _FoamPrevious,
@@ -756,7 +769,8 @@ Shader "PS3D/Stylized River Water"
                     _FoamInterpolation,
                     _FoamRenderTravelMetres,
                     _FoamSharpness,
-                    _FreezeAmount);
+                    _FreezeAmount,
+                    foamSurface);
 
 
                 float3 finalColour = RiverWaterApplyReservedIntegration(

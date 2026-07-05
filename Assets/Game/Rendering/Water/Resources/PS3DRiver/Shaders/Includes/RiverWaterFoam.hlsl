@@ -161,6 +161,186 @@ float RiverWaterFoamPatternedMask(
     return saturate(max(hardVisible, fringe));
 }
 
+
+struct RiverWaterFoamSurfaceInfluence
+{
+    float macroHeight;
+    float currentAccent;
+    float disturbanceHeight;
+    float downstreamGradient;
+    float lateralGradient;
+    float disturbanceVelocity;
+    float wakeEnergy;
+    float wakeIntensity;
+    float wakeDownstreamGradient;
+    float wakeLateralGradient;
+};
+
+RiverWaterFoamSurfaceInfluence RiverWaterCreateFoamSurfaceInfluence()
+{
+    RiverWaterFoamSurfaceInfluence influence;
+    influence.macroHeight = 0.0;
+    influence.currentAccent = 0.0;
+    influence.disturbanceHeight = 0.0;
+    influence.downstreamGradient = 0.0;
+    influence.lateralGradient = 0.0;
+    influence.disturbanceVelocity = 0.0;
+    influence.wakeEnergy = 0.0;
+    influence.wakeIntensity = 0.0;
+    influence.wakeDownstreamGradient = 0.0;
+    influence.wakeLateralGradient = 0.0;
+    return influence;
+}
+
+float RiverWaterFoamResolveSurfaceEnergy(
+    RiverWaterFoamSurfaceInfluence surface)
+{
+    float2 totalGradient = float2(
+        surface.downstreamGradient + surface.wakeDownstreamGradient * 0.70,
+        surface.lateralGradient + surface.wakeLateralGradient * 0.70);
+    float gradientEnergy = saturate(length(totalGradient) * 1.10);
+    float heightEnergy = saturate(
+        abs(surface.disturbanceHeight) * 2.40 +
+        abs(surface.macroHeight) * 0.80);
+    float wakeEnergy = saturate(
+        surface.wakeEnergy * 0.30 +
+        surface.wakeIntensity * 0.72);
+    float velocityEnergy = saturate(abs(surface.disturbanceVelocity) * 0.55);
+    float currentEnergy = saturate(abs(surface.currentAccent) * 0.35);
+
+    return saturate(
+        max(max(gradientEnergy, heightEnergy), max(wakeEnergy, velocityEnergy)) +
+        currentEnergy * 0.35);
+}
+
+float2 RiverWaterFoamResolveSurfaceWarpMetres(
+    RiverWaterFoamSurfaceInfluence surface,
+    float globalDistance,
+    float lateralMetres,
+    float surfaceHalfWidth,
+    float materialPattern)
+{
+    float surfaceEnergy = RiverWaterFoamResolveSurfaceEnergy(surface);
+    float2 totalGradient = float2(
+        surface.downstreamGradient + surface.wakeDownstreamGradient * 0.70,
+        surface.lateralGradient + surface.wakeLateralGradient * 0.70);
+
+    float seed = materialPattern * 37.17 + 9.41;
+    float waveA = sin(
+        _Time.y * 1.21 +
+        globalDistance * 0.37 +
+        lateralMetres * 0.82 +
+        seed);
+    float waveB = sin(
+        _Time.y * 1.73 -
+        globalDistance * 0.21 +
+        lateralMetres * 1.46 +
+        seed * 1.63);
+
+    // This is a render-space backtrace offset, not stored material motion.
+    // Gradients pull the visible edge along the already-rendered surface slope;
+    // opposed waves stop the result from becoming a one-way smear.
+    float downstream =
+        -totalGradient.x * 0.18 +
+        surface.disturbanceVelocity * 0.045 +
+        surface.wakeEnergy * 0.035 +
+        waveA * (0.035 + surfaceEnergy * 0.060);
+    float lateral =
+        -totalGradient.y * 0.24 +
+        waveB * (0.035 + surfaceEnergy * 0.075) +
+        surface.wakeLateralGradient * 0.070;
+
+    float shoreDistance01 = saturate(
+        (max(0.0, surfaceHalfWidth - abs(lateralMetres))) /
+        max(0.001, surfaceHalfWidth));
+    float shoreGuard = lerp(0.55, 1.0, smoothstep(0.02, 0.18, shoreDistance01));
+
+    float strength = surfaceEnergy * shoreGuard;
+    return float2(
+        clamp(downstream * strength, -0.38, 0.38),
+        clamp(lateral * strength, -0.34, 0.34));
+}
+
+float2 RiverWaterFoamMetresToFieldUV(
+    float2 metres,
+    float fieldLength,
+    float surfaceHalfWidth)
+{
+    return float2(
+        metres.x / max(0.001, fieldLength),
+        metres.y / max(0.001, surfaceHalfWidth * 2.0));
+}
+
+float4 RiverWaterFoamSampleInterpolatedState(
+    TEXTURE2D_PARAM(previousFoam, previousFoamSampler),
+    TEXTURE2D_PARAM(currentFoam, currentFoamSampler),
+    float2 foamUV,
+    float interpolation)
+{
+    float4 currentState = SAMPLE_TEXTURE2D_LOD(
+        currentFoam,
+        currentFoamSampler,
+        foamUV,
+        0.0);
+
+    if (interpolation >= 0.999)
+    {
+        return currentState;
+    }
+
+    float4 previousState = SAMPLE_TEXTURE2D_LOD(
+        previousFoam,
+        previousFoamSampler,
+        foamUV,
+        0.0);
+    return lerp(
+        previousState,
+        currentState,
+        saturate(interpolation));
+}
+
+void RiverWaterFoamDecodeMaterialState(
+    float4 state,
+    out float presence,
+    out float remainingLife,
+    out float materialPattern)
+{
+    presence = saturate(state.x);
+    remainingLife = presence > 0.0001
+        ? saturate(state.y / presence)
+        : 0.0;
+    materialPattern = presence > 0.0001
+        ? saturate(state.z / presence)
+        : 0.0;
+}
+
+float RiverWaterFoamResolveStateMask(
+    float4 state,
+    float storedGlobalDistance,
+    float lateralMetres,
+    float sharpness,
+    out float presence,
+    out float remainingLife,
+    out float materialPattern)
+{
+    RiverWaterFoamDecodeMaterialState(
+        state,
+        presence,
+        remainingLife,
+        materialPattern);
+    float baseMask = RiverWaterFoamSharpenCoverage(
+        presence,
+        sharpness);
+    return RiverWaterFoamPatternedMask(
+        baseMask,
+        presence,
+        remainingLife,
+        materialPattern,
+        storedGlobalDistance,
+        lateralMetres,
+        sharpness);
+}
+
 struct RiverWaterFoamResult
 {
     float presence;
@@ -181,7 +361,8 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float interpolation,
     float renderTravelMetres,
     float sharpness,
-    float freezeAmount)
+    float freezeAmount,
+    RiverWaterFoamSurfaceInfluence surfaceInfluence)
 {
     RiverWaterFoamResult result;
     result.presence = 0.0;
@@ -202,57 +383,183 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         fieldUV.y);
 
     float blend = saturate(interpolation);
-    float4 currentState = SAMPLE_TEXTURE2D_LOD(
-        currentFoam,
-        currentFoamSampler,
-        foamUV,
-        0.0);
-    float4 state = currentState;
-    if (blend < 0.999)
-    {
-        float4 previousState = SAMPLE_TEXTURE2D_LOD(
+    float4 storedState = RiverWaterFoamSampleInterpolatedState(
+        TEXTURE2D_ARGS(
             previousFoam,
-            previousFoamSampler,
-            foamUV,
-            0.0);
-        state = lerp(
-            previousState,
-            currentState,
-            blend);
-    }
+            previousFoamSampler),
+        TEXTURE2D_ARGS(
+            currentFoam,
+            currentFoamSampler),
+        foamUV,
+        blend);
 
-    float presence = saturate(state.x);
-    float remainingLife = presence > 0.0001
-        ? saturate(state.y / presence)
-        : 0.0;
-    float materialPattern = presence > 0.0001
-        ? saturate(state.z / presence)
-        : 0.0;
-
-    // Presence is geometric coverage, not emitter strength. The final mask is
-    // intentionally sharper than the raw transported coverage because the
-    // phase-transport model makes any broad bilinear softness read as a blurry
-    // static decal. Material Pattern finally participates here: it breaks the
-    // born footprint into a stable internal identity, while a slow threshold
-    // drift makes only the rendered silhouette/holes breathe over time.
-    float baseMask = RiverWaterFoamSharpenCoverage(
-        presence,
-        sharpness);
     float storedGlobalDistance = globalDistance - renderTravelMetres;
-    float mask = RiverWaterFoamPatternedMask(
-        baseMask,
-        presence,
-        remainingLife,
-        materialPattern,
+    float storedPresence;
+    float storedRemainingLife;
+    float storedMaterialPattern;
+    float storedMask = RiverWaterFoamResolveStateMask(
+        storedState,
         storedGlobalDistance,
         lateralMetres,
-        sharpness);
-    mask *= 1.0 - saturate(freezeAmount);
+        sharpness,
+        storedPresence,
+        storedRemainingLife,
+        storedMaterialPattern);
 
-    result.presence = presence;
-    result.remainingLife = remainingLife;
-    result.mask = saturate(mask);
+    // Material Presence debug must remain the unwarped stored state. Surface
+    // coupling is presentation only: waves, pressure, lee, wakes, and ripples
+    // bend the final mask without changing lifecycle or material ownership.
+    result.presence = storedPresence;
+    result.remainingLife = storedRemainingLife;
     result.fieldUV = fieldUV;
+
+    float liquidFactor = 1.0 - saturate(freezeAmount);
+    float surfaceEnergy = RiverWaterFoamResolveSurfaceEnergy(
+        surfaceInfluence) * liquidFactor;
+
+    float2 warpMetres = RiverWaterFoamResolveSurfaceWarpMetres(
+        surfaceInfluence,
+        globalDistance,
+        lateralMetres,
+        surfaceHalfWidth,
+        storedMaterialPattern);
+    float2 warpUV = RiverWaterFoamMetresToFieldUV(
+        warpMetres,
+        fieldLength,
+        surfaceHalfWidth);
+    float2 visualFoamUV = saturate(foamUV - warpUV);
+
+    float4 visualState = RiverWaterFoamSampleInterpolatedState(
+        TEXTURE2D_ARGS(
+            previousFoam,
+            previousFoamSampler),
+        TEXTURE2D_ARGS(
+            currentFoam,
+            currentFoamSampler),
+        visualFoamUV,
+        blend);
+
+    float visualPresence;
+    float visualRemainingLife;
+    float visualMaterialPattern;
+    float visualMask = RiverWaterFoamResolveStateMask(
+        visualState,
+        storedGlobalDistance - warpMetres.x,
+        lateralMetres - warpMetres.y,
+        sharpness,
+        visualPresence,
+        visualRemainingLife,
+        visualMaterialPattern);
+
+    float coupledMask = lerp(
+        storedMask,
+        visualMask,
+        saturate(surfaceEnergy * 0.72));
+
+    // Wake and lee regions should not spawn Foam, but they may visually stretch
+    // or compress already-nearby material. This extra pair of render samples is
+    // bounded and only contributes near an existing stored/warped body.
+    [branch]
+    if (surfaceEnergy > 0.015)
+    {
+        float2 stretchDirection = float2(
+            0.82 + abs(surfaceInfluence.disturbanceVelocity) * 0.16 +
+            surfaceInfluence.wakeEnergy * 0.20,
+            surfaceInfluence.lateralGradient +
+            surfaceInfluence.wakeLateralGradient * 0.42);
+        float stretchLength = length(stretchDirection);
+        if (stretchLength > 0.0001)
+        {
+            stretchDirection /= stretchLength;
+        }
+        else
+        {
+            stretchDirection = float2(1.0, 0.0);
+        }
+        float stretchMetres = surfaceEnergy *
+            (0.035 + surfaceInfluence.wakeIntensity * 0.125);
+        float2 stretchUV = RiverWaterFoamMetresToFieldUV(
+            stretchDirection * stretchMetres,
+            fieldLength,
+            surfaceHalfWidth);
+
+        float4 leadState = RiverWaterFoamSampleInterpolatedState(
+            TEXTURE2D_ARGS(
+                previousFoam,
+                previousFoamSampler),
+            TEXTURE2D_ARGS(
+                currentFoam,
+                currentFoamSampler),
+            saturate(visualFoamUV - stretchUV),
+            blend);
+        float4 trailState = RiverWaterFoamSampleInterpolatedState(
+            TEXTURE2D_ARGS(
+                previousFoam,
+                previousFoamSampler),
+            TEXTURE2D_ARGS(
+                currentFoam,
+                currentFoamSampler),
+            saturate(visualFoamUV + stretchUV),
+            blend);
+
+        float leadPresence;
+        float leadLife;
+        float leadPattern;
+        float leadMask = RiverWaterFoamResolveStateMask(
+            leadState,
+            storedGlobalDistance - warpMetres.x - stretchDirection.x * stretchMetres,
+            lateralMetres - warpMetres.y - stretchDirection.y * stretchMetres,
+            sharpness,
+            leadPresence,
+            leadLife,
+            leadPattern);
+        float trailPresence;
+        float trailLife;
+        float trailPattern;
+        float trailMask = RiverWaterFoamResolveStateMask(
+            trailState,
+            storedGlobalDistance - warpMetres.x + stretchDirection.x * stretchMetres,
+            lateralMetres - warpMetres.y + stretchDirection.y * stretchMetres,
+            sharpness,
+            trailPresence,
+            trailLife,
+            trailPattern);
+
+        float nearMaterial = saturate(max(
+            max(storedMask, visualMask),
+            max(leadMask, trailMask)));
+        float stretchedMask = max(
+            coupledMask,
+            max(leadMask, trailMask) * (0.42 + surfaceEnergy * 0.30));
+        coupledMask = lerp(
+            coupledMask,
+            stretchedMask,
+            saturate(nearMaterial * surfaceEnergy));
+    }
+
+    float edgeExposure = 1.0 - smoothstep(0.36, 0.82, max(storedPresence, visualPresence));
+    float contactWave = sin(
+        _Time.y * (1.10 + surfaceEnergy * 0.75) +
+        globalDistance * 2.15 +
+        lateralMetres * 5.30 +
+        storedMaterialPattern * 5.70) * 0.5 + 0.5;
+    float surfaceBreak = lerp(
+        0.92,
+        1.10,
+        contactWave);
+    coupledMask *= lerp(
+        1.0,
+        surfaceBreak,
+        saturate(edgeExposure * surfaceEnergy * 0.85));
+
+    // Do not allow render coupling to erase coherent stored material. It may
+    // visually bend/thin edges, but lifecycle remains in the material field.
+    coupledMask = max(
+        coupledMask,
+        storedMask * lerp(0.72, 0.58, saturate(surfaceEnergy)));
+    coupledMask *= liquidFactor;
+
+    result.mask = saturate(coupledMask);
     return result;
 }
 

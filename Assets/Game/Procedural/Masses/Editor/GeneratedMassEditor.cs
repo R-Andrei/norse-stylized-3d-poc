@@ -28,6 +28,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty creviceBreakup;
         private SerializedProperty dirtCrawlReach;
         private SerializedProperty dirtCoverage;
+        private SerializedProperty exposureResponse;
+        private SerializedProperty creviceResponse;
+        private SerializedProperty baseResponse;
+        private SerializedProperty dirtDepositResponse;
         private SerializedProperty surfaceFeatureVisibility;
         private SerializedProperty edgeWearAmount;
         private SerializedProperty edgeWearWidth;
@@ -76,6 +80,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "dirtCrawlReach");
             dirtCoverage = serializedObject.FindProperty(
                 "dirtCoverage");
+            exposureResponse = serializedObject.FindProperty(
+                "exposureResponse");
+            creviceResponse = serializedObject.FindProperty(
+                "creviceResponse");
+            baseResponse = serializedObject.FindProperty(
+                "baseResponse");
+            dirtDepositResponse = serializedObject.FindProperty(
+                "dirtDepositResponse");
             surfaceFeatureVisibility = serializedObject.FindProperty(
                 "surfaceFeatureVisibility");
             edgeWearAmount = serializedObject.FindProperty(
@@ -228,7 +240,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             EditorGUILayout.HelpBox(
                 "These controls tune generated CreviceBase and DirtDeposit " +
                 "surface masks per object. Crevice Reach controls crawl " +
-                "height; Crevice Smoothness controls the fade length.",
+                "height; Crevice Smoothness controls the fade length. The four Response controls affect final normal rendering only and let each accepted mask type be tuned independently.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(surfaceMaskBaseLift);
@@ -237,6 +249,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             EditorGUILayout.PropertyField(creviceBreakup);
             EditorGUILayout.PropertyField(dirtCrawlReach);
             EditorGUILayout.PropertyField(dirtCoverage);
+            EditorGUILayout.PropertyField(exposureResponse);
+            EditorGUILayout.PropertyField(creviceResponse);
+            EditorGUILayout.PropertyField(baseResponse);
+            EditorGUILayout.PropertyField(dirtDepositResponse);
         }
 
         private void DrawSurfaceFeatureLines()

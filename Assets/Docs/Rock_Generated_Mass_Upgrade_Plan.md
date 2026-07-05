@@ -2385,3 +2385,54 @@ Validation target:
 - `Surface Mask Debug = None`
 - Compare two rocks side-by-side, one with the generated mass response and one without.
 - The treated rock should now visibly show lower accumulation/deposit/profile response at normal viewing distance without returning to the old hard band.
+
+
+## Patch 12H.2K — Surface Mask Response Control
+
+Problem addressed:
+- Even after the stronger H2J final-render visibility pass, side-by-side validation still showed that the treated rock could remain too subtle at normal viewing distance.
+- The user requested a direct control to tune how strongly the accepted generated CreviceBase/DirtDeposit/Exposure masks appear in the final normal render.
+
+What changed:
+- Added a new per-object `Surface Mask Response` control under **Surface Mask Tuning**.
+- Range: `0.0` to `2.0`.
+- Default: `1.0`.
+- `1.0` is now a stronger baseline than H2J.
+- `0.0` suppresses the generated crevice/deposit/exposure response in the final render.
+- `2.0` exaggerates the final render interpretation for tuning and validation.
+- The control affects final-render response only; it does not redesign the accepted mask shapes.
+
+Implementation notes:
+- The new control is passed from `GeneratedMass` to the shader as `_GeneratedMassSurfaceMaskResponse`.
+- It scales the generated lower semantic darkening/tint response, dirt/deposit colour response, damp gathering, and exposed-vs-lower relief contrast.
+
+Validation target:
+- Compare two rocks side-by-side, one with response tuned and one without.
+- At `Surface Mask Response = 1.0`, the effect should be clearly visible at normal viewing distance.
+- Use the new control to decide the preferred long-term default intensity.
+
+
+## Patch 12H.2L — Per-Mask Final Render Response Controls
+
+Problem addressed:
+- The single `Surface Mask Response` control introduced in Patch 12H.2K was useful for visibility tuning, but it remained too coarse.
+- The user requested one final-render intensity control for each accepted generated mask type instead of a stacked global multiplier.
+
+What changed:
+- Removed the global `Surface Mask Response` control.
+- Added four per-object controls under **Surface Mask Tuning**:
+  - `Exposure Response`
+  - `Crevice Response`
+  - `Base Response`
+  - `Dirt Deposit Response`
+- Each control uses range `0.0` to `2.0` and default `1.0`.
+- These controls affect final normal rendering only; they do not redesign the accepted mask shapes.
+- `Exposure Response` scales exposed-plane brightening/frost interpretation and exposed-vs-lower relief contrast.
+- `Crevice Response` scales crevice-specific darkening, lower tint contribution, and relief contribution.
+- `Base Response` scales base-contact grounding contribution and lower relief/value shaping.
+- `Dirt Deposit Response` scales dirt/deposit coloration and damp gathering.
+
+Validation target:
+- `Surface Mask Debug = None`
+- Tune each response independently on the same generated rock.
+- The user should be able to decide the preferred final default balance by adjusting each mask type directly instead of fighting a single master multiplier.
