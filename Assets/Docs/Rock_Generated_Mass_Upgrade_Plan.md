@@ -2436,3 +2436,212 @@ Validation target:
 - `Surface Mask Debug = None`
 - Tune each response independently on the same generated rock.
 - The user should be able to decide the preferred final default balance by adjusting each mask type directly instead of fighting a single master multiplier.
+
+
+## Patch 12H.2M — Final Render Response Formula Rebuild
+
+Problem addressed:
+- The four H2L response controls exposed the right tuning surface, but the final-render formulas were still structurally weak.
+- Dirt worked better because it had a direct colour layer, while CreviceBase was split across scalar darkening, shared lower tint, relief, and frost suppression.
+- Crevice Response at 2.0 was still weaker than the desired default strength, which indicated the formula needed a rebuild rather than another multiplier.
+
+What changed:
+- Rebuilt the generated-mass final-render interpretation as four separate material layers:
+  - Exposure lift
+  - Crevice depth/occlusion
+  - Base/contact grounding
+  - Dirt/deposit tint
+- Removed the shared `generatedMassLowerProfileResponse` lower-region multiplier.
+- Crevice now has a dedicated profile-aware depth target and an opacity-style response curve.
+- Base now has a separate softer grounding target and opacity curve.
+- Dirt now uses an opacity-style tint curve calibrated so `Dirt Deposit Response = 1.0` is near the previous H2L `2.0` visual strength.
+- Crevice is calibrated so `Crevice Response = 1.0` should be stronger than previous H2L `2.0`.
+- The four response controls now directly control their own mask roles rather than being blended into one lower-response soup.
+
+Validation target:
+- `Surface Mask Debug = None`
+- Start with all four Response controls at `1.0`.
+- Dirt should now be near the previously preferred `2.0` strength.
+- Crevice should now be clearly stronger than the previous `2.0` result.
+- Setting any individual response to `0.0` should substantially remove that mask's final-render contribution.
+
+
+## Patch 12H.2N — Neutral Mask Tint Controls
+
+Problem addressed:
+- Patch 12H.2M fixed the strength model, but the final render still pushed grey rocks toward brown/red because crevice, base, dirt, and damp targets all reused the dirt tint colour.
+- CreviceBase and Base are not the same thing as dirt. By default they should read as neutral depth/grounding, with optional tint only when the material profile asks for it.
+- Rock profiles should behave like combinations of tunable options, not hardcoded colour behaviours.
+
+What changed:
+- Added explicit material-level tint controls for generated mask interpretation:
+  - `Exposure Tint`
+  - `Exposure Tint Strength`
+  - `Crevice Tint`
+  - `Crevice Tint Strength`
+  - `Base Tint`
+  - `Base Tint Strength`
+  - `Dirt Deposit Tint`
+  - `Dirt Deposit Tint Strength`
+- Crevice and Base now default to value-preserving neutral darkening/grounding instead of multiplying through the dirt tint.
+- Dirt and wet damp response now use the explicit Dirt Deposit tint controls.
+- Tinting uses a value-preserving hue blend so a tint changes hue without automatically crushing or inflating brightness.
+- Updated the four existing stone material presets with more neutral/non-red tint defaults:
+  - ColdGrey: neutral grey-brown dirt, crevice/base tint disabled by default.
+  - WetRiver: green-grey damp/deposit tint.
+  - PaleFrost: subtle blue-grey/frost tint.
+  - BlackSacred: neutral charcoal tint.
+
+Validation target:
+- `Surface Mask Debug = None`
+- Start with response controls at `1.0`.
+- Crevice and base should now read mostly as neutral depth/grounding, not reddish dirt.
+- Dirt should still be visible, but less red/brown by default.
+- Material tint controls can now intentionally push specific profiles warmer, colder, greener, or more neutral.
+
+
+## Patch 12H.2O — Neutral Grey Tint Inspector Fix
+
+Problem addressed:
+- Patch 12H.2N added tint properties to the shader/materials, but they were not exposed in the `GeneratedMass` inspector where the current rock tuning is happening.
+- The four response controls also appeared twice because they were not excluded from the automatic inspector draw.
+- Some material presets still had nonzero tint strengths, which meant a neutral grey base colour could still be pushed warmer/greener/colder by default.
+
+What changed:
+- Added per-object tint controls to `GeneratedMass` and exposed them in a new **Final Render Tinting** inspector section:
+  - `Exposure Tint`
+  - `Exposure Tint Strength`
+  - `Crevice Tint`
+  - `Crevice Tint Strength`
+  - `Base Tint`
+  - `Base Tint Strength`
+  - `Dirt Deposit Tint`
+  - `Dirt Deposit Tint Strength`
+- Default tint strength for every mask type is now `0`.
+- Neutral grey is now the default behaviour: crevice, base, dirt, and exposure response should preserve hue unless a tint strength is intentionally raised.
+- Removed the duplicate response controls from the automatic `Rendering` part of the inspector; they should now appear only in the custom Surface Mask Tuning section.
+- Updated the four stone material presets so their generated mask tint strengths are also `0` by default.
+
+Validation target:
+- Pick a neutral Base Color such as `#555759`.
+- Set all tint strengths to `0`.
+- `Surface Mask Debug = None`.
+- The affected rock should darken/brighten through neutral value changes, not red/yellow/brown hue shifts.
+- Raise individual tint strengths only when intentionally testing warm dirt, blue frost, green wet deposits, etc.
+
+
+## Patch 12H.2P — Material YAML Tint Serialization Fix
+
+Problem addressed:
+- Patch 12H.2O malformed the `.mat` YAML colour list by inserting new colour properties on the same line as existing colour entries.
+- Unity reported `Tried to get mapping information from scalar node` / `Assertion failed on expression: 'IsMapping()'` while reading those material files.
+
+What changed:
+- Rewrote the `m_Colors` section of each stone material as valid Unity YAML.
+- Kept all generated tint colours neutral grey.
+- Kept all generated tint strengths at `0`.
+- No shader behaviour changes.
+- No generator/editor behaviour changes.
+
+Validation target:
+- Unity should stop reporting YAML mapping/assertion errors.
+- Neutral grey tint defaults from Patch 12H.2O remain intact.
+
+
+## Patch 12H.2Q — Rock Colour Authority Controls
+
+Problem addressed:
+- Neutral base colours could still be visibly pushed warm/yellow/brown because the final colour came from the full RGB result of `UniversalFragmentPBR`.
+- We still need to rely on URP/PBR so global and local lights affect brightness, form, shadows, highlights and specular behaviour.
+- The desired result is not colourless lighting; light colour should still tint the rock, just with less authority than full PBR currently gives it.
+
+What changed:
+- Added per-object **Final Render Colour** controls to `GeneratedMass`:
+  - `Overall Rock Tint`
+  - `Overall Rock Tint Strength`
+  - `Lighting Tint Influence`
+- `Overall Rock Tint` is applied to the post-mask albedo before lighting. Default strength is `0`, so the selected Base Color remains authoritative unless intentionally tinted.
+- The shader still calls `UniversalFragmentPBR`.
+- After PBR, the shader extracts a luminance-style lighting value from the PBR result and blends between:
+  - neutral lighting value applied to the rock albedo
+  - full RGB PBR colour result
+- `Lighting Tint Influence` controls that blend:
+  - `0.0`: light affects value/shadow/form, but contributes no hue shift.
+  - `0.35`: default moderate light hue influence.
+  - `1.0`: full current PBR RGB lighting influence.
+
+Validation target:
+- Use a neutral Base Color such as `#555759`.
+- Keep all mask tint strengths at `0`.
+- Overall Rock Tint Strength should default to `0`.
+- Try Lighting Tint Influence at `0`, `0.35`, and `1`.
+- Local/global lights should still affect brightness, shadows and form at all values.
+- Hue shift from lighting should be controllable rather than fully dominating the selected rock colour.
+
+
+## Patch 12H.2R — Generated Mass Inspector Refactor
+
+Problem addressed:
+- The generated mass stone renderer had accumulated useful controls, but the inspector no longer communicated which controls changed mask placement, which controls changed final-render strength, and which controls changed hue/lighting authority.
+- Several fields were custom-drawn by `GeneratedMassEditor` while still carrying field-level `[Header]` decorators in `GeneratedMass`, making duplicate or misleading section headings likely.
+- The `Surface Feature Lines` controls took too much always-visible space even though ConvexEdgeWear and ConcaveCrease raised overlay strips are debug-validation tools, not the accepted final visible stone rendering path.
+- `surfaceFeatureVisibility` existed but was hidden by the custom inspector, which made the old visible overlay response harder to audit.
+
+What changed:
+- Reorganized the `GeneratedMass` inspector into explicit rendering sections:
+  - **Rendering & Profile**
+  - **Mask Shape**
+  - **Mask Strength**
+  - **Mask Tinting**
+  - **Rock Colour Authority**
+  - **Advanced Debug Feature Lines**
+  - **River Interaction**
+  - **Variant Controls**
+- Split mask placement controls from final-render response controls:
+  - Mask Shape contains `Base Lift`, `Crevice Height`, `Crevice Fade`, `Crevice Irregularity`, `Dirt Crawl Height`, and `Dirt Coverage`.
+  - Mask Strength contains `Exposure Strength`, `Crevice Strength`, `Base / Contact Strength`, and `Dirt Deposit Strength`.
+- Kept all response controls. None were removed or collapsed into a global multiplier.
+- Kept all per-mask tint controls and relabelled the base controls in the inspector as `Base / Contact Tint` and `Base / Contact Tint Strength` for clarity.
+- Kept the rock-level colour controls:
+  - `Overall Rock Tint`
+  - `Overall Rock Tint Strength`
+  - `Lighting Tint Influence`
+- Added an inspector-only read-only **Active Profile Summary** showing the currently selected profile material and important material traits when available:
+  - Wetness
+  - Frost Strength
+  - Monolithic Flatten
+  - Smoothness
+  - Specular Strength
+- Moved ConvexEdgeWear / ConcaveCrease overlay controls into a collapsed **Advanced Debug Feature Lines** foldout.
+- Exposed `Feature Line Visibility` inside that advanced foldout, with a warning when `VisibleProfileResponse` is selected.
+- Removed the field-level headers from `GeneratedMass` for custom-drawn rendering sections so the custom inspector owns the section labels.
+
+Important non-changes:
+- No shader formula changes.
+- No material preset retuning.
+- No `.mat` YAML changes.
+- No serialized field names changed.
+- No default values or ranges changed.
+- No response/tint/colour-authority controls removed.
+- No river interaction behaviour changed.
+- No material trait overrides added.
+
+Current generated stone rendering state:
+- Final normal rendering currently uses the accepted semantic mask response path for:
+  - `SurfaceVariation`
+  - `Exposure`
+  - `CreviceBase`
+  - `DirtDeposit`
+- `ConvexEdgeWear` and `ConcaveCrease` raised overlay strips remain available for debug validation, but they are still not the accepted final visible edge/crack rendering path.
+- Normal grey/neutral testing should still use:
+  - `Surface Mask Debug = None`
+  - all per-mask tint strengths at `0`
+  - `Overall Rock Tint Strength = 0`
+  - `Lighting Tint Influence = 0.35` as the moderate default, with `0` and `1` available for checking light-hue authority.
+
+Validation target:
+- The inspector should no longer show duplicate custom rendering headings.
+- The user should be able to understand whether a control changes mask shape, mask strength, tint, or lighting colour authority without reading shader code.
+- With identical serialized values before and after the patch, normal rock rendering should remain visually unchanged.
+- Expanding **Advanced Debug Feature Lines** should reveal all previous edge/crease debug controls plus `Feature Line Visibility`.
+- Leaving **Advanced Debug Feature Lines** collapsed should keep obsolete/noisy debug controls from dominating normal tuning.

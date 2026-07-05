@@ -175,6 +175,7 @@ namespace ProgrammaticStylized3D.Rivers
             "PS3DRiver/Textures/T_RiverNormal";
 
         private const int CurrentFoamMaterialLifecycleTuningVersion = 1;
+        private const int CurrentFoamSurfaceMorphCalibrationVersion = 1;
         private const float MinimumFoamNeutralLifetime = 1f;
         private const float MaximumFoamNeutralLifetime = 10f;
         private const float DefaultFoamNeutralLifetime = 4f;
@@ -187,6 +188,9 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamMaterialFlowSpeedMultiplier = 0f;
         private const float MaximumFoamMaterialFlowSpeedMultiplier = 6f;
         private const float DefaultFoamMaterialFlowSpeedMultiplier = 1f;
+        private const float MinimumFoamSurfaceMorphStrength = 0f;
+        private const float MaximumFoamSurfaceMorphStrength = 5f;
+        private const float DefaultFoamSurfaceMorphStrength = 1f;
         private const float MinimumFoamProgressiveRibbonDuration = 0.5f;
         private const float MaximumFoamProgressiveRibbonDuration = 5f;
         private const float DefaultFoamProgressiveRibbonDuration = 2.4f;
@@ -784,8 +788,19 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamMaterialFlowSpeedMultiplier =
             DefaultFoamMaterialFlowSpeedMultiplier;
 
+        [Tooltip("Strength for surface-driven persistent Foam material morphing. Zero disables the stored-state response to waves, pressure, lee, and wake fields; one is the normal readable authored response after 4.11C.5.7c; higher values push into strong and stress-test behavior without changing birth, lifetime, or topology.")]
+        [Range(
+            MinimumFoamSurfaceMorphStrength,
+            MaximumFoamSurfaceMorphStrength)]
+        [SerializeField]
+        private float foamSurfaceMorphStrength =
+            DefaultFoamSurfaceMorphStrength;
+
         [SerializeField, HideInInspector]
         private int foamMaterialLifecycleTuningVersion;
+
+        [SerializeField, HideInInspector]
+        private int foamSurfaceMorphCalibrationVersion;
 
         [Tooltip("Lit, non-emissive Foam tint. The alpha channel controls maximum Foam opacity, so no separate opacity control is required.")]
         [SerializeField] private Color foamColour =
@@ -1316,6 +1331,11 @@ namespace ProgrammaticStylized3D.Rivers
                 foamMaterialFlowSpeedMultiplier,
                 MinimumFoamMaterialFlowSpeedMultiplier,
                 MaximumFoamMaterialFlowSpeedMultiplier);
+        public float FoamSurfaceMorphStrength =>
+            Mathf.Clamp(
+                foamSurfaceMorphStrength,
+                MinimumFoamSurfaceMorphStrength,
+                MaximumFoamSurfaceMorphStrength);
         public Color FoamColour => foamColour;
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
         public float FoamSpawnDistanceNormalized =>
@@ -1538,6 +1558,7 @@ namespace ProgrammaticStylized3D.Rivers
         private void OnEnable()
         {
             MigrateFoamMaterialLifecycleTuningIfRequired();
+            MigrateFoamSurfaceMorphCalibrationIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -1644,9 +1665,23 @@ namespace ProgrammaticStylized3D.Rivers
                 CurrentFoamMaterialLifecycleTuningVersion;
         }
 
+        private void MigrateFoamSurfaceMorphCalibrationIfRequired()
+        {
+            if (foamSurfaceMorphCalibrationVersion >=
+                CurrentFoamSurfaceMorphCalibrationVersion)
+            {
+                return;
+            }
+
+            foamSurfaceMorphStrength = DefaultFoamSurfaceMorphStrength;
+            foamSurfaceMorphCalibrationVersion =
+                CurrentFoamSurfaceMorphCalibrationVersion;
+        }
+
         private void OnValidate()
         {
             MigrateFoamMaterialLifecycleTuningIfRequired();
+            MigrateFoamSurfaceMorphCalibrationIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);

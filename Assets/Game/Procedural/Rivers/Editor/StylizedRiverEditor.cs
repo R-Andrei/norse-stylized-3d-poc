@@ -1809,6 +1809,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent(
                     "Material Flow Speed",
                     "Multiplier for persistent Foam downstream travel."));
+            EditorGUILayout.PropertyField(
+                Find("foamSurfaceMorphStrength"),
+                new GUIContent(
+                    "Surface Morph Strength",
+                    "Strength for stored Foam morphology driven by waves, pressure, lee, and wake fields. Zero disables the stored-state response; one is the normal readable authored response, with higher values for strong or stress-test behavior."));
 
             if (runtime == null)
             {

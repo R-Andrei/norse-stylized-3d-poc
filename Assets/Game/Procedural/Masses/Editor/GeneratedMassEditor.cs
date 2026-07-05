@@ -22,6 +22,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty darkWetRiverStoneMaterial;
         private SerializedProperty paleFrostStoneMaterial;
         private SerializedProperty blackSacredStoneMaterial;
+        private SerializedProperty stoneSurfaceProfile;
+        private SerializedProperty baseColor;
+        private SerializedProperty surfaceMaskDebug;
         private SerializedProperty surfaceMaskBaseLift;
         private SerializedProperty creviceReach;
         private SerializedProperty creviceSmoothness;
@@ -32,6 +35,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty creviceResponse;
         private SerializedProperty baseResponse;
         private SerializedProperty dirtDepositResponse;
+        private SerializedProperty exposureTint;
+        private SerializedProperty exposureTintStrength;
+        private SerializedProperty creviceTint;
+        private SerializedProperty creviceTintStrength;
+        private SerializedProperty baseTint;
+        private SerializedProperty baseTintStrength;
+        private SerializedProperty dirtDepositTint;
+        private SerializedProperty dirtDepositTintStrength;
+        private SerializedProperty overallRockTint;
+        private SerializedProperty overallRockTintStrength;
+        private SerializedProperty lightingTintInfluence;
         private SerializedProperty surfaceFeatureVisibility;
         private SerializedProperty edgeWearAmount;
         private SerializedProperty edgeWearWidth;
@@ -56,6 +70,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty obstructionWakeSpread;
         private SerializedProperty obstructionWakeVariation;
         private SerializedProperty impactRippleCollisionMode;
+        private bool showAdvancedDebugFeatureLines;
         private bool showPressureProfile;
 
         private void OnEnable()
@@ -68,6 +83,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "paleFrostStoneMaterial");
             blackSacredStoneMaterial = serializedObject.FindProperty(
                 "blackSacredStoneMaterial");
+            stoneSurfaceProfile = serializedObject.FindProperty(
+                "stoneSurfaceProfile");
+            baseColor = serializedObject.FindProperty(
+                "baseColor");
+            surfaceMaskDebug = serializedObject.FindProperty(
+                "surfaceMaskDebug");
             surfaceMaskBaseLift = serializedObject.FindProperty(
                 "surfaceMaskBaseLift");
             creviceReach = serializedObject.FindProperty(
@@ -88,6 +109,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "baseResponse");
             dirtDepositResponse = serializedObject.FindProperty(
                 "dirtDepositResponse");
+            exposureTint = serializedObject.FindProperty(
+                "exposureTint");
+            exposureTintStrength = serializedObject.FindProperty(
+                "exposureTintStrength");
+            creviceTint = serializedObject.FindProperty(
+                "creviceTint");
+            creviceTintStrength = serializedObject.FindProperty(
+                "creviceTintStrength");
+            baseTint = serializedObject.FindProperty(
+                "baseTint");
+            baseTintStrength = serializedObject.FindProperty(
+                "baseTintStrength");
+            dirtDepositTint = serializedObject.FindProperty(
+                "dirtDepositTint");
+            dirtDepositTintStrength = serializedObject.FindProperty(
+                "dirtDepositTintStrength");
+            overallRockTint = serializedObject.FindProperty(
+                "overallRockTint");
+            overallRockTintStrength = serializedObject.FindProperty(
+                "overallRockTintStrength");
+            lightingTintInfluence = serializedObject.FindProperty(
+                "lightingTintInfluence");
             surfaceFeatureVisibility = serializedObject.FindProperty(
                 "surfaceFeatureVisibility");
             edgeWearAmount = serializedObject.FindProperty(
@@ -148,15 +191,35 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             serializedObject.Update();
             EnsureDefaultStoneMaterials();
 
+            DrawRenderingAndProfile();
+
             DrawPropertiesExcluding(
                 serializedObject,
                 "m_Script",
+                "stoneSurfaceProfile",
+                "baseColor",
+                "surfaceMaskDebug",
                 "surfaceMaskBaseLift",
                 "creviceReach",
                 "creviceSmoothness",
                 "creviceBreakup",
                 "dirtCrawlReach",
                 "dirtCoverage",
+                "exposureResponse",
+                "creviceResponse",
+                "baseResponse",
+                "dirtDepositResponse",
+                "exposureTint",
+                "exposureTintStrength",
+                "creviceTint",
+                "creviceTintStrength",
+                "baseTint",
+                "baseTintStrength",
+                "dirtDepositTint",
+                "dirtDepositTintStrength",
+                "overallRockTint",
+                "overallRockTintStrength",
+                "lightingTintInfluence",
                 "surfaceFeatureVisibility",
                 "edgeWearAmount",
                 "edgeWearWidth",
@@ -169,8 +232,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "creaseSoftness",
                 "riverInteraction");
 
-            DrawSurfaceMaskTuning();
-            DrawSurfaceFeatureLines();
+            DrawMaskShape();
+            DrawMaskStrength();
+            DrawMaskTinting();
+            DrawRockColourAuthority();
+            DrawAdvancedDebugFeatureLines();
             DrawRiverInteraction();
 
             serializedObject.ApplyModifiedProperties();
@@ -230,56 +296,347 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 MessageType.Info);
         }
 
-        private void DrawSurfaceMaskTuning()
+        private void DrawRenderingAndProfile()
         {
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
-                "Surface Mask Tuning",
+                "Rendering & Profile",
                 EditorStyles.boldLabel);
 
             EditorGUILayout.HelpBox(
-                "These controls tune generated CreviceBase and DirtDeposit " +
-                "surface masks per object. Crevice Reach controls crawl " +
-                "height; Crevice Smoothness controls the fade length. The four Response controls affect final normal rendering only and let each accepted mask type be tuned independently.",
+                "Base Color is the rock's chosen material colour before " +
+                "generated mask response, optional tint controls, and " +
+                "scene/PBR lighting. Use Lighting Tint Influence below to " +
+                "control how strongly scene and local light colour can " +
+                "hue-shift the final result.",
                 MessageType.Info);
 
-            EditorGUILayout.PropertyField(surfaceMaskBaseLift);
-            EditorGUILayout.PropertyField(creviceReach);
-            EditorGUILayout.PropertyField(creviceSmoothness);
-            EditorGUILayout.PropertyField(creviceBreakup);
-            EditorGUILayout.PropertyField(dirtCrawlReach);
-            EditorGUILayout.PropertyField(dirtCoverage);
-            EditorGUILayout.PropertyField(exposureResponse);
-            EditorGUILayout.PropertyField(creviceResponse);
-            EditorGUILayout.PropertyField(baseResponse);
-            EditorGUILayout.PropertyField(dirtDepositResponse);
+            EditorGUILayout.PropertyField(
+                stoneSurfaceProfile,
+                new GUIContent(
+                    "Stone Surface Profile",
+                    "Chooses the shared HLSL stone material profile. Renderer Material leaves the current renderer material untouched."));
+            EditorGUILayout.PropertyField(
+                baseColor,
+                new GUIContent(
+                    "Base Color",
+                    "Per-object starting stone colour before generated mask response, optional tinting, and scene lighting."));
+            EditorGUILayout.PropertyField(
+                surfaceMaskDebug,
+                new GUIContent(
+                    "Surface Mask Debug",
+                    "Temporarily visualizes generated material masks on this object. Leave disabled for normal rendering."));
+
+            DrawActiveProfileSummary();
         }
 
-        private void DrawSurfaceFeatureLines()
+        private void DrawActiveProfileSummary()
+        {
+            if (stoneSurfaceProfile == null)
+            {
+                return;
+            }
+
+            EditorGUILayout.Space(3f);
+            EditorGUILayout.LabelField(
+                "Active Profile Summary",
+                EditorStyles.miniBoldLabel);
+
+            if (stoneSurfaceProfile.hasMultipleDifferentValues)
+            {
+                EditorGUILayout.HelpBox(
+                    "Profile summary is unavailable while selected masses use different stone profiles.",
+                    MessageType.None);
+                return;
+            }
+
+            StoneSurfaceProfile profile =
+                (StoneSurfaceProfile)stoneSurfaceProfile.enumValueIndex;
+            Material material = ResolveActiveProfileMaterial(profile);
+
+            if (material == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "Profile summary unavailable: material reference missing or no renderer material found.",
+                    MessageType.None);
+                return;
+            }
+
+            using (new EditorGUI.DisabledScope(true))
+            {
+                EditorGUILayout.ObjectField(
+                    "Material",
+                    material,
+                    typeof(Material),
+                    false);
+                DrawMaterialFloat(material, "Wetness", "_Wetness");
+                DrawMaterialFloat(material, "Frost Strength", "_FrostStrength");
+                DrawMaterialFloat(
+                    material,
+                    "Monolithic Flatten",
+                    "_MonolithicFlatten");
+                DrawMaterialFloat(material, "Smoothness", "_Smoothness");
+                DrawMaterialFloat(
+                    material,
+                    "Specular Strength",
+                    "_SpecularStrength");
+            }
+        }
+
+        private Material ResolveActiveProfileMaterial(StoneSurfaceProfile profile)
+        {
+            switch (profile)
+            {
+                case StoneSurfaceProfile.ColdGreyStone:
+                    return coldGreyStoneMaterial?.objectReferenceValue as Material;
+
+                case StoneSurfaceProfile.DarkWetRiverStone:
+                    return darkWetRiverStoneMaterial?.objectReferenceValue as Material;
+
+                case StoneSurfaceProfile.PaleFrostStone:
+                    return paleFrostStoneMaterial?.objectReferenceValue as Material;
+
+                case StoneSurfaceProfile.BlackSacredStone:
+                    return blackSacredStoneMaterial?.objectReferenceValue as Material;
+
+                case StoneSurfaceProfile.RendererMaterial:
+                default:
+                    return ResolveRendererMaterial();
+            }
+        }
+
+        private Material ResolveRendererMaterial()
+        {
+            if (serializedObject.isEditingMultipleObjects)
+            {
+                return null;
+            }
+
+            GeneratedMass mass = target as GeneratedMass;
+            Renderer renderer =
+                mass != null
+                    ? mass.GetComponent<Renderer>()
+                    : null;
+            return renderer != null
+                ? renderer.sharedMaterial
+                : null;
+        }
+
+        private static void DrawMaterialFloat(
+            Material material,
+            string label,
+            string propertyName)
+        {
+            if (!material.HasProperty(propertyName))
+            {
+                EditorGUILayout.LabelField(label, "Unavailable");
+                return;
+            }
+
+            EditorGUILayout.FloatField(label, material.GetFloat(propertyName));
+        }
+
+        private void DrawMaskShape()
         {
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
-                "Surface Feature Lines",
+                "Mask Shape",
                 EditorStyles.boldLabel);
 
             EditorGUILayout.HelpBox(
-                "Generates raised overlay strips for ConvexEdgeWear and " +
-                "ConcaveCrease debug validation only. These strips are not " +
-                "used for normal stone rendering because their debug lift makes " +
-                "them read as floating lines instead of surface-integrated " +
-                "stone wear/cracks.",
+                "These controls change where generated masks exist. They " +
+                "reshape the semantic masks; they do not merely change " +
+                "visual intensity.",
                 MessageType.Info);
 
-            EditorGUILayout.PropertyField(edgeWearAmount);
-            EditorGUILayout.PropertyField(edgeWearWidth);
-            EditorGUILayout.PropertyField(edgeWearCoverage);
-            EditorGUILayout.PropertyField(edgeWearSoftness);
+            EditorGUILayout.PropertyField(
+                surfaceMaskBaseLift,
+                new GUIContent(
+                    "Base Lift",
+                    "Moves the lower/contact mask origin upward for embedded or flat masses."));
+            EditorGUILayout.PropertyField(
+                creviceReach,
+                new GUIContent(
+                    "Crevice Height",
+                    "Controls how far CreviceBase can crawl upward from lower/contact areas."));
+            EditorGUILayout.PropertyField(
+                creviceSmoothness,
+                new GUIContent(
+                    "Crevice Fade",
+                    "Controls how softly CreviceBase fades upward."));
+            EditorGUILayout.PropertyField(
+                creviceBreakup,
+                new GUIContent(
+                    "Crevice Irregularity",
+                    "Controls how uneven or broken the crevice crawl field is."));
+            EditorGUILayout.PropertyField(
+                dirtCrawlReach,
+                new GUIContent(
+                    "Dirt Crawl Height",
+                    "Controls how far DirtDeposit crawl paths may rise."));
+            EditorGUILayout.PropertyField(
+                dirtCoverage,
+                new GUIContent(
+                    "Dirt Coverage",
+                    "Controls how full or sparse DirtDeposit is."));
+        }
+
+        private void DrawMaskStrength()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Mask Strength",
+                EditorStyles.boldLabel);
+
+            EditorGUILayout.HelpBox(
+                "These controls scale how strongly each accepted mask affects " +
+                "the final render. They do not move or reshape the masks. " +
+                "0 disables that mask's final-render contribution. 1 is the " +
+                "current default. 2 exaggerates it for tuning.",
+                MessageType.Info);
+
+            EditorGUILayout.PropertyField(
+                exposureResponse,
+                new GUIContent(
+                    "Exposure Strength",
+                    "Scales how strongly the Exposure mask affects normal final rendering."));
+            EditorGUILayout.PropertyField(
+                creviceResponse,
+                new GUIContent(
+                    "Crevice Strength",
+                    "Scales how strongly the CreviceBase mask affects normal final rendering."));
+            EditorGUILayout.PropertyField(
+                baseResponse,
+                new GUIContent(
+                    "Base / Contact Strength",
+                    "Scales how strongly the Base/contact mask affects normal final rendering."));
+            EditorGUILayout.PropertyField(
+                dirtDepositResponse,
+                new GUIContent(
+                    "Dirt Deposit Strength",
+                    "Scales how strongly the DirtDeposit mask affects normal final rendering."));
+        }
+
+        private void DrawMaskTinting()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Mask Tinting",
+                EditorStyles.boldLabel);
+
+            EditorGUILayout.HelpBox(
+                "Tint Strength = 0 keeps the response hue-neutral. Raise " +
+                "tint strength only when intentionally pushing a mask area " +
+                "toward a colour. Neutral grey requires tint strengths at 0 " +
+                "and controlled Lighting Tint Influence below.",
+                MessageType.Info);
+
+            EditorGUILayout.PropertyField(exposureTint);
+            EditorGUILayout.PropertyField(exposureTintStrength);
             EditorGUILayout.Space(2f);
-            EditorGUILayout.PropertyField(creaseAmount);
-            EditorGUILayout.PropertyField(creaseWidth);
-            EditorGUILayout.PropertyField(creaseLength);
-            EditorGUILayout.PropertyField(creaseBranching);
-            EditorGUILayout.PropertyField(creaseSoftness);
+            EditorGUILayout.PropertyField(creviceTint);
+            EditorGUILayout.PropertyField(creviceTintStrength);
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.PropertyField(
+                baseTint,
+                new GUIContent(
+                    "Base / Contact Tint",
+                    "Optional hue tint for Base/contact grounding."));
+            EditorGUILayout.PropertyField(
+                baseTintStrength,
+                new GUIContent(
+                    "Base / Contact Tint Strength",
+                    "How much Base / Contact Tint affects the final render. Default 0 means neutral grounding only."));
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.PropertyField(dirtDepositTint);
+            EditorGUILayout.PropertyField(dirtDepositTintStrength);
+        }
+
+        private void DrawRockColourAuthority()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Rock Colour Authority",
+                EditorStyles.boldLabel);
+
+            EditorGUILayout.HelpBox(
+                "Overall Rock Tint changes the rock's own colour identity " +
+                "before lighting. Lighting Tint Influence controls how " +
+                "strongly scene/local light colour can hue-shift the final " +
+                "PBR result. Lights still affect brightness, shadows, " +
+                "highlights and form.",
+                MessageType.Info);
+
+            EditorGUILayout.PropertyField(overallRockTint);
+            EditorGUILayout.PropertyField(overallRockTintStrength);
+            EditorGUILayout.PropertyField(lightingTintInfluence);
+
+            EditorGUILayout.HelpBox(
+                "Lighting Tint Influence: 0 = value-only lighting hue " +
+                "influence, 0.35 = default moderate scene-light colour " +
+                "influence, 1 = full RGB PBR light colour influence.",
+                MessageType.None);
+        }
+
+        private void DrawAdvancedDebugFeatureLines()
+        {
+            EditorGUILayout.Space(6f);
+            showAdvancedDebugFeatureLines = EditorGUILayout.Foldout(
+                showAdvancedDebugFeatureLines,
+                "Advanced Debug Feature Lines",
+                true);
+
+            if (!showAdvancedDebugFeatureLines)
+            {
+                return;
+            }
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox(
+                    "Debug-only raised overlay strips for validating " +
+                    "ConvexEdgeWear and ConcaveCrease masks. These are not " +
+                    "the final visible edge/crack rendering path.",
+                    MessageType.Info);
+
+                EditorGUILayout.PropertyField(
+                    surfaceFeatureVisibility,
+                    new GUIContent(
+                        "Feature Line Visibility",
+                        "Controls whether generated raised edge/crease overlay strips stay debug-only or can be visible during normal rendering."));
+
+                if (surfaceFeatureVisibility != null &&
+                    !surfaceFeatureVisibility.hasMultipleDifferentValues &&
+                    surfaceFeatureVisibility.enumValueIndex ==
+                    (int)StoneSurfaceFeatureVisibility.VisibleProfileResponse)
+                {
+                    EditorGUILayout.HelpBox(
+                        "VisibleProfileResponse makes raised overlay strips " +
+                        "visible during normal rendering. Current accepted " +
+                        "stone rendering keeps this DebugOnly unless " +
+                        "intentionally testing the old overlay response.",
+                        MessageType.Warning);
+                }
+
+                EditorGUILayout.Space(3f);
+                EditorGUILayout.LabelField(
+                    "Convex Edge Wear",
+                    EditorStyles.miniBoldLabel);
+                EditorGUILayout.PropertyField(edgeWearAmount);
+                EditorGUILayout.PropertyField(edgeWearWidth);
+                EditorGUILayout.PropertyField(edgeWearCoverage);
+                EditorGUILayout.PropertyField(edgeWearSoftness);
+
+                EditorGUILayout.Space(3f);
+                EditorGUILayout.LabelField(
+                    "Concave Crease",
+                    EditorStyles.miniBoldLabel);
+                EditorGUILayout.PropertyField(creaseAmount);
+                EditorGUILayout.PropertyField(creaseWidth);
+                EditorGUILayout.PropertyField(creaseLength);
+                EditorGUILayout.PropertyField(creaseBranching);
+                EditorGUILayout.PropertyField(creaseSoftness);
+            }
         }
 
         private void EnsureDefaultStoneMaterials()

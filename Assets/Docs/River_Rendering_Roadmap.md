@@ -311,10 +311,15 @@ Birth/source events create candidate material. After merge, source Amount is dis
 The current approved order is:
 
 1. `4.11C.5.5 — Temporal Morphing and Material Shape Evolution`
-2. `4.11C.5.6 — Organic Breakup and Edge Readability`
-3. `4.11C.5.7 — Topology Aging Proof and Calibration`
-4. `4.11C.5.8 — Controlled Lateral Drift and Obstacle Tangential Flow`
-5. `4.11C.5.9 — Obstacle Boundary Repair`
+2. `4.11C.5.6 — Surface-Coupled Foam Rendering`
+3. `4.11C.5.6b — Foam Surface Clarity Filter`
+4. `4.11C.5.7 — Surface-Driven Material Morphing`
+5. `4.11C.5.7b — Surface Morph Calibration`
+6. `4.11C.5.7c — Surface Morph Formula Rebalance`
+7. `4.11C.5.8 — Organic Breakup and Edge Readability`
+8. `4.11C.5.9 — Topology Aging Proof and Calibration`
+9. `4.11C.5.10 — Controlled Lateral Drift and Obstacle Tangential Flow`
+10. `4.11C.5.11 — Obstacle Boundary Repair`
 
 Do not continue to automatic birth population until manually-born material passes those gates.
 

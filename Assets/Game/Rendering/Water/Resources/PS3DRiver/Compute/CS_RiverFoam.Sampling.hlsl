@@ -184,6 +184,48 @@ float4 SampleStaticWakeBilinear(float2 uv)
 
 
 
+float4 SampleRippleBilinear(float2 uv)
+{
+    int2 baseCoordinate;
+    int2 nextCoordinate;
+    float2 blend;
+    ResolveExternalBilinearCoordinates(
+        _FoamRippleDimensions,
+        uv,
+        baseCoordinate,
+        nextCoordinate,
+        blend);
+    float4 a = _FoamRippleField.Load(int3(baseCoordinate, 0));
+    float4 b = _FoamRippleField.Load(
+        int3(nextCoordinate.x, baseCoordinate.y, 0));
+    float4 c = _FoamRippleField.Load(
+        int3(baseCoordinate.x, nextCoordinate.y, 0));
+    float4 d = _FoamRippleField.Load(int3(nextCoordinate, 0));
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+
+float4 SampleWakeBilinear(float2 uv)
+{
+    int2 baseCoordinate;
+    int2 nextCoordinate;
+    float2 blend;
+    ResolveExternalBilinearCoordinates(
+        _FoamWakeDimensions,
+        uv,
+        baseCoordinate,
+        nextCoordinate,
+        blend);
+    float4 a = _FoamWakeField.Load(int3(baseCoordinate, 0));
+    float4 b = _FoamWakeField.Load(
+        int3(nextCoordinate.x, baseCoordinate.y, 0));
+    float4 c = _FoamWakeField.Load(
+        int3(baseCoordinate.x, nextCoordinate.y, 0));
+    float4 d = _FoamWakeField.Load(int3(nextCoordinate, 0));
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+
 float4 SampleStaticPressureBilinear(float2 uv)
 {
     int2 baseCoordinate;

@@ -22,11 +22,14 @@ Accepted or mostly accepted foundations:
 - the 5.4m realignment removes active pattern/complexity/density birth controls, restores one canonical stable manual source, and keeps those controls in a dedicated Inspector foldout;
 - the 5.5 material-evolution pass adds the first persistent `Presence` morphing layer; 5.5c restores lifecycle authority after the initial erosion attempt shortened Foam life incorrectly; 5.5d changes morphing to area-balanced intrinsic wobble so deformation does not continually grow the footprint;
 - 5.5d intrinsic runtime morphology is accepted as good enough for now;
-- 5.6 adds render-only surface coupling so Final Foam responds to existing macro waves, static pressure, lee/depression, ripples, disturbance gradients, and wake energy without changing stored material state.
+- 5.6 adds render-only surface coupling so Final Foam responds to existing macro waves, static pressure, lee/depression, ripples, disturbance gradients, and wake energy without changing stored material state;
+- 5.6b adds Foam interior clarity filtering so fine water-surface variation does not make the body noisy, while strong surface features can still imprint at reduced strength;
+- 5.7 adds stored-state surface-driven material morphing: existing ripple, wake, static pressure, and lee fields can amplify or bias persistent `Material Presence` morphology, without changing birth or lifecycle authority;
+- 5.7b adds a `Surface Morph Strength` calibration control so the stored-state response can be A/B tested at `0` and strengthened without changing lifecycle authority;
+- 5.7c rebalances the internal surface-response formula so `1` is a normal readable authored effect, `2` is strong, and `3+` becomes stress-test territory instead of merely compensating for an undertuned curve.
 
 Still not accepted:
 
-- surface-coupled Final Foam needs validation against Material Presence and Disturbance Debug;
 - organic breakup is not proven;
 - topology interaction needs final proof and calibration;
 - lateral drift/obstacle sliding is not implemented;
@@ -71,7 +74,7 @@ A source creates candidate material. Once merged into persistent state, source a
 
 Rendering answers: `how does existing material look this frame?`
 
-The final shader owns micro breakup, crisp stylized thresholds, edge detail, presentation polish, and render-only coupling to the already-evaluated river surface. It may bend, thin, stretch, or edge-modulate the Final Foam mask using macro waves, static pressure, lee/depression, ripples, disturbance gradients, and wake energy. It must not change `Material Presence`, Remaining Life, birth/population, or lifecycle authority, and it must not conceal invalid state behavior.
+The final shader owns micro breakup, crisp stylized thresholds, edge detail, presentation polish, Foam interior clarity, and render-only coupling to the already-evaluated river surface. It may bend, thin, stretch, or edge-modulate the Final Foam mask using macro waves, static pressure, lee/depression, ripples, disturbance gradients, and wake energy. It should suppress ordinary high-frequency water variation inside solid Foam so the material remains clean and white, while allowing strong surface features to show through at reduced strength. It must not change `Material Presence`, Remaining Life, birth/population, or lifecycle authority, and it must not conceal invalid state behavior.
 
 ## Canonical persistent material contract
 
@@ -167,7 +170,7 @@ Persistent material movement is downstream river-space transport plus approved d
 - no material guidance field resurrected from old experiments;
 - no hidden spread/reinforcement layer.
 
-Material simulation now owns intrinsic macro/meso deformation. The first 5.5 pass was too conservative; 5.5b strengthened stored-state deformation so a material body can bend, stretch, and locally widen/narrow. 5.5c repairs lifecycle authority: morphing may not erase material before `Remaining Life` expires. 5.5d makes intrinsic wobble area-balanced by using opposed normalized material samples instead of a max/current union, so patches can bulge, compress, and relax without continual footprint growth. 5.6 adds the first river-surface coupling at render time only: Final Foam samples the same water-surface influences used by the river shader, while Material Presence remains the unwarped stored field. Lifecycle-safe stored fragmentation, stored-state disturbance coupling, lateral drift, and obstacle tangential sliding remain separate explicit, budgeted work.
+Material simulation now owns intrinsic macro/meso deformation. The first 5.5 pass was too conservative; 5.5b strengthened stored-state deformation so a material body can bend, stretch, and locally widen/narrow. 5.5c repairs lifecycle authority: morphing may not erase material before `Remaining Life` expires. 5.5d makes intrinsic wobble area-balanced by using opposed normalized material samples instead of a max/current union, so patches can bulge, compress, and relax without continual footprint growth. 5.6/5.6b add river-surface coupling at render time only: Final Foam samples the same water-surface influences used by the river shader, and Foam interiors are clarity-filtered so fine water detail does not dominate the white body. 5.7 keeps that render path separate while also sampling the same ripple, wake, static pressure, and lee fields inside the persistent material simulation. Those fields only amplify/bias the existing area-balanced morphology; they do not spawn Foam, shorten `Remaining Life`, or become topology steering. 5.7b keeps the same boundary but adds an explicit `Surface Morph Strength` control: `0` disables stored-state surface response for A/B testing. 5.7c recalibrates the formula itself rather than hiding a larger multiplier behind the control: `1` is now intended to be the normal readable authored response, `2` should read strong, and `3+` is overdrive/stress-test behavior. Lifecycle-safe stored fragmentation, lateral drift, and obstacle tangential sliding remain separate explicit, budgeted work.
 
 ## Manual birth phase
 
@@ -237,6 +240,7 @@ Do not add these while the active blockers remain unresolved:
 - restored guidance fields or shore suction;
 - disturbance coupling hidden inside unrelated morphology work;
 - replacing intrinsic Foam morphology with water-surface coupling rather than layering them;
+- letting ordinary granular water-surface variation dirty the Foam interior;
 - final beauty-only rendering polish;
 - broad Inspector expansion.
 

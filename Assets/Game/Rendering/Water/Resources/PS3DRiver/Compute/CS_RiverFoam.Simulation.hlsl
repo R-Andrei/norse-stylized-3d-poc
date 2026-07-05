@@ -140,13 +140,124 @@ float FoamResolveNeighbourExposure(int2 coordinate, float currentPresence)
     return saturate(exposedByGradient + emptyNeighbourRatio * 0.55);
 }
 
+struct FoamSurfaceMorphInfluence
+{
+    float agitation;
+    float downstreamBias;
+    float lateralBias;
+    float edgeBoost;
+    float strength;
+};
+
+FoamSurfaceMorphInfluence FoamResolveSurfaceMorphInfluence(
+    float2 surfaceUv,
+    FoamMaterialTopologySample materialTopology,
+    float edgeExposure)
+{
+    FoamSurfaceMorphInfluence influence;
+    influence.agitation = 0.0;
+    influence.downstreamBias = 0.0;
+    influence.lateralBias = 0.0;
+    influence.edgeBoost = 0.0;
+    influence.strength = clamp(_FoamSurfaceMorphStrength, 0.0, 5.0);
+
+    if (_FoamDisturbanceEnabled <= 0.5 || influence.strength <= 0.0001)
+    {
+        return influence;
+    }
+
+    float4 ripple = SampleRippleBilinear(surfaceUv);
+    float4 wake = SampleWakeBilinear(surfaceUv);
+    float4 staticWake = SampleStaticWakeBilinear(surfaceUv);
+    float4 staticPressure = SampleStaticPressureBilinear(surfaceUv);
+
+    float2 rippleGradient = ripple.ba;
+    float2 wakeGradient = wake.ba;
+    float2 pressureGradient = staticPressure.gb;
+
+    // 5.7b proved the coupling path works, but the response was still too
+    // timid: a value of 5 read more like a merely strong authored effect than
+    // an overdriven stress test. This curve treats 1 as the normal readable
+    // authored response. It lifts low/mid disturbance values, favours wake/lee
+    // and pressure gradients, then clamps the result so debug-strength fields
+    // cannot fling stored material across the simulation or paint new Foam.
+    float rippleAgitation = saturate(
+        abs(ripple.r) * 3.20 +
+        abs(ripple.g) * 0.56 +
+        length(rippleGradient) * 0.46);
+    float wakeAgitation = saturate(
+        wake.r * 0.78 +
+        length(wakeGradient) * 0.72 +
+        wake.g * 0.28);
+    float pressureAgitation = saturate(
+        abs(staticPressure.r) * 1.70 +
+        length(pressureGradient) * 0.56);
+    float leeAgitation = saturate(
+        staticWake.g * 1.35 +
+        staticWake.r * 0.34 +
+        staticWake.b * 0.12);
+
+    float topologyContact = saturate(
+        materialTopology.pressureSupport * 0.34 +
+        materialTopology.leeSupport * 0.38 +
+        materialTopology.shoreSupport * 0.14);
+
+    float rawAgitation = saturate(
+        rippleAgitation * 0.36 +
+        wakeAgitation * 0.42 +
+        pressureAgitation * 0.34 +
+        leeAgitation * 0.46 +
+        topologyContact * 0.10);
+
+    float activeStrength = saturate(influence.strength);
+    float overdrive = max(0.0, influence.strength - 1.0);
+    float overdrive01 = saturate(overdrive * 0.50);
+    float midLift = 1.0 - (1.0 - rawAgitation) * (1.0 - rawAgitation);
+    float perceptualAgitation = sqrt(max(0.0, rawAgitation));
+    float readableAgitation = lerp(
+        midLift,
+        perceptualAgitation,
+        0.42 + overdrive01 * 0.20);
+    influence.agitation = saturate(
+        readableAgitation * activeStrength *
+        (1.0 + overdrive * 0.40));
+
+    // Surface gradients bias the already area-balanced wobble, not net
+    // transport. Low/mid gradients are shaped upward so Material Presence shows
+    // visible edge motion near wakes, lee depressions, and pressure ridges at
+    // strength 1.0, while the final clamps keep overdrive values bounded.
+    float biasGain = activeStrength * (1.0 + overdrive * 0.34);
+    float2 combinedGradient = clamp(
+        (rippleGradient * 0.40 +
+         wakeGradient * 0.72 +
+         pressureGradient * 0.58) * biasGain,
+        float2(-1.0, -1.0),
+        float2(1.0, 1.0));
+
+    float2 shapedGradient = sign(combinedGradient) *
+        sqrt(abs(combinedGradient));
+    combinedGradient = lerp(
+        combinedGradient,
+        shapedGradient,
+        0.46 + overdrive01 * 0.20);
+
+    influence.downstreamBias = clamp(combinedGradient.x, -0.96, 0.96);
+    influence.lateralBias = clamp(combinedGradient.y, -1.0, 1.0);
+    float edgeFocus = smoothstep(0.04, 0.72, edgeExposure);
+    influence.edgeBoost = saturate(
+        influence.agitation * lerp(0.54, 1.12, edgeFocus) *
+        (1.0 + overdrive * 0.18));
+    return influence;
+}
+
 float2 FoamResolveAreaBalancedWobbleCells(
     int2 coordinate,
     float2 physicalPosition,
     float materialPattern,
     float edgeExposure,
     float support,
-    float negative)
+    float negative,
+    FoamSurfaceMorphInfluence surfaceInfluence)
 {
     float2 cellPosition = float2(coordinate);
     float patternSeed =
@@ -185,22 +296,35 @@ float2 FoamResolveAreaBalancedWobbleCells(
         cellPosition.y * 0.087 +
         materialPattern * 4.71);
 
+    float surfaceAgitation = surfaceInfluence.agitation;
+    float surfaceCalibration = saturate(
+        surfaceAgitation * (0.62 + surfaceInfluence.strength * 0.12));
     float mobility =
         lerp(0.78, 1.55, edgeExposure) *
         lerp(1.0, 1.28, negative) *
-        lerp(1.0, 0.76, support);
+        lerp(1.0, 0.76, support) *
+        lerp(1.0, lerp(1.54, 2.18, surfaceCalibration),
+            surfaceAgitation);
 
     // The two axes use different phase mixtures so a strip alternates between
-    // bowing, relaxing, and bowing the other way. These offsets are sampled as
-    // paired/opposed gathers below, which keeps average area stable.
+    // bowing, relaxing, and bowing the other way. Surface data does not replace
+    // this intrinsic zero-mean wobble; it makes disturbed edges more mobile and
+    // pushes the balanced sample direction toward local ripple/wake/pressure
+    // slopes. Strength 1 is now intentionally readable instead of merely subtle.
     float lateralCells =
-        (broadA * 0.82 + waveA * 0.66 + detail * 0.22) * mobility;
+        (broadA * 0.82 + waveA * 0.66 + detail * 0.22) * mobility +
+        surfaceInfluence.lateralBias *
+        (0.26 + surfaceAgitation * lerp(0.78, 1.32, surfaceCalibration));
     float longitudinalCells =
-        (broadB * 0.58 - waveB * 0.42 + broadA * 0.18) * mobility;
+        (broadB * 0.58 - waveB * 0.42 + broadA * 0.18) * mobility +
+        surfaceInfluence.downstreamBias *
+        (0.20 + surfaceAgitation * lerp(0.58, 1.04, surfaceCalibration));
 
     return float2(
-        clamp(longitudinalCells, -1.45, 1.45),
-        clamp(lateralCells, -2.10, 2.10));
+        clamp(longitudinalCells, -lerp(1.70, 3.10, surfaceCalibration),
+            lerp(1.70, 3.10, surfaceCalibration)),
+        clamp(lateralCells, -lerp(2.45, 4.05, surfaceCalibration),
+            lerp(2.45, 4.05, surfaceCalibration)));
 }
 
 float4 FoamApplyPersistentMaterialMorph(
@@ -208,6 +332,7 @@ float4 FoamApplyPersistentMaterialMorph(
     int2 coordinate,
     float2 physicalPosition,
     float2 physicalCellSpacing,
+    float2 surfaceUv,
     FoamMaterialTopologySample materialTopology,
     float validFluid)
 {
@@ -225,6 +350,11 @@ float4 FoamApplyPersistentMaterialMorph(
     float edgeExposure = FoamResolveNeighbourExposure(
         coordinate,
         currentState.presence);
+    FoamSurfaceMorphInfluence surfaceInfluence =
+        FoamResolveSurfaceMorphInfluence(
+            surfaceUv,
+            materialTopology,
+            edgeExposure);
 
     float2 macroCells = FoamResolveAreaBalancedWobbleCells(
         coordinate,
@@ -232,14 +362,20 @@ float4 FoamApplyPersistentMaterialMorph(
         currentState.materialPattern,
         edgeExposure,
         support,
-        negative);
+        negative,
+        surfaceInfluence);
 
     float2 currentPixel = float2(coordinate);
     float2 primaryOffset = macroCells;
-    float2 counterOffset = -macroCells * lerp(0.58, 0.82, edgeExposure);
+    float counterBalance = lerp(
+        0.58,
+        0.82 + surfaceInfluence.edgeBoost * 0.10,
+        edgeExposure);
+    float2 counterOffset = -macroCells * counterBalance;
+    float crossScale = lerp(1.0, 1.18, surfaceInfluence.agitation);
     float2 crossOffset = float2(
-        -macroCells.y * 0.26,
-        macroCells.x * 0.42);
+        -macroCells.y * 0.26 * crossScale,
+        macroCells.x * 0.42 * crossScale);
 
     float4 primaryPacked = FoamSamplePackedMaterialBilinear(
         currentPixel - primaryOffset);
@@ -261,18 +397,30 @@ float4 FoamApplyPersistentMaterialMorph(
 
     float activity = smoothstep(0.01, 0.16, nearbyPresence);
     float materialAge = saturate(1.0 - currentState.remainingLife);
+    float surfaceCalibration = saturate(
+        surfaceInfluence.agitation *
+        (0.58 + surfaceInfluence.edgeBoost * 0.36));
     float mobility =
         lerp(0.86, 1.34, edgeExposure) *
         lerp(0.96, 1.14, materialAge) *
         lerp(1.0, 1.18, negative) *
-        lerp(1.0, 0.84, support);
+        lerp(1.0, 0.84, support) *
+        lerp(1.0, lerp(1.42, 2.08, surfaceCalibration),
+            surfaceInfluence.agitation) *
+        lerp(1.0, lerp(1.24, 1.72, surfaceCalibration),
+            surfaceInfluence.edgeBoost);
 
     // Area-balanced wobble: use opposed samples and normalized weights. Unlike
     // the 5.5c lifecycle repair, this is not a max/current union; material can
     // locally move away from a cell while another nearby cell gains it. That
     // produces visible back-and-forth body motion without making Presence an
     // independent death authority or an ever-growing smear.
-    float morphWeight = saturate(_FoamDeltaTime * 5.65 * activity * mobility);
+    float surfaceRate = lerp(
+        5.65,
+        7.35,
+        surfaceInfluence.agitation *
+        (0.45 + surfaceCalibration * 0.55));
+    float morphWeight = saturate(surfaceRate * _FoamDeltaTime * activity * mobility);
     float currentWeight = 1.0 - morphWeight;
     float primaryWeight = morphWeight * 0.46;
     float counterWeight = morphWeight * 0.34;

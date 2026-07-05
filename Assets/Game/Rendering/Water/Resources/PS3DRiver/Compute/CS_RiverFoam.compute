@@ -1325,6 +1325,9 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         worldSampleCoordinate.y /
             max(1.0, (float)_FoamDimensions.y) *
             (float)_FoamTopologyDimensions.y);
+    float2 surfaceSampleUv = saturate(
+        (worldSampleCoordinate + float2(0.5, 0.5)) /
+        max(float2(1.0, 1.0), (float2)_FoamDimensions));
 
     float4 topologyState = SampleTopologyBilinear(topologySampleCoordinate);
     float4 anchoredSources = SampleTopologySourcesBilinear(
@@ -1343,6 +1346,7 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         coordinate,
         physicalPosition,
         physicalCellSpacing,
+        surfaceSampleUv,
         materialTopology,
         validFluid);
     FoamMaterialState material = FoamDecodeMaterialState(morphedPacked);

@@ -23,8 +23,10 @@ Current visual/lifecycle state after 5.5b/5.5c/5.5d:
 - 5.5d changes the deformation from a current-preserving union into an area-balanced intrinsic wobble so Foam can bend back and forth without monotonic footprint growth;
 - intrinsic runtime morphology is accepted as good enough for now;
 - 5.6 adds render-only coupling between Final Foam and the existing river surface layer: macro waves, static pressure, lee/depression, ripples, disturbance gradients, and wake energy;
+- 5.6b filters Foam interior lighting so ordinary granular water-surface variation does not dirty the clean white stylized Foam body, while strong surface features can still show through at reduced strength;
+- stored-state disturbance/surface coupling is still pending: waves/pressure/lee/ripples should later amplify material morphing, not only render-space masking;
 - organic breakup is still too weak or blurry;
-- topology interaction, lateral drift, stored-state disturbance coupling, and obstacle behavior are not yet proven.
+- topology interaction, lateral drift, and obstacle behavior are not yet proven.
 
 ## Hard rules for the next patches
 
@@ -44,7 +46,7 @@ Do not let birth-time randomness decide whether a source becomes a chip, slug, s
 
 Do not proceed to automatic population until manually-born material can move, morph, age, and interact correctly.
 
-Keep the layer split explicit: birth creates stable source material; persistent material simulation owns macro/meso reconfiguration, but must not shorten lifespan outside the Remaining Life equation; the final shader owns micro breakup, crisp presentation, and render-only water-surface coupling. Surface coupling may warp/thin/stretch the Final Foam mask near existing material, but it must not change `Material Presence`, Remaining Life, or Foam population.
+Keep the layer split explicit: birth creates stable source material; persistent material simulation owns macro/meso reconfiguration, but must not shorten lifespan outside the Remaining Life equation; the final shader owns micro breakup, crisp presentation, Foam interior clarity, and render-only water-surface coupling. Render coupling may warp/thin/stretch the Final Foam mask near existing material, but it must not change `Material Presence`, Remaining Life, or Foam population. Ordinary high-frequency water detail should be suppressed on Foam interiors; strong waves/wakes/disturbances may imprint at reduced strength.
 
 ## Completed precondition — Manual source realignment
 
@@ -125,27 +127,39 @@ This is persistent material-simulation behavior, not topology and not final shad
 
 A manually-born patch observed over several seconds changes `Material Presence`, not only Final Foam. It should show clear macro change: altered curvature, different width distribution, local stretch/compression, and visible back-and-forth wobble/relaxation. The average occupied area should remain roughly stable before lifecycle/topology removal. It must not grow without bounds, snap, create new topology-painted material, or disappear independently of `Remaining Life`. This blocker is accepted as good enough for now after 5.5d.
 
-## Blocker 2 — Final Foam not coupled to river surface
+## Blocker 2 — Final Foam surface coupling and clarity
 
 ### Symptom
 
-Material Presence now morphs acceptably, but Final Foam can still read as a flat white layer sliding over the water instead of material riding waves, pressure ridges, lee depressions, ripples, and wake energy.
+Material Presence now morphs acceptably, but Final Foam can still read as a flat white layer sliding over the water. After first surface coupling, the opposite problem also appears: fine water-surface/noise variation can contaminate the Foam interior and make the clean stylized white body look too granular.
 
 ### Why it matters
 
-The reference reads as surface film attached to moving water. Intrinsic Foam morphology is necessary, but the rendered mask also needs to inherit the already-built river surface deformation layer.
+The reference reads as pale surface film attached to moving water, not paper floating over it and not noisy water texture painted on top of Foam. Intrinsic Foam morphology is necessary, but the final mask also needs controlled coupling to waves, pressure ridges, lee depressions, ripples, and wake energy.
 
 ### Correct behavior
 
-Final Foam may be visually warped, stretched, compressed, or edge-modulated by macro waves, static pressure, lee/depression, ripple gradients, disturbance velocity, and transported wake energy. `Material Presence` must remain unwarped stored material, and no new Foam may be created by surface coupling.
+Final Foam may be visually warped, stretched, compressed, or edge-modulated by macro waves, static pressure, lee/depression, ripple gradients, disturbance velocity, and transported wake energy. Foam interiors should remain clean and mostly white: ordinary high-frequency water detail is suppressed, while strong surface peaks/valleys may show through at reduced strength. Render coupling itself must not create Foam or change lifecycle state; stored-state surface coupling is limited to the approved 5.7 morphology input.
 
-### Implemented target
+### Implemented targets
 
 `4.11C.5.6 — Surface-Coupled Foam Rendering`
 
+`4.11C.5.6b — Foam Surface Clarity Filter`
+
+`4.11C.5.7 — Surface-Driven Material Morphing`
+
+`4.11C.5.7b — Surface Morph Calibration`
+
+`4.11C.5.7c — Surface Morph Formula Rebalance`
+
 ### Acceptance gate
 
-In Final Foam view, existing Foam visibly reacts to the same surface disturbances that move/shape the water. In Material Presence view, stored material remains governed by intrinsic morphology and lifecycle. Disabling disturbance/wave influence should remove the extra render coupling without changing Foam lifetime or population.
+In Final Foam view, existing Foam visibly reacts to the same surface disturbances that move/shape the water while the body remains stylistically clean. In Material Presence view, stored material should show approved 5.7 surface-amplified morphology, but lifetime and population must remain unchanged. `Surface Morph Strength = 0` should remove the stored-state surface response. After 5.7c, `1` should be the normal readable authored response, `2` should read strong, and `3+` should be treated as overdrive/stress-test behavior rather than the expected operating point.
+
+### Follow-up
+
+5.7 now samples the same river surface/disturbance fields in the persistent material simulation and uses them only as a bounded morphology-strength/bias input. 5.7b adds a single calibration control for A/B testing. 5.7c rebalances the internal response curve so mid-strength disturbance values become visually meaningful at strength `1` while overdrive remains clamped. It must remain separate from birth, topology painting, and lifecycle authority.
 
 ## Blocker 3 — Too blurry / weak organic breakup
 
@@ -167,7 +181,7 @@ Foam should have crisp enough edges, controlled raggedness, visible dark-water p
 
 ### Next patch target
 
-`4.11C.5.7 — Organic Breakup and Edge Readability`
+`4.11C.5.8 — Organic Breakup and Edge Readability`
 
 ### Acceptance gate
 
@@ -193,7 +207,7 @@ Foam in positive support should survive and remain more coherent. Foam in negati
 
 ### Next patch target
 
-`4.11C.5.8 — Topology Aging Proof and Calibration`
+`4.11C.5.9 — Topology Aging Proof and Calibration`
 
 ### Acceptance gate
 
@@ -219,7 +233,7 @@ Foam should remain net-downstream but may drift laterally and slide tangentially
 
 ### Next patch target
 
-`4.11C.5.9 — Controlled Lateral Drift and Obstacle Tangential Flow`
+`4.11C.5.10 — Controlled Lateral Drift and Obstacle Tangential Flow`
 
 ### Acceptance gate
 
@@ -245,7 +259,7 @@ Obstacle footprint remains solid exclusion, but material near it should be split
 
 ### Next patch target
 
-`4.11C.5.10 — Obstacle Boundary Repair`
+`4.11C.5.11 — Obstacle Boundary Repair`
 
 ### Acceptance gate
 
@@ -253,12 +267,11 @@ Foam contacting obstacle footprint no longer produces dominant hard rectangular/
 
 ## Recommended sequence
 
-1. Validate `4.11C.5.6 — Surface-Coupled Foam Rendering` in Final Foam, Material Presence, Disturbance Debug, and Foam + Aging Topology views.
-2. `4.11C.5.7 — Organic Breakup and Edge Readability`
-3. `4.11C.5.8 — Topology Aging Proof and Calibration`
-4. `4.11C.5.9 — Controlled Lateral Drift and Obstacle Tangential Flow`
-5. `4.11C.5.10 — Obstacle Boundary Repair`
-6. Later dedicated stored-state disturbance coupling, after render coupling is proven.
+1. Validate `4.11C.5.7c — Surface Morph Formula Rebalance` in Material Presence, Final Foam, Disturbance Debug, and Foam + Aging Topology views.
+2. `4.11C.5.8 — Organic Breakup and Edge Readability`
+3. `4.11C.5.9 — Topology Aging Proof and Calibration`
+4. `4.11C.5.10 — Controlled Lateral Drift and Obstacle Tangential Flow`
+5. `4.11C.5.11 — Obstacle Boundary Repair`
 
 Only after these pass should the project continue to automatic anchored/open-water birth population.
 
@@ -269,7 +282,6 @@ Deferred until manual material is accepted:
 - anchored automatic birth events;
 - open-water birth scheduling;
 - spatial fairness/population control;
-- stored-state coupling to river waves/static pressure/lee/ripples/disturbance fields;
 - mature Foam rendering polish;
 - final reference-matching pass;
 - production performance/regression closure.

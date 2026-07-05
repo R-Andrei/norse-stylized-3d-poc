@@ -35,6 +35,12 @@ Material:
     - _StoneCreaseResponse: 0.85
     - _StoneEdgeWearResponse: 0.28
     - _StoneDirtResponse: 1.00
+    - _GeneratedMassDirtDepositTintStrength: 0
+    - _GeneratedMassBaseTintStrength: 0
+    - _GeneratedMassCreviceTintStrength: 0
+    - _GeneratedMassExposureTintStrength: 0
+    - _GeneratedMassLightingTintInfluence: 0.35
+    - _GeneratedMassOverallRockTintStrength: 0
     - _CreviceDarkenStrength: 0.052
     - _Cull: 2
     - _DiffuseWrap: 0.18
@@ -77,6 +83,11 @@ Material:
     - _FrostColor: {r: 0.52, g: 0.6, b: 0.62, a: 1}
     - _StoneCreaseTint: {r: 0.045, g: 0.045, b: 0.04, a: 1}
     - _StoneEdgeWearTint: {r: 0.46, g: 0.48, b: 0.45, a: 1}
-    - _StoneDirtTint: {r: 0.2, g: 0.28, b: 0.205, a: 1}
+    - _GeneratedMassExposureTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _GeneratedMassCreviceTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _GeneratedMassBaseTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _GeneratedMassDirtDepositTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _GeneratedMassOverallRockTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _StoneDirtTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

@@ -346,6 +346,7 @@ struct RiverWaterFoamResult
     float presence;
     float remainingLife;
     float mask;
+    float surfaceEnergy;
     float2 fieldUV;
 };
 
@@ -368,6 +369,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     result.presence = 0.0;
     result.remainingLife = 0.0;
     result.mask = 0.0;
+    result.surfaceEnergy = 0.0;
     result.fieldUV = 0.0;
 
     if (enabled < 0.5 || fieldLength <= 0.0001)
@@ -560,7 +562,48 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     coupledMask *= liquidFactor;
 
     result.mask = saturate(coupledMask);
+    result.surfaceEnergy = surfaceEnergy;
     return result;
+}
+
+float3 RiverWaterResolveFoamInteriorLighting(
+    float3 lighting,
+    float foamMask,
+    float surfaceEnergy,
+    float minimumNightVisibility)
+{
+    float3 safeLighting = max(
+        float3(
+            minimumNightVisibility,
+            minimumNightVisibility,
+            minimumNightVisibility),
+        lighting);
+
+    // Foam is a clean stylized surface film, not bare water. The water normal
+    // and small detail noise may influence the edge, but the interior should
+    // not inherit every granular peak/valley from the liquid shader. Strong
+    // waves/wakes/disturbances are still allowed to show through at a reduced
+    // strength so Foam does not look detached from the river.
+    float luminance = dot(
+        safeLighting,
+        float3(0.2126, 0.7152, 0.0722));
+    float3 flatLighting = lerp(
+        float3(1.0, 1.0, 1.0),
+        float3(max(minimumNightVisibility, luminance), max(minimumNightVisibility, luminance), max(minimumNightVisibility, luminance)),
+        0.20);
+
+    float interior = smoothstep(0.42, 0.82, saturate(foamMask));
+    float strongSurfaceFeature = smoothstep(0.32, 0.78, saturate(surfaceEnergy));
+    float detailAllowance = lerp(0.10, 0.34, strongSurfaceFeature);
+    float3 filteredInteriorLighting = lerp(
+        flatLighting,
+        safeLighting,
+        detailAllowance);
+
+    return lerp(
+        safeLighting,
+        filteredInteriorLighting,
+        interior);
 }
 
 float3 RiverWaterResolveFoamColour(
@@ -575,6 +618,22 @@ float3 RiverWaterResolveFoamColour(
             minimumNightVisibility),
         lighting);
     return max(0.0, foamColour * lit);
+}
+
+float3 RiverWaterResolveFoamColourFiltered(
+    float3 foamColour,
+    float3 lighting,
+    float foamMask,
+    float surfaceEnergy,
+    float minimumNightVisibility)
+{
+    return max(
+        0.0,
+        foamColour * RiverWaterResolveFoamInteriorLighting(
+            lighting,
+            foamMask,
+            surfaceEnergy,
+            minimumNightVisibility));
 }
 
 #endif

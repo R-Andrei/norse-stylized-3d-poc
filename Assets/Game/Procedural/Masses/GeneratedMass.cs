@@ -364,6 +364,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Shader.PropertyToID("_GeneratedMassBaseResponse");
         private static readonly int GeneratedMassDirtDepositResponseId =
             Shader.PropertyToID("_GeneratedMassDirtDepositResponse");
+        private static readonly int GeneratedMassExposureTintId =
+            Shader.PropertyToID("_GeneratedMassExposureTint");
+        private static readonly int GeneratedMassExposureTintStrengthId =
+            Shader.PropertyToID("_GeneratedMassExposureTintStrength");
+        private static readonly int GeneratedMassCreviceTintId =
+            Shader.PropertyToID("_GeneratedMassCreviceTint");
+        private static readonly int GeneratedMassCreviceTintStrengthId =
+            Shader.PropertyToID("_GeneratedMassCreviceTintStrength");
+        private static readonly int GeneratedMassBaseTintId =
+            Shader.PropertyToID("_GeneratedMassBaseTint");
+        private static readonly int GeneratedMassBaseTintStrengthId =
+            Shader.PropertyToID("_GeneratedMassBaseTintStrength");
+        private static readonly int GeneratedMassDirtDepositTintId =
+            Shader.PropertyToID("_GeneratedMassDirtDepositTint");
+        private static readonly int GeneratedMassDirtDepositTintStrengthId =
+            Shader.PropertyToID("_GeneratedMassDirtDepositTintStrength");
+        private static readonly int GeneratedMassOverallRockTintId =
+            Shader.PropertyToID("_GeneratedMassOverallRockTint");
+        private static readonly int GeneratedMassOverallRockTintStrengthId =
+            Shader.PropertyToID("_GeneratedMassOverallRockTintStrength");
+        private static readonly int GeneratedMassLightingTintInfluenceId =
+            Shader.PropertyToID("_GeneratedMassLightingTintInfluence");
         private static readonly int GeneratedMassFeatureOverlayKindId =
             Shader.PropertyToID("_GeneratedMassFeatureOverlayKind");
         private static readonly int GeneratedMassEdgeWearCoverageId =
@@ -383,7 +405,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private bool regenerateOnValidate = true;
 
-        [Header("Rendering")]
         [Tooltip("Chooses a named HLSL stone material profile for this generated mass. Renderer Material leaves the current renderer material untouched.")]
         [SerializeField]
         private StoneSurfaceProfile stoneSurfaceProfile =
@@ -399,7 +420,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private StoneSurfaceMaskDebug surfaceMaskDebug =
             StoneSurfaceMaskDebug.None;
 
-        [Header("Surface Mask Tuning")]
         [Tooltip("Moves the generated lower/contact mask origin upward in normalized local height. Useful for flat slabs or rocks that are intentionally embedded below ground.")]
         [Range(0f, 0.2f)]
         [SerializeField]
@@ -450,7 +470,56 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float dirtDepositResponse = 1f;
 
-        [Header("Surface Feature Lines")]
+        [Tooltip("Optional hue tint for exposed/generated upper surfaces. Tint Strength at 0 keeps neutral greys neutral.")]
+        [SerializeField]
+        private Color exposureTint = new Color(0.72f, 0.76f, 0.78f, 1f);
+
+        [Tooltip("How much Exposure Tint affects the final render. Default 0 means no hue shift.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float exposureTintStrength;
+
+        [Tooltip("Optional hue tint for CreviceBase. Tint Strength at 0 keeps crevice as neutral depth/shadow.")]
+        [SerializeField]
+        private Color creviceTint = new Color(0.5f, 0.5f, 0.5f, 1f);
+
+        [Tooltip("How much Crevice Tint affects the final render. Default 0 means neutral darkening only.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float creviceTintStrength;
+
+        [Tooltip("Optional hue tint for Base/contact grounding. Tint Strength at 0 keeps base response neutral.")]
+        [SerializeField]
+        private Color baseTint = new Color(0.5f, 0.5f, 0.5f, 1f);
+
+        [Tooltip("How much Base Tint affects the final render. Default 0 means neutral grounding only.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float baseTintStrength;
+
+        [Tooltip("Optional hue tint for DirtDeposit. Tint Strength at 0 keeps dirt/deposit response neutral.")]
+        [SerializeField]
+        private Color dirtDepositTint = new Color(0.42f, 0.40f, 0.36f, 1f);
+
+        [Tooltip("How much Dirt Deposit Tint affects the final render. Default 0 means no brown/red/green hue shift.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float dirtDepositTintStrength;
+
+        [Tooltip("Optional object-level colour identity for the rock. Tint Strength at 0 keeps the chosen Base Color authoritative.")]
+        [SerializeField]
+        private Color overallRockTint = new Color(0.5f, 0.5f, 0.5f, 1f);
+
+        [Tooltip("How much Overall Rock Tint affects the post-mask albedo before lighting. Default 0 preserves neutral Base Color.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float overallRockTintStrength;
+
+        [Tooltip("How much RGB colour from URP/PBR lighting is allowed to tint the rock. 0 keeps only light brightness/shadow value, 1 keeps full PBR light colour. Default allows moderate light tint without letting it dominate neutral grey.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float lightingTintInfluence = 0.35f;
+
         [Tooltip("Controls whether generated edge/crease overlay strips are debug-only or visible during normal rendering as profile-specific stone material response.")]
         [SerializeField]
         private StoneSurfaceFeatureVisibility surfaceFeatureVisibility =
@@ -895,6 +964,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             materialProperties.SetFloat(
                 GeneratedMassDirtDepositResponseId,
                 Mathf.Clamp(dirtDepositResponse, 0f, 2f));
+            materialProperties.SetColor(
+                GeneratedMassExposureTintId,
+                exposureTint);
+            materialProperties.SetFloat(
+                GeneratedMassExposureTintStrengthId,
+                Mathf.Clamp01(exposureTintStrength));
+            materialProperties.SetColor(
+                GeneratedMassCreviceTintId,
+                creviceTint);
+            materialProperties.SetFloat(
+                GeneratedMassCreviceTintStrengthId,
+                Mathf.Clamp01(creviceTintStrength));
+            materialProperties.SetColor(
+                GeneratedMassBaseTintId,
+                baseTint);
+            materialProperties.SetFloat(
+                GeneratedMassBaseTintStrengthId,
+                Mathf.Clamp01(baseTintStrength));
+            materialProperties.SetColor(
+                GeneratedMassDirtDepositTintId,
+                dirtDepositTint);
+            materialProperties.SetFloat(
+                GeneratedMassDirtDepositTintStrengthId,
+                Mathf.Clamp01(dirtDepositTintStrength));
+            materialProperties.SetColor(
+                GeneratedMassOverallRockTintId,
+                overallRockTint);
+            materialProperties.SetFloat(
+                GeneratedMassOverallRockTintStrengthId,
+                Mathf.Clamp01(overallRockTintStrength));
+            materialProperties.SetFloat(
+                GeneratedMassLightingTintInfluenceId,
+                Mathf.Clamp01(lightingTintInfluence));
 
             meshRenderer.SetPropertyBlock(materialProperties);
 
@@ -1025,6 +1127,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             surfaceFeatureMaterialProperties.SetFloat(
                 GeneratedMassDirtDepositResponseId,
                 Mathf.Clamp(dirtDepositResponse, 0f, 2f));
+            surfaceFeatureMaterialProperties.SetColor(
+                GeneratedMassExposureTintId,
+                exposureTint);
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassExposureTintStrengthId,
+                Mathf.Clamp01(exposureTintStrength));
+            surfaceFeatureMaterialProperties.SetColor(
+                GeneratedMassCreviceTintId,
+                creviceTint);
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassCreviceTintStrengthId,
+                Mathf.Clamp01(creviceTintStrength));
+            surfaceFeatureMaterialProperties.SetColor(
+                GeneratedMassBaseTintId,
+                baseTint);
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassBaseTintStrengthId,
+                Mathf.Clamp01(baseTintStrength));
+            surfaceFeatureMaterialProperties.SetColor(
+                GeneratedMassDirtDepositTintId,
+                dirtDepositTint);
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassDirtDepositTintStrengthId,
+                Mathf.Clamp01(dirtDepositTintStrength));
+            surfaceFeatureMaterialProperties.SetColor(
+                GeneratedMassOverallRockTintId,
+                overallRockTint);
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassOverallRockTintStrengthId,
+                Mathf.Clamp01(overallRockTintStrength));
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassLightingTintInfluenceId,
+                Mathf.Clamp01(lightingTintInfluence));
             featureRenderer.SetPropertyBlock(surfaceFeatureMaterialProperties);
         }
 

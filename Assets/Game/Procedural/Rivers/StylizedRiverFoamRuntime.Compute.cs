@@ -91,6 +91,82 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamPresenceMetricThreshold",
                 PresenceMetricThreshold);
+            computeShader.SetFloat(
+                "_FoamSurfaceMorphStrength",
+                river.FoamSurfaceMorphStrength);
+
+            disturbanceRuntime ??=
+                GetComponent<StylizedRiverDisturbanceRuntime>();
+            bool disturbanceAllocated =
+                disturbanceRuntime != null && disturbanceRuntime.IsAllocated;
+
+            RenderTexture rippleSource = disturbanceAllocated
+                ? disturbanceRuntime.CurrentRippleTexture
+                : null;
+            RenderTexture wakeSource = disturbanceAllocated
+                ? disturbanceRuntime.CurrentWakeTexture
+                : null;
+            RenderTexture staticWakeSource = disturbanceAllocated
+                ? disturbanceRuntime.StaticWakeSourceTexture
+                : null;
+            RenderTexture staticPressureSource = disturbanceAllocated
+                ? disturbanceRuntime.StaticPressureTexture
+                : null;
+
+            bool rippleAvailable = IsCreatedTexture(rippleSource);
+            bool wakeAvailable = IsCreatedTexture(wakeSource);
+            bool staticWakeAvailable = IsCreatedTexture(staticWakeSource);
+            bool staticPressureAvailable = IsCreatedTexture(staticPressureSource);
+            Texture neutralSurfaceTexture = neutralDisturbanceTexture != null
+                ? (Texture)neutralDisturbanceTexture
+                : Texture2D.blackTexture;
+
+            Texture rippleTexture = rippleAvailable
+                ? (Texture)rippleSource
+                : neutralSurfaceTexture;
+            Texture wakeTexture = wakeAvailable
+                ? (Texture)wakeSource
+                : neutralSurfaceTexture;
+            Texture staticWakeTexture = staticWakeAvailable
+                ? (Texture)staticWakeSource
+                : neutralSurfaceTexture;
+            Texture staticPressureTexture = staticPressureAvailable
+                ? (Texture)staticPressureSource
+                : neutralSurfaceTexture;
+
+            Vector2Int rippleDimensions = rippleAvailable
+                ? disturbanceRuntime.RippleTextureDimensions
+                : Vector2Int.one;
+            Vector2Int wakeDimensions = wakeAvailable
+                ? disturbanceRuntime.WakeTextureDimensions
+                : Vector2Int.one;
+            Vector2Int staticWakeDimensions = staticWakeAvailable
+                ? disturbanceRuntime.StaticWakeTextureDimensions
+                : Vector2Int.one;
+            Vector2Int staticPressureDimensions = staticPressureAvailable
+                ? disturbanceRuntime.StaticPressureTextureDimensions
+                : Vector2Int.one;
+
+            computeShader.SetInts(
+                "_FoamRippleDimensions",
+                rippleDimensions.x,
+                rippleDimensions.y);
+            computeShader.SetInts(
+                "_FoamWakeDimensions",
+                wakeDimensions.x,
+                wakeDimensions.y);
+            computeShader.SetInts(
+                "_FoamStaticWakeDimensions",
+                staticWakeDimensions.x,
+                staticWakeDimensions.y);
+            computeShader.SetInts(
+                "_FoamStaticPressureDimensions",
+                staticPressureDimensions.x,
+                staticPressureDimensions.y);
+            computeShader.SetFloat(
+                "_FoamDisturbanceEnabled",
+                rippleAvailable || wakeAvailable || staticWakeAvailable ||
+                staticPressureAvailable ? 1f : 0f);
 
             computeShader.SetBuffer(
                 simulateKernel,
@@ -112,6 +188,22 @@ namespace ProgrammaticStylized3D.Rivers
                 simulateKernel,
                 "_FoamTopologySourcesRead",
                 topologySourcesTexture);
+            computeShader.SetTexture(
+                simulateKernel,
+                "_FoamRippleField",
+                rippleTexture);
+            computeShader.SetTexture(
+                simulateKernel,
+                "_FoamWakeField",
+                wakeTexture);
+            computeShader.SetTexture(
+                simulateKernel,
+                "_FoamStaticWakeField",
+                staticWakeTexture);
+            computeShader.SetTexture(
+                simulateKernel,
+                "_FoamStaticPressureField",
+                staticPressureTexture);
             computeShader.SetTexture(
                 simulateKernel,
                 "_FoamObstacleExclusionRead",

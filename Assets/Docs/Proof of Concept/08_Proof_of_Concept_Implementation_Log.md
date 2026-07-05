@@ -746,3 +746,33 @@ Adjusted persistent Foam morphology after validation showed 5.5b/5.5c still tend
 Intrinsic runtime Foam morphology from 5.5d is accepted as good enough for now. 5.6 adds the first render-layer coupling between Final Foam and the existing river surface systems. The Foam renderer now receives macro wave/current influence, disturbance height/gradients/velocity, and transported wake energy/gradients from the water shader path. These values warp, stretch, compress, and edge-modulate the Final Foam mask so existing material reads as attached to waves, static pressure, lee/depression, ripples, and wakes.
 
 This is presentation-only coupling. `Material Presence`, Remaining Life, manual birth, topology, and population are unchanged. A later dedicated patch may couple stored material motion to disturbances after render coupling is validated.
+
+## River Foam 4.11C.5.6b — Foam Surface Clarity Filter
+
+Validation of 5.6 showed that render-layer surface coupling works, but fine water-surface/detail variation can appear too strongly inside solid Foam and make the clean stylized white body look noisy. 5.6b keeps surface coupling render-only, but filters Foam interior lighting: ordinary granular water variation is heavily suppressed on high-coverage Foam, while strong waves/wakes/disturbances can still imprint at reduced strength. `Material Presence`, lifecycle, topology, birth controls, and stored-state morphology are unchanged.
+
+Next actionable item: `4.11C.5.7 — Surface-Driven Material Morphing`, where the existing river surface/disturbance fields should amplify persistent Foam morphology without becoming a death/lifecycle authority.
+
+## River Foam 4.11C.5.7 — Surface-Driven Material Morphing
+
+Added stored-state surface coupling to the persistent Foam simulation. `SimulateFoam` now receives the existing ripple, transported wake, static wake/lee, and static pressure fields and uses them as bounded inputs to the accepted area-balanced material wobble. Disturbed water can now make `Material Presence` itself wobble, bend, and reconfigure more strongly.
+
+This patch does not change manual birth controls, automatic population, topology generation, Foam color, render-side clarity filtering, or lifecycle authority. Surface fields do not spawn Foam and do not reduce `Remaining Life`; material death remains controlled by the approved topology aging path.
+
+Next actionable item after validation: `4.11C.5.8 — Organic Breakup and Edge Readability`.
+
+## River Foam 4.11C.5.7b — Surface Morph Calibration
+
+Validation of 5.7 suggested that the disturbance-to-material connection was likely present but too subtle to judge by eye. 5.7b adds one explicit `Surface Morph Strength` control under Foam material motion. `0` disables stored-state surface response for A/B comparison, `1` preserves the conservative 5.7 baseline, and higher values strengthen the bounded agitation/bias response from waves, pressure, lee, and wake fields.
+
+The calibration only affects persistent material morphing strength and direction bias. It does not change manual birth controls, automatic population, topology generation, Foam color, render-side clarity filtering, or lifecycle authority. Surface fields still do not spawn Foam and do not reduce `Remaining Life`.
+
+Next actionable item after validation: `4.11C.5.8 — Organic Breakup and Edge Readability`.
+
+## River Foam 4.11C.5.7c — Surface Morph Formula Rebalance
+
+Validation of 5.7b proved the stored-state surface morph path works, but the response was undertuned: `Surface Morph Strength = 5` read more like an acceptable strong setting than an overdriven debug/stress value. 5.7c rebalances the internal formula rather than hiding a larger multiplier behind the control. Low/mid wave, wake, pressure, and lee signals are lifted, wake/lee/pressure gradients are weighted more strongly, and edge mobility receives more of the visible response.
+
+The intended meaning after this pass is: `0` disables stored-state surface response for A/B testing, `1` is the normal readable authored response, `2` is strong, and `3+` is overdrive/stress-test territory. The change still affects only persistent material morphing strength/direction. It does not change Foam birth, automatic population, topology generation, Foam color, render-side clarity filtering, or lifecycle authority. Surface fields still do not spawn Foam and do not reduce `Remaining Life`.
+
+Next actionable item after validation: `4.11C.5.8 — Organic Breakup and Edge Readability`.

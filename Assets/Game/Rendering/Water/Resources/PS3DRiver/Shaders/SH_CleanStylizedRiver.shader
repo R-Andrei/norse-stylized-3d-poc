@@ -778,9 +778,11 @@ Shader "PS3D/Stylized River Water"
                     integration);
                 finalColour *= 1.0 + motion.currentAccent * 0.22;
 
-                float3 foamColour = RiverWaterResolveFoamColour(
+                float3 foamColour = RiverWaterResolveFoamColourFiltered(
                     _FoamColour.rgb,
                     lighting.combined,
+                    foam.mask,
+                    foam.surfaceEnergy,
                     _MinimumNightVisibility);
                 // Foam lifetime no longer fades the whole patch. RiverWaterEvaluateFoam
                 // returns an erosion-shaped mask: surviving fragments should stay

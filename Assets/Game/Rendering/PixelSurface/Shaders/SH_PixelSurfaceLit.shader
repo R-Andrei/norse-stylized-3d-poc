@@ -23,7 +23,23 @@ Shader "PS3D/Pixel Surface Lit"
 
         [Header(Generated Stone Mask Response)]
         _StoneDirtResponse("Stone Dirt/Deposit Response", Range(0, 1)) = 0.25
-        _StoneDirtTint("Stone Dirt/Deposit Tint", Color) = (0.42, 0.36, 0.26, 1)
+        _StoneDirtTint("Stone Dirt/Deposit Tint", Color) = (0.42, 0.40, 0.36, 1)
+
+        [Header(Generated Stone Mask Tinting)]
+        _GeneratedMassExposureTint("Exposure Tint", Color) = (0.50, 0.50, 0.50, 1)
+        _GeneratedMassExposureTintStrength("Exposure Tint Strength", Range(0, 1)) = 0
+        _GeneratedMassCreviceTint("Crevice Tint", Color) = (0.50, 0.50, 0.50, 1)
+        _GeneratedMassCreviceTintStrength("Crevice Tint Strength", Range(0, 1)) = 0
+        _GeneratedMassBaseTint("Base Tint", Color) = (0.50, 0.50, 0.50, 1)
+        _GeneratedMassBaseTintStrength("Base Tint Strength", Range(0, 1)) = 0
+        _GeneratedMassDirtDepositTint("Dirt Deposit Tint", Color) = (0.50, 0.50, 0.50, 1)
+        _GeneratedMassDirtDepositTintStrength("Dirt Deposit Tint Strength", Range(0, 1)) = 0
+
+        [Header(Generated Stone Colour Authority)]
+        _GeneratedMassOverallRockTint("Overall Rock Tint", Color) = (0.50, 0.50, 0.50, 1)
+        _GeneratedMassOverallRockTintStrength("Overall Rock Tint Strength", Range(0, 1)) = 0
+        _GeneratedMassLightingTintInfluence("Lighting Tint Influence", Range(0, 1)) = 0.35
+
         _StoneEdgeWearResponse("Stone Edge Wear Response", Range(0, 1)) = 0.5
         _StoneEdgeWearTint("Stone Edge Wear Tint", Color) = (0.76, 0.74, 0.62, 1)
         _StoneCreaseResponse("Stone Crease Response", Range(0, 1)) = 0.65
@@ -149,6 +165,17 @@ Shader "PS3D/Pixel Surface Lit"
                 float _BaseDarkenStrength;
                 float _StoneDirtResponse;
                 half4 _StoneDirtTint;
+                half4 _GeneratedMassExposureTint;
+                float _GeneratedMassExposureTintStrength;
+                half4 _GeneratedMassCreviceTint;
+                float _GeneratedMassCreviceTintStrength;
+                half4 _GeneratedMassBaseTint;
+                float _GeneratedMassBaseTintStrength;
+                half4 _GeneratedMassDirtDepositTint;
+                float _GeneratedMassDirtDepositTintStrength;
+                half4 _GeneratedMassOverallRockTint;
+                float _GeneratedMassOverallRockTintStrength;
+                float _GeneratedMassLightingTintInfluence;
                 float _StoneEdgeWearResponse;
                 half4 _StoneEdgeWearTint;
                 float _StoneCreaseResponse;
@@ -726,6 +753,23 @@ Shader "PS3D/Pixel Surface Lit"
                 return saturate(rawMask * sideFalloff);
             }
 
+            half PS3D_MaskTintLuminance(half3 color)
+            {
+                return dot(color, half3(0.2126h, 0.7152h, 0.0722h));
+            }
+
+            half3 PS3D_ApplyValuePreservingTint(
+                half3 neutralTarget,
+                half3 tintColor,
+                float tintStrength)
+            {
+                half strength = saturate((half)tintStrength);
+                half targetLum = max(0.001h, PS3D_MaskTintLuminance(neutralTarget));
+                half tintLum = max(0.001h, PS3D_MaskTintLuminance(tintColor));
+                half3 hueTarget = tintColor * (targetLum / tintLum);
+                return lerp(neutralTarget, hueTarget, strength);
+            }
+
             half3 ResolveMaskDebugColor(Varyings input)
             {
                 int mode = (int)round(_MaskDebugMode);
@@ -942,13 +986,6 @@ Shader "PS3D/Pixel Surface Lit"
                 float profileContrast =
                     max(0.0, _ProfileContrast) *
                     lerp(1.0, max(0.0, _FrostContrast), saturate(_FrostStrength));
-                float creviceDarken =
-                    _CreviceDarkenStrength *
-                    lerp(1.0, 0.36, saturate(_Wetness)) +
-                    _FrostCreviceDarken * saturate(_FrostStrength) * 0.72;
-                float baseDarken =
-                    _BaseDarkenStrength *
-                    lerp(1.0, 0.52, saturate(_Wetness));
                 float generatedMassExposureResponse =
                     max(0.0, _GeneratedMassExposureResponse);
                 float generatedMassCreviceResponse =
@@ -957,17 +994,33 @@ Shader "PS3D/Pixel Surface Lit"
                     max(0.0, _GeneratedMassBaseResponse);
                 float generatedMassDirtDepositResponse =
                     max(0.0, _GeneratedMassDirtDepositResponse);
-                float generatedMassLowerProfileResponse =
-                    max(0.0,
-                        generatedMassCreviceResponse * 0.54 +
-                        generatedMassBaseResponse * 0.28 +
-                        generatedMassDirtDepositResponse * 0.18);
 
+                float wetness = saturate(_Wetness);
+                float frostStrength = saturate(_FrostStrength);
+                float monolithicFlatten = saturate(_MonolithicFlatten);
+                float generatedMassSurface = 1.0 - isGroundSurface;
+
+                float exposureVisual =
+                    pow(saturate(exposureMask), 0.72);
+                float creviceVisual =
+                    pow(saturate(creviceMask), 0.58) *
+                    (1.0 - exposureVisual * 0.22);
+                float baseVisual =
+                    pow(saturate(baseMask), 0.78) *
+                    (1.0 - exposureVisual * 0.18);
+                float dirtDepositVisual =
+                    pow(saturate(dirtDepositMask), 0.70);
+
+                // Exposure remains the only generated-mass mask that primarily
+                // shifts the pre-layer value scale. Crevice, base, and dirt are
+                // handled below as independent material layers so their response
+                // controls do not collapse into one shared lower-region multiplier.
                 float generatedMassSemanticScale =
                     1.0 +
-                    (exposureMask * _ExposureTintStrength * 1.55 * generatedMassExposureResponse -
-                     creviceMask * creviceDarken * 1.42 * generatedMassCreviceResponse -
-                     baseMask * baseDarken * 0.96 * generatedMassBaseResponse) *
+                    exposureVisual *
+                    _ExposureTintStrength *
+                    1.72 *
+                    generatedMassExposureResponse *
                     profileContrast;
                 float groundSemanticScale =
                     1.0 +
@@ -1007,70 +1060,136 @@ Shader "PS3D/Pixel Surface Lit"
                     groundAlbedo,
                     (half)isGroundSurface);
 
-                float wetness = saturate(_Wetness);
-                float frostStrength = saturate(_FrostStrength);
-                float monolithicFlatten = saturate(_MonolithicFlatten);
-                float lowerProfileMask =
-                    saturate(
-                        creviceMask * 0.72 +
-                        baseMask * 0.34 +
-                        dirtDepositMask * 0.20) *
-                    (1.0 - exposureMask * 0.28);
-                half3 lowerTintTarget =
+                half3 exposureTintTarget =
+                    PS3D_ApplyValuePreservingTint(
+                        albedo,
+                        _GeneratedMassExposureTint.rgb,
+                        _GeneratedMassExposureTintStrength);
+                float exposureTintOpacity =
+                    exposureVisual *
+                    generatedMassExposureResponse *
+                    generatedMassSurface *
+                    saturate(_GeneratedMassExposureTintStrength);
+                albedo = lerp(
+                    albedo,
+                    exposureTintTarget,
+                    (half)saturate(exposureTintOpacity));
+
+                // Dedicated crevice layer: profile-aware depth/occlusion.
+                // Response 1.0 is intentionally stronger than H2L response 2.0.
+                half3 creviceNeutralTarget =
                     albedo *
-                    lerp(
-                        _StoneDirtTint.rgb,
-                        _FrostColor.rgb * half3(0.58h, 0.62h, 0.68h),
-                        (half)(frostStrength * 0.62));
-                lowerTintTarget = lerp(
-                    lowerTintTarget,
-                    _BaseColor.rgb * (half)0.72,
+                    (half)lerp(0.48, 0.38, wetness);
+                half3 creviceTarget =
+                    PS3D_ApplyValuePreservingTint(
+                        creviceNeutralTarget,
+                        _GeneratedMassCreviceTint.rgb,
+                        _GeneratedMassCreviceTintStrength);
+                creviceTarget = lerp(
+                    creviceTarget,
+                    _BaseColor.rgb * (half)0.46,
+                    (half)(monolithicFlatten * 0.82));
+                float creviceOpacity =
+                    (1.0 - exp2(
+                        -creviceVisual *
+                        (2.80 +
+                         _CreviceDarkenStrength * 14.50 +
+                         wetness * 1.05 +
+                         frostStrength * 0.62) *
+                        generatedMassCreviceResponse *
+                        profileContrast)) *
+                    generatedMassSurface *
+                    lerp(1.0, 0.72, frostStrength) *
+                    lerp(1.0, 0.66, monolithicFlatten);
+                albedo = lerp(
+                    albedo,
+                    creviceTarget,
+                    (half)saturate(creviceOpacity));
+
+                // Dedicated base/contact layer: broader grounding, less deep
+                // than crevice, controlled only by Base Response.
+                half3 baseNeutralTarget =
+                    albedo *
+                    (half)lerp(0.70, 0.62, wetness);
+                half3 baseTarget =
+                    PS3D_ApplyValuePreservingTint(
+                        baseNeutralTarget,
+                        _GeneratedMassBaseTint.rgb,
+                        _GeneratedMassBaseTintStrength);
+                baseTarget = lerp(
+                    baseTarget,
+                    _BaseColor.rgb * (half)0.62,
                     (half)(monolithicFlatten * 0.70));
-                float lowerTintStrength =
-                    lowerProfileMask *
-                    saturate(
-                        0.085 +
-                        _CreviceDarkenStrength * 5.75 +
-                        _BaseDarkenStrength * 3.00 +
-                        wetness * 0.170) *
-                    profileContrast *
-                    generatedMassLowerProfileResponse *
+                float baseOpacity =
+                    (1.0 - exp2(
+                        -baseVisual *
+                        (1.25 +
+                         _BaseDarkenStrength * 9.50 +
+                         wetness * 0.42) *
+                        generatedMassBaseResponse *
+                        profileContrast)) *
+                    generatedMassSurface *
                     lerp(1.0, 0.70, frostStrength) *
                     lerp(1.0, 0.62, monolithicFlatten);
                 albedo = lerp(
                     albedo,
-                    lowerTintTarget,
-                    (half)lowerTintStrength);
+                    baseTarget,
+                    (half)saturate(baseOpacity));
+
+                // Dedicated dirt/deposit layer. Response 1.0 is calibrated to
+                // land near the previous H2L response 2.0 visual strength, but
+                // the exponential opacity curve keeps high values from becoming
+                // flat paint too quickly.
+                half3 dirtNeutralTarget =
+                    albedo *
+                    (half)lerp(0.88, 0.70, wetness);
+                half3 dirtTintTarget =
+                    PS3D_ApplyValuePreservingTint(
+                        dirtNeutralTarget,
+                        _GeneratedMassDirtDepositTint.rgb,
+                        _GeneratedMassDirtDepositTintStrength);
+                half3 dirtTarget = lerp(
+                    dirtTintTarget,
+                    dirtTintTarget *
+                        (half)lerp(0.92, 0.62, saturate(_WetDarkenStrength)),
+                    (half)wetness);
+                float dirtOpacity =
+                    (1.0 - exp2(
+                        -dirtDepositVisual *
+                        (1.75 + saturate(_StoneDirtResponse) * 2.65) *
+                        generatedMassDirtDepositResponse *
+                        lerp(1.0, 1.36, wetness))) *
+                    generatedMassSurface *
+                    lerp(1.0, 0.18, frostStrength) *
+                    lerp(1.0, 0.09, monolithicFlatten);
+                albedo = lerp(
+                    albedo,
+                    dirtTarget,
+                    (half)saturate(dirtOpacity));
 
                 float dampGatherMask =
                     saturate(
-                        dirtDepositMask * 0.92 +
-                        baseMask * 0.26 +
-                        creviceMask * 0.18 -
-                        exposureMask * 0.18);
-                float dirtResponseStrength =
-                    dirtDepositMask *
-                    saturate(_StoneDirtResponse * 1.35) *
-                    lerp(1.0, 1.72, wetness) *
-                    lerp(1.0, 0.18, frostStrength) *
-                    lerp(1.0, 0.09, monolithicFlatten) *
-                    generatedMassDirtDepositResponse;
-                albedo = lerp(
-                    albedo,
-                    albedo * _StoneDirtTint.rgb,
-                    (half)dirtResponseStrength);
-
+                        dirtDepositVisual * generatedMassDirtDepositResponse * 0.82 +
+                        baseVisual * generatedMassBaseResponse * 0.20 +
+                        creviceVisual * generatedMassCreviceResponse * 0.14 -
+                        exposureVisual * generatedMassExposureResponse * 0.16);
+                half3 wetDampNeutralTarget =
+                    albedo *
+                    (half)lerp(0.88, 0.58, saturate(_WetDarkenStrength));
                 half3 wetDampTarget =
-                    albedo * _StoneDirtTint.rgb *
-                    (half)lerp(0.90, 0.62, saturate(_WetDarkenStrength));
+                    PS3D_ApplyValuePreservingTint(
+                        wetDampNeutralTarget,
+                        _GeneratedMassDirtDepositTint.rgb,
+                        _GeneratedMassDirtDepositTintStrength);
                 float wetDampStrength =
-                    dampGatherMask * wetness *
-                    saturate(_WetDarkenStrength * 2.50) *
-                    lerp(0.0, 1.25, saturate(generatedMassDirtDepositResponse * 0.5));
+                    dampGatherMask *
+                    wetness *
+                    saturate(_WetDarkenStrength * 1.65) *
+                    generatedMassSurface;
                 albedo = lerp(
                     albedo,
                     wetDampTarget,
-                    (half)wetDampStrength);
+                    (half)saturate(wetDampStrength));
 
                 float frostNoise =
                     PS3D_ValueNoise31(broadCoordinate * 1.7 + 71.31);
@@ -1080,25 +1199,27 @@ Shader "PS3D/Pixel Surface Lit"
                         max(0.001, saturate(_FrostCoverage)));
                 float frostMask =
                     saturate(
-                        exposureMask * (1.05 * generatedMassExposureResponse) +
+                        exposureVisual * (1.08 * generatedMassExposureResponse) +
                         frostPattern * 0.36 -
-                        creviceMask * (0.10 * generatedMassCreviceResponse) -
-                        dirtDepositMask * (0.10 * generatedMassDirtDepositResponse)) *
-                    frostStrength;
+                        creviceVisual * (0.12 * generatedMassCreviceResponse) -
+                        dirtDepositVisual *
+                            (0.12 * generatedMassDirtDepositResponse)) *
+                    frostStrength *
+                    generatedMassSurface;
                 albedo = lerp(
                     albedo,
                     _FrostColor.rgb,
-                    (half)(frostMask * 0.76));
+                    (half)(frostMask * 0.78));
 
                 float wetGlobalDarken =
-                    wetness * saturate(_WetDarkenStrength) * 0.42;
+                    wetness * saturate(_WetDarkenStrength) * 0.36;
                 albedo *= (half)max(0.0, 1.0 - wetGlobalDarken);
 
                 float monolithicRelief =
                     broadValue * 0.028 +
-                    exposureMask * (0.072 * generatedMassExposureResponse) -
-                    creviceMask * (0.072 * generatedMassCreviceResponse) -
-                    baseMask * (0.036 * generatedMassBaseResponse);
+                    exposureVisual * (0.078 * generatedMassExposureResponse) -
+                    creviceVisual * (0.110 * generatedMassCreviceResponse) -
+                    baseVisual * (0.052 * generatedMassBaseResponse);
                 half3 monolithicTarget =
                     _BaseColor.rgb * (half)max(0.0, 1.0 + monolithicRelief);
                 albedo = lerp(
@@ -1248,11 +1369,38 @@ Shader "PS3D/Pixel Surface Lit"
 
                 half3 albedo = ResolvePixelSurfaceColor(input);
                 albedo = ApplyStylizedValueShaping(albedo, input, normalWS);
+                albedo = PS3D_ApplyValuePreservingTint(
+                    albedo,
+                    _GeneratedMassOverallRockTint.rgb,
+                    _GeneratedMassOverallRockTintStrength);
+
                 InputData inputData = BuildInputData(input, normalWS);
                 SurfaceData surfaceData = BuildSurfaceData(albedo);
-                half4 color = UniversalFragmentPBR(inputData, surfaceData);
-                color.rgb = MixFog(color.rgb, inputData.fogCoord);
-                return color;
+                half4 pbrColor = UniversalFragmentPBR(inputData, surfaceData);
+
+                // Keep URP/PBR lighting, shadows, local lights and specular,
+                // but reduce how much RGB light colour can override the rock's
+                // chosen material hue. This preserves brightness/form from PBR
+                // while letting light tint remain an adjustable influence.
+                half3 safeAlbedo = max(albedo, half3(0.001h, 0.001h, 0.001h));
+                half3 pbrLightingRatio = pbrColor.rgb / safeAlbedo;
+                half lightingLuma =
+                    dot(
+                        pbrLightingRatio,
+                        half3(0.2126h, 0.7152h, 0.0722h));
+                half3 neutralLitColor =
+                    albedo * max(0.0h, lightingLuma);
+
+                half lightingTintInfluence =
+                    saturate((half)_GeneratedMassLightingTintInfluence);
+                half3 finalRgb =
+                    lerp(
+                        neutralLitColor,
+                        pbrColor.rgb,
+                        lightingTintInfluence);
+
+                finalRgb = MixFog(finalRgb, inputData.fogCoord);
+                return half4(finalRgb, pbrColor.a);
             }
             ENDHLSL
         }
