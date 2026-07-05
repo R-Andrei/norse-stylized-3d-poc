@@ -88,8 +88,8 @@ Current inspector state:
 
 Immediate roadmap:
 
-1. Keep this current-state summary accurate before starting new visual work.
-2. Proceed next to **Patch 13 - Dirty Surface Mottle and Material Breakup**.
+1. Validate **Patch 13 - Dirty Surface Mottle and Material Breakup** in Unity against all four HLSL stone profiles.
+2. Tune the four profile material mottle values only if the broad breakup is useful but under/overpowered.
 3. Defer **Patch 14 - Crack and Seam Language** until a proper surface-integrated crack/line representation is planned.
 
 ## Design Constraints
@@ -417,7 +417,7 @@ Checklist:
 - [x] Patch 12H.2 - Main-surface stone profile tuning pass
 - [x] Patch 12H.2B-R - Crevice/base response correction, tint controls, colour authority, and inspector refactor sequence
 - [x] Patch 12H.2S - Rock plan current-state cleanup
-- [ ] Patch 13 - Dirty surface mottle and material breakup
+- [x] Patch 13 - Dirty surface mottle and material breakup
 - [ ] Patch 14 - Crack and seam language
 
 ### Patch 1 - Document and Baseline Capture
@@ -2151,35 +2151,65 @@ Next step after visual validation:
 
 ### Patch 13 - Dirty Surface Mottle and Material Breakup
 
-Status: planned as the next visual feature patch after Patch 12H.2S.
+Status: implemented as a cautious shader/profile-material pass.
 
-This patch should improve the accepted main-surface rendering path. It should not reintroduce raised debug edge/crease overlays as final rendering.
+This patch improves the accepted main-surface rendering path. It does not reintroduce raised debug edge/crease overlays as final rendering.
 
 Checklist status:
 
-- [ ] add a smooth, irregular grime/mineral stain layer separate from square pixel variation;
-- [ ] bias dirt toward lower, sheltered, or less exposed areas;
-- [ ] add profile controls for dirty, wet, frost, sacred, and default stones;
-- [ ] preserve the current pixel-like texture as the base style;
-- [ ] avoid making the rocks look noisy, photographic, or too high-frequency.
+- [x] add a smooth, irregular mottle layer separate from square pixel variation;
+- [x] bias darker gathered mottle toward lower, sheltered, or less exposed areas;
+- [x] add profile-material controls for dirty, wet, frost, sacred, and default-like stone profiles;
+- [x] preserve the current pixel-like texture as the base style;
+- [x] avoid mesh-authored dirt data and avoid new per-object inspector controls in this first pass.
 
 Primary files:
 
-- `SH_PixelSurfaceLit.shader`
-- HLSL stone materials
-- optionally `MassGenerator.cs` if dirt masks become mesh-authored
+- `Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelSurfaceLit.shader`
+- `Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_ColdGrey.mat`
+- `Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_WetRiver.mat`
+- `Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_PaleFrost.mat`
+- `Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_BlackSacred.mat`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
 
-Work:
+Work completed:
 
-- layer broad cloudy variation, fine speckle, and subtle colour temperature shifts;
-- treat dirt as material response, not a replacement for the base colour;
-- support future biomes by keeping the controls generic.
+- Added a new shader/material section named **Generated Stone Surface Breakup**.
+- Added profile-material properties:
+  - `Stone Mottle Strength` / `_StoneMottleStrength`
+  - `Stone Mottle Scale` / `_StoneMottleScale`
+  - `Stone Mottle Softness` / `_StoneMottleSoftness`
+  - `Stone Mottle Shelter Bias` / `_StoneMottleShelterBias`
+- Added `ResolveGeneratedMassMottleNoise()` using existing generated-mass object-space mask coordinates and seed-stable procedural noise.
+- Added `ApplyGeneratedMassSurfaceMottle()` to apply value-based broad face breakup and shelter-biased darker gathering.
+- Inserted the mottle pass after base albedo / ground branching and before exposure, crevice, base/contact, dirt/deposit, wet, frost, and monolithic profile response.
+- Tuned the four active HLSL stone profiles with different mottle strength/scale/softness/shelter-bias values.
+- Updated the read-only **Active Profile Summary** in the custom `GeneratedMass` inspector to show:
+  - Mottle Strength
+  - Mottle Scale
+  - Mottle Softness
+  - Mottle Shelter Bias
+
+Important non-changes:
+
+- No mesh generation changes.
+- No new mesh channels.
+- No generated feature-line changes.
+- No cracks.
+- No decals.
+- No new per-object `GeneratedMass` controls.
+- No river interaction changes.
+- No ground rendering changes.
+- No raised edge/crease overlays enabled in normal rendering.
 
 Acceptance:
 
-- rock faces no longer look uniformly flat or purely square-noise based;
-- dirt/mottle helps faces read as stone without overwhelming the blocky geometry;
-- material variants become more distinct without requiring new textures.
+- Rock faces should no longer look uniformly flat or purely square-noise based.
+- The new mottle should read as broad material breakup, not photographic speckle.
+- Darker gathered mottle should be more visible in lower/sheltered/deposit areas, especially on `DarkWetRiverStone`.
+- `PaleFrostStone` should remain frost-dominant and not become dirty.
+- `BlackSacredStone` should remain monolithic, with only subtle breakup.
+- If the effect is useful but too weak/strong, tune only the four new material properties before changing the architecture.
 
 ### Patch 14 - Crack and Seam Language
 
@@ -2740,3 +2770,47 @@ Current next step:
 - Keep Patch 13 focused on broad material/surface breakup for the accepted masks.
 - Do not use Patch 13 to re-enable raised feature overlays or start visible crack rendering.
 
+## Patch 13 — Dirty Surface Mottle and Material Breakup
+
+Problem addressed:
+- The accepted generated-stone rendering path used semantic masks well, but large rock faces could still read as too flat or as only square pixel variation.
+- The previous raised ConvexEdgeWear / ConcaveCrease overlay path was not acceptable for final rendering, so the next visual improvement needed to strengthen the accepted main-surface path instead of reopening line features.
+
+What changed:
+- Added profile-material driven generated-stone mottle to `SH_PixelSurfaceLit.shader`.
+- The mottle uses existing generated-mass object-space mask coordinates and procedural noise, so it is seed-stable and does not require new mesh data.
+- The pass applies value-based broad face breakup first, then a darker gathered component biased toward shelter/base/crevice/dirt areas.
+- The pass is restricted to generated masses and is not applied to ground materials.
+- Added four material properties under **Generated Stone Surface Breakup**:
+  - `Stone Mottle Strength`
+  - `Stone Mottle Scale`
+  - `Stone Mottle Softness`
+  - `Stone Mottle Shelter Bias`
+- Updated the four active HLSL stone material profiles with cautious first-pass values.
+- Updated the read-only `GeneratedMass` Active Profile Summary to display the new profile mottle values.
+
+Profile intent:
+- `ColdGreyStone`: moderate neutral mottle for broad face breakup.
+- `DarkWetRiverStone`: stronger sheltered/wet gathered breakup.
+- `PaleFrostStone`: restrained mottle so frost remains dominant.
+- `BlackSacredStone`: subtle mottle so the profile remains monolithic rather than dirty.
+
+Important non-changes:
+- No mesh generation changes.
+- No new generated-mass serialized fields.
+- No per-object mottle controls.
+- No shader texture dependencies.
+- No cracks or seam language.
+- No raised edge/crease overlays in normal rendering.
+- No river, ground, or collision behavior changes.
+
+Validation target:
+- With `Surface Mask Debug = None` and `Feature Line Visibility = DebugOnly`, rocks should gain broad material variation without visible floating lines.
+- Mottle should be visible enough to break up flat faces but not so strong that silhouettes or semantic masks become muddy.
+- Neutral grey testing should remain hue-stable because the mottle pass is value-based, not colour-tint based.
+- If the effect is promising but badly calibrated, tune material values before altering generated mesh data.
+
+Current next step:
+- Validate Patch 13 in Unity across all four stone profiles.
+- If accepted, choose between small profile tuning or a separate Patch 14 planning pass for surface-integrated crack/seam language.
+- Do not move to visible cracks until the final representation avoids floating raised-line artifacts.

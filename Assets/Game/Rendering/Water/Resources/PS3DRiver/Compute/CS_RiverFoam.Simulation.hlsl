@@ -362,72 +362,87 @@ FoamChaoticDriftSample FoamResolveChaoticIntermittentDriftCells(
         physicalPosition.x * 0.019 +
         physicalPosition.y * 0.047;
 
-    // The activity gate is deliberately intermittent. Low rhythm values use a
-    // slower field and higher threshold, creating longer calm periods. Higher
-    // rhythm values make lateral impulses more frequent, but the second gate
-    // still prevents a permanent left/right conveyor-belt motion.
+    // 5.8b calibration: normal authored values should read clearly. The gate is
+    // still intermittent, but its mid-range values are lifted instead of spending
+    // most ticks too close to zero. Rhythm controls how often coherent drift
+    // events wake up; it does not turn the drift into a permanent conveyor.
     float2 activityDomain = cellPosition / float2(31.0, 17.0) +
-        float2(_FoamTime * 0.105 * rhythm, -_FoamTime * 0.071 * rhythm);
+        float2(_FoamTime * 0.125 * rhythm, -_FoamTime * 0.083 * rhythm);
     float activityNoise = FoamSourceFillValueNoise(
         activityDomain,
         patternSeed + 211.0);
-    float activityThreshold = lerp(0.69, 0.49, rhythm01);
+    float activityThreshold = lerp(0.56, 0.37, rhythm01);
     float activity = smoothstep(
         activityThreshold,
-        activityThreshold + lerp(0.25, 0.17, rhythm01),
+        activityThreshold + lerp(0.22, 0.14, rhythm01),
         activityNoise);
 
     float2 pulseDomain = cellPosition / float2(19.0, 29.0) +
-        float2(-_FoamTime * 0.061 * rhythm, _FoamTime * 0.092 * rhythm);
+        float2(-_FoamTime * 0.074 * rhythm, _FoamTime * 0.108 * rhythm);
     float pulseNoise = FoamSourceFillValueNoise(
         pulseDomain,
         patternSeed + 337.0);
     float pulseGate = smoothstep(
-        lerp(0.64, 0.47, rhythm01),
-        lerp(0.88, 0.73, rhythm01),
+        lerp(0.54, 0.38, rhythm01),
+        lerp(0.79, 0.63, rhythm01),
         pulseNoise);
     activity *= pulseGate;
+
+    // Lift low/mid activity so Strength 1 / Rhythm 1 is useful, while true calm
+    // periods remain possible when either coherent gate is closed.
+    float activityLift = lerp(1.22, 1.58, rhythm01);
+    float activityCurve = lerp(0.66, 0.48, rhythm01);
+    activity = saturate(pow(saturate(activity), activityCurve) * activityLift);
+    activity = lerp(
+        activity,
+        max(activity, lerp(0.24, 0.34, rhythm01)),
+        smoothstep(0.08, 0.30, activity));
 
     // Disturbed water can wake up the drift field a little, but not enough to
     // erase calm periods. Surface Morph Strength remains the owner of render/
     // surface-coupled shape response; this control owns actual intermittent
     // material drift.
     activity = saturate(activity *
-        (1.0 + surfaceInfluence.edgeBoost * 0.24));
+        (1.0 + surfaceInfluence.edgeBoost * 0.42));
     if (activity <= 0.0001)
     {
         return drift;
     }
 
+    float effectiveStrength = strength * (2.18 + strength * 0.17);
+
     float2 directionDomain = cellPosition / float2(25.0, 14.0) +
-        float2(_FoamTime * 0.049 * rhythm, -_FoamTime * 0.037 * rhythm);
+        float2(_FoamTime * 0.058 * rhythm, -_FoamTime * 0.044 * rhythm);
     float directionA = FoamSignedMorphNoise(
         directionDomain,
         patternSeed + 431.0);
     float directionB = sin(
-        _FoamTime * (0.37 + rhythm * 0.19) +
+        _FoamTime * (0.42 + rhythm * 0.22) +
         cellPosition.x * 0.043 -
         cellPosition.y * 0.067 +
         patternSeed * 0.029);
     float lateralDirection = clamp(
-        directionA * 0.76 + directionB * 0.24,
+        directionA * 0.78 + directionB * 0.22,
         -1.0,
         1.0);
     lateralDirection = sign(lateralDirection) * sqrt(abs(lateralDirection));
 
     float shear = FoamSignedMorphNoise(
         cellPosition / float2(11.0, 7.0) +
-            float2(_FoamTime * 0.087 * rhythm, _FoamTime * 0.041 * rhythm),
+            float2(_FoamTime * 0.104 * rhythm, _FoamTime * 0.051 * rhythm),
         patternSeed + 557.0) *
-        (0.13 + edgeExposure * 0.24);
+        (0.20 + edgeExposure * 0.38);
 
     float lateralCells =
-        (lateralDirection * (0.20 + abs(lateralDirection) * 0.27) + shear) *
-        activity * strength;
+        (lateralDirection * (0.30 + abs(lateralDirection) * 0.42) + shear) *
+        activity * effectiveStrength;
     lateralCells += surfaceInfluence.lateralBias *
-        surfaceInfluence.agitation * activity * strength * 0.18;
+        surfaceInfluence.agitation * activity * effectiveStrength * 0.24;
 
-    float maximumLateralCells = lerp(0.52, 1.48, saturate(strength / 4.0));
+    float maximumLateralCells =
+        0.34 +
+        1.16 * saturate(effectiveStrength / 2.55) +
+        1.12 * saturate((effectiveStrength - 2.55) / 7.0);
     lateralCells = clamp(
         lateralCells,
         -maximumLateralCells,
@@ -443,21 +458,21 @@ FoamChaoticDriftSample FoamResolveChaoticIntermittentDriftCells(
     float sideValid = saturate(
         SampleBoundaryCoverageBilinear(sideCoordinate) *
         (1.0 - SampleObstacleExclusionBilinear(sideCoordinate)));
-    lateralCells *= lerp(0.16, 1.0, smoothstep(0.05, 0.48, sideValid));
+    lateralCells *= lerp(0.20, 1.0, smoothstep(0.04, 0.42, sideValid));
 
     float2 resistanceDomain = cellPosition / float2(27.0, 21.0) +
-        float2(_FoamTime * 0.079 * rhythm, -_FoamTime * 0.054 * rhythm);
+        float2(_FoamTime * 0.093 * rhythm, -_FoamTime * 0.066 * rhythm);
     float resistanceNoise = FoamSourceFillValueNoise(
         resistanceDomain,
         patternSeed + 683.0);
     float resistanceGate = activity * smoothstep(
-        lerp(0.68, 0.54, rhythm01),
-        lerp(0.91, 0.79, rhythm01),
+        lerp(0.60, 0.47, rhythm01),
+        lerp(0.84, 0.70, rhythm01),
         resistanceNoise);
     float flowSign = _FoamFlowDirection < 0.0 ? -1.0 : 1.0;
-    float resistanceCells = -flowSign * resistanceGate * strength *
-        (0.045 + edgeExposure * 0.035 + surfaceInfluence.agitation * 0.075);
-    resistanceCells = clamp(resistanceCells, -0.32, 0.32);
+    float resistanceCells = -flowSign * resistanceGate * effectiveStrength *
+        (0.050 + edgeExposure * 0.050 + surfaceInfluence.agitation * 0.110);
+    resistanceCells = clamp(resistanceCells, -0.56, 0.56);
 
     drift.cells = float2(resistanceCells, lateralCells);
     drift.activity = saturate(activity);
@@ -524,6 +539,14 @@ float4 FoamApplyPersistentMaterialMorph(
         -macroCells.y * 0.26 * crossScale,
         macroCells.x * 0.42 * crossScale);
 
+    // 5.8b: sample the drifted center too. The original 5.8 stencil shifted
+    // the side samples, but left the center heavily anchored to the current
+    // cell, so high Inspector values were needed before stored movement read
+    // clearly. Blending the center toward the backtraced source keeps the same
+    // one-pass gather architecture while making Strength 1 a useful baseline.
+    float4 driftCenterPacked = FoamSamplePackedMaterialBilinear(
+        driftSampleBase);
+
     float4 primaryPacked = FoamSamplePackedMaterialBilinear(
         driftSampleBase - primaryOffset);
     float4 counterPacked = FoamSamplePackedMaterialBilinear(
@@ -531,11 +554,12 @@ float4 FoamApplyPersistentMaterialMorph(
     float4 crossPacked = FoamSamplePackedMaterialBilinear(
         driftSampleBase - crossOffset);
 
+    float driftCenterPresence = FoamDecodeMaterialState(driftCenterPacked).presence;
     float primaryPresence = FoamDecodeMaterialState(primaryPacked).presence;
     float counterPresence = FoamDecodeMaterialState(counterPacked).presence;
     float crossPresence = FoamDecodeMaterialState(crossPacked).presence;
     float nearbyPresence = max(
-        currentState.presence,
+        max(currentState.presence, driftCenterPresence),
         max(primaryPresence, max(counterPresence, crossPresence)));
     if (nearbyPresence <= FoamMaterialStateEpsilon)
     {
@@ -568,9 +592,16 @@ float4 FoamApplyPersistentMaterialMorph(
         7.35,
         surfaceInfluence.agitation *
         (0.45 + surfaceCalibration * 0.55));
+    float chaoticStrength = clamp(_FoamChaoticDriftStrength, 0.0, 4.0);
     surfaceRate += chaoticDrift.activity *
-        clamp(_FoamChaoticDriftStrength, 0.0, 4.0) * 0.28;
+        min(2.40, 0.52 + chaoticStrength * 0.58);
     float morphWeight = saturate(surfaceRate * _FoamDeltaTime * activity * mobility);
+    float driftCenterInfluence = chaoticDrift.activity *
+        lerp(0.0, 0.68, saturate(chaoticStrength / 2.0));
+    float4 centerPacked = lerp(
+        currentPacked,
+        driftCenterPacked,
+        driftCenterInfluence);
     float currentWeight = 1.0 - morphWeight;
     float primaryWeight = morphWeight * 0.46;
     float counterWeight = morphWeight * 0.34;
@@ -580,7 +611,7 @@ float4 FoamApplyPersistentMaterialMorph(
         currentWeight + primaryWeight + counterWeight + crossWeight);
 
     float4 mixedPacked =
-        (currentPacked * currentWeight +
+        (centerPacked * currentWeight +
          primaryPacked * primaryWeight +
          counterPacked * counterWeight +
          crossPacked * crossWeight) /

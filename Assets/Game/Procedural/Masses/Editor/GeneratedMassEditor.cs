@@ -375,6 +375,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     material,
                     "Monolithic Flatten",
                     "_MonolithicFlatten");
+                DrawMaterialFloat(material, "Mottle Strength", "_StoneMottleStrength");
+                DrawMaterialFloat(material, "Mottle Scale", "_StoneMottleScale");
+                DrawMaterialFloat(material, "Mottle Softness", "_StoneMottleSoftness");
+                DrawMaterialFloat(
+                    material,
+                    "Mottle Shelter Bias",
+                    "_StoneMottleShelterBias");
                 DrawMaterialFloat(material, "Smoothness", "_Smoothness");
                 DrawMaterialFloat(
                     material,

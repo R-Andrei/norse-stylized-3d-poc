@@ -25,6 +25,12 @@ Shader "PS3D/Pixel Surface Lit"
         _StoneDirtResponse("Stone Dirt/Deposit Response", Range(0, 1)) = 0.25
         _StoneDirtTint("Stone Dirt/Deposit Tint", Color) = (0.42, 0.40, 0.36, 1)
 
+        [Header(Generated Stone Surface Breakup)]
+        _StoneMottleStrength("Stone Mottle Strength", Range(0, 1)) = 0.25
+        _StoneMottleScale("Stone Mottle Scale", Range(0.2, 2.5)) = 0.9
+        _StoneMottleSoftness("Stone Mottle Softness", Range(0, 1)) = 0.6
+        _StoneMottleShelterBias("Stone Mottle Shelter Bias", Range(0, 1)) = 0.45
+
         [Header(Generated Stone Mask Tinting)]
         _GeneratedMassExposureTint("Exposure Tint", Color) = (0.50, 0.50, 0.50, 1)
         _GeneratedMassExposureTintStrength("Exposure Tint Strength", Range(0, 1)) = 0
@@ -165,6 +171,10 @@ Shader "PS3D/Pixel Surface Lit"
                 float _BaseDarkenStrength;
                 float _StoneDirtResponse;
                 half4 _StoneDirtTint;
+                float _StoneMottleStrength;
+                float _StoneMottleScale;
+                float _StoneMottleSoftness;
+                float _StoneMottleShelterBias;
                 half4 _GeneratedMassExposureTint;
                 float _GeneratedMassExposureTintStrength;
                 half4 _GeneratedMassCreviceTint;
@@ -552,6 +562,80 @@ Shader "PS3D/Pixel Surface Lit"
                     lerp(0.034, 0.056, lobePresence);
 
                 return saturate(max(lowerFade, contactAnchor));
+            }
+
+            float ResolveGeneratedMassMottleNoise(Varyings input)
+            {
+                float scale = max(0.05, _StoneMottleScale);
+                float broad =
+                    ResolveGeneratedMassSoftPatchNoise(input, scale * 0.48, 151.0);
+                float middle =
+                    ResolveGeneratedMassSoftPatchNoise(input, scale * 0.94, 197.0);
+                float small =
+                    ResolveGeneratedMassPatchNoise(input, scale * 1.82, 233.0);
+                float raw = saturate(
+                    broad * 0.56 +
+                    middle * 0.32 +
+                    small * 0.12);
+
+                // Higher softness keeps the mottle as broad material variation;
+                // lower softness exaggerates the same field for validation.
+                float contrast = lerp(1.90, 0.78, saturate(_StoneMottleSoftness));
+                return saturate((raw - 0.5) * contrast + 0.5);
+            }
+
+            half3 ApplyGeneratedMassSurfaceMottle(
+                half3 albedo,
+                Varyings input,
+                float generatedMassSurface,
+                float exposureVisual,
+                float creviceVisual,
+                float baseVisual,
+                float dirtDepositVisual,
+                float wetness,
+                float frostStrength,
+                float monolithicFlatten)
+            {
+                float strength =
+                    saturate(_StoneMottleStrength) *
+                    saturate(generatedMassSurface) *
+                    lerp(1.0, 0.55, saturate(frostStrength)) *
+                    lerp(1.0, 0.30, saturate(monolithicFlatten));
+
+                if (strength <= 0.0001)
+                {
+                    return albedo;
+                }
+
+                float mottle = ResolveGeneratedMassMottleNoise(input);
+                float signedMottle = (mottle - 0.5) * 2.0;
+                float shelterBias = saturate(_StoneMottleShelterBias);
+                float shelterMask = saturate(
+                    creviceVisual * 0.36 +
+                    baseVisual * 0.28 +
+                    dirtDepositVisual * 0.52 +
+                    (1.0 - exposureVisual) * 0.14);
+
+                // Broad face breakup should remain value-based so neutral grey
+                // rocks do not regain unwanted hue drift. Shelter bias only
+                // increases the darker gathered component in existing semantic
+                // dirt/base/crevice zones.
+                float broadValueScale =
+                    1.0 +
+                    signedMottle *
+                    strength *
+                    lerp(0.070, 0.045, shelterBias);
+                float gatheredDarkMask = saturate(
+                    (1.0 - mottle) *
+                    lerp(0.26, 0.54 + shelterMask * 0.78, shelterBias));
+                float gatheredDarken =
+                    gatheredDarkMask *
+                    strength *
+                    lerp(0.055, 0.185, shelterBias) *
+                    lerp(1.0, 1.22, saturate(wetness));
+
+                float valueScale = max(0.0, broadValueScale - gatheredDarken);
+                return albedo * (half)valueScale;
             }
 
             float ResolveGeneratedMassOrganicBottomMask(Varyings input)
@@ -1060,6 +1144,18 @@ Shader "PS3D/Pixel Surface Lit"
                     groundAlbedo,
                     (half)isGroundSurface);
 
+                albedo = ApplyGeneratedMassSurfaceMottle(
+                    albedo,
+                    input,
+                    generatedMassSurface,
+                    exposureVisual,
+                    creviceVisual,
+                    baseVisual,
+                    dirtDepositVisual,
+                    wetness,
+                    frostStrength,
+                    monolithicFlatten);
+
                 half3 exposureTintTarget =
                     PS3D_ApplyValuePreservingTint(
                         albedo,
@@ -1441,6 +1537,10 @@ Shader "PS3D/Pixel Surface Lit"
                 float _BaseDarkenStrength;
                 float _StoneDirtResponse;
                 half4 _StoneDirtTint;
+                float _StoneMottleStrength;
+                float _StoneMottleScale;
+                float _StoneMottleSoftness;
+                float _StoneMottleShelterBias;
                 float _StoneEdgeWearResponse;
                 half4 _StoneEdgeWearTint;
                 float _StoneCreaseResponse;
@@ -1600,6 +1700,10 @@ Shader "PS3D/Pixel Surface Lit"
                 float _BaseDarkenStrength;
                 float _StoneDirtResponse;
                 half4 _StoneDirtTint;
+                float _StoneMottleStrength;
+                float _StoneMottleScale;
+                float _StoneMottleSoftness;
+                float _StoneMottleShelterBias;
                 float _StoneEdgeWearResponse;
                 half4 _StoneEdgeWearTint;
                 float _StoneCreaseResponse;
@@ -1753,6 +1857,10 @@ Shader "PS3D/Pixel Surface Lit"
                 float _BaseDarkenStrength;
                 float _StoneDirtResponse;
                 half4 _StoneDirtTint;
+                float _StoneMottleStrength;
+                float _StoneMottleScale;
+                float _StoneMottleSoftness;
+                float _StoneMottleShelterBias;
                 float _StoneEdgeWearResponse;
                 half4 _StoneEdgeWearTint;
                 float _StoneCreaseResponse;

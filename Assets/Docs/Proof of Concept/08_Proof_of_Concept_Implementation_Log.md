@@ -790,3 +790,11 @@ Added true stored-state chaotic drift to the persistent Foam simulation. The imp
 Two material-motion controls were added: `Chaotic Drift Strength` controls the amount of intermittent material drift, and `Chaotic Drift Rhythm` controls how frequently coherent drift events become active. `Strength = 0` is the A/B disabled path. The drift does not change Remaining Life, birth/source semantics, topology generation, automatic population, or final visual fragmentation. A small valid-fluid safety attenuation prevents obvious lateral dumping into invalid water, but this is not obstacle steering; obstacle-based tangential movement remains a separate future patch.
 
 Next actionable item after validation: `4.11C.5.9 — Obstacle-Based Tangential Foam Movement`.
+
+## River Foam 4.11C.5.8b — Chaotic Drift Calibration
+
+Validation of 5.8 proved the chaotic intermittent drift path works, but the authored range was undertuned: maximum Strength/Rhythm settings read closer to a normal usable effect than exaggerated stress behavior. 5.8b keeps the same two controls and the same single-pass persistent simulation architecture, but recalibrates the internal formula. The activity gate now wakes up more often at normal rhythm values while preserving true calm intervals; low/mid activity is lifted; lateral impulse, shear, and resistance are stronger at `Strength = 1`; and the existing one-pass material gather now blends in the drifted center sample so the stored Material Presence is less anchored to its current cell.
+
+This remains a calibration patch only. It does not add obstacle steering, change downstream phase transport, modify Remaining Life, spawn Foam, alter topology generation, or touch final visual fragmentation. After this patch, testing should restart from `Chaotic Drift Strength = 1` and `Chaotic Drift Rhythm = 1`; old max settings should be treated as stress values, not the expected normal operating point.
+
+Next actionable item: `4.11C.5.9 — Obstacle-Based Tangential Foam Movement`.

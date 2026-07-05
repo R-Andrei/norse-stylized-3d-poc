@@ -35,6 +35,10 @@ Material:
     - _StoneCreaseResponse: 0.65
     - _StoneEdgeWearResponse: 0.58
     - _StoneDirtResponse: 0.55
+    - _StoneMottleStrength: 0.32
+    - _StoneMottleScale: 0.90
+    - _StoneMottleSoftness: 0.58
+    - _StoneMottleShelterBias: 0.45
     - _GeneratedMassDirtDepositTintStrength: 0
     - _GeneratedMassBaseTintStrength: 0
     - _GeneratedMassCreviceTintStrength: 0
