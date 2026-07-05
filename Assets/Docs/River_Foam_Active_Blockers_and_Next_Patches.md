@@ -16,11 +16,12 @@ The 5.4l refactor fixed the hidden spawn-scaling issue: one manual spawn now map
 
 The 5.4m realignment removes the old pattern/complexity/density birth controls from the active manual workflow and makes manual birth a single canonical source again. The source-fill field is keyed from source controls rather than event count, so repeated starts with the same settings keep the same broad footprint. This is intentionally plainer: birth should create stable candidate material, while later material evolution owns macro/meso breakup and the renderer owns micro breakup.
 
-Current visual/lifecycle state after 5.5b/5.5c:
+Current visual/lifecycle state after 5.5b/5.5c/5.5d:
 
 - 5.5b made intrinsic macro deformation visible, but introduced an unacceptable lifecycle regression by letting `Presence` depletion shorten material life independently of `Remaining Life`;
 - 5.5c repairs lifecycle authority: `Remaining Life`, Neutral Lifetime, and topology aging are the only systems allowed to decide when material dies;
-- intrinsic macro deformation remains the current direction before river-disturbance coupling;
+- 5.5d changes the deformation from a current-preserving union into an area-balanced intrinsic wobble so Foam can bend back and forth without monotonic footprint growth;
+- river surface/disturbance coupling is accepted as a later dedicated patch after intrinsic morphology, not a substitute for it;
 - organic breakup is still too weak or blurry;
 - topology interaction, lateral drift, disturbance coupling, and obstacle behavior are not yet proven.
 
@@ -113,13 +114,15 @@ Existing Foam should visibly change over time without creating hidden material a
 
 `4.11C.5.5c — Lifecycle Authority Repair` removes the regression where simulation-side `Presence` erosion and empty-sample blending could make Foam disappear before `Remaining Life` expired.
 
+`4.11C.5.5d — Area-Balanced Foam Wobble` removes the current-preserving union behavior that made deformation accumulate/grow. Morphing now uses opposed, normalized wobble samples so material can locally widen, narrow, bend, and relax while average occupied area remains roughly stable until lifecycle/topology actually removes it.
+
 ### Accepted layer split
 
 This is persistent material-simulation behavior, not topology and not final shader-only polish. The simulation may reconfigure stored `Presence` over time so a patch can stretch, bend, and crawl. It may not delete material independently of `Remaining Life`; visual thinning/fragmentation must either be driven by the lifecycle equation or remain presentation-only until a lifecycle-safe stored-fragmentation design is approved. The renderer remains responsible for micro fracture and final crispness.
 
 ### Acceptance gate
 
-A manually-born patch observed over several seconds changes `Material Presence`, not only Final Foam. It should show clear macro change: altered curvature, different width distribution, and local stretch/compression. It must not grow without bounds, snap, create new topology-painted material, or disappear independently of `Remaining Life`. River disturbance coupling is explicitly deferred to a later patch after intrinsic Foam morphology is proven.
+A manually-born patch observed over several seconds changes `Material Presence`, not only Final Foam. It should show clear macro change: altered curvature, different width distribution, local stretch/compression, and visible back-and-forth wobble/relaxation. The average occupied area should remain roughly stable before lifecycle/topology removal. It must not grow without bounds, snap, create new topology-painted material, or disappear independently of `Remaining Life`. River disturbance/wave/static-pressure/lee/ripple coupling is explicitly deferred to a later dedicated patch after intrinsic Foam morphology is proven.
 
 ## Blocker 2 — Too blurry / weak organic breakup
 
@@ -227,11 +230,12 @@ Foam contacting obstacle footprint no longer produces dominant hard rectangular/
 
 ## Recommended sequence
 
-1. Validate `4.11C.5.5c — Lifecycle Authority Repair` in Final Foam, Material Presence, and Foam + Aging Topology views.
+1. Validate `4.11C.5.5d — Area-Balanced Foam Wobble` in Final Foam, Material Presence, and Foam + Aging Topology views.
 2. `4.11C.5.6 — Organic Breakup and Edge Readability`
 3. `4.11C.5.7 — Topology Aging Proof and Calibration`
 4. `4.11C.5.8 — Controlled Lateral Drift and Obstacle Tangential Flow`
 5. `4.11C.5.9 — Obstacle Boundary Repair`
+6. Dedicated river surface/disturbance coupling patch once intrinsic Foam morphology is accepted.
 
 Only after these pass should the project continue to automatic anchored/open-water birth population.
 
@@ -242,6 +246,7 @@ Deferred until manual material is accepted:
 - anchored automatic birth events;
 - open-water birth scheduling;
 - spatial fairness/population control;
+- dedicated coupling to river waves/static pressure/lee/ripples/disturbance fields;
 - mature Foam rendering polish;
 - final reference-matching pass;
 - production performance/regression closure.

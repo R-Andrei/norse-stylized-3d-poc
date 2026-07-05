@@ -140,14 +140,13 @@ float FoamResolveNeighbourExposure(int2 coordinate, float currentPresence)
     return saturate(exposedByGradient + emptyNeighbourRatio * 0.55);
 }
 
-float2 FoamResolveMacroMaterialDeformationCells(
+float2 FoamResolveAreaBalancedWobbleCells(
     int2 coordinate,
     float2 physicalPosition,
     float materialPattern,
     float edgeExposure,
     float support,
-    float negative,
-    float flowCells)
+    float negative)
 {
     float2 cellPosition = float2(coordinate);
     float patternSeed =
@@ -156,37 +155,52 @@ float2 FoamResolveMacroMaterialDeformationCells(
         physicalPosition.x * 0.013 +
         physicalPosition.y * 0.071;
 
-    // Low-frequency, river-space intrinsic deformation. This is not river
-    // disturbance coupling yet; it is the material's own slow film wobble so
-    // stored Presence can bend and stretch instead of remaining a rigid stamp.
-    float slowPhase = _FoamTime * 0.115;
-    float2 broadDomain = cellPosition / float2(18.0, 11.0) +
-        float2(slowPhase, -slowPhase * 0.73);
-    float2 detailDomain = cellPosition / float2(7.0, 5.0) +
-        float2(-slowPhase * 1.37, slowPhase * 0.91);
+    // Intrinsic material wobble only. Phase transport already supplies net
+    // downstream travel, so this field must be approximately zero-mean: it
+    // bends, expands, and compresses the stored material back and forth instead
+    // of continually pushing the silhouette outward.
+    float slowPhase = _FoamTime * 0.72 + patternSeed * 0.017;
+    float counterPhase = _FoamTime * 0.43 + patternSeed * 0.031;
+    float2 broadDomain = cellPosition / float2(21.0, 13.0);
+    float2 detailDomain = cellPosition / float2(9.0, 6.0);
 
-    float broadLateral = FoamSignedMorphNoise(
-        broadDomain,
+    float broadA = FoamSignedMorphNoise(
+        broadDomain + float2(slowPhase, -slowPhase * 0.61),
         patternSeed + 31.0);
-    float broadLongitudinal = FoamSignedMorphNoise(
-        broadDomain + float2(12.7, 4.3),
+    float broadB = FoamSignedMorphNoise(
+        broadDomain + float2(-counterPhase * 0.83, counterPhase),
         patternSeed + 79.0);
-    float detailLateral = FoamSignedMorphNoise(
-        detailDomain + float2(3.1, 17.4),
+    float detail = FoamSignedMorphNoise(
+        detailDomain + float2(counterPhase * 1.17, -slowPhase * 0.94),
         patternSeed + 137.0);
 
+    float waveA = sin(
+        slowPhase +
+        cellPosition.x * 0.073 +
+        cellPosition.y * 0.119 +
+        materialPattern * 6.28318);
+    float waveB = cos(
+        counterPhase +
+        cellPosition.x * 0.052 -
+        cellPosition.y * 0.087 +
+        materialPattern * 4.71);
+
     float mobility =
-        lerp(0.62, 1.42, edgeExposure) *
-        lerp(1.0, 1.34, negative) *
-        lerp(1.0, 0.78, support);
+        lerp(0.78, 1.55, edgeExposure) *
+        lerp(1.0, 1.28, negative) *
+        lerp(1.0, 0.76, support);
 
+    // The two axes use different phase mixtures so a strip alternates between
+    // bowing, relaxing, and bowing the other way. These offsets are sampled as
+    // paired/opposed gathers below, which keeps average area stable.
     float lateralCells =
-        (broadLateral * 1.18 + detailLateral * 0.34) * mobility;
+        (broadA * 0.82 + waveA * 0.66 + detail * 0.22) * mobility;
     float longitudinalCells =
-        broadLongitudinal * lerp(0.28, 1.04, mobility) +
-        flowCells * 0.42;
+        (broadB * 0.58 - waveB * 0.42 + broadA * 0.18) * mobility;
 
-    return float2(longitudinalCells, lateralCells);
+    return float2(
+        clamp(longitudinalCells, -1.45, 1.45),
+        clamp(lateralCells, -2.10, 2.10));
 }
 
 float4 FoamApplyPersistentMaterialMorph(
@@ -204,11 +218,6 @@ float4 FoamApplyPersistentMaterialMorph(
     }
 
     FoamMaterialState currentState = FoamDecodeMaterialState(currentPacked);
-    float flowSign = _FoamFlowDirection >= 0.0 ? 1.0 : -1.0;
-    float longitudinalCellSize = max(0.01, physicalCellSpacing.x);
-    float flowCells = saturate(
-        abs(_FoamFlowSpeed) * _FoamDeltaTime / longitudinalCellSize);
-
     float support = FoamShapeAgingInfluence(
         FoamCombinedMaterialSupport(materialTopology));
     float negative = FoamShapeAgingInfluence(
@@ -217,101 +226,81 @@ float4 FoamApplyPersistentMaterialMorph(
         coordinate,
         currentState.presence);
 
-    float2 macroCells = FoamResolveMacroMaterialDeformationCells(
+    float2 macroCells = FoamResolveAreaBalancedWobbleCells(
         coordinate,
         physicalPosition,
         currentState.materialPattern,
         edgeExposure,
         support,
-        negative,
-        flowCells);
+        negative);
 
     float2 currentPixel = float2(coordinate);
+    float2 primaryOffset = macroCells;
+    float2 counterOffset = -macroCells * lerp(0.58, 0.82, edgeExposure);
+    float2 crossOffset = float2(
+        -macroCells.y * 0.26,
+        macroCells.x * 0.42);
 
-    // Backtrace from several deliberately different local material velocities.
-    // The offsets are large enough to deform broad silhouettes over seconds,
-    // while the weighted gather keeps the event one persistent material body
-    // rather than spawning new hidden Foam.
-    float forwardCells = clamp(
-        0.42 + flowCells * 1.15 + macroCells.x,
-        -0.65,
-        2.25);
-    float lateralCells = clamp(macroCells.y, -1.85, 1.85);
-    float2 primaryPixel = currentPixel -
-        float2(flowSign * forwardCells, lateralCells);
-
-    float lagCells = clamp(
-        -0.48 + macroCells.x * 0.58,
-        -1.35,
-        0.95);
-    float2 lagPixel = currentPixel -
-        float2(flowSign * lagCells,
-            -lateralCells * 0.62 + macroCells.x * 0.28);
-
-    float sideDirection = macroCells.y >= 0.0 ? 1.0 : -1.0;
-    float2 sidePixel = currentPixel -
-        float2(flowSign * (forwardCells * 0.28 - macroCells.x * 0.18),
-            lateralCells + sideDirection * lerp(0.35, 1.10, edgeExposure));
-
-    float4 primaryPacked = FoamSamplePackedMaterialBilinear(primaryPixel);
-    float4 lagPacked = FoamSamplePackedMaterialBilinear(lagPixel);
-    float4 sidePacked = FoamSamplePackedMaterialBilinear(sidePixel);
+    float4 primaryPacked = FoamSamplePackedMaterialBilinear(
+        currentPixel - primaryOffset);
+    float4 counterPacked = FoamSamplePackedMaterialBilinear(
+        currentPixel - counterOffset);
+    float4 crossPacked = FoamSamplePackedMaterialBilinear(
+        currentPixel - crossOffset);
 
     float primaryPresence = FoamDecodeMaterialState(primaryPacked).presence;
-    float lagPresence = FoamDecodeMaterialState(lagPacked).presence;
-    float sidePresence = FoamDecodeMaterialState(sidePacked).presence;
+    float counterPresence = FoamDecodeMaterialState(counterPacked).presence;
+    float crossPresence = FoamDecodeMaterialState(crossPacked).presence;
     float nearbyPresence = max(
         currentState.presence,
-        max(primaryPresence, max(lagPresence, sidePresence)));
+        max(primaryPresence, max(counterPresence, crossPresence)));
     if (nearbyPresence <= FoamMaterialStateEpsilon)
     {
         return 0.0.xxxx;
     }
 
-    float activity = smoothstep(0.01, 0.18, nearbyPresence);
+    float activity = smoothstep(0.01, 0.16, nearbyPresence);
     float materialAge = saturate(1.0 - currentState.remainingLife);
     float mobility =
-        lerp(0.78, 1.34, edgeExposure) *
-        lerp(0.92, 1.22, materialAge) *
-        lerp(1.0, 1.32, negative) *
-        lerp(1.0, 0.82, support);
+        lerp(0.86, 1.34, edgeExposure) *
+        lerp(0.96, 1.14, materialAge) *
+        lerp(1.0, 1.18, negative) *
+        lerp(1.0, 0.84, support);
 
-    // 5.5 was intentionally conservative and only roughened edges. This pass
-    // uses a much stronger stored-state deformation weight so Material Presence
-    // itself visibly bends/stretches over time. Erosion remains separate below.
-    float morphWeight = saturate(_FoamDeltaTime * 4.35 * activity * mobility);
+    // Area-balanced wobble: use opposed samples and normalized weights. Unlike
+    // the 5.5c lifecycle repair, this is not a max/current union; material can
+    // locally move away from a cell while another nearby cell gains it. That
+    // produces visible back-and-forth body motion without making Presence an
+    // independent death authority or an ever-growing smear.
+    float morphWeight = saturate(_FoamDeltaTime * 5.65 * activity * mobility);
     float currentWeight = 1.0 - morphWeight;
-    float primaryWeight = morphWeight * 0.52;
-    float lagWeight = morphWeight * 0.30;
-    float sideWeight = morphWeight * 0.18;
+    float primaryWeight = morphWeight * 0.46;
+    float counterWeight = morphWeight * 0.34;
+    float crossWeight = morphWeight * 0.20;
+    float totalWeight = max(
+        0.0001,
+        currentWeight + primaryWeight + counterWeight + crossWeight);
 
     float4 mixedPacked =
-        currentPacked * currentWeight +
-        primaryPacked * primaryWeight +
-        lagPacked * lagWeight +
-        sidePacked * sideWeight;
+        (currentPacked * currentWeight +
+         primaryPacked * primaryWeight +
+         counterPacked * counterWeight +
+         crossPacked * crossWeight) /
+        totalWeight;
 
     FoamMaterialState mixedState = FoamDecodeMaterialState(
         FoamClampPackedMaterialState(mixedPacked));
 
-    // Lifecycle authority repair: morphing may redistribute and locally extend
-    // stored material, but it may not become an independent death path.
-    // Existing material cells keep at least their current Presence until the
-    // Remaining Life equation removes them. This keeps lifespan controlled only
-    // by Neutral Lifetime, support, and negative-aging topology.
-    float preservedExistingPresence = currentState.presence > FoamMaterialStateEpsilon
-        ? currentState.presence
-        : 0.0;
-    mixedState.presence = max(mixedState.presence, preservedExistingPresence);
-
-    // Prevent deformation gather from turning interpolation haze into permanent
-    // full-strength material while still allowing nearby material to create
-    // visible local widening/reconfiguration.
+    // Do not allow interpolation haze to accumulate into new full material.
+    // Existing cells are not forcibly preserved at full strength; that previous
+    // union behavior caused monotonic area growth. Lifespan remains governed by
+    // Remaining Life because this pass contains no explicit Presence erosion.
     mixedState.presence = min(
         mixedState.presence,
-        max(nearbyPresence, currentState.presence) + 0.08);
+        nearbyPresence + 0.025);
 
     return FoamClipPackedToValidFluid(
         FoamEncodeMaterialState(mixedState),
         validFluid);
 }
+

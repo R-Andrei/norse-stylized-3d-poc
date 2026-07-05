@@ -735,3 +735,8 @@ This is still intrinsic Foam morphology only. River disturbance/wave coupling is
 Validation of 5.5b showed a project-breaking regression: Foam could disappear in 1–2 seconds even with long Neutral Lifetime and strong support. The audit found two independent non-lifecycle death paths introduced by the morphing work: explicit simulation-side `Presence` erosion and morph blending against empty samples that could reduce existing material below visibility before `Remaining Life` expired.
 
 5.5c removes simulation-side `Presence` erosion and preserves existing-cell `Presence` during morphing. Stored morphing may still bend/stretch/reconfigure material, but material death is again controlled only by `Remaining Life`, whose delta comes from Neutral Lifetime and topology aging influence. No Inspector, birth, topology, automatic population, or obstacle behavior changed.
+
+### 4.11C.5.5d — Area-Balanced Foam Wobble
+
+Adjusted persistent Foam morphology after validation showed 5.5b/5.5c still tended to stretch/grow rather than wobble around a stable average footprint. The simulation morph pass now uses opposed, normalized intrinsic wobble samples instead of preserving current Presence as a union. This keeps lifecycle authority with Remaining Life while allowing visible back-and-forth bending, local widening/narrowing, and relaxation. River wave/static-pressure/lee/ripple/disturbance coupling remains a later dedicated patch layered on top of intrinsic morphology, not a substitute for it.
+

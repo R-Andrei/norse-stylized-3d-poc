@@ -943,9 +943,9 @@ Shader "PS3D/Pixel Surface Lit"
                     lerp(1.0, 0.52, saturate(_Wetness));
                 float generatedMassSemanticScale =
                     1.0 +
-                    (exposureMask * _ExposureTintStrength -
-                     creviceMask * creviceDarken * 0.62 -
-                     baseMask * baseDarken * 0.42) *
+                    (exposureMask * _ExposureTintStrength * 1.34 -
+                     creviceMask * creviceDarken * 1.10 -
+                     baseMask * baseDarken * 0.74) *
                     profileContrast;
                 float groundSemanticScale =
                     1.0 +
@@ -988,18 +988,49 @@ Shader "PS3D/Pixel Surface Lit"
                 float wetness = saturate(_Wetness);
                 float frostStrength = saturate(_FrostStrength);
                 float monolithicFlatten = saturate(_MonolithicFlatten);
+                float lowerProfileMask =
+                    saturate(
+                        creviceMask * 0.72 +
+                        baseMask * 0.34 +
+                        dirtDepositMask * 0.20) *
+                    (1.0 - exposureMask * 0.28);
+                half3 lowerTintTarget =
+                    albedo *
+                    lerp(
+                        _StoneDirtTint.rgb,
+                        _FrostColor.rgb * half3(0.58h, 0.62h, 0.68h),
+                        (half)(frostStrength * 0.62));
+                lowerTintTarget = lerp(
+                    lowerTintTarget,
+                    _BaseColor.rgb * (half)0.72,
+                    (half)(monolithicFlatten * 0.70));
+                float lowerTintStrength =
+                    lowerProfileMask *
+                    saturate(
+                        0.060 +
+                        _CreviceDarkenStrength * 4.65 +
+                        _BaseDarkenStrength * 2.35 +
+                        wetness * 0.135) *
+                    profileContrast *
+                    lerp(1.0, 0.66, frostStrength) *
+                    lerp(1.0, 0.56, monolithicFlatten);
+                albedo = lerp(
+                    albedo,
+                    lowerTintTarget,
+                    (half)lowerTintStrength);
+
                 float dampGatherMask =
                     saturate(
-                        dirtDepositMask * 0.88 +
-                        baseMask * 0.22 +
-                        creviceMask * 0.14 -
-                        exposureMask * 0.20);
+                        dirtDepositMask * 0.92 +
+                        baseMask * 0.26 +
+                        creviceMask * 0.18 -
+                        exposureMask * 0.18);
                 float dirtResponseStrength =
                     dirtDepositMask *
-                    saturate(_StoneDirtResponse) *
-                    lerp(1.0, 1.30, wetness) *
-                    lerp(1.0, 0.24, frostStrength) *
-                    lerp(1.0, 0.12, monolithicFlatten);
+                    saturate(_StoneDirtResponse * 1.22) *
+                    lerp(1.0, 1.58, wetness) *
+                    lerp(1.0, 0.18, frostStrength) *
+                    lerp(1.0, 0.09, monolithicFlatten);
                 albedo = lerp(
                     albedo,
                     albedo * _StoneDirtTint.rgb,
@@ -1007,10 +1038,10 @@ Shader "PS3D/Pixel Surface Lit"
 
                 half3 wetDampTarget =
                     albedo * _StoneDirtTint.rgb *
-                    (half)lerp(0.92, 0.68, saturate(_WetDarkenStrength));
+                    (half)lerp(0.90, 0.62, saturate(_WetDarkenStrength));
                 float wetDampStrength =
                     dampGatherMask * wetness *
-                    saturate(_WetDarkenStrength * 1.55);
+                    saturate(_WetDarkenStrength * 2.25);
                 albedo = lerp(
                     albedo,
                     wetDampTarget,
@@ -1032,17 +1063,17 @@ Shader "PS3D/Pixel Surface Lit"
                 albedo = lerp(
                     albedo,
                     _FrostColor.rgb,
-                    (half)(frostMask * 0.68));
+                    (half)(frostMask * 0.76));
 
                 float wetGlobalDarken =
                     wetness * saturate(_WetDarkenStrength) * 0.42;
                 albedo *= (half)max(0.0, 1.0 - wetGlobalDarken);
 
                 float monolithicRelief =
-                    broadValue * 0.022 +
-                    exposureMask * 0.035 -
-                    creviceMask * 0.025 -
-                    baseMask * 0.012;
+                    broadValue * 0.026 +
+                    exposureMask * 0.058 -
+                    creviceMask * 0.054 -
+                    baseMask * 0.026;
                 half3 monolithicTarget =
                     _BaseColor.rgb * (half)max(0.0, 1.0 + monolithicRelief);
                 albedo = lerp(

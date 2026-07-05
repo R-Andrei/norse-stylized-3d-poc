@@ -30,16 +30,16 @@ Material:
     m_Ints: []
     m_Floats:
     - _AmbientStrength: 0.88
-    - _BaseDarkenStrength: 0.005
+    - _BaseDarkenStrength: 0.014
     - _StoneFeatureClip: 0.035
     - _StoneCreaseResponse: 0.9
     - _StoneEdgeWearResponse: 0.42
-    - _StoneDirtResponse: 0.012
-    - _CreviceDarkenStrength: 0.018
+    - _StoneDirtResponse: 0.010
+    - _CreviceDarkenStrength: 0.038
     - _Cull: 2
     - _DiffuseWrap: 0.14
     - _DirectStrength: 1.08
-    - _ExposureTintStrength: 0.026
+    - _ExposureTintStrength: 0.044
     - _HighlightCompressStrength: 0.04
     - _HighlightCompressStart: 0.78
     - _BottomDarkenStrength: 0.006
@@ -56,7 +56,7 @@ Material:
     - _PixelVariation: 0.035
     - _PixelVertexVariation: 0.045
     - _PixelWarpStrength: 0.06
-    - _ProfileContrast: 0.54
+    - _ProfileContrast: 0.64
     - _ProfilePixelContrast: 0.42
     - _ReceiveShadows: 1
     - _Smoothness: 0.28

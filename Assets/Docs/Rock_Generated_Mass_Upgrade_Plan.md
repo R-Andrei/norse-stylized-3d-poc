@@ -2343,3 +2343,45 @@ Validation target:
 Expected result:
 - Every lateral point should retain some low crevice/base accumulation.
 - Breakup should make some areas crawl low and others crawl higher, without creating fully empty vertical strips.
+
+
+## Patch 12H.2I — Stone Profile Response Visibility Pass
+
+Problem addressed:
+- The CreviceBase mask behavior became acceptable after the side-surface lobe and minimum crawl floor corrections, but the normal final render was too timid.
+- The shader was technically using CreviceBase, DirtDeposit, and Exposure, but the response was weak enough that the final result still read mostly like a simple faceted stone material.
+
+What changed:
+- Increased normal-render response to the accepted CreviceBase mask without changing the mask shape.
+- Added a soft profile tint layer for the lower crevice/base accumulation:
+  - Cold grey uses a duller grey-brown lower tone.
+  - Wet river stone pushes lower regions more into damp deposited colour.
+  - Pale frost keeps lower crevices colder/darker while suppressing ordinary dirt.
+  - Black sacred uses controlled lower depth instead of mud.
+- Strengthened DirtDeposit colour separation so it reads more like actual deposited material instead of generic darkening.
+- Increased Exposure response modestly so exposed facets contrast more clearly against lower accumulation.
+- Kept bottom value shaping weak and did not re-enable raised line-feature overlays.
+
+Validation target:
+- `Surface Mask Debug = None`
+- Use the same generated mass and cycle the four stone profiles.
+- The final rendered surface should visibly use lower crevice/base accumulation, dirt/deposit colour, and exposed-plane contrast without returning to a hard lower band.
+
+
+## Patch 12H.2J — Final Render Mask Intensity Pass
+
+Problem addressed:
+- Patch 12H.2I confirmed the final render was using the accepted semantic masks, but the effect remained too subtle to read clearly without comparing against debug views.
+- Side-by-side validation showed rocks with and without the effect looked nearly identical at normal viewing distance.
+
+What changed:
+- Increased normal-render semantic darkening from CreviceBase and Base masks without changing mask generation.
+- Increased the soft lower profile tint contribution so lower crevice/base accumulation is visible to the naked eye.
+- Increased DirtDeposit colour response, especially for ColdGrey and WetRiver.
+- Increased WetRiver damp gathering and PaleFrost exposed-plane frost response.
+- Increased BlackSacred lower relief slightly while keeping it controlled and non-muddy.
+
+Validation target:
+- `Surface Mask Debug = None`
+- Compare two rocks side-by-side, one with the generated mass response and one without.
+- The treated rock should now visibly show lower accumulation/deposit/profile response at normal viewing distance without returning to the old hard band.

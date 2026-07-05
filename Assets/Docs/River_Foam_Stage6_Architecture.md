@@ -20,11 +20,11 @@ Accepted or mostly accepted foundations:
 - manual birth controls are consolidated under `Foam Debug > Manual Birth Source`;
 - the hidden multi-writer spawn scaling problem was corrected by the 5.4l composition-event/birth-budget refactor;
 - the 5.4m realignment removes active pattern/complexity/density birth controls, restores one canonical stable manual source, and keeps those controls in a dedicated Inspector foldout;
-- the 5.5 material-evolution pass adds the first persistent `Presence` morphing layer; 5.5c restores lifecycle authority after the initial erosion attempt shortened Foam life incorrectly.
+- the 5.5 material-evolution pass adds the first persistent `Presence` morphing layer; 5.5c restores lifecycle authority after the initial erosion attempt shortened Foam life incorrectly; 5.5d changes morphing to area-balanced intrinsic wobble so deformation does not continually grow the footprint.
 
 Still not accepted:
 
-- 5.5 morphing needs visual validation and tuning without independent `Presence` death paths;
+- 5.5d area-balanced intrinsic wobble needs validation without independent `Presence` death paths or monotonic area growth;
 - organic breakup is not proven;
 - topology interaction needs final proof and calibration;
 - lateral drift/obstacle sliding is not implemented;
@@ -165,7 +165,7 @@ Persistent material movement is downstream river-space transport plus approved d
 - no material guidance field resurrected from old experiments;
 - no hidden spread/reinforcement layer.
 
-Material simulation now owns intrinsic macro/meso deformation. The first 5.5 pass was too conservative; 5.5b strengthened stored-state deformation so a material body can bend, stretch, and locally widen/narrow. 5.5c repairs lifecycle authority: morphing may not erase material before `Remaining Life` expires. Larger river-disturbance coupling, lifecycle-safe stored fragmentation, lateral drift, and obstacle tangential sliding remain separate explicit, budgeted work.
+Material simulation now owns intrinsic macro/meso deformation. The first 5.5 pass was too conservative; 5.5b strengthened stored-state deformation so a material body can bend, stretch, and locally widen/narrow. 5.5c repairs lifecycle authority: morphing may not erase material before `Remaining Life` expires. 5.5d makes intrinsic wobble area-balanced by using opposed normalized material samples instead of a max/current union, so patches can bulge, compress, and relax without continual footprint growth. Larger river-surface coupling to waves, static pressure, lee influence, ripples, and disturbance fields is accepted as later dedicated work after intrinsic morphology is accepted. Lifecycle-safe stored fragmentation, lateral drift, and obstacle tangential sliding remain separate explicit, budgeted work.
 
 ## Manual birth phase
 
@@ -234,6 +234,7 @@ Do not add these while the active blockers remain unresolved:
 - separate river architecture for thin lines;
 - restored guidance fields or shore suction;
 - disturbance coupling hidden inside unrelated morphology work;
+- replacing intrinsic Foam morphology with water-surface coupling instead of layering it later;
 - final beauty-only rendering polish;
 - broad Inspector expansion.
 
