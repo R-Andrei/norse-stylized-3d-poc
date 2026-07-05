@@ -77,6 +77,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         DirtDeposit
     }
 
+    public enum StoneSurfaceFeatureVisibility
+    {
+        DebugOnly,
+        VisibleProfileResponse
+    }
+
     public enum ShapeDiversity
     {
         Restrained,
@@ -410,7 +416,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private float dirtCoverage = 1f;
 
         [Header("Surface Feature Lines")]
-        [Tooltip("Controls how many selected convex ridge/corner strips are generated for ConvexEdgeWear debug. Zero disables generated edge-wear strips.")]
+        [Tooltip("Controls whether generated edge/crease overlay strips are debug-only or visible during normal rendering as profile-specific stone material response.")]
+        [SerializeField]
+        private StoneSurfaceFeatureVisibility surfaceFeatureVisibility =
+            StoneSurfaceFeatureVisibility.DebugOnly;
+
+        [Tooltip("Controls how many selected convex ridge/corner strips are generated for ConvexEdgeWear debug/profile response. Zero disables generated edge-wear strips.")]
         [Range(0f, 2f)]
         [SerializeField]
         private float edgeWearAmount = 1f;
@@ -512,6 +523,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public bool IsStaticGeometry => true;
         public StoneSurfaceProfile StoneSurfaceProfile => stoneSurfaceProfile;
         public StoneSurfaceMaskDebug SurfaceMaskDebug => surfaceMaskDebug;
+        public StoneSurfaceFeatureVisibility SurfaceFeatureVisibility =>
+            surfaceFeatureVisibility;
         public Color BaseColor => baseColor;
         public float SurfaceMaskBaseLift => surfaceMaskBaseLift;
         public float CreviceReach => creviceReach;
@@ -845,10 +858,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float localHeight,
             float localXZScale)
         {
+            bool visibleProfileResponse =
+                surfaceMaskDebug == StoneSurfaceMaskDebug.None &&
+                surfaceFeatureVisibility ==
+                StoneSurfaceFeatureVisibility.VisibleProfileResponse;
+
             ApplySingleSurfaceFeatureOverlayMaterialProperties(
                 edgeWearFeatureMeshRenderer,
                 1f,
-                surfaceMaskDebug == StoneSurfaceMaskDebug.ConvexEdgeWear,
+                surfaceMaskDebug == StoneSurfaceMaskDebug.ConvexEdgeWear ||
+                visibleProfileResponse,
                 meshBounds,
                 localHeight,
                 localXZScale);
@@ -856,7 +875,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ApplySingleSurfaceFeatureOverlayMaterialProperties(
                 creaseFeatureMeshRenderer,
                 2f,
-                surfaceMaskDebug == StoneSurfaceMaskDebug.ConcaveCrease,
+                surfaceMaskDebug == StoneSurfaceMaskDebug.ConcaveCrease ||
+                visibleProfileResponse,
                 meshBounds,
                 localHeight,
                 localXZScale);

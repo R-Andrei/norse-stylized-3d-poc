@@ -27,6 +27,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty creviceBreakup;
         private SerializedProperty dirtCrawlReach;
         private SerializedProperty dirtCoverage;
+        private SerializedProperty surfaceFeatureVisibility;
         private SerializedProperty edgeWearAmount;
         private SerializedProperty edgeWearWidth;
         private SerializedProperty edgeWearCoverage;
@@ -72,6 +73,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "dirtCrawlReach");
             dirtCoverage = serializedObject.FindProperty(
                 "dirtCoverage");
+            surfaceFeatureVisibility = serializedObject.FindProperty(
+                "surfaceFeatureVisibility");
             edgeWearAmount = serializedObject.FindProperty(
                 "edgeWearAmount");
             edgeWearWidth = serializedObject.FindProperty(
@@ -138,6 +141,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "creviceBreakup",
                 "dirtCrawlReach",
                 "dirtCoverage",
+                "surfaceFeatureVisibility",
                 "edgeWearAmount",
                 "edgeWearWidth",
                 "edgeWearCoverage",
@@ -238,11 +242,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 EditorStyles.boldLabel);
 
             EditorGUILayout.HelpBox(
-                "Generates debug-only overlay strips for ConvexEdgeWear and " +
-                "ConcaveCrease. The child overlay renderer is disabled during " +
-                "normal rendering and enabled only for those two debug modes.",
+                "Generates overlay strips for ConvexEdgeWear and ConcaveCrease. " +
+                "DebugOnly keeps them disabled during normal rendering. " +
+                "VisibleProfileResponse enables them during normal rendering " +
+                "so stone profiles can show worn ridges and cracks. Keep this " +
+                "explicit until final feature overlays are batched/chunk-combined.",
                 MessageType.Info);
 
+            EditorGUILayout.PropertyField(surfaceFeatureVisibility);
+            EditorGUILayout.Space(2f);
             EditorGUILayout.PropertyField(edgeWearAmount);
             EditorGUILayout.PropertyField(edgeWearWidth);
             EditorGUILayout.PropertyField(edgeWearCoverage);

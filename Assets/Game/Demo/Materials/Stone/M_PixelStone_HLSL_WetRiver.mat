@@ -31,6 +31,10 @@ Material:
     m_Floats:
     - _AmbientStrength: 0.90
     - _BaseDarkenStrength: 0.025
+    - _StoneFeatureClip: 0.035
+    - _StoneCreaseResponse: 0.85
+    - _StoneEdgeWearResponse: 0.28
+    - _StoneDirtResponse: 0.65
     - _CreviceDarkenStrength: 0.035
     - _Cull: 2
     - _DiffuseWrap: 0.18
@@ -71,5 +75,8 @@ Material:
     m_Colors:
     - _BaseColor: {r: 0.245, g: 0.255, b: 0.252, a: 1}
     - _FrostColor: {r: 0.58, g: 0.66, b: 0.70, a: 1}
+    - _StoneCreaseTint: {r: 0.045, g: 0.045, b: 0.04, a: 1}
+    - _StoneEdgeWearTint: {r: 0.46, g: 0.48, b: 0.45, a: 1}
+    - _StoneDirtTint: {r: 0.25, g: 0.32, b: 0.22, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

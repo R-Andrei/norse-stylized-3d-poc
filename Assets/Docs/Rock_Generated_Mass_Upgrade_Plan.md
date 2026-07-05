@@ -358,7 +358,8 @@ Checklist:
 - [x] Patch 12G.4 - Feature-line control semantics fix
 - [x] Patch 12G.5 - Edge-wear ridge chain generation
 - [x] Patch 12G.6 - Final edge-wear mask refinement before material response
-- [ ] Patch 12H - Stone material response from accepted masks
+- [x] Patch 12H.1 - Profile-specific stone mask response prototype
+- [ ] Patch 12H.2 - Stone profile tuning pass
 - [ ] Patch 13 - Dirty surface mottle and material breakup
 - [ ] Patch 14 - Crack and seam language
 
@@ -1744,17 +1745,172 @@ Acceptance:
 - `ConcaveCrease` should remain close to the previously accepted result.
 - If this patch is serviceable, proceed to `Patch 12H - Stone Material Response From Accepted Masks`.
 
-### Patch 12H - Stone Material Response From Accepted Masks
+### Patch 12H.1 - Profile-Specific Stone Mask Response Prototype
 
-Status: planned after Patch 12G.6 validation.
+Status: implemented after the generated mass debug masks were accepted as semantic data.
+
+Reason for patch:
+
+- The accepted masks are not a final rock look.
+- They are shared semantic inputs that each stone profile should interpret differently.
+- The generated mass system already had material profile slots for:
+  - `ColdGreyStone`;
+  - `DarkWetRiverStone`;
+  - `PaleFrostStone`;
+  - `BlackSacredStone`.
+- The shader already supported profile concepts such as wetness, frost, monolithic flattening, exposure response, and crevice darkening.
+- The missing piece was profile-specific interpretation of the accepted masks:
+  - `DirtDeposit`;
+  - `ConvexEdgeWear`;
+  - `ConcaveCrease`.
 
 Checklist status:
 
-- [ ] convert accepted debug mask data into final stone material response;
-- [ ] make `ConvexEdgeWear` render as pale, soft, worn ridges rather than debug strips;
-- [ ] make `ConcaveCrease` render as dark cracks/creases with optional soft surrounding shadow or later bright lip;
-- [ ] combine `SurfaceVariation`, `Exposure`, `CreviceBase`, `DirtDeposit`, `ConvexEdgeWear`, and `ConcaveCrease` into coherent profile-specific stone response;
-- [ ] preserve performance architecture: debug per-mass overlays are acceptable, but final many-rock rendering should move toward chunk-combined overlays or another batching strategy.
+- [x] keep the accepted mask-generation system unchanged;
+- [x] do not add new mask types;
+- [x] add profile/material response properties for dirt, edge wear, and creases;
+- [x] make `DirtDeposit` affect normal generated-stone rendering;
+- [x] keep `DirtDeposit` profile-sensitive:
+  - stronger on wet stone;
+  - muted on frost;
+  - heavily reduced on black sacred stone;
+- [x] make edge-wear overlay strips render as visible profile response when explicitly enabled;
+- [x] make crease overlay strips render as visible profile response when explicitly enabled;
+- [x] keep overlay renderers disabled in normal rendering by default;
+- [x] add an explicit `Surface Feature Visibility` toggle to `GeneratedMass`;
+- [x] update the existing four stone material assets with first-pass response values;
+- [x] avoid emission/magic/sacred glow in this patch;
+- [x] keep final batching/chunk-combined overlay work deferred.
+
+Primary files:
+
+- `GeneratedMass.cs`
+- `GeneratedMassEditor.cs`
+- `SH_PixelSurfaceLit.shader`
+- `M_PixelStone_HLSL_ColdGrey.mat`
+- `M_PixelStone_HLSL_WetRiver.mat`
+- `M_PixelStone_HLSL_PaleFrost.mat`
+- `M_PixelStone_HLSL_BlackSacred.mat`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+GeneratedMass work:
+
+- Added `StoneSurfaceFeatureVisibility`:
+  - `DebugOnly`;
+  - `VisibleProfileResponse`.
+- Added serialized `surfaceFeatureVisibility`, defaulting to `DebugOnly`.
+- Overlay renderer enable rules now are:
+  - `ConvexEdgeWear` debug enables only the edge-wear overlay;
+  - `ConcaveCrease` debug enables only the crease overlay;
+  - `Surface Mask Debug = None` and `Surface Feature Visibility = VisibleProfileResponse` enables both overlays for normal profile-response validation;
+  - otherwise both overlays remain disabled.
+- This keeps final line-feature rendering opt-in until feature overlays are batched or chunk-combined for many visible rocks.
+
+GeneratedMassEditor work:
+
+- Added the `Surface Feature Visibility` field to the existing `Surface Feature Lines` section.
+- Updated the help text to clarify the difference between debug-only overlays and visible profile-response overlays.
+
+Shader work:
+
+- Added profile/material response properties:
+  - `_StoneDirtResponse`;
+  - `_StoneDirtTint`;
+  - `_StoneEdgeWearResponse`;
+  - `_StoneEdgeWearTint`;
+  - `_StoneCreaseResponse`;
+  - `_StoneCreaseTint`;
+  - `_StoneFeatureClip`.
+- `DirtDeposit` now participates in normal generated-mass material response.
+- Dirt response is multiplied by wet/frost/monolithic profile factors:
+  - wetness can increase damp deposit response;
+  - frost suppresses ordinary dirt;
+  - monolithic/black sacred profiles suppress ordinary dirt strongly.
+- Edge-wear overlay strips can now render in normal mode as pale worn-ridge material response instead of debug yellow.
+- Crease overlay strips can now render in normal mode as dark crack/crease material response instead of debug yellow.
+- Normal overlay rendering uses `ResolveFeatureLineMask` and `clip(featureMask - _StoneFeatureClip)` so strip boards do not render as full quads in the forward pass.
+- Debug mask modes remain unchanged in intent.
+
+Material profile work:
+
+- `M_PixelStone_HLSL_ColdGrey`
+  - moderate dirt response;
+  - medium/high pale edge wear;
+  - medium/high dark neutral cracks.
+- `M_PixelStone_HLSL_WetRiver`
+  - strong damp deposit response;
+  - muted edge wear;
+  - very dark damp cracks.
+- `M_PixelStone_HLSL_PaleFrost`
+  - low ordinary dirt response;
+  - strong icy edge wear;
+  - cold dark blue-grey cracks.
+- `M_PixelStone_HLSL_BlackSacred`
+  - almost no ordinary dirt response;
+  - restrained cool grey edge accents;
+  - very strong near-black cracks.
+
+Known limitation:
+
+- This patch deliberately uses per-generated-mass overlay renderers for visible profile-response validation.
+- That is acceptable for prototype validation, but not the intended final scalable solution for many visible rocks.
+- Before using visible line overlays broadly in production chunks, implement chunk-combined feature overlays or another batching strategy.
+
+Validation:
+
+1. Default safety:
+   - `Surface Mask Debug = None`
+   - `Surface Feature Visibility = DebugOnly`
+   - expected: no visible edge/crease overlays.
+
+2. ColdGrey:
+   - `Stone Surface Profile = ColdGreyStone`
+   - `Surface Feature Visibility = VisibleProfileResponse`
+   - expected: dry grey stylized stone, pale worn ridges, dark cracks, subtle lower deposit response.
+
+3. WetRiver:
+   - `Stone Surface Profile = DarkWetRiverStone`
+   - `Surface Feature Visibility = VisibleProfileResponse`
+   - expected: darker damp stone, stronger lower/dirt/deposit response, muted edge wear, deep damp cracks.
+
+4. PaleFrost:
+   - `Stone Surface Profile = PaleFrostStone`
+   - `Surface Feature Visibility = VisibleProfileResponse`
+   - expected: frosted exposed areas, icy pale worn ridges, cold dark cracks, ordinary dirt mostly muted.
+
+5. BlackSacred:
+   - `Stone Surface Profile = BlackSacredStone`
+   - `Surface Feature Visibility = VisibleProfileResponse`
+   - expected: dark monolithic stone, controlled cool edge accents, deep cracks, little/no ordinary dirt.
+
+Pass criteria:
+
+- The same generated mass reads differently across the four stone profiles.
+- `DirtDeposit` visibly affects profile response.
+- Edge wear no longer appears as debug-white/yellow strips in normal rendering.
+- Creases no longer appear as debug-white/yellow strips in normal rendering.
+- Visible overlays only appear when debug mode or `VisibleProfileResponse` is active.
+
+Fail criteria:
+
+- All profiles look like the same rock with only base-colour changes.
+- Overlay strip boards are visible.
+- Wet stone becomes uniformly black.
+- Frost stone ignores exposure and becomes flat.
+- Black sacred stone gets ordinary muddy dirt everywhere.
+- Feature overlays are silently visible in normal rendering without the explicit visibility mode.
+
+### Patch 12H.2 - Stone Profile Tuning Pass
+
+Status: planned after Patch 12H.1 Unity validation.
+
+Checklist status:
+
+- [ ] tune response values per profile after visual screenshots;
+- [ ] decide whether edge-wear/crease overlay colours need profile-specific material variants or remain material-property driven;
+- [ ] decide whether crease lips are needed;
+- [ ] decide whether wet and frost profiles need additional smoothness/specular shaping for feature overlays;
+- [ ] document requirements for chunk-combined visible feature overlays before many-rock production use.
 
 ### Patch 13 - Dirty Surface Mottle and Material Breakup
 

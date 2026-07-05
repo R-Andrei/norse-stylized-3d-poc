@@ -282,6 +282,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -688,6 +689,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -1103,6 +1105,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -1294,6 +1297,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -1667,6 +1671,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -2124,6 +2129,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -3763,6 +3769,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -5871,6 +5878,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -6168,6 +6176,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -7448,6 +7457,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -8335,6 +8345,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -8932,6 +8943,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -9123,6 +9135,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -9357,6 +9370,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -9821,6 +9835,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -10314,6 +10329,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -10601,6 +10617,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -10865,7 +10882,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1380129005}
-  m_Enabled: 0
+  m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -11774,6 +11791,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -12531,6 +12549,7 @@ MonoBehaviour:
   creviceBreakup: 0.664
   dirtCrawlReach: 1.577
   dirtCoverage: 1.051
+  surfaceFeatureVisibility: 1
   edgeWearAmount: 2
   edgeWearWidth: 0.875
   edgeWearCoverage: 2
@@ -12944,6 +12963,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -14991,7 +15011,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1837836103}
-  m_Enabled: 0
+  m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -15114,6 +15134,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -15305,6 +15326,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -15990,6 +16012,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1
@@ -16305,6 +16328,7 @@ MonoBehaviour:
   creviceBreakup: 1
   dirtCrawlReach: 1
   dirtCoverage: 1
+  surfaceFeatureVisibility: 0
   edgeWearAmount: 1
   edgeWearWidth: 1
   edgeWearCoverage: 1

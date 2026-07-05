@@ -20,6 +20,16 @@ Shader "PS3D/Pixel Surface Lit"
         _ExposureTintStrength("Exposure Brighten Strength", Range(0, 0.5)) = 0.04
         _CreviceDarkenStrength("Crevice Darken Strength", Range(0, 0.75)) = 0.075
         _BaseDarkenStrength("Base Darken Strength", Range(0, 0.75)) = 0.04
+
+        [Header(Generated Stone Mask Response)]
+        _StoneDirtResponse("Stone Dirt/Deposit Response", Range(0, 1)) = 0.25
+        _StoneDirtTint("Stone Dirt/Deposit Tint", Color) = (0.42, 0.36, 0.26, 1)
+        _StoneEdgeWearResponse("Stone Edge Wear Response", Range(0, 1)) = 0.5
+        _StoneEdgeWearTint("Stone Edge Wear Tint", Color) = (0.76, 0.74, 0.62, 1)
+        _StoneCreaseResponse("Stone Crease Response", Range(0, 1)) = 0.65
+        _StoneCreaseTint("Stone Crease Tint", Color) = (0.09, 0.085, 0.075, 1)
+        _StoneFeatureClip("Stone Feature Overlay Clip", Range(0, 0.25)) = 0.035
+
         [Enum(ProgrammaticStylized3D.Rendering.PixelSurfaceMaskDebugMode)]
         _MaskDebugMode("Mask Debug Mode", Float) = 0
         [Enum(GeneratedMass,0,Ground,1)]
@@ -132,6 +142,13 @@ Shader "PS3D/Pixel Surface Lit"
                 float _ExposureTintStrength;
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
+                float _StoneDirtResponse;
+                half4 _StoneDirtTint;
+                float _StoneEdgeWearResponse;
+                half4 _StoneEdgeWearTint;
+                float _StoneCreaseResponse;
+                half4 _StoneCreaseTint;
+                float _StoneFeatureClip;
                 float _MaskDebugMode;
                 float _SurfaceContract;
                 float _GroundSnowResponse;
@@ -695,6 +712,41 @@ Shader "PS3D/Pixel Surface Lit"
                 half4 baseSample =
                     SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
 
+                float overlayKind = round(_GeneratedMassFeatureOverlayKind);
+                bool isNormalFeatureOverlay =
+                    round(_MaskDebugMode) <= 0.0 &&
+                    overlayKind > 0.5;
+                if (isNormalFeatureOverlay)
+                {
+                    bool isEdgeWearOverlay = overlayKind == 1.0;
+                    float featureMask = ResolveFeatureLineMask(
+                        input,
+                        isEdgeWearOverlay
+                            ? (float)input.color.a
+                            : (float)input.materialMasks.x,
+                        isEdgeWearOverlay
+                            ? _GeneratedMassEdgeWearSoftness
+                            : _GeneratedMassCreaseSoftness);
+                    clip(featureMask - max(0.0, _StoneFeatureClip));
+
+                    half3 overlayBase =
+                        baseSample.rgb *
+                        _BaseColor.rgb;
+                    half3 overlayTarget =
+                        isEdgeWearOverlay
+                            ? _StoneEdgeWearTint.rgb
+                            : _StoneCreaseTint.rgb;
+                    float overlayResponse =
+                        saturate(
+                            isEdgeWearOverlay
+                                ? _StoneEdgeWearResponse
+                                : _StoneCreaseResponse);
+                    return lerp(
+                        overlayBase,
+                        overlayTarget,
+                        (half)(featureMask * overlayResponse));
+                }
+
                 float broadCellSize = max(_PixelCellSize * 8.0, 0.0001);
                 float3 broadCoordinate =
                     input.positionWS / broadCellSize + _PixelSeed * 0.013;
@@ -749,6 +801,10 @@ Shader "PS3D/Pixel Surface Lit"
                     ResolveShaderCreviceBaseMask(input) * contractMask;
                 float creviceMask =
                     lerp(massCreviceMask, 0.0, isGroundSurface);
+                float massDirtDepositMask =
+                    ResolveShaderDirtDepositMask(input) * contractMask;
+                float dirtDepositMask =
+                    lerp(massDirtDepositMask, 0.0, isGroundSurface);
                 float baseMask = creviceMask * (1.0 - exposureMask);
                 float groundDampDeposit = ResolveGroundDampDepositMask(input);
                 float groundShore = ResolveGroundShoreMask(input);
@@ -818,6 +874,17 @@ Shader "PS3D/Pixel Surface Lit"
                     albedo,
                     groundAlbedo,
                     (half)isGroundSurface);
+
+                float dirtResponseStrength =
+                    dirtDepositMask *
+                    saturate(_StoneDirtResponse) *
+                    lerp(1.0, 1.20, saturate(_Wetness)) *
+                    lerp(1.0, 0.35, saturate(_FrostStrength)) *
+                    lerp(1.0, 0.20, saturate(_MonolithicFlatten));
+                albedo = lerp(
+                    albedo,
+                    albedo * _StoneDirtTint.rgb,
+                    (half)dirtResponseStrength);
 
                 float frostNoise =
                     PS3D_ValueNoise31(broadCoordinate * 1.7 + 71.31);
@@ -968,13 +1035,13 @@ Shader "PS3D/Pixel Surface Lit"
                             flatNormalWS,
                             flatNormalStrength));
                 }
-                half3 albedo = ResolvePixelSurfaceColor(input);
                 half3 debugColor = ResolveMaskDebugColor(input);
                 if (debugColor.r >= 0.0h)
                 {
                     return half4(debugColor, 1.0h);
                 }
 
+                half3 albedo = ResolvePixelSurfaceColor(input);
                 albedo = ApplyStylizedValueShaping(albedo, input, normalWS);
                 InputData inputData = BuildInputData(input, normalWS);
                 SurfaceData surfaceData = BuildSurfaceData(albedo);
@@ -1019,6 +1086,13 @@ Shader "PS3D/Pixel Surface Lit"
                 float _ExposureTintStrength;
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
+                float _StoneDirtResponse;
+                half4 _StoneDirtTint;
+                float _StoneEdgeWearResponse;
+                half4 _StoneEdgeWearTint;
+                float _StoneCreaseResponse;
+                half4 _StoneCreaseTint;
+                float _StoneFeatureClip;
                 float _MaskDebugMode;
                 float _SurfaceContract;
                 float _GroundSnowResponse;
@@ -1170,6 +1244,13 @@ Shader "PS3D/Pixel Surface Lit"
                 float _ExposureTintStrength;
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
+                float _StoneDirtResponse;
+                half4 _StoneDirtTint;
+                float _StoneEdgeWearResponse;
+                half4 _StoneEdgeWearTint;
+                float _StoneCreaseResponse;
+                half4 _StoneCreaseTint;
+                float _StoneFeatureClip;
                 float _MaskDebugMode;
                 float _SurfaceContract;
                 float _GroundSnowResponse;
@@ -1315,6 +1396,13 @@ Shader "PS3D/Pixel Surface Lit"
                 float _ExposureTintStrength;
                 float _CreviceDarkenStrength;
                 float _BaseDarkenStrength;
+                float _StoneDirtResponse;
+                half4 _StoneDirtTint;
+                float _StoneEdgeWearResponse;
+                half4 _StoneEdgeWearTint;
+                float _StoneCreaseResponse;
+                half4 _StoneCreaseTint;
+                float _StoneFeatureClip;
                 float _MaskDebugMode;
                 float _SurfaceContract;
                 float _GroundSnowResponse;
