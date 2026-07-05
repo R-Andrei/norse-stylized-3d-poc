@@ -359,7 +359,8 @@ Checklist:
 - [x] Patch 12G.5 - Edge-wear ridge chain generation
 - [x] Patch 12G.6 - Final edge-wear mask refinement before material response
 - [x] Patch 12H.1 - Profile-specific stone mask response prototype
-- [ ] Patch 12H.2 - Stone profile tuning pass
+- [x] Patch 12H.1B - Disable raised line overlays in normal rendering
+- [x] Patch 12H.2 - Main-surface stone profile tuning pass
 - [ ] Patch 13 - Dirty surface mottle and material breakup
 - [ ] Patch 14 - Crack and seam language
 
@@ -1900,17 +1901,197 @@ Fail criteria:
 - Black sacred stone gets ordinary muddy dirt everywhere.
 - Feature overlays are silently visible in normal rendering without the explicit visibility mode.
 
-### Patch 12H.2 - Stone Profile Tuning Pass
+### Patch 12H.1B - Disable Raised Line Overlays in Normal Rendering
 
-Status: planned after Patch 12H.1 Unity validation.
+Status: implemented as a corrective patch after Patch 12H.1 validation.
+
+Validation finding:
+
+- `VisibleProfileResponse` made the generated line-feature overlay meshes visible during normal rendering.
+- This produced floating/raised ridge and crack strokes above the rock surface.
+- The reason is structural: the line-feature meshes are debug validation geometry and are lifted along the surface normal to avoid z-fighting.
+- That lift is useful for mask debugging but wrong for final stone appearance.
+
+Corrected interpretation:
+
+- The generated line masks remain useful semantic data.
+- The raised overlay meshes should remain debug-only until there is a proper surface-integrated or decal-like feature rendering path.
+- The current material/profile work should continue with the main-surface masks first:
+  - `SurfaceVariation`;
+  - `Exposure`;
+  - `CreviceBase`;
+  - `DirtDeposit`.
 
 Checklist status:
 
-- [ ] tune response values per profile after visual screenshots;
-- [ ] decide whether edge-wear/crease overlay colours need profile-specific material variants or remain material-property driven;
-- [ ] decide whether crease lips are needed;
-- [ ] decide whether wet and frost profiles need additional smoothness/specular shaping for feature overlays;
-- [ ] document requirements for chunk-combined visible feature overlays before many-rock production use.
+- [x] keep accepted mask generation unchanged;
+- [x] keep `ConvexEdgeWear` and `ConcaveCrease` debug modes;
+- [x] stop using raised line overlay meshes as normal visible material response;
+- [x] hide the `Surface Feature Visibility` control from the inspector;
+- [x] make overlay renderers debug-only again in `GeneratedMass`;
+- [x] make the shader discard feature overlay meshes during normal rendering as a safety guard;
+- [x] keep the new dirt/deposit profile response on the main rock surface;
+- [x] keep material profile response properties for future integrated line rendering/tuning;
+- [x] document that final line wear/cracks need a proper surface-integrated/decal-like or batched solution.
+
+Primary files:
+
+- `GeneratedMass.cs`
+- `GeneratedMassEditor.cs`
+- `SH_PixelSurfaceLit.shader`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+GeneratedMass work:
+
+- Overlay renderer enable rules are reverted to debug-only:
+  - `ConvexEdgeWear` debug enables the edge-wear overlay;
+  - `ConcaveCrease` debug enables the crease overlay;
+  - normal rendering keeps both overlays disabled.
+- The serialized visibility field remains only for compatibility with scenes that already received Patch 12H.1, but it is not used to enable normal rendering.
+
+GeneratedMassEditor work:
+
+- The visible-profile-response field is no longer drawn.
+- The `Surface Feature Lines` help text now explicitly states that the raised overlays are debug validation geometry only.
+
+Shader work:
+
+- Normal rendering now discards feature overlay meshes when `_GeneratedMassFeatureOverlayKind > 0` and `_MaskDebugMode == None`.
+- Debug modes still render overlays for validation.
+- Main rock surface response from `DirtDeposit` remains active.
+
+Material profile work:
+
+- The 12H.1 material response properties remain on the four stone materials.
+- For this corrective patch, the line-response values are retained for future integrated line rendering, but raised overlays no longer show them in normal rendering.
+
+Acceptance:
+
+- With `Surface Mask Debug = None`, no floating edge/crease lines should be visible.
+- `SurfaceVariation`, `Exposure`, `CreviceBase`, and `DirtDeposit` should remain available for main-surface profile response.
+- `ConvexEdgeWear` and `ConcaveCrease` remain debug-checkable through their mask modes.
+- The rock should no longer be judged against the reference using raised overlay strokes.
+
+Next step:
+
+- Patch 12H.2 should tune the main-surface stone profiles first.
+- Final visible edge wear and cracks should be reintroduced later through an actual surface-integrated/decal-like solution, not the raised debug strip geometry.
+
+
+### Patch 12H.2 - Main-Surface Stone Profile Tuning Pass
+
+Status: implemented after Patch 12H.1B restored raised feature overlays to debug-only rendering.
+
+Reason for patch:
+
+- Patch 12H.1 proved that the current raised edge/crease overlay meshes are the wrong carrier for final visible stone detail.
+- Patch 12H.1B correctly parked `ConvexEdgeWear` and `ConcaveCrease` as debug-only semantic masks.
+- The useful next step is therefore not another overlay toggle; it is making the accepted main-surface masks distinguish the four stone profiles.
+- The normal rendered rock should now be judged with `Surface Mask Debug = None`.
+
+Main-surface masks used by this patch:
+
+- `SurfaceVariation` / vertex colour variation and pixel-cell variation;
+- `Exposure` / vertex colour green;
+- `CreviceBase` / shader-space lower shelter/contact mask;
+- `DirtDeposit` / shader-space lower crawl/deposit mask.
+
+Masks deliberately not used for final rendering in this patch:
+
+- `ConvexEdgeWear`;
+- `ConcaveCrease`.
+
+Those remain debug-checkable only until a later surface-integrated, decal-like, or batched line-feature solution is approved.
+
+Checklist status:
+
+- [x] keep accepted generated mass geometry and mask-generation scripts unchanged;
+- [x] keep raised edge/crease overlay meshes debug-only;
+- [x] make wet stone darken primarily through lower damp/deposit/crevice zones instead of a flat whole-rock blackening pass;
+- [x] make frost response depend more strongly on exposed/top planes and less on ordinary dirt;
+- [x] preserve controlled mask relief on black sacred stone instead of flattening it into a featureless black block;
+- [x] tune the four HLSL stone material assets so they are more than base-colour swaps;
+- [x] avoid adding new inspector controls, systems, layers, tags, components, or generated data contracts.
+
+Primary files:
+
+- `SH_PixelSurfaceLit.shader`
+- `M_PixelStone_HLSL_ColdGrey.mat`
+- `M_PixelStone_HLSL_WetRiver.mat`
+- `M_PixelStone_HLSL_PaleFrost.mat`
+- `M_PixelStone_HLSL_BlackSacred.mat`
+- `Rock_Generated_Mass_Upgrade_Plan.md`
+
+Shader work:
+
+- Introduced a local `dampGatherMask` derived from:
+  - `DirtDeposit`;
+  - `CreviceBase`;
+  - lower/base shelter;
+  - reduced by `Exposure`.
+- WetRiver-style darkening now has two parts:
+  - a stronger local damp/deposit response where water and grime would collect;
+  - a much smaller global darkening pass to preserve overall wet identity without making the whole rock a uniform black blob.
+- Dirt response remains material-driven through `_StoneDirtResponse` and `_StoneDirtTint`, but profile factors now suppress ordinary dirt more strongly for frost and monolithic profiles.
+- Frost response now weights `Exposure` more heavily and subtracts some dirt/deposit influence so frost reads as pale exposed accumulation rather than brown dirt painted white.
+- Monolithic/black sacred flattening now preserves a small amount of semantic relief from exposure, crevice, base, and broad variation instead of completely overwriting the surface with a flat target colour.
+
+Material profile work:
+
+- `ColdGreyStone`
+  - slightly stronger exposure lift;
+  - slightly stronger crevice/base structure;
+  - modest grey-brown dirt deposit;
+  - readable dry tonal breakup.
+- `DarkWetRiverStone`
+  - stronger damp deposit response;
+  - lower global wet darkening;
+  - slightly stronger crevice/base dampening;
+  - smoother/softer pixel breakup without erasing all variation.
+- `PaleFrostStone`
+  - stronger frost strength, coverage, and contrast;
+  - stronger exposure/frost lift;
+  - ordinary dirt heavily reduced and cold-muted;
+  - darker cold crevices for contrast.
+- `BlackSacredStone`
+  - ordinary dirt almost suppressed;
+  - monolithic flattening reduced enough to preserve controlled relief;
+  - subtle cool exposure highlight;
+  - dark base colour and restrained pixel breakup.
+
+Validation:
+
+1. Set `Surface Mask Debug = None`.
+2. Cycle the same generated mass through:
+   - `ColdGreyStone`;
+   - `DarkWetRiverStone`;
+   - `PaleFrostStone`;
+   - `BlackSacredStone`.
+3. Judge only the normal rendered rock surface, not the edge/crease debug views.
+
+Expected pass:
+
+- no floating line overlays are visible;
+- the four profiles read as different stone identities, not only different base colours;
+- `DarkWetRiverStone` is damp and darker mostly in lower/deposit/sheltered areas, not uniformly black;
+- `PaleFrostStone` reads pale and cold on exposed planes, with ordinary dirt mostly suppressed;
+- `BlackSacredStone` reads dark and monolithic while still retaining controlled surface relief;
+- `ColdGreyStone` remains the readable dry baseline.
+
+Expected fail:
+
+- any raised edge/crease strip appears with `Surface Mask Debug = None`;
+- WetRiver becomes a flat black blob;
+- PaleFrost becomes flat white paint;
+- BlackSacred becomes featureless black;
+- all four profiles differ only by base colour.
+
+Next step after visual validation:
+
+- If this pass is accepted, move to broader dirty surface mottle/material breakup or the later surface-integrated crack/edge language.
+- Do not re-enable raised line overlays as final rendering.
+- Final visible `ConvexEdgeWear` and `ConcaveCrease` still require a later dedicated solution.
+
 
 ### Patch 13 - Dirty Surface Mottle and Material Breakup
 
@@ -2023,3 +2204,118 @@ After the above is accepted, consider a `GeneratedMassCluster` authoring compone
 - can use the same material variants and vertex colour contract.
 
 This should be a separate system after the single-mass upgrade is proven.
+
+
+## Patch 12H.2B - CreviceBase Organic Fade Correction - Implemented
+
+Patch 12H.2B corrects the first visual-validation failure from 12H.2: `CreviceBase` could read as a straight horizontal band across large generated stones, especially when frost or darker profile values amplified it. The correction keeps the same semantic mask but makes its boundary more organic and less abrupt.
+
+Changed behavior:
+
+- `CreviceBase` boundary height now uses additional seed-stable vertical and contour noise, so the upper edge is irregular instead of a clean object-height stripe.
+- The lower-region transition uses a wider feather and a soft edge fade, so the effect fades in/out instead of snapping from clean stone to dark band.
+- The side shelter portion can now fade almost to zero in broken regions, while the very bottom contact core remains thin and subdued.
+- The four stone material profiles reduce crevice/base darkening slightly, with the strongest reduction on `PaleFrostStone`, where the straight band was most visually destructive.
+
+This patch still does not re-enable `ConvexEdgeWear` or `ConcaveCrease` as final visible overlays. Those remain debug-only until the later surface-integrated line-feature pass.
+
+
+## Patch 12H.2C - CreviceBase Wide Fade Correction - Implemented
+
+Patch 12H.2C corrects the failed 12H.2B visual result. The prior correction still behaved like a horizontal threshold: it moved the band slightly, but it did not remove the abrupt two-zone split between lower/base colour and upper body colour.
+
+Changed behavior:
+
+- `CreviceBase` no longer relies on a crisp lower-region threshold. Its vertical falloff now spans a broad normalized height range so the material response eases in gradually instead of forming a visible stripe.
+- The local boundary is warped much more strongly by seed-stable low-frequency XZ noise, vertical noise, contour noise, and facet variation. This makes the effective height vary per area instead of tracking a clean object-space horizontal contour.
+- The side-shelter component is weaker and more veil-like. It is intended to add broad grounding/shelter information, not a rectangular lower belt.
+- Final albedo interpretation now weights `CreviceBase` less aggressively in semantic darkening, wet dampening, frost suppression, and monolithic relief. This prevents material profiles from amplifying the mask into a hard visual cutoff.
+- Stone material profiles reduce crevice/base darkening again, especially on `PaleFrostStone`, because frost was the easiest profile to turn into an obvious two-tone block.
+
+Validation remains: `Surface Mask Debug = None`. The expected result is not a perfect final crevice system; it is simply that `CreviceBase` must no longer create a straight or abrupt band in normal rendering.
+
+
+## Patch 12H.2D — Organic Lower Accumulation Gradient Correction
+
+Problem addressed:
+- The previous CreviceBase material response still read as a rectangular lower band.
+- The visible artifact was caused by two stacked height-driven effects: the CreviceBase visual model still behaved like a lower region mask, and the later stylized value-shaping pass also applied an independent object-space bottom darken band.
+
+What changed:
+- Replaced the threshold-like CreviceBase visual model with a broad organic lower accumulation gradient.
+- The lower response now fades upward gradually, with stronger seeded height variation across the whole fade envelope rather than only at the top contour.
+- The stylized value-shaping bottom darken now uses a generated-mass-specific organic bottom mask instead of a simple object-space Y band.
+- Stone material profile values were reduced again for bottom/crevice darkening so the lower grounding reads as a soft accumulation effect rather than a hard painted region.
+
+Intended validation:
+- With `Surface Mask Debug = None`, the lower region should no longer read as a light/dark rectangle separated by a straight abrupt line.
+- The lower grounding should instead fade gradually and irregularly into the rest of the stone surface.
+
+
+## Patch 12H.2E — Crevice Reach / Smoothness Decoupling
+
+Problem addressed:
+- Patch 12H.2D improved the hard rectangle, but default Crevice Reach still climbed too high on large flat masses.
+- Lowering Crevice Reach also compressed the fade, so low reach settings could become abrupt again.
+- Broad lobe variation was too weak, so the lower response still read as a softened continuous band rather than varied relief.
+
+What changed:
+- Added a separate `Crevice Smoothness` control under Surface Mask Tuning.
+- `Crevice Reach` now primarily controls crawl height.
+- `Crevice Smoothness` controls the upward fade length independently from reach.
+- Retuned default crawl height downward so reach 1 is moderate instead of occupying nearly half the object.
+- Strengthened broad lobe variation so some sections fade out low, some crawl higher, and some nearly vanish.
+- Reduced generated-mass bottom/crevice value-shaping so the material response does not amplify the lower field back into a visible band.
+
+Validation target:
+- With `Surface Mask Debug = None`, default reach/smoothness should read as a lower accumulation fade, not a half-height skirt.
+- Low reach should remain soft when Crevice Smoothness is left at or above default.
+- Increasing Crevice Smoothness should broaden the fade without necessarily raising the maximum crawl height as much as Crevice Reach does.
+
+
+## Patch 12H.2F — Lobe Crawl Crevice/Base Correction
+
+Problem addressed:
+- 12H.2E reduced the default reach, but the result still read as a continuous lower skirt with a soft top contour.
+- The previous mask averaged several noise fields, which kept most of the side face in a middle value and prevented strong local highs/lows.
+
+What changed:
+- Replaced the continuous lower-skirt model with a domain-warped lobe crawl field.
+- Weak regions are now allowed to fall nearly absent instead of keeping a permanent minimum band.
+- Strong regions can crawl higher, producing broader height variation across the rock width.
+- `Crevice Reach` remains crawl-height control, while `Crevice Smoothness` remains fade-length control.
+- The generic bottom value-shaping pass now follows the same lobe field very weakly, preventing a second object-space bottom band.
+- Reduced material-side bottom/crevice amplification so the mask reads as accumulation relief instead of a painted layer.
+
+Validation target:
+- With `Surface Mask Debug = None`, default reach/smoothness/breakup should no longer show a smooth continuous skirt.
+- Some areas should crawl higher, some should remain low or nearly absent, while every active area still fades gradually from lower accumulation into the upper stone.
+
+
+## Patch 12H.2G — Side-Surface Crevice Lobe Correction
+
+Problem addressed:
+- Patch 12H.2F improved the banding problem, but the lobe field was still based primarily on object-space XZ footprint projection.
+- On large side faces, that let entire back/side faces fall into inactive footprint-lobe regions, so only some faces showed crevice/base accumulation.
+- `Crevice Breakup` also acted too much like extra reach/coverage because it lowered lobe thresholds instead of increasing local relief contrast.
+
+What changed:
+- Added side-surface-aware lobe projection:
+  - Z-facing side faces vary primarily along local X.
+  - X-facing side faces vary primarily along local Z.
+  - Dominant +X, -X, +Z, and -Z sides receive separate phases so coverage does not disappear or mirror across entire faces.
+- Reworked lobe presence and lobe height as separate fields.
+- Reworked `Crevice Breakup` so it increases side-to-side height contrast and local interruption instead of simply raising overall reach.
+- Restored some default material response so `Crevice Reach = 1`, `Crevice Smoothness = 1`, and `Crevice Breakup = 1` should be visible without returning to a hard lower band.
+- Kept the separate generated-mass bottom value shaping very weak and driven by the same lobe field, so it does not reintroduce a horizontal skirt.
+
+Validation target:
+- `Surface Mask Debug = None`
+- `Crevice Reach = 1`
+- `Crevice Smoothness = 1`
+- `Crevice Breakup = 1`
+
+Expected result:
+- All side faces should show some lower accumulation.
+- The effect should vary across each side face instead of appearing only on two faces.
+- Increasing `Crevice Breakup` should add more height relief/local interruption, not merely increase total reach.

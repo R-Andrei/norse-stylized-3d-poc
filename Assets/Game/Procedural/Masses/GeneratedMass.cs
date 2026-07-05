@@ -348,6 +348,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Shader.PropertyToID("_GeneratedMassMaskBaseLift");
         private static readonly int GeneratedMassCreviceReachId =
             Shader.PropertyToID("_GeneratedMassCreviceReach");
+        private static readonly int GeneratedMassCreviceSmoothnessId =
+            Shader.PropertyToID("_GeneratedMassCreviceSmoothness");
         private static readonly int GeneratedMassCreviceBreakupId =
             Shader.PropertyToID("_GeneratedMassCreviceBreakup");
         private static readonly int GeneratedMassDirtCrawlReachId =
@@ -395,12 +397,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float surfaceMaskBaseLift;
 
-        [Tooltip("Scales how far the CreviceBase mask may climb from the generated base/contact area.")]
+        [Tooltip("Scales how far the CreviceBase accumulation may crawl upward from the generated base/contact area.")]
         [Range(0.25f, 2f)]
         [SerializeField]
         private float creviceReach = 1f;
 
-        [Tooltip("Controls how interrupted the CreviceBase lower belt is. Lower values are smoother; higher values break the belt more aggressively.")]
+        [Tooltip("Controls how gradually the CreviceBase accumulation fades out upward, independently from reach. Higher values create a longer, softer transition.")]
+        [Range(0.25f, 2f)]
+        [SerializeField]
+        private float creviceSmoothness = 1f;
+
+        [Tooltip("Controls how interrupted the CreviceBase accumulation field is. Lower values are smoother; higher values break the field more aggressively.")]
         [Range(0.25f, 2f)]
         [SerializeField]
         private float creviceBreakup = 1f;
@@ -528,6 +535,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public Color BaseColor => baseColor;
         public float SurfaceMaskBaseLift => surfaceMaskBaseLift;
         public float CreviceReach => creviceReach;
+        public float CreviceSmoothness => creviceSmoothness;
         public float CreviceBreakup => creviceBreakup;
         public float DirtCrawlReach => dirtCrawlReach;
         public float DirtCoverage => dirtCoverage;
@@ -836,6 +844,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 GeneratedMassCreviceReachId,
                 Mathf.Clamp(creviceReach, 0.25f, 2f));
             materialProperties.SetFloat(
+                GeneratedMassCreviceSmoothnessId,
+                Mathf.Clamp(creviceSmoothness, 0.25f, 2f));
+            materialProperties.SetFloat(
                 GeneratedMassCreviceBreakupId,
                 Mathf.Clamp(creviceBreakup, 0.25f, 2f));
             materialProperties.SetFloat(
@@ -858,16 +869,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float localHeight,
             float localXZScale)
         {
-            bool visibleProfileResponse =
-                surfaceMaskDebug == StoneSurfaceMaskDebug.None &&
-                surfaceFeatureVisibility ==
-                StoneSurfaceFeatureVisibility.VisibleProfileResponse;
-
+            // The generated line meshes are debug validation geometry. They are
+            // intentionally lifted above the mass surface to prevent z-fighting,
+            // which makes them unsuitable as the final visible stone response.
+            // Keep them debug-only until a decal-like or chunk-batched
+            // surface-integrated feature path is implemented.
             ApplySingleSurfaceFeatureOverlayMaterialProperties(
                 edgeWearFeatureMeshRenderer,
                 1f,
-                surfaceMaskDebug == StoneSurfaceMaskDebug.ConvexEdgeWear ||
-                visibleProfileResponse,
+                surfaceMaskDebug == StoneSurfaceMaskDebug.ConvexEdgeWear,
                 meshBounds,
                 localHeight,
                 localXZScale);
@@ -875,8 +885,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ApplySingleSurfaceFeatureOverlayMaterialProperties(
                 creaseFeatureMeshRenderer,
                 2f,
-                surfaceMaskDebug == StoneSurfaceMaskDebug.ConcaveCrease ||
-                visibleProfileResponse,
+                surfaceMaskDebug == StoneSurfaceMaskDebug.ConcaveCrease,
                 meshBounds,
                 localHeight,
                 localXZScale);
@@ -952,6 +961,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             surfaceFeatureMaterialProperties.SetFloat(
                 GeneratedMassCreviceReachId,
                 Mathf.Clamp(creviceReach, 0.25f, 2f));
+            surfaceFeatureMaterialProperties.SetFloat(
+                GeneratedMassCreviceSmoothnessId,
+                Mathf.Clamp(creviceSmoothness, 0.25f, 2f));
             surfaceFeatureMaterialProperties.SetFloat(
                 GeneratedMassCreviceBreakupId,
                 Mathf.Clamp(creviceBreakup, 0.25f, 2f));

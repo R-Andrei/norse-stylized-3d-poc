@@ -12,13 +12,17 @@ Canonical architecture lives in `River_Foam_Stage6_Architecture.md`. Macro stage
 
 The Foam system is in the `4.11C` manually-born persistent material phase.
 
-The recent 5.4l refactor fixed the hidden spawn-scaling issue: one manual spawn pattern now maps to one budgeted composition event instead of several hidden progressive writers. That was necessary, but it did not solve visual quality.
+The 5.4l refactor fixed the hidden spawn-scaling issue: one manual spawn now maps to one budgeted composition event instead of several hidden progressive writers.
 
-Current visual failure:
+The 5.4m realignment removes the old pattern/complexity/density birth controls from the active manual workflow and makes manual birth a single canonical source again. The source-fill field is keyed from source controls rather than event count, so repeated starts with the same settings keep the same broad footprint. This is intentionally plainer: birth should create stable candidate material, while later material evolution owns macro/meso breakup and the renderer owns micro breakup.
 
-- repeated manual births can still produce tiny chips, fat slugs, or disconnected blobs with the same settings;
-- birth-time pattern/noise logic is still deciding macro shape identity;
-- Foam does not yet read like the reference river's broad broken sheets, contour ribbons, connectors, and peeling strips.
+Current visual/lifecycle state after 5.5b/5.5c:
+
+- 5.5b made intrinsic macro deformation visible, but introduced an unacceptable lifecycle regression by letting `Presence` depletion shorten material life independently of `Remaining Life`;
+- 5.5c repairs lifecycle authority: `Remaining Life`, Neutral Lifetime, and topology aging are the only systems allowed to decide when material dies;
+- intrinsic macro deformation remains the current direction before river-disturbance coupling;
+- organic breakup is still too weak or blurry;
+- topology interaction, lateral drift, disturbance coupling, and obstacle behavior are not yet proven.
 
 ## Hard rules for the next patches
 
@@ -38,11 +42,13 @@ Do not let birth-time randomness decide whether a source becomes a chip, slug, s
 
 Do not proceed to automatic population until manually-born material can move, morph, age, and interact correctly.
 
-## Blocker 0 — Manual source realignment
+Keep the layer split explicit: birth creates stable source material; persistent material simulation owns macro/meso reconfiguration, but must not shorten lifespan outside the Remaining Life equation; the final shader owns micro breakup and crisp presentation.
+
+## Completed precondition — Manual source realignment
 
 ### Symptom
 
-The current manual birth path can produce wildly different macro results with the same settings: tiny fragments, short tadpoles, fat blobs, or disconnected islands.
+Before 5.4m, the manual birth path could produce wildly different macro results with the same settings: tiny fragments, short tadpoles, fat blobs, or disconnected islands.
 
 ### Why it matters
 
@@ -58,9 +64,14 @@ Manual birth should create a bounded, stable candidate source with predictable m
 
 `Amount` remains source-only spatial fill. It must not act as life, opacity, or random macro deletion.
 
-### Next patch target
+### Implemented target
 
 `4.11C.5.4m — Manual Source Realignment`
+
+
+### Inspector organization rule
+
+All manual birth controls live under `Foam Debug > Manual Birth Source`. Persistent travel diagnostics live under `Material Motion`; stored/visible footprint diagnostics live under `Material Shape`. Do not scatter source controls into unrelated foldouts.
 
 ### Acceptance gate
 
@@ -94,13 +105,21 @@ Too much visual identity is defined at birth. Existing render/material breakup i
 
 Existing Foam should visibly change over time without creating hidden material and without using topology as motion guidance. Edges should crawl, interiors should breathe/break, and near-death material should visibly fragment or thin.
 
-### Next patch target
+### Implemented targets
 
-`4.11C.5.5 — Temporal Morphing and Material Shape Evolution`
+`4.11C.5.5 — Persistent Foam Morphing and Gradual Erosion` added the first conservative pass, but validation showed it was too local and edge-biased.
+
+`4.11C.5.5b — Macro Material Deformation` strengthens persistent-state deformation so the stored material body bends, stretches, and changes width distribution over time.
+
+`4.11C.5.5c — Lifecycle Authority Repair` removes the regression where simulation-side `Presence` erosion and empty-sample blending could make Foam disappear before `Remaining Life` expired.
+
+### Accepted layer split
+
+This is persistent material-simulation behavior, not topology and not final shader-only polish. The simulation may reconfigure stored `Presence` over time so a patch can stretch, bend, and crawl. It may not delete material independently of `Remaining Life`; visual thinning/fragmentation must either be driven by the lifecycle equation or remain presentation-only until a lifecycle-safe stored-fragmentation design is approved. The renderer remains responsible for micro fracture and final crispness.
 
 ### Acceptance gate
 
-A manually-born patch observed over several seconds changes silhouette and interior structure while remaining recognizably the same material body. It must not inflate, snap, or disappear independently of Remaining Life.
+A manually-born patch observed over several seconds changes `Material Presence`, not only Final Foam. It should show clear macro change: altered curvature, different width distribution, and local stretch/compression. It must not grow without bounds, snap, create new topology-painted material, or disappear independently of `Remaining Life`. River disturbance coupling is explicitly deferred to a later patch after intrinsic Foam morphology is proven.
 
 ## Blocker 2 — Too blurry / weak organic breakup
 
@@ -208,12 +227,11 @@ Foam contacting obstacle footprint no longer produces dominant hard rectangular/
 
 ## Recommended sequence
 
-1. `4.11C.5.4m — Manual Source Realignment`
-2. `4.11C.5.5 — Temporal Morphing and Material Shape Evolution`
-3. `4.11C.5.6 — Organic Breakup and Edge Readability`
-4. `4.11C.5.7 — Topology Aging Proof and Calibration`
-5. `4.11C.5.8 — Controlled Lateral Drift and Obstacle Tangential Flow`
-6. `4.11C.5.9 — Obstacle Boundary Repair`
+1. Validate `4.11C.5.5c — Lifecycle Authority Repair` in Final Foam, Material Presence, and Foam + Aging Topology views.
+2. `4.11C.5.6 — Organic Breakup and Edge Readability`
+3. `4.11C.5.7 — Topology Aging Proof and Calibration`
+4. `4.11C.5.8 — Controlled Lateral Drift and Obstacle Tangential Flow`
+5. `4.11C.5.9 — Obstacle Boundary Repair`
 
 Only after these pass should the project continue to automatic anchored/open-water birth population.
 

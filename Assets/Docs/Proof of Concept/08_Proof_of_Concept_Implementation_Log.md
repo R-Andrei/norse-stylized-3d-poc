@@ -682,7 +682,7 @@ Do not begin production terrain placement, dynamic rock physics, or a universal 
 
 ## River Foam 4.11C.5.4j–5.4l — Spawn UI and Budgeting Summary
 
-This group of patches cleaned the manual Foam spawning workflow and corrected a hidden runtime scaling problem. The old manual button wall was removed, spawning stayed under one `Foam Debug > Spawning` workflow, and 5.4l changed one user-facing spawn into one budgeted composition event instead of several hidden progressive writer events. Birth dispatches are now internally budgeted by quality tier.
+This group of patches cleaned the manual Foam spawning workflow and corrected a hidden runtime scaling problem. The old manual button wall was removed, manual birth stayed in a dedicated Foam Debug workflow, and 5.4l changed one user-facing spawn into one budgeted composition event instead of several hidden progressive writer events. Birth dispatches are now internally budgeted by quality tier.
 
 Important correction: these patches did **not** solve the reference visual language. The later pattern/shape logic still produced chip/slug/blob births and should not be treated as the accepted Foam morphology direction.
 
@@ -697,3 +697,41 @@ The river/Foam documents were consolidated to avoid conflicting long-form plans.
 Older material-state, topology, progressive-scheduling, and problem-register documents should be removed after their stable content is merged into the three active docs.
 
 Next actionable item: `4.11C.5.4m — Manual Source Realignment`, before temporal morphing or automatic Foam population.
+
+## River Foam 4.11C.5.4m — Manual Source Realignment
+
+Manual Foam birth was simplified back to a stable source contract. The active Inspector workflow is now `Foam Debug > Manual Birth Source` rather than pattern-driven spawning. Pattern, Complexity, and Density were removed from the active manual controls because they were obsolete birth-time art controls and made the same settings produce chip/slug/blob macro identities.
+
+Birth injection now writes a canonical moving source using source Amount, Initial Remaining Life, Half Width, and optional Source Path Motion. Destructive pattern/composition masks were removed from the compute birth path, and source-fill seeding is derived from source controls instead of event count so repeated identical starts are comparable. This does not solve final Foam beauty; it gives later temporal morphing, organic breakup, topology calibration, and obstacle tests a trustworthy material source.
+
+Next actionable item: `4.11C.5.5 — Temporal Morphing and Material Shape Evolution`.
+
+
+## River Foam 4.11C.5.4m-hotfix — Inspector Control Cleanup
+
+The Foam Debug Inspector organization was corrected after the manual source realignment. All manual birth controls now live under `Foam Debug > Manual Birth Source`, with subgroups for Source Position, Source Material, Source Shape, Source Path Motion, Actions, and State. Persistent downstream travel diagnostics are labelled `Material Motion`; stored/visible footprint diagnostics are labelled `Material Shape`.
+
+No runtime Foam behavior changed in this hotfix.
+
+Next actionable item: `4.11C.5.5 — Temporal Morphing and Material Shape Evolution`.
+
+## River Foam 4.11C.5.5 — Persistent Foam Morphing and Gradual Erosion
+
+Added the first persistent material-simulation shape evolution pass. Manual birth remains a stable source; topology remains influence-only; the final shader remains responsible for micro breakup and presentation. The compute simulation now lets stored Foam `Presence` subtly reconfigure over time through flow-aligned/lateral sampling, then applies slower edge-, age-, and topology-biased erosion. This is intended to make `Material Presence` itself change shape instead of relying only on final shader masking.
+
+No manual birth controls, automatic population, topology generation, obstacle sliding, or Inspector layout were changed.
+
+Next actionable item after validation: `4.11C.5.6 — Organic Breakup and Edge Readability`.
+
+## River Foam 4.11C.5.5b — Macro Material Deformation
+
+Validation showed that 5.5 mostly produced edge roughening and gradual erosion while the stored Foam body still read as a rigid strip. 5.5b strengthens the persistent material simulation layer: `Material Presence` is now backtraced from several low-frequency flow-space deformation samples so existing Foam can visibly bend, stretch, locally widen/narrow, and alter its silhouette over time. Erosion remains a slower separate trend.
+
+This is still intrinsic Foam morphology only. River disturbance/wave coupling is intentionally documented as a later explicit step, not hidden inside this patch. No manual birth controls, topology generation, automatic population, obstacle sliding/clipping, or Inspector layout were changed.
+
+
+## River Foam 4.11C.5.5c — Lifecycle Authority Repair
+
+Validation of 5.5b showed a project-breaking regression: Foam could disappear in 1–2 seconds even with long Neutral Lifetime and strong support. The audit found two independent non-lifecycle death paths introduced by the morphing work: explicit simulation-side `Presence` erosion and morph blending against empty samples that could reduce existing material below visibility before `Remaining Life` expired.
+
+5.5c removes simulation-side `Presence` erosion and preserves existing-cell `Presence` during morphing. Stored morphing may still bend/stretch/reconfigure material, but material death is again controlled only by `Remaining Life`, whose delta comes from Neutral Lifetime and topology aging influence. No Inspector, birth, topology, automatic population, or obstacle behavior changed.

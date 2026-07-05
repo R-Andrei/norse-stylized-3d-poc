@@ -97,15 +97,6 @@ namespace ProgrammaticStylized3D.Rivers
         MaterialRemainingLife = 4
     }
 
-    public enum StylizedRiverFoamSpawnPreset
-    {
-        CompactDiagnostic = 0,
-        ThinScratchStreaks = 1,
-        FracturedRibbonBundle = 2,
-        ShoreSkirt = 3,
-        SmoothSurfaceLane = 4,
-        TornSheetRibbon = 5
-    }
 
     public enum StylizedRiverDisturbanceDebugView
     {
@@ -211,12 +202,6 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamSpawnScale = 0.03f;
         private const float MaximumFoamSpawnScale = 1.25f;
         private const float DefaultFoamSpawnScale = 0.18f;
-        private const float MinimumFoamSpawnComplexity = 0f;
-        private const float MaximumFoamSpawnComplexity = 1f;
-        private const float DefaultFoamSpawnComplexity = 0.65f;
-        private const float MinimumFoamSpawnDensity = 0f;
-        private const float MaximumFoamSpawnDensity = 1f;
-        private const float DefaultFoamSpawnDensity = 0.55f;
 
 
         [Header("Setup")]
@@ -810,10 +795,6 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private StylizedRiverFoamDebugView foamDebugView =
             StylizedRiverFoamDebugView.Final;
 
-        [Tooltip("Canonical manual foam-spawn pattern. Each pattern now starts one budgeted composition event; internal strands or sheet fragments are resolved inside the bounded material birth pass instead of by spawning extra runtime writers.")]
-        [HideInInspector, SerializeField]
-        private StylizedRiverFoamSpawnPreset foamSpawnPreset =
-            StylizedRiverFoamSpawnPreset.FracturedRibbonBundle;
 
         [FormerlySerializedAs("foamTestDistanceNormalized")]
         [HideInInspector, SerializeField, Range(0f, 1f)]
@@ -823,7 +804,7 @@ namespace ProgrammaticStylized3D.Rivers
         [HideInInspector, SerializeField, Range(-1f, 1f)]
         private float foamSpawnAcrossNormalized;
 
-        [Tooltip("Overall world-space size of the selected foam-spawn pattern. Pattern definitions interpret this as strand half-width, sheet half-width, or compact diagnostic radius.")]
+        [Tooltip("World-space half-width of the canonical manual source. This is source material footprint size, not final Foam fracture or renderer detail.")]
         [FormerlySerializedAs("foamSpawnRibbonHalfWidth")]
         [FormerlySerializedAs("foamSpawnPatchRadius")]
         [FormerlySerializedAs("foamTestProgressiveRibbonHalfWidth")]
@@ -841,17 +822,8 @@ namespace ProgrammaticStylized3D.Rivers
         [HideInInspector, SerializeField, Range(0f, 1f)]
         private float foamSpawnRemainingLife = 1f;
 
-        [Tooltip("Pattern-level shape complexity. Higher values add more strands, gaps, offset fragments, width variation, and sheet tearing according to the selected pattern.")]
-        [HideInInspector, SerializeField]
-        [Range(MinimumFoamSpawnComplexity, MaximumFoamSpawnComplexity)]
-        private float foamSpawnComplexity = DefaultFoamSpawnComplexity;
 
-        [Tooltip("Pattern-level density. Higher values add more virtual strands or more continuous material inside the selected composition without increasing active runtime event count.")]
-        [HideInInspector, SerializeField]
-        [Range(MinimumFoamSpawnDensity, MaximumFoamSpawnDensity)]
-        private float foamSpawnDensity = DefaultFoamSpawnDensity;
-
-        [Tooltip("Duration of the budgeted moving-head composition birth event.")]
+        [Tooltip("Duration of the budgeted moving-head manual source event.")]
         [FormerlySerializedAs("foamTestProgressiveRibbonDuration")]
         [HideInInspector, SerializeField]
         [Range(
@@ -860,7 +832,7 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamSpawnRibbonDuration =
             DefaultFoamProgressiveRibbonDuration;
 
-        [Tooltip("Net downstream distance travelled by the progressive emission head while the event is active.")]
+        [Tooltip("Net downstream distance travelled by the manual source head while the event is active.")]
         [FormerlySerializedAs("foamTestProgressiveRibbonTravelDistance")]
         [HideInInspector, SerializeField]
         [Range(
@@ -1346,7 +1318,6 @@ namespace ProgrammaticStylized3D.Rivers
                 MaximumFoamMaterialFlowSpeedMultiplier);
         public Color FoamColour => foamColour;
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
-        public StylizedRiverFoamSpawnPreset FoamSpawnPreset => foamSpawnPreset;
         public float FoamSpawnDistanceNormalized =>
             foamSpawnDistanceNormalized;
         public float FoamSpawnAcrossNormalized =>
@@ -1358,10 +1329,6 @@ namespace ProgrammaticStylized3D.Rivers
                 MaximumFoamSpawnScale);
         public float FoamSpawnAmount => foamSpawnAmount;
         public float FoamSpawnRemainingLife => foamSpawnRemainingLife;
-        public float FoamSpawnComplexity =>
-            Mathf.Clamp01(foamSpawnComplexity);
-        public float FoamSpawnDensity =>
-            Mathf.Clamp01(foamSpawnDensity);
         public float FoamSpawnRibbonDuration =>
             Mathf.Clamp(
                 foamSpawnRibbonDuration,
@@ -2140,23 +2107,12 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            float spawnAcross = foamSpawnAcrossNormalized;
-            if (foamSpawnPreset == StylizedRiverFoamSpawnPreset.ShoreSkirt)
-            {
-                spawnAcross = Mathf.Abs(foamSpawnAcrossNormalized) < 0.65f
-                    ? (foamSpawnAcrossNormalized < 0f ? -0.86f : 0.86f)
-                    : Mathf.Clamp(foamSpawnAcrossNormalized, -0.95f, 0.95f);
-            }
-
             return runtime.StartFoamCompositionNormalized(
-                foamSpawnPreset,
                 foamSpawnDistanceNormalized,
-                spawnAcross,
+                foamSpawnAcrossNormalized,
                 FoamSpawnScale,
                 foamSpawnAmount,
                 foamSpawnRemainingLife,
-                FoamSpawnComplexity,
-                FoamSpawnDensity,
                 foamSpawnRibbonDuration,
                 foamSpawnRibbonTravelDistance,
                 foamSpawnRibbonAcrossDrift,
@@ -2969,8 +2925,6 @@ namespace ProgrammaticStylized3D.Rivers
             foamSpawnAmount = Mathf.Clamp01(foamSpawnAmount);
             foamSpawnRemainingLife = Mathf.Clamp01(
                 foamSpawnRemainingLife);
-            foamSpawnComplexity = Mathf.Clamp01(foamSpawnComplexity);
-            foamSpawnDensity = Mathf.Clamp01(foamSpawnDensity);
             foamSpawnRibbonDuration = Mathf.Clamp(
                 foamSpawnRibbonDuration,
                 MinimumFoamProgressiveRibbonDuration,

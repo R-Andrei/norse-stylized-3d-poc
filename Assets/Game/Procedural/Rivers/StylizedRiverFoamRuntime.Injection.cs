@@ -391,18 +391,7 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat("_FoamInjectionShapeVariety", injection.ShapeVariety);
             computeShader.SetFloat(
                 "_FoamInjectionCompound",
-                injection.CompoundShape || injection.SegmentSheetStyle
-                    ? 1f
-                    : 0f);
-            computeShader.SetFloat(
-                "_FoamInjectionCompositionPattern",
-                (float)injection.CompositionPattern);
-            computeShader.SetFloat(
-                "_FoamInjectionCompositionComplexity",
-                injection.CompositionComplexity);
-            computeShader.SetFloat(
-                "_FoamInjectionCompositionDensity",
-                injection.CompositionDensity);
+                injection.CompoundShape ? 1f : 0f);
             computeShader.SetFloat(
                 "_FoamInjectionSegment",
                 injection.SegmentShape ? 1f : 0f);

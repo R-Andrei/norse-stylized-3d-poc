@@ -30,7 +30,7 @@ namespace ProgrammaticStylized3D.Rivers
         private const float ProgressiveRibbonMinimumTravelDistance = 0.5f;
         private const float ProgressiveRibbonMaximumTravelDistance = 8f;
         private const float ProgressiveRibbonMaximumBendAcross = 0.35f;
-        private const float ProgressiveRibbonWidthVariation = 0.20f;
+        private const float ManualSourceStrokeAspect = 6.25f;
         private const float ProgressiveRibbonRampInEnd = 0.18f;
         private const float ProgressiveRibbonTaperStart = 0.72f;
         private const float ProgressiveRibbonMinimumHalfWidth = 0.05f;
@@ -167,7 +167,7 @@ namespace ProgrammaticStylized3D.Rivers
         private const float LowMaterialTemporalUpdateRate = 8f;
         private const float MediumMaterialTemporalUpdateRate = 12f;
         private const float HighMaterialTemporalUpdateRate = 16f;
-        private const float ManualTestShapeVariety = 0.763854f;
+        private const float ManualTestShapeVariety = 0f;
         private const float PresenceMetricThreshold = 0.16432f;
         // Preserve the accepted pre-C.5 wake/pressure deformation strength
         // after removing the unrelated network, bank-attraction, spread, and

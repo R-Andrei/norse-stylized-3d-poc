@@ -568,7 +568,7 @@ namespace ProgrammaticStylized3D.Rivers
                     sourceFillFeatureSize,
                     shapeSeed,
                     ManualTestShapeVariety,
-                    true));
+                    false));
             idleSince = 0.0;
             return true;
         }

@@ -45,6 +45,7 @@ Shader "PS3D/Pixel Surface Lit"
         [HideInInspector] _GeneratedMassLocalXZScale("Generated Mass Local XZ Scale", Float) = 1
         [HideInInspector] _GeneratedMassMaskBaseLift("Generated Mass Mask Base Lift", Float) = 0
         [HideInInspector] _GeneratedMassCreviceReach("Generated Mass Crevice Reach", Float) = 1
+        [HideInInspector] _GeneratedMassCreviceSmoothness("Generated Mass Crevice Smoothness", Float) = 1
         [HideInInspector] _GeneratedMassCreviceBreakup("Generated Mass Crevice Breakup", Float) = 1
         [HideInInspector] _GeneratedMassDirtCrawlReach("Generated Mass Dirt Crawl Reach", Float) = 1
         [HideInInspector] _GeneratedMassDirtCoverage("Generated Mass Dirt Coverage", Float) = 1
@@ -162,6 +163,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassLocalXZScale;
                 float _GeneratedMassMaskBaseLift;
                 float _GeneratedMassCreviceReach;
+                float _GeneratedMassCreviceSmoothness;
                 float _GeneratedMassCreviceBreakup;
                 float _GeneratedMassDirtCrawlReach;
                 float _GeneratedMassDirtCoverage;
@@ -330,97 +332,220 @@ Shader "PS3D/Pixel Surface Lit"
                 return saturate((_GeneratedMassLocalHeight - 0.75) * 0.16);
             }
 
+            float ResolveGeneratedMassOrganicLowerFade(Varyings input)
+            {
+                float height01 = ResolveGeneratedMassHeight01(input);
+                float3 normalOS = normalize((float3)input.normalOS);
+                float tallness = ResolveGeneratedMassTallnessFactor();
+                float sizeFactor = ResolveGeneratedMassSizeFactor();
+                float creviceReach = max(0.05, _GeneratedMassCreviceReach);
+                float creviceSmoothness = max(0.05, _GeneratedMassCreviceSmoothness);
+                float creviceBreakup = max(0.05, _GeneratedMassCreviceBreakup);
+                float reach01 = saturate((creviceReach - 0.25) / 1.75);
+                float smoothness01 = saturate((creviceSmoothness - 0.25) / 1.75);
+                float breakup01 = saturate((creviceBreakup - 0.25) / 1.75);
+                float xzScale = max(0.0001, _GeneratedMassLocalXZScale);
+                float2 normalizedXZ = input.positionOS.xz / xzScale;
+                float seed = _GeneratedMassMaskSeed;
+
+                // Footprint lobes are useful for broad object-level variation, but
+                // they cannot be the only field; on large side faces they can leave
+                // a whole face inside one inactive footprint island.
+                float footprintWarpA = PS3D_ValueNoise31(float3(
+                    normalizedXZ * 0.45 + float2(seed * 0.007, seed * -0.013),
+                    seed * 0.019));
+                float footprintWarpB = PS3D_ValueNoise31(float3(
+                    normalizedXZ.yx * 0.49 + float2(seed * -0.011, seed * 0.017),
+                    seed * 0.023 + 11.7));
+                float2 warpedXZ = normalizedXZ +
+                    (float2(footprintWarpA, footprintWarpB) - 0.5) *
+                    lerp(0.12, 0.42, breakup01);
+
+                float footprintWaveA = sin(warpedXZ.x * 2.35 + seed * 0.071);
+                float footprintWaveB = sin(warpedXZ.y * 2.05 + seed * 0.053 + 1.37);
+                float footprintWaveC = sin(
+                    (warpedXZ.x * 0.62 + warpedXZ.y * 0.48) * 3.35 +
+                    seed * 0.093 - 0.48);
+                float footprintWave =
+                    (footprintWaveA * 0.36 +
+                     footprintWaveB * 0.34 +
+                     footprintWaveC * 0.30) * 0.5 + 0.5;
+
+                float broadNoise =
+                    ResolveGeneratedMassSoftPatchNoise(input, 0.42, 47.0);
+                float lobeNoise =
+                    ResolveGeneratedMassSoftPatchNoise(input, 0.72, 83.0);
+                float patchNoise =
+                    ResolveGeneratedMassSoftPatchNoise(input, 1.18, 119.0);
+                float planeNoise =
+                    ResolveGeneratedMassPatchNoise(input, 1.82, 29.0);
+                float facetNoise = saturate(
+                    (float)input.color.r * 0.28 +
+                    broadNoise * 0.24 +
+                    lobeNoise * 0.22 +
+                    patchNoise * 0.16 +
+                    planeNoise * 0.10);
+
+                // Side-surface lobes: choose the useful width coordinate for the
+                // current side face. Z-facing faces vary along local X; X-facing
+                // faces vary along local Z. Each dominant side receives a separate
+                // phase so the back/side faces do not mirror or disappear together.
+                float dominantX = step(abs(normalOS.z), abs(normalOS.x));
+                float sideWidthCoord = lerp(normalizedXZ.x, normalizedXZ.y, dominantX);
+                float positiveSide = lerp(step(0.0, normalOS.z), step(0.0, normalOS.x), dominantX);
+                float sidePhase = lerp(
+                    lerp(23.7, 41.9, positiveSide),
+                    lerp(67.3, 89.1, positiveSide),
+                    dominantX);
+                float sideWarp = PS3D_ValueNoise31(float3(
+                    sideWidthCoord * 0.96 + sidePhase * 0.019,
+                    height01 * 0.62 + seed * 0.017,
+                    seed * 0.031 + sidePhase));
+                float sideCoord = sideWidthCoord +
+                    (sideWarp - 0.5) * lerp(0.18, 0.78, breakup01);
+
+                float sideWaveA = sin(sideCoord * 5.6 + seed * 0.061 + sidePhase);
+                float sideWaveB = sin(sideCoord * 10.4 + seed * 0.089 + sidePhase * 1.37);
+                float sideWaveC = sin(sideCoord * 15.7 + seed * 0.047 - sidePhase * 0.73);
+                float sideNoiseA = PS3D_ValueNoise31(float3(
+                    sideCoord * 1.65 + sidePhase * 0.027,
+                    seed * 0.021,
+                    height01 * 0.42));
+                float sideNoiseB = PS3D_ValueNoise31(float3(
+                    sideCoord * 3.25 - sidePhase * 0.013,
+                    seed * 0.037 + 9.1,
+                    height01 * 0.85));
+                float rawSideLobe = saturate(
+                    (sideWaveA * 0.28 +
+                     sideWaveB * 0.19 +
+                     sideWaveC * 0.12) * 0.5 + 0.5);
+                rawSideLobe = saturate(
+                    rawSideLobe * 0.48 +
+                    sideNoiseA * 0.32 +
+                    sideNoiseB * 0.20);
+
+                // Breakup should increase contrast and local relief, not simply
+                // lower the threshold and behave like a second Reach slider.
+                float sideLobe =
+                    saturate((rawSideLobe - 0.5) *
+                        lerp(1.35, 3.15, breakup01) + 0.5);
+                float footprintLobe =
+                    saturate((footprintWave * 0.44 +
+                              broadNoise * 0.26 +
+                              lobeNoise * 0.20 +
+                              facetNoise * 0.10 - 0.5) *
+                        lerp(1.15, 2.25, breakup01) + 0.5);
+                float patchRelief =
+                    saturate((patchNoise * 0.36 +
+                              planeNoise * 0.24 +
+                              facetNoise * 0.24 +
+                              broadNoise * 0.16 - 0.5) *
+                        lerp(1.05, 2.05, breakup01) + 0.5);
+
+                float lobeHeightDriver = saturate(
+                    sideLobe * 0.58 +
+                    footprintLobe * 0.25 +
+                    patchRelief * 0.17);
+                float lobePresenceDriver = saturate(
+                    sideLobe * 0.66 +
+                    footprintLobe * 0.18 +
+                    patchRelief * 0.16);
+
+                // Presence has only a tiny floor: enough to avoid whole-side
+                // disappearance, but not enough to rebuild a continuous skirt.
+                float lobePresence = saturate(
+                    lerp(0.035, 0.015, breakup01) +
+                    smoothstep(0.30, 0.76, lobePresenceDriver) * 0.94);
+
+                // Preserve approximate average height while increasing the low/high
+                // spread as Breakup rises.
+                float lobeHeightContrast =
+                    saturate((lobeHeightDriver - 0.5) *
+                        lerp(1.10, 2.80, breakup01) + 0.5);
+
+                // Reach controls average crawl height. The default is intentionally
+                // visible again, but local side lobes decide where it climbs.
+                float averageCrawlHeight =
+                    (0.078 + tallness * 0.030 + sizeFactor * 0.018) *
+                    lerp(0.56, 1.44, reach01);
+                float localCrawlHeight =
+                    averageCrawlHeight *
+                    lerp(0.18, 2.42, lobeHeightContrast);
+
+                // Smoothness controls the vertical dissolve length independently.
+                float fadeLength =
+                    (0.125 + tallness * 0.048 + sizeFactor * 0.028) *
+                    lerp(1.10, 3.05, smoothness01) *
+                    lerp(0.92, 1.32, saturate(broadNoise * 0.55 + sideNoiseA * 0.45));
+
+                float verticalNoise = PS3D_ValueNoise31(float3(
+                    sideCoord * 0.86 + sidePhase * 0.017,
+                    warpedXZ.x * 0.38 + seed * 0.011,
+                    height01 * 1.95 + seed * 0.029));
+                float heightJitter =
+                    (verticalNoise - 0.5) * lerp(0.050, 0.135, breakup01) +
+                    (patchNoise - 0.5) * lerp(0.030, 0.082, breakup01) +
+                    (planeNoise - 0.5) * lerp(0.018, 0.055, breakup01) +
+                    (facetNoise - 0.5) * 0.028;
+                float shiftedHeight = max(0.0, height01 + heightJitter);
+
+                // Long-tail fade: avoid a single smoothstep contour. Higher local
+                // crawl shifts the strongest part upward; smoothness widens the
+                // dissolve without increasing crawl height.
+                float fadeStart = localCrawlHeight * 0.16;
+                float fadeDenominator = max(0.035, localCrawlHeight * 0.62 + fadeLength);
+                float distanceT = max(0.0, shiftedHeight - fadeStart) / fadeDenominator;
+                float falloffShape = lerp(1.05, 0.56, smoothness01);
+                float falloffRate = lerp(4.25, 1.55, smoothness01);
+                float lowerFade =
+                    exp2(-pow(max(0.0, distanceT), falloffShape) * falloffRate);
+
+                lowerFade *= lobePresence;
+                lowerFade *= 1.0 - smoothstep(0.68, 0.94, height01);
+
+                float contactAnchor =
+                    (1.0 - smoothstep(0.0, 0.010 + tallness * 0.003, height01)) *
+                    lerp(0.028, 0.052, lobePresence);
+
+                return saturate(max(lowerFade, contactAnchor));
+            }
+
+            float ResolveGeneratedMassOrganicBottomMask(Varyings input)
+            {
+                // Keep value shaping from rebuilding a separate horizontal band.
+                // This only lightly follows the same side-aware lobe field.
+                return saturate(ResolveGeneratedMassOrganicLowerFade(input) * 0.20);
+            }
+
             float ResolveShaderCreviceBaseMask(Varyings input)
             {
                 float height01 = ResolveGeneratedMassHeight01(input);
                 float normalY = normalize((float3)input.normalOS).y;
                 float up = saturate(normalY);
-                float downward = saturate(-normalY * 1.18);
-                float sideFacing = 1.0 - smoothstep(0.18, 0.90, abs(normalY));
-                float notUpward = 1.0 - smoothstep(0.08, 0.52, up);
-
+                float downward = saturate(-normalY * 1.10);
+                float sideFacing = 1.0 - smoothstep(0.16, 0.92, abs(normalY));
+                float notUpward = 1.0 - smoothstep(0.10, 0.56, up);
                 float tallness = ResolveGeneratedMassTallnessFactor();
-                float sizeFactor = ResolveGeneratedMassSizeFactor();
-                float creviceReach = max(0.05, _GeneratedMassCreviceReach);
-                float creviceBreakup = max(0.05, _GeneratedMassCreviceBreakup);
-                float creviceBreakupDelta = clamp(creviceBreakup - 1.0, -0.75, 1.0);
-                float xzScale = max(0.0001, _GeneratedMassLocalXZScale);
-                float2 normalizedXZ = input.positionOS.xz / xzScale;
-                float seed = _GeneratedMassMaskSeed;
 
-                float waveA = sin(normalizedXZ.x * 8.4 + seed * 0.113);
-                float waveB = sin(normalizedXZ.y * 6.7 + seed * 0.071 + 1.73);
-                float waveC = sin(
-                    (normalizedXZ.x + normalizedXZ.y * 0.73) * 9.7 +
-                    seed * 0.097 - 0.61);
-                float irregularWave =
-                    (waveA * 0.44 + waveB * 0.35 + waveC * 0.21) * 0.5 + 0.5;
+                float broadNoise = ResolveGeneratedMassSoftPatchNoise(input, 0.92, 19.0);
+                float patchNoise = ResolveGeneratedMassSoftPatchNoise(input, 1.42, 31.0);
+                float planeNoise = ResolveGeneratedMassPatchNoise(input, 2.05, 37.0);
+                float facetNoise = saturate(
+                    (float)input.color.r * 0.46 +
+                    broadNoise * 0.20 +
+                    patchNoise * 0.17 +
+                    planeNoise * 0.17);
 
-                float broadNoise =
-                    ResolveGeneratedMassSoftPatchNoise(input, 1.08, 19.0);
-                float planeBreakNoise =
-                    ResolveGeneratedMassPatchNoise(input, 1.95, 31.0);
-                float facetNoise =
-                    saturate((float)input.color.r * 0.50 + broadNoise * 0.28 + planeBreakNoise * 0.22);
-                float boundaryWarp = saturate(irregularWave * 0.74 + broadNoise * 0.26);
-                float patchField = saturate(
-                    irregularWave * 0.38 +
-                    broadNoise * 0.22 +
-                    facetNoise * 0.18 +
-                    planeBreakNoise * 0.22);
+                float lowerFade = ResolveGeneratedMassOrganicLowerFade(input);
+                float shelter = saturate(sideFacing * 0.50 + notUpward * 0.14 + downward * 0.14);
+                float shelterBlend = lerp(0.66, 1.00, smoothstep(0.16, 0.82, shelter));
+                float facetAttenuation = lerp(0.58, 1.02, saturate(facetNoise * 0.72 + broadNoise * 0.28));
+                float contactAccent =
+                    (1.0 - smoothstep(0.0, 0.012 + tallness * 0.003, height01)) * 0.045;
 
-                float baseRise =
-                    (0.078 + tallness * 0.026 + sizeFactor * 0.018) *
-                    creviceReach;
-                float localBoundary = baseRise * lerp(0.34, 1.78, boundaryWarp);
-                float boundaryFeather =
-                    (0.044 + tallness * 0.016) *
-                    lerp(0.85, 1.15, saturate((creviceReach - 0.25) / 1.75));
-
-                float contactCore =
-                    1.0 - smoothstep(
-                        0.0,
-                        (0.032 + tallness * 0.006) *
-                            lerp(0.85, 1.12, saturate((creviceReach - 0.25) / 1.75)),
-                        height01);
-                float lowerRegion =
-                    1.0 - smoothstep(
-                        localBoundary,
-                        localBoundary + boundaryFeather,
-                        height01);
-                float lowerShoulder =
-                    1.0 - smoothstep(
-                        localBoundary + 0.018,
-                        localBoundary + 0.088,
-                        height01);
-
-                float shelter = saturate(
-                    sideFacing * 0.54 +
-                    notUpward * 0.15 +
-                    downward * 0.17);
-                float shelterGate = smoothstep(0.33, 0.80, shelter);
-                float facetBreakup = lerp(0.66, 1.00, facetNoise);
-                float regionCoverage = smoothstep(
-                    saturate(0.40 + creviceBreakupDelta * 0.08),
-                    saturate(0.86 + creviceBreakupDelta * 0.04),
-                    patchField);
-                float interruption = lerp(
-                    saturate(0.16 - creviceBreakupDelta * 0.08),
-                    1.00,
-                    regionCoverage);
-
-                float lowerSideShelter =
-                    lowerRegion *
-                    shelterGate *
-                    facetBreakup *
-                    interruption;
-                float sideMids = lowerShoulder * sideFacing * lerp(0.002, 0.018, broadNoise) * interruption;
-                float mask = max(contactCore * 0.90, lowerSideShelter * 0.54);
-                mask += sideMids;
-
-                float upperSuppress = smoothstep(0.36, 0.56, height01);
-                mask *= lerp(1.0, 0.02, upperSuppress);
-                return saturate(pow(mask, 1.26));
+                float mask = lowerFade * shelterBlend * facetAttenuation;
+                mask = max(mask, contactAccent);
+                return saturate(mask);
             }
 
             float ResolveShaderDirtDepositMask(Varyings input)
@@ -713,38 +838,14 @@ Shader "PS3D/Pixel Surface Lit"
                     SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
 
                 float overlayKind = round(_GeneratedMassFeatureOverlayKind);
-                bool isNormalFeatureOverlay =
-                    round(_MaskDebugMode) <= 0.0 &&
-                    overlayKind > 0.5;
-                if (isNormalFeatureOverlay)
+                if (round(_MaskDebugMode) <= 0.0 && overlayKind > 0.5)
                 {
-                    bool isEdgeWearOverlay = overlayKind == 1.0;
-                    float featureMask = ResolveFeatureLineMask(
-                        input,
-                        isEdgeWearOverlay
-                            ? (float)input.color.a
-                            : (float)input.materialMasks.x,
-                        isEdgeWearOverlay
-                            ? _GeneratedMassEdgeWearSoftness
-                            : _GeneratedMassCreaseSoftness);
-                    clip(featureMask - max(0.0, _StoneFeatureClip));
-
-                    half3 overlayBase =
-                        baseSample.rgb *
-                        _BaseColor.rgb;
-                    half3 overlayTarget =
-                        isEdgeWearOverlay
-                            ? _StoneEdgeWearTint.rgb
-                            : _StoneCreaseTint.rgb;
-                    float overlayResponse =
-                        saturate(
-                            isEdgeWearOverlay
-                                ? _StoneEdgeWearResponse
-                                : _StoneCreaseResponse);
-                    return lerp(
-                        overlayBase,
-                        overlayTarget,
-                        (half)(featureMask * overlayResponse));
+                    // Feature overlay meshes are raised debug geometry, not the
+                    // final visible stone response. Discard them in normal
+                    // rendering so accidental renderer state cannot show
+                    // floating lines above the rock.
+                    clip(-1.0);
+                    return half3(0.0h, 0.0h, 0.0h);
                 }
 
                 float broadCellSize = max(_PixelCellSize * 8.0, 0.0001);
@@ -826,16 +927,16 @@ Shader "PS3D/Pixel Surface Lit"
                     lerp(1.0, max(0.0, _FrostContrast), saturate(_FrostStrength));
                 float creviceDarken =
                     _CreviceDarkenStrength *
-                    lerp(1.0, 0.4, saturate(_Wetness)) +
-                    _FrostCreviceDarken * saturate(_FrostStrength);
+                    lerp(1.0, 0.36, saturate(_Wetness)) +
+                    _FrostCreviceDarken * saturate(_FrostStrength) * 0.72;
                 float baseDarken =
                     _BaseDarkenStrength *
-                    lerp(1.0, 0.65, saturate(_Wetness));
+                    lerp(1.0, 0.52, saturate(_Wetness));
                 float generatedMassSemanticScale =
                     1.0 +
                     (exposureMask * _ExposureTintStrength -
-                     creviceMask * creviceDarken -
-                     baseMask * baseDarken) *
+                     creviceMask * creviceDarken * 0.62 -
+                     baseMask * baseDarken * 0.42) *
                     profileContrast;
                 float groundSemanticScale =
                     1.0 +
@@ -875,16 +976,36 @@ Shader "PS3D/Pixel Surface Lit"
                     groundAlbedo,
                     (half)isGroundSurface);
 
+                float wetness = saturate(_Wetness);
+                float frostStrength = saturate(_FrostStrength);
+                float monolithicFlatten = saturate(_MonolithicFlatten);
+                float dampGatherMask =
+                    saturate(
+                        dirtDepositMask * 0.88 +
+                        baseMask * 0.22 +
+                        creviceMask * 0.14 -
+                        exposureMask * 0.20);
                 float dirtResponseStrength =
                     dirtDepositMask *
                     saturate(_StoneDirtResponse) *
-                    lerp(1.0, 1.20, saturate(_Wetness)) *
-                    lerp(1.0, 0.35, saturate(_FrostStrength)) *
-                    lerp(1.0, 0.20, saturate(_MonolithicFlatten));
+                    lerp(1.0, 1.30, wetness) *
+                    lerp(1.0, 0.24, frostStrength) *
+                    lerp(1.0, 0.12, monolithicFlatten);
                 albedo = lerp(
                     albedo,
                     albedo * _StoneDirtTint.rgb,
                     (half)dirtResponseStrength);
+
+                half3 wetDampTarget =
+                    albedo * _StoneDirtTint.rgb *
+                    (half)lerp(0.92, 0.68, saturate(_WetDarkenStrength));
+                float wetDampStrength =
+                    dampGatherMask * wetness *
+                    saturate(_WetDarkenStrength * 1.55);
+                albedo = lerp(
+                    albedo,
+                    wetDampTarget,
+                    (half)wetDampStrength);
 
                 float frostNoise =
                     PS3D_ValueNoise31(broadCoordinate * 1.7 + 71.31);
@@ -894,25 +1015,31 @@ Shader "PS3D/Pixel Surface Lit"
                         max(0.001, saturate(_FrostCoverage)));
                 float frostMask =
                     saturate(
-                        exposureMask * 0.85 +
-                        frostPattern * 0.45 -
-                        creviceMask * 0.35) *
-                    saturate(_FrostStrength);
+                        exposureMask * 1.05 +
+                        frostPattern * 0.36 -
+                        creviceMask * 0.10 -
+                        dirtDepositMask * 0.10) *
+                    frostStrength;
                 albedo = lerp(
                     albedo,
                     _FrostColor.rgb,
-                    (half)(frostMask * 0.62));
+                    (half)(frostMask * 0.68));
 
-                albedo *= (half)max(
-                    0.0,
-                    1.0 - saturate(_Wetness) * _WetDarkenStrength);
+                float wetGlobalDarken =
+                    wetness * saturate(_WetDarkenStrength) * 0.42;
+                albedo *= (half)max(0.0, 1.0 - wetGlobalDarken);
 
+                float monolithicRelief =
+                    broadValue * 0.022 +
+                    exposureMask * 0.035 -
+                    creviceMask * 0.025 -
+                    baseMask * 0.012;
                 half3 monolithicTarget =
-                    _BaseColor.rgb * (half)(1.0 + broadValue * 0.025);
+                    _BaseColor.rgb * (half)max(0.0, 1.0 + monolithicRelief);
                 albedo = lerp(
                     albedo,
                     monolithicTarget,
-                    (half)saturate(_MonolithicFlatten));
+                    (half)monolithicFlatten);
 
                 return albedo;
             }
@@ -932,12 +1059,19 @@ Shader "PS3D/Pixel Surface Lit"
                     highlightMask *
                     saturate((half)_HighlightCompressStrength);
 
-                half bottomMask =
+                float isGroundSurface = ResolveSurfaceContractIsGround();
+                half generatedMassBottomMask =
+                    (half)ResolveGeneratedMassOrganicBottomMask(input);
+                half defaultBottomMask =
                     1.0h -
                     smoothstep(
                         0.0h,
                         max(0.001h, (half)_BottomDarkenHeight),
                         (half)max(0.0, input.positionOS.y));
+                half bottomMask = lerp(
+                    generatedMassBottomMask,
+                    defaultBottomMask,
+                    (half)isGroundSurface);
                 half sideMask = pow(
                     saturate(1.0h - abs(normalWS.y)),
                     max(0.5h, (half)_EdgeDarkenPower));
@@ -1106,6 +1240,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassLocalXZScale;
                 float _GeneratedMassMaskBaseLift;
                 float _GeneratedMassCreviceReach;
+                float _GeneratedMassCreviceSmoothness;
                 float _GeneratedMassCreviceBreakup;
                 float _GeneratedMassDirtCrawlReach;
                 float _GeneratedMassDirtCoverage;
@@ -1264,6 +1399,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassLocalXZScale;
                 float _GeneratedMassMaskBaseLift;
                 float _GeneratedMassCreviceReach;
+                float _GeneratedMassCreviceSmoothness;
                 float _GeneratedMassCreviceBreakup;
                 float _GeneratedMassDirtCrawlReach;
                 float _GeneratedMassDirtCoverage;
@@ -1416,6 +1552,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassLocalXZScale;
                 float _GeneratedMassMaskBaseLift;
                 float _GeneratedMassCreviceReach;
+                float _GeneratedMassCreviceSmoothness;
                 float _GeneratedMassCreviceBreakup;
                 float _GeneratedMassDirtCrawlReach;
                 float _GeneratedMassDirtCoverage;

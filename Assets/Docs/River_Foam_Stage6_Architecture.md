@@ -17,14 +17,15 @@ Accepted or mostly accepted foundations:
 - topology influences lifespan instead of directly painting Foam;
 - the lifetime delta-time rebind fixed the bug where material did not age;
 - support/negative overlap now makes negative pressure suppress support before accelerating age;
-- manual spawning is consolidated under `Foam Debug > Spawning`;
-- the hidden multi-writer spawn scaling problem was corrected by the 5.4l composition-event/birth-budget refactor.
+- manual birth controls are consolidated under `Foam Debug > Manual Birth Source`;
+- the hidden multi-writer spawn scaling problem was corrected by the 5.4l composition-event/birth-budget refactor;
+- the 5.4m realignment removes active pattern/complexity/density birth controls, restores one canonical stable manual source, and keeps those controls in a dedicated Inspector foldout;
+- the 5.5 material-evolution pass adds the first persistent `Presence` morphing layer; 5.5c restores lifecycle authority after the initial erosion attempt shortened Foam life incorrectly.
 
 Still not accepted:
 
-- manually-born Foam still has weak shape language;
-- birth-time pattern logic can create blob/chip/slug results that do not match the reference;
-- temporal morphing and organic breakup are not proven;
+- 5.5 morphing needs visual validation and tuning without independent `Presence` death paths;
+- organic breakup is not proven;
 - topology interaction needs final proof and calibration;
 - lateral drift/obstacle sliding is not implemented;
 - obstacle interaction can still read as hard clipping.
@@ -56,7 +57,7 @@ Topology may influence aging, validation, and diagnostics. It must not continuou
 
 Material state answers: `what Foam currently exists?`
 
-It stores presence, remaining life, and pattern identity. It is the thing that moves, ages, splits visually, merges, fragments, fades, and eventually disappears.
+It stores presence, remaining life, and pattern identity. It is the thing that moves, ages, reconfigures, and stretches. Macro/meso shape change belongs here, not in topology and not only in final shader masking. Actual disappearance remains controlled by `Remaining Life`; independent `Presence` erosion must not shorten lifespan.
 
 ### Birth/source events
 
@@ -68,7 +69,7 @@ A source creates candidate material. Once merged into persistent state, source a
 
 Rendering answers: `how does existing material look this frame?`
 
-Edges may crawl, breakup may evolve, and material can become visually shredded or faded near death, but presentation must not conceal invalid state behavior.
+The final shader owns micro breakup, crisp stylized thresholds, edge detail, and presentation polish. It may make edges crawl visually, but it must not be the only layer responsible for macro/meso shape change, and it must not conceal invalid state behavior.
 
 ## Canonical persistent material contract
 
@@ -82,7 +83,7 @@ A cell can have partial presence. Transport and clipping must preserve the footp
 
 ### Remaining Life
 
-`Remaining Life` is the ordinary survival clock for material. It decreases according to the local topology aging equation. It is not a visual fade value and should not be reinterpreted as source amount.
+`Remaining Life` is the ordinary survival clock for material and the only approved stored-state death authority. It decreases according to the local topology aging equation. It is not a visual fade value and should not be reinterpreted as source amount.
 
 ### Material Pattern
 
@@ -101,7 +102,7 @@ Rules:
 - Amount is discarded after source-to-persistent merge;
 - source-to-source overlap is geometric union, not additive life inflation.
 
-A birth patch may be broken, but randomness must not decide the macro identity of the source. With the same settings, repeated births should keep the same broad source type and approximate footprint while varying edge detail and local gaps.
+A birth patch may be partially filled by Amount, but randomness must not decide the macro identity of the source. With the same settings, repeated births should keep the same broad source type and approximate footprint; the source-fill field is keyed from source controls rather than event count. Macro/meso tearing belongs to later material evolution; renderer-side breakup should stay at micro/detail scale.
 
 ## Lifetime equation
 
@@ -164,7 +165,7 @@ Persistent material movement is downstream river-space transport plus approved d
 - no material guidance field resurrected from old experiments;
 - no hidden spread/reinforcement layer.
 
-Material can later gain lateral drift and obstacle tangential sliding, but that work must be explicit and budgeted.
+Material simulation now owns intrinsic macro/meso deformation. The first 5.5 pass was too conservative; 5.5b strengthened stored-state deformation so a material body can bend, stretch, and locally widen/narrow. 5.5c repairs lifecycle authority: morphing may not erase material before `Remaining Life` expires. Larger river-disturbance coupling, lifecycle-safe stored fragmentation, lateral drift, and obstacle tangential sliding remain separate explicit, budgeted work.
 
 ## Manual birth phase
 
@@ -209,7 +210,7 @@ Runtime rules:
 - birth dispatch count is budgeted;
 - visual complexity must not secretly multiply active C# events or dispatches.
 
-The current 5.4l rule is one composition event per manual spawn, with a per-material-step birth budget. Future visual complexity should be evaluated inside bounded work, not by adding hidden writer events.
+The current rule is one budgeted event per manual birth source, with a per-material-step birth budget. Future visual complexity must not add hidden writer events or unbounded dispatches.
 
 ## Diagnostics contract
 
@@ -232,6 +233,7 @@ Do not add these while the active blockers remain unresolved:
 - topology-as-direct-painting;
 - separate river architecture for thin lines;
 - restored guidance fields or shore suction;
+- disturbance coupling hidden inside unrelated morphology work;
 - final beauty-only rendering polish;
 - broad Inspector expansion.
 

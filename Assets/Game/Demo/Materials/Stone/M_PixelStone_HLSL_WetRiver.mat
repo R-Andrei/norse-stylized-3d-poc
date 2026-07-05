@@ -30,53 +30,53 @@ Material:
     m_Ints: []
     m_Floats:
     - _AmbientStrength: 0.90
-    - _BaseDarkenStrength: 0.025
+    - _BaseDarkenStrength: 0.008
     - _StoneFeatureClip: 0.035
     - _StoneCreaseResponse: 0.85
     - _StoneEdgeWearResponse: 0.28
-    - _StoneDirtResponse: 0.65
-    - _CreviceDarkenStrength: 0.035
+    - _StoneDirtResponse: 0.78
+    - _CreviceDarkenStrength: 0.025
     - _Cull: 2
     - _DiffuseWrap: 0.18
     - _DirectStrength: 1.05
-    - _ExposureTintStrength: 0.015
+    - _ExposureTintStrength: 0.006
     - _HighlightCompressStrength: 0.045
     - _HighlightCompressStart: 0.76
-    - _BottomDarkenStrength: 0.14
+    - _BottomDarkenStrength: 0.012
     - _BottomDarkenHeight: 0.62
-    - _EdgeDarkenStrength: 0.03
+    - _EdgeDarkenStrength: 0.010
     - _EdgeDarkenPower: 3
     - _FlatNormalStrength: 0
-    - _PixelBroadVariation: 0.012
+    - _PixelBroadVariation: 0.016
     - _PixelCellSize: 0.058
     - _PixelClusterStrength: 0.42
     - _PixelEffectStrength: 0.82
     - _PixelSeed: 1412
     - _PixelToneCount: 3.15
-    - _PixelVariation: 0.033
-    - _PixelVertexVariation: 0.035
+    - _PixelVariation: 0.038
+    - _PixelVertexVariation: 0.045
     - _PixelWarpStrength: 0.12
-    - _ProfileContrast: 0.58
-    - _ProfilePixelContrast: 0.46
+    - _ProfileContrast: 0.66
+    - _ProfilePixelContrast: 0.52
     - _ReceiveShadows: 1
-    - _Smoothness: 0.34
-    - _SpecularStrength: 0.25
+    - _Smoothness: 0.36
+    - _SpecularStrength: 0.28
     - _ShadowAmbientStrength: 0.46
-    - _WetDarkenStrength: 0.30
-    - _WetPixelSoftening: 0.72
-    - _WetSmoothnessBoost: 0.42
-    - _Wetness: 0.86
+    - _WetDarkenStrength: 0.22
+    - _WetPixelSoftening: 0.78
+    - _WetSmoothnessBoost: 0.46
+    - _Wetness: 0.88
     - _FrostStrength: 0
     - _FrostCoverage: 0.20
     - _FrostContrast: 0.7
     - _FrostCreviceDarken: 0.05
-    - _MonolithicFlatten: 0.10
+    - _MonolithicFlatten: 0.04
     - _MonolithicSmoothnessBoost: 0.12
     m_Colors:
-    - _BaseColor: {r: 0.245, g: 0.255, b: 0.252, a: 1}
-    - _FrostColor: {r: 0.58, g: 0.66, b: 0.70, a: 1}
+    - _BaseColor: {r: 0.215, g: 0.235, b: 0.228, a: 1}
+    - _FrostColor: {r: 0.52, g: 0.6, b: 0.62, a: 1}
     - _StoneCreaseTint: {r: 0.045, g: 0.045, b: 0.04, a: 1}
     - _StoneEdgeWearTint: {r: 0.46, g: 0.48, b: 0.45, a: 1}
-    - _StoneDirtTint: {r: 0.25, g: 0.32, b: 0.22, a: 1}
+    - _StoneDirtTint: {r: 0.2, g: 0.28, b: 0.205, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

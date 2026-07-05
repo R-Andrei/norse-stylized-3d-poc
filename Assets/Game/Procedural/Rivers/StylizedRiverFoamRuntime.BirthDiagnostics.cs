@@ -236,7 +236,7 @@ namespace ProgrammaticStylized3D.Rivers
                 ribbonEvent.SourceFillSeed,
                 ribbonEvent.SourceFillFeatureSize,
                 ribbonEvent.ShapeSeed,
-                ribbonEvent.FragmentStrength,
+                0f,
                 false,
                 true,
                 startGlobalDistance,
@@ -246,11 +246,7 @@ namespace ProgrammaticStylized3D.Rivers
                 endGlobalDistance,
                 endAcrossNormalized,
                 endRadius,
-                endAmount,
-                ribbonEvent.SheetStyle,
-                ribbonEvent.Pattern,
-                ribbonEvent.Complexity,
-                ribbonEvent.Density);
+                endAmount);
         }
 
         private void DispatchProgressiveBirthDebugSegment(
@@ -311,16 +307,7 @@ namespace ProgrammaticStylized3D.Rivers
                 segment.ShapeVariety);
             computeShader.SetFloat(
                 "_FoamInjectionCompound",
-                segment.SegmentSheetStyle ? 1f : 0f);
-            computeShader.SetFloat(
-                "_FoamInjectionCompositionPattern",
-                (float)segment.CompositionPattern);
-            computeShader.SetFloat(
-                "_FoamInjectionCompositionComplexity",
-                segment.CompositionComplexity);
-            computeShader.SetFloat(
-                "_FoamInjectionCompositionDensity",
-                segment.CompositionDensity);
+                segment.CompoundShape ? 1f : 0f);
             computeShader.SetFloat(
                 "_FoamInjectionSegmentStartGlobalDistance",
                 segment.SegmentStartGlobalDistance);

@@ -18,7 +18,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private bool showFoamTransportDiagnostics;
         private bool showFoamLifetimeDiagnostics;
         private bool showFoamMaterialProbe;
-        private bool showFoamSpawning = true;
+        private bool showFoamManualBirthSource = true;
+        private bool showFoamManualSourceMotion;
         private bool showFoamShapeResidueDiagnostics;
         private bool showFoamRuntimeResourceDiagnostics;
         private bool showFoamAdvancedInternalDiagnostics;
@@ -50,7 +51,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 showFoamTransportDiagnostics ||
                 showFoamLifetimeDiagnostics ||
                 showFoamMaterialProbe ||
-                showFoamSpawning ||
+                showFoamManualBirthSource ||
                 showFoamShapeResidueDiagnostics ||
                 showFoamRuntimeResourceDiagnostics ||
                 showFoamAdvancedInternalDiagnostics;
@@ -1656,7 +1657,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam Debug",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Compact workflow: Overview for status, View for display mode, Motion for downstream travel, Lifetime + Topology for aging/support, Spawning for manual source presets, Shape for footprint issues. Each section is intentionally small; advanced internals stay collapsed unless a compile/runtime failure points there.",
+                "Compact workflow: Overview for status, View for display mode, Material Motion for persistent downstream travel, Lifetime + Topology for aging/support, Material Probe for isolated lifetime checks, Manual Birth Source for all manual source controls, Material Shape for stored/visible footprint diagnostics, Runtime for resources, and Advanced Internals only for low-level failures.",
                 MessageType.None);
 
             DrawFoamValidationOverview(river, runtime);
@@ -1664,7 +1665,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawFoamTransportMotionSection(river, runtime);
             DrawFoamLifetimeSection(river, runtime);
             DrawFoamMaterialProbeSection(river, runtime);
-            DrawFoamSpawningSection(river, runtime);
+            DrawFoamManualBirthSourceSection(river, runtime);
             DrawFoamShapeResidueSection(runtime);
             DrawFoamRuntimeResourceSection(runtime);
             DrawFoamAdvancedInternalSection(runtime);
@@ -1720,7 +1721,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             if (runtimeAvailable && hiddenArea > Mathf.Max(0.05f, visibleArea * 0.25f))
             {
                 EditorGUILayout.HelpBox(
-                    "Stored Foam is much larger than visible Foam. Open Shape if the visible mask looks wrong, or Lifetime + Topology if Foam should have died but remains stored.",
+                    "Stored Foam is much larger than visible Foam. Open Material Shape if the visible mask looks wrong, or Lifetime + Topology if Foam should have died but remains stored.",
                     MessageType.Warning);
             }
 
@@ -1794,7 +1795,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             showFoamTransportDiagnostics = EditorGUILayout.Foldout(
                 showFoamTransportDiagnostics,
-                "Motion",
+                "Material Motion",
                 true);
             if (!showFoamTransportDiagnostics)
             {
@@ -2032,30 +2033,27 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUI.indentLevel--;
         }
 
-        private void DrawFoamSpawningSection(
+        private void DrawFoamManualBirthSourceSection(
             StylizedRiver river,
             StylizedRiverFoamRuntime runtime)
         {
-            showFoamSpawning = EditorGUILayout.Foldout(
-                showFoamSpawning,
-                "Spawning",
+            showFoamManualBirthSource = EditorGUILayout.Foldout(
+                showFoamManualBirthSource,
+                "Manual Birth Source",
                 true);
-            if (!showFoamSpawning)
+            if (!showFoamManualBirthSource)
             {
                 return;
             }
 
             EditorGUI.indentLevel++;
 
-            SerializedProperty presetProperty = Find("foamSpawnPreset");
-            EditorGUILayout.PropertyField(
-                presetProperty,
-                new GUIContent(
-                    "Spawn Pattern",
-                    "Single canonical manual foam-spawn pattern. Patterns are compositions: one click starts one budgeted composition event; internal strands, sheets, and fragments are resolved inside that event instead of by multiplying runtime writers."));
-            StylizedRiverFoamSpawnPreset selectedPreset =
-                (StylizedRiverFoamSpawnPreset)presetProperty.intValue;
+            EditorGUILayout.HelpBox(
+                "Manual Birth Source contains every manual foam birth control. This section creates stable source material only; macro/meso breakup belongs to material evolution and micro breakup belongs to rendering.",
+                MessageType.None);
 
+            EditorGUILayout.LabelField("Source Position", EditorStyles.boldLabel);
+            EditorGUI.indentLevel++;
             EditorGUILayout.PropertyField(
                 Find("foamSpawnDistanceNormalized"),
                 new GUIContent(
@@ -2065,64 +2063,73 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("foamSpawnAcrossNormalized"),
                 new GUIContent(
                     "Across Position",
-                    "Normalized lateral position. Minus one is the left surface edge, zero is centre, and one is the right surface edge. Shore Skirt snaps centre-ish starts toward the nearest shore."));
+                    "Normalized lateral position. Minus one is the left surface edge, zero is centre, and one is the right surface edge."));
+            EditorGUI.indentLevel--;
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField("Source Material", EditorStyles.boldLabel);
+            EditorGUI.indentLevel++;
             EditorGUILayout.PropertyField(
                 Find("foamSpawnAmount"),
                 new GUIContent(
                     "Amount",
-                    "Source-only coverage amount. It controls how much of the candidate birth shapes becomes occupied Foam, not Remaining Life or durability."));
+                    "Source-only coverage amount. Higher values fill more of the same candidate source; this is not Remaining Life, opacity, density, or fracture severity."));
             EditorGUILayout.PropertyField(
                 Find("foamSpawnRemainingLife"),
                 new GUIContent(
                     "Initial Remaining Life",
                     "Normalized lifetime assigned to accepted source material. One starts with a complete lifetime; lower values begin closer to expiry."));
+            EditorGUI.indentLevel--;
+
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField("Source Shape", EditorStyles.boldLabel);
+            EditorGUI.indentLevel++;
             EditorGUILayout.PropertyField(
                 Find("foamSpawnScale"),
                 new GUIContent(
-                    "Scale",
-                    "Overall world-space size of the selected pattern. Thin patterns interpret this as strand width; sheet patterns interpret it as sheet half-width; Compact Diagnostic interprets it as patch radius."));
+                    "Half Width",
+                    "World-space half-width of the canonical moving manual source. Final breakup and morphing are handled after birth, not by this source control."));
+            EditorGUI.indentLevel--;
 
-            if (selectedPreset != StylizedRiverFoamSpawnPreset.CompactDiagnostic)
+            showFoamManualSourceMotion = EditorGUILayout.Foldout(
+                showFoamManualSourceMotion,
+                "Source Path Motion",
+                true);
+            if (showFoamManualSourceMotion)
             {
-                EditorGUILayout.PropertyField(
-                    Find("foamSpawnComplexity"),
-                    new GUIContent(
-                        "Complexity",
-                        "Pattern-level shape complexity: more strands, gaps, width variation, sheet tearing, and offset fragments according to the selected pattern."));
-                EditorGUILayout.PropertyField(
-                    Find("foamSpawnDensity"),
-                    new GUIContent(
-                        "Density",
-                        "Pattern-level material density. Higher values make compositions more populated and more continuous without changing Remaining Life or active event count."));
+                EditorGUI.indentLevel++;
                 EditorGUILayout.PropertyField(
                     Find("foamSpawnRibbonDuration"),
                     new GUIContent(
-                        "Event Duration",
-                        "Base duration for the moving-head composition event. Birth dispatches are internally budgeted per material step."));
+                        "Duration",
+                        "Duration of the budgeted moving-head source event."));
                 EditorGUILayout.PropertyField(
                     Find("foamSpawnRibbonTravelDistance"),
                     new GUIContent(
                         "Travel Distance",
-                        "Base downstream travel distance for the composition path. Virtual internal strands are resolved inside the single event."));
+                        "Net downstream travel distance of the source head."));
                 EditorGUILayout.PropertyField(
                     Find("foamSpawnRibbonAcrossDrift"),
                     new GUIContent(
                         "Across Drift",
-                        "Base normalized lateral displacement. Patterns scale or invert this inside the single composition event."));
+                        "Total normalized lateral displacement from source start to source end."));
                 EditorGUILayout.PropertyField(
                     Find("foamSpawnRibbonPathWander"),
                     new GUIContent(
-                        "Path Wander",
-                        "Strength of deterministic smooth bend. Patterns scale this value internally without adding child runtime writers."));
+                        "Path Bend",
+                        "Strength of the deterministic smooth bend added to the source path. This is path curvature, not Foam breakup."));
+                EditorGUI.indentLevel--;
             }
 
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField("Actions", EditorStyles.boldLabel);
             using (new EditorGUI.DisabledScope(!Application.isPlaying))
             {
                 EditorGUILayout.BeginHorizontal();
                 if (GUILayout.Button(
                         new GUIContent(
-                            "Start Spawn",
-                            "Starts the selected canonical foam-spawn pattern as one budgeted composition event. No legacy one-frame button wall remains.")))
+                            "Start Manual Source",
+                            "Starts one budgeted manual source event. The source is intentionally stable so later material behavior can be tested honestly.")))
                 {
                     ApplyFoamSpawnProperties();
                     river.StartFoamSpawn();
@@ -2142,17 +2149,20 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             if (!Application.isPlaying)
             {
                 EditorGUILayout.HelpBox(
-                    "Enter Play Mode to start a manual foam spawn. Automatic spawning is still intentionally disabled; this section now drives only the canonical composition-pattern path.",
+                    "Enter Play Mode to start a manual source. Automatic spawning remains intentionally disabled.",
                     MessageType.Info);
             }
 
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField("State", EditorStyles.boldLabel);
             if (runtime != null)
             {
+                EditorGUI.indentLevel++;
                 EditorGUILayout.LabelField(
-                    "Composition State",
+                    "Source State",
                     runtime.LatestFoamCompositionEventId > 0
                         ? $"event {runtime.LatestFoamCompositionEventId}, active {runtime.ActiveFoamCompositionEventCount}/{runtime.FoamCompositionPoolCapacity}, budget {runtime.FoamCompositionBirthBudgetPerStep}/step"
-                        : $"No active event, budget {runtime.FoamCompositionBirthBudgetPerStep}/step");
+                        : $"No active source, budget {runtime.FoamCompositionBirthBudgetPerStep}/step");
                 EditorGUILayout.LabelField(
                     "Last Segment",
                     $"{runtime.LastFoamCompositionSegmentLength:0.000} m");
@@ -2161,6 +2171,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     runtime.ProgressiveBirthDebugReadbackAvailable
                         ? $"{runtime.ProgressiveBirthDebugLatestAffectedTexels:N0} latest"
                         : "No source readback");
+                EditorGUI.indentLevel--;
+            }
+            else
+            {
+                EditorGUILayout.LabelField("Runtime", "Unavailable");
             }
 
             EditorGUI.indentLevel--;
@@ -2171,7 +2186,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             showFoamShapeResidueDiagnostics = EditorGUILayout.Foldout(
                 showFoamShapeResidueDiagnostics,
-                "Shape",
+                "Material Shape",
                 true);
             if (!showFoamShapeResidueDiagnostics)
             {
@@ -2361,7 +2376,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             if (runtime.MaterialStepsLastFrame > 1 ||
                 runtime.EstimatedTransportCellsPerStep > 1.25f)
             {
-                return "Open Motion";
+                return "Open Material Motion";
             }
             float hiddenArea = Mathf.Max(
                 0f,
@@ -2369,13 +2384,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 runtime.VisiblePresenceCoreArea);
             if (hiddenArea > Mathf.Max(0.05f, runtime.VisiblePresenceCoreArea * 0.25f))
             {
-                return "Open Lifetime + Topology or Shape";
+                return "Open Lifetime + Topology or Material Shape";
             }
             if (runtime.ManualProofReferenceAvailable &&
                 (runtime.ManualProofPresenceRatio < 0.65f ||
                  runtime.ManualProofPresenceRatio > 1.25f))
             {
-                return "Open Shape";
+                return "Open Material Shape";
             }
             return "No obvious diagnostic failure";
         }

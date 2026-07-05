@@ -24,6 +24,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty blackSacredStoneMaterial;
         private SerializedProperty surfaceMaskBaseLift;
         private SerializedProperty creviceReach;
+        private SerializedProperty creviceSmoothness;
         private SerializedProperty creviceBreakup;
         private SerializedProperty dirtCrawlReach;
         private SerializedProperty dirtCoverage;
@@ -67,6 +68,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "surfaceMaskBaseLift");
             creviceReach = serializedObject.FindProperty(
                 "creviceReach");
+            creviceSmoothness = serializedObject.FindProperty(
+                "creviceSmoothness");
             creviceBreakup = serializedObject.FindProperty(
                 "creviceBreakup");
             dirtCrawlReach = serializedObject.FindProperty(
@@ -138,6 +141,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "m_Script",
                 "surfaceMaskBaseLift",
                 "creviceReach",
+                "creviceSmoothness",
                 "creviceBreakup",
                 "dirtCrawlReach",
                 "dirtCoverage",
@@ -223,12 +227,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             EditorGUILayout.HelpBox(
                 "These controls tune generated CreviceBase and DirtDeposit " +
-                "debug masks per object. They do not implement edge wear, " +
-                "cracks, or final material response.",
+                "surface masks per object. Crevice Reach controls crawl " +
+                "height; Crevice Smoothness controls the fade length.",
                 MessageType.Info);
 
             EditorGUILayout.PropertyField(surfaceMaskBaseLift);
             EditorGUILayout.PropertyField(creviceReach);
+            EditorGUILayout.PropertyField(creviceSmoothness);
             EditorGUILayout.PropertyField(creviceBreakup);
             EditorGUILayout.PropertyField(dirtCrawlReach);
             EditorGUILayout.PropertyField(dirtCoverage);
@@ -242,15 +247,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 EditorStyles.boldLabel);
 
             EditorGUILayout.HelpBox(
-                "Generates overlay strips for ConvexEdgeWear and ConcaveCrease. " +
-                "DebugOnly keeps them disabled during normal rendering. " +
-                "VisibleProfileResponse enables them during normal rendering " +
-                "so stone profiles can show worn ridges and cracks. Keep this " +
-                "explicit until final feature overlays are batched/chunk-combined.",
+                "Generates raised overlay strips for ConvexEdgeWear and " +
+                "ConcaveCrease debug validation only. These strips are not " +
+                "used for normal stone rendering because their debug lift makes " +
+                "them read as floating lines instead of surface-integrated " +
+                "stone wear/cracks.",
                 MessageType.Info);
 
-            EditorGUILayout.PropertyField(surfaceFeatureVisibility);
-            EditorGUILayout.Space(2f);
             EditorGUILayout.PropertyField(edgeWearAmount);
             EditorGUILayout.PropertyField(edgeWearWidth);
             EditorGUILayout.PropertyField(edgeWearCoverage);

@@ -6,14 +6,11 @@ namespace ProgrammaticStylized3D.Rivers
     public sealed partial class StylizedRiverFoamRuntime
     {
         public bool StartFoamCompositionNormalized(
-            StylizedRiverFoamSpawnPreset pattern,
             float distanceNormalized,
             float acrossNormalized,
             float scale,
             float amount,
             float remainingLife,
-            float complexity,
-            float density,
             float duration,
             float travelDistance,
             float acrossDrift,
@@ -51,9 +48,7 @@ namespace ProgrammaticStylized3D.Rivers
                     : startGlobalDistance - river.Domain.GlobalDistanceMinimum);
             float resolvedTravelDistance = Mathf.Min(
                 Mathf.Clamp(
-                    ResolveFoamCompositionTravelDistance(
-                        pattern,
-                        travelDistance),
+                    travelDistance,
                     ProgressiveRibbonMinimumTravelDistance,
                     ProgressiveRibbonMaximumTravelDistance),
                 availableDownstreamDistance);
@@ -71,68 +66,42 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             int eventId = ++foamCompositionSequence;
-            float shapeSeed = river.VisualSeed + eventId * 37.719f;
-            float patternSeed =
-                river.VisualSeed * 0.613f +
-                eventId * 97.217f +
-                ProgressivePatternSeedSalt;
-            float sourceFillSeed =
-                river.VisualSeed * 0.431f +
-                eventId * 53.173f +
-                ProgressiveSourceFillSeedSalt;
-            float bendSign = Hash01(shapeSeed + 11.3f) < 0.5f ? -1f : 1f;
-            float widthPhase = Hash01(shapeSeed + 23.7f) * Mathf.PI * 2f;
-            float resolvedComplexity = Mathf.Clamp01(complexity);
-            float resolvedDensity = Mathf.Clamp01(density);
             float startAcross = Mathf.Clamp(acrossNormalized, -1f, 1f);
             float resolvedHalfWidth = Mathf.Clamp(
-                ResolveFoamCompositionHalfWidth(pattern, scale),
+                scale,
                 ProgressiveRibbonMinimumHalfWidth,
                 ProgressiveRibbonMaximumHalfWidth);
-            float resolvedStrokeAspect = ResolveFoamCompositionStrokeAspect(
-                pattern,
-                resolvedComplexity,
-                resolvedDensity);
-            float resolvedFragmentStrength = ResolveFoamCompositionFragmentStrength(
-                pattern,
-                resolvedComplexity);
-            float resolvedWidthVariation = ResolveFoamCompositionWidthVariation(
-                pattern,
-                resolvedComplexity);
-            float resolvedSourceFillFeatureScale = ResolveFoamCompositionFeatureScale(
-                pattern,
-                resolvedComplexity,
-                resolvedDensity);
             float sourceFillFeatureSize =
-                ResolveSourceFillFeatureSize(resolvedHalfWidth) *
-                resolvedSourceFillFeatureScale;
+                ResolveSourceFillFeatureSize(resolvedHalfWidth);
             float resolvedDuration = Mathf.Clamp(
-                ResolveFoamCompositionDuration(pattern, duration),
+                duration,
                 ProgressiveRibbonMinimumDuration,
                 ProgressiveRibbonMaximumDuration);
-            float resolvedDrift = Mathf.Clamp(
-                ResolveFoamCompositionAcrossDrift(
-                    pattern,
-                    acrossDrift,
-                    startAcross),
-                -1f,
-                1f);
-            float resolvedWander = Mathf.Clamp01(
-                pathWander * Mathf.Lerp(0.55f, 1.20f, resolvedComplexity));
-            bool sheetStyle = pattern == StylizedRiverFoamSpawnPreset.TornSheetRibbon ||
-                pattern == StylizedRiverFoamSpawnPreset.ShoreSkirt;
+            float resolvedDrift = Mathf.Clamp(acrossDrift, -1f, 1f);
+            float resolvedWander = Mathf.Clamp01(pathWander);
+            float sourceKey =
+                river.VisualSeed * 0.613f +
+                Mathf.Clamp01(distanceNormalized) * 1009.17f +
+                startAcross * 503.31f +
+                resolvedHalfWidth * 311.73f +
+                resolvedTravelDistance * 67.19f +
+                resolvedDrift * 59.7f +
+                resolvedWander * 37.1f;
+            float shapeSeed = sourceKey + 37.719f;
+            float patternSeed = sourceKey + ProgressivePatternSeedSalt;
+            float sourceFillSeed = sourceKey + ProgressiveSourceFillSeedSalt;
+            float bendSign = Hash01(shapeSeed + 11.3f) < 0.5f ? -1f : 1f;
             float startRadius = ResolveProgressiveRibbonRadius(
                 resolvedHalfWidth,
                 0f,
-                widthPhase,
                 0f,
-                resolvedWidthVariation);
+                0f,
+                0f);
 
             foamCompositionEvents[slotIndex] = new FoamCompositionEvent
             {
                 Active = true,
                 EventId = eventId,
-                Pattern = pattern,
                 StartGlobalDistance = startGlobalDistance,
                 StartAcrossNormalized = startAcross,
                 Duration = resolvedDuration,
@@ -141,20 +110,16 @@ namespace ProgrammaticStylized3D.Rivers
                 AcrossDrift = resolvedDrift,
                 PathWander = resolvedWander,
                 BaseRadius = resolvedHalfWidth,
-                SourceAmount = resolvedAmount * Mathf.Lerp(0.45f, 1.15f, resolvedDensity),
+                SourceAmount = resolvedAmount,
                 RemainingLife = Mathf.Clamp01(remainingLife),
                 PatternSeed = patternSeed,
                 ShapeSeed = shapeSeed,
                 SourceFillSeed = sourceFillSeed,
                 SourceFillFeatureSize = sourceFillFeatureSize,
                 BendSign = bendSign,
-                WidthPhase = widthPhase,
-                StrokeAspect = resolvedStrokeAspect,
-                FragmentStrength = resolvedFragmentStrength,
-                WidthVariation = resolvedWidthVariation,
-                Complexity = resolvedComplexity,
-                Density = resolvedDensity,
-                SheetStyle = sheetStyle,
+                WidthPhase = 0f,
+                StrokeAspect = ManualSourceStrokeAspect,
+                WidthVariation = 0f,
                 Elapsed = 0f,
                 PreviousGlobalDistance = startGlobalDistance,
                 PreviousAcrossNormalized = startAcross,
@@ -364,7 +329,7 @@ namespace ProgrammaticStylized3D.Rivers
                 compositionEvent.SourceFillSeed,
                 compositionEvent.SourceFillFeatureSize,
                 compositionEvent.ShapeSeed,
-                compositionEvent.FragmentStrength,
+                0f,
                 false,
                 true,
                 start.x,
@@ -374,11 +339,7 @@ namespace ProgrammaticStylized3D.Rivers
                 end.x,
                 ResolveAcrossNormalizedApproximation(end.y),
                 headRadius,
-                headAmount,
-                compositionEvent.SheetStyle,
-                compositionEvent.Pattern,
-                compositionEvent.Complexity,
-                compositionEvent.Density);
+                headAmount);
         }
 
         private void CompleteFoamCompositionEvent(
@@ -552,151 +513,6 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverQuality.High => HighFoamCompositionBirthBudgetPerStep,
                 _ => MediumFoamCompositionBirthBudgetPerStep
             };
-        }
-
-        private static float ResolveFoamCompositionHalfWidth(
-            StylizedRiverFoamSpawnPreset pattern,
-            float scale)
-        {
-            float multiplier = pattern switch
-            {
-                StylizedRiverFoamSpawnPreset.ThinScratchStreaks => 0.82f,
-                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 1.00f,
-                StylizedRiverFoamSpawnPreset.FracturedRibbonBundle => 1.10f,
-                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 1.85f,
-                StylizedRiverFoamSpawnPreset.ShoreSkirt => 1.35f,
-                _ => 1.00f
-            };
-            return scale * multiplier;
-        }
-
-        private static float ResolveFoamCompositionDuration(
-            StylizedRiverFoamSpawnPreset pattern,
-            float duration)
-        {
-            float multiplier = pattern switch
-            {
-                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 1.00f,
-                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 1.00f,
-                StylizedRiverFoamSpawnPreset.ShoreSkirt => 1.00f,
-                _ => 1.00f
-            };
-            return duration * multiplier;
-        }
-
-        private static float ResolveFoamCompositionTravelDistance(
-            StylizedRiverFoamSpawnPreset pattern,
-            float travelDistance)
-        {
-            float multiplier = pattern switch
-            {
-                StylizedRiverFoamSpawnPreset.ThinScratchStreaks => 0.58f,
-                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 0.75f,
-                StylizedRiverFoamSpawnPreset.FracturedRibbonBundle => 0.72f,
-                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 0.90f,
-                StylizedRiverFoamSpawnPreset.ShoreSkirt => 0.95f,
-                _ => 0.35f
-            };
-            return travelDistance * multiplier;
-        }
-
-        private static float ResolveFoamCompositionAcrossDrift(
-            StylizedRiverFoamSpawnPreset pattern,
-            float acrossDrift,
-            float startAcross)
-        {
-            if (pattern == StylizedRiverFoamSpawnPreset.ShoreSkirt)
-            {
-                float inwardSign = startAcross >= 0f ? -1f : 1f;
-                return inwardSign * Mathf.Abs(acrossDrift) * 0.35f;
-            }
-
-            float multiplier = pattern switch
-            {
-                StylizedRiverFoamSpawnPreset.ThinScratchStreaks => 0.30f,
-                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 0.12f,
-                StylizedRiverFoamSpawnPreset.FracturedRibbonBundle => 0.10f,
-                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 0.04f,
-                _ => 1.00f
-            };
-            return acrossDrift * multiplier;
-        }
-
-        private static float ResolveFoamCompositionStrokeAspect(
-            StylizedRiverFoamSpawnPreset pattern,
-            float complexity,
-            float density)
-        {
-            float baseAspect = pattern switch
-            {
-                StylizedRiverFoamSpawnPreset.ThinScratchStreaks => 8.75f,
-                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 7.50f,
-                StylizedRiverFoamSpawnPreset.FracturedRibbonBundle => 8.50f,
-                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 5.40f,
-                StylizedRiverFoamSpawnPreset.ShoreSkirt => 7.20f,
-                _ => 1.45f
-            };
-            return Mathf.Clamp(
-                baseAspect * Mathf.Lerp(0.88f, 1.15f, density) *
-                Mathf.Lerp(0.95f, 1.08f, complexity),
-                1f,
-                12f);
-        }
-
-        private static float ResolveFoamCompositionFragmentStrength(
-            StylizedRiverFoamSpawnPreset pattern,
-            float complexity)
-        {
-            float baseStrength = pattern switch
-            {
-                StylizedRiverFoamSpawnPreset.ThinScratchStreaks => 0.84f,
-                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 0.22f,
-                StylizedRiverFoamSpawnPreset.FracturedRibbonBundle => 0.78f,
-                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 0.86f,
-                StylizedRiverFoamSpawnPreset.ShoreSkirt => 0.58f,
-                _ => 0f
-            };
-            return Mathf.Clamp01(baseStrength * Mathf.Lerp(0.45f, 1.20f, complexity));
-        }
-
-        private static float ResolveFoamCompositionWidthVariation(
-            StylizedRiverFoamSpawnPreset pattern,
-            float complexity)
-        {
-            float baseVariation = pattern switch
-            {
-                StylizedRiverFoamSpawnPreset.ThinScratchStreaks => 0.42f,
-                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 0.18f,
-                StylizedRiverFoamSpawnPreset.FracturedRibbonBundle => 0.44f,
-                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 0.50f,
-                StylizedRiverFoamSpawnPreset.ShoreSkirt => 0.30f,
-                _ => ProgressiveRibbonWidthVariation
-            };
-            return Mathf.Clamp(
-                baseVariation * Mathf.Lerp(0.60f, 1.20f, complexity),
-                0f,
-                0.65f);
-        }
-
-        private static float ResolveFoamCompositionFeatureScale(
-            StylizedRiverFoamSpawnPreset pattern,
-            float complexity,
-            float density)
-        {
-            float baseScale = pattern switch
-            {
-                StylizedRiverFoamSpawnPreset.ThinScratchStreaks => 0.72f,
-                StylizedRiverFoamSpawnPreset.SmoothSurfaceLane => 1.25f,
-                StylizedRiverFoamSpawnPreset.FracturedRibbonBundle => 0.72f,
-                StylizedRiverFoamSpawnPreset.TornSheetRibbon => 0.50f,
-                StylizedRiverFoamSpawnPreset.ShoreSkirt => 0.64f,
-                _ => 1.00f
-            };
-            return Mathf.Clamp(
-                baseScale * Mathf.Lerp(1.20f, 0.85f, density) *
-                Mathf.Lerp(1.10f, 0.82f, complexity),
-                0.35f,
-                2.5f);
         }
 
         private static float Hash01(float value)

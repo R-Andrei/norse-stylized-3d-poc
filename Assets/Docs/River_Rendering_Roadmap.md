@@ -292,10 +292,11 @@ Stage 6 is in the `4.11C` manually-born persistent material phase. The following
 - topology lifespan support and negative aging pressure;
 - lifetime delta-time rebind, so material now ages according to runtime settings;
 - support/negative aging response repair, so negative pressure suppresses positive support before accelerating death;
-- consolidated manual Foam spawning UI;
-- 5.4l composition-event refactor, so one manual spawn starts one budgeted composition event instead of hidden multiple writer events.
+- consolidated manual Foam birth controls under `Foam Debug > Manual Birth Source`;
+- 5.4l composition-event refactor, so one manual spawn starts one budgeted composition event instead of hidden multiple writer events;
+- 5.4m manual source realignment, so birth no longer uses pattern/complexity/density controls to randomize macro Foam identity.
 
-Current failing area: visual/material behavior. Manual births can still produce chip/slug/blob results, and persistent Foam does not yet morph, tear, drift, and interact with obstacles well enough to match the reference language.
+Current failing area: visual/material behavior. Manual source material is now intentionally stable, but persistent Foam does not yet morph, tear, drift, and interact with obstacles well enough to match the reference language.
 
 ### Canonical topology/material relationship
 
@@ -309,12 +310,11 @@ Birth/source events create candidate material. After merge, source Amount is dis
 
 The current approved order is:
 
-1. `4.11C.5.4m — Manual Source Realignment`
-2. `4.11C.5.5 — Temporal Morphing and Material Shape Evolution`
-3. `4.11C.5.6 — Organic Breakup and Edge Readability`
-4. `4.11C.5.7 — Topology Aging Proof and Calibration`
-5. `4.11C.5.8 — Controlled Lateral Drift and Obstacle Tangential Flow`
-6. `4.11C.5.9 — Obstacle Boundary Repair`
+1. `4.11C.5.5 — Temporal Morphing and Material Shape Evolution`
+2. `4.11C.5.6 — Organic Breakup and Edge Readability`
+3. `4.11C.5.7 — Topology Aging Proof and Calibration`
+4. `4.11C.5.8 — Controlled Lateral Drift and Obstacle Tangential Flow`
+5. `4.11C.5.9 — Obstacle Boundary Repair`
 
 Do not continue to automatic birth population until manually-born material passes those gates.
 
