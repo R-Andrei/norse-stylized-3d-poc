@@ -798,3 +798,13 @@ Validation of 5.8 proved the chaotic intermittent drift path works, but the auth
 This remains a calibration patch only. It does not add obstacle steering, change downstream phase transport, modify Remaining Life, spawn Foam, alter topology generation, or touch final visual fragmentation. After this patch, testing should restart from `Chaotic Drift Strength = 1` and `Chaotic Drift Rhythm = 1`; old max settings should be treated as stress values, not the expected normal operating point.
 
 Next actionable item: `4.11C.5.9 — Obstacle-Based Tangential Foam Movement`.
+
+## River Foam 4.11C.5.8c — Macro Drift Rebalance
+
+Validation of 5.8b proved the chaotic intermittent drift path was now strong enough, but the visible response was weighted too much toward local edge tearing. Large Strength values produced crawling, shredded borders while the broader Foam patch still felt comparatively anchored.
+
+5.8c keeps the same two controls, the same existing `SimulateFoam` pass, and no new textures or dispatches. The HLSL drift resolver now separates chaotic drift into macro body transport, meso shear, and edge detail. `FoamApplyPersistentMaterialMorph` uses the macro backtrace as the primary advected base first, then samples meso/edge deformation around that base. Edge tearing remains available, but it is reduced to secondary border detail instead of being the dominant expression of chaotic drift.
+
+This patch does not add obstacle steering, change downstream phase transport, modify Remaining Life, spawn Foam, alter topology generation, or touch final visual fragmentation. Validate in Material Presence from `Chaotic Drift Strength = 0`, then `1`, then `2`, with `Rhythm = 1`; success means the patch body meanders as a broader mass and edges no longer dominate the effect.
+
+Next actionable item after validation: `4.11C.5.9 — Obstacle-Based Tangential Foam Movement`.

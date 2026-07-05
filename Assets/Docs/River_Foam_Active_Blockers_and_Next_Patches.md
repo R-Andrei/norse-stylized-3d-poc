@@ -25,7 +25,7 @@ Current visual/lifecycle state after 5.5b/5.5c/5.5d:
 - 5.6 adds render-only coupling between Final Foam and the existing river surface layer: macro waves, static pressure, lee/depression, ripples, disturbance gradients, and wake energy;
 - 5.6b filters Foam interior lighting so ordinary granular water-surface variation does not dirty the clean white stylized Foam body, while strong surface features can still show through at reduced strength;
 - 5.7/5.7b/5.7c add stored-state disturbance/surface coupling; validation shows the path works, with a practical authored `Surface Morph Strength` range around 2-4 and approximately 2.5 as the current working setting;
-- 5.8 adds chaotic intermittent lateral material drift inside the persistent Foam simulation, so stored material can sometimes meander, shear, and briefly resist while remaining net-downstream; 5.8b recalibrates that drift so `Strength = 1` / `Rhythm = 1` is the normal readable baseline instead of requiring maximum settings;
+- 5.8 adds chaotic intermittent lateral material drift inside the persistent Foam simulation, so stored material can sometimes meander, shear, and briefly resist while remaining net-downstream; 5.8b made the effect strong enough, and 5.8c rebalances the formula so the broader patch body moves first while edge tearing remains secondary;
 - obstacle-based tangential movement, better source-shape spawning, topology proof/calibration, and final visual fragmentation remain future work.
 
 ## Hard rules for the next patches
@@ -177,17 +177,17 @@ Persistent Foam material should remain net-downstream while receiving intermitte
 
 ### Implemented target
 
-`4.11C.5.8/5.8b — Chaotic Intermittent Foam Drift + Calibration`
+`4.11C.5.8/5.8b/5.8c — Chaotic Intermittent Foam Drift + Macro Drift Rebalance`
 
 ### Acceptance gate
 
-In Material Presence view, `Chaotic Drift Strength = 0` should match the previous accepted baseline. After 5.8b, retest from `Strength = 1` and `Rhythm = 1` rather than the old maximum values: this should now be the normal readable authored baseline, with mostly-downstream travel, occasional coherent lateral drift, calm/no-drift intervals, mild shear, and no constant left/right conveyor motion. Higher Rhythm should increase event frequency without making drift continuous. Higher Strength should make the same intermittent behavior stronger without smearing, early death, birth changes, or topology changes; `3+` should be treated as stress territory.
+In Material Presence view, `Chaotic Drift Strength = 0` should match the previous accepted baseline. After 5.8c, retest from `Strength = 1` and `Rhythm = 1`: the broader stored patch body should visibly meander first, meso shear should bend/lag parts of the patch second, and edge tearing should remain secondary detail. Higher Rhythm should increase event frequency without making drift continuous. Higher Strength should make the same intermittent body movement stronger without reducing it to edge crawl, smearing, early death, birth changes, or topology changes; `3+` should be treated as stress territory.
 
 ## Blocker 4 — Obstacle-based lateral/tangential movement not implemented
 
 ### Symptom
 
-5.8/5.8b add and calibrate natural chaotic lateral material drift, but they deliberately do not route Foam around rocks, banks, logs, or bridge supports. Obstacle footprint is still mostly valid-fluid exclusion.
+5.8/5.8b/5.8c add, calibrate, and rebalance natural chaotic lateral material drift, but they deliberately do not route Foam around rocks, banks, logs, or bridge supports. Obstacle footprint is still mostly valid-fluid exclusion.
 
 ### Why it matters
 
@@ -251,7 +251,7 @@ Using the Foam + Aging Topology view and Final Foam view, the same material sour
 
 ## Recommended sequence
 
-1. Validate `4.11C.5.8/5.8b — Chaotic Intermittent Foam Drift + Calibration` in Material Presence with `Chaotic Drift Strength = 0/1/2` and low/normal/high Rhythm.
+1. Validate `4.11C.5.8c — Macro Drift Rebalance` in Material Presence with `Chaotic Drift Strength = 0/1/2` and low/normal/high Rhythm. Confirm the patch body moves first and the edges no longer dominate the effect.
 2. `4.11C.5.9 — Obstacle-Based Tangential Foam Movement`
 3. `4.11C.5.10 — Better Manual Source Shape Spawning`
 4. `4.11C.5.11 — Topology Aging Proof and Calibration`
