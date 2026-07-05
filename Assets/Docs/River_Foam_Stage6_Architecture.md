@@ -26,14 +26,15 @@ Accepted or mostly accepted foundations:
 - 5.6b adds Foam interior clarity filtering so fine water-surface variation does not make the body noisy, while strong surface features can still imprint at reduced strength;
 - 5.7 adds stored-state surface-driven material morphing: existing ripple, wake, static pressure, and lee fields can amplify or bias persistent `Material Presence` morphology, without changing birth or lifecycle authority;
 - 5.7b adds a `Surface Morph Strength` calibration control so the stored-state response can be A/B tested at `0` and strengthened without changing lifecycle authority;
-- 5.7c rebalances the internal surface-response formula so `1` is a normal readable authored effect, `2` is strong, and `3+` becomes stress-test territory instead of merely compensating for an undertuned curve.
+- 5.7c rebalances the internal surface-response formula so `1` is a normal readable authored effect, `2` is strong, and `3+` becomes stress-test territory instead of merely compensating for an undertuned curve;
+- 5.8 adds chaotic intermittent persistent material drift: stored `Material Presence` can receive coherent lateral impulses, calm/no-drift intervals, local shear, and subtle resistance while remaining net-downstream.
 
 Still not accepted:
 
-- organic breakup is not proven;
+- obstacle-based tangential movement is not implemented;
+- source shapes still need improvement before final reference-matching;
 - topology interaction needs final proof and calibration;
-- lateral drift/obstacle sliding is not implemented;
-- obstacle interaction can still read as hard clipping.
+- final visual fragmentation / organic breakup is deferred until movement and source-shape foundations are stronger.
 
 Current blockers and patch order live in `River_Foam_Active_Blockers_and_Next_Patches.md`.
 
@@ -170,7 +171,7 @@ Persistent material movement is downstream river-space transport plus approved d
 - no material guidance field resurrected from old experiments;
 - no hidden spread/reinforcement layer.
 
-Material simulation now owns intrinsic macro/meso deformation. The first 5.5 pass was too conservative; 5.5b strengthened stored-state deformation so a material body can bend, stretch, and locally widen/narrow. 5.5c repairs lifecycle authority: morphing may not erase material before `Remaining Life` expires. 5.5d makes intrinsic wobble area-balanced by using opposed normalized material samples instead of a max/current union, so patches can bulge, compress, and relax without continual footprint growth. 5.6/5.6b add river-surface coupling at render time only: Final Foam samples the same water-surface influences used by the river shader, and Foam interiors are clarity-filtered so fine water detail does not dominate the white body. 5.7 keeps that render path separate while also sampling the same ripple, wake, static pressure, and lee fields inside the persistent material simulation. Those fields only amplify/bias the existing area-balanced morphology; they do not spawn Foam, shorten `Remaining Life`, or become topology steering. 5.7b keeps the same boundary but adds an explicit `Surface Morph Strength` control: `0` disables stored-state surface response for A/B testing. 5.7c recalibrates the formula itself rather than hiding a larger multiplier behind the control: `1` is now intended to be the normal readable authored response, `2` should read strong, and `3+` is overdrive/stress-test behavior. Lifecycle-safe stored fragmentation, lateral drift, and obstacle tangential sliding remain separate explicit, budgeted work.
+Material simulation now owns intrinsic macro/meso deformation. The first 5.5 pass was too conservative; 5.5b strengthened stored-state deformation so a material body can bend, stretch, and locally widen/narrow. 5.5c repairs lifecycle authority: morphing may not erase material before `Remaining Life` expires. 5.5d makes intrinsic wobble area-balanced by using opposed normalized material samples instead of a max/current union, so patches can bulge, compress, and relax without continual footprint growth. 5.6/5.6b add river-surface coupling at render time only: Final Foam samples the same water-surface influences used by the river shader, and Foam interiors are clarity-filtered so fine water detail does not dominate the white body. 5.7 keeps that render path separate while also sampling the same ripple, wake, static pressure, and lee fields inside the persistent material simulation. Those fields only amplify/bias the existing area-balanced morphology; they do not spawn Foam, shorten `Remaining Life`, or become topology steering. 5.7b keeps the same boundary but adds an explicit `Surface Morph Strength` control: `0` disables stored-state surface response for A/B testing. 5.7c recalibrates the formula itself rather than hiding a larger multiplier behind the control: `1` is now intended to be the normal readable authored response, `2` should read strong, and `3+` is overdrive/stress-test behavior. 5.8 adds chaotic intermittent drift inside the same persistent simulation pass rather than a new dispatch or render-only offset. The new drift is a bounded backtrace input with a strength control and rhythm control: it can create coherent lateral impulses, calm intervals, local shear, and subtle upstream resistance, but it must not change downstream phase transport, birth, topology, or lifecycle authority. Obstacle tangential sliding remains separate explicit, budgeted work.
 
 ## Manual birth phase
 

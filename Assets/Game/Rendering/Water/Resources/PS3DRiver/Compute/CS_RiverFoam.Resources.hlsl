@@ -122,6 +122,8 @@ float _FoamPresenceMetricThreshold;
 float _FoamIntegratedAreaFixedPointScale;
 float _FoamDisturbanceEnabled;
 float _FoamSurfaceMorphStrength;
+float _FoamChaoticDriftStrength;
+float _FoamChaoticDriftRhythm;
 float _FoamMotionFlowSpeed;
 float _FoamMotionWaveHeight;
 float _FoamMotionWaveLength;

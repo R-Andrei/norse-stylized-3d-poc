@@ -24,9 +24,9 @@ Current visual/lifecycle state after 5.5b/5.5c/5.5d:
 - intrinsic runtime morphology is accepted as good enough for now;
 - 5.6 adds render-only coupling between Final Foam and the existing river surface layer: macro waves, static pressure, lee/depression, ripples, disturbance gradients, and wake energy;
 - 5.6b filters Foam interior lighting so ordinary granular water-surface variation does not dirty the clean white stylized Foam body, while strong surface features can still show through at reduced strength;
-- stored-state disturbance/surface coupling is still pending: waves/pressure/lee/ripples should later amplify material morphing, not only render-space masking;
-- organic breakup is still too weak or blurry;
-- topology interaction, lateral drift, and obstacle behavior are not yet proven.
+- 5.7/5.7b/5.7c add stored-state disturbance/surface coupling; validation shows the path works, with a practical authored `Surface Morph Strength` range around 2-4 and approximately 2.5 as the current working setting;
+- 5.8 adds chaotic intermittent lateral material drift inside the persistent Foam simulation, so stored material can sometimes meander, shear, and briefly resist while remaining net-downstream;
+- obstacle-based tangential movement, better source-shape spawning, topology proof/calibration, and final visual fragmentation remain future work.
 
 ## Hard rules for the next patches
 
@@ -161,33 +161,73 @@ In Final Foam view, existing Foam visibly reacts to the same surface disturbance
 
 5.7 now samples the same river surface/disturbance fields in the persistent material simulation and uses them only as a bounded morphology-strength/bias input. 5.7b adds a single calibration control for A/B testing. 5.7c rebalances the internal response curve so mid-strength disturbance values become visually meaningful at strength `1` while overdrive remains clamped. It must remain separate from birth, topology painting, and lifecycle authority.
 
-## Blocker 3 — Too blurry / weak organic breakup
+## Blocker 3 — No chaotic intermittent lateral material drift
 
 ### Symptom
 
-Foam reads either as soft blobs or as noisy fragments rather than crisp stylized surface film with readable torn edges.
+Foam has downstream travel and area-balanced shape wobble, but stored `Material Presence` can still read too lane-locked. It does not yet behave like water Foam that mostly travels downstream while sometimes drifting sideways, pausing laterally, shearing, or briefly resisting uneven surface motion.
 
 ### Why it matters
 
-The reference has graphic, high-readability Foam. It is stylized but not mushy. From the gameplay camera, the shape must read as broken film/ribbon, not generic cloud noise.
-
-### Likely current cause
-
-Edge breakup and internal masks are not structured enough. Resolution limits, filtering, and noise choice can smear the shape. Birth-time destructive noise also produces random islands instead of controlled tearing.
+If the material foundation still moves like a stiff strip, final visual fragmentation will only disguise the problem. The reference behavior needs a chaotic downstream trend: not constant lateral sliding, not predictable sine-wave motion, and not per-cell buzzing.
 
 ### Correct behavior
 
-Foam should have crisp enough edges, controlled raggedness, visible dark-water pockets, and readable fragments. Detail should enhance the main shape rather than erase it.
+Persistent Foam material should remain net-downstream while receiving intermittent, coherent lateral impulses. Some moments should have little or no lateral drift. Active moments may drift sideways, shear locally, and show subtle upstream resistance/compression, but must remain bounded and performance-safe.
 
-### Next patch target
+### Implemented target
 
-`4.11C.5.8 — Organic Breakup and Edge Readability`
+`4.11C.5.8 — Chaotic Intermittent Foam Drift`
 
 ### Acceptance gate
 
-In Final Foam view, broad pieces keep clean graphic identity while showing torn edges, holes, and fragments. The result should not collapse into blur, dust, or round blobs.
+In Material Presence view, `Chaotic Drift Strength = 0` should match the previous accepted baseline. At `Strength = 1` and `Rhythm = 1`, Foam should mostly move downstream with occasional coherent lateral drift, calm/no-drift intervals, mild shear, and no constant left/right conveyor motion. Higher Rhythm should increase event frequency without making drift continuous. Higher Strength should make the same intermittent behavior stronger without smearing, early death, birth changes, or topology changes.
 
-## Blocker 4 — Topology interaction not fully proven
+## Blocker 4 — Obstacle-based lateral/tangential movement not implemented
+
+### Symptom
+
+5.8 adds natural chaotic lateral material drift, but it deliberately does not route Foam around rocks, banks, logs, or bridge supports. Obstacle footprint is still mostly valid-fluid exclusion.
+
+### Why it matters
+
+The reference Foam wraps, splits, and peels around obstacles. Generic chaotic drift helps the material stop looking lane-locked, but it cannot replace obstacle-aware tangential movement.
+
+### Correct behavior
+
+Foam should remain net-downstream while sliding tangentially around obstacle/bank exclusion. This must use explicit bounded steering derived from existing obstacle/valid-fluid information, not resurrect the old rejected guidance/attraction systems.
+
+### Next patch target
+
+`4.11C.5.9 — Obstacle-Based Tangential Foam Movement`
+
+### Acceptance gate
+
+A patch approaching an obstacle bends/splits/slides around it instead of only clipping or passing through it. Motion remains stable through bends, reverse flow, and quality settings.
+
+## Blocker 5 — Source shapes still need improvement
+
+### Symptom
+
+Manual birth is stable enough for testing, but it can still create source material that reads too broad, fat, or blob/ribbon-like for the intended final river Foam language.
+
+### Why it matters
+
+Final visual fragmentation cannot fully compensate for bad source geometry. Birth should not decide the final art species, but it does need to create usable initial source shapes for the persistent simulation to evolve.
+
+### Correct behavior
+
+Birth should create stable but usable source shapes such as thin downstream ribbons, broken sheets, forked bands, and smaller seeded clusters. It should not return to destructive birth-time randomness or hidden chip/slug/blob lotteries.
+
+### Next patch target
+
+`4.11C.5.10 — Better Manual Source Shape Spawning`
+
+### Acceptance gate
+
+Repeated starts with identical settings remain comparable, Amount remains source-fill semantics, and the source shape is better suited for downstream evolution without pretending to be the final visual beauty pass.
+
+## Blocker 6 — Topology proof and calibration still needed
 
 ### Symptom
 
@@ -195,11 +235,7 @@ The debug topology shows support and negative regions, but the visible material 
 
 ### Why it matters
 
-Topology is the main reason Foam should persist in some places and open dark pockets in others. If this does not work, later automatic population will produce incoherent results.
-
-### Likely current causes
-
-Bad source shapes and weak visual evolution make the aging response hard to judge. Debug colors may exaggerate regions. Some material may cross support/negative zones too briefly for the expected lifespan difference to read.
+Topology is the main reason Foam should persist in some places and open dark pockets in others. Better movement and better source shapes should make this easier to judge, but the support/negative aging contract still needs a focused proof pass.
 
 ### Correct behavior
 
@@ -207,71 +243,19 @@ Foam in positive support should survive and remain more coherent. Foam in negati
 
 ### Next patch target
 
-`4.11C.5.9 — Topology Aging Proof and Calibration`
+`4.11C.5.11 — Topology Aging Proof and Calibration`
 
 ### Acceptance gate
 
 Using the Foam + Aging Topology view and Final Foam view, the same material source must show a clear lifetime/shape difference when passing through neutral, supported, negative, and overlapping regions.
 
-## Blocker 5 — No lateral drift / obstacle sliding
-
-### Symptom
-
-Foam movement is mostly downstream. It does not convincingly slide around rocks, banks, logs, bridge supports, or local flow constraints.
-
-### Why it matters
-
-The reference Foam wraps and peels around obstacles. A purely downstream material track will clip or pass unnaturally through features.
-
-### Likely current cause
-
-The accepted lateral/obstacle-tangential motion layer has not been implemented yet. Old guidance/attraction systems were rejected and must not be restored.
-
-### Correct behavior
-
-Foam should remain net-downstream but may drift laterally and slide tangentially around obstacle/bank exclusion. This motion must be explicit, bounded, and performance-safe.
-
-### Next patch target
-
-`4.11C.5.10 — Controlled Lateral Drift and Obstacle Tangential Flow`
-
-### Acceptance gate
-
-A patch approaching an obstacle bends/slides around it instead of only clipping or passing through it. Motion remains stable through bends, reverse flow, and quality settings.
-
-## Blocker 6 — Obstacle interaction is still clipping
-
-### Symptom
-
-Foam can be hard-cut by obstacle exclusion, producing an impermeable clipped look instead of a natural skirt, split, or slide.
-
-### Why it matters
-
-Rocks, logs, and bridge elements are central to the reference. Hard clipping breaks the illusion immediately.
-
-### Likely current cause
-
-Obstacle footprint is currently valid-fluid exclusion, but there is no complete companion behavior that preserves material readability near exclusion boundaries.
-
-### Correct behavior
-
-Obstacle footprint remains solid exclusion, but material near it should be split, redirected, peeled, or dissolved in a controlled way rather than chopped bluntly.
-
-### Next patch target
-
-`4.11C.5.11 — Obstacle Boundary Repair`
-
-### Acceptance gate
-
-Foam contacting obstacle footprint no longer produces dominant hard rectangular/capsule clipping. It either slides, splits, peels, or dies in a way that reads as water interaction.
-
 ## Recommended sequence
 
-1. Validate `4.11C.5.7c — Surface Morph Formula Rebalance` in Material Presence, Final Foam, Disturbance Debug, and Foam + Aging Topology views.
-2. `4.11C.5.8 — Organic Breakup and Edge Readability`
-3. `4.11C.5.9 — Topology Aging Proof and Calibration`
-4. `4.11C.5.10 — Controlled Lateral Drift and Obstacle Tangential Flow`
-5. `4.11C.5.11 — Obstacle Boundary Repair`
+1. Validate `4.11C.5.8 — Chaotic Intermittent Foam Drift` in Material Presence with `Chaotic Drift Strength = 0/1/2` and low/normal/high Rhythm.
+2. `4.11C.5.9 — Obstacle-Based Tangential Foam Movement`
+3. `4.11C.5.10 — Better Manual Source Shape Spawning`
+4. `4.11C.5.11 — Topology Aging Proof and Calibration`
+5. `4.11C.5.12 — Final Foam Visual Fragmentation and Reference-Matching`
 
 Only after these pass should the project continue to automatic anchored/open-water birth population.
 
@@ -282,7 +266,7 @@ Deferred until manual material is accepted:
 - anchored automatic birth events;
 - open-water birth scheduling;
 - spatial fairness/population control;
-- mature Foam rendering polish;
+- mature Foam rendering polish / final visual fragmentation;
 - final reference-matching pass;
 - production performance/regression closure.
 

@@ -1814,6 +1814,16 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent(
                     "Surface Morph Strength",
                     "Strength for stored Foam morphology driven by waves, pressure, lee, and wake fields. Zero disables the stored-state response; one is the normal readable authored response, with higher values for strong or stress-test behavior."));
+            EditorGUILayout.PropertyField(
+                Find("foamChaoticDriftStrength"),
+                new GUIContent(
+                    "Chaotic Drift Strength",
+                    "Strength for intermittent persistent Foam material drift. Zero disables lateral impulses; one gives normal irregular meander with calm pauses, while higher values increase sideways shear and subtle resistance without changing lifetime or birth."));
+            EditorGUILayout.PropertyField(
+                Find("foamChaoticDriftRhythm"),
+                new GUIContent(
+                    "Chaotic Drift Rhythm",
+                    "Controls how often coherent lateral impulses become active. Lower values create longer calm periods; higher values create more frequent drift events without forcing constant sideways motion."));
 
             if (runtime == null)
             {

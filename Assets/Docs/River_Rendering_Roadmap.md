@@ -294,9 +294,11 @@ Stage 6 is in the `4.11C` manually-born persistent material phase. The following
 - support/negative aging response repair, so negative pressure suppresses positive support before accelerating death;
 - consolidated manual Foam birth controls under `Foam Debug > Manual Birth Source`;
 - 5.4l composition-event refactor, so one manual spawn starts one budgeted composition event instead of hidden multiple writer events;
-- 5.4m manual source realignment, so birth no longer uses pattern/complexity/density controls to randomize macro Foam identity.
+- 5.4m manual source realignment, so birth no longer uses pattern/complexity/density controls to randomize macro Foam identity;
+- 5.7c accepted stored-state surface morphing as functional, with a practical authored `Surface Morph Strength` range around 2-4 and approximately 2.5 as the current working value;
+- 5.8 adds chaotic intermittent persistent material drift inside the existing simulation pass, with coherent lateral impulses, calm/no-drift intervals, local shear, and subtle resistance while preserving net-downstream phase transport.
 
-Current failing area: visual/material behavior. Manual source material is now intentionally stable, but persistent Foam does not yet morph, tear, drift, and interact with obstacles well enough to match the reference language.
+Current failing area: movement/source/final-readability behavior. Manual source material is intentionally stable and persistent Foam now has intrinsic wobble, surface-driven morphing, and chaotic intermittent drift, but obstacle-aware tangential movement, better source shapes, topology proof, and final visual fragmentation remain unresolved.
 
 ### Canonical topology/material relationship
 
@@ -316,10 +318,11 @@ The current approved order is:
 4. `4.11C.5.7 — Surface-Driven Material Morphing`
 5. `4.11C.5.7b — Surface Morph Calibration`
 6. `4.11C.5.7c — Surface Morph Formula Rebalance`
-7. `4.11C.5.8 — Organic Breakup and Edge Readability`
-8. `4.11C.5.9 — Topology Aging Proof and Calibration`
-9. `4.11C.5.10 — Controlled Lateral Drift and Obstacle Tangential Flow`
-10. `4.11C.5.11 — Obstacle Boundary Repair`
+7. `4.11C.5.8 — Chaotic Intermittent Foam Drift`
+8. `4.11C.5.9 — Obstacle-Based Tangential Foam Movement`
+9. `4.11C.5.10 — Better Manual Source Shape Spawning`
+10. `4.11C.5.11 — Topology Aging Proof and Calibration`
+11. `4.11C.5.12 — Final Foam Visual Fragmentation and Reference-Matching`
 
 Do not continue to automatic birth population until manually-born material passes those gates.
 

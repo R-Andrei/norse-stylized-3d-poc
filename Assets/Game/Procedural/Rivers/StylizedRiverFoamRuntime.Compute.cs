@@ -94,6 +94,12 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamSurfaceMorphStrength",
                 river.FoamSurfaceMorphStrength);
+            computeShader.SetFloat(
+                "_FoamChaoticDriftStrength",
+                river.FoamChaoticDriftStrength);
+            computeShader.SetFloat(
+                "_FoamChaoticDriftRhythm",
+                river.FoamChaoticDriftRhythm);
 
             disturbanceRuntime ??=
                 GetComponent<StylizedRiverDisturbanceRuntime>();

@@ -759,7 +759,9 @@ Added stored-state surface coupling to the persistent Foam simulation. `Simulate
 
 This patch does not change manual birth controls, automatic population, topology generation, Foam color, render-side clarity filtering, or lifecycle authority. Surface fields do not spawn Foam and do not reduce `Remaining Life`; material death remains controlled by the approved topology aging path.
 
-Next actionable item after validation: `4.11C.5.8 — Organic Breakup and Edge Readability`.
+Validation result: surface-driven material morphing works, but the useful authored range is currently around `2.0-4.0`, with approximately `2.5` as the practical working value. Further formula polish is deferred.
+
+Next actionable item: `4.11C.5.8 — Chaotic Intermittent Foam Drift`.
 
 ## River Foam 4.11C.5.7b — Surface Morph Calibration
 
@@ -767,7 +769,9 @@ Validation of 5.7 suggested that the disturbance-to-material connection was like
 
 The calibration only affects persistent material morphing strength and direction bias. It does not change manual birth controls, automatic population, topology generation, Foam color, render-side clarity filtering, or lifecycle authority. Surface fields still do not spawn Foam and do not reduce `Remaining Life`.
 
-Next actionable item after validation: `4.11C.5.8 — Organic Breakup and Edge Readability`.
+Validation result: surface-driven material morphing works, but the useful authored range is currently around `2.0-4.0`, with approximately `2.5` as the practical working value. Further formula polish is deferred.
+
+Next actionable item: `4.11C.5.8 — Chaotic Intermittent Foam Drift`.
 
 ## River Foam 4.11C.5.7c — Surface Morph Formula Rebalance
 
@@ -775,4 +779,14 @@ Validation of 5.7b proved the stored-state surface morph path works, but the res
 
 The intended meaning after this pass is: `0` disables stored-state surface response for A/B testing, `1` is the normal readable authored response, `2` is strong, and `3+` is overdrive/stress-test territory. The change still affects only persistent material morphing strength/direction. It does not change Foam birth, automatic population, topology generation, Foam color, render-side clarity filtering, or lifecycle authority. Surface fields still do not spawn Foam and do not reduce `Remaining Life`.
 
-Next actionable item after validation: `4.11C.5.8 — Organic Breakup and Edge Readability`.
+Validation result: surface-driven material morphing works, but the useful authored range is currently around `2.0-4.0`, with approximately `2.5` as the practical working value. Further formula polish is deferred.
+
+Next actionable item: `4.11C.5.8 — Chaotic Intermittent Foam Drift`.
+
+## River Foam 4.11C.5.8 — Chaotic Intermittent Foam Drift
+
+Added true stored-state chaotic drift to the persistent Foam simulation. The implementation stays inside the existing `SimulateFoam` pass rather than adding a new compute dispatch or texture. `Material Presence` now receives a bounded backtrace offset from a deterministic, coherent, intermittent drift field: Foam remains net-downstream through the existing phase transport, but can sometimes drift laterally, sometimes enter calm/no-drift intervals, shear locally, and show small resistance/compression moments.
+
+Two material-motion controls were added: `Chaotic Drift Strength` controls the amount of intermittent material drift, and `Chaotic Drift Rhythm` controls how frequently coherent drift events become active. `Strength = 0` is the A/B disabled path. The drift does not change Remaining Life, birth/source semantics, topology generation, automatic population, or final visual fragmentation. A small valid-fluid safety attenuation prevents obvious lateral dumping into invalid water, but this is not obstacle steering; obstacle-based tangential movement remains a separate future patch.
+
+Next actionable item after validation: `4.11C.5.9 — Obstacle-Based Tangential Foam Movement`.

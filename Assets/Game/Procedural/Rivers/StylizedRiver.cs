@@ -176,6 +176,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private const int CurrentFoamMaterialLifecycleTuningVersion = 1;
         private const int CurrentFoamSurfaceMorphCalibrationVersion = 1;
+        private const int CurrentFoamChaoticDriftTuningVersion = 1;
         private const float MinimumFoamNeutralLifetime = 1f;
         private const float MaximumFoamNeutralLifetime = 10f;
         private const float DefaultFoamNeutralLifetime = 4f;
@@ -191,6 +192,12 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamSurfaceMorphStrength = 0f;
         private const float MaximumFoamSurfaceMorphStrength = 5f;
         private const float DefaultFoamSurfaceMorphStrength = 1f;
+        private const float MinimumFoamChaoticDriftStrength = 0f;
+        private const float MaximumFoamChaoticDriftStrength = 4f;
+        private const float DefaultFoamChaoticDriftStrength = 1f;
+        private const float MinimumFoamChaoticDriftRhythm = 0.25f;
+        private const float MaximumFoamChaoticDriftRhythm = 2f;
+        private const float DefaultFoamChaoticDriftRhythm = 1f;
         private const float MinimumFoamProgressiveRibbonDuration = 0.5f;
         private const float MaximumFoamProgressiveRibbonDuration = 5f;
         private const float DefaultFoamProgressiveRibbonDuration = 2.4f;
@@ -796,11 +803,30 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamSurfaceMorphStrength =
             DefaultFoamSurfaceMorphStrength;
 
+        [Tooltip("Strength for chaotic intermittent Foam material drift. Zero disables lateral drift; one gives normal irregular meander with calm pauses, higher values increase lateral impulses, shear, and subtle resistance without changing birth, lifetime, topology, or final visual fragmentation.")]
+        [Range(
+            MinimumFoamChaoticDriftStrength,
+            MaximumFoamChaoticDriftStrength)]
+        [SerializeField]
+        private float foamChaoticDriftStrength =
+            DefaultFoamChaoticDriftStrength;
+
+        [Tooltip("Rhythm for chaotic intermittent Foam material drift. Lower values produce longer calm periods and rarer lateral impulses; one is the normal irregular rhythm; higher values make drift events more frequent without forcing constant sideways motion.")]
+        [Range(
+            MinimumFoamChaoticDriftRhythm,
+            MaximumFoamChaoticDriftRhythm)]
+        [SerializeField]
+        private float foamChaoticDriftRhythm =
+            DefaultFoamChaoticDriftRhythm;
+
         [SerializeField, HideInInspector]
         private int foamMaterialLifecycleTuningVersion;
 
         [SerializeField, HideInInspector]
         private int foamSurfaceMorphCalibrationVersion;
+
+        [SerializeField, HideInInspector]
+        private int foamChaoticDriftTuningVersion;
 
         [Tooltip("Lit, non-emissive Foam tint. The alpha channel controls maximum Foam opacity, so no separate opacity control is required.")]
         [SerializeField] private Color foamColour =
@@ -1336,6 +1362,16 @@ namespace ProgrammaticStylized3D.Rivers
                 foamSurfaceMorphStrength,
                 MinimumFoamSurfaceMorphStrength,
                 MaximumFoamSurfaceMorphStrength);
+        public float FoamChaoticDriftStrength =>
+            Mathf.Clamp(
+                foamChaoticDriftStrength,
+                MinimumFoamChaoticDriftStrength,
+                MaximumFoamChaoticDriftStrength);
+        public float FoamChaoticDriftRhythm =>
+            Mathf.Clamp(
+                foamChaoticDriftRhythm,
+                MinimumFoamChaoticDriftRhythm,
+                MaximumFoamChaoticDriftRhythm);
         public Color FoamColour => foamColour;
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
         public float FoamSpawnDistanceNormalized =>
@@ -1559,6 +1595,7 @@ namespace ProgrammaticStylized3D.Rivers
         {
             MigrateFoamMaterialLifecycleTuningIfRequired();
             MigrateFoamSurfaceMorphCalibrationIfRequired();
+            MigrateFoamChaoticDriftTuningIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -1678,10 +1715,25 @@ namespace ProgrammaticStylized3D.Rivers
                 CurrentFoamSurfaceMorphCalibrationVersion;
         }
 
+        private void MigrateFoamChaoticDriftTuningIfRequired()
+        {
+            if (foamChaoticDriftTuningVersion >=
+                CurrentFoamChaoticDriftTuningVersion)
+            {
+                return;
+            }
+
+            foamChaoticDriftStrength = DefaultFoamChaoticDriftStrength;
+            foamChaoticDriftRhythm = DefaultFoamChaoticDriftRhythm;
+            foamChaoticDriftTuningVersion =
+                CurrentFoamChaoticDriftTuningVersion;
+        }
+
         private void OnValidate()
         {
             MigrateFoamMaterialLifecycleTuningIfRequired();
             MigrateFoamSurfaceMorphCalibrationIfRequired();
+            MigrateFoamChaoticDriftTuningIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -2946,6 +2998,18 @@ namespace ProgrammaticStylized3D.Rivers
                 foamMaterialFlowSpeedMultiplier,
                 MinimumFoamMaterialFlowSpeedMultiplier,
                 MaximumFoamMaterialFlowSpeedMultiplier);
+            foamSurfaceMorphStrength = Mathf.Clamp(
+                foamSurfaceMorphStrength,
+                MinimumFoamSurfaceMorphStrength,
+                MaximumFoamSurfaceMorphStrength);
+            foamChaoticDriftStrength = Mathf.Clamp(
+                foamChaoticDriftStrength,
+                MinimumFoamChaoticDriftStrength,
+                MaximumFoamChaoticDriftStrength);
+            foamChaoticDriftRhythm = Mathf.Clamp(
+                foamChaoticDriftRhythm,
+                MinimumFoamChaoticDriftRhythm,
+                MaximumFoamChaoticDriftRhythm);
             foamColour.a = Mathf.Clamp01(foamColour.a);
             foamSpawnDistanceNormalized = Mathf.Clamp01(
                 foamSpawnDistanceNormalized);
