@@ -353,6 +353,10 @@ namespace ProgrammaticStylized3D.Rivers
             new ProfilerMarker("RiverFoam.Init.BuildObstacleExclusion");
         private static readonly ProfilerMarker InitClearMaterialProfilerMarker =
             new ProfilerMarker("RiverFoam.Init.ClearMaterial");
+        private static readonly ProfilerMarker MotionBuildLaneProfilerMarker =
+            new ProfilerMarker("RiverFoam.Motion.BuildLane");
+        private static readonly ProfilerMarker MotionBuildObstacleRoutingProfilerMarker =
+            new ProfilerMarker("RiverFoam.Motion.BuildObstacleRouting");
         private static readonly ProfilerMarker TopologyBuildMajorProfilerMarker =
             new ProfilerMarker("RiverFoam.Topology.BuildMajor");
         private static readonly ProfilerMarker TopologyBuildConnectorProfilerMarker =
@@ -408,6 +412,12 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamTopologySources");
         private static readonly int FoamObstacleExclusionId =
             Shader.PropertyToID("_FoamObstacleExclusion");
+        private static readonly int FoamMotionLaneId =
+            Shader.PropertyToID("_FoamMotionLane");
+        private static readonly int FoamObstacleRoutingId =
+            Shader.PropertyToID("_FoamObstacleRouting");
+        private static readonly int FoamMotionLaneScrollCellsId =
+            Shader.PropertyToID("_FoamMotionLaneScrollCells");
         private static readonly int FoamInterpolationId =
             Shader.PropertyToID("_FoamInterpolation");
         private static readonly int FoamRenderTravelMetresId =

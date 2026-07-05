@@ -46,6 +46,9 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(
                 FoamObstacleExclusionId,
                 ResolveBoundTexture(snapshot.ObstacleExclusion));
+            propertyBlock.SetTexture(FoamMotionLaneId, Texture2D.blackTexture);
+            propertyBlock.SetTexture(FoamObstacleRoutingId, Texture2D.blackTexture);
+            propertyBlock.SetFloat(FoamMotionLaneScrollCellsId, 0f);
             propertyBlock.SetFloat(
                 FoamInterpolationId,
                 snapshot.Interpolation);
@@ -93,6 +96,15 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(
                 FoamObstacleExclusionId,
                 ResolveBoundTexture(obstacleExclusionTexture));
+            propertyBlock.SetTexture(
+                FoamMotionLaneId,
+                ResolveBoundTexture(motionLaneTexture));
+            propertyBlock.SetTexture(
+                FoamObstacleRoutingId,
+                ResolveBoundTexture(obstacleRoutingTexture));
+            propertyBlock.SetFloat(
+                FoamMotionLaneScrollCellsId,
+                motionLaneScrollCells);
             propertyBlock.SetFloat(FoamInterpolationId, simulationInterpolation);
             propertyBlock.SetFloat(FoamRenderTravelMetresId, foamRenderTravelMetres);
             propertyBlock.SetFloat(FoamGlobalStartId, allocatedGlobalStart);
@@ -130,6 +142,9 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(
                 FoamObstacleExclusionId,
                 Texture2D.blackTexture);
+            propertyBlock.SetTexture(FoamMotionLaneId, Texture2D.blackTexture);
+            propertyBlock.SetTexture(FoamObstacleRoutingId, Texture2D.blackTexture);
+            propertyBlock.SetFloat(FoamMotionLaneScrollCellsId, 0f);
             propertyBlock.SetFloat(FoamInterpolationId, 1f);
             propertyBlock.SetFloat(FoamRenderTravelMetresId, 0f);
             propertyBlock.SetFloat(FoamGlobalStartId, 0f);

@@ -1749,7 +1749,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam + Aging Topology",
                 "Progressive Birth Source",
                 "Material Presence",
-                "Material Remaining Life"
+                "Material Remaining Life",
+                "Foam Motion Field"
             };
             int[] foamDebugValues =
             {
@@ -1757,7 +1758,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.FoamAndAgingTopology,
                 (int)StylizedRiverFoamDebugView.ProgressiveBirthSource,
                 (int)StylizedRiverFoamDebugView.MaterialPresence,
-                (int)StylizedRiverFoamDebugView.MaterialRemainingLife
+                (int)StylizedRiverFoamDebugView.MaterialRemainingLife,
+                (int)StylizedRiverFoamDebugView.FoamMotionField
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -1771,7 +1773,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             int selectedDebugIndex = EditorGUILayout.Popup(
                 new GUIContent(
                     "Debug View",
-                    "Final Foam for normal validation. Foam + Aging Topology for support/negative/obstacle checks. Progressive Birth Source is only for source debugging."),
+                    "Final Foam for normal validation. Foam Motion Field shows dense left/right lateral motion, obstacle overrides, and a semi-transparent white Foam overlay."),
                 currentDebugIndex,
                 foamDebugLabels);
             if (EditorGUI.EndChangeCheck())
@@ -1815,15 +1817,25 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Surface Morph Strength",
                     "Strength for stored Foam morphology driven by waves, pressure, lee, and wake fields. Zero disables the stored-state response; one is the normal readable authored response, with higher values for strong or stress-test behavior."));
             EditorGUILayout.PropertyField(
-                Find("foamChaoticDriftStrength"),
+                Find("foamMotionFieldStrength"),
                 new GUIContent(
-                    "Chaotic Drift Strength",
-                    "Strength for intermittent persistent Foam material drift. Zero disables lateral impulses; one gives normal irregular meander with calm pauses, while higher values increase sideways shear and subtle resistance without changing lifetime or birth."));
+                    "Motion Field Strength",
+                    "Strength for dense field-driven lateral macro motion. Zero disables the field; one is the normal authored field; higher values exaggerate lateral body routing without changing birth, lifetime, topology, or final visual fragmentation."));
             EditorGUILayout.PropertyField(
-                Find("foamChaoticDriftRhythm"),
+                Find("foamMotionFieldScrollHz"),
                 new GUIContent(
-                    "Chaotic Drift Rhythm",
-                    "Controls how often coherent lateral impulses become active. Lower values create longer calm periods; higher values create more frequent drift events without forcing constant sideways motion."));
+                    "Motion Field Scroll Hz",
+                    "Complete downstream wraps per second for the dense lane field. This is a sample-coordinate phase scroll only, not a field rebuild rate."));
+            EditorGUILayout.PropertyField(
+                Find("foamMotionFieldNeutralCoverage"),
+                new GUIContent(
+                    "Motion Field Neutral Coverage",
+                    "Approximate fraction of the dense lane field that resolves to neutral/no lateral direction. Changing it regenerates the lane texture only."));
+            EditorGUILayout.PropertyField(
+                Find("foamMotionFieldLaneScale"),
+                new GUIContent(
+                    "Motion Field Lane Scale",
+                    "Broadness of the dense lane pattern. Lower values produce larger lanes; higher values produce finer lanes. Changing it regenerates the lane texture only."));
 
             if (runtime == null)
             {
@@ -1834,7 +1846,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUILayout.LabelField(
                 "Transport Mode",
-                "Phase + integer commit");
+                "Phase + integer commit + lateral motion field");
+            EditorGUILayout.LabelField(
+                "Motion Field",
+                $"scroll {runtime.FoamMotionLaneScrollCells:0.00} cells / lane sig {runtime.FoamMotionLaneSignature} / obstacle sig {runtime.FoamObstacleRoutingSignature}");
             EditorGUILayout.LabelField(
                 "Phase",
                 $"{runtime.FoamPhaseCellFraction:0.00} cell / {runtime.FoamPhaseTransportMetres:0.000} m");
@@ -1984,7 +1999,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam + Aging Topology",
                 "Progressive Birth Source",
                 "Material Presence",
-                "Material Remaining Life"
+                "Material Remaining Life",
+                "Foam Motion Field"
             };
             int[] foamDebugValues =
             {
@@ -1992,7 +2008,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.FoamAndAgingTopology,
                 (int)StylizedRiverFoamDebugView.ProgressiveBirthSource,
                 (int)StylizedRiverFoamDebugView.MaterialPresence,
-                (int)StylizedRiverFoamDebugView.MaterialRemainingLife
+                (int)StylizedRiverFoamDebugView.MaterialRemainingLife,
+                (int)StylizedRiverFoamDebugView.FoamMotionField
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -3045,6 +3062,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 case StylizedRiverFoamDebugView.MaterialRemainingLife:
                     return
                         "Raw normalized Remaining Life from the persistent material texture. This ignores beauty colour and shows whether cells actually age independently.";
+
+                case StylizedRiverFoamDebugView.FoamMotionField:
+                    return
+                        "Dense lateral Foam Motion Field. Blue/cyan means leftward stored-material motion, red/orange means rightward motion, black means intentional neutral/calm field, green/yellow marks obstacle override influence, and semi-transparent white overlays the current Foam mask.";
 
                 default:
                     return

@@ -11,6 +11,9 @@ namespace ProgrammaticStylized3D.Rivers
         public int TopologyWidth => topologyTexture != null ? topologyTexture.width : 0;
         public int TopologyHeight => topologyTexture != null ? topologyTexture.height : 0;
         public bool MajorTopologyAvailable => majorTopology != null;
+        public float FoamMotionLaneScrollCells => lastMotionLaneScrollCells;
+        public int FoamMotionLaneSignature => lastMotionLaneSignature;
+        public int FoamObstacleRoutingSignature => lastObstacleRoutingSignature;
         public int MajorOpportunityCount => majorTopology != null
             ? majorTopology.AttemptedOpportunityCount
             : 0;
@@ -725,6 +728,7 @@ namespace ProgrammaticStylized3D.Rivers
             !TopologyTransitionActive &&
             !IsTopologyDebugActive &&
             !IsProgressiveBirthSourceDebugActive &&
+            !IsMotionFieldDebugActive &&
             !materialLifetimeAuthorityActive &&
             pendingInjections.Count == 0 &&
             !pendingIsolatedLifeProbe &&
@@ -755,6 +759,8 @@ namespace ProgrammaticStylized3D.Rivers
             EstimateTextureBytes(freeWaterNegativeMaskTextureArray) +
             EstimateTextureBytes(currentShoreEdgesTexture) +
             EstimateTextureBytes(obstacleExclusionTexture) +
+            EstimateTextureBytes(motionLaneTexture) +
+            EstimateTextureBytes(obstacleRoutingTexture) +
             EstimateTextureBytes(neutralDisturbanceTexture) +
             EstimateTextureBytes(boundaryTexture) +
             EstimateTextureBytes(obstacleExclusionReadbackTexture) +
@@ -827,12 +833,28 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
+        private bool IsMotionFieldDebugActive
+        {
+            get
+            {
+                if (river == null)
+                {
+                    return false;
+                }
+
+                return river.FoamDebugView ==
+                    StylizedRiverFoamDebugView.FoamMotionField;
+            }
+        }
+
         private bool IsSupported =>
             SystemInfo.supportsComputeShaders &&
             SystemInfo.supports2DArrayTextures &&
             SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBHalf) &&
             SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.RGHalf) &&
             SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.RHalf) &&
-            SystemInfo.SupportsTextureFormat(TextureFormat.RGBAHalf);
+            SystemInfo.SupportsTextureFormat(TextureFormat.RGBAHalf) &&
+            SystemInfo.SupportsTextureFormat(TextureFormat.RHalf) &&
+            SystemInfo.SupportsTextureFormat(TextureFormat.RGHalf);
     }
 }

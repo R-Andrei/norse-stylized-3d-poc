@@ -95,11 +95,11 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamSurfaceMorphStrength",
                 river.FoamSurfaceMorphStrength);
             computeShader.SetFloat(
-                "_FoamChaoticDriftStrength",
-                river.FoamChaoticDriftStrength);
+                "_FoamMotionFieldStrength",
+                river.FoamMotionFieldStrength);
             computeShader.SetFloat(
-                "_FoamChaoticDriftRhythm",
-                river.FoamChaoticDriftRhythm);
+                "_FoamMotionLaneScrollCells",
+                motionLaneScrollCells);
 
             disturbanceRuntime ??=
                 GetComponent<StylizedRiverDisturbanceRuntime>();
@@ -214,6 +214,18 @@ namespace ProgrammaticStylized3D.Rivers
                 simulateKernel,
                 "_FoamObstacleExclusionRead",
                 obstacleExclusionTexture);
+            computeShader.SetTexture(
+                simulateKernel,
+                "_FoamMotionLaneRead",
+                motionLaneTexture != null
+                    ? (Texture)motionLaneTexture
+                    : Texture2D.blackTexture);
+            computeShader.SetTexture(
+                simulateKernel,
+                "_FoamObstacleRoutingRead",
+                obstacleRoutingTexture != null
+                    ? (Texture)obstacleRoutingTexture
+                    : Texture2D.blackTexture);
             computeShader.SetTexture(
                 simulateKernel,
                 "_FoamStateWrite",

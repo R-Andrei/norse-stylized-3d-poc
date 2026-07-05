@@ -22,6 +22,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty darkWetRiverStoneMaterial;
         private SerializedProperty paleFrostStoneMaterial;
         private SerializedProperty blackSacredStoneMaterial;
+        private SerializedProperty recipe;
+        private SerializedProperty regenerateOnValidate;
+        private SerializedProperty featureRecipe;
         private SerializedProperty stoneSurfaceProfile;
         private SerializedProperty baseColor;
         private SerializedProperty surfaceMaskDebug;
@@ -70,7 +73,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty obstructionWakeSpread;
         private SerializedProperty obstructionWakeVariation;
         private SerializedProperty impactRippleCollisionMode;
-        private bool showAdvancedDebugFeatureLines;
+        private bool showExposureFeature = true;
+        private bool showBaseContactFeature = true;
+        private bool showCreviceShelterFeature = true;
+        private bool showDirtDepositFeature = true;
+        private bool showEdgeWearFeature;
+        private bool showCreaseDebugFeature;
         private bool showPressureProfile;
 
         private void OnEnable()
@@ -83,6 +91,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "paleFrostStoneMaterial");
             blackSacredStoneMaterial = serializedObject.FindProperty(
                 "blackSacredStoneMaterial");
+            recipe = serializedObject.FindProperty(
+                "recipe");
+            regenerateOnValidate = serializedObject.FindProperty(
+                "regenerateOnValidate");
+            featureRecipe = serializedObject.FindProperty(
+                "featureRecipe");
             stoneSurfaceProfile = serializedObject.FindProperty(
                 "stoneSurfaceProfile");
             baseColor = serializedObject.FindProperty(
@@ -191,11 +205,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             serializedObject.Update();
             EnsureDefaultStoneMaterials();
 
+            DrawFeatureRecipeWorkflow();
+            DrawCoreShapeRecipe();
             DrawRenderingAndProfile();
 
             DrawPropertiesExcluding(
                 serializedObject,
                 "m_Script",
+                "recipe",
+                "regenerateOnValidate",
+                "featureRecipe",
                 "stoneSurfaceProfile",
                 "baseColor",
                 "surfaceMaskDebug",
@@ -232,11 +251,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "creaseSoftness",
                 "riverInteraction");
 
-            DrawMaskShape();
-            DrawMaskStrength();
-            DrawMaskTinting();
+            DrawFeatureStack();
             DrawRockColourAuthority();
-            DrawAdvancedDebugFeatureLines();
             DrawRiverInteraction();
 
             serializedObject.ApplyModifiedProperties();
@@ -296,6 +312,123 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 MessageType.Info);
         }
 
+        private void DrawFeatureRecipeWorkflow()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Recipe & Feature Stack",
+                EditorStyles.boldLabel);
+
+            EditorGUILayout.HelpBox(
+                "Feature Recipe is an editable starting point for generated " +
+                "mass feature controls. Changing the dropdown does not " +
+                "overwrite manual edits. Use the buttons below when you " +
+                "explicitly want to apply or reset those controls.",
+                MessageType.Info);
+
+            EditorGUILayout.PropertyField(
+                featureRecipe,
+                new GUIContent(
+                    "Feature Recipe",
+                    "Selects a reusable Generated Mass feature-control recipe. This selection is inert until Apply or Reset is pressed."));
+
+            DrawFeatureRecipeStatus();
+
+            EditorGUILayout.BeginHorizontal();
+
+            if (GUILayout.Button("Apply Selected Recipe"))
+            {
+                serializedObject.ApplyModifiedProperties();
+                ApplyToTargets(
+                    "Apply Generated Mass Feature Recipe",
+                    mass => mass.ApplySelectedFeatureRecipe());
+            }
+
+            if (GUILayout.Button("Reset Controls to Recipe"))
+            {
+                serializedObject.ApplyModifiedProperties();
+                ApplyToTargets(
+                    "Reset Generated Mass Feature Controls",
+                    mass => mass.ResetFeatureControlsToSelectedRecipe());
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.HelpBox(
+                "Patch 14B scaffolds recipe-driven feature controls only. " +
+                "The recipes currently remap existing rendering/mask/debug " +
+                "controls; new feature channels such as pitting, water wear, " +
+                "frost stress and sacred plane control are still future work.",
+                MessageType.None);
+        }
+
+        private void DrawFeatureRecipeStatus()
+        {
+            if (featureRecipe == null)
+            {
+                return;
+            }
+
+            if (featureRecipe.hasMultipleDifferentValues ||
+                serializedObject.isEditingMultipleObjects)
+            {
+                EditorGUILayout.HelpBox(
+                    "Recipe status is unavailable while editing multiple generated masses.",
+                    MessageType.None);
+                return;
+            }
+
+            GeneratedMass mass = target as GeneratedMass;
+            if (mass == null)
+            {
+                return;
+            }
+
+            GeneratedMassFeatureRecipe selectedRecipe =
+                (GeneratedMassFeatureRecipe)featureRecipe.enumValueIndex;
+            bool matchesRecipe =
+                mass.CurrentFeatureControlsMatchRecipe(selectedRecipe);
+            EditorGUILayout.HelpBox(
+                matchesRecipe
+                    ? "Recipe Status: current feature controls match the selected recipe."
+                    : "Recipe Status: current feature controls are modified/custom relative to the selected recipe.",
+                MessageType.None);
+        }
+
+        private void DrawCoreShapeRecipe()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Core Shape Recipe",
+                EditorStyles.boldLabel);
+
+            EditorGUILayout.HelpBox(
+                "Core Shape Recipe controls the generated mesh: seeds, size, " +
+                "major cuts, faceting, edge character, grounding, lean and " +
+                "base surface variation. Patch 14B keeps this existing shape " +
+                "recipe separate from the new Feature Recipe scaffold.",
+                MessageType.Info);
+
+            if (recipe != null)
+            {
+                EditorGUILayout.PropertyField(
+                    recipe,
+                    new GUIContent(
+                        "Core Shape Recipe",
+                        "Existing generated-mass shape recipe. This controls mesh generation rather than material/feature interpretation."),
+                    true);
+            }
+
+            if (regenerateOnValidate != null)
+            {
+                EditorGUILayout.PropertyField(
+                    regenerateOnValidate,
+                    new GUIContent(
+                        "Regenerate On Validate",
+                        "When enabled, inspector edits regenerate the generated mesh immediately."));
+            }
+        }
+
         private void DrawRenderingAndProfile()
         {
             EditorGUILayout.Space(6f);
@@ -304,7 +437,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 EditorStyles.boldLabel);
 
             EditorGUILayout.HelpBox(
-                "Base Color is the rock's chosen material colour before " +
+                "Base Color is the generated mass's chosen material colour before " +
                 "generated mask response, optional tint controls, and " +
                 "scene/PBR lighting. Use Lighting Tint Influence below to " +
                 "control how strongly scene and local light colour can " +
@@ -443,157 +576,38 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             EditorGUILayout.FloatField(label, material.GetFloat(propertyName));
         }
 
-        private void DrawMaskShape()
+        private void DrawFeatureStack()
         {
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
-                "Mask Shape",
+                "Feature Stack",
                 EditorStyles.boldLabel);
 
             EditorGUILayout.HelpBox(
-                "These controls change where generated masks exist. They " +
-                "reshape the semantic masks; they do not merely change " +
-                "visual intensity.",
+                "Controls are grouped by generated-mass feature. Each " +
+                "feature owns its own shape, strength, tint and debug " +
+                "controls where those controls exist. Future feature " +
+                "channels should be added here as self-contained foldouts, " +
+                "not split into global Shape/Strength/Tint buckets.",
                 MessageType.Info);
 
-            EditorGUILayout.PropertyField(
-                surfaceMaskBaseLift,
-                new GUIContent(
-                    "Base Lift",
-                    "Moves the lower/contact mask origin upward for embedded or flat masses."));
-            EditorGUILayout.PropertyField(
-                creviceReach,
-                new GUIContent(
-                    "Crevice Height",
-                    "Controls how far CreviceBase can crawl upward from lower/contact areas."));
-            EditorGUILayout.PropertyField(
-                creviceSmoothness,
-                new GUIContent(
-                    "Crevice Fade",
-                    "Controls how softly CreviceBase fades upward."));
-            EditorGUILayout.PropertyField(
-                creviceBreakup,
-                new GUIContent(
-                    "Crevice Irregularity",
-                    "Controls how uneven or broken the crevice crawl field is."));
-            EditorGUILayout.PropertyField(
-                dirtCrawlReach,
-                new GUIContent(
-                    "Dirt Crawl Height",
-                    "Controls how far DirtDeposit crawl paths may rise."));
-            EditorGUILayout.PropertyField(
-                dirtCoverage,
-                new GUIContent(
-                    "Dirt Coverage",
-                    "Controls how full or sparse DirtDeposit is."));
+            DrawExposureFeature();
+            DrawBaseContactFeature();
+            DrawCreviceShelterFeature();
+            DrawDirtDepositFeature();
+            DrawSharedEdgeCreaseDebugVisibility();
+            DrawEdgeWearFeature();
+            DrawCreaseDebugFeature();
         }
 
-        private void DrawMaskStrength()
+        private void DrawExposureFeature()
         {
-            EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField(
-                "Mask Strength",
-                EditorStyles.boldLabel);
-
-            EditorGUILayout.HelpBox(
-                "These controls scale how strongly each accepted mask affects " +
-                "the final render. They do not move or reshape the masks. " +
-                "0 disables that mask's final-render contribution. 1 is the " +
-                "current default. 2 exaggerates it for tuning.",
-                MessageType.Info);
-
-            EditorGUILayout.PropertyField(
-                exposureResponse,
-                new GUIContent(
-                    "Exposure Strength",
-                    "Scales how strongly the Exposure mask affects normal final rendering."));
-            EditorGUILayout.PropertyField(
-                creviceResponse,
-                new GUIContent(
-                    "Crevice Strength",
-                    "Scales how strongly the CreviceBase mask affects normal final rendering."));
-            EditorGUILayout.PropertyField(
-                baseResponse,
-                new GUIContent(
-                    "Base / Contact Strength",
-                    "Scales how strongly the Base/contact mask affects normal final rendering."));
-            EditorGUILayout.PropertyField(
-                dirtDepositResponse,
-                new GUIContent(
-                    "Dirt Deposit Strength",
-                    "Scales how strongly the DirtDeposit mask affects normal final rendering."));
-        }
-
-        private void DrawMaskTinting()
-        {
-            EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField(
-                "Mask Tinting",
-                EditorStyles.boldLabel);
-
-            EditorGUILayout.HelpBox(
-                "Tint Strength = 0 keeps the response hue-neutral. Raise " +
-                "tint strength only when intentionally pushing a mask area " +
-                "toward a colour. Neutral grey requires tint strengths at 0 " +
-                "and controlled Lighting Tint Influence below.",
-                MessageType.Info);
-
-            EditorGUILayout.PropertyField(exposureTint);
-            EditorGUILayout.PropertyField(exposureTintStrength);
-            EditorGUILayout.Space(2f);
-            EditorGUILayout.PropertyField(creviceTint);
-            EditorGUILayout.PropertyField(creviceTintStrength);
-            EditorGUILayout.Space(2f);
-            EditorGUILayout.PropertyField(
-                baseTint,
-                new GUIContent(
-                    "Base / Contact Tint",
-                    "Optional hue tint for Base/contact grounding."));
-            EditorGUILayout.PropertyField(
-                baseTintStrength,
-                new GUIContent(
-                    "Base / Contact Tint Strength",
-                    "How much Base / Contact Tint affects the final render. Default 0 means neutral grounding only."));
-            EditorGUILayout.Space(2f);
-            EditorGUILayout.PropertyField(dirtDepositTint);
-            EditorGUILayout.PropertyField(dirtDepositTintStrength);
-        }
-
-        private void DrawRockColourAuthority()
-        {
-            EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField(
-                "Rock Colour Authority",
-                EditorStyles.boldLabel);
-
-            EditorGUILayout.HelpBox(
-                "Overall Rock Tint changes the rock's own colour identity " +
-                "before lighting. Lighting Tint Influence controls how " +
-                "strongly scene/local light colour can hue-shift the final " +
-                "PBR result. Lights still affect brightness, shadows, " +
-                "highlights and form.",
-                MessageType.Info);
-
-            EditorGUILayout.PropertyField(overallRockTint);
-            EditorGUILayout.PropertyField(overallRockTintStrength);
-            EditorGUILayout.PropertyField(lightingTintInfluence);
-
-            EditorGUILayout.HelpBox(
-                "Lighting Tint Influence: 0 = value-only lighting hue " +
-                "influence, 0.35 = default moderate scene-light colour " +
-                "influence, 1 = full RGB PBR light colour influence.",
-                MessageType.None);
-        }
-
-        private void DrawAdvancedDebugFeatureLines()
-        {
-            EditorGUILayout.Space(6f);
-            showAdvancedDebugFeatureLines = EditorGUILayout.Foldout(
-                showAdvancedDebugFeatureLines,
-                "Advanced Debug Feature Lines",
+            showExposureFeature = EditorGUILayout.Foldout(
+                showExposureFeature,
+                "Exposure",
                 true);
 
-            if (!showAdvancedDebugFeatureLines)
+            if (!showExposureFeature)
             {
                 return;
             }
@@ -601,16 +615,283 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             using (new EditorGUI.IndentLevelScope())
             {
                 EditorGUILayout.HelpBox(
-                    "Debug-only raised overlay strips for validating " +
-                    "ConvexEdgeWear and ConcaveCrease masks. These are not " +
-                    "the final visible edge/crack rendering path.",
+                    "Upward/exposed surface response. This feature currently " +
+                    "controls final-render strength and optional hue tinting; " +
+                    "its generated mask placement comes from the mass surface " +
+                    "data rather than a separate per-object height control.",
+                    MessageType.None);
+
+                EditorGUILayout.PropertyField(
+                    exposureResponse,
+                    new GUIContent(
+                        "Strength",
+                        "Scales how strongly the Exposure mask affects normal final rendering."));
+                EditorGUILayout.PropertyField(
+                    exposureTint,
+                    new GUIContent(
+                        "Tint",
+                        "Optional hue tint for exposed surfaces."));
+                EditorGUILayout.PropertyField(
+                    exposureTintStrength,
+                    new GUIContent(
+                        "Tint Strength",
+                        "How much Exposure Tint affects the final render. Default 0 keeps exposure response hue-neutral."));
+            }
+        }
+
+        private void DrawBaseContactFeature()
+        {
+            showBaseContactFeature = EditorGUILayout.Foldout(
+                showBaseContactFeature,
+                "Base / Contact",
+                true);
+
+            if (!showBaseContactFeature)
+            {
+                return;
+            }
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox(
+                    "Lower/contact grounding response. Base Lift changes " +
+                    "where the base/contact feature starts; the other " +
+                    "controls define how strongly and with what optional tint " +
+                    "the feature appears in final rendering.",
+                    MessageType.None);
+
+                EditorGUILayout.PropertyField(
+                    surfaceMaskBaseLift,
+                    new GUIContent(
+                        "Base Lift",
+                        "Moves the lower/contact mask origin upward for embedded or flat masses."));
+                EditorGUILayout.PropertyField(
+                    baseResponse,
+                    new GUIContent(
+                        "Strength",
+                        "Scales how strongly the Base/contact mask affects normal final rendering."));
+                EditorGUILayout.PropertyField(
+                    baseTint,
+                    new GUIContent(
+                        "Tint",
+                        "Optional hue tint for Base/contact grounding."));
+                EditorGUILayout.PropertyField(
+                    baseTintStrength,
+                    new GUIContent(
+                        "Tint Strength",
+                        "How much Base / Contact Tint affects the final render. Default 0 means neutral grounding only."));
+            }
+        }
+
+        private void DrawCreviceShelterFeature()
+        {
+            showCreviceShelterFeature = EditorGUILayout.Foldout(
+                showCreviceShelterFeature,
+                "Crevice / Shelter",
+                true);
+
+            if (!showCreviceShelterFeature)
+            {
+                return;
+            }
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox(
+                    "Sheltered lower-side accumulation. Height, Fade and " +
+                    "Irregularity change where the CreviceBase feature " +
+                    "exists; Strength and Tint control its final visual " +
+                    "interpretation.",
+                    MessageType.None);
+
+                EditorGUILayout.PropertyField(
+                    creviceReach,
+                    new GUIContent(
+                        "Height",
+                        "Controls how far CreviceBase can crawl upward from lower/contact areas."));
+                EditorGUILayout.PropertyField(
+                    creviceSmoothness,
+                    new GUIContent(
+                        "Fade",
+                        "Controls how softly CreviceBase fades upward."));
+                EditorGUILayout.PropertyField(
+                    creviceBreakup,
+                    new GUIContent(
+                        "Irregularity",
+                        "Controls how uneven or broken the crevice crawl field is."));
+                EditorGUILayout.PropertyField(
+                    creviceResponse,
+                    new GUIContent(
+                        "Strength",
+                        "Scales how strongly the CreviceBase mask affects normal final rendering."));
+                EditorGUILayout.PropertyField(
+                    creviceTint,
+                    new GUIContent(
+                        "Tint",
+                        "Optional hue tint for sheltered crevice/base areas."));
+                EditorGUILayout.PropertyField(
+                    creviceTintStrength,
+                    new GUIContent(
+                        "Tint Strength",
+                        "How much Crevice Tint affects the final render. Default 0 keeps the response hue-neutral."));
+            }
+        }
+
+        private void DrawDirtDepositFeature()
+        {
+            showDirtDepositFeature = EditorGUILayout.Foldout(
+                showDirtDepositFeature,
+                "Dirt / Deposit",
+                true);
+
+            if (!showDirtDepositFeature)
+            {
+                return;
+            }
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox(
+                    "Dirt, mineral and gathered deposit response. Crawl " +
+                    "Height and Coverage change where the DirtDeposit feature " +
+                    "exists; Strength and Tint control its final visual " +
+                    "interpretation.",
+                    MessageType.None);
+
+                EditorGUILayout.PropertyField(
+                    dirtCrawlReach,
+                    new GUIContent(
+                        "Crawl Height",
+                        "Controls how far DirtDeposit crawl paths may rise."));
+                EditorGUILayout.PropertyField(
+                    dirtCoverage,
+                    new GUIContent(
+                        "Coverage",
+                        "Controls how full or sparse DirtDeposit is."));
+                EditorGUILayout.PropertyField(
+                    dirtDepositResponse,
+                    new GUIContent(
+                        "Strength",
+                        "Scales how strongly the DirtDeposit mask affects normal final rendering."));
+                EditorGUILayout.PropertyField(
+                    dirtDepositTint,
+                    new GUIContent(
+                        "Tint",
+                        "Optional hue tint for dirt, mineral or deposit accumulation."));
+                EditorGUILayout.PropertyField(
+                    dirtDepositTintStrength,
+                    new GUIContent(
+                        "Tint Strength",
+                        "How much Dirt Deposit Tint affects the final render. Default 0 keeps the response hue-neutral."));
+            }
+        }
+
+        private void DrawEdgeWearFeature()
+        {
+            showEdgeWearFeature = EditorGUILayout.Foldout(
+                showEdgeWearFeature,
+                "Edge Wear",
+                true);
+
+            if (!showEdgeWearFeature)
+            {
+                return;
+            }
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox(
+                    "ConvexEdgeWear is currently a semantic/debug feature. " +
+                    "These controls generate and validate edge-wear data; " +
+                    "the raised overlay strips are not the accepted final " +
+                    "visible edge-wear rendering path.",
                     MessageType.Info);
 
                 EditorGUILayout.PropertyField(
+                    edgeWearAmount,
+                    new GUIContent(
+                        "Amount",
+                        "How much ConvexEdgeWear debug/data is generated."));
+                EditorGUILayout.PropertyField(
+                    edgeWearWidth,
+                    new GUIContent(
+                        "Width",
+                        "Controls the debug/data width around convex feature edges."));
+                EditorGUILayout.PropertyField(
+                    edgeWearCoverage,
+                    new GUIContent(
+                        "Coverage",
+                        "Controls how broadly convex edge-wear candidates appear."));
+                EditorGUILayout.PropertyField(
+                    edgeWearSoftness,
+                    new GUIContent(
+                        "Softness",
+                        "Controls how soft the generated edge-wear debug/data response is."));
+            }
+        }
+
+        private void DrawCreaseDebugFeature()
+        {
+            showCreaseDebugFeature = EditorGUILayout.Foldout(
+                showCreaseDebugFeature,
+                "Crease / Crack Debug",
+                true);
+
+            if (!showCreaseDebugFeature)
+            {
+                return;
+            }
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox(
+                    "ConcaveCrease is currently a semantic/debug feature. " +
+                    "These controls generate and validate crease data; this " +
+                    "is not yet the final surface-integrated crack system.",
+                    MessageType.Info);
+
+                EditorGUILayout.PropertyField(
+                    creaseAmount,
+                    new GUIContent(
+                        "Amount",
+                        "How much ConcaveCrease debug/data is generated."));
+                EditorGUILayout.PropertyField(
+                    creaseWidth,
+                    new GUIContent(
+                        "Width",
+                        "Controls the debug/data width around concave creases."));
+                EditorGUILayout.PropertyField(
+                    creaseLength,
+                    new GUIContent(
+                        "Length",
+                        "Controls the generated length of crease debug/data strips."));
+                EditorGUILayout.PropertyField(
+                    creaseBranching,
+                    new GUIContent(
+                        "Branching",
+                        "Controls how often crease debug/data branches are generated."));
+                EditorGUILayout.PropertyField(
+                    creaseSoftness,
+                    new GUIContent(
+                        "Softness",
+                        "Controls how soft the generated crease debug/data response is."));
+            }
+        }
+
+        private void DrawSharedEdgeCreaseDebugVisibility()
+        {
+            EditorGUILayout.Space(3f);
+            EditorGUILayout.LabelField(
+                "Shared Edge / Crease Debug Visibility",
+                EditorStyles.miniBoldLabel);
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.PropertyField(
                     surfaceFeatureVisibility,
                     new GUIContent(
-                        "Feature Line Visibility",
-                        "Controls whether generated raised edge/crease overlay strips stay debug-only or can be visible during normal rendering."));
+                        "Debug Line Visibility",
+                        "Shared visibility control for generated raised Edge Wear and Crease overlay strips."));
 
                 if (surfaceFeatureVisibility != null &&
                     !surfaceFeatureVisibility.hasMultipleDifferentValues &&
@@ -620,30 +901,49 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     EditorGUILayout.HelpBox(
                         "VisibleProfileResponse makes raised overlay strips " +
                         "visible during normal rendering. Current accepted " +
-                        "stone rendering keeps this DebugOnly unless " +
+                        "Generated Mass rendering keeps this DebugOnly unless " +
                         "intentionally testing the old overlay response.",
                         MessageType.Warning);
                 }
-
-                EditorGUILayout.Space(3f);
-                EditorGUILayout.LabelField(
-                    "Convex Edge Wear",
-                    EditorStyles.miniBoldLabel);
-                EditorGUILayout.PropertyField(edgeWearAmount);
-                EditorGUILayout.PropertyField(edgeWearWidth);
-                EditorGUILayout.PropertyField(edgeWearCoverage);
-                EditorGUILayout.PropertyField(edgeWearSoftness);
-
-                EditorGUILayout.Space(3f);
-                EditorGUILayout.LabelField(
-                    "Concave Crease",
-                    EditorStyles.miniBoldLabel);
-                EditorGUILayout.PropertyField(creaseAmount);
-                EditorGUILayout.PropertyField(creaseWidth);
-                EditorGUILayout.PropertyField(creaseLength);
-                EditorGUILayout.PropertyField(creaseBranching);
-                EditorGUILayout.PropertyField(creaseSoftness);
             }
+        }
+
+        private void DrawRockColourAuthority()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Colour / Lighting Interpretation",
+                EditorStyles.boldLabel);
+
+            EditorGUILayout.HelpBox(
+                "Overall Rock Tint changes the generated mass's own colour identity " +
+                "before lighting. Lighting Tint Influence controls how " +
+                "strongly scene/local light colour can hue-shift the final " +
+                "PBR result. Lights still affect brightness, shadows, " +
+                "highlights and form.",
+                MessageType.Info);
+
+            EditorGUILayout.PropertyField(
+                overallRockTint,
+                new GUIContent(
+                    "Overall Mass Tint",
+                    "Optional overall colour identity tint applied before lighting."));
+            EditorGUILayout.PropertyField(
+                overallRockTintStrength,
+                new GUIContent(
+                    "Overall Tint Strength",
+                    "How strongly Overall Mass Tint affects the final generated mass colour."));
+            EditorGUILayout.PropertyField(
+                lightingTintInfluence,
+                new GUIContent(
+                    "Lighting Tint Influence",
+                    "Controls how strongly scene/local light colour can hue-shift the final PBR result. Lights still affect brightness, shadows, highlights and form."));
+
+            EditorGUILayout.HelpBox(
+                "Lighting Tint Influence: 0 = value-only lighting hue " +
+                "influence, 0.35 = default moderate scene-light colour " +
+                "influence, 1 = full RGB PBR light colour influence.",
+                MessageType.None);
         }
 
         private void EnsureDefaultStoneMaterials()

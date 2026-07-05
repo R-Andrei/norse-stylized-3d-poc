@@ -66,6 +66,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         BlackSacredStone
     }
 
+    public enum GeneratedMassFeatureRecipe
+    {
+        GenericTestMass,
+        ColdGreyStone,
+        WetRiverStone,
+        PaleFrostStone,
+        BlackSacredStone,
+        Custom
+    }
+
     public enum StoneSurfaceMaskDebug
     {
         None,
@@ -399,11 +409,54 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private static readonly int GeneratedMassCreaseSoftnessId =
             Shader.PropertyToID("_GeneratedMassCreaseSoftness");
 
+        private struct FeatureRecipeValues
+        {
+            public StoneSurfaceProfile StoneSurfaceProfile;
+            public Color BaseColor;
+            public StoneSurfaceMaskDebug SurfaceMaskDebug;
+            public float SurfaceMaskBaseLift;
+            public float CreviceReach;
+            public float CreviceSmoothness;
+            public float CreviceBreakup;
+            public float DirtCrawlReach;
+            public float DirtCoverage;
+            public float ExposureResponse;
+            public float CreviceResponse;
+            public float BaseResponse;
+            public float DirtDepositResponse;
+            public Color ExposureTint;
+            public float ExposureTintStrength;
+            public Color CreviceTint;
+            public float CreviceTintStrength;
+            public Color BaseTint;
+            public float BaseTintStrength;
+            public Color DirtDepositTint;
+            public float DirtDepositTintStrength;
+            public Color OverallRockTint;
+            public float OverallRockTintStrength;
+            public float LightingTintInfluence;
+            public StoneSurfaceFeatureVisibility SurfaceFeatureVisibility;
+            public float EdgeWearAmount;
+            public float EdgeWearWidth;
+            public float EdgeWearCoverage;
+            public float EdgeWearSoftness;
+            public float CreaseAmount;
+            public float CreaseWidth;
+            public float CreaseLength;
+            public float CreaseBranching;
+            public float CreaseSoftness;
+        }
+
         [SerializeField]
         private MassRecipe recipe = new MassRecipe();
 
         [SerializeField]
         private bool regenerateOnValidate = true;
+
+        [Tooltip("Editable feature recipe used by the Generated Mass framework. Changing this field does not overwrite current controls; use Apply Selected Feature Recipe or Reset Feature Controls to Recipe in the inspector.")]
+        [SerializeField]
+        private GeneratedMassFeatureRecipe featureRecipe =
+            GeneratedMassFeatureRecipe.GenericTestMass;
 
         [Tooltip("Chooses a named HLSL stone material profile for this generated mass. Renderer Material leaves the current renderer material untouched.")]
         [SerializeField]
@@ -593,6 +646,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField, HideInInspector]
         private MassArchetype lastAppliedArchetype;
 
+        [SerializeField, HideInInspector]
+        private GeneratedMassFeatureRecipe lastAppliedFeatureRecipe =
+            GeneratedMassFeatureRecipe.GenericTestMass;
+
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
         private MeshCollider meshCollider;
@@ -625,6 +682,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         }
         public bool IsSolidGeometry => true;
         public bool IsStaticGeometry => true;
+        public GeneratedMassFeatureRecipe FeatureRecipe => featureRecipe;
+        public GeneratedMassFeatureRecipe LastAppliedFeatureRecipe =>
+            lastAppliedFeatureRecipe;
         public StoneSurfaceProfile StoneSurfaceProfile => stoneSurfaceProfile;
         public StoneSurfaceMaskDebug SurfaceMaskDebug => surfaceMaskDebug;
         public StoneSurfaceFeatureVisibility SurfaceFeatureVisibility =>
@@ -833,6 +893,282 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             lastAppliedArchetype = recipe.Archetype;
             recipeInitialized = true;
             Regenerate();
+        }
+
+        [ContextMenu("Apply Selected Feature Recipe")]
+        public void ApplySelectedFeatureRecipe()
+        {
+            ApplyFeatureRecipe(featureRecipe);
+        }
+
+        [ContextMenu("Reset Feature Controls to Selected Recipe")]
+        public void ResetFeatureControlsToSelectedRecipe()
+        {
+            ApplyFeatureRecipe(featureRecipe);
+        }
+
+        public bool CurrentFeatureControlsMatchSelectedRecipe()
+        {
+            return CurrentFeatureControlsMatchRecipe(featureRecipe);
+        }
+
+        public bool CurrentFeatureControlsMatchRecipe(
+            GeneratedMassFeatureRecipe selectedRecipe)
+        {
+            if (selectedRecipe == GeneratedMassFeatureRecipe.Custom)
+            {
+                return false;
+            }
+
+            FeatureRecipeValues values =
+                ResolveFeatureRecipeValues(selectedRecipe);
+            return FeatureControlsMatch(values);
+        }
+
+        private void ApplyFeatureRecipe(
+            GeneratedMassFeatureRecipe selectedRecipe)
+        {
+            featureRecipe = selectedRecipe;
+
+            if (selectedRecipe == GeneratedMassFeatureRecipe.Custom)
+            {
+                ApplyMaterialProperties();
+                return;
+            }
+
+            FeatureRecipeValues values =
+                ResolveFeatureRecipeValues(selectedRecipe);
+            ApplyFeatureRecipeValues(values);
+            lastAppliedFeatureRecipe = selectedRecipe;
+            Regenerate();
+        }
+
+        private void ApplyFeatureRecipeValues(FeatureRecipeValues values)
+        {
+            stoneSurfaceProfile = values.StoneSurfaceProfile;
+            baseColor = values.BaseColor;
+            surfaceMaskDebug = values.SurfaceMaskDebug;
+            surfaceMaskBaseLift = values.SurfaceMaskBaseLift;
+            creviceReach = values.CreviceReach;
+            creviceSmoothness = values.CreviceSmoothness;
+            creviceBreakup = values.CreviceBreakup;
+            dirtCrawlReach = values.DirtCrawlReach;
+            dirtCoverage = values.DirtCoverage;
+            exposureResponse = values.ExposureResponse;
+            creviceResponse = values.CreviceResponse;
+            baseResponse = values.BaseResponse;
+            dirtDepositResponse = values.DirtDepositResponse;
+            exposureTint = values.ExposureTint;
+            exposureTintStrength = values.ExposureTintStrength;
+            creviceTint = values.CreviceTint;
+            creviceTintStrength = values.CreviceTintStrength;
+            baseTint = values.BaseTint;
+            baseTintStrength = values.BaseTintStrength;
+            dirtDepositTint = values.DirtDepositTint;
+            dirtDepositTintStrength = values.DirtDepositTintStrength;
+            overallRockTint = values.OverallRockTint;
+            overallRockTintStrength = values.OverallRockTintStrength;
+            lightingTintInfluence = values.LightingTintInfluence;
+            surfaceFeatureVisibility = values.SurfaceFeatureVisibility;
+            edgeWearAmount = values.EdgeWearAmount;
+            edgeWearWidth = values.EdgeWearWidth;
+            edgeWearCoverage = values.EdgeWearCoverage;
+            edgeWearSoftness = values.EdgeWearSoftness;
+            creaseAmount = values.CreaseAmount;
+            creaseWidth = values.CreaseWidth;
+            creaseLength = values.CreaseLength;
+            creaseBranching = values.CreaseBranching;
+            creaseSoftness = values.CreaseSoftness;
+        }
+
+        private bool FeatureControlsMatch(FeatureRecipeValues values)
+        {
+            return stoneSurfaceProfile == values.StoneSurfaceProfile &&
+                   ColorApproximately(baseColor, values.BaseColor) &&
+                   surfaceMaskDebug == values.SurfaceMaskDebug &&
+                   FloatApproximately(
+                       surfaceMaskBaseLift,
+                       values.SurfaceMaskBaseLift) &&
+                   FloatApproximately(creviceReach, values.CreviceReach) &&
+                   FloatApproximately(
+                       creviceSmoothness,
+                       values.CreviceSmoothness) &&
+                   FloatApproximately(creviceBreakup, values.CreviceBreakup) &&
+                   FloatApproximately(dirtCrawlReach, values.DirtCrawlReach) &&
+                   FloatApproximately(dirtCoverage, values.DirtCoverage) &&
+                   FloatApproximately(
+                       exposureResponse,
+                       values.ExposureResponse) &&
+                   FloatApproximately(creviceResponse, values.CreviceResponse) &&
+                   FloatApproximately(baseResponse, values.BaseResponse) &&
+                   FloatApproximately(
+                       dirtDepositResponse,
+                       values.DirtDepositResponse) &&
+                   ColorApproximately(exposureTint, values.ExposureTint) &&
+                   FloatApproximately(
+                       exposureTintStrength,
+                       values.ExposureTintStrength) &&
+                   ColorApproximately(creviceTint, values.CreviceTint) &&
+                   FloatApproximately(
+                       creviceTintStrength,
+                       values.CreviceTintStrength) &&
+                   ColorApproximately(baseTint, values.BaseTint) &&
+                   FloatApproximately(
+                       baseTintStrength,
+                       values.BaseTintStrength) &&
+                   ColorApproximately(
+                       dirtDepositTint,
+                       values.DirtDepositTint) &&
+                   FloatApproximately(
+                       dirtDepositTintStrength,
+                       values.DirtDepositTintStrength) &&
+                   ColorApproximately(
+                       overallRockTint,
+                       values.OverallRockTint) &&
+                   FloatApproximately(
+                       overallRockTintStrength,
+                       values.OverallRockTintStrength) &&
+                   FloatApproximately(
+                       lightingTintInfluence,
+                       values.LightingTintInfluence) &&
+                   surfaceFeatureVisibility == values.SurfaceFeatureVisibility &&
+                   FloatApproximately(edgeWearAmount, values.EdgeWearAmount) &&
+                   FloatApproximately(edgeWearWidth, values.EdgeWearWidth) &&
+                   FloatApproximately(
+                       edgeWearCoverage,
+                       values.EdgeWearCoverage) &&
+                   FloatApproximately(
+                       edgeWearSoftness,
+                       values.EdgeWearSoftness) &&
+                   FloatApproximately(creaseAmount, values.CreaseAmount) &&
+                   FloatApproximately(creaseWidth, values.CreaseWidth) &&
+                   FloatApproximately(creaseLength, values.CreaseLength) &&
+                   FloatApproximately(
+                       creaseBranching,
+                       values.CreaseBranching) &&
+                   FloatApproximately(creaseSoftness, values.CreaseSoftness);
+        }
+
+        private static FeatureRecipeValues ResolveFeatureRecipeValues(
+            GeneratedMassFeatureRecipe selectedRecipe)
+        {
+            FeatureRecipeValues values = CreateGenericTestMassValues();
+
+            switch (selectedRecipe)
+            {
+                case GeneratedMassFeatureRecipe.GenericTestMass:
+                    return values;
+
+                case GeneratedMassFeatureRecipe.ColdGreyStone:
+                    values.StoneSurfaceProfile =
+                        StoneSurfaceProfile.ColdGreyStone;
+                    return values;
+
+                case GeneratedMassFeatureRecipe.WetRiverStone:
+                    values.StoneSurfaceProfile =
+                        StoneSurfaceProfile.DarkWetRiverStone;
+                    values.BaseColor =
+                        new Color(0.22f, 0.23f, 0.24f, 1f);
+                    values.CreviceReach = 1.15f;
+                    values.CreviceSmoothness = 1.15f;
+                    values.DirtCrawlReach = 1.2f;
+                    values.DirtCoverage = 1.15f;
+                    values.ExposureResponse = 0.85f;
+                    values.CreviceResponse = 1.2f;
+                    values.BaseResponse = 1.15f;
+                    values.DirtDepositResponse = 1.1f;
+                    values.EdgeWearAmount = 1.2f;
+                    values.EdgeWearSoftness = 0.65f;
+                    return values;
+
+                case GeneratedMassFeatureRecipe.PaleFrostStone:
+                    values.StoneSurfaceProfile =
+                        StoneSurfaceProfile.PaleFrostStone;
+                    values.BaseColor =
+                        new Color(0.58f, 0.60f, 0.60f, 1f);
+                    values.ExposureResponse = 1.15f;
+                    values.CreviceResponse = 0.85f;
+                    values.BaseResponse = 0.85f;
+                    values.DirtDepositResponse = 0.45f;
+                    values.DirtCoverage = 0.55f;
+                    values.CreaseAmount = 1.25f;
+                    values.CreaseSoftness = 0.45f;
+                    return values;
+
+                case GeneratedMassFeatureRecipe.BlackSacredStone:
+                    values.StoneSurfaceProfile =
+                        StoneSurfaceProfile.BlackSacredStone;
+                    values.BaseColor =
+                        new Color(0.055f, 0.057f, 0.06f, 1f);
+                    values.ExposureResponse = 0.55f;
+                    values.CreviceResponse = 0.75f;
+                    values.BaseResponse = 0.65f;
+                    values.DirtDepositResponse = 0.2f;
+                    values.DirtCoverage = 0.4f;
+                    values.EdgeWearAmount = 0.55f;
+                    values.CreaseAmount = 0.35f;
+                    values.LightingTintInfluence = 0.2f;
+                    return values;
+
+                case GeneratedMassFeatureRecipe.Custom:
+                default:
+                    return values;
+            }
+        }
+
+        private static FeatureRecipeValues CreateGenericTestMassValues()
+        {
+            return new FeatureRecipeValues
+            {
+                StoneSurfaceProfile = StoneSurfaceProfile.ColdGreyStone,
+                BaseColor = new Color(0.33423817f, 0.3410176f, 0.3490566f, 1f),
+                SurfaceMaskDebug = StoneSurfaceMaskDebug.None,
+                SurfaceMaskBaseLift = 0f,
+                CreviceReach = 1f,
+                CreviceSmoothness = 1f,
+                CreviceBreakup = 1f,
+                DirtCrawlReach = 1f,
+                DirtCoverage = 1f,
+                ExposureResponse = 1f,
+                CreviceResponse = 1f,
+                BaseResponse = 1f,
+                DirtDepositResponse = 1f,
+                ExposureTint = new Color(0.72f, 0.76f, 0.78f, 1f),
+                ExposureTintStrength = 0f,
+                CreviceTint = new Color(0.5f, 0.5f, 0.5f, 1f),
+                CreviceTintStrength = 0f,
+                BaseTint = new Color(0.5f, 0.5f, 0.5f, 1f),
+                BaseTintStrength = 0f,
+                DirtDepositTint = new Color(0.42f, 0.40f, 0.36f, 1f),
+                DirtDepositTintStrength = 0f,
+                OverallRockTint = new Color(0.5f, 0.5f, 0.5f, 1f),
+                OverallRockTintStrength = 0f,
+                LightingTintInfluence = 0.35f,
+                SurfaceFeatureVisibility =
+                    StoneSurfaceFeatureVisibility.DebugOnly,
+                EdgeWearAmount = 1f,
+                EdgeWearWidth = 1f,
+                EdgeWearCoverage = 1f,
+                EdgeWearSoftness = 0.45f,
+                CreaseAmount = 1f,
+                CreaseWidth = 1f,
+                CreaseLength = 1f,
+                CreaseBranching = 1f,
+                CreaseSoftness = 0.35f
+            };
+        }
+
+        private static bool FloatApproximately(float a, float b)
+        {
+            return Mathf.Abs(a - b) <= 0.0001f;
+        }
+
+        private static bool ColorApproximately(Color a, Color b)
+        {
+            return FloatApproximately(a.r, b.r) &&
+                   FloatApproximately(a.g, b.g) &&
+                   FloatApproximately(a.b, b.b) &&
+                   FloatApproximately(a.a, b.a);
         }
 
         private static int GenerateDifferentSeed(int current)

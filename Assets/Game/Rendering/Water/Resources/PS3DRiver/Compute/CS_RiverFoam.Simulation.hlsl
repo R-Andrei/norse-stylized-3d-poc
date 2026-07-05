@@ -327,216 +327,6 @@ float2 FoamResolveAreaBalancedWobbleCells(
             lerp(2.45, 4.05, surfaceCalibration)));
 }
 
-struct FoamChaoticDriftSample
-{
-    float2 macroCells;
-    float2 mesoCells;
-    float2 edgeCells;
-    float activity;
-    float edgeActivity;
-    float resistance;
-};
-
-FoamChaoticDriftSample FoamResolveChaoticIntermittentDriftCells(
-    int2 coordinate,
-    float2 physicalPosition,
-    float materialPattern,
-    float edgeExposure,
-    FoamSurfaceMorphInfluence surfaceInfluence,
-    float validFluid)
-{
-    FoamChaoticDriftSample drift;
-    drift.macroCells = 0.0.xx;
-    drift.mesoCells = 0.0.xx;
-    drift.edgeCells = 0.0.xx;
-    drift.activity = 0.0;
-    drift.edgeActivity = 0.0;
-    drift.resistance = 0.0;
-
-    float strength = clamp(_FoamChaoticDriftStrength, 0.0, 4.0);
-    if (strength <= 0.0001 || validFluid <= 0.0001)
-    {
-        return drift;
-    }
-
-    float rhythm = clamp(_FoamChaoticDriftRhythm, 0.25, 2.0);
-    float rhythm01 = saturate((rhythm - 0.25) / 1.75);
-    float2 cellPosition = float2(coordinate);
-    float patternSeed =
-        materialPattern * 823.17 +
-        _FoamSeed * 0.059 +
-        physicalPosition.x * 0.019 +
-        physicalPosition.y * 0.047;
-
-    // 5.8d: keep the 5.8c macro/meso/edge split, but give the broad
-    // body transport clear authority. Meso shear and edge detail still exist,
-    // but at normal strengths they decorate the macro movement instead of
-    // becoming the visible motion on their own. The gate still leaves true
-    // calm intervals so the patch does not slide laterally every simulation tick.
-    float2 activityDomain = cellPosition / float2(37.0, 23.0) +
-        float2(_FoamTime * 0.112 * rhythm, -_FoamTime * 0.076 * rhythm);
-    float activityNoise = FoamSourceFillValueNoise(
-        activityDomain,
-        patternSeed + 211.0);
-    float activityThreshold = lerp(0.57, 0.38, rhythm01);
-    float activity = smoothstep(
-        activityThreshold,
-        activityThreshold + lerp(0.23, 0.15, rhythm01),
-        activityNoise);
-
-    float2 pulseDomain = cellPosition / float2(27.0, 35.0) +
-        float2(-_FoamTime * 0.068 * rhythm, _FoamTime * 0.096 * rhythm);
-    float pulseNoise = FoamSourceFillValueNoise(
-        pulseDomain,
-        patternSeed + 337.0);
-    float pulseGate = smoothstep(
-        lerp(0.55, 0.39, rhythm01),
-        lerp(0.80, 0.64, rhythm01),
-        pulseNoise);
-    activity *= pulseGate;
-
-    float activityLift = lerp(1.18, 1.50, rhythm01);
-    float activityCurve = lerp(0.70, 0.52, rhythm01);
-    activity = saturate(pow(saturate(activity), activityCurve) * activityLift);
-    activity = lerp(
-        activity,
-        max(activity, lerp(0.20, 0.31, rhythm01)),
-        smoothstep(0.10, 0.32, activity));
-
-    activity = saturate(activity *
-        (1.0 + surfaceInfluence.edgeBoost * 0.22));
-    if (activity <= 0.0001)
-    {
-        return drift;
-    }
-
-    // 5.8d: route the public strength primarily into coherent body
-    // transport. Detail layers receive a deliberately smaller effective scale
-    // so they cannot dominate the read at normal authored values.
-    float macroEffectiveStrength = strength * (2.20 + strength * 0.10);
-    float detailEffectiveStrength = strength * (0.92 + strength * 0.05);
-
-    // Macro body transport: broad, slow, not edge-weighted. This is the only
-    // component allowed to carry the patch centre at normal values.
-    float2 macroDirectionDomain = cellPosition / float2(67.0, 43.0) +
-        float2(_FoamTime * 0.039 * rhythm, -_FoamTime * 0.031 * rhythm);
-    float macroA = FoamSignedMorphNoise(
-        macroDirectionDomain,
-        patternSeed + 431.0);
-    float macroB = FoamSignedMorphNoise(
-        cellPosition / float2(83.0, 57.0) +
-            float2(-_FoamTime * 0.026 * rhythm, _FoamTime * 0.034 * rhythm),
-        patternSeed + 463.0);
-    float macroWave = sin(
-        _FoamTime * (0.28 + rhythm * 0.13) +
-        cellPosition.x * 0.019 -
-        cellPosition.y * 0.027 +
-        patternSeed * 0.021);
-    float macroDirection = clamp(
-        macroA * 0.62 + macroB * 0.24 + macroWave * 0.14,
-        -1.0,
-        1.0);
-    macroDirection = sign(macroDirection) * sqrt(abs(macroDirection));
-
-    float macroLateralCells = macroDirection *
-        (0.34 + abs(macroDirection) * 0.68) *
-        activity * macroEffectiveStrength;
-    macroLateralCells += surfaceInfluence.lateralBias *
-        surfaceInfluence.agitation * activity * macroEffectiveStrength * 0.18;
-
-    float maximumMacroLateral =
-        0.45 +
-        1.65 * saturate(macroEffectiveStrength / 2.40) +
-        1.05 * saturate((macroEffectiveStrength - 2.40) / 5.00);
-    macroLateralCells = clamp(
-        macroLateralCells,
-        -maximumMacroLateral,
-        maximumMacroLateral);
-
-    // Boundary/obstacle validity remains a safety attenuator only. It prevents
-    // macro body transport from dumping material straight out of valid water;
-    // it does not compute tangents or perform obstacle sliding.
-    float lateralSign = sign(macroLateralCells);
-    float2 sideCoordinate = cellPosition +
-        float2(0.0, lateralSign * max(1.0, abs(macroLateralCells) + 0.35));
-    float sideValid = saturate(
-        SampleBoundaryCoverageBilinear(sideCoordinate) *
-        (1.0 - SampleObstacleExclusionBilinear(sideCoordinate)));
-    macroLateralCells *= lerp(0.28, 1.0, smoothstep(0.04, 0.42, sideValid));
-
-    float2 resistanceDomain = cellPosition / float2(43.0, 31.0) +
-        float2(_FoamTime * 0.074 * rhythm, -_FoamTime * 0.049 * rhythm);
-    float resistanceNoise = FoamSourceFillValueNoise(
-        resistanceDomain,
-        patternSeed + 683.0);
-    float resistanceGate = activity * smoothstep(
-        lerp(0.62, 0.49, rhythm01),
-        lerp(0.86, 0.72, rhythm01),
-        resistanceNoise);
-    float flowSign = _FoamFlowDirection < 0.0 ? -1.0 : 1.0;
-    float macroResistanceCells = -flowSign * resistanceGate * macroEffectiveStrength *
-        (0.022 + surfaceInfluence.agitation * 0.042);
-    macroResistanceCells = clamp(macroResistanceCells, -0.42, 0.42);
-
-    // Meso shear: moderate scale, only lightly edge-influenced. It bends and
-    // lags parts of the patch around the already-advected macro base.
-    float2 mesoDomain = cellPosition / float2(29.0, 19.0) +
-        float2(_FoamTime * 0.071 * rhythm, _FoamTime * 0.043 * rhythm);
-    float mesoNoise = FoamSignedMorphNoise(
-        mesoDomain,
-        patternSeed + 557.0);
-    float mesoWave = sin(
-        _FoamTime * (0.46 + rhythm * 0.19) -
-        cellPosition.x * 0.041 +
-        cellPosition.y * 0.029 +
-        patternSeed * 0.017);
-    float mesoLateralCells =
-        (mesoNoise * 0.11 + mesoWave * 0.045) *
-        (0.58 + edgeExposure * 0.18) *
-        activity * detailEffectiveStrength;
-    mesoLateralCells += surfaceInfluence.lateralBias *
-        surfaceInfluence.agitation * activity * detailEffectiveStrength * 0.045;
-    mesoLateralCells = clamp(mesoLateralCells, -0.42, 0.42);
-
-    float mesoLongitudinalCells = FoamSignedMorphNoise(
-        cellPosition / float2(34.0, 25.0) +
-            float2(-_FoamTime * 0.055 * rhythm, _FoamTime * 0.038 * rhythm),
-        patternSeed + 601.0) *
-        activity * detailEffectiveStrength * 0.028;
-    mesoLongitudinalCells -= flowSign * resistanceGate * detailEffectiveStrength *
-        (0.010 + surfaceInfluence.agitation * 0.018);
-    mesoLongitudinalCells = clamp(mesoLongitudinalCells, -0.15, 0.15);
-
-    // Edge detail: deliberately small and edge-gated. This keeps the useful
-    // torn/peeled border motion from 5.8b without letting it masquerade as the
-    // main drift behavior.
-    float edgeFocus = smoothstep(0.18, 0.82, edgeExposure);
-    float edgeOverdrive = smoothstep(1.65, 3.20, strength);
-    float edgeActivity = saturate(activity * edgeFocus *
-        (0.34 + surfaceInfluence.edgeBoost * 0.16 + edgeOverdrive * 0.30));
-    float2 edgeDomain = cellPosition / float2(13.0, 8.0) +
-        float2(_FoamTime * 0.092 * rhythm, _FoamTime * 0.061 * rhythm);
-    float edgeNoise = FoamSignedMorphNoise(
-        edgeDomain,
-        patternSeed + 719.0);
-    float edgeLateralCells = edgeNoise * edgeActivity *
-        min(detailEffectiveStrength, 2.10) *
-        (0.020 + edgeExposure * 0.055 + edgeOverdrive * 0.030);
-    edgeLateralCells = clamp(edgeLateralCells, -0.20, 0.20);
-
-    float edgeLongitudinalCells = -flowSign * resistanceGate * edgeFocus *
-        min(detailEffectiveStrength, 2.10) * (0.008 + edgeOverdrive * 0.006);
-    edgeLongitudinalCells = clamp(edgeLongitudinalCells, -0.055, 0.055);
-
-    drift.macroCells = float2(macroResistanceCells, macroLateralCells);
-    drift.mesoCells = float2(mesoLongitudinalCells, mesoLateralCells);
-    drift.edgeCells = float2(edgeLongitudinalCells, edgeLateralCells);
-    drift.activity = saturate(activity);
-    drift.edgeActivity = saturate(edgeActivity);
-    drift.resistance = saturate(resistanceGate);
-    return drift;
-}
-
 float4 FoamApplyPersistentMaterialMorph(
     float4 currentPacked,
     int2 coordinate,
@@ -565,14 +355,9 @@ float4 FoamApplyPersistentMaterialMorph(
             surfaceUv,
             materialTopology,
             edgeExposure);
-    FoamChaoticDriftSample chaoticDrift =
-        FoamResolveChaoticIntermittentDriftCells(
-            coordinate,
-            physicalPosition,
-            currentState.materialPattern,
-            edgeExposure,
-            surfaceInfluence,
-            validFluid);
+    FoamMotionFieldSample motionField = FoamResolveMotionFieldSample(
+        coordinate,
+        validFluid);
 
     float2 morphCells = FoamResolveAreaBalancedWobbleCells(
         coordinate,
@@ -585,14 +370,12 @@ float4 FoamApplyPersistentMaterialMorph(
 
     float2 currentPixel = float2(coordinate);
 
-    // 5.8d macro authority calibration: first move the stored body with a
-    // broad intermittent backtrace, then apply smaller meso/edge deformation
-    // around that advected base. This keeps the same one-pass gather and sample
-    // count, but makes Strength primarily mean patch-body transport instead of
-    // local edge animation.
-    float2 macroBase = currentPixel - chaoticDrift.macroCells;
-    float2 mesoBase = macroBase - chaoticDrift.mesoCells;
-    float2 edgeOffset = chaoticDrift.edgeCells;
+    // 4.11C.5.9: macro lateral body transport now comes from the explicit
+    // dense Foam Motion Field. Downstream transport remains owned by phase
+    // transport; this pass contributes lateral stored-material motion only.
+    float2 macroBase = currentPixel - float2(0.0, motionField.lateralCells);
+    float2 mesoBase = macroBase;
+    float2 edgeOffset = 0.0.xx;
 
     float2 primaryOffset = morphCells;
     float counterBalance = lerp(
@@ -639,26 +422,20 @@ float4 FoamApplyPersistentMaterialMorph(
         lerp(1.0, lerp(1.20, 1.50, surfaceCalibration),
             surfaceInfluence.agitation) *
         lerp(1.0, lerp(1.04, 1.16, surfaceCalibration),
-            surfaceInfluence.edgeBoost) *
-        lerp(1.0, 1.04, chaoticDrift.activity);
+            surfaceInfluence.edgeBoost);
 
-    // Area-balanced wobble now acts as meso deformation around the advected
-    // body instead of pretending to be the macro drift. It remains normalized
-    // and lifecycle-neutral: this pass still contains no explicit Presence
-    // erosion or Remaining Life adjustment.
+    // Area-balanced wobble remains meso deformation around the field-advected
+    // body. It remains normalized and lifecycle-neutral: this pass still
+    // contains no explicit Presence erosion or Remaining Life adjustment.
     float surfaceRate = lerp(
         5.35,
         6.75,
         surfaceInfluence.agitation *
         (0.45 + surfaceCalibration * 0.55));
-    float chaoticStrength = clamp(_FoamChaoticDriftStrength, 0.0, 4.0);
-    surfaceRate += chaoticDrift.activity *
-        min(1.10, 0.22 + chaoticStrength * 0.22);
     float morphWeight = saturate(surfaceRate * _FoamDeltaTime * activity * mobility);
 
-    float activeTransport = smoothstep(0.06, 0.38, chaoticDrift.activity);
-    float baseTransportInfluence = activeTransport *
-        lerp(0.0, 0.98, saturate(chaoticStrength / 0.85));
+    float baseTransportInfluence = saturate(
+        abs(motionField.lateralCells) * (0.42 + activity * 0.42));
     float4 basePacked = lerp(
         currentPacked,
         advectedBasePacked,

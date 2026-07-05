@@ -27,11 +27,12 @@ Accepted or mostly accepted foundations:
 - 5.7 adds stored-state surface-driven material morphing: existing ripple, wake, static pressure, and lee fields can amplify or bias persistent `Material Presence` morphology, without changing birth or lifecycle authority;
 - 5.7b adds a `Surface Morph Strength` calibration control so the stored-state response can be A/B tested at `0` and strengthened without changing lifecycle authority;
 - 5.7c rebalances the internal surface-response formula so `1` is a normal readable authored effect, `2` is strong, and `3+` becomes stress-test territory instead of merely compensating for an undertuned curve;
-- 5.8 adds chaotic intermittent persistent material drift: stored `Material Presence` can receive coherent lateral impulses, calm/no-drift intervals, local shear, and subtle resistance while remaining net-downstream; 5.8b recalibrates the activity curve and strength, 5.8c separates macro body transport, meso shear, and edge detail, and 5.8d gives macro body transport stronger authority while reducing meso/edge dominance.
+- 5.8/5.8b/5.8c/5.8d proved that lateral stored-material movement must have macro body authority, but the local chaotic drift resolver is superseded by the explicit 5.9 field architecture;
+- 5.9 adds the Unified Foam Motion Field as the single active lateral macro movement authority: a dense scrolling lane field plus a fixed obstacle-routing override field. The field is lateral-only, debug-visible, and performance-bounded to texture loads in `SimulateFoam`.
 
 Still not accepted:
 
-- obstacle-based tangential movement is not implemented;
+- obstacle routing has an initial field-based proof and still needs visual calibration after validation;
 - source shapes still need improvement before final reference-matching;
 - topology interaction needs final proof and calibration;
 - final visual fragmentation / organic breakup is deferred until movement and source-shape foundations are stronger.
@@ -162,16 +163,20 @@ Obstacle clipping is a known active blocker. Do not compensate for it with opaci
 
 ## Motion and transport rules
 
-Persistent material movement is downstream river-space transport plus approved disturbance/obstacle motion. Rejected behaviors remain rejected:
+Persistent material movement is downstream river-space transport plus approved disturbance and explicit motion-field inputs. Rejected behaviors remain rejected:
 
 - no shore suction;
 - no generic target attraction;
 - no topology steering network;
 - no continuous fill controller;
-- no material guidance field resurrected from old experiments;
-- no hidden spread/reinforcement layer.
+- no hidden spread/reinforcement layer;
+- no obstacle back-pressure, upstream compression, or radial repulsion masquerading as routing.
 
-Material simulation now owns intrinsic macro/meso deformation. The first 5.5 pass was too conservative; 5.5b strengthened stored-state deformation so a material body can bend, stretch, and locally widen/narrow. 5.5c repairs lifecycle authority: morphing may not erase material before `Remaining Life` expires. 5.5d makes intrinsic wobble area-balanced by using opposed normalized material samples instead of a max/current union, so patches can bulge, compress, and relax without continual footprint growth. 5.6/5.6b add river-surface coupling at render time only: Final Foam samples the same water-surface influences used by the river shader, and Foam interiors are clarity-filtered so fine water detail does not dominate the white body. 5.7 keeps that render path separate while also sampling the same ripple, wake, static pressure, and lee fields inside the persistent material simulation. Those fields only amplify/bias the existing area-balanced morphology; they do not spawn Foam, shorten `Remaining Life`, or become topology steering. 5.7b keeps the same boundary but adds an explicit `Surface Morph Strength` control: `0` disables stored-state surface response for A/B testing. 5.7c recalibrates the formula itself rather than hiding a larger multiplier behind the control: `1` is now intended to be the normal readable authored response, `2` should read strong, and `3+` is overdrive/stress-test behavior. 5.8 adds chaotic intermittent drift inside the same persistent simulation pass rather than a new dispatch or render-only offset. The drift is a bounded backtrace input with a strength control and rhythm control: it can create coherent lateral impulses, calm intervals, local shear, and subtle upstream resistance, but it must not change downstream phase transport, birth, topology, or lifecycle authority. 5.8b recalibrates the formula after validation showed the maximum 5.8 settings read closer to normal than stress-test behavior. Validation of 5.8b showed the path had become strong enough but expressed too much of that strength as edge tearing. 5.8c keeps the same controls, dispatch, texture set, and approximate state-sample stencil, but separates chaotic drift into macro body transport, meso shear, and edge detail so the stored patch can move as a broader body before its edges peel. Validation showed this was directionally better but still too edge/micro dominated, so 5.8d increases macro body-transport authority, trusts the macro backtrace more during active drift, and reduces meso/edge amplitudes. Obstacle tangential sliding remains separate explicit, budgeted work.
+Material simulation now owns intrinsic macro/meso deformation. The first 5.5 pass was too conservative; 5.5b strengthened stored-state deformation so a material body can bend, stretch, and locally widen/narrow. 5.5c repairs lifecycle authority: morphing may not erase material before `Remaining Life` expires. 5.5d makes intrinsic wobble area-balanced by using opposed normalized material samples instead of a max/current union, so patches can bulge, compress, and relax without continual footprint growth. 5.6/5.6b add river-surface coupling at render time only: Final Foam samples the same water-surface influences used by the river shader, and Foam interiors are clarity-filtered so fine water detail does not dominate the white body. 5.7 keeps that render path separate while also sampling the same ripple, wake, static pressure, and lee fields inside the persistent material simulation. Those fields only amplify/bias the existing area-balanced morphology; they do not spawn Foam, shorten `Remaining Life`, or become topology steering. 5.7b keeps the same boundary but adds an explicit `Surface Morph Strength` control: `0` disables stored-state surface response for A/B testing. 5.7c recalibrates the formula itself rather than hiding a larger multiplier behind the control: `1` is now intended to be the normal readable authored response, `2` should read strong, and `3+` is overdrive/stress-test behavior.
+
+5.8/5.8b/5.8c/5.8d are historical calibration work that proved macro body-scale lateral movement is necessary, but their local chaotic drift resolver is no longer the active macro authority. 5.9 replaces that path with the Unified Foam Motion Field. The field answers only lateral macro movement: downstream travel still belongs to phase transport, `Remaining Life` still owns death, topology still owns support/negative aging, birth still creates source material, and final rendering still owns presentation.
+
+The 5.9 field has two explicit inputs. The dense lane field stores a signed lateral suggestion across the full river and scrolls by sample-coordinate phase; time does not rebuild the texture. The lane texture is generated as a layered/domain-warped fractal field so it reads as granular chaotic structure rather than a few broad ribbons. The obstacle-routing field is fixed in river space, generated only from dirty obstacle/domain data, and overrides the lane field near obstacles through an influence weight. Obstacle routing is lateral-only, groups obstacle cells into connected bodies, and includes a weaker upstream approach region before stronger near-obstacle override. `SimulateFoam` samples these fields as texture loads only; it does not run procedural lane noise or local obstacle search in the hot path.
 
 ## Manual birth phase
 
@@ -272,3 +277,7 @@ Before automatic population begins, manually-born Foam must show:
 - at least initial lateral/obstacle interaction;
 - no obstacle clipping that dominates the result;
 - bounded runtime cost under active-chunk scenarios.
+
+## 5.9e obstacle routing refinement
+
+Obstacle routing must be interpreted as collision prevention, not as a generic proximity force. Close beside an object is not sufficient reason for strong redirection; the strongest influence is reserved for material that would otherwise hit the obstacle. The fixed obstacle-routing texture therefore uses a flow-relative collision-risk envelope: weak upstream approach, high direct-front override, weak side skirt, and rapid downstream release. This preserves the Stage 6 ownership split and keeps runtime simulation cost unchanged.

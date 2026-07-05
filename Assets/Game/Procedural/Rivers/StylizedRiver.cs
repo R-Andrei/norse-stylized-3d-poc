@@ -94,7 +94,8 @@ namespace ProgrammaticStylized3D.Rivers
         FoamAndAgingTopology = 1,
         ProgressiveBirthSource = 2,
         MaterialPresence = 3,
-        MaterialRemainingLife = 4
+        MaterialRemainingLife = 4,
+        FoamMotionField = 5
     }
 
 
@@ -176,7 +177,6 @@ namespace ProgrammaticStylized3D.Rivers
 
         private const int CurrentFoamMaterialLifecycleTuningVersion = 1;
         private const int CurrentFoamSurfaceMorphCalibrationVersion = 1;
-        private const int CurrentFoamChaoticDriftTuningVersion = 1;
         private const float MinimumFoamNeutralLifetime = 1f;
         private const float MaximumFoamNeutralLifetime = 10f;
         private const float DefaultFoamNeutralLifetime = 4f;
@@ -192,12 +192,18 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamSurfaceMorphStrength = 0f;
         private const float MaximumFoamSurfaceMorphStrength = 5f;
         private const float DefaultFoamSurfaceMorphStrength = 1f;
-        private const float MinimumFoamChaoticDriftStrength = 0f;
-        private const float MaximumFoamChaoticDriftStrength = 4f;
-        private const float DefaultFoamChaoticDriftStrength = 1f;
-        private const float MinimumFoamChaoticDriftRhythm = 0.25f;
-        private const float MaximumFoamChaoticDriftRhythm = 2f;
-        private const float DefaultFoamChaoticDriftRhythm = 1f;
+        private const float MinimumFoamMotionFieldStrength = 0f;
+        private const float MaximumFoamMotionFieldStrength = 4f;
+        private const float DefaultFoamMotionFieldStrength = 1f;
+        private const float MinimumFoamMotionFieldScrollHz = 0f;
+        private const float MaximumFoamMotionFieldScrollHz = 0.2f;
+        private const float DefaultFoamMotionFieldScrollHz = 0.01f;
+        private const float MinimumFoamMotionFieldNeutralCoverage = 0f;
+        private const float MaximumFoamMotionFieldNeutralCoverage = 0.30f;
+        private const float DefaultFoamMotionFieldNeutralCoverage = 0.10f;
+        private const float MinimumFoamMotionFieldLaneScale = 0.25f;
+        private const float MaximumFoamMotionFieldLaneScale = 4f;
+        private const float DefaultFoamMotionFieldLaneScale = 1f;
         private const float MinimumFoamProgressiveRibbonDuration = 0.5f;
         private const float MaximumFoamProgressiveRibbonDuration = 5f;
         private const float DefaultFoamProgressiveRibbonDuration = 2.4f;
@@ -803,30 +809,43 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamSurfaceMorphStrength =
             DefaultFoamSurfaceMorphStrength;
 
-        [Tooltip("Strength for chaotic intermittent Foam material drift. Zero disables lateral drift; one gives normal irregular meander with calm pauses, higher values increase lateral impulses, shear, and subtle resistance without changing birth, lifetime, topology, or final visual fragmentation.")]
+        [Tooltip("Strength of the dense Foam Motion Field. Zero disables field-driven lateral macro motion; one is the normal authored drift field; values above one exaggerate body-scale lateral routing without changing birth, lifetime, topology, or final visual fragmentation.")]
         [Range(
-            MinimumFoamChaoticDriftStrength,
-            MaximumFoamChaoticDriftStrength)]
+            MinimumFoamMotionFieldStrength,
+            MaximumFoamMotionFieldStrength)]
         [SerializeField]
-        private float foamChaoticDriftStrength =
-            DefaultFoamChaoticDriftStrength;
+        private float foamMotionFieldStrength =
+            DefaultFoamMotionFieldStrength;
 
-        [Tooltip("Rhythm for chaotic intermittent Foam material drift. Lower values produce longer calm periods and rarer lateral impulses; one is the normal irregular rhythm; higher values make drift events more frequent without forcing constant sideways motion.")]
+        [Tooltip("Scroll rate for the dense Foam Motion Field in complete downstream wraps per second. This is only a UV/sample phase offset, not a field rebuild rate. The default 0.01 means one full wrap every 100 seconds.")]
         [Range(
-            MinimumFoamChaoticDriftRhythm,
-            MaximumFoamChaoticDriftRhythm)]
+            MinimumFoamMotionFieldScrollHz,
+            MaximumFoamMotionFieldScrollHz)]
         [SerializeField]
-        private float foamChaoticDriftRhythm =
-            DefaultFoamChaoticDriftRhythm;
+        private float foamMotionFieldScrollHz =
+            DefaultFoamMotionFieldScrollHz;
+
+        [Tooltip("Approximate fraction of the dense Foam Motion Field that resolves to neutral/no lateral direction. Changing this regenerates the lane texture only; it does not add per-frame cost.")]
+        [Range(
+            MinimumFoamMotionFieldNeutralCoverage,
+            MaximumFoamMotionFieldNeutralCoverage)]
+        [SerializeField]
+        private float foamMotionFieldNeutralCoverage =
+            DefaultFoamMotionFieldNeutralCoverage;
+
+        [Tooltip("Feature scale for the dense Foam Motion Field lanes. Lower values produce broader lanes; higher values produce finer lanes. Changing this regenerates the lane texture only; it does not add per-frame cost.")]
+        [Range(
+            MinimumFoamMotionFieldLaneScale,
+            MaximumFoamMotionFieldLaneScale)]
+        [SerializeField]
+        private float foamMotionFieldLaneScale =
+            DefaultFoamMotionFieldLaneScale;
 
         [SerializeField, HideInInspector]
         private int foamMaterialLifecycleTuningVersion;
 
         [SerializeField, HideInInspector]
         private int foamSurfaceMorphCalibrationVersion;
-
-        [SerializeField, HideInInspector]
-        private int foamChaoticDriftTuningVersion;
 
         [Tooltip("Lit, non-emissive Foam tint. The alpha channel controls maximum Foam opacity, so no separate opacity control is required.")]
         [SerializeField] private Color foamColour =
@@ -1362,16 +1381,26 @@ namespace ProgrammaticStylized3D.Rivers
                 foamSurfaceMorphStrength,
                 MinimumFoamSurfaceMorphStrength,
                 MaximumFoamSurfaceMorphStrength);
-        public float FoamChaoticDriftStrength =>
+        public float FoamMotionFieldStrength =>
             Mathf.Clamp(
-                foamChaoticDriftStrength,
-                MinimumFoamChaoticDriftStrength,
-                MaximumFoamChaoticDriftStrength);
-        public float FoamChaoticDriftRhythm =>
+                foamMotionFieldStrength,
+                MinimumFoamMotionFieldStrength,
+                MaximumFoamMotionFieldStrength);
+        public float FoamMotionFieldScrollHz =>
             Mathf.Clamp(
-                foamChaoticDriftRhythm,
-                MinimumFoamChaoticDriftRhythm,
-                MaximumFoamChaoticDriftRhythm);
+                foamMotionFieldScrollHz,
+                MinimumFoamMotionFieldScrollHz,
+                MaximumFoamMotionFieldScrollHz);
+        public float FoamMotionFieldNeutralCoverage =>
+            Mathf.Clamp(
+                foamMotionFieldNeutralCoverage,
+                MinimumFoamMotionFieldNeutralCoverage,
+                MaximumFoamMotionFieldNeutralCoverage);
+        public float FoamMotionFieldLaneScale =>
+            Mathf.Clamp(
+                foamMotionFieldLaneScale,
+                MinimumFoamMotionFieldLaneScale,
+                MaximumFoamMotionFieldLaneScale);
         public Color FoamColour => foamColour;
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
         public float FoamSpawnDistanceNormalized =>
@@ -1595,7 +1624,6 @@ namespace ProgrammaticStylized3D.Rivers
         {
             MigrateFoamMaterialLifecycleTuningIfRequired();
             MigrateFoamSurfaceMorphCalibrationIfRequired();
-            MigrateFoamChaoticDriftTuningIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -1680,6 +1708,8 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.MaterialPresence;
                 case (int)StylizedRiverFoamDebugView.MaterialRemainingLife:
                     return StylizedRiverFoamDebugView.MaterialRemainingLife;
+                case (int)StylizedRiverFoamDebugView.FoamMotionField:
+                    return StylizedRiverFoamDebugView.FoamMotionField;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }
@@ -1715,25 +1745,10 @@ namespace ProgrammaticStylized3D.Rivers
                 CurrentFoamSurfaceMorphCalibrationVersion;
         }
 
-        private void MigrateFoamChaoticDriftTuningIfRequired()
-        {
-            if (foamChaoticDriftTuningVersion >=
-                CurrentFoamChaoticDriftTuningVersion)
-            {
-                return;
-            }
-
-            foamChaoticDriftStrength = DefaultFoamChaoticDriftStrength;
-            foamChaoticDriftRhythm = DefaultFoamChaoticDriftRhythm;
-            foamChaoticDriftTuningVersion =
-                CurrentFoamChaoticDriftTuningVersion;
-        }
-
         private void OnValidate()
         {
             MigrateFoamMaterialLifecycleTuningIfRequired();
             MigrateFoamSurfaceMorphCalibrationIfRequired();
-            MigrateFoamChaoticDriftTuningIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -3002,14 +3017,22 @@ namespace ProgrammaticStylized3D.Rivers
                 foamSurfaceMorphStrength,
                 MinimumFoamSurfaceMorphStrength,
                 MaximumFoamSurfaceMorphStrength);
-            foamChaoticDriftStrength = Mathf.Clamp(
-                foamChaoticDriftStrength,
-                MinimumFoamChaoticDriftStrength,
-                MaximumFoamChaoticDriftStrength);
-            foamChaoticDriftRhythm = Mathf.Clamp(
-                foamChaoticDriftRhythm,
-                MinimumFoamChaoticDriftRhythm,
-                MaximumFoamChaoticDriftRhythm);
+            foamMotionFieldStrength = Mathf.Clamp(
+                foamMotionFieldStrength,
+                MinimumFoamMotionFieldStrength,
+                MaximumFoamMotionFieldStrength);
+            foamMotionFieldScrollHz = Mathf.Clamp(
+                foamMotionFieldScrollHz,
+                MinimumFoamMotionFieldScrollHz,
+                MaximumFoamMotionFieldScrollHz);
+            foamMotionFieldNeutralCoverage = Mathf.Clamp(
+                foamMotionFieldNeutralCoverage,
+                MinimumFoamMotionFieldNeutralCoverage,
+                MaximumFoamMotionFieldNeutralCoverage);
+            foamMotionFieldLaneScale = Mathf.Clamp(
+                foamMotionFieldLaneScale,
+                MinimumFoamMotionFieldLaneScale,
+                MaximumFoamMotionFieldLaneScale);
             foamColour.a = Mathf.Clamp01(foamColour.a);
             foamSpawnDistanceNormalized = Mathf.Clamp01(
                 foamSpawnDistanceNormalized);

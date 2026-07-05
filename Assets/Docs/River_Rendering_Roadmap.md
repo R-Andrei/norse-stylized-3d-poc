@@ -296,9 +296,10 @@ Stage 6 is in the `4.11C` manually-born persistent material phase. The following
 - 5.4l composition-event refactor, so one manual spawn starts one budgeted composition event instead of hidden multiple writer events;
 - 5.4m manual source realignment, so birth no longer uses pattern/complexity/density controls to randomize macro Foam identity;
 - 5.7c accepted stored-state surface morphing as functional, with a practical authored `Surface Morph Strength` range around 2-4 and approximately 2.5 as the current working value;
-- 5.8 adds chaotic intermittent persistent material drift inside the existing simulation pass, with coherent lateral impulses, calm/no-drift intervals, local shear, and subtle resistance while preserving net-downstream phase transport; 5.8b recalibrates the response so normal values are useful, 5.8c separates macro patch transport, meso shear, and edge detail, and 5.8d increases macro authority while reducing micro/edge dominance.
+- 5.8/5.8b/5.8c/5.8d proved the need for macro body-scale lateral movement but are now treated as historical calibration work rather than the active long-term movement architecture;
+- 5.9 adds the Unified Foam Motion Field: a dense scrolling lane field plus a fixed obstacle-routing override field. It replaces the local chaotic drift path as the single lateral macro movement authority while preserving downstream phase transport, Remaining Life authority, topology support/negative aging, manual birth semantics, and final-render ownership. The lane field is generated as granular layered/domain-warped noise, while obstacle routing is generated per connected obstacle body rather than per occupied cell.
 
-Current failing area: movement/source/final-readability behavior. Manual source material is intentionally stable and persistent Foam now has intrinsic wobble, surface-driven morphing, and chaotic intermittent drift, but obstacle-aware tangential movement, better source shapes, topology proof, and final visual fragmentation remain unresolved.
+Current failing area: source/final-readability behavior. Manual source material is intentionally stable and persistent Foam now has intrinsic wobble, surface-driven morphing, and explicit field-driven lateral macro movement, but better source shapes, topology proof/calibration, and final visual fragmentation remain unresolved. Obstacle routing now has an initial field-based proof and still needs validation/tuning.
 
 ### Canonical topology/material relationship
 
@@ -318,8 +319,8 @@ The current approved order is:
 4. `4.11C.5.7 — Surface-Driven Material Morphing`
 5. `4.11C.5.7b — Surface Morph Calibration`
 6. `4.11C.5.7c — Surface Morph Formula Rebalance`
-7. `4.11C.5.8/5.8b/5.8c/5.8d — Chaotic Intermittent Foam Drift + Macro Authority Calibration`
-8. `4.11C.5.9 — Obstacle-Based Tangential Foam Movement`
+7. `4.11C.5.8/5.8b/5.8c/5.8d — Chaotic Intermittent Foam Drift + Macro Authority Calibration` — historical/interim proof of need for macro body motion.
+8. `4.11C.5.9 — Unified Foam Motion Field` — replaces local chaotic drift with dense field-driven lateral macro motion and fixed obstacle override routing.
 9. `4.11C.5.10 — Better Manual Source Shape Spawning`
 10. `4.11C.5.11 — Topology Aging Proof and Calibration`
 11. `4.11C.5.12 — Final Foam Visual Fragmentation and Reference-Matching`
@@ -378,3 +379,7 @@ Do not compensate for broken manual material behavior with automatic births, top
 ## Working Rule
 
 Before implementing a stage or sub-feature, define its acceptance tests. After approval, record a conservative summary under **Implemented** or **Validated**. Later work may consume earlier outputs, but it must not change an approved feature's contract unless that change is discussed and approved first.
+
+### 4.11C.5.9e — obstacle routing envelope correction
+
+The Unified Foam Motion Field obstacle override was refined from a broad component stamp into a flow-relative collision-risk envelope. This keeps the two-field runtime sampling model unchanged while reducing rectangular override slabs, excessive upstream strength, side over-steering, and continued steering after an obstacle is cleared.

@@ -89,6 +89,9 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamTopology("Foam Topology", 2D) = "black" {}
         [HideInInspector] _FoamTopologySources("Foam Topology Sources", 2D) = "black" {}
         [HideInInspector] _FoamObstacleExclusion("Foam Obstacle Footprint", 2D) = "black" {}
+        [HideInInspector] _FoamMotionLane("Foam Motion Lane", 2D) = "black" {}
+        [HideInInspector] _FoamObstacleRouting("Foam Obstacle Routing", 2D) = "black" {}
+        [HideInInspector] _FoamMotionLaneScrollCells("Foam Motion Lane Scroll Cells", Float) = 0
         [HideInInspector] _FoamInterpolation("Foam Interpolation", Range(0, 1)) = 1
         [HideInInspector] _FoamRenderTravelMetres("Foam Render Travel Metres", Float) = 0
         [HideInInspector] _FoamGlobalStart("Foam Global Start", Float) = 0
@@ -244,8 +247,11 @@ Shader "PS3D/Stylized River Water"
                 half4 _FoamColour;
                 float _FoamSharpness;
                 float _FoamDebugView;
+                float _FoamMotionLaneScrollCells;
                 float4 _FoamBirthDebug_TexelSize;
                 float4 _FoamObstacleExclusion_TexelSize;
+                float4 _FoamMotionLane_TexelSize;
+                float4 _FoamObstacleRouting_TexelSize;
 
                 float _DomainFallbackDepth;
                 float _BodyDebugView;
@@ -278,6 +284,8 @@ Shader "PS3D/Stylized River Water"
             TEXTURE2D(_FoamTopology);
             TEXTURE2D(_FoamTopologySources);
             TEXTURE2D(_FoamObstacleExclusion);
+            TEXTURE2D(_FoamMotionLane);
+            TEXTURE2D(_FoamObstacleRouting);
 
             struct Attributes
             {
@@ -794,6 +802,76 @@ Shader "PS3D/Stylized River Water"
                 finalColour = MixFog(finalColour, input.motionData.w);
 
                 int foamDebug = (int)round(_FoamDebugView);
+
+                if (foamDebug == 5)
+                {
+                    int2 laneDimensions = int2(
+                        max(1.0, _FoamMotionLane_TexelSize.z),
+                        max(1.0, _FoamMotionLane_TexelSize.w));
+                    int2 routingDimensions = int2(
+                        max(1.0, _FoamObstacleRouting_TexelSize.z),
+                        max(1.0, _FoamObstacleRouting_TexelSize.w));
+                    float laneX = foam.fieldUV.x * (float)laneDimensions.x -
+                        _FoamMotionLaneScrollCells;
+                    laneX = fmod(laneX, (float)laneDimensions.x);
+                    if (laneX < 0.0)
+                    {
+                        laneX += (float)laneDimensions.x;
+                    }
+
+                    int laneX0 = clamp(
+                        (int)floor(laneX),
+                        0,
+                        laneDimensions.x - 1);
+                    int laneX1 = laneX0 + 1;
+                    if (laneX1 >= laneDimensions.x)
+                    {
+                        laneX1 = 0;
+                    }
+
+                    int laneY = clamp(
+                        (int)floor(foam.fieldUV.y * (float)laneDimensions.y),
+                        0,
+                        laneDimensions.y - 1);
+                    float laneBlend = frac(laneX);
+                    float laneA = _FoamMotionLane.Load(
+                        int3(laneX0, laneY, 0)).r;
+                    float laneB = _FoamMotionLane.Load(
+                        int3(laneX1, laneY, 0)).r;
+                    float lane = clamp(lerp(laneA, laneB, laneBlend), -1.0, 1.0);
+
+                    int2 routingCoordinate = clamp(
+                        (int2)floor(foam.fieldUV * (float2)routingDimensions),
+                        int2(0, 0),
+                        routingDimensions - 1);
+                    float2 obstacleRouting = _FoamObstacleRouting.Load(
+                        int3(routingCoordinate, 0)).rg;
+                    obstacleRouting.x = clamp(obstacleRouting.x, -1.0, 1.0);
+                    obstacleRouting.y = saturate(obstacleRouting.y);
+                    float lateral = lerp(
+                        lane,
+                        obstacleRouting.x,
+                        obstacleRouting.y);
+
+                    float3 fieldColour = float3(0.0, 0.0, 0.0);
+                    fieldColour.r = saturate(lateral) * 0.95;
+                    fieldColour.g = obstacleRouting.y * 0.72;
+                    fieldColour.b = saturate(-lateral) * 0.95;
+                    fieldColour += abs(lateral) * float3(0.08, 0.04, 0.10);
+                    fieldColour = lerp(
+                        fieldColour,
+                        float3(1.0, 0.85, 0.10),
+                        obstacleRouting.y * 0.35);
+
+                    float foamOverlay = saturate(
+                        smoothstep(0.08, 0.46, foam.mask) * 0.58);
+                    fieldColour = lerp(
+                        saturate(fieldColour),
+                        float3(1.0, 1.0, 0.95),
+                        foamOverlay);
+                    return half4(saturate(fieldColour), 1.0);
+                }
+
                 if (foamDebug == 4)
                 {
                     float life = saturate(foam.remainingLife) *

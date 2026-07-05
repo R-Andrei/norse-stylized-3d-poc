@@ -86,6 +86,8 @@ namespace ProgrammaticStylized3D.Rivers
                 currentShoreEdgesTexture != null &&
                 obstacleExclusionTexture != null &&
                 obstacleExclusionTexture.IsCreated() &&
+                motionLaneTexture != null &&
+                obstacleRoutingTexture != null &&
                 neutralDisturbanceTexture != null &&
                 neutralDisturbanceTexture.IsCreated() &&
                 boundaryTexture != null &&
@@ -212,6 +214,8 @@ namespace ProgrammaticStylized3D.Rivers
                         obstacleExclusionTexture =
                             CreateObstacleExclusionTexture(
                                 "PS3D_RiverFoam_ObstacleExclusion");
+                        motionLaneTexture = CreateMotionLaneTexture();
+                        obstacleRoutingTexture = CreateObstacleRoutingTexture();
                     }
 
                     initializationPhase =
@@ -806,6 +810,41 @@ namespace ProgrammaticStylized3D.Rivers
         }
 
 
+
+        private Texture2D CreateMotionLaneTexture()
+        {
+            Texture2D texture = new Texture2D(
+                fieldWidth,
+                fieldHeight,
+                TextureFormat.RHalf,
+                false,
+                true)
+            {
+                name = "T_PS3D_RiverFoamMotionLane_Runtime",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+            return texture;
+        }
+
+        private Texture2D CreateObstacleRoutingTexture()
+        {
+            Texture2D texture = new Texture2D(
+                fieldWidth,
+                fieldHeight,
+                TextureFormat.RGHalf,
+                false,
+                true)
+            {
+                name = "T_PS3D_RiverFoamObstacleRouting_Runtime",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+            return texture;
+        }
+
         private static RenderTexture CreateNeutralDisturbanceTexture()
         {
             RenderTexture texture = new RenderTexture(
@@ -861,6 +900,16 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseTexture(ref evolvingWeakSpanNegativeTexture);
             ReleaseTexture(ref currentShoreEdgesTexture);
             ReleaseTexture(ref obstacleExclusionTexture);
+            if (motionLaneTexture != null)
+            {
+                DestroyUnityObject(motionLaneTexture);
+                motionLaneTexture = null;
+            }
+            if (obstacleRoutingTexture != null)
+            {
+                DestroyUnityObject(obstacleRoutingTexture);
+                obstacleRoutingTexture = null;
+            }
             ReleaseTexture(ref neutralDisturbanceTexture);
             previousState = null;
             currentState = null;
@@ -891,6 +940,19 @@ namespace ProgrammaticStylized3D.Rivers
             obstacleExclusionGpuCells =
                 Array.Empty<FoamObstacleIntervalCellData>();
             obstacleExclusionScalar = Array.Empty<float>();
+            motionLaneHalfData = Array.Empty<ushort>();
+            obstacleRoutingHalfData = Array.Empty<ushort>();
+            motionLaneRawValues = Array.Empty<float>();
+            obstacleRoutingOccupied = Array.Empty<bool>();
+            obstacleRoutingVisited = Array.Empty<bool>();
+            obstacleRoutingQueue = Array.Empty<int>();
+            obstacleRoutingComponents.Clear();
+            motionLaneFieldSignature = int.MinValue;
+            obstacleRoutingFieldSignature = int.MinValue;
+            motionLaneScrollCells = 0f;
+            lastMotionLaneScrollCells = 0f;
+            lastMotionLaneSignature = int.MinValue;
+            lastObstacleRoutingSignature = int.MinValue;
             topologyCacheLoadedForActiveResources = false;
             obstacleExclusionUsesCachedScalar = false;
             activeTopologyObstacleStale = false;
@@ -1039,6 +1101,7 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     TextureFormat.RGBAHalf => 8L,
                     TextureFormat.RGHalf => 4L,
+                    TextureFormat.RHalf => 2L,
                     _ => 4L
                 };
             }
@@ -1048,6 +1111,7 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     TextureFormat.RGBAHalf => 8L,
                     TextureFormat.RGHalf => 4L,
+                    TextureFormat.RHalf => 2L,
                     _ => 4L
                 };
                 return (long)texture.width * texture.height *
