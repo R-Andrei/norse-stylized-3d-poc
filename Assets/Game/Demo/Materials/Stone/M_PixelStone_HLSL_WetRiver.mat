@@ -34,57 +34,57 @@ Material:
     - _StoneFeatureClip: 0.035
     - _StoneCreaseResponse: 0.85
     - _StoneEdgeWearResponse: 0.28
-    - _StoneDirtResponse: 1.00
-    - _StoneMottleStrength: 0.45
-    - _StoneMottleScale: 0.70
-    - _StoneMottleSoftness: 0.64
-    - _StoneMottleShelterBias: 0.75
+    - _StoneDirtResponse: 0.72
+    - _StoneMottleStrength: 0.62
+    - _StoneMottleScale: 0.62
+    - _StoneMottleSoftness: 0.56
+    - _StoneMottleShelterBias: 0.46
     - _GeneratedMassDirtDepositTintStrength: 0
     - _GeneratedMassBaseTintStrength: 0
     - _GeneratedMassCreviceTintStrength: 0
     - _GeneratedMassExposureTintStrength: 0
     - _GeneratedMassLightingTintInfluence: 0.35
     - _GeneratedMassOverallRockTintStrength: 0
-    - _CreviceDarkenStrength: 0.052
+    - _CreviceDarkenStrength: 0.046
     - _Cull: 2
     - _DiffuseWrap: 0.18
     - _DirectStrength: 1.05
     - _ExposureTintStrength: 0.012
-    - _HighlightCompressStrength: 0.045
-    - _HighlightCompressStart: 0.76
+    - _HighlightCompressStrength: 0.12
+    - _HighlightCompressStart: 0.64
     - _BottomDarkenStrength: 0.012
     - _BottomDarkenHeight: 0.62
     - _EdgeDarkenStrength: 0.010
     - _EdgeDarkenPower: 3
     - _FlatNormalStrength: 0
-    - _PixelBroadVariation: 0.016
+    - _PixelBroadVariation: 0.026
     - _PixelCellSize: 0.058
-    - _PixelClusterStrength: 0.42
-    - _PixelEffectStrength: 0.82
+    - _PixelClusterStrength: 0.56
+    - _PixelEffectStrength: 0.96
     - _PixelSeed: 1412
-    - _PixelToneCount: 3.15
-    - _PixelVariation: 0.038
-    - _PixelVertexVariation: 0.045
+    - _PixelToneCount: 3.55
+    - _PixelVariation: 0.055
+    - _PixelVertexVariation: 0.070
     - _PixelWarpStrength: 0.12
-    - _ProfileContrast: 0.76
-    - _ProfilePixelContrast: 0.52
+    - _ProfileContrast: 0.94
+    - _ProfilePixelContrast: 0.86
     - _ReceiveShadows: 1
-    - _Smoothness: 0.36
-    - _SpecularStrength: 0.28
+    - _Smoothness: 0.16
+    - _SpecularStrength: 0.10
     - _ShadowAmbientStrength: 0.46
-    - _WetDarkenStrength: 0.30
-    - _WetPixelSoftening: 0.78
-    - _WetSmoothnessBoost: 0.46
-    - _Wetness: 0.88
+    - _WetDarkenStrength: 0.22
+    - _WetPixelSoftening: 0.28
+    - _WetSmoothnessBoost: 0.12
+    - _Wetness: 0.62
     - _FrostStrength: 0
     - _FrostCoverage: 0.20
     - _FrostContrast: 0.7
     - _FrostCreviceDarken: 0.05
-    - _MonolithicFlatten: 0.04
-    - _MonolithicSmoothnessBoost: 0.12
+    - _MonolithicFlatten: 0
+    - _MonolithicSmoothnessBoost: 0.04
     m_Colors:
-    - _BaseColor: {r: 0.215, g: 0.235, b: 0.228, a: 1}
-    - _FrostColor: {r: 0.52, g: 0.6, b: 0.62, a: 1}
+    - _BaseColor: {r: 0.235, g: 0.255, b: 0.247, a: 1}
+    - _FrostColor: {r: 0.52, g: 0.56, b: 0.55, a: 1}
     - _StoneCreaseTint: {r: 0.045, g: 0.045, b: 0.04, a: 1}
     - _StoneEdgeWearTint: {r: 0.46, g: 0.48, b: 0.45, a: 1}
     - _GeneratedMassExposureTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}

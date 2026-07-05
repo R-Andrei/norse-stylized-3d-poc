@@ -88,9 +88,10 @@ Current inspector state:
 
 Immediate roadmap:
 
-1. Validate **Patch 13 - Dirty Surface Mottle and Material Breakup** in Unity against all four HLSL stone profiles.
-2. Tune the four profile material mottle values only if the broad breakup is useful but under/overpowered.
-3. Defer **Patch 14 - Crack and Seam Language** until a proper surface-integrated crack/line representation is planned.
+1. Validate **Patch 13B - Stone Profile Usability Pass** in Unity against all four HLSL stone profiles.
+2. Treat `ColdGreyStone` as the current usable baseline/reference profile.
+3. Do not proceed to **Patch 14 - Crack and Seam Language** until the wet, frost, and black/sacred profiles are broadly usable as stone materials.
+4. Defer visible crack/seam work until a proper surface-integrated crack/line representation is planned.
 
 ## Design Constraints
 
@@ -418,6 +419,7 @@ Checklist:
 - [x] Patch 12H.2B-R - Crevice/base response correction, tint controls, colour authority, and inspector refactor sequence
 - [x] Patch 12H.2S - Rock plan current-state cleanup
 - [x] Patch 13 - Dirty surface mottle and material breakup
+- [x] Patch 13B - Stone profile usability pass
 - [ ] Patch 14 - Crack and seam language
 
 ### Patch 1 - Document and Baseline Capture
@@ -2810,7 +2812,69 @@ Validation target:
 - Neutral grey testing should remain hue-stable because the mottle pass is value-based, not colour-tint based.
 - If the effect is promising but badly calibrated, tune material values before altering generated mesh data.
 
+Post-validation result:
+- User validation found that `ColdGreyStone` was the only broadly usable profile after Patch 13.
+- `DarkWetRiverStone` read too smooth, too reflective, and too close to metal/glass instead of wet stone.
+- `PaleFrostStone` read artificial, too blue, noisy, and prone to exposing internal triangulation/facet patterns.
+- `BlackSacredStone` read like a weaker wet-stone variant: too polished, not black enough, and lacking visible stone surface breakup.
+
 Current next step:
-- Validate Patch 13 in Unity across all four stone profiles.
-- If accepted, choose between small profile tuning or a separate Patch 14 planning pass for surface-integrated crack/seam language.
-- Do not move to visible cracks until the final representation avoids floating raised-line artifacts.
+- Proceed to Patch 13B before any crack/seam work.
+- Patch 13B should make the existing profiles usable as material archetypes rather than adding new semantic masks or geometry.
+- Do not move to visible cracks until the base stone profile set is usable and the final line/crack representation avoids floating raised-line artifacts.
+
+## Patch 13B — Stone Profile Usability Pass
+
+Problem addressed:
+- Patch 13 added a useful mottle/material-breakup layer, but Unity validation showed that three of the four HLSL stone profiles were not usable as production-facing archetypes.
+- The issue was not primarily the generated semantic masks. The strongest failures came from material/profile calibration: too much smoothness/specular response on wet and black/sacred stone, too much blue/high-contrast frost response, and profile settings that hid or flattened the new mottle layer.
+
+User validation findings after Patch 13:
+- `ColdGreyStone` is the only broadly usable profile and should remain the reference baseline.
+- `DarkWetRiverStone` looked like polished metal/dark glass rather than wet stone.
+- `PaleFrostStone` looked artificial, blue/brown, noisy, and triangle/facet-driven rather than coherently frosted.
+- `BlackSacredStone` looked like a less extreme wet stone instead of distinct black/dark sacred stone.
+
+What changed:
+- Retuned `DarkWetRiverStone` away from glass/metal and toward damp rough stone:
+  - Lowered base smoothness and specular strength.
+  - Lowered wet smoothness boost and wet pixel softening so surface breakup remains visible.
+  - Reduced excessive wetness while keeping the profile darker/damper than `ColdGreyStone`.
+  - Increased broad mottle/pixel variation enough to make the stone surface read through the wet response.
+- Retuned `PaleFrostStone` toward coherent pale frost:
+  - Reduced blue saturation by moving frost colour toward warm/cold-neutral off-white.
+  - Reduced frost strength, coverage, contrast, exposure lift, pixel contrast, and vertex variation.
+  - Reduced dirt/mottle influence so frost does not become random blue/brown noise.
+- Retuned `BlackSacredStone` toward matte black/charcoal ritual stone:
+  - Darkened the base colour.
+  - Removed wetness.
+  - Reduced smoothness/specular and monolithic smoothness boost.
+  - Reduced monolithic flattening enough that surface breakup remains visible.
+  - Increased subtle mottle/pixel variation so the material is dark but not featureless.
+- Adjusted `SH_PixelSurfaceLit.shader` profile guardrails:
+  - Reduced wet and monolithic specular amplification so stone profiles do not drift into polished metal/glass.
+  - Reduced how aggressively frost exposes high-contrast triangle/facet patterns.
+  - Kept some broad mottle visible under frost and monolithic profiles so those profiles do not erase all stone breakup.
+
+Important non-changes:
+- No mesh generation changes.
+- No new generated-mass serialized fields.
+- No new per-object controls.
+- No new semantic masks.
+- No cracks or seam language.
+- No raised edge/crease overlay changes.
+- No river, ground, or collision behavior changes.
+- `ColdGreyStone` was intentionally left as the reference baseline.
+
+Validation target:
+- `ColdGreyStone`: still the neutral usable baseline.
+- `DarkWetRiverStone`: darker/damper than dry stone, but rough enough to read as stone, not metal/glass.
+- `PaleFrostStone`: pale, matte, coherent frost; no strong blue cast, no random blue/brown noise, and much less internal triangulation emphasis.
+- `BlackSacredStone`: darker and more distinct from wet stone; matte or low-sheen black/charcoal with subtle surface breakup.
+- All profiles should still use `Surface Mask Debug = None` and `Feature Line Visibility = DebugOnly` for normal rendering validation.
+- Do not evaluate Patch 14 until all four profiles are accepted or the remaining unusable profiles are explicitly removed/deferred.
+
+Current next step:
+- Validate Patch 13B in Unity with the same generated rock shape across all four profiles.
+- If a profile is still unusable, tune profile material values before adding any new visual feature system.
+- Patch 14 remains deferred.

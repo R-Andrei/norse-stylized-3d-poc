@@ -599,8 +599,12 @@ Shader "PS3D/Pixel Surface Lit"
                 float strength =
                     saturate(_StoneMottleStrength) *
                     saturate(generatedMassSurface) *
-                    lerp(1.0, 0.55, saturate(frostStrength)) *
-                    lerp(1.0, 0.30, saturate(monolithicFlatten));
+                    // Frost and monolithic profiles should reduce mottle, not
+                    // erase it completely. Patch 13B keeps some broad stone
+                    // breakup visible so these profiles do not collapse into
+                    // smooth artificial material slabs.
+                    lerp(1.0, 0.68, saturate(frostStrength)) *
+                    lerp(1.0, 0.58, saturate(monolithicFlatten));
 
                 if (strength <= 0.0001)
                 {
@@ -1293,19 +1297,28 @@ Shader "PS3D/Pixel Surface Lit"
                     saturate(
                         (frostNoise - (1.0 - saturate(_FrostCoverage))) /
                         max(0.001, saturate(_FrostCoverage)));
+                float frostPatternSoft =
+                    smoothstep(0.12, 0.88, frostPattern);
+
+                // Patch 13B: frost should read as a coherent pale material
+                // layer, not as a high-contrast triangle/facet visualizer.
+                // Keep exposure important, but soften its authority and use the
+                // procedural frost field as a low-frequency breakup term.
+                float frostExposure =
+                    saturate(exposureVisual * 0.72 + broadValue * 0.08);
                 float frostMask =
                     saturate(
-                        exposureVisual * (1.08 * generatedMassExposureResponse) +
-                        frostPattern * 0.36 -
-                        creviceVisual * (0.12 * generatedMassCreviceResponse) -
+                        frostExposure * (0.84 * generatedMassExposureResponse) +
+                        frostPatternSoft * 0.22 -
+                        creviceVisual * (0.10 * generatedMassCreviceResponse) -
                         dirtDepositVisual *
-                            (0.12 * generatedMassDirtDepositResponse)) *
+                            (0.10 * generatedMassDirtDepositResponse)) *
                     frostStrength *
                     generatedMassSurface;
                 albedo = lerp(
                     albedo,
                     _FrostColor.rgb,
-                    (half)(frostMask * 0.78));
+                    (half)(frostMask * 0.62));
 
                 float wetGlobalDarken =
                     wetness * saturate(_WetDarkenStrength) * 0.36;
@@ -1412,13 +1425,17 @@ Shader "PS3D/Pixel Surface Lit"
                 surfaceData.albedo = albedo;
                 surfaceData.specular =
                     (half3)_SpecularStrength *
+                    // Wet and monolithic stone can have controlled highlights,
+                    // but the previous amplification pushed profiles toward
+                    // polished metal/glass. Keep profile identity without
+                    // overwhelming stone roughness.
                     lerp(
                         1.0h,
-                        1.8h,
+                        1.25h,
                         saturate((half)_Wetness)) *
                     lerp(
                         1.0h,
-                        1.35h,
+                        1.10h,
                         saturate((half)_MonolithicFlatten));
                 surfaceData.metallic = 0.0h;
                 surfaceData.smoothness = ResolveProfileSmoothness();

@@ -296,7 +296,7 @@ Stage 6 is in the `4.11C` manually-born persistent material phase. The following
 - 5.4l composition-event refactor, so one manual spawn starts one budgeted composition event instead of hidden multiple writer events;
 - 5.4m manual source realignment, so birth no longer uses pattern/complexity/density controls to randomize macro Foam identity;
 - 5.7c accepted stored-state surface morphing as functional, with a practical authored `Surface Morph Strength` range around 2-4 and approximately 2.5 as the current working value;
-- 5.8 adds chaotic intermittent persistent material drift inside the existing simulation pass, with coherent lateral impulses, calm/no-drift intervals, local shear, and subtle resistance while preserving net-downstream phase transport; 5.8b recalibrates the response so normal values are useful, and 5.8c rebalances the motion hierarchy so macro patch transport is primary, meso shear is secondary, and edge tearing is only detail.
+- 5.8 adds chaotic intermittent persistent material drift inside the existing simulation pass, with coherent lateral impulses, calm/no-drift intervals, local shear, and subtle resistance while preserving net-downstream phase transport; 5.8b recalibrates the response so normal values are useful, 5.8c separates macro patch transport, meso shear, and edge detail, and 5.8d increases macro authority while reducing micro/edge dominance.
 
 Current failing area: movement/source/final-readability behavior. Manual source material is intentionally stable and persistent Foam now has intrinsic wobble, surface-driven morphing, and chaotic intermittent drift, but obstacle-aware tangential movement, better source shapes, topology proof, and final visual fragmentation remain unresolved.
 
@@ -318,7 +318,7 @@ The current approved order is:
 4. `4.11C.5.7 — Surface-Driven Material Morphing`
 5. `4.11C.5.7b — Surface Morph Calibration`
 6. `4.11C.5.7c — Surface Morph Formula Rebalance`
-7. `4.11C.5.8/5.8b/5.8c — Chaotic Intermittent Foam Drift + Macro Drift Rebalance`
+7. `4.11C.5.8/5.8b/5.8c/5.8d — Chaotic Intermittent Foam Drift + Macro Authority Calibration`
 8. `4.11C.5.9 — Obstacle-Based Tangential Foam Movement`
 9. `4.11C.5.10 — Better Manual Source Shape Spawning`
 10. `4.11C.5.11 — Topology Aging Proof and Calibration`
