@@ -8,6 +8,8 @@ The existing rocks already hit the intended direction: broad geometric masses, r
 
 ## Current State
 
+This document now contains both historical implementation notes and the current generated-mass rock roadmap. Treat this section as the authoritative current-state summary. Older sections that mention the initial Shader Graph baseline remain useful history, but they are no longer the active rendering baseline.
+
 Primary implementation files:
 
 - `Assets/Game/Procedural/Masses/GeneratedMass.cs`
@@ -15,19 +17,28 @@ Primary implementation files:
 - `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
 - `Assets/Game/Procedural/Core/MeshData.cs`
 - `Assets/Game/Procedural/Core/MeshBuilder.cs`
+- `Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelSurfaceLit.shader`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelCellVariation.hlsl`
+- `Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_ColdGrey.mat`
+- `Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_WetRiver.mat`
+- `Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_PaleFrost.mat`
+- `Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_BlackSacred.mat`
+
+Historical / reference files from the older Shader Graph phase may still exist and should not be deleted without a separate migration cleanup plan:
+
 - `Assets/Game/Rendering/PixelSurface/Shaders/SG_PixelSurfaceLit.shadergraph`
 - `Assets/Game/Rendering/PixelSurface/SubGraphs/SGS_PixelSurfaceCore.shadersubgraph`
-- `Assets/Game/Rendering/PixelSurface/Includes/PixelCellVariation.hlsl`
-- `Assets/Game/Demo/Materials/Stone/M_PixelStone.mat`
+- older test or baseline stone materials such as `M_PixelStone.mat`
 
-The current generated mass system separates shape and surface well:
+The current generated mass system separates shape, surface data, rendering profile, and river interaction reasonably well:
 
-- `ShapeSeed` controls proportions, major planes, cuts, lean, and silhouette.
-- `SurfaceSeed` controls triangulation relief and vertex-colour variation.
+- `ShapeSeed` controls proportions, major planes, cuts, lean, silhouette, and archetype-specific form decisions.
+- `SurfaceSeed` controls triangulation relief, surface variation, mask breakup, and other seed-stable surface detail.
 - `MassArchetype` controls the base family and default recipe.
-- `MeshData` already supports vertex colours, UV0, optional UV2, and optional normals.
-- `MeshBuilder` applies colours and recalculates normals and tangents.
-- The stone material uses the generic pixel surface shader and consumes procedural pixel variation plus vertex colour.
+- `MeshData` and `MeshBuilder` carry geometry, vertex colours, UVs, normals, and tangents into the generated mesh.
+- `GeneratedMass` owns per-object colour/profile selection, material property block output, regeneration controls, and river interaction settings.
+- `GeneratedMassEditor` owns the custom inspector layout and intentionally separates mask shape, mask strength, tinting, rock colour authority, debug feature lines, and river interaction controls.
+- The current active stone rendering path is the handwritten HLSL URP shader `SH_PixelSurfaceLit.shader`, not the original Shader Graph baseline.
 
 Existing archetypes:
 
@@ -37,6 +48,49 @@ Existing archetypes:
 - `FlatSlab`
 - `BrokenChunk`
 - `PolishedStone`
+- `LayeredStone`
+- `FracturedPillar`
+- `CarvedMarkerStone`
+
+Current HLSL stone profiles exposed through `GeneratedMass.StoneSurfaceProfile`:
+
+- `ColdGreyStone`
+- `DarkWetRiverStone`
+- `PaleFrostStone`
+- `BlackSacredStone`
+
+Current accepted normal-rendering mask path:
+
+- `SurfaceVariation` remains the base deterministic/pixel surface variation channel.
+- `Exposure` is accepted as an exposed/upward-facing mask for lift, frost, and worn-plane response.
+- `CreviceBase` is accepted as a lower/contact/shelter response mask after the 12H.2B-R correction sequence.
+- `DirtDeposit` is accepted as a lower/deposit/crawl response mask after the 12H.2B-R correction sequence.
+
+Current debug-only / deferred mask path:
+
+- `ConvexEdgeWear` and `ConcaveCrease` are still useful semantic/debug concepts.
+- Their current raised overlay strip representation is not accepted as final visible rock rendering.
+- They must remain debug-validation tools until a surface-integrated, decal-like, or otherwise non-floating line-feature solution is explicitly approved.
+
+Current inspector state:
+
+- Patch 12H.2R reorganized the `GeneratedMass` inspector into the accepted section model:
+  - Rendering & Profile
+  - Mask Shape
+  - Mask Strength
+  - Mask Tinting
+  - Rock Colour Authority
+  - Advanced Debug Feature Lines
+  - River Interaction
+  - Variant Controls
+- Response, tint, and rock-colour-authority controls are considered important and must not be removed as part of cleanup.
+- `Feature Line Visibility` is visible only inside the advanced debug foldout and should be treated as a debug/audit control, not a normal art-direction path.
+
+Immediate roadmap:
+
+1. Keep this current-state summary accurate before starting new visual work.
+2. Proceed next to **Patch 13 - Dirty Surface Mottle and Material Breakup**.
+3. Defer **Patch 14 - Crack and Seam Language** until a proper surface-integrated crack/line representation is planned.
 
 ## Design Constraints
 
@@ -54,8 +108,8 @@ The upgrade should not:
 
 - turn rocks into realistic scanned boulders;
 - require authored textures for the first improvement pass;
-- make Shader Graph and HLSL diverge indefinitely;
-- introduce a broad biome system before one material/style path is proven.
+- re-open Shader Graph as the primary generated-mass stone rendering path without a separate migration decision;
+- introduce a broad biome system before the current HLSL generated-stone path is proven and stable.
 
 ## Proposed Archetype Additions
 
@@ -361,6 +415,8 @@ Checklist:
 - [x] Patch 12H.1 - Profile-specific stone mask response prototype
 - [x] Patch 12H.1B - Disable raised line overlays in normal rendering
 - [x] Patch 12H.2 - Main-surface stone profile tuning pass
+- [x] Patch 12H.2B-R - Crevice/base response correction, tint controls, colour authority, and inspector refactor sequence
+- [x] Patch 12H.2S - Rock plan current-state cleanup
 - [ ] Patch 13 - Dirty surface mottle and material breakup
 - [ ] Patch 14 - Crack and seam language
 
@@ -2095,7 +2151,9 @@ Next step after visual validation:
 
 ### Patch 13 - Dirty Surface Mottle and Material Breakup
 
-Status: planned.
+Status: planned as the next visual feature patch after Patch 12H.2S.
+
+This patch should improve the accepted main-surface rendering path. It should not reintroduce raised debug edge/crease overlays as final rendering.
 
 Checklist status:
 
@@ -2645,3 +2703,40 @@ Validation target:
 - With identical serialized values before and after the patch, normal rock rendering should remain visually unchanged.
 - Expanding **Advanced Debug Feature Lines** should reveal all previous edge/crease debug controls plus `Feature Line Visibility`.
 - Leaving **Advanced Debug Feature Lines** collapsed should keep obsolete/noisy debug controls from dominating normal tuning.
+
+## Patch 12H.2S — Rock Plan Current-State Cleanup
+
+Problem addressed:
+- The top of this document still described the early Shader Graph / baseline-material phase as if it were the current state.
+- The later 12H.2Q and 12H.2R sections correctly described the active HLSL profile, colour-authority, and inspector-refactor state, but future readers could still start from obsolete assumptions.
+- Patch 13 needs a clean planning baseline before adding another visual layer.
+
+What changed:
+- Rewrote the top **Current State** section so it now treats the HLSL generated-stone path as the active baseline.
+- Marked Shader Graph references as historical/reference material rather than the active generated-mass stone path.
+- Added the current HLSL stone material profiles to the current-state summary.
+- Documented the accepted normal-rendering mask path:
+  - `SurfaceVariation`
+  - `Exposure`
+  - `CreviceBase`
+  - `DirtDeposit`
+- Documented the deferred/debug-only state of:
+  - `ConvexEdgeWear`
+  - `ConcaveCrease`
+- Documented the accepted inspector organization from Patch 12H.2R.
+- Updated the rough implementation checklist so Patch 12H.2B-R and Patch 12H.2S are represented before Patch 13.
+- Clarified that Patch 13 is the next visual feature patch, while Patch 14 should remain deferred until there is a surface-integrated crack/line-feature plan.
+
+Important non-changes:
+- No code changes.
+- No shader changes.
+- No material changes.
+- No serialized data changes.
+- No inspector behavior changes.
+- No new controls.
+
+Current next step:
+- Proceed to **Patch 13 - Dirty Surface Mottle and Material Breakup**.
+- Keep Patch 13 focused on broad material/surface breakup for the accepted masks.
+- Do not use Patch 13 to re-enable raised feature overlays or start visible crack rendering.
+
