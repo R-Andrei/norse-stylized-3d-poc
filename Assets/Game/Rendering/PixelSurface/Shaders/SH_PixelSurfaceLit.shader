@@ -451,11 +451,14 @@ Shader "PS3D/Pixel Surface Lit"
                     footprintLobe * 0.18 +
                     patchRelief * 0.16);
 
-                // Presence has only a tiny floor: enough to avoid whole-side
-                // disappearance, but not enough to rebuild a continuous skirt.
+                // Every side point needs a low crawl floor. Breakup should make
+                // areas crawl low or high; it should not create fully empty
+                // vertical strips. Keep the floor in crawl height, not in mask
+                // intensity, so it does not rebuild the old continuous skirt.
                 float lobePresence = saturate(
-                    lerp(0.035, 0.015, breakup01) +
-                    smoothstep(0.30, 0.76, lobePresenceDriver) * 0.94);
+                    lerp(0.18, 0.12, breakup01) +
+                    smoothstep(0.30, 0.76, lobePresenceDriver) *
+                    lerp(0.72, 0.86, breakup01));
 
                 // Preserve approximate average height while increasing the low/high
                 // spread as Breakup rises.
@@ -464,13 +467,19 @@ Shader "PS3D/Pixel Surface Lit"
                         lerp(1.10, 2.80, breakup01) + 0.5);
 
                 // Reach controls average crawl height. The default is intentionally
-                // visible again, but local side lobes decide where it climbs.
+                // visible again, but local side lobes decide how much extra height
+                // each area gets above the guaranteed low crawl floor.
                 float averageCrawlHeight =
                     (0.078 + tallness * 0.030 + sizeFactor * 0.018) *
                     lerp(0.56, 1.44, reach01);
-                float localCrawlHeight =
+                float minimumCrawlHeight =
                     averageCrawlHeight *
-                    lerp(0.18, 2.42, lobeHeightContrast);
+                    lerp(0.20, 0.15, breakup01);
+                float extraCrawlHeight =
+                    averageCrawlHeight *
+                    lerp(0.00, 2.24, lobeHeightContrast);
+                float localCrawlHeight =
+                    minimumCrawlHeight + extraCrawlHeight;
 
                 // Smoothness controls the vertical dissolve length independently.
                 float fadeLength =
@@ -505,7 +514,7 @@ Shader "PS3D/Pixel Surface Lit"
 
                 float contactAnchor =
                     (1.0 - smoothstep(0.0, 0.010 + tallness * 0.003, height01)) *
-                    lerp(0.028, 0.052, lobePresence);
+                    lerp(0.034, 0.056, lobePresence);
 
                 return saturate(max(lowerFade, contactAnchor));
             }

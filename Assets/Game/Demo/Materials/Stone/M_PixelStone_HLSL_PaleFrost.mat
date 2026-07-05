@@ -30,7 +30,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _AmbientStrength: 1.02
-    - _BaseDarkenStrength: 0.003
+    - _BaseDarkenStrength: 0.002
     - _StoneFeatureClip: 0.035
     - _StoneCreaseResponse: 0.55
     - _StoneEdgeWearResponse: 0.75

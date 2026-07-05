@@ -2319,3 +2319,27 @@ Expected result:
 - All side faces should show some lower accumulation.
 - The effect should vary across each side face instead of appearing only on two faces.
 - Increasing `Crevice Breakup` should add more height relief/local interruption, not merely increase total reach.
+
+
+## Patch 12H.2H — Crevice Minimum Crawl Floor
+
+Problem addressed:
+- Patch 12H.2G produced the right side-surface lobe behavior, but some lateral regions could still fall too close to zero.
+- That created empty vertical strips where the lower crevice/base accumulation disappeared completely.
+
+What changed:
+- Added a guaranteed low crawl-height floor to the side-surface crevice field.
+- Kept lobe variation as extra crawl height above that floor.
+- Raised the contact anchor slightly so every side has some base accumulation.
+- Kept the floor in crawl height, not broad mask intensity, so it should not recreate the old continuous lower band.
+- Slightly reduced direct BaseDarken response on the stone materials to keep the new floor from reading as a painted stripe.
+
+Validation target:
+- `Surface Mask Debug = None`
+- `Crevice Reach = 1`
+- `Crevice Smoothness = 1`
+- `Crevice Breakup = 1`
+
+Expected result:
+- Every lateral point should retain some low crevice/base accumulation.
+- Breakup should make some areas crawl low and others crawl higher, without creating fully empty vertical strips.
