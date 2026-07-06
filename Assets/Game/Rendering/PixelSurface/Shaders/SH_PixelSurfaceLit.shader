@@ -858,12 +858,14 @@ Shader "PS3D/Pixel Surface Lit"
 
             float ResolveGeneratedMassAtlasEdgeWearMask(Varyings input)
             {
-                return ResolveGeneratedMassFeatureAtlas0(input).r;
+                float4 atlas0 = ResolveGeneratedMassFeatureAtlas0(input);
+                return saturate(atlas0.r * atlas0.g);
             }
 
             float ResolveGeneratedMassAtlasCreaseMask(Varyings input)
             {
-                return ResolveGeneratedMassFeatureAtlas0(input).g;
+                float4 atlas0 = ResolveGeneratedMassFeatureAtlas0(input);
+                return saturate(atlas0.b * atlas0.a);
             }
 
             half3 ResolveMaskDebugColor(Varyings input)

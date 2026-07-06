@@ -102,12 +102,12 @@ Patch 14C is documentation-approved as a data/debug foundation patch. It should 
 - [x] Add chart padding/gutters. Patch 14C.2 avoids global dilation and bakes ridge/crease distance fields inside packed surface-patch charts. Patch 14C.3 adds semantic gutter fill so chart boundaries near ridges/creases do not sample black.
 - [x] Keep atlas resolution parameterized internally; Patch 14C.3 uses 512x512 as the current quality-oriented default while preserving 128/256/512 as future quality tiers.
 - [x] Use a linear/non-sRGB mask texture with clamp sampling.
-- [x] Define first packed channel layout: `FeatureAtlas0.R = ConvexEdgeWear / convex ridge proximity`, `FeatureAtlas0.G = ConcaveCrease / concave crease proximity`, with B/A reserved for future features.
+- [x] Define first packed channel layout. Patch 14C.4 splits proximity from weight: `FeatureAtlas0.R = Convex ridge proximity`, `G = Convex ridge weight`, `B = Concave crease proximity`, `A = Concave crease weight`.
 - [x] Add generated feature atlas runtime/editor texture ownership and safe cleanup in edit mode and play mode.
 - [x] Assign the atlas through the generated-mass renderer/material data path without mutating shared material assets.
 - [x] Add main shader sampling through the dedicated feature-atlas UV channel.
-- [x] Add debug view support that displays Atlas0.R on the main mass surface.
-- [x] Bake ConvexEdgeWear into Atlas0.R using shared/reused convex-edge candidate logic where possible.
+- [x] Add debug view support that displays atlas-backed masks on the main mass surface. Patch 14C.4 displays ConvexEdgeWear as `Atlas0.R * Atlas0.G` and ConcaveCrease as `Atlas0.B * Atlas0.A`.
+- [x] Bake ConvexEdgeWear semantic data into Atlas0.R/G using shared/reused convex-edge candidate logic where possible.
 - [x] Paint selected convex edges into both adjacent triangle charts when both sides exist and chart texel density is sufficient; skip tiny charts rather than emitting triangle wedges.
 - [x] Remove existing raised edge/crease carriers from the GeneratedMass path; ConvexEdgeWear and ConcaveCrease validation are both main-surface atlas debug channels.
 - [x] Keep normal rendering unchanged.
@@ -338,7 +338,7 @@ Existing data:
 
 - controls remain reserved for future crease/crack work.
 - legacy raised overlay strips have been removed.
-- visual crease debug now exists as atlas-backed main-surface data in `GeneratedMassFeatureAtlas0.G`; final darkening response is still deferred.
+- visual crease debug now exists as atlas-backed main-surface data in `GeneratedMassFeatureAtlas0.B/A`; final darkening response is still deferred.
 
 Minimum controls:
 
@@ -1277,9 +1277,9 @@ Rules for this next phase:
 - [x] Keep the original generated mass render mesh unchanged.
 - [x] Assign feature atlas UVs to Unity mesh channel 3 / shader `TEXCOORD3`.
 - [x] Bake convex ridge distance data into `GeneratedMassFeatureAtlas0.R`.
-- [x] Bake concave crease distance data into `GeneratedMassFeatureAtlas0.G`.
-- [x] Update ConvexEdgeWear debug to show the main-surface Atlas0.R ridge field.
-- [x] Update ConcaveCrease debug to show the main-surface Atlas0.G crease field.
+- [x] Bake concave crease distance data into `GeneratedMassFeatureAtlas0.G` in Patch 14C.2/14C.3; Patch 14C.4 moves concave proximity to B and concave weight to A.
+- [x] Update ConvexEdgeWear debug to show the main-surface convex ridge field.
+- [x] Update ConcaveCrease debug to show the main-surface concave crease field.
 - [x] Keep normal rendering unchanged; final lightening/darkening response is deferred.
 - [x] Keep legacy raised secondary feature meshes removed.
 - [x] Leave `MeshData.cs` and `MeshBuilder.cs` untouched.
@@ -1289,7 +1289,7 @@ Rules for this next phase:
 - [x] Treat convex and concave boundaries as first-class semantic feature data rather than final-looking paint.
 - [x] Add lightweight boundary-chain metadata so future effects can reason about continuous ridge/crease networks.
 - [x] Keep `FeatureAtlas0.R` as clean convex ridge proximity, brightest at the ridge core with soft falloff onto neighboring patches.
-- [x] Keep `FeatureAtlas0.G` as clean concave crease proximity, brightest at the crease core with a narrower/sharper falloff.
+- [x] Patch 14C.3 kept `FeatureAtlas0.G` as clean concave crease proximity; Patch 14C.4 splits this into `FeatureAtlas0.B = concave crease proximity` and `FeatureAtlas0.A = concave crease weight`.
 - [x] Fill chart gutters semantically near ridge/crease boundaries so bilinear filtering does not pull black into the exact ridge or crease.
 - [x] Remove baked decorative breakup/noise from the atlas data; coverage now controls semantic boundary eligibility rather than random line fragmentation, and final breakup belongs to material response.
 - [x] Raise the current default atlas resolution to 512x512 while keeping the baker parameterized for later quality tiers.
@@ -1297,9 +1297,26 @@ Rules for this next phase:
 - [x] Keep secondary feature meshes removed.
 - [x] Leave `MeshData.cs` and `MeshBuilder.cs` untouched.
 
+
+### Patch 14C.4 — Boundary Field Contract + Diagnostic Refinement
+
+- [x] Keep the surface-patch atlas and surface graph architecture from Patch 14C.2/14C.3.
+- [x] Split proximity from semantic importance so the atlas is no longer one final-looking mask channel.
+- [x] Store `FeatureAtlas0.R = convex ridge proximity`.
+- [x] Store `FeatureAtlas0.G = convex ridge weight / importance`.
+- [x] Store `FeatureAtlas0.B = concave crease proximity`.
+- [x] Store `FeatureAtlas0.A = concave crease weight / importance`.
+- [x] Update ConvexEdgeWear debug to show `R * G` on the main mass surface.
+- [x] Update ConcaveCrease debug to show `B * A` on the main mass surface.
+- [x] Keep proximity fields clean and reusable; do not bake decorative breakup/noise into the semantic data.
+- [x] Keep coverage as semantic boundary eligibility rather than random segment deletion.
+- [x] Keep normal rendering unchanged; debug/data only.
+- [x] Keep secondary feature meshes removed.
+- [x] Leave `MeshData.cs` and `MeshBuilder.cs` untouched.
+
 Future notes:
 
-- Patch 14D should interpret clean Atlas0.R/Atlas0.G data as convex lightening and concave darkening through the main shader.
+- Patch 14D should interpret clean Atlas0.R/G/B/A data as convex lightening and concave darkening through the main shader.
 - If shader response still reads as paint on hard geometry, evaluate shader-side ridge-normal support or dirty-time main-mesh bevel/chamfer generation. Do not solve that with secondary meshes.
 - The graph/atlas system should remain reusable for future edge-adjacent or patch-adjacent effects, but future effects are not forced to use it if another representation is cleaner.
 

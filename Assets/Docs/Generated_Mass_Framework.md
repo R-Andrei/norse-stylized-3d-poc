@@ -184,15 +184,17 @@ Dedicated feature-atlas UV channel
 
 The foundation should use generated surface-chart mapping, not local X/Z projection. Local projection can validate a texture sample path, but it is not a foundation for vertical faces, steep facets, edge wear, cracks, pitting, frost patches, water streaks, stains, or carved seams. Patch 14C should therefore establish deterministic surface-patch chart coordinates, chart packing, adjacency metadata, semantic gutters, and clean ridge/crease fields as part of the generated-mass feature pipeline.
 
-Initial Patch 14C atlas contract:
+Patch 14C atlas contract after the boundary-field refinement:
 
 ```text
 GeneratedMassFeatureAtlas0
-  R = Convex Edge Wear
-  G = Concave Crease / Crack candidate reserve
-  B = Surface Pitting reserve
-  A = future broad/special feature reserve
+  R = Convex ridge proximity
+  G = Convex ridge weight / importance
+  B = Concave crease proximity
+  A = Concave crease weight / importance
 ```
+
+This split is intentional. Proximity answers where the surface point is relative to a ridge/crease. Weight answers how important or eligible that boundary is. Final material response should combine and interpret these channels rather than treating atlas data as final-looking paint.
 
 Possible later atlas:
 
@@ -378,7 +380,7 @@ Use modest additional memory for packed masks.
 Keep frame-time shader/render cost predictable and low.
 ```
 
-The first implementation milestone creates the surface-chart atlas foundation and bakes semantic ridge/crease proximity fields: Convex Edge Wear into FeatureAtlas0.R and Concave Crease into FeatureAtlas0.G. This phase is data/debug-only. Normal rendering should remain unchanged; the final edge-wear colour/value/smoothness response belongs in the next patch after the atlas fields are validated.
+The first implementation milestone creates the surface-chart atlas foundation and bakes semantic ridge/crease fields: Convex Edge Wear into FeatureAtlas0.R/G and Concave Crease into FeatureAtlas0.B/A. This phase is data/debug-only. Normal rendering should remain unchanged; the final edge-wear colour/value/smoothness response belongs in a later patch after the atlas fields are validated.
 
 Feature mask atlas rules:
 
@@ -1543,7 +1545,7 @@ Patch 14B.1
 Correct the generated-mass inspector to be feature-oriented rather than category-oriented. Existing controls are grouped under feature foldouts so future feature channels have a stable authoring pattern. Status: implemented.
 
 Patch 14C
-Generated Mass Surface-Chart Feature Atlas Foundation. Create the dedicated feature-atlas UV channel, generated surface-chart atlas mapping, FeatureAtlas0 texture, shader binding, and main-surface debug preview. Patch 14C.1b removes the old raised secondary feature meshes. Patch 14C.2 replaces the failed per-triangle decal bake with surface-patch charts and ridge-distance fields. Patch 14C.3 hardens that system so convex/concave boundaries are first-class semantic data, the exact ridge/crease core is written into the field, and chart gutters carry semantic feature values instead of black. Atlas0.R stores ConvexEdgeWear data/debug and Atlas0.G stores ConcaveCrease data/debug. Normal rendering remains unchanged. This is now a prerequisite before serious final surface-feature implementation.
+Generated Mass Surface-Chart Feature Atlas Foundation. Create the dedicated feature-atlas UV channel, generated surface-chart atlas mapping, FeatureAtlas0 texture, shader binding, and main-surface debug preview. Patch 14C.1b removes the old raised secondary feature meshes. Patch 14C.2 replaces the failed per-triangle decal bake with surface-patch charts and ridge-distance fields. Patch 14C.3 hardens that system so convex/concave boundaries are first-class semantic data, the exact ridge/crease core is written into the field, and chart gutters carry semantic feature values instead of black. Atlas0.R/G store ConvexEdgeWear proximity/weight data and Atlas0.B/A store ConcaveCrease proximity/weight data. Normal rendering remains unchanged. This is now a prerequisite before serious final surface-feature implementation.
 
 Patch 14D
 Generic Edge Wear via Feature Atlas. Interpret the already-baked ConvexEdgeWear atlas channel through the main generated-mass shader using generic controls.
@@ -1582,16 +1584,16 @@ source generated mass mesh
 → boundary classification: open / flat / convex / concave / ambiguous
 → surface patches flood-filled across flat/internal boundaries only
 → one chart per surface patch, packed by projected patch area
-→ convex ridge distance field baked into FeatureAtlas0.R
-→ concave crease distance field baked into FeatureAtlas0.G
-→ shader debug previews both channels on the main mass surface
+→ convex ridge proximity/weight baked into FeatureAtlas0.R/G
+→ concave crease proximity/weight baked into FeatureAtlas0.B/A
+→ shader debug previews composite fields on the main mass surface
 ```
 
 Convex edge wear and concave crease are now paired semantic opposites at the data level:
 
 ```text
-FeatureAtlas0.R = convex ridge lightening candidate
-FeatureAtlas0.G = concave crease darkening candidate
+FeatureAtlas0.R/G = convex ridge lightening candidate proximity/weight
+FeatureAtlas0.B/A = concave crease darkening candidate proximity/weight
 ```
 
 Patch 14C.2 remains data/debug-only. Normal generated-mass rendering should remain unchanged until the ridge/crease masks are visually validated and a later response patch intentionally maps them into value, tint, and smoothness changes.
@@ -1628,15 +1630,49 @@ FeatureAtlas0.R = convex ridge proximity
   soft falloff onto both adjacent patches
   no baked decorative breakup
 
-FeatureAtlas0.G = concave crease proximity
+FeatureAtlas0.G = convex ridge weight / importance
+  stable semantic eligibility/importance
+  driven by boundary score and coverage threshold
+  not decorative noise
+
+FeatureAtlas0.B = concave crease proximity
   brightest at the crease core
   narrower/sharper falloff
   no baked decorative breakup
+
+FeatureAtlas0.A = concave crease weight / importance
+  stable semantic eligibility/importance
+  driven by boundary score and coverage threshold
+  not decorative noise
 ```
 
 The atlas field should stay clean and reusable. Coverage is allowed to control semantic boundary eligibility, but not random line fragmentation. Mottle, noisy breakup, profile tint, value shift, smoothness shift, and other artistic interpretation belong to the material response patch, not to the semantic atlas bake. This keeps the system future-proof for edge wear, crease darkening, frost catch, mineral seams, water polish, sacred seams, and other later features.
 
 Patch 14C.3 also raises the current default Atlas0 resolution to 512x512. This is a dirty-time/memory tradeoff in favour of cleaner generated feature fields; runtime cost remains a fixed atlas sample in the main shader. Future quality tiers can expose 128/256/512 if needed.
+
+
+
+### Patch 14C.4 implementation correction — boundary proximity/weight split
+
+Patch 14C.4 keeps the surface-patch atlas, semantic boundary graph, and seam-safe gutters from Patch 14C.3, but corrects the data contract so the atlas is no longer a single final-looking ridge mask. The support architecture now separates shape from importance:
+
+```text
+FeatureAtlas0.R = convex ridge proximity
+FeatureAtlas0.G = convex ridge weight / importance
+FeatureAtlas0.B = concave crease proximity
+FeatureAtlas0.A = concave crease weight / importance
+```
+
+Debug views intentionally composite these fields:
+
+```text
+ConvexEdgeWear debug = R * G
+ConcaveCrease debug = B * A
+```
+
+This keeps the dirty-time atlas reusable. Future material response can decide how to turn proximity and weight into value shift, tint, smoothness response, noisy breakup, frost catch, wet polish, sacred seams, or other effects without rebaking final artistic decisions into the atlas. Runtime cost remains a fixed atlas sample through the main material path.
+
+Patch 14C.4 is still data/debug-only. It does not implement final edge-wear lightening, concave darkening, bevels, shader normal tricks, pitting, water wear, frost, or sacred features.
 
 Important non-goals remain unchanged:
 

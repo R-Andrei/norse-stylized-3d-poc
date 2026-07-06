@@ -6,8 +6,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 {
     /// <summary>
     /// Builds the generated-mass surface-chart feature atlas used by the main
-    /// material path. Patch 14C.3 keeps the atlas semantic: surface patches and
-    /// convex/concave ridge proximity fields are baked as clean data, not
+    /// material path. Patch 14C.4 keeps the atlas semantic: surface patches,
+    /// boundary proximity, and boundary weight are baked as clean data, not
     /// final decorative paint.
     /// </summary>
     public static class GeneratedMassFeatureAtlasBaker
@@ -80,6 +80,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public Vector2 C { get; }
         }
 
+        private readonly struct BoundaryFieldSample
+        {
+            public BoundaryFieldSample(float proximity, float weight)
+            {
+                Proximity = Mathf.Clamp01(proximity);
+                Weight = Mathf.Clamp01(weight);
+            }
+
+            public float Proximity { get; }
+            public float Weight { get; }
+            public float Composite => Proximity * Weight;
+        }
+
         public static Result Bake(
             MeshData meshData,
             MassSurfaceFeatureSettings settings,
@@ -120,7 +133,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Color32[] pixels = new Color32[resolution * resolution];
             for (int i = 0; i < pixels.Length; i++)
             {
-                pixels[i] = new Color32(0, 0, 0, 255);
+                pixels[i] = new Color32(0, 0, 0, 0);
             }
 
             BakePatchDistanceFields(
@@ -657,10 +670,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     Vector2 local = AtlasPixelToLocalUnclamped(pixel, chart);
                     bool insideSurface = IsPointInsideAnyTriangle(local, projectedTriangles);
 
-                    float red = 0f;
+                    BoundaryFieldSample convex = default;
                     if (bakeConvex && chart.ConvexSegments.Count > 0)
                     {
-                        red = ResolveSemanticDistanceFieldMask(
+                        convex = ResolveSemanticDistanceFieldSample(
                             local,
                             chart.ConvexSegments,
                             edgeWearWidth,
@@ -671,10 +684,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             false);
                     }
 
-                    float green = 0f;
+                    BoundaryFieldSample concave = default;
                     if (bakeConcave && chart.ConcaveSegments.Count > 0)
                     {
-                        green = ResolveSemanticDistanceFieldMask(
+                        concave = ResolveSemanticDistanceFieldSample(
                             local,
                             chart.ConcaveSegments,
                             creaseWidth,
@@ -691,24 +704,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         // gutters close to the feature core. This prevents black
                         // seam bleed without turning empty atlas space into a broad
                         // fake feature field.
-                        red = red >= 0.20f ? red : 0f;
-                        green = green >= 0.20f ? green : 0f;
+                        convex = convex.Proximity >= 0.20f
+                            ? convex
+                            : default;
+                        concave = concave.Proximity >= 0.20f
+                            ? concave
+                            : default;
                     }
 
-                    if (red <= 0.001f && green <= 0.001f)
+                    if (convex.Proximity <= 0.001f &&
+                        convex.Weight <= 0.001f &&
+                        concave.Proximity <= 0.001f &&
+                        concave.Weight <= 0.001f)
                     {
                         continue;
                     }
 
                     int pixelIndex = y * resolution + x;
-                    if (red > 0.001f)
+
+                    // FeatureAtlas0 channel contract:
+                    // R = convex ridge proximity
+                    // G = convex ridge weight / importance
+                    // B = concave crease proximity
+                    // A = concave crease weight / importance
+                    if (convex.Proximity > 0.001f)
                     {
-                        pixels[pixelIndex].r = MaxByte(pixels[pixelIndex].r, red);
+                        pixels[pixelIndex].r = MaxByte(pixels[pixelIndex].r, convex.Proximity);
+                        pixels[pixelIndex].g = MaxByte(pixels[pixelIndex].g, convex.Weight);
                     }
 
-                    if (green > 0.001f)
+                    if (concave.Proximity > 0.001f)
                     {
-                        pixels[pixelIndex].g = MaxByte(pixels[pixelIndex].g, green);
+                        pixels[pixelIndex].b = MaxByte(pixels[pixelIndex].b, concave.Proximity);
+                        pixels[pixelIndex].a = MaxByte(pixels[pixelIndex].a, concave.Weight);
                     }
                 }
             }
@@ -751,7 +779,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return (point.x - b.x) * (a.y - b.y) - (a.x - b.x) * (point.y - b.y);
         }
 
-        private static float ResolveSemanticDistanceFieldMask(
+        private static BoundaryFieldSample ResolveSemanticDistanceFieldSample(
             Vector2 local,
             List<BoundarySegment> segments,
             float widthWorld,
@@ -761,15 +789,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float coverage01,
             bool sharper)
         {
-            float bestMask = 0f;
+            BoundaryFieldSample bestSample = default;
+            float bestComposite = 0f;
             float safeWidth = Mathf.Max(texelWorld * 2f, widthWorld);
             float softness01 = Mathf.Clamp01(softness);
             float core = Mathf.Max(
                 texelWorld * (sharper ? 1.20f : 1.55f),
-                safeWidth * Mathf.Lerp(sharper ? 0.055f : 0.075f, sharper ? 0.020f : 0.035f, softness01));
+                safeWidth * Mathf.Lerp(sharper ? 0.045f : 0.065f, sharper ? 0.016f : 0.030f, softness01));
             float outer = Mathf.Max(
                 core + texelWorld,
-                safeWidth * Mathf.Lerp(sharper ? 0.78f : 0.96f, sharper ? 1.18f : 1.42f, softness01));
+                safeWidth * Mathf.Lerp(sharper ? 0.70f : 0.86f, sharper ? 1.06f : 1.26f, softness01));
 
             for (int i = 0; i < segments.Count; i++)
             {
@@ -781,17 +810,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     continue;
                 }
 
-                float field;
+                float proximity;
                 if (distance <= core)
                 {
-                    field = 1f;
+                    proximity = 1f;
                 }
                 else
                 {
-                    field = 1f - Mathf.SmoothStep(core, outer, distance);
+                    proximity = 1f - Mathf.SmoothStep(core, outer, distance);
                 }
 
-                if (field <= 0.001f)
+                if (proximity <= 0.001f)
                 {
                     continue;
                 }
@@ -805,18 +834,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     continue;
                 }
 
-                // Score decides eligibility, but accepted boundaries retain a
-                // readable core. Decorative breakup/noise is deferred to the
-                // material response patch.
-                float eligibility = Mathf.Lerp(sharper ? 0.62f : 0.68f, 1f, segment.Score);
-                float mask = field * eligibility * Mathf.Clamp01(amount01);
-                if (mask > bestMask)
+                // Keep proximity and boundary weight separate. Proximity is the
+                // clean distance field; weight is the semantic importance/eligibility
+                // for final material interpretation. Decorative breakup/noise is
+                // deferred to the material response patch.
+                float normalizedScore = Mathf.InverseLerp(scoreThreshold, 1f, segment.Score);
+                float semanticWeight = Mathf.SmoothStep(0f, 1f, normalizedScore);
+                semanticWeight = Mathf.Lerp(sharper ? 0.32f : 0.38f, 1f, semanticWeight);
+                semanticWeight *= Mathf.Clamp01(amount01);
+
+                BoundaryFieldSample sample = new(proximity, semanticWeight);
+                float composite = sample.Composite;
+                if (composite > bestComposite)
                 {
-                    bestMask = mask;
+                    bestComposite = composite;
+                    bestSample = sample;
                 }
             }
 
-            return Mathf.Clamp01(bestMask);
+            return bestSample;
         }
 
         private static float DistanceToSegment(
