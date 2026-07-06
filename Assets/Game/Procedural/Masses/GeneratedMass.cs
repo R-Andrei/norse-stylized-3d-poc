@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using UnityEngine.Rendering;
 using ProgrammaticStylized3D.Geometry;
 
 namespace ProgrammaticStylized3D.Geometry.Masses
@@ -85,12 +84,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         ConvexEdgeWear,
         ConcaveCrease,
         DirtDeposit
-    }
-
-    public enum StoneSurfaceFeatureVisibility
-    {
-        DebugOnly,
-        VisibleProfileResponse
     }
 
     public enum ShapeDiversity
@@ -332,12 +325,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
     {
         private const string LegacyRiverFoamProxyObjectName =
             "RiverFoamProxy";
-        private const string SurfaceFeatureRootObjectName =
+        private const string LegacySurfaceFeatureRootObjectName =
             "GeneratedMass_SurfaceFeatures";
-        private const string EdgeWearFeatureObjectName =
+        private const string LegacyEdgeWearFeatureObjectName =
             "GeneratedMass_EdgeWearFeatures";
-        private const string CreaseFeatureObjectName =
+        private const string LegacyCreaseFeatureObjectName =
             "GeneratedMass_CreaseFeatures";
+        private const int FeatureAtlasResolution =
+            GeneratedMassFeatureAtlasBaker.DefaultResolution;
         private static readonly int BaseColorId =
             Shader.PropertyToID("_BaseColor");
         private static readonly int LegacyBaseColorId =
@@ -396,8 +391,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Shader.PropertyToID("_GeneratedMassOverallRockTintStrength");
         private static readonly int GeneratedMassLightingTintInfluenceId =
             Shader.PropertyToID("_GeneratedMassLightingTintInfluence");
-        private static readonly int GeneratedMassFeatureOverlayKindId =
-            Shader.PropertyToID("_GeneratedMassFeatureOverlayKind");
+        private static readonly int GeneratedMassFeatureAtlas0Id =
+            Shader.PropertyToID("_GeneratedMassFeatureAtlas0");
+        private static readonly int GeneratedMassFeatureAtlas0EnabledId =
+            Shader.PropertyToID("_GeneratedMassFeatureAtlas0Enabled");
         private static readonly int GeneratedMassEdgeWearCoverageId =
             Shader.PropertyToID("_GeneratedMassEdgeWearCoverage");
         private static readonly int GeneratedMassEdgeWearSoftnessId =
@@ -435,7 +432,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public Color OverallRockTint;
             public float OverallRockTintStrength;
             public float LightingTintInfluence;
-            public StoneSurfaceFeatureVisibility SurfaceFeatureVisibility;
             public float EdgeWearAmount;
             public float EdgeWearWidth;
             public float EdgeWearCoverage;
@@ -573,37 +569,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float lightingTintInfluence = 0.35f;
 
-        [Tooltip("Controls whether generated edge/crease overlay strips are debug-only or visible during normal rendering as profile-specific stone material response.")]
-        [SerializeField]
-        private StoneSurfaceFeatureVisibility surfaceFeatureVisibility =
-            StoneSurfaceFeatureVisibility.DebugOnly;
-
-        [Tooltip("Controls how many selected convex ridge/corner strips are generated for ConvexEdgeWear debug/profile response. Zero disables generated edge-wear strips.")]
+        [Tooltip("Controls the generated ConvexEdgeWear semantic field strength. Zero disables the atlas edge-wear mask.")]
         [Range(0f, 2f)]
         [SerializeField]
         private float edgeWearAmount = 1f;
 
-        [Tooltip("Scales the width of generated ConvexEdgeWear debug strips.")]
+        [Tooltip("Scales the width of the generated ConvexEdgeWear atlas mask.")]
         [Range(0.25f, 2f)]
         [SerializeField]
         private float edgeWearWidth = 1f;
 
-        [Tooltip("Controls how much of each selected ridge edge is covered. Lower values create short broken fragments; higher values cover more of each selected edge.")]
+        [Tooltip("Controls how broadly convex ridge boundaries are eligible for the semantic edge-wear field. Lower values keep only strongest ridges; higher values include more ridge boundaries.")]
         [Range(0.1f, 2f)]
         [SerializeField]
         private float edgeWearCoverage = 1f;
 
-        [Tooltip("Controls cross-strip and end falloff for generated ConvexEdgeWear masks. Lower values are sharper; higher values are softer.")]
+        [Tooltip("Controls falloff for generated ConvexEdgeWear atlas data. Lower values are sharper; higher values are softer.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float edgeWearSoftness = 0.45f;
 
-        [Tooltip("Controls how many selected seam/crack strips are generated for ConcaveCrease debug. Zero disables generated crease/crack strips.")]
+        [Tooltip("Reserved ConcaveCrease amount for the future atlas-based crack/seam feature. Current Patch 14C does not render secondary crease meshes.")]
         [Range(0f, 2f)]
         [SerializeField]
         private float creaseAmount = 1f;
 
-        [Tooltip("Scales the width of generated ConcaveCrease debug strips.")]
+        [Tooltip("Reserved ConcaveCrease width for the future atlas-based crack/seam feature.")]
         [Range(0.25f, 2f)]
         [SerializeField]
         private float creaseWidth = 1f;
@@ -618,7 +609,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float creaseBranching = 1f;
 
-        [Tooltip("Controls cross-strip and end falloff for generated ConcaveCrease masks. Lower values are sharper; higher values are softer.")]
+        [Tooltip("Reserved ConcaveCrease softness for the future atlas-based crack/seam feature.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float creaseSoftness = 0.35f;
@@ -653,16 +644,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
         private MeshCollider meshCollider;
-        private Transform surfaceFeatureRoot;
-        private MeshFilter edgeWearFeatureMeshFilter;
-        private MeshRenderer edgeWearFeatureMeshRenderer;
-        private MeshFilter creaseFeatureMeshFilter;
-        private MeshRenderer creaseFeatureMeshRenderer;
         private MaterialPropertyBlock materialProperties;
-        private MaterialPropertyBlock surfaceFeatureMaterialProperties;
         private Mesh generatedMesh;
-        private Mesh edgeWearFeatureMesh;
-        private Mesh creaseFeatureMesh;
+        private Texture2D generatedFeatureAtlas0;
         private bool stableWorldGeometryFingerprintValid;
         private GeneratedGeometryStableFingerprint
             stableWorldGeometryFingerprint;
@@ -687,8 +671,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             lastAppliedFeatureRecipe;
         public StoneSurfaceProfile StoneSurfaceProfile => stoneSurfaceProfile;
         public StoneSurfaceMaskDebug SurfaceMaskDebug => surfaceMaskDebug;
-        public StoneSurfaceFeatureVisibility SurfaceFeatureVisibility =>
-            surfaceFeatureVisibility;
         public Color BaseColor => baseColor;
         public float SurfaceMaskBaseLift => surfaceMaskBaseLift;
         public float CreviceReach => creviceReach;
@@ -758,6 +740,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             EnsureRecipeState();
             RemoveLegacyRiverFoamProxy();
+            RemoveLegacySurfaceFeatureObjects();
 
             if (!regenerateOnValidate)
             {
@@ -797,9 +780,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public void Regenerate()
         {
             CacheComponents();
+            RemoveLegacySurfaceFeatureObjects();
 
             if (recipe == null)
             {
+                ReleaseGeneratedFeatureAtlas();
                 ClearGeneratedAssignments();
                 ApplyMaterialProperties();
                 InvalidateStableWorldGeometryFingerprint();
@@ -808,16 +793,36 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             EnsureGeneratedMesh();
+            ReleaseGeneratedFeatureAtlas();
 
-            MeshData meshData = MassGenerator.Generate(recipe);
+            MeshData sourceMeshData = MassGenerator.Generate(recipe);
+            MassSurfaceFeatureSettings featureSettings =
+                CreateSurfaceFeatureSettings();
+            GeneratedMassFeatureAtlasBaker.Result featureAtlas =
+                GeneratedMassFeatureAtlasBaker.Bake(
+                    sourceMeshData,
+                    featureSettings,
+                    FeatureAtlasResolution);
 
             string meshName =
                 $"GeneratedMass_{recipe.Archetype}_Shape{recipe.ShapeSeed}_Surface{recipe.SurfaceSeed}";
 
             MeshBuilder.ApplyToMesh(
-                meshData,
+                sourceMeshData,
                 generatedMesh,
                 meshName);
+
+            if (featureAtlas != null &&
+                featureAtlas.FeatureAtlasUV != null &&
+                featureAtlas.FeatureAtlasUV.Count == generatedMesh.vertexCount)
+            {
+                generatedFeatureAtlas0 = featureAtlas.Atlas0;
+                generatedMesh.SetUVs(3, featureAtlas.FeatureAtlasUV);
+            }
+            else if (featureAtlas != null)
+            {
+                DestroyGeneratedTexture(featureAtlas.Atlas0);
+            }
 
             meshFilter.sharedMesh = generatedMesh;
 
@@ -825,7 +830,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             meshCollider.sharedMesh = generatedMesh;
             meshCollider.convex = false;
 
-            RegenerateSurfaceFeatureOverlay();
             ApplyMaterialProperties();
             RefreshStableWorldGeometryFingerprint();
             RemoveLegacyRiverFoamProxy();
@@ -969,7 +973,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             overallRockTint = values.OverallRockTint;
             overallRockTintStrength = values.OverallRockTintStrength;
             lightingTintInfluence = values.LightingTintInfluence;
-            surfaceFeatureVisibility = values.SurfaceFeatureVisibility;
             edgeWearAmount = values.EdgeWearAmount;
             edgeWearWidth = values.EdgeWearWidth;
             edgeWearCoverage = values.EdgeWearCoverage;
@@ -1031,7 +1034,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                    FloatApproximately(
                        lightingTintInfluence,
                        values.LightingTintInfluence) &&
-                   surfaceFeatureVisibility == values.SurfaceFeatureVisibility &&
                    FloatApproximately(edgeWearAmount, values.EdgeWearAmount) &&
                    FloatApproximately(edgeWearWidth, values.EdgeWearWidth) &&
                    FloatApproximately(
@@ -1144,8 +1146,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 OverallRockTint = new Color(0.5f, 0.5f, 0.5f, 1f),
                 OverallRockTintStrength = 0f,
                 LightingTintInfluence = 0.35f,
-                SurfaceFeatureVisibility =
-                    StoneSurfaceFeatureVisibility.DebugOnly,
                 EdgeWearAmount = 1f,
                 EdgeWearWidth = 1f,
                 EdgeWearCoverage = 1f,
@@ -1204,8 +1204,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 meshCollider = GetComponent<MeshCollider>();
             }
-
-            CacheSurfaceFeatureReferences();
         }
 
         private void ApplyMaterialProperties()
@@ -1228,8 +1226,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 SurfaceContractId,
                 0f);
             materialProperties.SetFloat(
-                GeneratedMassFeatureOverlayKindId,
-                0f);
+                GeneratedMassFeatureAtlas0EnabledId,
+                generatedFeatureAtlas0 != null ? 1f : 0f);
+            materialProperties.SetTexture(
+                GeneratedMassFeatureAtlas0Id,
+                generatedFeatureAtlas0 != null
+                    ? generatedFeatureAtlas0
+                    : Texture2D.blackTexture);
             materialProperties.SetFloat(
                 GeneratedMassEdgeWearCoverageId,
                 Mathf.Clamp(edgeWearCoverage, 0.1f, 2f));
@@ -1335,174 +1338,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Mathf.Clamp01(lightingTintInfluence));
 
             meshRenderer.SetPropertyBlock(materialProperties);
-
-            ApplySurfaceFeatureOverlayMaterialProperties(
-                meshBounds,
-                localHeight,
-                localXZScale);
-        }
-
-        private void ApplySurfaceFeatureOverlayMaterialProperties(
-            Bounds meshBounds,
-            float localHeight,
-            float localXZScale)
-        {
-            // The generated line meshes are debug validation geometry. They are
-            // intentionally lifted above the mass surface to prevent z-fighting,
-            // which makes them unsuitable as the final visible stone response.
-            // Keep them debug-only until a decal-like or chunk-batched
-            // surface-integrated feature path is implemented.
-            ApplySingleSurfaceFeatureOverlayMaterialProperties(
-                edgeWearFeatureMeshRenderer,
-                1f,
-                surfaceMaskDebug == StoneSurfaceMaskDebug.ConvexEdgeWear,
-                meshBounds,
-                localHeight,
-                localXZScale);
-
-            ApplySingleSurfaceFeatureOverlayMaterialProperties(
-                creaseFeatureMeshRenderer,
-                2f,
-                surfaceMaskDebug == StoneSurfaceMaskDebug.ConcaveCrease,
-                meshBounds,
-                localHeight,
-                localXZScale);
-        }
-
-        private void ApplySingleSurfaceFeatureOverlayMaterialProperties(
-            MeshRenderer featureRenderer,
-            float overlayKind,
-            bool enabled,
-            Bounds meshBounds,
-            float localHeight,
-            float localXZScale)
-        {
-            if (featureRenderer == null)
-            {
-                return;
-            }
-
-            featureRenderer.sharedMaterial = meshRenderer.sharedMaterial;
-            featureRenderer.enabled = enabled;
-            featureRenderer.shadowCastingMode = ShadowCastingMode.Off;
-            featureRenderer.receiveShadows = false;
-            featureRenderer.lightProbeUsage = LightProbeUsage.Off;
-            featureRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
-            featureRenderer.motionVectorGenerationMode =
-                MotionVectorGenerationMode.ForceNoMotion;
-
-            surfaceFeatureMaterialProperties ??= new MaterialPropertyBlock();
-            surfaceFeatureMaterialProperties.Clear();
-            surfaceFeatureMaterialProperties.SetColor(BaseColorId, baseColor);
-            surfaceFeatureMaterialProperties.SetColor(LegacyBaseColorId, baseColor);
-            surfaceFeatureMaterialProperties.SetFloat(
-                MaskDebugModeId,
-                (float)surfaceMaskDebug);
-            surfaceFeatureMaterialProperties.SetFloat(
-                SurfaceContractId,
-                0f);
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassFeatureOverlayKindId,
-                overlayKind);
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassEdgeWearCoverageId,
-                Mathf.Clamp(edgeWearCoverage, 0.1f, 2f));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassEdgeWearSoftnessId,
-                Mathf.Clamp01(edgeWearSoftness));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassCreaseLengthId,
-                Mathf.Clamp(creaseLength, 0.25f, 2f));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassCreaseBranchingId,
-                Mathf.Clamp(creaseBranching, 0f, 2f));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassCreaseSoftnessId,
-                Mathf.Clamp01(creaseSoftness));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassLocalMinYId,
-                meshBounds.min.y);
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassLocalHeightId,
-                localHeight);
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassMaskSeedId,
-                recipe != null
-                    ? recipe.SurfaceSeed
-                    : 0f);
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassLocalXZScaleId,
-                localXZScale);
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassMaskBaseLiftId,
-                Mathf.Clamp(surfaceMaskBaseLift, 0f, 0.2f));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassCreviceReachId,
-                Mathf.Clamp(creviceReach, 0.25f, 2f));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassCreviceSmoothnessId,
-                Mathf.Clamp(creviceSmoothness, 0.25f, 2f));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassCreviceBreakupId,
-                Mathf.Clamp(creviceBreakup, 0.25f, 2f));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassDirtCrawlReachId,
-                Mathf.Clamp(dirtCrawlReach, 0.25f, 2f));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassDirtCoverageId,
-                Mathf.Clamp(dirtCoverage, 0.25f, 2f));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassExposureResponseId,
-                Mathf.Clamp(exposureResponse, 0f, 2f));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassCreviceResponseId,
-                Mathf.Clamp(creviceResponse, 0f, 2f));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassBaseResponseId,
-                Mathf.Clamp(baseResponse, 0f, 2f));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassDirtDepositResponseId,
-                Mathf.Clamp(dirtDepositResponse, 0f, 2f));
-            surfaceFeatureMaterialProperties.SetColor(
-                GeneratedMassExposureTintId,
-                exposureTint);
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassExposureTintStrengthId,
-                Mathf.Clamp01(exposureTintStrength));
-            surfaceFeatureMaterialProperties.SetColor(
-                GeneratedMassCreviceTintId,
-                creviceTint);
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassCreviceTintStrengthId,
-                Mathf.Clamp01(creviceTintStrength));
-            surfaceFeatureMaterialProperties.SetColor(
-                GeneratedMassBaseTintId,
-                baseTint);
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassBaseTintStrengthId,
-                Mathf.Clamp01(baseTintStrength));
-            surfaceFeatureMaterialProperties.SetColor(
-                GeneratedMassDirtDepositTintId,
-                dirtDepositTint);
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassDirtDepositTintStrengthId,
-                Mathf.Clamp01(dirtDepositTintStrength));
-            surfaceFeatureMaterialProperties.SetColor(
-                GeneratedMassOverallRockTintId,
-                overallRockTint);
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassOverallRockTintStrengthId,
-                Mathf.Clamp01(overallRockTintStrength));
-            surfaceFeatureMaterialProperties.SetFloat(
-                GeneratedMassLightingTintInfluenceId,
-                Mathf.Clamp01(lightingTintInfluence));
-            featureRenderer.SetPropertyBlock(surfaceFeatureMaterialProperties);
-        }
-
-        private bool IsSurfaceFeatureDebugMode()
-        {
-            return surfaceMaskDebug == StoneSurfaceMaskDebug.ConvexEdgeWear ||
-                   surfaceMaskDebug == StoneSurfaceMaskDebug.ConcaveCrease;
         }
 
         private void ApplyStoneSurfaceProfileMaterial()
@@ -1530,203 +1365,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             meshRenderer.sharedMaterial = selectedMaterial;
         }
 
-        private void RegenerateSurfaceFeatureOverlay()
+        private MassSurfaceFeatureSettings CreateSurfaceFeatureSettings()
         {
-            EnsureSurfaceFeatureObjects();
-
-            if (edgeWearFeatureMesh == null ||
-                edgeWearFeatureMeshFilter == null ||
-                creaseFeatureMesh == null ||
-                creaseFeatureMeshFilter == null ||
-                generatedMesh == null)
-            {
-                return;
-            }
-
-            MassSurfaceFeatureSettings settings =
-                new MassSurfaceFeatureSettings(
-                    recipe != null
-                        ? recipe.Archetype
-                        : MassArchetype.TerrainBoulder,
-                    recipe != null
-                        ? recipe.SurfaceSeed
-                        : 0,
-                    edgeWearAmount,
-                    edgeWearWidth,
-                    edgeWearCoverage,
-                    creaseAmount,
-                    creaseWidth,
-                    creaseLength,
-                    creaseBranching);
-
-            MassSurfaceFeatureGenerator.Generate(
-                generatedMesh,
-                edgeWearFeatureMesh,
-                settings,
-                MassSurfaceFeatureKind.EdgeWear);
-            MassSurfaceFeatureGenerator.Generate(
-                generatedMesh,
-                creaseFeatureMesh,
-                settings,
-                MassSurfaceFeatureKind.Crease);
-
-            edgeWearFeatureMeshFilter.sharedMesh = edgeWearFeatureMesh;
-            creaseFeatureMeshFilter.sharedMesh = creaseFeatureMesh;
-        }
-
-        private void CacheSurfaceFeatureReferences()
-        {
-            if (surfaceFeatureRoot == null)
-            {
-                surfaceFeatureRoot = transform.Find(SurfaceFeatureRootObjectName);
-            }
-
-            if (surfaceFeatureRoot == null)
-            {
-                return;
-            }
-
-            if (edgeWearFeatureMeshFilter == null ||
-                edgeWearFeatureMeshRenderer == null)
-            {
-                Transform edgeWearTransform =
-                    surfaceFeatureRoot.Find(EdgeWearFeatureObjectName);
-                if (edgeWearTransform != null)
-                {
-                    edgeWearFeatureMeshFilter =
-                        edgeWearTransform.GetComponent<MeshFilter>();
-                    edgeWearFeatureMeshRenderer =
-                        edgeWearTransform.GetComponent<MeshRenderer>();
-                }
-            }
-
-            if (creaseFeatureMeshFilter == null ||
-                creaseFeatureMeshRenderer == null)
-            {
-                Transform creaseTransform =
-                    surfaceFeatureRoot.Find(CreaseFeatureObjectName);
-                if (creaseTransform != null)
-                {
-                    creaseFeatureMeshFilter =
-                        creaseTransform.GetComponent<MeshFilter>();
-                    creaseFeatureMeshRenderer =
-                        creaseTransform.GetComponent<MeshRenderer>();
-                }
-            }
-        }
-
-        private void EnsureSurfaceFeatureObjects()
-        {
-            if (surfaceFeatureRoot == null)
-            {
-                surfaceFeatureRoot = transform.Find(SurfaceFeatureRootObjectName);
-                if (surfaceFeatureRoot == null)
-                {
-                    GameObject rootObject =
-                        new GameObject(SurfaceFeatureRootObjectName);
-                    surfaceFeatureRoot = rootObject.transform;
-                    surfaceFeatureRoot.SetParent(transform, false);
-                }
-            }
-
-            surfaceFeatureRoot.localPosition = Vector3.zero;
-            surfaceFeatureRoot.localRotation = Quaternion.identity;
-            surfaceFeatureRoot.localScale = Vector3.one;
-            DisableLegacySurfaceFeatureRenderer(surfaceFeatureRoot);
-
-            EnsureSingleSurfaceFeatureObject(
-                surfaceFeatureRoot,
-                EdgeWearFeatureObjectName,
-                ref edgeWearFeatureMeshFilter,
-                ref edgeWearFeatureMeshRenderer,
-                ref edgeWearFeatureMesh,
-                "GeneratedMass_EdgeWearFeatures_Temporary");
-
-            EnsureSingleSurfaceFeatureObject(
-                surfaceFeatureRoot,
-                CreaseFeatureObjectName,
-                ref creaseFeatureMeshFilter,
-                ref creaseFeatureMeshRenderer,
-                ref creaseFeatureMesh,
-                "GeneratedMass_CreaseFeatures_Temporary");
-        }
-
-        private static void DisableLegacySurfaceFeatureRenderer(Transform root)
-        {
-            MeshRenderer legacyRenderer = root.GetComponent<MeshRenderer>();
-            if (legacyRenderer != null)
-            {
-                legacyRenderer.enabled = false;
-            }
-
-            MeshFilter legacyFilter = root.GetComponent<MeshFilter>();
-            if (legacyFilter != null)
-            {
-                legacyFilter.sharedMesh = null;
-            }
-        }
-
-        private void EnsureSingleSurfaceFeatureObject(
-            Transform root,
-            string objectName,
-            ref MeshFilter featureMeshFilter,
-            ref MeshRenderer featureMeshRenderer,
-            ref Mesh featureMesh,
-            string meshName)
-        {
-            if (featureMeshFilter == null ||
-                featureMeshRenderer == null)
-            {
-                Transform featureTransform = root.Find(objectName);
-                if (featureTransform == null)
-                {
-                    GameObject featureObject = new GameObject(objectName);
-                    featureTransform = featureObject.transform;
-                    featureTransform.SetParent(root, false);
-                }
-
-                featureTransform.localPosition = Vector3.zero;
-                featureTransform.localRotation = Quaternion.identity;
-                featureTransform.localScale = Vector3.one;
-
-                featureMeshFilter =
-                    featureTransform.GetComponent<MeshFilter>();
-                if (featureMeshFilter == null)
-                {
-                    featureMeshFilter =
-                        featureTransform.gameObject.AddComponent<MeshFilter>();
-                }
-
-                featureMeshRenderer =
-                    featureTransform.GetComponent<MeshRenderer>();
-                if (featureMeshRenderer == null)
-                {
-                    featureMeshRenderer =
-                        featureTransform.gameObject.AddComponent<MeshRenderer>();
-                }
-
-                featureMeshRenderer.shadowCastingMode = ShadowCastingMode.Off;
-                featureMeshRenderer.receiveShadows = false;
-                featureMeshRenderer.lightProbeUsage = LightProbeUsage.Off;
-                featureMeshRenderer.reflectionProbeUsage =
-                    ReflectionProbeUsage.Off;
-                featureMeshRenderer.motionVectorGenerationMode =
-                    MotionVectorGenerationMode.ForceNoMotion;
-                featureMeshRenderer.enabled = false;
-            }
-
-            if (featureMesh != null)
-            {
-                featureMeshFilter.sharedMesh = featureMesh;
-                return;
-            }
-
-            featureMesh = new Mesh
-            {
-                name = meshName,
-                hideFlags = HideFlags.DontSave
-            };
-            featureMeshFilter.sharedMesh = featureMesh;
+            return new MassSurfaceFeatureSettings(
+                recipe != null
+                    ? recipe.Archetype
+                    : MassArchetype.TerrainBoulder,
+                recipe != null
+                    ? recipe.SurfaceSeed
+                    : 0,
+                edgeWearAmount,
+                edgeWearWidth,
+                edgeWearCoverage,
+                edgeWearSoftness,
+                creaseAmount,
+                creaseWidth,
+                creaseLength,
+                creaseBranching);
         }
 
         private void EnsureGeneratedMesh()
@@ -1757,29 +1412,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 meshCollider.sharedMesh = null;
             }
 
-            if (edgeWearFeatureMeshFilter != null &&
-                edgeWearFeatureMeshFilter.sharedMesh == edgeWearFeatureMesh)
-            {
-                edgeWearFeatureMeshFilter.sharedMesh = null;
-            }
-
-            if (creaseFeatureMeshFilter != null &&
-                creaseFeatureMeshFilter.sharedMesh == creaseFeatureMesh)
-            {
-                creaseFeatureMeshFilter.sharedMesh = null;
-            }
-
-            if (edgeWearFeatureMeshRenderer != null)
-            {
-                edgeWearFeatureMeshRenderer.enabled = false;
-            }
-
-            if (creaseFeatureMeshRenderer != null)
-            {
-                creaseFeatureMeshRenderer.enabled = false;
-            }
-
             RemoveLegacyRiverFoamProxy();
+            RemoveLegacySurfaceFeatureObjects();
         }
 
         private void NotifyGeometryChanged()
@@ -1787,46 +1421,57 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             GeometryChanged?.Invoke();
         }
 
-        private void DestroySurfaceFeatureMesh(ref Mesh mesh)
+        private void ReleaseGeneratedFeatureAtlas()
         {
-            if (mesh == null)
+            DestroyGeneratedTexture(generatedFeatureAtlas0);
+            generatedFeatureAtlas0 = null;
+        }
+
+        private void DestroyGeneratedTexture(Texture2D texture)
+        {
+            if (texture == null)
             {
                 return;
             }
 
             if (Application.isPlaying)
             {
-                Destroy(mesh);
+                Destroy(texture);
             }
             else
             {
-                DestroyImmediate(mesh);
+                DestroyImmediate(texture);
             }
-
-            mesh = null;
         }
 
         private void RemoveLegacyRiverFoamProxy()
         {
-            Transform existing =
-                transform.Find(
-                    LegacyRiverFoamProxyObjectName);
+            RemoveLegacyChildObject(LegacyRiverFoamProxyObjectName);
+        }
+
+        private void RemoveLegacySurfaceFeatureObjects()
+        {
+            RemoveLegacyChildObject(LegacySurfaceFeatureRootObjectName);
+            RemoveLegacyChildObject(LegacyEdgeWearFeatureObjectName);
+            RemoveLegacyChildObject(LegacyCreaseFeatureObjectName);
+        }
+
+        private void RemoveLegacyChildObject(string childName)
+        {
+            Transform existing = transform.Find(childName);
 
             if (existing == null)
             {
                 return;
             }
 
-            GameObject proxy = existing.gameObject;
+            GameObject legacyObject = existing.gameObject;
 
-            if (Application.isPlaying)
-            {
-                Destroy(proxy);
-            }
-            else
-            {
-                DestroyImmediate(proxy);
-            }
+            // OnValidate can be invoked while Unity is inside validation, rendering,
+            // animation, or physics callbacks. DestroyImmediate is not permitted
+            // for GameObjects in those contexts, so legacy scene children are
+            // removed through Unity's delayed destruction path instead.
+            Destroy(legacyObject);
         }
 
         private void OnDestroy()
@@ -1835,8 +1480,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ClearGeneratedAssignments();
             InvalidateStableWorldGeometryFingerprint();
 
-            DestroySurfaceFeatureMesh(ref edgeWearFeatureMesh);
-            DestroySurfaceFeatureMesh(ref creaseFeatureMesh);
+            ReleaseGeneratedFeatureAtlas();
 
             if (generatedMesh == null)
             {

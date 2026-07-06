@@ -12,6 +12,7 @@ namespace ProgrammaticStylized3D.Rivers
     {
         private struct FoamObstacleRoutingComponent
         {
+            public int Id;
             public int MinX;
             public int MaxX;
             public int MinY;
@@ -458,6 +459,15 @@ namespace ProgrammaticStylized3D.Rivers
                 Array.Clear(obstacleRoutingVisited, 0, obstacleRoutingVisited.Length);
             }
 
+            if (obstacleRoutingComponentIds.Length != cellCount)
+            {
+                obstacleRoutingComponentIds = new int[cellCount];
+            }
+            else
+            {
+                Array.Clear(obstacleRoutingComponentIds, 0, obstacleRoutingComponentIds.Length);
+            }
+
             if (obstacleRoutingQueue.Length != cellCount)
             {
                 obstacleRoutingQueue = new int[cellCount];
@@ -508,7 +518,11 @@ namespace ProgrammaticStylized3D.Rivers
                         continue;
                     }
 
-                    FoamObstacleRoutingComponent component = FloodObstacleRoutingComponent(x, y);
+                    int componentId = obstacleRoutingComponents.Count + 1;
+                    FoamObstacleRoutingComponent component = FloodObstacleRoutingComponent(
+                        x,
+                        y,
+                        componentId);
                     if (component.Count > 0)
                     {
                         obstacleRoutingComponents.Add(component);
@@ -519,16 +533,19 @@ namespace ProgrammaticStylized3D.Rivers
 
         private FoamObstacleRoutingComponent FloodObstacleRoutingComponent(
             int startX,
-            int startY)
+            int startY,
+            int componentId)
         {
             int read = 0;
             int write = 0;
             int startIndex = startY * fieldWidth + startX;
             obstacleRoutingQueue[write++] = startIndex;
             obstacleRoutingVisited[startIndex] = true;
+            obstacleRoutingComponentIds[startIndex] = componentId;
 
             FoamObstacleRoutingComponent component = new FoamObstacleRoutingComponent
             {
+                Id = componentId,
                 MinX = startX,
                 MaxX = startX,
                 MinY = startY,
@@ -581,6 +598,7 @@ namespace ProgrammaticStylized3D.Rivers
                         }
 
                         obstacleRoutingVisited[neighbourIndex] = true;
+                        obstacleRoutingComponentIds[neighbourIndex] = componentId;
                         obstacleRoutingQueue[write++] = neighbourIndex;
                     }
                 }
@@ -602,26 +620,35 @@ namespace ProgrammaticStylized3D.Rivers
             int maxS = Mathf.Max(flowSign * component.MinX, flowSign * component.MaxX);
             int componentWidth = Mathf.Max(1, maxS - minS + 1);
             int componentHeight = Mathf.Max(1, component.MaxY - component.MinY + 1);
+
+            // Obstacle routing is a collision-shadow, not a proximity halo.
+            // The bounds below are only a cheap iteration window.  Written
+            // influence is constrained by ResolveComponentCollisionRiskInfluence
+            // so side-passing material is not redirected just because it is
+            // close to the obstacle.
             int approachCells = Mathf.Max(
                 6,
-                Mathf.RoundToInt(fieldWidth * 0.065f));
+                Mathf.RoundToInt(fieldWidth * 0.055f));
             int frontCells = Mathf.Max(
-                2,
-                Mathf.RoundToInt(componentWidth * 0.45f));
-            int releaseCells = Mathf.Max(
                 1,
-                Mathf.RoundToInt(fieldWidth * 0.006f));
-            int sidePaddingCells = Mathf.Max(
-                3,
-                Mathf.RoundToInt(componentHeight * 0.70f));
+                Mathf.RoundToInt(componentWidth * 0.28f));
+            int releaseCells = 0;
+            int frontClosureCells = Mathf.Clamp(
+                Mathf.RoundToInt(componentWidth * 0.08f),
+                1,
+                2);
+            int lateralMarginCells = Mathf.Max(
+                1,
+                Mathf.RoundToInt(componentHeight * 0.22f));
             float tieSide = ResolveComponentTieSide(
                 component,
                 flowSign,
                 approachCells);
+
             int startS = minS - approachCells;
             int endS = maxS + releaseCells;
-            int startY = Mathf.Max(0, component.MinY - sidePaddingCells);
-            int endY = Mathf.Min(fieldHeight - 1, component.MaxY + sidePaddingCells);
+            int startY = Mathf.Max(0, component.MinY - lateralMarginCells);
+            int endY = Mathf.Min(fieldHeight - 1, component.MaxY + lateralMarginCells);
 
             for (int s = startS; s <= endS; s++)
             {
@@ -642,7 +669,9 @@ namespace ProgrammaticStylized3D.Rivers
                         approachCells,
                         frontCells,
                         releaseCells,
-                        sidePaddingCells);
+                        frontClosureCells,
+                        lateralMarginCells,
+                        flowSign);
                     if (influence <= 0.001f)
                     {
                         continue;
@@ -713,68 +742,120 @@ namespace ProgrammaticStylized3D.Rivers
             int approachCells,
             int frontCells,
             int releaseCells,
-            int sidePaddingCells)
+            int frontClosureCells,
+            int lateralMarginCells,
+            int flowSign)
         {
             float centerY = (component.MinY + component.MaxY) * 0.5f;
             float halfHeight = Mathf.Max(
                 0.5f,
                 (component.MaxY - component.MinY + 1) * 0.5f);
-            float signedLateral = y - centerY;
-            float absLateral = Mathf.Abs(signedLateral);
-            float safetyMargin = Mathf.Max(1f, halfHeight * 0.18f);
-            float frontCoreHalfWidth = halfHeight + safetyMargin;
-            float sideOuterHalfWidth = frontCoreHalfWidth + Mathf.Max(1f, sidePaddingCells);
+            float absLateral = Mathf.Abs(y - centerY);
 
-            if (s < minS)
+            int rowLeadingS = ResolveComponentRowLeadingS(
+                component,
+                y,
+                flowSign,
+                minS);
+
+            // Obstacle routing is now a one-sided collision shadow.  The far
+            // upstream tip is soft, but the obstacle-facing end is deliberately
+            // not softened: the last valid cells before the obstacle are the
+            // highest-risk cells and should be the strongest part of the field.
+            // Permit a tiny front-contact closure so the visible routing
+            // band touches the obstacle/negative topology boundary instead
+            // of stopping one row short.  The lateral collision corridor below
+            // still prevents this from recreating a broad side halo.
+            int closureLeadingS = rowLeadingS + Mathf.Max(0, frontClosureCells);
+            if (s >= closureLeadingS)
             {
-                float approachT = Mathf.Clamp01(
-                    1f - ((float)(minS - s) / Mathf.Max(1, approachCells)));
-                approachT = Smooth01(approachT);
-                float approachCap = Mathf.Lerp(0.18f, 0.60f, approachT);
-                float imminentT = Mathf.Clamp01((approachT - 0.72f) / 0.28f);
-                imminentT = Smooth01(imminentT);
-                float maxInfluence = Mathf.Lerp(approachCap, 1f, imminentT);
-                float envelopeHalfWidth = Mathf.Lerp(
-                    Mathf.Max(1f, halfHeight * 0.45f),
-                    sideOuterHalfWidth,
-                    approachT);
-                float corridor = RoundedCorridorFactor(
-                    absLateral,
-                    frontCoreHalfWidth,
-                    envelopeHalfWidth);
-
-                return Mathf.Clamp01(maxInfluence * corridor);
+                return 0f;
             }
 
-            if (s <= maxS)
+            int upstreamDistance = Mathf.Max(1, rowLeadingS - s);
+            if (upstreamDistance > approachCells)
             {
-                float frontT = Mathf.Clamp01(
-                    1f - ((float)(s - minS) / Mathf.Max(1, frontCells)));
-                frontT = Smooth01(frontT);
-                float directCollision = RoundedCorridorFactor(
-                    absLateral,
-                    frontCoreHalfWidth,
-                    frontCoreHalfWidth + Mathf.Max(1f, sidePaddingCells * 0.45f));
-                float sideSkirt = RoundedCorridorFactor(
-                    absLateral,
-                    halfHeight + safetyMargin,
-                    sideOuterHalfWidth);
-                float maxInfluence = Mathf.Lerp(0.12f, 1f, frontT);
-                float influence = Mathf.Max(
-                    directCollision * maxInfluence,
-                    sideSkirt * 0.14f * frontT);
-
-                return Mathf.Clamp01(influence);
+                return 0f;
             }
 
-            float releaseT = Mathf.Clamp01(
-                1f - ((float)(s - maxS) / Mathf.Max(1, releaseCells)));
-            releaseT = Smooth01(releaseT);
-            float releaseCorridor = RoundedCorridorFactor(
+            float approachRaw = Mathf.Clamp01(
+                1f - ((float)upstreamDistance / Mathf.Max(1, approachCells)));
+            float approachEase = Mathf.Pow(Smooth01(approachRaw), 2.75f);
+
+            float footprintHalfWidth = halfHeight;
+            float safetyMargin = Mathf.Max(1f, halfHeight * 0.10f);
+            float directOuterHalfWidth = footprintHalfWidth + safetyMargin;
+            float directFootprint = RoundedCorridorFactor(
                 absLateral,
-                halfHeight + safetyMargin,
-                sideOuterHalfWidth);
-            return Mathf.Clamp01(releaseT * releaseCorridor * 0.12f);
+                footprintHalfWidth,
+                directOuterHalfWidth);
+
+            // The upstream approach starts as a narrow, nearly invisible hint
+            // and expands toward the obstacle footprint.  It is still gated by
+            // collision overlap so side-passing material can continue downstream
+            // almost untouched.
+            float approachCoreHalfWidth = Mathf.Lerp(
+                Mathf.Max(0.5f, halfHeight * 0.10f),
+                Mathf.Max(0.5f, footprintHalfWidth * 0.88f),
+                approachEase);
+            float approachOuterHalfWidth = Mathf.Lerp(
+                Mathf.Max(0.75f, halfHeight * 0.24f),
+                directOuterHalfWidth,
+                approachEase);
+            float collisionCorridor = RoundedCorridorFactor(
+                absLateral,
+                approachCoreHalfWidth,
+                approachOuterHalfWidth);
+            if (collisionCorridor <= 0f)
+            {
+                return 0f;
+            }
+
+            float approachCap = Mathf.Lerp(0.035f, 0.58f, approachEase);
+            float influence = approachCap * collisionCorridor;
+
+            int contactCells = Mathf.Max(2, Mathf.Min(5, approachCells / 4));
+            int contactDistance = Mathf.Max(1, rowLeadingS - s);
+            if (contactDistance <= contactCells)
+            {
+                float contactT = Mathf.Clamp01(
+                    1f - ((float)(contactDistance - 1) /
+                    Mathf.Max(1, contactCells - 1)));
+                contactT = Mathf.Pow(Smooth01(contactT), 0.55f);
+                float contactInfluence = Mathf.Lerp(0.70f, 1f, contactT) *
+                    directFootprint;
+                influence = Mathf.Max(influence, contactInfluence);
+            }
+
+            influence = Mathf.Clamp01(influence);
+            return influence < 0.03f ? 0f : influence;
+        }
+
+        private int ResolveComponentRowLeadingS(
+            FoamObstacleRoutingComponent component,
+            int y,
+            int flowSign,
+            int fallbackMinS)
+        {
+            if (y < component.MinY || y > component.MaxY)
+            {
+                return fallbackMinS;
+            }
+
+            int bestS = int.MaxValue;
+            for (int x = component.MinX; x <= component.MaxX; x++)
+            {
+                int index = y * fieldWidth + x;
+                if (index < 0 || index >= obstacleRoutingComponentIds.Length ||
+                    obstacleRoutingComponentIds[index] != component.Id)
+                {
+                    continue;
+                }
+
+                bestS = Mathf.Min(bestS, flowSign * x);
+            }
+
+            return bestS == int.MaxValue ? fallbackMinS : bestS;
         }
 
         private static float RoundedCorridorFactor(
@@ -890,7 +971,7 @@ namespace ProgrammaticStylized3D.Rivers
             float frequency,
             float seed)
         {
-            float warpBaseY = Mathf.Max(2.0f, 2.85f * frequency);
+            float warpBaseY = Mathf.Max(3.0f, 4.10f * frequency);
             int warpPeriodX = Mathf.Max(
                 4,
                 Mathf.RoundToInt(warpBaseY * aspect));
@@ -903,57 +984,102 @@ namespace ProgrammaticStylized3D.Rivers
                 v * warpBaseY + seed * 1.11f - 7.17f,
                 warpPeriodX) * 2f - 1f;
 
-            float warpedU = u + warpX * 0.035f;
-            float warpedV = v + warpY * 0.115f;
+            float warpedU = u + warpX * 0.055f;
+            float warpedV = v + warpY * 0.155f;
             float sum = 0f;
             float weightSum = 0f;
+
+            // The low octave should organize the field, not decide the sign for
+            // huge river stretches.  Medium/high octaves carry more authority so
+            // broad same-direction continents break into red/blue turbulent
+            // patches while the texture remains coherent and scrollable.
             sum += MotionLaneOctave(
                 warpedU,
                 warpedV,
                 aspect,
-                4.20f * frequency,
-                0.24f,
+                5.60f * frequency,
+                0.10f,
                 seed + 3.17f,
                 ref weightSum);
             sum += MotionLaneOctave(
-                warpedU,
+                warpedU + warpedV * 0.09f,
                 warpedV,
                 aspect,
-                7.80f * frequency,
-                0.25f,
+                10.50f * frequency,
+                0.20f,
                 seed - 11.73f,
                 ref weightSum);
             sum += MotionLaneOctave(
-                warpedU,
-                warpedV,
+                warpedU - warpedV * 0.14f,
+                warpedV + warpedU * 0.025f,
                 aspect,
-                13.60f * frequency,
-                0.22f,
+                17.80f * frequency,
+                0.24f,
                 seed + 29.41f,
                 ref weightSum);
             sum += MotionLaneOctave(
-                warpedU,
-                warpedV,
+                warpedU + warpedV * 0.23f,
+                warpedV - warpedU * 0.035f,
                 aspect,
-                23.50f * frequency,
-                0.17f,
+                30.00f * frequency,
+                0.21f,
                 seed - 43.09f,
                 ref weightSum);
             sum += MotionLaneOctave(
-                warpedU,
-                warpedV,
+                warpedU - warpedV * 0.31f,
+                warpedV + warpedU * 0.055f,
                 aspect,
-                39.00f * frequency,
-                0.12f,
+                49.00f * frequency,
+                0.16f,
                 seed + 61.83f,
+                ref weightSum);
+            sum += MotionLaneOctave(
+                warpedU + warpedV * 0.41f,
+                warpedV - warpedU * 0.075f,
+                aspect,
+                76.00f * frequency,
+                0.09f,
+                seed - 83.27f,
                 ref weightSum);
 
             float raw = weightSum > 0.0001f
                 ? sum / weightSum
                 : 0f;
-            raw = Mathf.Clamp(raw * 1.42f, -1f, 1f);
-            float magnitude = Mathf.Pow(Mathf.Abs(raw), 0.82f);
+
+            float breaker = MotionLaneSignedNoise(
+                warpedU + warpedV * 0.37f,
+                warpedV - warpedU * 0.045f,
+                aspect,
+                24.00f * frequency,
+                seed + 101.9f) * 0.22f;
+            breaker += MotionLaneSignedNoise(
+                warpedU - warpedV * 0.27f,
+                warpedV + warpedU * 0.065f,
+                aspect,
+                42.00f * frequency,
+                seed - 137.6f) * 0.14f;
+            raw = Mathf.Clamp(raw * 0.88f + breaker * (1.05f - 0.35f * Mathf.Abs(raw)), -1f, 1f);
+
+            raw = Mathf.Clamp(raw * 1.62f, -1f, 1f);
+            float magnitude = Mathf.Pow(Mathf.Abs(raw), 0.76f);
             return Mathf.Sign(raw) * magnitude;
+        }
+
+        private static float MotionLaneSignedNoise(
+            float u,
+            float v,
+            float aspect,
+            float verticalFrequency,
+            float seed)
+        {
+            float safeVerticalFrequency = Mathf.Max(1f, verticalFrequency);
+            int periodX = Mathf.Max(
+                4,
+                Mathf.RoundToInt(safeVerticalFrequency * Mathf.Max(1f, aspect)));
+            return MotionValueNoiseTiledX(
+                u * periodX + seed * 0.37f,
+                v * safeVerticalFrequency - seed * 0.19f,
+                periodX) * 2f - 1f;
         }
 
         private static float MotionLaneOctave(

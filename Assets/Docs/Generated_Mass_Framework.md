@@ -182,7 +182,7 @@ Dedicated feature-atlas UV channel
   generated chart coordinates for packed feature-mask textures
 ```
 
-The foundation should use generated surface-chart mapping, not local X/Z projection. Local projection can validate a texture sample path, but it is not a foundation for vertical faces, steep facets, edge wear, cracks, pitting, frost patches, water streaks, stains, or carved seams. Patch 14C should therefore establish deterministic per-surface/per-triangle chart coordinates, chart packing, adjacency metadata, padding, and mask dilation as part of the generated-mass feature pipeline.
+The foundation should use generated surface-chart mapping, not local X/Z projection. Local projection can validate a texture sample path, but it is not a foundation for vertical faces, steep facets, edge wear, cracks, pitting, frost patches, water streaks, stains, or carved seams. Patch 14C should therefore establish deterministic surface-patch chart coordinates, chart packing, adjacency metadata, semantic gutters, and clean ridge/crease fields as part of the generated-mass feature pipeline.
 
 Initial Patch 14C atlas contract:
 
@@ -206,7 +206,7 @@ GeneratedMassFeatureAtlas1
 
 The exact channel packing may change after implementation pressure, but the architectural rule should not: expensive feature discovery and mask generation happen once during generation; runtime shader work should be cheap sampling and generic response application.
 
-Mask textures should be treated as data, not colour art. The initial implementation should use a linear/non-sRGB mask texture, clamp sampling, chart padding/gutters, and dilation to avoid bilinear bleeding between packed charts. A 256x256 Atlas0 is the preferred first default, with the baker written as if 128/256/512 quality tiers can be exposed later.
+Mask textures should be treated as data, not colour art. The implementation should use a linear/non-sRGB mask texture, clamp sampling, chart padding/gutters, and semantic gutter fill to avoid bilinear bleeding between packed charts. Atlas resolution must remain parameterized internally; Patch 14C.3 uses 512x512 as the current quality-oriented default, with 128/256/512 tiers left open for later quality settings.
 
 ### Archetype Recipe
 
@@ -378,7 +378,7 @@ Use modest additional memory for packed masks.
 Keep frame-time shader/render cost predictable and low.
 ```
 
-The first implementation milestone should create the surface-chart atlas foundation and bake one initial feature mask: Convex Edge Wear into FeatureAtlas0.R. This first patch should be data/debug-only. Normal rendering should remain unchanged; the final edge-wear colour/value/smoothness response belongs in the next patch after the atlas path is validated.
+The first implementation milestone creates the surface-chart atlas foundation and bakes semantic ridge/crease proximity fields: Convex Edge Wear into FeatureAtlas0.R and Concave Crease into FeatureAtlas0.G. This phase is data/debug-only. Normal rendering should remain unchanged; the final edge-wear colour/value/smoothness response belongs in the next patch after the atlas fields are validated.
 
 Feature mask atlas rules:
 
@@ -386,7 +386,7 @@ Feature mask atlas rules:
 - use generated surface-chart mapping rather than local X/Z projection;
 - preserve adjacency metadata so features can paint coherently across shared edges and connected surface regions;
 - pack multiple feature masks together where possible;
-- include chart padding/gutters and dilation from the first implementation;
+- include chart padding/gutters and semantic gutter fill from the first implementation;
 - sample from the main generated-mass shader, not separate final overlay materials;
 - keep feature channels generic and archetype-agnostic;
 - keep debug views available for individual channels;
@@ -396,12 +396,44 @@ Feature mask atlas rules:
 Initial implementation details to prefer:
 
 ```text
-Atlas0 default resolution: 256x256
-Internal baker resolution parameter: prepare for 128 / 256 / 512 later
+Atlas0 current default resolution: 512x512
+Internal baker resolution parameter: prepare for 128 / 256 / 512 quality tiers later
 Texture interpretation: linear/non-sRGB mask data
 Wrap mode: Clamp
-Filtering: bilinear is acceptable when padding/dilation is present
+Filtering: bilinear is acceptable when padding/semantic gutters are present
 Mip usage: deliberate later decision; do not rely on mips for the debug foundation
+```
+
+Patch 14C.1 implementation note:
+
+```text
+Main generated-mass mesh
+  dedicated feature atlas UV channel: Unity mesh channel 3 / shader TEXCOORD3
+
+GeneratedMassFeatureAtlas0
+  texture format: RGBA32 linear mask data
+  initial default resolution: 256x256, raised to 512x512 in Patch 14C.3 for cleaner ridge fields
+  wrap/filter: clamp + bilinear
+  R: baked ConvexEdgeWear debug/data mask
+  G/B/A: reserved for later feature channels
+
+Baker behavior
+  superseded first attempt: deterministic per-triangle chart packing
+  validation result: rejected because it produced triangle/decal artifacts
+  replacement path: surface-patch chart packing plus semantic ridge/crease fields
+
+Runtime behavior
+  GeneratedMass owns and safely destroys the generated texture
+  MaterialPropertyBlock binds the atlas without mutating shared materials
+  ConvexEdgeWear debug mode previews Atlas0.R on the main mass surface
+  normal rendering remains unchanged until the final response patch
+
+Patch 14C.1b correction:
+  legacy raised secondary EdgeWear/Crease meshes are removed from the GeneratedMass path
+  old serialized GeneratedMass_SurfaceFeatures children are deleted during regenerate/validation
+  ConcaveCrease temporarily has no visual debug output until an atlas channel exists
+  per-triangle charts require triangle-corner unique render vertices; sharing one atlas UV per reused mesh vertex caused wedge artifacts and is not a valid surface-chart implementation
+  the first debug channel intentionally skips charts that are too small to represent an edge-local band cleanly; sparse/missing debug data is acceptable, triangle wedges are not
 ```
 
 ---
@@ -612,8 +644,8 @@ Future role:
 
 Current role:
 
-- exists as debug/validation data;
-- raised visual strips are debug-only and not accepted as final rendering.
+- exists as atlas debug/data on `GeneratedMassFeatureAtlas0.R`;
+- legacy raised visual strips have been removed and are not part of current validation.
 
 Future role:
 
@@ -624,8 +656,8 @@ Future role:
 
 Current role:
 
-- exists as debug/validation data;
-- raised visual strips are debug-only and not accepted as final rendering.
+- controls are reserved for future atlas-backed crease/crack data;
+- legacy raised visual strips have been removed, so this feature currently has no visual debug output.
 
 Future role:
 
@@ -838,7 +870,7 @@ Advanced controls:
 
 Important:
 
-- The existing raised edge strips are debug-only.
+- The existing raised edge strips have been removed.
 - Final edge wear must be surface-integrated through the main generated-mass shader.
 - Long-term final edge wear should use the generated feature mask atlas, not duplicate final-render meshes.
 - Edge Wear must stay generic; water erosion, frost catch, and sacred accents are recipe outcomes created by combining generic features.
@@ -864,7 +896,7 @@ Advanced controls:
 
 Important:
 
-- The existing raised crease strips are debug-only.
+- The existing raised crease strips have been removed.
 - Final creases must not float above the surface.
 
 #### Crack Network
@@ -1511,7 +1543,7 @@ Patch 14B.1
 Correct the generated-mass inspector to be feature-oriented rather than category-oriented. Existing controls are grouped under feature foldouts so future feature channels have a stable authoring pattern. Status: implemented.
 
 Patch 14C
-Generated Mass Surface-Chart Feature Atlas Foundation. Create the dedicated feature-atlas UV channel, generated surface-chart atlas mapping, FeatureAtlas0 texture, Atlas0.R ConvexEdgeWear data/debug bake, shader binding, and main-surface debug preview. Normal rendering remains unchanged. This is now a prerequisite before serious final surface-feature implementation.
+Generated Mass Surface-Chart Feature Atlas Foundation. Create the dedicated feature-atlas UV channel, generated surface-chart atlas mapping, FeatureAtlas0 texture, shader binding, and main-surface debug preview. Patch 14C.1b removes the old raised secondary feature meshes. Patch 14C.2 replaces the failed per-triangle decal bake with surface-patch charts and ridge-distance fields. Patch 14C.3 hardens that system so convex/concave boundaries are first-class semantic data, the exact ridge/crease core is written into the field, and chart gutters carry semantic feature values instead of black. Atlas0.R stores ConvexEdgeWear data/debug and Atlas0.G stores ConcaveCrease data/debug. Normal rendering remains unchanged. This is now a prerequisite before serious final surface-feature implementation.
 
 Patch 14D
 Generic Edge Wear via Feature Atlas. Interpret the already-baked ConvexEdgeWear atlas channel through the main generated-mass shader using generic controls.
@@ -1537,3 +1569,81 @@ Current recommendation:
 ```text
 Implement the feature mask atlas foundation before adding more final visual feature complexity.
 ```
+
+### Patch 14C.2 implementation correction — surface patches and ridge fields
+
+Patch 14C.2 corrects the first atlas bake attempt. The earlier per-triangle chart/segment-paint approach produced triangular decal artifacts rather than convincing worn ridge bands. The atlas architecture remains correct, but the baker must produce semantic surface fields rather than isolated triangle fragments.
+
+Patch 14C.2 therefore changes the atlas foundation to:
+
+```text
+source generated mass mesh
+→ quantized-position surface graph
+→ boundary classification: open / flat / convex / concave / ambiguous
+→ surface patches flood-filled across flat/internal boundaries only
+→ one chart per surface patch, packed by projected patch area
+→ convex ridge distance field baked into FeatureAtlas0.R
+→ concave crease distance field baked into FeatureAtlas0.G
+→ shader debug previews both channels on the main mass surface
+```
+
+Convex edge wear and concave crease are now paired semantic opposites at the data level:
+
+```text
+FeatureAtlas0.R = convex ridge lightening candidate
+FeatureAtlas0.G = concave crease darkening candidate
+```
+
+Patch 14C.2 remains data/debug-only. Normal generated-mass rendering should remain unchanged until the ridge/crease masks are visually validated and a later response patch intentionally maps them into value, tint, and smoothness changes.
+
+Important implementation constraints:
+
+- legacy raised secondary feature meshes remain removed;
+- the original generated mass render mesh is kept unchanged;
+- feature atlas UVs are assigned to Unity mesh channel 3 / shader TEXCOORD3;
+- `MeshData.cs` and `MeshBuilder.cs` are not changed;
+- per-triangle chart output and segment decal painting are no longer the atlas input model;
+- coverage should modulate ridge/crease intensity and continuity, not create random isolated triangle chunks.
+
+### Patch 14C.3 implementation correction — seam-safe semantic ridge fields
+
+Patch 14C.3 keeps the surface-patch atlas architecture and corrects the next validation issue: the mask could appear beside a ridge while the exact ridge sampled dark. That is not acceptable for the desired worn-edge feature.
+
+The correction is architectural, not a visual tuning pass:
+
+```text
+MassSurfaceFeatureGraph
+→ first-class convex/concave Boundary objects
+→ lightweight BoundaryChain metadata for future continuous ridge effects
+→ surface-patch chart bake
+→ clean semantic proximity fields
+→ semantic gutter fill at chart boundaries
+```
+
+FeatureAtlas0 remains data/debug-only:
+
+```text
+FeatureAtlas0.R = convex ridge proximity
+  brightest at the ridge core
+  soft falloff onto both adjacent patches
+  no baked decorative breakup
+
+FeatureAtlas0.G = concave crease proximity
+  brightest at the crease core
+  narrower/sharper falloff
+  no baked decorative breakup
+```
+
+The atlas field should stay clean and reusable. Coverage is allowed to control semantic boundary eligibility, but not random line fragmentation. Mottle, noisy breakup, profile tint, value shift, smoothness shift, and other artistic interpretation belong to the material response patch, not to the semantic atlas bake. This keeps the system future-proof for edge wear, crease darkening, frost catch, mineral seams, water polish, sacred seams, and other later features.
+
+Patch 14C.3 also raises the current default Atlas0 resolution to 512x512. This is a dirty-time/memory tradeoff in favour of cleaner generated feature fields; runtime cost remains a fixed atlas sample in the main shader. Future quality tiers can expose 128/256/512 if needed.
+
+Important non-goals remain unchanged:
+
+- no final edge-wear lightening response yet;
+- no final concave darkening response yet;
+- no secondary feature meshes;
+- no archetype-specific edge-wear modes;
+- no local X/Z projection fallback;
+- no changes to `MeshData.cs` or `MeshBuilder.cs`.
+

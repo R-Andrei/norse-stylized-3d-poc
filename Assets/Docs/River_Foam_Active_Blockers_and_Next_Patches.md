@@ -316,4 +316,20 @@ This document should stay short. When a blocker is solved, move its result into 
 
 ## 4.11C.5.9e obstacle routing correction note
 
-The 5.9 obstacle-routing field was corrected after debug validation. Obstacle influence is now collision-risk based rather than raw proximity based. Strong override is reserved for Foam on a likely collision course directly upstream of an obstacle. Foam beside an obstacle receives only low influence and should generally be carried downstream by phase transport. The routing field uses a rounded flow-relative envelope with weak upstream approach, strong direct-front collision correction, weak side skirt, and short downstream release. Runtime simulation cost is unchanged: two lane loads plus one obstacle-routing load.
+The 5.9 obstacle-routing field was corrected after debug validation. Obstacle influence is now collision-risk based rather than raw proximity based. Strong override is reserved for Foam on a likely collision course directly upstream of an obstacle. Foam beside an obstacle receives only low influence and should generally be carried downstream by phase transport. The routing field uses a rounded flow-relative envelope with weak upstream approach, strong direct-front collision correction, minimal side influence, and no downstream tail after the obstacle is cleared. Runtime simulation cost is unchanged: two lane loads plus one obstacle-routing load.
+
+## 4.11C.5.9f collision-shadow routing note
+
+After 5.9e, debug validation still showed outward/rectangular obstacle edges. The obstacle-routing stamp was tightened again so the override acts as an upstream collision shadow rather than a proximity envelope. Component bounds are only used as the iteration window. Written influence is narrow far upstream, grows toward the obstacle footprint near the leading edge, reaches full strength only for likely direct collision, stays minimal beside the obstacle, and releases almost immediately downstream. Runtime cost is unchanged.
+
+## 4.11C.5.9g obstacle shadow ramp note
+
+After 5.9f, validation showed the collision shadow was close but still had a small downstream residue, a visible dip right before the obstacle exclusion zone, and an approach ramp that started too strong. 5.9g removes the downstream tail, forces a strong direct-front contact band immediately before the obstacle footprint, and eases the upstream ramp so far-ahead routing starts weaker and becomes strong only near imminent collision. Runtime cost is unchanged.
+
+## 4.11C.5.9h field shape calibration note
+
+After 5.9g, validation showed two remaining debug-field content problems: the dense lane field could still form large same-direction bands, and the obstacle collision shadow could still soften right before the obstacle boundary. 5.9h changes only dirty-time field generation. The dense lane generator now uses stronger medium/high-frequency sign-flipping and breaker layers so red/blue direction changes are more granular. The obstacle-routing generator now assigns component ids during flood fill and uses row-specific obstacle leading edges so the shadow peaks at the last valid upstream cells instead of fading symmetrically at both ends. Runtime simulation cost remains unchanged: two lane loads plus one obstacle-routing load.
+
+## 4.11C.5.9i obstacle front-contact closure
+
+After 5.9h, debug validation showed the motion lane field was close enough for functional Foam tests and the obstacle shadow was mostly correct, but the front-contact region could stop one or two cells before the obstacle/negative topology boundary. 5.9i keeps the obstacle shadow position and extends only the direct-front contact band by one to two cells so collision-bound material receives continuous guidance right up to the blocked zone. It also applies a small cutoff to near-zero obstacle-routing influence to remove tiny stray sliver artifacts. The patch changes only dirty-time obstacle-routing texture generation. Runtime cost and ownership boundaries are unchanged.

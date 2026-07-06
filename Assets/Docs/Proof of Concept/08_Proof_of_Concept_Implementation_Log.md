@@ -909,3 +909,32 @@ Validation of the 5.9c/5.9d motion-field debug view showed that the dense lane f
 5.9e keeps the approved runtime architecture unchanged: `SimulateFoam` still performs two scrolling lane loads plus one fixed obstacle-routing load, with no procedural obstacle math, no local obstacle search, no full-field rebuild from scrolling, and no additional runtime texture samples. The correction is dirty-time only: the CPU-generated obstacle-routing texture now writes a flow-relative collision-risk envelope instead of a broad proximity/rectangle override.
 
 The corrected obstacle rule is: likely collision course gets redirected strongly; Foam passing beside an obstacle receives only weak or no redirection; Foam that has cleared the obstacle releases quickly back to the dense lane field. Influence is shaped by upstream/near/release flow zones, lateral collision-corridor overlap, rounded falloff, and a short downstream release. Directly upstream cells aligned with the obstacle footprint can still reach full override, but side-near cells are deliberately capped low so phase transport can carry them downstream beside the object.
+
+## 2026-07-05 — River Foam 4.11C.5.9f collision-shadow obstacle routing correction
+
+Validation of the 5.9e obstacle-routing envelope showed that the field was still too proximity-driven: it produced outward/rectangular side edges and continued to influence material that should simply phase-transport past the obstacle. 5.9f narrows the obstacle override into a projected upstream collision shadow. The bounds are still used as a cheap dirty-time iteration window, but the written influence is now shaped by collision-corridor overlap, upstream approach distance, a short front-corner skirt, and a tiny downstream release.
+
+The runtime contract is unchanged. `SimulateFoam` still samples two lane values plus one obstacle-routing value and performs no obstacle search, no procedural obstacle math, and no field rebuild from lane scrolling. The obstacle-routing texture generation remains dirty-time CPU work only.
+
+
+## 2026-07-06 — River Foam 4.11C.5.9g obstacle shadow ramp correction
+
+Validation of 5.9f showed the obstacle routing field was much closer, but three shaping problems remained: a tiny residual field behind obstacles, a weak dip immediately before the obstacle exclusion/negative zone, and a far-approach ramp that became too visible too early. 5.9g keeps the approved two-field motion architecture and changes only dirty-time obstacle-routing texture generation. The downstream release tail is removed, the final valid upstream cells receive a direct-front contact band so they are the strongest part of the collision shadow, and the approach ramp now eases in more slowly before rising sharply near actual collision risk. Runtime simulation cost remains unchanged: two motion-lane loads plus one obstacle-routing load.
+
+## 2026-07-06 — River Foam 4.11C.5.9h field shape calibration
+
+Validation of 5.9g showed that the overall motion-field architecture was working, but two field-content issues remained. First, the dense lane field could still produce large same-direction regions where one lateral colour dominated almost the full river width for a long downstream span. Second, the obstacle collision shadow could still soften immediately before the actual obstacle boundary because its leading-edge logic was based on component-wide bounds rather than row-specific obstacle contact.
+
+5.9h keeps the runtime contract unchanged: `SimulateFoam` still performs two scrolling lane-field loads plus one fixed obstacle-routing load, with no runtime noise evaluation, no runtime obstacle search, no procedural obstacle math, and no field rebuild from lane scrolling. The changes are dirty-time generation only.
+
+The lane generator now gives more authority to medium/high-frequency sign-flipping layers, uses stronger domain warp, and adds additional breaker noise so broad low-frequency regions can no longer decide the sign over huge stretches by themselves. The goal is more granular red/blue intermixing while preserving a coherent scrolling field.
+
+The obstacle routing generator now stores connected-component ids during flood fill and resolves the upstream leading edge per row. The collision shadow is one-sided: the far upstream tip is softened, but the obstacle-facing end is not. The last valid cells before the obstacle footprint remain the strongest part of the collision shadow, and cells at or past the row-specific obstacle leading edge write no routing influence. Runtime cost remains unchanged.
+
+## 2026-07-06 — River Foam 4.11C.5.9i obstacle front-contact closure
+
+Validation of 5.9h showed the Unified Foam Motion Field was close enough to begin functional Foam testing, but two final obstacle-shadow polish issues remained. The main issue was that the collision shadow could end too abruptly one or two cells before the obstacle/negative topology zone. A secondary issue was the appearance of tiny near-zero routing strips outside the main shadow.
+
+5.9i keeps the approved runtime contract unchanged: `SimulateFoam` still samples two scrolling lane-field values and one fixed obstacle-routing value, with no runtime noise evaluation, no runtime obstacle search, no procedural obstacle math, and no rebuild from lane scrolling. The change is dirty-time obstacle-routing generation only.
+
+The direct-front contact band now extends one to two cells toward the obstacle-facing boundary while remaining gated by the collision corridor. This closes the visual/functional gap between the strongest routing region and the obstacle/negative topology zone without translating the entire approach shadow upstream and without restoring a broad side halo. Very small obstacle-routing influences are also discarded so meaningless sliver artifacts do not appear in the debug view or produce tiny lateral impulses.

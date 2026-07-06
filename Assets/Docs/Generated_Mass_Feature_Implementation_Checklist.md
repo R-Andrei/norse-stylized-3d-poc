@@ -84,7 +84,7 @@ Archetype recipe usage third.
 - [x] Group Dirt Crawl Height/Coverage, Dirt response and Dirt tint controls under `Dirt / Deposit`.
 - [x] Keep Edge Wear controls under `Edge Wear`.
 - [x] Keep ConcaveCrease controls under `Crease / Crack Debug`.
-- [x] Keep shared raised-overlay visibility clearly marked as debug-only.
+- [x] Remove shared raised-overlay visibility because legacy secondary feature meshes are no longer part of the GeneratedMass path.
 - [x] Do not add new feature channels.
 - [x] Do not change shader/material behavior.
 - [x] Update framework docs to make feature-oriented grouping foundational.
@@ -93,28 +93,28 @@ Archetype recipe usage third.
 
 Patch 14C is documentation-approved as a data/debug foundation patch. It should not implement the final artistic edge-wear response.
 
-- [ ] Inspect current mesh UV/channel usage and shader data flow.
-- [ ] Add or select a dedicated feature-atlas UV channel separate from the existing scalar/material-mask channel.
-- [ ] Do not use `UV2.zw` or local X/Z projection as the feature-atlas foundation.
-- [ ] Build deterministic generated surface-chart mapping for generated masses.
-- [ ] Preserve triangle/edge adjacency metadata so semantic features can paint across shared edges and connected regions.
-- [ ] Pack charts into FeatureAtlas0 with padding/gutters.
-- [ ] Implement mask dilation/gutter fill to prevent bilinear bleeding between charts.
-- [ ] Keep atlas resolution parameterized internally; use 256x256 as the preferred first default and prepare for 128/256/512 later.
-- [ ] Use a linear/non-sRGB mask texture with clamp sampling.
-- [ ] Define first packed channel layout: `FeatureAtlas0.R = ConvexEdgeWear`, with G/B/A reserved for future features.
-- [ ] Add generated feature atlas runtime/editor texture ownership and safe cleanup in edit mode and play mode.
-- [ ] Assign the atlas through the generated-mass renderer/material data path without mutating shared material assets.
-- [ ] Add main shader sampling through the dedicated feature-atlas UV channel.
-- [ ] Add debug view support that displays Atlas0.R on the main mass surface.
-- [ ] Bake ConvexEdgeWear into Atlas0.R using shared/reused convex-edge candidate logic where possible.
-- [ ] Paint selected convex edges into both adjacent triangle charts when both sides exist.
-- [ ] Keep existing raised edge/crease carriers debug-only and visibly separate from atlas debug validation.
-- [ ] Keep normal rendering unchanged.
-- [ ] Do not add a final edge-wear tint/value/smoothness response in this patch.
-- [ ] Do not add duplicate final-render feature meshes.
-- [ ] Do not add archetype-specific feature response modes.
-- [ ] Update feature contracts to reference surface-chart atlas storage where applicable.
+- [x] Inspect current mesh UV/channel usage and shader data flow.
+- [x] Add or select a dedicated feature-atlas UV channel separate from the existing scalar/material-mask channel. *(Patch 14C.1 uses Unity mesh channel 3 / shader `TEXCOORD3` for generated-mass feature atlas UVs.)*
+- [x] Do not use `UV2.zw` or local X/Z projection as the feature-atlas foundation.
+- [x] Build deterministic generated surface-chart mapping for generated masses, corrected in Patch 14C.2 to use surface-patch charts rather than per-triangle decal charts.
+- [x] Preserve triangle/edge adjacency metadata so semantic features can paint across shared edges and connected regions.
+- [x] Pack charts into FeatureAtlas0 with padding/gutters.
+- [x] Add chart padding/gutters. Patch 14C.2 avoids global dilation and bakes ridge/crease distance fields inside packed surface-patch charts. Patch 14C.3 adds semantic gutter fill so chart boundaries near ridges/creases do not sample black.
+- [x] Keep atlas resolution parameterized internally; Patch 14C.3 uses 512x512 as the current quality-oriented default while preserving 128/256/512 as future quality tiers.
+- [x] Use a linear/non-sRGB mask texture with clamp sampling.
+- [x] Define first packed channel layout: `FeatureAtlas0.R = ConvexEdgeWear / convex ridge proximity`, `FeatureAtlas0.G = ConcaveCrease / concave crease proximity`, with B/A reserved for future features.
+- [x] Add generated feature atlas runtime/editor texture ownership and safe cleanup in edit mode and play mode.
+- [x] Assign the atlas through the generated-mass renderer/material data path without mutating shared material assets.
+- [x] Add main shader sampling through the dedicated feature-atlas UV channel.
+- [x] Add debug view support that displays Atlas0.R on the main mass surface.
+- [x] Bake ConvexEdgeWear into Atlas0.R using shared/reused convex-edge candidate logic where possible.
+- [x] Paint selected convex edges into both adjacent triangle charts when both sides exist and chart texel density is sufficient; skip tiny charts rather than emitting triangle wedges.
+- [x] Remove existing raised edge/crease carriers from the GeneratedMass path; ConvexEdgeWear and ConcaveCrease validation are both main-surface atlas debug channels.
+- [x] Keep normal rendering unchanged.
+- [x] Do not add a final edge-wear tint/value/smoothness response in this patch.
+- [x] Do not add duplicate final-render feature meshes.
+- [x] Do not add archetype-specific feature response modes.
+- [x] Update feature contracts to reference surface-chart atlas storage where applicable.
 
 ### Framework implementation tasks
 
@@ -126,7 +126,7 @@ Patch 14C is documentation-approved as a data/debug foundation patch. It should 
 - [x] Define how recipe values are stored. *(Patch 14B: built-in recipe values are code-defined for the current scaffold; future data assets remain possible.)*
 - [x] Define how feature groups are displayed in the inspector. *(Patch 14B.1: existing controls are grouped by owning feature foldout: Exposure, Base / Contact, Crevice / Shelter, Dirt / Deposit, Edge Wear, and Crease / Crack Debug. Global controls remain outside the feature stack.)*
 - [ ] Define how feature debug views are selected.
-- [ ] Implement Generated Mass Surface-Chart Feature Atlas foundation. *(Prerequisite before serious final feature work such as edge wear, pitting, cracks, frost, or water wear.)*
+- [x] Implement Generated Mass Surface-Chart Feature Atlas foundation. *(Prerequisite before serious final feature work such as edge wear, pitting, cracks, frost, or water wear.)*
 - [x] Audit existing controls and map them into feature groups. *(Patch 14B.1: existing shape/strength/tint controls have been remapped under their owning feature rather than category buckets.)*
 - [ ] Keep old generated-stone material profiles available only as transitional recipes or historical presets.
 
@@ -289,13 +289,13 @@ Potential future uses:
 
 ### ConvexEdgeWear
 
-Status: Implemented: Debug/Data Only; blocked on Feature Mask Atlas for final response
+Status: Implemented: Atlas Debug/Data Only; final response deferred
 
 Existing data:
 
-- debug feature-line data exists.
-- current raised overlay strips are not accepted as final rendering.
-- final edge wear should be baked into the generated feature mask atlas and interpreted by the main generated-mass shader.
+- ConvexEdgeWear bakes into `GeneratedMassFeatureAtlas0.R`.
+- legacy raised overlay strips have been removed.
+- final edge wear should be interpreted by the main generated-mass shader.
 
 Minimum controls:
 
@@ -308,8 +308,9 @@ Minimum controls:
 
 Debug / validation:
 
-- [x] existing debug strip visualization.
-- [ ] add generated atlas channel debug/final comparison view.
+- [x] generated atlas channel debug view on the main mass surface.
+- [x] legacy debug strip visualization removed.
+- [ ] add final response comparison after 14D implements interpretation.
 
 Recipe readiness:
 
@@ -331,12 +332,13 @@ Failure cases:
 
 ### ConcaveCrease
 
-Status: Implemented: Debug/Data Only
+Status: Reserved: Awaiting Atlas Channel
 
 Existing data:
 
-- debug feature-line data exists.
-- current raised overlay strips are not accepted as final rendering.
+- controls remain reserved for future crease/crack work.
+- legacy raised overlay strips have been removed.
+- visual crease debug now exists as atlas-backed main-surface data in `GeneratedMassFeatureAtlas0.G`; final darkening response is still deferred.
 
 Minimum controls:
 
@@ -349,8 +351,8 @@ Minimum controls:
 
 Debug / validation:
 
-- [x] existing debug strip visualization.
-- [ ] add surface-integrated debug/final comparison view.
+- [x] legacy debug strip visualization removed.
+- [ ] add surface-integrated atlas debug/final comparison view.
 
 Recipe readiness:
 
@@ -481,7 +483,7 @@ Status: Planned; depends on Generated Mass Feature Mask Atlas Foundation
 
 Purpose:
 
-- replace debug-only raised edge strips with final surface-integrated generic edge-wear data sampled by the main generated-mass shader.
+- continue from removed legacy raised edge strips and implement final surface-integrated generic edge-wear data sampled by the main generated-mass shader.
 
 Implementation tasks:
 
@@ -531,7 +533,7 @@ Status: Planned; likely depends on Generated Mass Feature Mask Atlas Foundation
 
 Purpose:
 
-- replace debug-only raised crease strips with actual surface-integrated generic crease/seam data sampled by the main generated-mass shader.
+- continue from removed legacy raised crease strips and implement actual surface-integrated generic crease/seam data sampled by the main generated-mass shader.
 
 Implementation tasks:
 
@@ -1264,3 +1266,40 @@ Rules for this next phase:
 - Keep old edge/crease strip carriers debug-only unless a specific exception is approved.
 - Keep feature controls generic and archetype-agnostic.
 - Build recipe outcomes by combining generic feature controls, not by adding Wet/Frost/Sacred modes inside each feature.
+
+### Patch 14C.2 — Surface-Patch Atlas + Convex/Concave Ridge Fields
+
+- [x] Replace per-triangle chart atlas baking with surface-patch chart baking.
+- [x] Build a quantized-position surface graph from the generated mass mesh.
+- [x] Classify boundaries as open border, flat/internal, convex ridge, concave crease, or ambiguous.
+- [x] Flood-fill patches across flat/internal boundaries only.
+- [x] Pack one chart per surface patch rather than one chart per triangle.
+- [x] Keep the original generated mass render mesh unchanged.
+- [x] Assign feature atlas UVs to Unity mesh channel 3 / shader `TEXCOORD3`.
+- [x] Bake convex ridge distance data into `GeneratedMassFeatureAtlas0.R`.
+- [x] Bake concave crease distance data into `GeneratedMassFeatureAtlas0.G`.
+- [x] Update ConvexEdgeWear debug to show the main-surface Atlas0.R ridge field.
+- [x] Update ConcaveCrease debug to show the main-surface Atlas0.G crease field.
+- [x] Keep normal rendering unchanged; final lightening/darkening response is deferred.
+- [x] Keep legacy raised secondary feature meshes removed.
+- [x] Leave `MeshData.cs` and `MeshBuilder.cs` untouched.
+
+### Patch 14C.3 — Feature Graph / Ridge Field Hardening
+
+- [x] Treat convex and concave boundaries as first-class semantic feature data rather than final-looking paint.
+- [x] Add lightweight boundary-chain metadata so future effects can reason about continuous ridge/crease networks.
+- [x] Keep `FeatureAtlas0.R` as clean convex ridge proximity, brightest at the ridge core with soft falloff onto neighboring patches.
+- [x] Keep `FeatureAtlas0.G` as clean concave crease proximity, brightest at the crease core with a narrower/sharper falloff.
+- [x] Fill chart gutters semantically near ridge/crease boundaries so bilinear filtering does not pull black into the exact ridge or crease.
+- [x] Remove baked decorative breakup/noise from the atlas data; coverage now controls semantic boundary eligibility rather than random line fragmentation, and final breakup belongs to material response.
+- [x] Raise the current default atlas resolution to 512x512 while keeping the baker parameterized for later quality tiers.
+- [x] Keep normal rendering unchanged; debug/data only.
+- [x] Keep secondary feature meshes removed.
+- [x] Leave `MeshData.cs` and `MeshBuilder.cs` untouched.
+
+Future notes:
+
+- Patch 14D should interpret clean Atlas0.R/Atlas0.G data as convex lightening and concave darkening through the main shader.
+- If shader response still reads as paint on hard geometry, evaluate shader-side ridge-normal support or dirty-time main-mesh bevel/chamfer generation. Do not solve that with secondary meshes.
+- The graph/atlas system should remain reusable for future edge-adjacent or patch-adjacent effects, but future effects are not forced to use it if another representation is cleaner.
+

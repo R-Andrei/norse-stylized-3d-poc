@@ -49,7 +49,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty overallRockTint;
         private SerializedProperty overallRockTintStrength;
         private SerializedProperty lightingTintInfluence;
-        private SerializedProperty surfaceFeatureVisibility;
         private SerializedProperty edgeWearAmount;
         private SerializedProperty edgeWearWidth;
         private SerializedProperty edgeWearCoverage;
@@ -145,8 +144,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "overallRockTintStrength");
             lightingTintInfluence = serializedObject.FindProperty(
                 "lightingTintInfluence");
-            surfaceFeatureVisibility = serializedObject.FindProperty(
-                "surfaceFeatureVisibility");
             edgeWearAmount = serializedObject.FindProperty(
                 "edgeWearAmount");
             edgeWearWidth = serializedObject.FindProperty(
@@ -239,7 +236,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "overallRockTint",
                 "overallRockTintStrength",
                 "lightingTintInfluence",
-                "surfaceFeatureVisibility",
                 "edgeWearAmount",
                 "edgeWearWidth",
                 "edgeWearCoverage",
@@ -595,7 +591,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             DrawBaseContactFeature();
             DrawCreviceShelterFeature();
             DrawDirtDepositFeature();
-            DrawSharedEdgeCreaseDebugVisibility();
             DrawEdgeWearFeature();
             DrawCreaseDebugFeature();
         }
@@ -801,10 +796,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             using (new EditorGUI.IndentLevelScope())
             {
                 EditorGUILayout.HelpBox(
-                    "ConvexEdgeWear is currently a semantic/debug feature. " +
-                    "These controls generate and validate edge-wear data; " +
-                    "the raised overlay strips are not the accepted final " +
-                    "visible edge-wear rendering path.",
+                    "ConvexEdgeWear now bakes into GeneratedMassFeatureAtlas0.R " +
+                    "as a seam-safe surface-patch ridge-proximity field for main-surface " +
+                    "debug validation. Legacy raised secondary meshes remain " +
+                    "removed; normal rendering still has no final edge-wear " +
+                    "response in Patch 14C.",
                     MessageType.Info);
 
                 EditorGUILayout.PropertyField(
@@ -821,7 +817,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     edgeWearCoverage,
                     new GUIContent(
                         "Coverage",
-                        "Controls how broadly convex edge-wear candidates appear."));
+                        "Controls semantic ridge eligibility: lower values keep only the strongest ridges, higher values include more ridge boundaries. It no longer creates random edge fragments."));
                 EditorGUILayout.PropertyField(
                     edgeWearSoftness,
                     new GUIContent(
@@ -845,9 +841,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             using (new EditorGUI.IndentLevelScope())
             {
                 EditorGUILayout.HelpBox(
-                    "ConcaveCrease is currently a semantic/debug feature. " +
-                    "These controls generate and validate crease data; this " +
-                    "is not yet the final surface-integrated crack system.",
+                    "ConcaveCrease now bakes into GeneratedMassFeatureAtlas0.G " +
+                    "as a seam-safe surface-patch crease-proximity field for main-surface " +
+                    "debug validation. This remains data/debug-only; final " +
+                    "crease darkening is deferred until the mask is validated.",
                     MessageType.Info);
 
                 EditorGUILayout.PropertyField(
@@ -875,36 +872,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     new GUIContent(
                         "Softness",
                         "Controls how soft the generated crease debug/data response is."));
-            }
-        }
-
-        private void DrawSharedEdgeCreaseDebugVisibility()
-        {
-            EditorGUILayout.Space(3f);
-            EditorGUILayout.LabelField(
-                "Shared Edge / Crease Debug Visibility",
-                EditorStyles.miniBoldLabel);
-
-            using (new EditorGUI.IndentLevelScope())
-            {
-                EditorGUILayout.PropertyField(
-                    surfaceFeatureVisibility,
-                    new GUIContent(
-                        "Debug Line Visibility",
-                        "Shared visibility control for generated raised Edge Wear and Crease overlay strips."));
-
-                if (surfaceFeatureVisibility != null &&
-                    !surfaceFeatureVisibility.hasMultipleDifferentValues &&
-                    surfaceFeatureVisibility.enumValueIndex ==
-                    (int)StoneSurfaceFeatureVisibility.VisibleProfileResponse)
-                {
-                    EditorGUILayout.HelpBox(
-                        "VisibleProfileResponse makes raised overlay strips " +
-                        "visible during normal rendering. Current accepted " +
-                        "Generated Mass rendering keeps this DebugOnly unless " +
-                        "intentionally testing the old overlay response.",
-                        MessageType.Warning);
-                }
             }
         }
 

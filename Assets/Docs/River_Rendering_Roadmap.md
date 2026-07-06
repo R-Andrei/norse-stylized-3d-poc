@@ -383,3 +383,19 @@ Before implementing a stage or sub-feature, define its acceptance tests. After a
 ### 4.11C.5.9e — obstacle routing envelope correction
 
 The Unified Foam Motion Field obstacle override was refined from a broad component stamp into a flow-relative collision-risk envelope. This keeps the two-field runtime sampling model unchanged while reducing rectangular override slabs, excessive upstream strength, side over-steering, and continued steering after an obstacle is cleared.
+
+### 4.11C.5.9f — collision-shadow obstacle routing correction
+
+Follow-up validation showed the 5.9e obstacle envelope still behaved too much like an expanded proximity volume. The obstacle override was narrowed into a collision-shadow model: strong influence is reserved for cells in the projected upstream collision corridor, side-passing material receives only minimal corner protection, and downstream release is deliberately tiny. The runtime sampling contract is unchanged.
+
+### 4.11C.5.9g — obstacle shadow ramp correction
+
+Debug validation of 5.9f showed the obstacle shadow was finally in the correct area, but still had three field-shaping issues: a tiny residual tail behind objects, a strength dip immediately before the obstacle exclusion zone, and an approach ramp that began too assertively. 5.9g removes the downstream tail entirely, adds a direct-front contact band so the final valid upstream cells are the strongest cells, and changes the upstream approach curve to a slower eased/exponential-style ramp. Runtime sampling remains unchanged: two lane-field loads plus one obstacle-routing load.
+
+### 4.11C.5.9h — Field Shape Calibration
+
+5.9h refines the approved Unified Foam Motion Field without changing runtime cost. The dense lane field generation now uses stronger medium/high-frequency sign-flipping and breaker noise to reduce huge same-direction zones. The obstacle-routing field now uses row-specific connected-component leading edges, producing a one-sided collision shadow that peaks immediately before the obstacle instead of fading at the obstacle-facing end. Runtime remains two lane loads plus one obstacle-routing load, with no runtime noise and no runtime obstacle search.
+
+### 4.11C.5.9i — obstacle front-contact closure
+
+5.9i is intended as the final obstacle-shadow shape tuning pass before testing actual Foam movement. Validation of 5.9h showed the collision shadow was in the correct area and the lane field had enough red/blue intermixing, but the obstacle shadow could end one or two cells before visually contacting the obstacle/negative topology boundary, and very tiny low-value routing slivers could appear outside the main collision shadow. The 5.9i correction keeps the current shadow position and extends only the front-contact band by one to two cells in the flow direction, constrained by the collision corridor, so the obstacle override meets the blocked/negative zone without restoring a broad side halo. It also suppresses near-zero routing values to remove insignificant sliver artifacts. Runtime sampling remains unchanged: two lane-field loads plus one obstacle-routing load.

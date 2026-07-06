@@ -50,7 +50,6 @@ Shader "PS3D/Pixel Surface Lit"
         _StoneEdgeWearTint("Stone Edge Wear Tint", Color) = (0.76, 0.74, 0.62, 1)
         _StoneCreaseResponse("Stone Crease Response", Range(0, 1)) = 0.65
         _StoneCreaseTint("Stone Crease Tint", Color) = (0.09, 0.085, 0.075, 1)
-        _StoneFeatureClip("Stone Feature Overlay Clip", Range(0, 0.25)) = 0.035
 
         [Enum(ProgrammaticStylized3D.Rendering.PixelSurfaceMaskDebugMode)]
         _MaskDebugMode("Mask Debug Mode", Float) = 0
@@ -75,7 +74,8 @@ Shader "PS3D/Pixel Surface Lit"
         [HideInInspector] _GeneratedMassCreviceResponse("Generated Mass Crevice Response", Float) = 1
         [HideInInspector] _GeneratedMassBaseResponse("Generated Mass Base Response", Float) = 1
         [HideInInspector] _GeneratedMassDirtDepositResponse("Generated Mass Dirt Deposit Response", Float) = 1
-        [HideInInspector] _GeneratedMassFeatureOverlayKind("Generated Mass Feature Overlay Kind", Float) = 0
+        [HideInInspector] _GeneratedMassFeatureAtlas0("Generated Mass Feature Atlas 0", 2D) = "black" {}
+        [HideInInspector] _GeneratedMassFeatureAtlas0Enabled("Generated Mass Feature Atlas 0 Enabled", Float) = 0
         [HideInInspector] _GeneratedMassEdgeWearCoverage("Generated Mass Edge Wear Coverage", Float) = 1
         [HideInInspector] _GeneratedMassEdgeWearSoftness("Generated Mass Edge Wear Softness", Float) = 0.45
         [HideInInspector] _GeneratedMassCreaseLength("Generated Mass Crease Length", Float) = 1
@@ -190,7 +190,6 @@ Shader "PS3D/Pixel Surface Lit"
                 half4 _StoneEdgeWearTint;
                 float _StoneCreaseResponse;
                 half4 _StoneCreaseTint;
-                float _StoneFeatureClip;
                 float _MaskDebugMode;
                 float _SurfaceContract;
                 float _GroundSnowResponse;
@@ -212,7 +211,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassCreviceResponse;
                 float _GeneratedMassBaseResponse;
                 float _GeneratedMassDirtDepositResponse;
-                float _GeneratedMassFeatureOverlayKind;
+                float _GeneratedMassFeatureAtlas0Enabled;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassCreaseLength;
@@ -250,6 +249,8 @@ Shader "PS3D/Pixel Surface Lit"
 
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_GeneratedMassFeatureAtlas0);
+            SAMPLER(sampler_GeneratedMassFeatureAtlas0);
 
             struct Attributes
             {
@@ -257,6 +258,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float3 normalOS : NORMAL;
                 float2 uv : TEXCOORD0;
                 float4 uv2 : TEXCOORD2;
+                float2 featureAtlasUV : TEXCOORD3;
                 half4 color : COLOR;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
@@ -272,6 +274,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float3 positionOS : TEXCOORD4;
                 float4 materialMasks : TEXCOORD5;
                 half3 normalOS : TEXCOORD6;
+                float2 featureAtlasUV : TEXCOORD7;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -297,6 +300,7 @@ Shader "PS3D/Pixel Surface Lit"
                 output.positionOS = input.positionOS.xyz;
                 output.materialMasks = input.uv2;
                 output.normalOS = normalize(input.normalOS);
+                output.featureAtlasUV = input.featureAtlasUV;
                 return output;
             }
 
@@ -820,27 +824,6 @@ Shader "PS3D/Pixel Surface Lit"
                 return saturate(input.materialMasks.z);
             }
 
-            float ResolveFeatureLineMask(
-                Varyings input,
-                float rawMask,
-                float softness)
-            {
-                rawMask = saturate(rawMask);
-                float across01 = saturate(abs(input.uv.y * 2.0 - 1.0));
-                float length01 = saturate(input.uv.x);
-                float sideEdge = lerp(0.72, 0.18, saturate(softness));
-                float sideFalloff =
-                    1.0 -
-                    smoothstep(
-                        sideEdge,
-                        1.0,
-                        across01);
-                // Softness intentionally affects cross-strip falloff only.
-                // End taper on every strip segment creates visible holes where
-                // generated segments meet or continue each other.
-                return saturate(rawMask * sideFalloff);
-            }
-
             half PS3D_MaskTintLuminance(half3 color)
             {
                 return dot(color, half3(0.2126h, 0.7152h, 0.0722h));
@@ -858,6 +841,31 @@ Shader "PS3D/Pixel Surface Lit"
                 return lerp(neutralTarget, hueTarget, strength);
             }
 
+            float4 ResolveGeneratedMassFeatureAtlas0(Varyings input)
+            {
+                if (_GeneratedMassFeatureAtlas0Enabled < 0.5)
+                {
+                    return float4(0.0, 0.0, 0.0, 0.0);
+                }
+
+                float2 atlasUV = saturate(input.featureAtlasUV);
+                return saturate(
+                    SAMPLE_TEXTURE2D(
+                        _GeneratedMassFeatureAtlas0,
+                        sampler_GeneratedMassFeatureAtlas0,
+                        atlasUV));
+            }
+
+            float ResolveGeneratedMassAtlasEdgeWearMask(Varyings input)
+            {
+                return ResolveGeneratedMassFeatureAtlas0(input).r;
+            }
+
+            float ResolveGeneratedMassAtlasCreaseMask(Varyings input)
+            {
+                return ResolveGeneratedMassFeatureAtlas0(input).g;
+            }
+
             half3 ResolveMaskDebugColor(Varyings input)
             {
                 int mode = (int)round(_MaskDebugMode);
@@ -867,21 +875,10 @@ Shader "PS3D/Pixel Surface Lit"
                     return half3(-1.0h, -1.0h, -1.0h);
                 }
 
-                float overlayKind = round(_GeneratedMassFeatureOverlayKind);
-                bool isEdgeWearOverlay = overlayKind == 1.0;
-                bool isCreaseOverlay = overlayKind == 2.0;
-
                 if (mode == 4)
                 {
-                    if (!isEdgeWearOverlay)
-                    {
-                        return half3(-1.0h, -1.0h, -1.0h);
-                    }
+                    float mask = ResolveGeneratedMassAtlasEdgeWearMask(input);
 
-                    float mask = ResolveFeatureLineMask(
-                        input,
-                        (float)input.color.a,
-                        _GeneratedMassEdgeWearSoftness);
                     return (half3)lerp(
                         float3(0.025, 0.025, 0.035),
                         float3(1.0, 0.92, 0.55),
@@ -890,28 +887,12 @@ Shader "PS3D/Pixel Surface Lit"
 
                 if (mode == 5)
                 {
-                    if (!isCreaseOverlay)
-                    {
-                        return half3(-1.0h, -1.0h, -1.0h);
-                    }
+                    float mask = ResolveGeneratedMassAtlasCreaseMask(input);
 
-                    float mask = ResolveFeatureLineMask(
-                        input,
-                        (float)input.materialMasks.x,
-                        _GeneratedMassCreaseSoftness);
                     return (half3)lerp(
                         float3(0.025, 0.025, 0.035),
-                        float3(1.0, 0.92, 0.55),
+                        float3(0.20, 0.36, 1.0),
                         mask);
-                }
-
-                // Line-feature debug modes are overlay-only. The main generated
-                // mass remains normally shaded so geometry and facet placement
-                // stay readable during validation. Area and ground debug modes
-                // below still use the full-surface mask preview.
-                if (isEdgeWearOverlay || isCreaseOverlay)
-                {
-                    return half3(-1.0h, -1.0h, -1.0h);
                 }
 
                 float mask = 0.0;
@@ -985,17 +966,6 @@ Shader "PS3D/Pixel Surface Lit"
             {
                 half4 baseSample =
                     SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
-
-                float overlayKind = round(_GeneratedMassFeatureOverlayKind);
-                if (round(_MaskDebugMode) <= 0.0 && overlayKind > 0.5)
-                {
-                    // Feature overlay meshes are raised debug geometry, not the
-                    // final visible stone response. Discard them in normal
-                    // rendering so accidental renderer state cannot show
-                    // floating lines above the rock.
-                    clip(-1.0);
-                    return half3(0.0h, 0.0h, 0.0h);
-                }
 
                 float broadCellSize = max(_PixelCellSize * 8.0, 0.0001);
                 float3 broadCoordinate =
@@ -1562,7 +1532,6 @@ Shader "PS3D/Pixel Surface Lit"
                 half4 _StoneEdgeWearTint;
                 float _StoneCreaseResponse;
                 half4 _StoneCreaseTint;
-                float _StoneFeatureClip;
                 float _MaskDebugMode;
                 float _SurfaceContract;
                 float _GroundSnowResponse;
@@ -1580,7 +1549,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassCreviceBreakup;
                 float _GeneratedMassDirtCrawlReach;
                 float _GeneratedMassDirtCoverage;
-                float _GeneratedMassFeatureOverlayKind;
+                float _GeneratedMassFeatureAtlas0Enabled;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassCreaseLength;
@@ -1725,7 +1694,6 @@ Shader "PS3D/Pixel Surface Lit"
                 half4 _StoneEdgeWearTint;
                 float _StoneCreaseResponse;
                 half4 _StoneCreaseTint;
-                float _StoneFeatureClip;
                 float _MaskDebugMode;
                 float _SurfaceContract;
                 float _GroundSnowResponse;
@@ -1743,7 +1711,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassCreviceBreakup;
                 float _GeneratedMassDirtCrawlReach;
                 float _GeneratedMassDirtCoverage;
-                float _GeneratedMassFeatureOverlayKind;
+                float _GeneratedMassFeatureAtlas0Enabled;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassCreaseLength;
@@ -1882,7 +1850,6 @@ Shader "PS3D/Pixel Surface Lit"
                 half4 _StoneEdgeWearTint;
                 float _StoneCreaseResponse;
                 half4 _StoneCreaseTint;
-                float _StoneFeatureClip;
                 float _MaskDebugMode;
                 float _SurfaceContract;
                 float _GroundSnowResponse;
@@ -1900,7 +1867,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassCreviceBreakup;
                 float _GeneratedMassDirtCrawlReach;
                 float _GeneratedMassDirtCoverage;
-                float _GeneratedMassFeatureOverlayKind;
+                float _GeneratedMassFeatureAtlas0Enabled;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassCreaseLength;

@@ -945,6 +945,7 @@ namespace ProgrammaticStylized3D.Rivers
             motionLaneRawValues = Array.Empty<float>();
             obstacleRoutingOccupied = Array.Empty<bool>();
             obstacleRoutingVisited = Array.Empty<bool>();
+            obstacleRoutingComponentIds = Array.Empty<int>();
             obstacleRoutingQueue = Array.Empty<int>();
             obstacleRoutingComponents.Clear();
             motionLaneFieldSignature = int.MinValue;

@@ -41,6 +41,7 @@ namespace ProgrammaticStylized3D.Rivers
         private float[] motionLaneRawValues = Array.Empty<float>();
         private bool[] obstacleRoutingOccupied = Array.Empty<bool>();
         private bool[] obstacleRoutingVisited = Array.Empty<bool>();
+        private int[] obstacleRoutingComponentIds = Array.Empty<int>();
         private int[] obstacleRoutingQueue = Array.Empty<int>();
         private readonly List<FoamObstacleRoutingComponent> obstacleRoutingComponents = new();
         private int motionLaneFieldSignature = int.MinValue;

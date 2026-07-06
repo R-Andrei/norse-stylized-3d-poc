@@ -280,4 +280,20 @@ Before automatic population begins, manually-born Foam must show:
 
 ## 5.9e obstacle routing refinement
 
-Obstacle routing must be interpreted as collision prevention, not as a generic proximity force. Close beside an object is not sufficient reason for strong redirection; the strongest influence is reserved for material that would otherwise hit the obstacle. The fixed obstacle-routing texture therefore uses a flow-relative collision-risk envelope: weak upstream approach, high direct-front override, weak side skirt, and rapid downstream release. This preserves the Stage 6 ownership split and keeps runtime simulation cost unchanged.
+Obstacle routing must be interpreted as collision prevention, not as a generic proximity force. Close beside an object is not sufficient reason for strong redirection; the strongest influence is reserved for material that would otherwise hit the obstacle. The fixed obstacle-routing texture therefore uses a flow-relative collision-risk envelope: weak upstream approach, high direct-front override, minimal side influence, and no downstream tail after the obstacle is cleared. This preserves the Stage 6 ownership split and keeps runtime simulation cost unchanged.
+
+## 5.9f collision-shadow obstacle routing correction
+
+Obstacle routing must be based on likely collision, not closeness. The corrected obstacle-routing texture now treats the component bounds only as a cheap iteration window; the written influence is constrained to a flow-relative collision shadow. Far upstream influence remains weak, direct-front cells aligned with the obstacle footprint can reach full override, side-passing cells are capped to very low influence, and downstream influence is cut entirely once the obstacle is cleared. This keeps `SimulateFoam` at the same runtime cost: two lane loads plus one fixed obstacle-routing load.
+
+## 5.9g obstacle shadow ramp correction
+
+The final valid cells immediately before the obstacle exclusion zone should be the strongest part of the collision shadow. 5.9g therefore adds a direct-front contact band, removes the remaining downstream release tail, and changes the upstream approach ramp from an overly assertive near-linear feel to a slower eased ramp that only becomes strong near actual collision risk. The obstacle texture is still dirty-time data only; runtime simulation cost is unchanged.
+
+## 4.11C.5.9h motion-field shape calibration
+
+The unified Foam Motion Field remains a two-field system: a dense scrolling lane field plus a fixed dirty-time obstacle-routing field. 5.9h does not alter runtime ownership or sample count. It refines the generated field content so the lane field avoids large same-direction continents and the obstacle field behaves as a one-sided collision shadow. Obstacle components now track ids during flood fill so row-specific leading edges can be used when shaping the shadow. This keeps strongest obstacle influence at the final valid upstream cells before collision, while immediately releasing cells at or past the row-specific obstacle boundary.
+
+## 4.11C.5.9i obstacle front-contact closure
+
+5.9i is a final dirty-time shape correction for the obstacle-routing texture. It does not alter the two-field architecture, lane scrolling, runtime sampling, lifecycle ownership, topology ownership, or final rendering ownership. The obstacle collision shadow keeps the 5.9h row-specific leading-edge model, but its front-contact band is allowed to extend one to two cells into the obstacle-facing boundary so the strongest routing region visually and functionally touches the obstacle/negative topology zone instead of stopping short. The extension is constrained by the collision corridor so side-passing material is still not redirected merely because it is close to the object. Low-value routing influences below the artifact threshold are discarded to remove tiny stray strips outside the main shadow. Runtime remains two lane loads plus one obstacle-routing load.
