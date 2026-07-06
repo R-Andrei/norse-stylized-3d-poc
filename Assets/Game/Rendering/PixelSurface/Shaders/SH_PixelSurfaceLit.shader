@@ -76,13 +76,16 @@ Shader "PS3D/Pixel Surface Lit"
         [HideInInspector] _GeneratedMassDirtDepositResponse("Generated Mass Dirt Deposit Response", Float) = 1
         [HideInInspector] _GeneratedMassFeatureAtlas0("Generated Mass Feature Atlas 0", 2D) = "black" {}
         [HideInInspector] _GeneratedMassFeatureAtlas0Enabled("Generated Mass Feature Atlas 0 Enabled", Float) = 0
+        [HideInInspector] _GeneratedMassFeatureAtlas1("Generated Mass Feature Atlas 1", 2D) = "black" {}
+        [HideInInspector] _GeneratedMassFeatureAtlas1Enabled("Generated Mass Feature Atlas 1 Enabled", Float) = 0
         [HideInInspector] _GeneratedMassEdgeWearCoverage("Generated Mass Edge Wear Coverage", Float) = 1
         [HideInInspector] _GeneratedMassEdgeWearSoftness("Generated Mass Edge Wear Softness", Float) = 0.45
         [HideInInspector] _GeneratedMassEdgeWearResponseStrength("Generated Mass Edge Wear Response Strength", Float) = 0
         [HideInInspector] _GeneratedMassEdgeWearBrightnessLift("Generated Mass Edge Wear Brightness Lift", Float) = 0.25
         [HideInInspector] _GeneratedMassEdgeWearTint("Generated Mass Edge Wear Tint", Color) = (0.70, 0.69, 0.62, 1)
         [HideInInspector] _GeneratedMassEdgeWearTintStrength("Generated Mass Edge Wear Tint Strength", Float) = 0
-        [HideInInspector] _GeneratedMassEdgeWearBreakup("Generated Mass Edge Wear Breakup", Float) = 0
+        [HideInInspector] _GeneratedMassEdgeWearMacroVariation("Generated Mass Edge Wear Macro Variation", Float) = 0
+        [HideInInspector] _GeneratedMassEdgeWearMicroVariation("Generated Mass Edge Wear Micro Variation", Float) = 0
         [HideInInspector] _GeneratedMassCreaseLength("Generated Mass Crease Length", Float) = 1
         [HideInInspector] _GeneratedMassCreaseBranching("Generated Mass Crease Branching", Float) = 1
         [HideInInspector] _GeneratedMassCreaseSoftness("Generated Mass Crease Softness", Float) = 0.35
@@ -217,13 +220,15 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassBaseResponse;
                 float _GeneratedMassDirtDepositResponse;
                 float _GeneratedMassFeatureAtlas0Enabled;
+                float _GeneratedMassFeatureAtlas1Enabled;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;
                 float _GeneratedMassEdgeWearBrightnessLift;
                 half4 _GeneratedMassEdgeWearTint;
                 float _GeneratedMassEdgeWearTintStrength;
-                float _GeneratedMassEdgeWearBreakup;
+                float _GeneratedMassEdgeWearMacroVariation;
+                float _GeneratedMassEdgeWearMicroVariation;
                 float _GeneratedMassCreaseLength;
                 float _GeneratedMassCreaseBranching;
                 float _GeneratedMassCreaseSoftness;
@@ -261,6 +266,8 @@ Shader "PS3D/Pixel Surface Lit"
             SAMPLER(sampler_BaseMap);
             TEXTURE2D(_GeneratedMassFeatureAtlas0);
             SAMPLER(sampler_GeneratedMassFeatureAtlas0);
+            TEXTURE2D(_GeneratedMassFeatureAtlas1);
+            SAMPLER(sampler_GeneratedMassFeatureAtlas1);
 
             struct Attributes
             {
@@ -866,6 +873,21 @@ Shader "PS3D/Pixel Surface Lit"
                         atlasUV));
             }
 
+            float4 ResolveGeneratedMassFeatureAtlas1(Varyings input)
+            {
+                if (_GeneratedMassFeatureAtlas1Enabled < 0.5)
+                {
+                    return float4(0.0, 0.0, 0.0, 0.0);
+                }
+
+                float2 atlasUV = saturate(input.featureAtlasUV);
+                return saturate(
+                    SAMPLE_TEXTURE2D(
+                        _GeneratedMassFeatureAtlas1,
+                        sampler_GeneratedMassFeatureAtlas1,
+                        atlasUV));
+            }
+
             float ResolveGeneratedMassAtlasEdgeWearMask(Varyings input)
             {
                 float4 atlas0 = ResolveGeneratedMassFeatureAtlas0(input);
@@ -893,6 +915,7 @@ Shader "PS3D/Pixel Surface Lit"
                 }
 
                 float4 atlas0 = ResolveGeneratedMassFeatureAtlas0(input);
+                float4 atlas1 = ResolveGeneratedMassFeatureAtlas1(input);
                 float convexProximity = saturate(atlas0.r);
                 float convexWeight = saturate(atlas0.g);
 
@@ -901,51 +924,68 @@ Shader "PS3D/Pixel Surface Lit"
                     return albedo;
                 }
 
-                float breakupStrength = saturate(_GeneratedMassEdgeWearBreakup);
+                float macroVariation = saturate(_GeneratedMassEdgeWearMacroVariation);
+                float microVariation = saturate(_GeneratedMassEdgeWearMicroVariation);
+                float atlas1Enabled = step(0.5, _GeneratedMassFeatureAtlas1Enabled);
 
-                // Patch 14D.1: the atlas stores clean semantic ridge data; the
-                // visual response is responsible for making that data look worn
-                // instead of like a perfectly even debug stripe. Use the single
-                // Breakup control to drive width wobble, ridge-strength
-                // variation and fine material mottle without destroying the
-                // continuous ridge structure.
-                float broadNoise = ResolveGeneratedMassSoftPatchNoise(input, 0.62, 271.0);
-                float midNoise = ResolveGeneratedMassSoftPatchNoise(input, 1.18, 307.0);
+                // Patch 14D.3: Atlas0 remains semantic boundary data.
+                // Atlas1 is a generated visual-irregularity layer using the
+                // same surface charts: R = amplitude variation, G = width/smear
+                // variation, B = continuity/chip-thinning variation. The shader
+                // still performs only cheap sampling/ALU at runtime.
+                float amplitudeVariation = lerp(0.5, saturate(atlas1.r), atlas1Enabled);
+                float widthVariation = lerp(0.5, saturate(atlas1.g), atlas1Enabled);
+                float continuityVariation = lerp(0.72, saturate(atlas1.b), atlas1Enabled);
+
+                // Macro Variation is strictly inter-edge variation. At 0, all
+                // eligible ridges keep comparable strength. At 1, the baked
+                // convex ridge importance field is mapped aggressively so weak
+                // eligible ridges visibly recede while important ridges remain
+                // pronounced. Do not feed same-ridge noise or width variation
+                // into this path; that belongs to Micro Variation below.
+                float ridgeEligibility = smoothstep(0.025, 0.12, convexWeight);
+                float macroImportance = smoothstep(0.12, 0.92, convexWeight);
+                float weightedRidge = lerp(0.06, 1.55, pow(macroImportance, 1.85));
+                float macroWeight = ridgeEligibility * lerp(1.0, weightedRidge, macroVariation);
+
+                float broadNoise = ResolveGeneratedMassSoftPatchNoise(input, 0.42, 271.0);
                 float fineNoise = ResolveGeneratedMassPatchNoise(input, 3.15, 349.0);
 
-                float widthWobble =
-                    (broadNoise - 0.5) * 0.18 +
-                    (midNoise - 0.5) * 0.08;
+                // Micro Variation should change the shape of the visible mask,
+                // not only the final brightness. Width variation shifts apparent
+                // proximity; continuity variation preserves the ridge core while
+                // allowing the shoulder to thin, smear, or fade irregularly.
+                float widthOffset = (widthVariation - 0.5) * 0.74 * microVariation;
+                float shapedProximity = saturate(convexProximity + widthOffset);
 
-                float shapedProximity = saturate(
-                    convexProximity + widthWobble * breakupStrength);
+                float ridgeCore = smoothstep(0.80, 0.995, shapedProximity);
+                float shoulderPower = lerp(1.95, 0.88, widthVariation);
+                float ridgeShoulder = pow(saturate(shapedProximity), shoulderPower);
+                float outerFade = smoothstep(0.018, lerp(0.18, 0.54, widthVariation), shapedProximity);
 
-                // Split the response into a narrow core plus a softer shoulder.
-                // This preserves a readable worn crest while avoiding a single
-                // flat stripe across the whole atlas band.
-                float ridgeCore = smoothstep(0.68, 0.98, shapedProximity);
-                float ridgeShoulder = pow(saturate(shapedProximity), 1.75);
+                float continuityKeep = lerp(0.26, 1.18, continuityVariation);
+                float shoulderKeep = lerp(1.0, saturate(continuityKeep + shapedProximity * 0.42), microVariation);
+                float coreKeep = lerp(1.0, lerp(0.72, 1.10, continuityVariation), microVariation * 0.40);
+
                 float ridgeShape = saturate(
-                    ridgeCore * 0.78 +
-                    ridgeShoulder * 0.48);
+                    ridgeCore * coreKeep * 0.76 +
+                    ridgeShoulder * outerFade * shoulderKeep * 0.46);
 
-                float longitudinalVariation = lerp(
+                float localAmplitude = lerp(
                     1.0,
-                    lerp(0.58, 1.18, broadNoise) *
-                    lerp(0.78, 1.08, midNoise),
-                    breakupStrength);
-
+                    lerp(0.26, 1.62, amplitudeVariation),
+                    microVariation);
                 float fineMottle = lerp(
                     1.0,
-                    lerp(0.82, 1.06, fineNoise),
-                    breakupStrength * 0.65);
+                    lerp(0.82, 1.10, fineNoise) * lerp(0.92, 1.08, broadNoise),
+                    microVariation * 0.38);
 
                 float responseGain = responseStrength * lerp(1.0, 1.85, responseStrength);
                 float edgeMask = saturate(
                     ridgeShape *
-                    convexWeight *
+                    macroWeight *
                     responseGain *
-                    longitudinalVariation *
+                    localAmplitude *
                     fineMottle);
 
                 if (edgeMask <= 0.0001)
@@ -1046,6 +1086,42 @@ Shader "PS3D/Pixel Surface Lit"
                         saturate(atlas0.r),
                         saturate(atlas0.g),
                         saturate(atlas0.b));
+                }
+
+                if (mode == 22)
+                {
+                    float4 atlas1 = ResolveGeneratedMassFeatureAtlas1(input);
+                    return (half3)float3(
+                        saturate(atlas1.r),
+                        saturate(atlas1.g),
+                        saturate(atlas1.b));
+                }
+
+                if (mode == 23)
+                {
+                    float4 atlas1 = ResolveGeneratedMassFeatureAtlas1(input);
+                    return (half3)lerp(
+                        float3(0.025, 0.025, 0.035),
+                        float3(1.0, 0.58, 0.24),
+                        saturate(atlas1.r));
+                }
+
+                if (mode == 24)
+                {
+                    float4 atlas1 = ResolveGeneratedMassFeatureAtlas1(input);
+                    return (half3)lerp(
+                        float3(0.025, 0.025, 0.035),
+                        float3(0.35, 0.90, 1.0),
+                        saturate(atlas1.g));
+                }
+
+                if (mode == 25)
+                {
+                    float4 atlas1 = ResolveGeneratedMassFeatureAtlas1(input);
+                    return (half3)lerp(
+                        float3(0.025, 0.025, 0.035),
+                        float3(0.82, 0.55, 1.0),
+                        saturate(atlas1.b));
                 }
 
                 float mask = 0.0;
@@ -1708,13 +1784,15 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassDirtCrawlReach;
                 float _GeneratedMassDirtCoverage;
                 float _GeneratedMassFeatureAtlas0Enabled;
+                float _GeneratedMassFeatureAtlas1Enabled;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;
                 float _GeneratedMassEdgeWearBrightnessLift;
                 half4 _GeneratedMassEdgeWearTint;
                 float _GeneratedMassEdgeWearTintStrength;
-                float _GeneratedMassEdgeWearBreakup;
+                float _GeneratedMassEdgeWearMacroVariation;
+                float _GeneratedMassEdgeWearMicroVariation;
                 float _GeneratedMassCreaseLength;
                 float _GeneratedMassCreaseBranching;
                 float _GeneratedMassCreaseSoftness;
@@ -1875,13 +1953,15 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassDirtCrawlReach;
                 float _GeneratedMassDirtCoverage;
                 float _GeneratedMassFeatureAtlas0Enabled;
+                float _GeneratedMassFeatureAtlas1Enabled;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;
                 float _GeneratedMassEdgeWearBrightnessLift;
                 half4 _GeneratedMassEdgeWearTint;
                 float _GeneratedMassEdgeWearTintStrength;
-                float _GeneratedMassEdgeWearBreakup;
+                float _GeneratedMassEdgeWearMacroVariation;
+                float _GeneratedMassEdgeWearMicroVariation;
                 float _GeneratedMassCreaseLength;
                 float _GeneratedMassCreaseBranching;
                 float _GeneratedMassCreaseSoftness;
@@ -2036,13 +2116,15 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassDirtCrawlReach;
                 float _GeneratedMassDirtCoverage;
                 float _GeneratedMassFeatureAtlas0Enabled;
+                float _GeneratedMassFeatureAtlas1Enabled;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;
                 float _GeneratedMassEdgeWearBrightnessLift;
                 half4 _GeneratedMassEdgeWearTint;
                 float _GeneratedMassEdgeWearTintStrength;
-                float _GeneratedMassEdgeWearBreakup;
+                float _GeneratedMassEdgeWearMacroVariation;
+                float _GeneratedMassEdgeWearMicroVariation;
                 float _GeneratedMassCreaseLength;
                 float _GeneratedMassCreaseBranching;
                 float _GeneratedMassCreaseSoftness;

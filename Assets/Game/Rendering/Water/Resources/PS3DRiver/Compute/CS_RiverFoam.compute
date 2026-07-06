@@ -1226,6 +1226,111 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     }
 }
 
+float FoamStablePhaseTransportDither(int2 source, float4 sourcePacked)
+{
+    uint hash = (uint)source.x * 1664525u;
+    hash ^= (uint)source.y * 1013904223u;
+    hash ^= (uint)(saturate(sourcePacked.z) * 65535.0 + 0.5);
+    hash ^= hash >> 16;
+    hash *= 2246822519u;
+    hash ^= hash >> 13;
+    hash *= 3266489917u;
+    hash ^= hash >> 16;
+    return ((float)(hash & 65535u) + 0.5) / 65536.0;
+}
+
+float4 FoamMergePhaseTransportContribution(
+    float4 accumulatedPacked,
+    float4 contributionPacked)
+{
+    accumulatedPacked = FoamClampPackedMaterialState(accumulatedPacked);
+    contributionPacked = FoamClampPackedMaterialState(contributionPacked);
+
+    if (contributionPacked.x <= FoamMaterialStateEpsilon)
+    {
+        return accumulatedPacked;
+    }
+
+    if (accumulatedPacked.x <= FoamMaterialStateEpsilon)
+    {
+        return contributionPacked;
+    }
+
+    float totalPresence = accumulatedPacked.x + contributionPacked.x;
+    if (totalPresence <= FoamMaterialStateEpsilon)
+    {
+        return 0.0.xxxx;
+    }
+
+    FoamMaterialState merged;
+    merged.presence = saturate(totalPresence);
+    merged.remainingLife = saturate(
+        (accumulatedPacked.y + contributionPacked.y) / totalPresence);
+    merged.materialPattern = saturate(
+        (accumulatedPacked.z + contributionPacked.z) / totalPresence);
+    return FoamEncodeMaterialState(merged);
+}
+
+float4 FoamResolvePhaseTransportSourceContribution(
+    int sourceX,
+    int sourceY,
+    int destinationY,
+    float phaseCells)
+{
+    if (sourceY < 0 || sourceY >= _FoamDimensions.y)
+    {
+        return 0.0.xxxx;
+    }
+
+    int2 source = int2(sourceX, sourceY);
+    float sourceValidFluid = FoamValidFluidAt(source);
+    if (sourceValidFluid <= FoamMaterialStateEpsilon)
+    {
+        return 0.0.xxxx;
+    }
+
+    float4 sourcePacked = FoamClampPackedMaterialState(
+        _FoamStateRead.Load(int3(source, 0)));
+    if (sourcePacked.x <= FoamMaterialStateEpsilon)
+    {
+        return 0.0.xxxx;
+    }
+
+    // Patch 4.11C.5.9l: downstream phase commits remain the only macro
+    // material transport step, but lateral movement is now source-owned
+    // relocation. A source cell picks one target row for this commit; it no
+    // longer splits fractional Presence between neighbouring rows, which read
+    // as diffusion/stretching instead of actual lateral traversal.
+    float2 motionSampleCoordinate = float2(
+        (float)sourceX + phaseCells,
+        (float)sourceY);
+    FoamMotionFieldSample motionField = FoamResolveMotionFieldSample(
+        motionSampleCoordinate,
+        sourceValidFluid);
+
+    // The destination gather checks only the current row and immediate
+    // neighbours, so keep per-commit lateral travel below one cell. Fractional
+    // values are converted into stable per-source row choices with deterministic
+    // dither, not per-cell material splitting.
+    float lateralCells = clamp(motionField.lateralCells, -0.95, 0.95);
+    float lateralMagnitude = saturate(abs(lateralCells));
+    int rowShift = 0;
+    if (lateralMagnitude > FoamMaterialStateEpsilon)
+    {
+        int direction = lateralCells >= 0.0 ? 1 : -1;
+        float dither = FoamStablePhaseTransportDither(source, sourcePacked);
+        rowShift = dither < lateralMagnitude ? direction : 0;
+    }
+
+    int targetY = ClampY(sourceY + rowShift);
+    if (targetY != destinationY)
+    {
+        return 0.0.xxxx;
+    }
+
+    return sourcePacked;
+}
+
 [numthreads(8, 8, 1)]
 void CommitPhaseTransport(uint3 dispatchId : SV_DispatchThreadID)
 {
@@ -1252,19 +1357,50 @@ void CommitPhaseTransport(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     int sourceX = x - _FoamPhaseCommitCells;
-    int2 source = int2(sourceX, y);
     if (sourceX < 0 || sourceX >= _FoamDimensions.x ||
-        !IsFoamColumnInsideSimulation(sourceX) ||
-        FoamValidFluidAt(source) <= FoamMaterialStateEpsilon)
+        !IsFoamColumnInsideSimulation(sourceX))
     {
         _FoamStateWrite[destination] = 0.0.xxxx;
         return;
     }
 
-    float4 packed = FoamClampPackedMaterialState(
-        _FoamStateRead.Load(int3(source, 0)));
+    float phaseCells = _FoamFieldLength > 0.0001
+        ? _FoamPhaseTransportMetres / _FoamFieldLength *
+          (float)_FoamDimensions.x
+        : 0.0;
+
+    float4 transportedPacked = 0.0.xxxx;
+    transportedPacked = FoamMergePhaseTransportContribution(
+        transportedPacked,
+        FoamResolvePhaseTransportSourceContribution(
+            sourceX,
+            y - 1,
+            y,
+            phaseCells));
+    transportedPacked = FoamMergePhaseTransportContribution(
+        transportedPacked,
+        FoamResolvePhaseTransportSourceContribution(
+            sourceX,
+            y,
+            y,
+            phaseCells));
+    transportedPacked = FoamMergePhaseTransportContribution(
+        transportedPacked,
+        FoamResolvePhaseTransportSourceContribution(
+            sourceX,
+            y + 1,
+            y,
+            phaseCells));
+
+    transportedPacked = FoamClampPackedMaterialState(transportedPacked);
+    if (transportedPacked.x <= FoamMaterialStateEpsilon)
+    {
+        _FoamStateWrite[destination] = 0.0.xxxx;
+        return;
+    }
+
     _FoamStateWrite[destination] = FoamClipPackedToValidFluid(
-        packed,
+        transportedPacked,
         destinationValidFluid);
 }
 
@@ -1344,7 +1480,6 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     float4 morphedPacked = FoamApplyPersistentMaterialMorph(
         currentPacked,
         coordinate,
-        worldSampleCoordinate,
         physicalPosition,
         physicalCellSpacing,
         surfaceSampleUv,

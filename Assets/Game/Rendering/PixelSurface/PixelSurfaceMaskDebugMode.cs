@@ -34,6 +34,10 @@ namespace ProgrammaticStylized3D.Rendering
         ConcaveCreaseProximity = 18,
         ConcaveCreaseWeight = 19,
         ConcaveCreaseComposite = 20,
-        BoundaryFieldDiagnostic = 21
+        BoundaryFieldDiagnostic = 21,
+        EdgeWearIrregularity = 22,
+        EdgeWearAmplitudeVariation = 23,
+        EdgeWearWidthVariation = 24,
+        EdgeWearContinuityVariation = 25
     }
 }

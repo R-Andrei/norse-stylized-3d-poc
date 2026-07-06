@@ -1726,7 +1726,8 @@ This field drives a generic material response on the main generated-mass shader:
 base stone colour
 → brightness lift on worn convex ridges
 → optional worn-edge tint influence
-→ optional response breakup from existing generated surface noise
+→ optional macro variation between ridges
+→ optional micro variation along each ridge
 ```
 
 The response controls are intentionally limited and grouped in the inspector:
@@ -1744,7 +1745,8 @@ Edge Wear
     Brightness Lift
     Worn Edge Tint
     Tint Influence
-    Breakup
+    Macro Variation
+    Micro Variation
 ```
 
 Do not collapse these two layers. Data Field / Atlas Bake controls decide where the semantic feature exists and may require atlas regeneration. Visual Response controls decide how the shader displays already-baked data and should not mutate the atlas.
@@ -1774,15 +1776,87 @@ Deferred deliberately: concave darkening response, smoothness offset, falloff co
 
 ### Patch 14D.1 implementation — edge-wear response shaping
 
-Patch 14D.1 keeps the Patch 14D control surface but changes the shader interpretation so the first visible edge-wear response is less literal and less artificial. The supporting atlas contract does not change:
+Patch 14D.1 kept the original Patch 14D control surface and changed the shader interpretation so the first visible edge-wear response was less literal and less artificial. The supporting atlas contract does not change:
 
 ```text
 FeatureAtlas0.R = convex ridge proximity
 FeatureAtlas0.G = convex ridge weight / importance
 ```
 
-The visual response should not treat `R * G` as final paint. Instead, it should derive a narrow ridge core and a softer shoulder from convex proximity, then modulate that response with the existing single Breakup control. Breakup is deliberately response-layer modulation only: it may vary apparent width, intensity, and fine mottle, but it must not destroy ridge continuity or write noise back into the semantic atlas.
+The visual response should not treat `R * G` as final paint. Instead, it should derive a narrow ridge core and a softer shoulder from convex proximity, then modulate that response with the original single Breakup control. Patch 14D.2 supersedes that ambiguous control by splitting it into Macro Variation and Micro Variation.
 
 Patch 14D.1 also recalibrates the existing 0..1 controls so they are useful without adding an overdrive range. `Response Strength = 1` and `Brightness Lift = 1` should be capable of producing a clearly visible worn edge, including on darker stone, while lower values remain suitable for subtle tuning.
 
-Do not add Falloff Contrast, Breakup Scale, Smoothness Offset, bevels, shader-side ridge normals, concave darkening, pitting, water wear, frost, sacred features, or crack generation in this patch. Those remain separate future decisions. The purpose of Patch 14D.1 is only to make the existing convex edge-wear response less like a uniform debug stripe while preserving the clean, scalable 14C data foundation.
+Do not add Falloff Contrast, Macro/Micro Scale, Smoothness Offset, bevels, shader-side ridge normals, concave darkening, pitting, water wear, frost, sacred features, or crack generation in this patch. Those remain separate future decisions. The purpose of Patch 14D.1 is only to make the existing convex edge-wear response less like a uniform debug stripe while preserving the clean, scalable 14C data foundation.
+
+
+### Patch 14D.2 implementation — edge-wear variation split
+
+Patch 14D.2 replaces the ambiguous single `Breakup` response control with two clearer visual-response controls:
+
+```text
+Macro Variation
+  stable variation between different convex ridges
+
+Micro Variation
+  visible variation along the same ridge
+```
+
+This preserves the 14C atlas contract. The atlas still stores clean semantic data:
+
+```text
+FeatureAtlas0.R = convex ridge proximity
+FeatureAtlas0.G = convex ridge weight / importance
+```
+
+`Macro Variation` uses the baked ridge weight to decide how much different eligible ridges are allowed to differ in visible strength. `Micro Variation` uses deterministic shader-side noise and the feature atlas coordinates to modulate apparent width, local intensity, thinning, and fine mottle along a ridge. Neither control mutates the atlas, adds secondary meshes, or changes the generated mass topology.
+
+The purpose of Patch 14D.2 is to make the edge-wear response less ruler-straight and less uniform without adding scale/falloff/smoothness controls yet. Do not add Falloff Contrast, Micro Scale, Smoothness Offset, bevels, shader-side ridge normals, concave darkening, pitting, water wear, frost, sacred features, or crack generation in this patch.
+
+
+### Patch 14D.3 implementation — baked edge-wear irregularity field
+
+Patch 14D.3 adds a second generated feature atlas for ridge-aware visual variation while preserving the clean semantic boundary contract from Patch 14C:
+
+```text
+FeatureAtlas0.R = convex ridge proximity
+FeatureAtlas0.G = convex ridge weight / importance
+FeatureAtlas0.B = concave crease proximity
+FeatureAtlas0.A = concave crease weight / importance
+```
+
+The new response-support atlas is:
+
+```text
+FeatureAtlas1.R = edge-wear amplitude variation
+FeatureAtlas1.G = edge-wear width / smear variation
+FeatureAtlas1.B = edge-wear continuity / chip-thinning variation
+FeatureAtlas1.A = reserved
+```
+
+This atlas exists because natural worn ridges need variation that belongs to the ridge itself: local opacity changes, local width changes, and local thinning/chipping. Generic shader noise after the fact was not enough; it made the visible response too straight and too uniform. Baking this ridge-aware irregularity at generation time is aligned with the project performance policy: dirty-time compute and modest memory are acceptable when they keep runtime shading cheap and avoid secondary renderers or per-frame topology work.
+
+The editor control surface remains intentionally small. Patch 14D.3 does not add new response sliders. The existing controls now have stronger internal meaning:
+
+```text
+Macro Variation
+  controls stronger/weaker differences between ridges, primarily from semantic ridge weight.
+
+Micro Variation
+  controls within-ridge irregularity using FeatureAtlas1 amplitude, width/smear, and continuity/chip fields.
+```
+
+Debug remains curated:
+
+```text
+Surface Mask Debug
+  Edge Wear Irregularity
+    RGB diagnostic for FeatureAtlas1.R/G/B.
+
+Advanced Feature Diagnostics
+  Edge-Wear Amplitude Variation
+  Edge-Wear Width / Smear Variation
+  Edge-Wear Continuity / Thinning
+```
+
+Do not move these raw Atlas1 channels into the main debug selector unless they become common authoring views. They are validation tools, not normal material controls.

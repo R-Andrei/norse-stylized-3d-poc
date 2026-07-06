@@ -301,6 +301,7 @@ namespace ProgrammaticStylized3D.Rivers
             int hash = 17;
             hash = AccumulateHash(hash, fieldWidth);
             hash = AccumulateHash(hash, fieldHeight);
+            hash = AccumulateHash(hash, 2); // 4.11C.5.9l lane anisotropy algorithm version.
             hash = AccumulateHash(hash, river != null ? river.VisualSeed : 0);
             hash = AccumulateHash(
                 hash,
@@ -376,13 +377,18 @@ namespace ProgrammaticStylized3D.Rivers
                 }
             }
 
+            SmoothMotionLaneAcrossWidth(
+                motionLaneRawValues,
+                fieldWidth,
+                fieldHeight);
+
             float neutralCoverage = river != null
                 ? river.FoamMotionFieldNeutralCoverage
                 : 0.10f;
             float neutralThreshold = ResolveNeutralThreshold(
                 motionLaneRawValues,
                 Mathf.Clamp01(neutralCoverage));
-            const float minimumLaneMotionMagnitude = 0.065f;
+            const float minimumLaneMotionMagnitude = 0.125f;
             float denominator = Mathf.Max(0.0001f, 1f - neutralThreshold);
             for (int index = 0; index < cellCount; index++)
             {
@@ -423,6 +429,45 @@ namespace ProgrammaticStylized3D.Rivers
             motionLaneTexture.Apply(false, false);
             motionLaneFieldSignature = signature;
             lastMotionLaneSignature = signature;
+        }
+
+        private static void SmoothMotionLaneAcrossWidth(
+            float[] values,
+            int width,
+            int height)
+        {
+            if (values == null || width <= 0 || height <= 0 ||
+                values.Length != width * height)
+            {
+                return;
+            }
+
+            float[] buffer = new float[values.Length];
+            for (int pass = 0; pass < 2; pass++)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    int y0 = Mathf.Max(0, y - 2);
+                    int y1 = Mathf.Max(0, y - 1);
+                    int y2 = Mathf.Min(height - 1, y + 1);
+                    int y3 = Mathf.Min(height - 1, y + 2);
+                    for (int x = 0; x < width; x++)
+                    {
+                        int index = y * width + x;
+                        float centre = values[index];
+                        float near = values[y1 * width + x] +
+                            values[y2 * width + x];
+                        float far = values[y0 * width + x] +
+                            values[y3 * width + x];
+                        buffer[index] = Mathf.Clamp(
+                            centre * 0.52f + near * 0.19f + far * 0.05f,
+                            -1f,
+                            1f);
+                    }
+                }
+
+                Array.Copy(buffer, values, values.Length);
+            }
         }
 
         private void RebuildObstacleRoutingField(int signature)
@@ -991,136 +1036,124 @@ namespace ProgrammaticStylized3D.Rivers
             float frequency,
             float seed)
         {
-            float warpBaseY = Mathf.Max(3.0f, 4.10f * frequency);
+            float aspectSafe = Mathf.Max(1f, aspect);
+            float acrossWarpFrequency = Mathf.Max(1.0f, 1.85f * frequency);
             int warpPeriodX = Mathf.Max(
-                4,
-                Mathf.RoundToInt(warpBaseY * aspect));
+                6,
+                Mathf.RoundToInt(10.0f * frequency * aspectSafe));
             float warpX = MotionValueNoiseTiledX(
                 u * warpPeriodX + seed * 1.37f,
-                v * warpBaseY - seed * 0.61f,
+                v * acrossWarpFrequency - seed * 0.61f,
                 warpPeriodX) * 2f - 1f;
             float warpY = MotionValueNoiseTiledX(
                 u * warpPeriodX - seed * 0.83f + 19.31f,
-                v * warpBaseY + seed * 1.11f - 7.17f,
+                v * acrossWarpFrequency + seed * 1.11f - 7.17f,
                 warpPeriodX) * 2f - 1f;
 
-            float warpedU = u + warpX * 0.055f;
-            float warpedV = v + warpY * 0.155f;
+            float warpedU = u + warpX * 0.075f;
+            float warpedV = v + warpY * 0.045f;
             float sum = 0f;
             float weightSum = 0f;
 
-            // The low octave should organize the field, not decide the sign for
-            // huge river stretches.  Medium/high octaves carry more authority so
-            // broad same-direction continents break into red/blue turbulent
-            // patches while the texture remains coherent and scrollable.
-            sum += MotionLaneOctave(
+            // Patch 4.11C.5.9l: source-owned transport needs the field to give
+            // a coherent lateral instruction across a foam body's width, then
+            // change as that body travels downstream.  The lane texture therefore
+            // uses anisotropic octaves: higher frequency along downstream X and
+            // deliberately lower frequency across lateral Y.  Runtime still reads
+            // the baked texture only.
+            sum += MotionLaneAnisotropicSignedNoise(
                 warpedU,
                 warpedV,
-                aspect,
-                5.60f * frequency,
-                0.10f,
-                seed + 3.17f,
-                ref weightSum);
-            sum += MotionLaneOctave(
-                warpedU + warpedV * 0.09f,
-                warpedV,
-                aspect,
-                10.50f * frequency,
-                0.20f,
-                seed - 11.73f,
-                ref weightSum);
-            sum += MotionLaneOctave(
-                warpedU - warpedV * 0.14f,
-                warpedV + warpedU * 0.025f,
-                aspect,
-                17.80f * frequency,
-                0.24f,
-                seed + 29.41f,
-                ref weightSum);
-            sum += MotionLaneOctave(
-                warpedU + warpedV * 0.23f,
-                warpedV - warpedU * 0.035f,
-                aspect,
-                30.00f * frequency,
-                0.21f,
-                seed - 43.09f,
-                ref weightSum);
-            sum += MotionLaneOctave(
-                warpedU - warpedV * 0.31f,
-                warpedV + warpedU * 0.055f,
-                aspect,
-                49.00f * frequency,
-                0.16f,
-                seed + 61.83f,
-                ref weightSum);
-            sum += MotionLaneOctave(
-                warpedU + warpedV * 0.41f,
-                warpedV - warpedU * 0.075f,
-                aspect,
-                76.00f * frequency,
-                0.09f,
-                seed - 83.27f,
-                ref weightSum);
+                8.50f * frequency * aspectSafe,
+                1.15f * frequency,
+                seed + 3.17f) * 0.22f;
+            weightSum += 0.22f;
+            sum += MotionLaneAnisotropicSignedNoise(
+                warpedU + warpedV * 0.045f,
+                warpedV - warpedU * 0.006f,
+                15.50f * frequency * aspectSafe,
+                1.65f * frequency,
+                seed - 11.73f) * 0.24f;
+            weightSum += 0.24f;
+            sum += MotionLaneAnisotropicSignedNoise(
+                warpedU - warpedV * 0.060f,
+                warpedV + warpedU * 0.010f,
+                25.00f * frequency * aspectSafe,
+                2.25f * frequency,
+                seed + 29.41f) * 0.22f;
+            weightSum += 0.22f;
+            sum += MotionLaneAnisotropicSignedNoise(
+                warpedU + warpedV * 0.090f,
+                warpedV - warpedU * 0.014f,
+                40.00f * frequency * aspectSafe,
+                3.15f * frequency,
+                seed - 43.09f) * 0.17f;
+            weightSum += 0.17f;
+            sum += MotionLaneAnisotropicSignedNoise(
+                warpedU - warpedV * 0.130f,
+                warpedV + warpedU * 0.020f,
+                64.00f * frequency * aspectSafe,
+                4.30f * frequency,
+                seed + 61.83f) * 0.10f;
+            weightSum += 0.10f;
 
             float raw = weightSum > 0.0001f
                 ? sum / weightSum
                 : 0f;
 
-            float breaker = MotionLaneSignedNoise(
-                warpedU + warpedV * 0.37f,
-                warpedV - warpedU * 0.045f,
-                aspect,
-                24.00f * frequency,
-                seed + 101.9f) * 0.22f;
-            breaker += MotionLaneSignedNoise(
-                warpedU - warpedV * 0.27f,
-                warpedV + warpedU * 0.065f,
-                aspect,
-                42.00f * frequency,
-                seed - 137.6f) * 0.14f;
-            raw = Mathf.Clamp(raw * 0.88f + breaker * (1.05f - 0.35f * Mathf.Abs(raw)), -1f, 1f);
+            float breaker = MotionLaneAnisotropicSignedNoise(
+                warpedU + warpedV * 0.050f,
+                warpedV - warpedU * 0.010f,
+                34.00f * frequency * aspectSafe,
+                1.80f * frequency,
+                seed + 101.9f) * 0.18f;
+            breaker += MotionLaneAnisotropicSignedNoise(
+                warpedU - warpedV * 0.070f,
+                warpedV + warpedU * 0.016f,
+                58.00f * frequency * aspectSafe,
+                2.55f * frequency,
+                seed - 137.6f) * 0.12f;
 
-            raw = Mathf.Clamp(raw * 1.62f, -1f, 1f);
-            float magnitude = Mathf.Pow(Mathf.Abs(raw), 0.76f);
+            float crossCut = MotionLaneAnisotropicSignedNoise(
+                warpedU + warpedV * 0.035f,
+                warpedV - warpedU * 0.008f,
+                72.00f * frequency * aspectSafe,
+                1.60f * frequency,
+                seed + 211.4f) * 0.12f;
+            crossCut += MotionLaneAnisotropicSignedNoise(
+                warpedU - warpedV * 0.050f,
+                warpedV + warpedU * 0.012f,
+                105.00f * frequency * aspectSafe,
+                2.10f * frequency,
+                seed - 257.8f) * 0.08f;
+
+            raw = Mathf.Clamp(
+                raw * 0.92f +
+                breaker * (1.00f - 0.30f * Mathf.Abs(raw)) +
+                crossCut * (0.88f - 0.24f * Mathf.Abs(raw)),
+                -1f,
+                1f);
+
+            raw = Mathf.Clamp(raw * 1.55f, -1f, 1f);
+            float magnitude = Mathf.Pow(Mathf.Abs(raw), 0.78f);
             return Mathf.Sign(raw) * magnitude;
         }
 
-        private static float MotionLaneSignedNoise(
+        private static float MotionLaneAnisotropicSignedNoise(
             float u,
             float v,
-            float aspect,
-            float verticalFrequency,
+            float downstreamFrequency,
+            float lateralFrequency,
             float seed)
         {
-            float safeVerticalFrequency = Mathf.Max(1f, verticalFrequency);
-            int periodX = Mathf.Max(
-                4,
-                Mathf.RoundToInt(safeVerticalFrequency * Mathf.Max(1f, aspect)));
-            return MotionValueNoiseTiledX(
-                u * periodX + seed * 0.37f,
-                v * safeVerticalFrequency - seed * 0.19f,
-                periodX) * 2f - 1f;
-        }
+            float safeDownstreamFrequency = Mathf.Max(1f, Mathf.Round(downstreamFrequency));
+            float safeLateralFrequency = Mathf.Max(0.25f, lateralFrequency);
+            int periodX = Mathf.Max(1, Mathf.RoundToInt(safeDownstreamFrequency));
 
-        private static float MotionLaneOctave(
-            float u,
-            float v,
-            float aspect,
-            float verticalFrequency,
-            float weight,
-            float seed,
-            ref float weightSum)
-        {
-            float safeVerticalFrequency = Mathf.Max(1f, verticalFrequency);
-            int periodX = Mathf.Max(
-                4,
-                Mathf.RoundToInt(safeVerticalFrequency * Mathf.Max(1f, aspect)));
-            float sample = MotionValueNoiseTiledX(
-                u * periodX + seed * 0.37f,
-                v * safeVerticalFrequency - seed * 0.19f,
+            return MotionValueNoiseTiledX(
+                u * safeDownstreamFrequency + seed * 1.713f,
+                v * safeLateralFrequency - seed * 0.947f,
                 periodX) * 2f - 1f;
-            weightSum += weight;
-            return sample * weight;
         }
 
         private static float MotionValueNoiseTiledX(

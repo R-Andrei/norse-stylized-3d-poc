@@ -265,6 +265,12 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamPhaseTransportMetres",
                 foamPhaseTransportMetres);
+            computeShader.SetFloat(
+                "_FoamMotionFieldStrength",
+                river.FoamMotionFieldStrength);
+            computeShader.SetFloat(
+                "_FoamMotionLaneScrollCells",
+                motionLaneScrollCells);
             computeShader.SetTexture(
                 phaseCommitKernel,
                 "_FoamBoundary",
@@ -273,6 +279,18 @@ namespace ProgrammaticStylized3D.Rivers
                 phaseCommitKernel,
                 "_FoamObstacleExclusionRead",
                 obstacleExclusionTexture);
+            computeShader.SetTexture(
+                phaseCommitKernel,
+                "_FoamMotionLaneRead",
+                motionLaneTexture != null
+                    ? (Texture)motionLaneTexture
+                    : Texture2D.blackTexture);
+            computeShader.SetTexture(
+                phaseCommitKernel,
+                "_FoamObstacleRoutingRead",
+                obstacleRoutingTexture != null
+                    ? (Texture)obstacleRoutingTexture
+                    : Texture2D.blackTexture);
             computeShader.SetTexture(
                 phaseCommitKernel,
                 "_FoamStateRead",

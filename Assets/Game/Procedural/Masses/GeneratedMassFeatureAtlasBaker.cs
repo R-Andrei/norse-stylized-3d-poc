@@ -24,13 +24,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         public sealed class Result
         {
-            public Result(Texture2D atlas0, List<Vector2> featureAtlasUV)
+            public Result(Texture2D atlas0, Texture2D atlas1, List<Vector2> featureAtlasUV)
             {
                 Atlas0 = atlas0;
+                Atlas1 = atlas1;
                 FeatureAtlasUV = featureAtlasUV;
             }
 
             public Texture2D Atlas0 { get; }
+            public Texture2D Atlas1 { get; }
             public List<Vector2> FeatureAtlasUV { get; }
         }
 
@@ -55,16 +57,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private readonly struct BoundarySegment
         {
-            public BoundarySegment(Vector2 start, Vector2 end, float score)
+            public BoundarySegment(
+                Vector2 start,
+                Vector2 end,
+                float score,
+                int boundaryIndex,
+                int chainIndex,
+                float lengthWorld)
             {
                 Start = start;
                 End = end;
                 Score = Mathf.Clamp01(score);
+                BoundaryIndex = boundaryIndex;
+                ChainIndex = chainIndex;
+                LengthWorld = Mathf.Max(0.0001f, lengthWorld);
             }
 
             public Vector2 Start { get; }
             public Vector2 End { get; }
             public float Score { get; }
+            public int BoundaryIndex { get; }
+            public int ChainIndex { get; }
+            public float LengthWorld { get; }
         }
 
         private readonly struct ProjectedTriangle
@@ -130,11 +144,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 charts,
                 resolution);
 
-            Texture2D atlas0 = CreateAtlasTexture(resolution);
-            Color32[] pixels = new Color32[resolution * resolution];
-            for (int i = 0; i < pixels.Length; i++)
+            Texture2D atlas0 = CreateAtlasTexture(
+                resolution,
+                "GeneratedMass_FeatureAtlas0_Temporary");
+            Texture2D atlas1 = CreateAtlasTexture(
+                resolution,
+                "GeneratedMass_FeatureAtlas1_Temporary");
+            Color32[] pixels0 = new Color32[resolution * resolution];
+            Color32[] pixels1 = new Color32[resolution * resolution];
+            for (int i = 0; i < pixels0.Length; i++)
             {
-                pixels[i] = new Color32(0, 0, 0, 0);
+                pixels0[i] = new Color32(0, 0, 0, 0);
+                pixels1[i] = new Color32(0, 0, 0, 0);
             }
 
             BakePatchDistanceFields(
@@ -142,12 +163,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 charts,
                 settings,
                 bounds,
-                pixels,
+                pixels0,
+                pixels1,
                 resolution);
 
-            atlas0.SetPixels32(pixels);
+            atlas0.SetPixels32(pixels0);
             atlas0.Apply(false, false);
-            return new Result(atlas0, featureAtlasUV);
+            atlas1.SetPixels32(pixels1);
+            atlas1.Apply(false, false);
+            return new Result(atlas0, atlas1, featureAtlasUV);
         }
 
         private static int SanitizeResolution(int requestedResolution)
@@ -170,7 +194,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return 512;
         }
 
-        private static Texture2D CreateAtlasTexture(int resolution)
+        private static Texture2D CreateAtlasTexture(int resolution, string textureName)
         {
             return new Texture2D(
                 resolution,
@@ -179,7 +203,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 false,
                 true)
             {
-                name = "GeneratedMass_FeatureAtlas0_Temporary",
+                name = textureName,
                 hideFlags = HideFlags.DontSave,
                 wrapMode = TextureWrapMode.Clamp,
                 filterMode = FilterMode.Bilinear,
@@ -477,7 +501,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             BoundarySegment segment = new(
                 Project(boundary.Start, chart.Origin, chart.AxisU, chart.AxisV),
                 Project(boundary.End, chart.Origin, chart.AxisU, chart.AxisV),
-                boundary.Score);
+                boundary.Score,
+                boundary.Index,
+                boundary.ChainIndex,
+                boundary.Length);
 
             if (boundary.Kind == MassSurfaceBoundaryKind.ConvexRidge)
             {
@@ -583,7 +610,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<PatchChart> charts,
             MassSurfaceFeatureSettings settings,
             Bounds bounds,
-            Color32[] pixels,
+            Color32[] pixels0,
+            Color32[] pixels1,
             int resolution)
         {
             float scale = Mathf.Max(0.0001f, Mathf.Max(bounds.size.x, Mathf.Max(bounds.size.y, bounds.size.z)));
@@ -616,7 +644,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     creaseAmount01,
                     creaseCoverage01,
                     settings.EdgeWearSoftness,
-                    pixels,
+                    settings.SurfaceSeed,
+                    pixels0,
+                    pixels1,
                     resolution);
             }
         }
@@ -633,7 +663,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float creaseAmount01,
             float creaseCoverage01,
             float edgeSoftness,
-            Color32[] pixels,
+            int surfaceSeed,
+            Color32[] pixels0,
+            Color32[] pixels1,
             int resolution)
         {
             if ((!bakeConvex || chart.ConvexSegments.Count == 0) &&
@@ -730,16 +762,131 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     // A = concave crease weight / importance
                     if (convex.Proximity > 0.001f)
                     {
-                        pixels[pixelIndex].r = MaxByte(pixels[pixelIndex].r, convex.Proximity);
-                        pixels[pixelIndex].g = MaxByte(pixels[pixelIndex].g, convex.Weight);
+                        pixels0[pixelIndex].r = MaxByte(pixels0[pixelIndex].r, convex.Proximity);
+                        pixels0[pixelIndex].g = MaxByte(pixels0[pixelIndex].g, convex.Weight);
+
+                        Color edgeIrregularity = ResolveEdgeWearIrregularitySample(
+                            local,
+                            chart.ConvexSegments,
+                            edgeWearWidth,
+                            texelWorld,
+                            surfaceSeed,
+                            convex.Proximity);
+
+                        // FeatureAtlas1 channel contract:
+                        // R = baked edge-wear amplitude variation
+                        // G = baked edge-wear width/smear variation
+                        // B = baked edge-wear continuity / chip-thinning variation
+                        // A = reserved
+                        pixels1[pixelIndex].r = MaxByte(pixels1[pixelIndex].r, edgeIrregularity.r);
+                        pixels1[pixelIndex].g = MaxByte(pixels1[pixelIndex].g, edgeIrregularity.g);
+                        pixels1[pixelIndex].b = MaxByte(pixels1[pixelIndex].b, edgeIrregularity.b);
                     }
 
                     if (concave.Proximity > 0.001f)
                     {
-                        pixels[pixelIndex].b = MaxByte(pixels[pixelIndex].b, concave.Proximity);
-                        pixels[pixelIndex].a = MaxByte(pixels[pixelIndex].a, concave.Weight);
+                        pixels0[pixelIndex].b = MaxByte(pixels0[pixelIndex].b, concave.Proximity);
+                        pixels0[pixelIndex].a = MaxByte(pixels0[pixelIndex].a, concave.Weight);
                     }
                 }
+            }
+        }
+
+        private static Color ResolveEdgeWearIrregularitySample(
+            Vector2 local,
+            List<BoundarySegment> segments,
+            float widthWorld,
+            float texelWorld,
+            int surfaceSeed,
+            float proximity)
+        {
+            if (segments == null || segments.Count == 0)
+            {
+                return new Color(0.5f, 0.5f, 0.72f, 0f);
+            }
+
+            float searchDistance = Mathf.Max(texelWorld * 2f, widthWorld) * GutterDistanceMultiplier;
+            BoundarySegment bestSegment = default;
+            float bestT = 0f;
+            float bestScore = -1f;
+
+            for (int i = 0; i < segments.Count; i++)
+            {
+                BoundarySegment segment = segments[i];
+                float t;
+                float distance = DistanceToSegment(local, segment.Start, segment.End, out t);
+                if (distance > searchDistance)
+                {
+                    continue;
+                }
+
+                float distanceScore = 1f - Mathf.Clamp01(distance / Mathf.Max(0.0001f, searchDistance));
+                float score = distanceScore * Mathf.Lerp(0.55f, 1.0f, segment.Score);
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestSegment = segment;
+                    bestT = t;
+                }
+            }
+
+            if (bestScore < 0f)
+            {
+                return new Color(0.5f, 0.5f, 0.72f, 0f);
+            }
+
+            float seedBase = surfaceSeed * 0.00137f + bestSegment.BoundaryIndex * 0.173f;
+            float chainSeed = (bestSegment.ChainIndex + 17) * 0.319f;
+            float lengthScale = Mathf.Clamp(bestSegment.LengthWorld / Mathf.Max(widthWorld, texelWorld * 3f), 1.0f, 24.0f);
+            float along = bestT * Mathf.Lerp(1.35f, 5.25f, Mathf.InverseLerp(1.0f, 18.0f, lengthScale));
+
+            float chainBias = Hash01(surfaceSeed, bestSegment.ChainIndex + 101, 19);
+            float boundaryBias = Hash01(surfaceSeed, bestSegment.BoundaryIndex + 211, 29);
+            float low = Mathf.PerlinNoise(seedBase + chainSeed + along * 0.72f, 11.37f + chainBias * 19.0f);
+            float mid = Mathf.PerlinNoise(seedBase * 1.73f + along * 1.85f, 31.11f + boundaryBias * 23.0f);
+            float fine = Mathf.PerlinNoise(seedBase * 2.41f + along * 4.10f, 71.91f + chainBias * 13.0f);
+
+            // Atlas1 stores visual-irregularity fields, not final color.
+            // Keep the values stable and ridge-aware so the shader can cheaply
+            // vary opacity, apparent width, and local thinning without adding
+            // more runtime topology work or extra user-facing controls.
+            float amplitude = Mathf.Clamp01(
+                0.08f +
+                chainBias * 0.18f +
+                boundaryBias * 0.15f +
+                low * 0.42f +
+                mid * 0.26f -
+                fine * 0.08f);
+
+            float width = Mathf.Clamp01(
+                0.10f +
+                low * 0.24f +
+                mid * 0.50f +
+                fine * 0.16f +
+                (boundaryBias - 0.5f) * 0.16f);
+
+            float continuity = Mathf.Clamp01(
+                0.12f +
+                low * 0.30f +
+                mid * 0.16f +
+                fine * 0.36f +
+                proximity * 0.18f);
+
+            return new Color(amplitude, width, continuity, 0f);
+        }
+
+        private static float Hash01(int a, int b, int c)
+        {
+            unchecked
+            {
+                uint hash = 2166136261u;
+                hash = (hash ^ (uint)a) * 16777619u;
+                hash = (hash ^ (uint)b) * 16777619u;
+                hash = (hash ^ (uint)c) * 16777619u;
+                hash ^= hash >> 13;
+                hash *= 1274126177u;
+                hash ^= hash >> 16;
+                return (hash & 0x00FFFFFFu) / 16777215f;
             }
         }
 

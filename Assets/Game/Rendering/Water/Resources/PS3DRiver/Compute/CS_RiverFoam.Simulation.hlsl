@@ -330,7 +330,6 @@ float2 FoamResolveAreaBalancedWobbleCells(
 float4 FoamApplyPersistentMaterialMorph(
     float4 currentPacked,
     int2 coordinate,
-    float2 motionSampleCoordinate,
     float2 physicalPosition,
     float2 physicalCellSpacing,
     float2 surfaceUv,
@@ -356,10 +355,6 @@ float4 FoamApplyPersistentMaterialMorph(
             surfaceUv,
             materialTopology,
             edgeExposure);
-    FoamMotionFieldSample motionField = FoamResolveMotionFieldSample(
-        motionSampleCoordinate,
-        validFluid);
-
     float2 morphCells = FoamResolveAreaBalancedWobbleCells(
         coordinate,
         physicalPosition,
@@ -371,10 +366,12 @@ float4 FoamApplyPersistentMaterialMorph(
 
     float2 currentPixel = float2(coordinate);
 
-    // 4.11C.5.9: macro lateral body transport now comes from the explicit
-    // dense Foam Motion Field. Downstream transport remains owned by phase
-    // transport; this pass contributes lateral stored-material motion only.
-    float2 macroBase = currentPixel - float2(0.0, motionField.lateralCells);
+    // Patch 4.11C.5.9k moves explicit motion-field transport into the
+    // downstream phase commit. This pass remains lifecycle-neutral material
+    // morphology only; it no longer tries to perform macro lateral movement by
+    // sampling from a field-offset source, which caused stretch/growth instead
+    // of true relocation.
+    float2 macroBase = currentPixel;
     float2 mesoBase = macroBase;
     float2 edgeOffset = 0.0.xx;
 

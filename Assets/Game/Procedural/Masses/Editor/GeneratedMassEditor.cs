@@ -23,6 +23,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             (int)StoneSurfaceMaskDebug.None,
             (int)StoneSurfaceMaskDebug.ConvexEdgeWear,
             (int)StoneSurfaceMaskDebug.BoundaryFieldDiagnostic,
+            (int)StoneSurfaceMaskDebug.EdgeWearIrregularity,
             (int)StoneSurfaceMaskDebug.Exposure,
             (int)StoneSurfaceMaskDebug.CreviceBase,
             (int)StoneSurfaceMaskDebug.DirtDeposit
@@ -33,6 +34,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             new GUIContent("None"),
             new GUIContent("Convex Edge Wear"),
             new GUIContent("Boundary Field Diagnostic"),
+            new GUIContent("Edge Wear Irregularity"),
             new GUIContent("Exposure"),
             new GUIContent("Crevice / Base"),
             new GUIContent("Dirt / Deposit")
@@ -46,7 +48,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             (int)StoneSurfaceMaskDebug.ConvexRidgeComposite,
             (int)StoneSurfaceMaskDebug.ConcaveCreaseProximity,
             (int)StoneSurfaceMaskDebug.ConcaveCreaseWeight,
-            (int)StoneSurfaceMaskDebug.ConcaveCreaseComposite
+            (int)StoneSurfaceMaskDebug.ConcaveCreaseComposite,
+            (int)StoneSurfaceMaskDebug.EdgeWearAmplitudeVariation,
+            (int)StoneSurfaceMaskDebug.EdgeWearWidthVariation,
+            (int)StoneSurfaceMaskDebug.EdgeWearContinuityVariation
         };
 
         private static readonly GUIContent[] AdvancedDebugLabels =
@@ -57,7 +62,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             new GUIContent("Convex Ridge Composite"),
             new GUIContent("Concave Crease Proximity"),
             new GUIContent("Concave Crease Weight"),
-            new GUIContent("Concave Crease Composite")
+            new GUIContent("Concave Crease Composite"),
+            new GUIContent("Edge-Wear Amplitude Variation"),
+            new GUIContent("Edge-Wear Width / Smear Variation"),
+            new GUIContent("Edge-Wear Continuity / Thinning")
         };
 
         private SerializedProperty coldGreyStoneMaterial;
@@ -99,7 +107,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty edgeWearBrightnessLift;
         private SerializedProperty edgeWearTint;
         private SerializedProperty edgeWearTintStrength;
-        private SerializedProperty edgeWearBreakup;
+        private SerializedProperty edgeWearMacroVariation;
+        private SerializedProperty edgeWearMicroVariation;
         private SerializedProperty creaseAmount;
         private SerializedProperty creaseWidth;
         private SerializedProperty creaseLength;
@@ -208,8 +217,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "edgeWearTint");
             edgeWearTintStrength = serializedObject.FindProperty(
                 "edgeWearTintStrength");
-            edgeWearBreakup = serializedObject.FindProperty(
-                "edgeWearBreakup");
+            edgeWearMacroVariation = serializedObject.FindProperty(
+                "edgeWearMacroVariation");
+            edgeWearMicroVariation = serializedObject.FindProperty(
+                "edgeWearMicroVariation");
             creaseAmount = serializedObject.FindProperty(
                 "creaseAmount");
             creaseWidth = serializedObject.FindProperty(
@@ -302,7 +313,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "edgeWearBrightnessLift",
                 "edgeWearTint",
                 "edgeWearTintStrength",
-                "edgeWearBreakup",
+                "edgeWearMacroVariation",
+                "edgeWearMicroVariation",
                 "creaseAmount",
                 "creaseWidth",
                 "creaseLength",
@@ -595,9 +607,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             using (new EditorGUI.IndentLevelScope())
             {
                 EditorGUILayout.HelpBox(
-                    "Raw FeatureAtlas0 channel inspection. These views are " +
-                    "for validating generated data, not for normal material " +
-                    "authoring.",
+                    "Raw generated feature-atlas inspection. FeatureAtlas0 stores " +
+                    "semantic boundary fields; FeatureAtlas1 stores baked " +
+                    "edge-wear irregularity fields. These views are for validation, " +
+                    "not normal material authoring.",
                     MessageType.None);
 
                 int advancedIndex =
@@ -611,8 +624,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 EditorGUI.BeginChangeCheck();
                 int nextAdvancedIndex = EditorGUILayout.Popup(
                     new GUIContent(
-                        "Raw Boundary Channel",
-                        "Inspects separated proximity/weight channels for generated boundary fields."),
+                        "Raw Feature Channel",
+                        "Inspects separated semantic and baked irregularity channels for generated mass features."),
                     advancedIndex,
                     AdvancedDebugLabels);
                 if (EditorGUI.EndChangeCheck())
@@ -1035,10 +1048,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         "Tint Influence",
                         "How strongly Worn Edge Tint affects the visible response. Zero keeps the response value-only."));
                 EditorGUILayout.PropertyField(
-                    edgeWearBreakup,
+                    edgeWearMacroVariation,
                     new GUIContent(
-                        "Breakup",
-                        "How much existing generated surface noise modulates the visible response without changing the semantic ridge field."));
+                        "Macro Variation",
+                        "Controls stable variation between different convex ridges. Higher values let some eligible ridges read stronger or weaker than others."));
+                EditorGUILayout.PropertyField(
+                    edgeWearMicroVariation,
+                    new GUIContent(
+                        "Micro Variation",
+                        "Controls visible variation along the same ridge: local width wobble, thinning, and intensity unevenness without changing the semantic atlas data."));
             }
         }
 
