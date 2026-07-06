@@ -1770,3 +1770,19 @@ Advanced Feature Diagnostics
 ```
 
 Deferred deliberately: concave darkening response, smoothness offset, falloff contrast, breakup scale, shader-side ridge normals, generated bevels/chamfers, pitting, water wear, frost, sacred features, and crack-network generation.
+
+
+### Patch 14D.1 implementation — edge-wear response shaping
+
+Patch 14D.1 keeps the Patch 14D control surface but changes the shader interpretation so the first visible edge-wear response is less literal and less artificial. The supporting atlas contract does not change:
+
+```text
+FeatureAtlas0.R = convex ridge proximity
+FeatureAtlas0.G = convex ridge weight / importance
+```
+
+The visual response should not treat `R * G` as final paint. Instead, it should derive a narrow ridge core and a softer shoulder from convex proximity, then modulate that response with the existing single Breakup control. Breakup is deliberately response-layer modulation only: it may vary apparent width, intensity, and fine mottle, but it must not destroy ridge continuity or write noise back into the semantic atlas.
+
+Patch 14D.1 also recalibrates the existing 0..1 controls so they are useful without adding an overdrive range. `Response Strength = 1` and `Brightness Lift = 1` should be capable of producing a clearly visible worn edge, including on darker stone, while lower values remain suitable for subtle tuning.
+
+Do not add Falloff Contrast, Breakup Scale, Smoothness Offset, bevels, shader-side ridge normals, concave darkening, pitting, water wear, frost, sacred features, or crack generation in this patch. Those remain separate future decisions. The purpose of Patch 14D.1 is only to make the existing convex edge-wear response less like a uniform debug stripe while preserving the clean, scalable 14C data foundation.

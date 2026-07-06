@@ -895,27 +895,58 @@ Shader "PS3D/Pixel Surface Lit"
                 float4 atlas0 = ResolveGeneratedMassFeatureAtlas0(input);
                 float convexProximity = saturate(atlas0.r);
                 float convexWeight = saturate(atlas0.g);
-                float convexField = saturate(convexProximity * convexWeight);
 
-                if (convexField <= 0.0001)
+                if (convexProximity <= 0.0001 || convexWeight <= 0.0001)
                 {
                     return albedo;
                 }
 
                 float breakupStrength = saturate(_GeneratedMassEdgeWearBreakup);
-                float breakupNoise = ResolveGeneratedMassMottleNoise(input);
-                float breakup = lerp(
+
+                // Patch 14D.1: the atlas stores clean semantic ridge data; the
+                // visual response is responsible for making that data look worn
+                // instead of like a perfectly even debug stripe. Use the single
+                // Breakup control to drive width wobble, ridge-strength
+                // variation and fine material mottle without destroying the
+                // continuous ridge structure.
+                float broadNoise = ResolveGeneratedMassSoftPatchNoise(input, 0.62, 271.0);
+                float midNoise = ResolveGeneratedMassSoftPatchNoise(input, 1.18, 307.0);
+                float fineNoise = ResolveGeneratedMassPatchNoise(input, 3.15, 349.0);
+
+                float widthWobble =
+                    (broadNoise - 0.5) * 0.18 +
+                    (midNoise - 0.5) * 0.08;
+
+                float shapedProximity = saturate(
+                    convexProximity + widthWobble * breakupStrength);
+
+                // Split the response into a narrow core plus a softer shoulder.
+                // This preserves a readable worn crest while avoiding a single
+                // flat stripe across the whole atlas band.
+                float ridgeCore = smoothstep(0.68, 0.98, shapedProximity);
+                float ridgeShoulder = pow(saturate(shapedProximity), 1.75);
+                float ridgeShape = saturate(
+                    ridgeCore * 0.78 +
+                    ridgeShoulder * 0.48);
+
+                float longitudinalVariation = lerp(
                     1.0,
-                    lerp(0.58, 1.18, breakupNoise),
+                    lerp(0.58, 1.18, broadNoise) *
+                    lerp(0.78, 1.08, midNoise),
                     breakupStrength);
 
-                // The atlas already stores the semantic ridge field. The
-                // material layer only interprets that field and may modulate it;
-                // it must not erase ridge continuity or invent new topology.
+                float fineMottle = lerp(
+                    1.0,
+                    lerp(0.82, 1.06, fineNoise),
+                    breakupStrength * 0.65);
+
+                float responseGain = responseStrength * lerp(1.0, 1.85, responseStrength);
                 float edgeMask = saturate(
-                    convexField *
-                    responseStrength *
-                    breakup);
+                    ridgeShape *
+                    convexWeight *
+                    responseGain *
+                    longitudinalVariation *
+                    fineMottle);
 
                 if (edgeMask <= 0.0001)
                 {
@@ -923,9 +954,20 @@ Shader "PS3D/Pixel Surface Lit"
                 }
 
                 float valueLift = max(0.0, _GeneratedMassEdgeWearBrightnessLift);
-                half3 lifted = albedo * (half)max(0.0, 1.0 + valueLift);
+
+                // Multiplicative brightening alone is too weak on dark stone.
+                // Blend in a controlled value lift toward a pale worn surface so
+                // Brightness Lift = 1 can be visibly useful without exposing an
+                // overdrive range in the inspector.
+                half3 multipliedLift =
+                    albedo * (half)max(0.0, 1.0 + valueLift * 1.15);
+                half3 valueLifted = lerp(
+                    multipliedLift,
+                    half3(1.0h, 1.0h, 1.0h),
+                    (half)saturate(valueLift * 0.42));
+
                 half3 tinted = PS3D_ApplyValuePreservingTint(
-                    lifted,
+                    valueLifted,
                     _GeneratedMassEdgeWearTint.rgb,
                     _GeneratedMassEdgeWearTintStrength);
 

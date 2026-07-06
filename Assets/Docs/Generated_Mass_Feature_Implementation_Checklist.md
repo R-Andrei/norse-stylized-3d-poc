@@ -1379,3 +1379,32 @@ Validation target:
 - Raising `Response Strength` should reveal lighter worn convex ridges without changing atlas data.
 - `Brightness Lift`, `Tint Influence`, and `Breakup` should visibly affect only the convex ridge response.
 - Existing raw debug modes should still show the same atlas fields.
+
+
+### Patch 14D.1 — Edge-Wear Response Shaping
+
+Patch 14D.1 keeps the Patch 14D control surface intact and improves how the existing controls are interpreted. It does not add new inspector controls, does not modify the atlas baker, and does not change the semantic boundary-field contract.
+
+Implemented scope:
+
+- [x] Recalibrate `Response Strength` and `Brightness Lift` so values in the existing 0..1 inspector range can produce a visibly useful worn-edge response, especially on darker base stone.
+- [x] Replace the initial literal `R * G` stripe interpretation with a shaped core/shoulder response derived from convex ridge proximity.
+- [x] Use the existing single `Breakup` control to modulate edge intensity, apparent band width, and fine material mottle internally.
+- [x] Keep breakup as response modulation only; it should not destroy ridge continuity or mutate atlas data.
+- [x] Keep the semantic atlas clean: `FeatureAtlas0.R/G` remain proximity/weight data, not final decorative paint.
+- [x] Keep the existing five Visual Response controls only: Response Strength, Brightness Lift, Worn Edge Tint, Tint Influence, and Breakup.
+
+Deferred on purpose:
+
+- [ ] New response controls such as Falloff Contrast, Breakup Scale, and Smoothness Offset.
+- [ ] Concave darkening response.
+- [ ] Shader-side ridge-normal support.
+- [ ] Generated main-mesh bevel/chamfer support.
+- [ ] Any pitting, water wear, frost, sacred, or crack-network feature work.
+
+Validation target:
+
+- `Response Strength = 1` and `Brightness Lift = 1` should now be clearly visible without needing an overdrive range.
+- Raising `Breakup` should make the worn edge less ruler-straight and less uniformly intense while preserving the same semantic ridge structure.
+- The visible response should read as a worn ridge core plus softer shoulder, not as a flat debug band.
+- Existing debug modes should remain diagnostic and should not inherit the visual-response shaping.
