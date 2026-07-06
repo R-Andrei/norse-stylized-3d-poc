@@ -6,9 +6,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 {
     /// <summary>
     /// Builds the generated-mass surface-chart feature atlas used by the main
-    /// material path. Patch 14C.4 keeps the atlas semantic: surface patches,
+    /// material path. Patch 14C.5 keeps the atlas semantic: surface patches,
     /// boundary proximity, and boundary weight are baked as clean data, not
-    /// final decorative paint.
+    /// final decorative paint. Raw channel diagnostics make the field contract
+    /// inspectable before any final material response is built.
     /// </summary>
     public static class GeneratedMassFeatureAtlasBaker
     {
@@ -793,12 +794,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float bestComposite = 0f;
             float safeWidth = Mathf.Max(texelWorld * 2f, widthWorld);
             float softness01 = Mathf.Clamp01(softness);
+
+            // Keep the semantic field inspectable. Earlier debug builds let too
+            // much of the band sit at full proximity, which made the atlas read
+            // like a binary selected-edge strip. The ridge/crease core must
+            // remain present, but it should be narrow enough that the raw
+            // proximity channel exposes a visible distance gradient.
             float core = Mathf.Max(
-                texelWorld * (sharper ? 1.20f : 1.55f),
-                safeWidth * Mathf.Lerp(sharper ? 0.045f : 0.065f, sharper ? 0.016f : 0.030f, softness01));
+                texelWorld * (sharper ? 0.95f : 1.10f),
+                safeWidth * Mathf.Lerp(sharper ? 0.024f : 0.030f, sharper ? 0.008f : 0.014f, softness01));
             float outer = Mathf.Max(
-                core + texelWorld,
-                safeWidth * Mathf.Lerp(sharper ? 0.70f : 0.86f, sharper ? 1.06f : 1.26f, softness01));
+                core + texelWorld * 2f,
+                safeWidth * Mathf.Lerp(sharper ? 0.56f : 0.68f, sharper ? 0.88f : 1.02f, softness01));
 
             for (int i = 0; i < segments.Count; i++)
             {
@@ -817,7 +824,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
                 else
                 {
-                    proximity = 1f - Mathf.SmoothStep(core, outer, distance);
+                    float distance01 = Mathf.InverseLerp(core, outer, distance);
+                    float falloff = 1f - Mathf.SmoothStep(0f, 1f, distance01);
+
+                    // A mild power curve makes the raw proximity diagnostic show
+                    // a clearer bright-core / mid-falloff / outer-fade structure
+                    // without adding decorative breakup to the data channel.
+                    proximity = Mathf.Pow(
+                        Mathf.Clamp01(falloff),
+                        sharper ? 1.45f : 1.28f);
                 }
 
                 if (proximity <= 0.001f)

@@ -1344,6 +1344,7 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     float4 morphedPacked = FoamApplyPersistentMaterialMorph(
         currentPacked,
         coordinate,
+        worldSampleCoordinate,
         physicalPosition,
         physicalCellSpacing,
         surfaceSampleUv,

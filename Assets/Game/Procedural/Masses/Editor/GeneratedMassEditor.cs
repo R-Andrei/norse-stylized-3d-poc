@@ -18,6 +18,48 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private const string BlackSacredStoneMaterialPath =
             "Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_BlackSacred.mat";
 
+        private static readonly int[] CommonDebugValues =
+        {
+            (int)StoneSurfaceMaskDebug.None,
+            (int)StoneSurfaceMaskDebug.ConvexEdgeWear,
+            (int)StoneSurfaceMaskDebug.BoundaryFieldDiagnostic,
+            (int)StoneSurfaceMaskDebug.Exposure,
+            (int)StoneSurfaceMaskDebug.CreviceBase,
+            (int)StoneSurfaceMaskDebug.DirtDeposit
+        };
+
+        private static readonly GUIContent[] CommonDebugLabels =
+        {
+            new GUIContent("None"),
+            new GUIContent("Convex Edge Wear"),
+            new GUIContent("Boundary Field Diagnostic"),
+            new GUIContent("Exposure"),
+            new GUIContent("Crevice / Base"),
+            new GUIContent("Dirt / Deposit")
+        };
+
+        private static readonly int[] AdvancedDebugValues =
+        {
+            (int)StoneSurfaceMaskDebug.None,
+            (int)StoneSurfaceMaskDebug.ConvexRidgeProximity,
+            (int)StoneSurfaceMaskDebug.ConvexRidgeWeight,
+            (int)StoneSurfaceMaskDebug.ConvexRidgeComposite,
+            (int)StoneSurfaceMaskDebug.ConcaveCreaseProximity,
+            (int)StoneSurfaceMaskDebug.ConcaveCreaseWeight,
+            (int)StoneSurfaceMaskDebug.ConcaveCreaseComposite
+        };
+
+        private static readonly GUIContent[] AdvancedDebugLabels =
+        {
+            new GUIContent("None"),
+            new GUIContent("Convex Ridge Proximity"),
+            new GUIContent("Convex Ridge Weight"),
+            new GUIContent("Convex Ridge Composite"),
+            new GUIContent("Concave Crease Proximity"),
+            new GUIContent("Concave Crease Weight"),
+            new GUIContent("Concave Crease Composite")
+        };
+
         private SerializedProperty coldGreyStoneMaterial;
         private SerializedProperty darkWetRiverStoneMaterial;
         private SerializedProperty paleFrostStoneMaterial;
@@ -53,6 +95,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty edgeWearWidth;
         private SerializedProperty edgeWearCoverage;
         private SerializedProperty edgeWearSoftness;
+        private SerializedProperty edgeWearResponseStrength;
+        private SerializedProperty edgeWearBrightnessLift;
+        private SerializedProperty edgeWearTint;
+        private SerializedProperty edgeWearTintStrength;
+        private SerializedProperty edgeWearBreakup;
         private SerializedProperty creaseAmount;
         private SerializedProperty creaseWidth;
         private SerializedProperty creaseLength;
@@ -77,6 +124,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private bool showCreviceShelterFeature = true;
         private bool showDirtDepositFeature = true;
         private bool showEdgeWearFeature;
+        private bool showAdvancedFeatureDiagnostics;
         private bool showCreaseDebugFeature;
         private bool showPressureProfile;
 
@@ -152,6 +200,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "edgeWearCoverage");
             edgeWearSoftness = serializedObject.FindProperty(
                 "edgeWearSoftness");
+            edgeWearResponseStrength = serializedObject.FindProperty(
+                "edgeWearResponseStrength");
+            edgeWearBrightnessLift = serializedObject.FindProperty(
+                "edgeWearBrightnessLift");
+            edgeWearTint = serializedObject.FindProperty(
+                "edgeWearTint");
+            edgeWearTintStrength = serializedObject.FindProperty(
+                "edgeWearTintStrength");
+            edgeWearBreakup = serializedObject.FindProperty(
+                "edgeWearBreakup");
             creaseAmount = serializedObject.FindProperty(
                 "creaseAmount");
             creaseWidth = serializedObject.FindProperty(
@@ -240,6 +298,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "edgeWearWidth",
                 "edgeWearCoverage",
                 "edgeWearSoftness",
+                "edgeWearResponseStrength",
+                "edgeWearBrightnessLift",
+                "edgeWearTint",
+                "edgeWearTintStrength",
+                "edgeWearBreakup",
                 "creaseAmount",
                 "creaseWidth",
                 "creaseLength",
@@ -450,13 +513,129 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 new GUIContent(
                     "Base Color",
                     "Per-object starting stone colour before generated mask response, optional tinting, and scene lighting."));
-            EditorGUILayout.PropertyField(
-                surfaceMaskDebug,
-                new GUIContent(
-                    "Surface Mask Debug",
-                    "Temporarily visualizes generated material masks on this object. Leave disabled for normal rendering."));
+            DrawSurfaceMaskDebugControls();
 
             DrawActiveProfileSummary();
+        }
+
+        private void DrawSurfaceMaskDebugControls()
+        {
+            if (surfaceMaskDebug == null)
+            {
+                return;
+            }
+
+            EditorGUILayout.LabelField(
+                "Surface Debug",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                "Common debug views stay in the main selector. Raw boundary " +
+                "channels live in Advanced Feature Diagnostics so normal use " +
+                "does not turn into a long debug-control list.",
+                MessageType.None);
+
+            int currentValue = surfaceMaskDebug.intValue;
+            int commonIndex = IndexOfDebugValue(CommonDebugValues, currentValue);
+            bool currentIsAdvanced =
+                commonIndex < 0 &&
+                IndexOfDebugValue(AdvancedDebugValues, currentValue) > 0;
+            bool currentIsOtherDebug =
+                commonIndex < 0 &&
+                !currentIsAdvanced &&
+                currentValue != (int)StoneSurfaceMaskDebug.None;
+
+            int[] displayedCommonValues = CommonDebugValues;
+            GUIContent[] displayedCommonLabels = CommonDebugLabels;
+            if (currentIsAdvanced || currentIsOtherDebug)
+            {
+                displayedCommonValues = new int[CommonDebugValues.Length + 1];
+                displayedCommonLabels = new GUIContent[CommonDebugLabels.Length + 1];
+                displayedCommonValues[0] = currentValue;
+                displayedCommonLabels[0] = currentIsAdvanced
+                    ? new GUIContent("Advanced Diagnostic Active")
+                    : new GUIContent("Other Debug Active");
+                for (int i = 0; i < CommonDebugValues.Length; i++)
+                {
+                    displayedCommonValues[i + 1] = CommonDebugValues[i];
+                    displayedCommonLabels[i + 1] = CommonDebugLabels[i];
+                }
+
+                commonIndex = 0;
+            }
+            else if (commonIndex < 0)
+            {
+                commonIndex = 0;
+            }
+
+            EditorGUI.showMixedValue = surfaceMaskDebug.hasMultipleDifferentValues;
+            EditorGUI.BeginChangeCheck();
+            int nextCommonIndex = EditorGUILayout.Popup(
+                new GUIContent(
+                    "Surface Mask Debug",
+                    "Temporarily visualizes generated material masks on this object. Leave at None for normal rendering."),
+                commonIndex,
+                displayedCommonLabels);
+            if (EditorGUI.EndChangeCheck())
+            {
+                surfaceMaskDebug.intValue = displayedCommonValues[nextCommonIndex];
+            }
+
+            EditorGUI.showMixedValue = false;
+
+            showAdvancedFeatureDiagnostics = EditorGUILayout.Foldout(
+                showAdvancedFeatureDiagnostics,
+                "Advanced Feature Diagnostics",
+                true);
+
+            if (!showAdvancedFeatureDiagnostics)
+            {
+                return;
+            }
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox(
+                    "Raw FeatureAtlas0 channel inspection. These views are " +
+                    "for validating generated data, not for normal material " +
+                    "authoring.",
+                    MessageType.None);
+
+                int advancedIndex =
+                    IndexOfDebugValue(AdvancedDebugValues, surfaceMaskDebug.intValue);
+                if (advancedIndex < 0)
+                {
+                    advancedIndex = 0;
+                }
+
+                EditorGUI.showMixedValue = surfaceMaskDebug.hasMultipleDifferentValues;
+                EditorGUI.BeginChangeCheck();
+                int nextAdvancedIndex = EditorGUILayout.Popup(
+                    new GUIContent(
+                        "Raw Boundary Channel",
+                        "Inspects separated proximity/weight channels for generated boundary fields."),
+                    advancedIndex,
+                    AdvancedDebugLabels);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    surfaceMaskDebug.intValue =
+                        AdvancedDebugValues[nextAdvancedIndex];
+                }
+
+                EditorGUI.showMixedValue = false;
+            }
+        }
+
+        private static int IndexOfDebugValue(int[] values, int value)
+        {
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (values[i] == value)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
 
         private void DrawActiveProfileSummary()
@@ -796,33 +975,70 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             using (new EditorGUI.IndentLevelScope())
             {
                 EditorGUILayout.HelpBox(
-                    "ConvexEdgeWear now bakes into GeneratedMassFeatureAtlas0.R " +
-                    "as a seam-safe surface-patch ridge-proximity field for main-surface " +
-                    "debug validation. Legacy raised secondary meshes remain " +
-                    "removed; normal rendering still has no final edge-wear " +
-                    "response in Patch 14C.",
+                    "Edge Wear is split into two layers. Data Field / Atlas Bake " +
+                    "controls where the semantic convex ridge field exists and may " +
+                    "regenerate the feature atlas. Visual Response controls how the " +
+                    "material interprets that existing data in normal rendering.",
                     MessageType.Info);
 
+                EditorGUILayout.LabelField(
+                    "Data Field / Atlas Bake",
+                    EditorStyles.miniBoldLabel);
                 EditorGUILayout.PropertyField(
                     edgeWearAmount,
                     new GUIContent(
                         "Amount",
-                        "How much ConvexEdgeWear debug/data is generated."));
+                        "How much ConvexEdgeWear semantic atlas data is generated."));
                 EditorGUILayout.PropertyField(
                     edgeWearWidth,
                     new GUIContent(
                         "Width",
-                        "Controls the debug/data width around convex feature edges."));
+                        "Controls semantic field width around convex ridge boundaries."));
                 EditorGUILayout.PropertyField(
                     edgeWearCoverage,
                     new GUIContent(
                         "Coverage",
-                        "Controls semantic ridge eligibility: lower values keep only the strongest ridges, higher values include more ridge boundaries. It no longer creates random edge fragments."));
+                        "Controls semantic ridge eligibility: lower values keep only the strongest ridges, higher values include more ridge boundaries."));
                 EditorGUILayout.PropertyField(
                     edgeWearSoftness,
                     new GUIContent(
                         "Softness",
-                        "Controls how soft the generated edge-wear debug/data response is."));
+                        "Controls how softly the generated convex ridge proximity field fades."));
+
+                EditorGUILayout.Space(3f);
+                EditorGUILayout.LabelField(
+                    "Visual Response",
+                    EditorStyles.miniBoldLabel);
+                EditorGUILayout.HelpBox(
+                    "These controls do not change the atlas. They only control " +
+                    "how the shader displays the convex ridge field when Surface " +
+                    "Mask Debug is None.",
+                    MessageType.None);
+                EditorGUILayout.PropertyField(
+                    edgeWearResponseStrength,
+                    new GUIContent(
+                        "Response Strength",
+                        "Master intensity for visible convex edge wear in normal rendering. Zero leaves normal rendering unchanged."));
+                EditorGUILayout.PropertyField(
+                    edgeWearBrightnessLift,
+                    new GUIContent(
+                        "Brightness Lift",
+                        "How much visible worn ridges brighten the stone value."));
+                EditorGUILayout.PropertyField(
+                    edgeWearTint,
+                    new GUIContent(
+                        "Worn Edge Tint",
+                        "Optional hue target for worn convex ridges."));
+                EditorGUILayout.PropertyField(
+                    edgeWearTintStrength,
+                    new GUIContent(
+                        "Tint Influence",
+                        "How strongly Worn Edge Tint affects the visible response. Zero keeps the response value-only."));
+                EditorGUILayout.PropertyField(
+                    edgeWearBreakup,
+                    new GUIContent(
+                        "Breakup",
+                        "How much existing generated surface noise modulates the visible response without changing the semantic ridge field."));
             }
         }
 
@@ -841,10 +1057,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             using (new EditorGUI.IndentLevelScope())
             {
                 EditorGUILayout.HelpBox(
-                    "ConcaveCrease now bakes into GeneratedMassFeatureAtlas0.G " +
-                    "as a seam-safe surface-patch crease-proximity field for main-surface " +
-                    "debug validation. This remains data/debug-only; final " +
-                    "crease darkening is deferred until the mask is validated.",
+                    "ConcaveCrease uses FeatureAtlas0.B as concave crease proximity " +
+                    "and FeatureAtlas0.A as concave crease weight/importance. This " +
+                    "remains data/debug-only; final crease darkening is deferred until " +
+                    "the mask is validated.",
                     MessageType.Info);
 
                 EditorGUILayout.PropertyField(

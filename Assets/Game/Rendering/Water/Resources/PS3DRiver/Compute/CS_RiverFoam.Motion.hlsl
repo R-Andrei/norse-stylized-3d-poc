@@ -37,33 +37,35 @@ float FoamLoadMotionLaneCell(int x, int y)
         1.0);
 }
 
-float FoamSampleMotionLaneSmooth(int2 coordinate)
+float FoamSampleMotionLaneSmooth(float2 coordinate)
 {
-    float scrolledX = (float)coordinate.x - _FoamMotionLaneScrollCells;
+    float scrolledX = coordinate.x - _FoamMotionLaneScrollCells;
     int x0 = (int)floor(scrolledX);
     int x1 = x0 + 1;
     float blend = frac(scrolledX);
-    float a = FoamLoadMotionLaneCell(x0, coordinate.y);
-    float b = FoamLoadMotionLaneCell(x1, coordinate.y);
+    int y = ClampY((int)floor(coordinate.y));
+    float a = FoamLoadMotionLaneCell(x0, y);
+    float b = FoamLoadMotionLaneCell(x1, y);
     return lerp(a, b, blend);
 }
 
-float2 FoamLoadObstacleRoutingCell(int2 coordinate)
+float2 FoamLoadObstacleRoutingCell(float2 coordinate)
 {
-    if (coordinate.x < 0 || coordinate.x >= _FoamDimensions.x ||
-        coordinate.y < 0 || coordinate.y >= _FoamDimensions.y)
+    int2 texel = int2(floor(coordinate));
+    if (texel.x < 0 || texel.x >= _FoamDimensions.x ||
+        texel.y < 0 || texel.y >= _FoamDimensions.y)
     {
         return 0.0.xx;
     }
 
-    float2 routing = _FoamObstacleRoutingRead.Load(int3(coordinate, 0));
+    float2 routing = _FoamObstacleRoutingRead.Load(int3(texel, 0));
     routing.x = clamp(routing.x, -1.0, 1.0);
     routing.y = saturate(routing.y);
     return routing;
 }
 
 FoamMotionFieldSample FoamResolveMotionFieldSample(
-    int2 coordinate,
+    float2 motionSampleCoordinate,
     float validFluid)
 {
     FoamMotionFieldSample sample;
@@ -78,8 +80,8 @@ FoamMotionFieldSample FoamResolveMotionFieldSample(
         return sample;
     }
 
-    float lane = FoamSampleMotionLaneSmooth(coordinate);
-    float2 obstacle = FoamLoadObstacleRoutingCell(coordinate);
+    float lane = FoamSampleMotionLaneSmooth(motionSampleCoordinate);
+    float2 obstacle = FoamLoadObstacleRoutingCell(motionSampleCoordinate);
     float obstacleInfluence = saturate(obstacle.y);
     float resolved = lerp(lane, obstacle.x, obstacleInfluence);
 

@@ -77,13 +77,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
     public enum StoneSurfaceMaskDebug
     {
-        None,
-        SurfaceVariation,
-        Exposure,
-        CreviceBase,
-        ConvexEdgeWear,
-        ConcaveCrease,
-        DirtDeposit
+        None = 0,
+        SurfaceVariation = 1,
+        Exposure = 2,
+        CreviceBase = 3,
+        ConvexEdgeWear = 4,
+        ConcaveCrease = 5,
+        DirtDeposit = 6,
+
+        // FeatureAtlas0 diagnostics. Values intentionally match
+        // PixelSurfaceMaskDebugMode and avoid the shared ground-debug range.
+        ConvexRidgeProximity = 15,
+        ConvexRidgeWeight = 16,
+        ConvexRidgeComposite = 17,
+        ConcaveCreaseProximity = 18,
+        ConcaveCreaseWeight = 19,
+        ConcaveCreaseComposite = 20,
+        BoundaryFieldDiagnostic = 21
     }
 
     public enum ShapeDiversity
@@ -399,6 +409,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Shader.PropertyToID("_GeneratedMassEdgeWearCoverage");
         private static readonly int GeneratedMassEdgeWearSoftnessId =
             Shader.PropertyToID("_GeneratedMassEdgeWearSoftness");
+        private static readonly int GeneratedMassEdgeWearResponseStrengthId =
+            Shader.PropertyToID("_GeneratedMassEdgeWearResponseStrength");
+        private static readonly int GeneratedMassEdgeWearBrightnessLiftId =
+            Shader.PropertyToID("_GeneratedMassEdgeWearBrightnessLift");
+        private static readonly int GeneratedMassEdgeWearTintId =
+            Shader.PropertyToID("_GeneratedMassEdgeWearTint");
+        private static readonly int GeneratedMassEdgeWearTintStrengthId =
+            Shader.PropertyToID("_GeneratedMassEdgeWearTintStrength");
+        private static readonly int GeneratedMassEdgeWearBreakupId =
+            Shader.PropertyToID("_GeneratedMassEdgeWearBreakup");
         private static readonly int GeneratedMassCreaseLengthId =
             Shader.PropertyToID("_GeneratedMassCreaseLength");
         private static readonly int GeneratedMassCreaseBranchingId =
@@ -436,6 +456,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public float EdgeWearWidth;
             public float EdgeWearCoverage;
             public float EdgeWearSoftness;
+            public float EdgeWearResponseStrength;
+            public float EdgeWearBrightnessLift;
+            public Color EdgeWearTint;
+            public float EdgeWearTintStrength;
+            public float EdgeWearBreakup;
             public float CreaseAmount;
             public float CreaseWidth;
             public float CreaseLength;
@@ -589,6 +614,30 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float edgeWearSoftness = 0.45f;
 
+        [Tooltip("Master intensity for the normal-render convex edge-wear material response. Zero keeps the atlas data debug-only and leaves normal rendering unchanged.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float edgeWearResponseStrength;
+
+        [Tooltip("How much the worn convex ridge response brightens the base stone value.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float edgeWearBrightnessLift = 0.25f;
+
+        [Tooltip("Optional material tint target for worn convex ridges. Tint Influence controls how much of this hue is applied.")]
+        [SerializeField]
+        private Color edgeWearTint = new Color(0.70f, 0.69f, 0.62f, 1f);
+
+        [Tooltip("How strongly Worn Edge Tint affects the edge-wear response. Zero keeps the response value-only.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float edgeWearTintStrength;
+
+        [Tooltip("How much existing generated surface noise modulates the visible edge-wear response. This does not change the semantic atlas data.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float edgeWearBreakup;
+
         [Tooltip("Reserved ConcaveCrease amount for the future atlas-based crack/seam feature. Current Patch 14C does not render secondary crease meshes.")]
         [Range(0f, 2f)]
         [SerializeField]
@@ -682,6 +731,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public float EdgeWearWidth => edgeWearWidth;
         public float EdgeWearCoverage => edgeWearCoverage;
         public float EdgeWearSoftness => edgeWearSoftness;
+        public float EdgeWearResponseStrength => edgeWearResponseStrength;
+        public float EdgeWearBrightnessLift => edgeWearBrightnessLift;
+        public Color EdgeWearTint => edgeWearTint;
+        public float EdgeWearTintStrength => edgeWearTintStrength;
+        public float EdgeWearBreakup => edgeWearBreakup;
         public float CreaseAmount => creaseAmount;
         public float CreaseWidth => creaseWidth;
         public float CreaseLength => creaseLength;
@@ -977,6 +1031,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             edgeWearWidth = values.EdgeWearWidth;
             edgeWearCoverage = values.EdgeWearCoverage;
             edgeWearSoftness = values.EdgeWearSoftness;
+            edgeWearResponseStrength = values.EdgeWearResponseStrength;
+            edgeWearBrightnessLift = values.EdgeWearBrightnessLift;
+            edgeWearTint = values.EdgeWearTint;
+            edgeWearTintStrength = values.EdgeWearTintStrength;
+            edgeWearBreakup = values.EdgeWearBreakup;
             creaseAmount = values.CreaseAmount;
             creaseWidth = values.CreaseWidth;
             creaseLength = values.CreaseLength;
@@ -1042,6 +1101,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                    FloatApproximately(
                        edgeWearSoftness,
                        values.EdgeWearSoftness) &&
+                   FloatApproximately(
+                       edgeWearResponseStrength,
+                       values.EdgeWearResponseStrength) &&
+                   FloatApproximately(
+                       edgeWearBrightnessLift,
+                       values.EdgeWearBrightnessLift) &&
+                   ColorApproximately(edgeWearTint, values.EdgeWearTint) &&
+                   FloatApproximately(
+                       edgeWearTintStrength,
+                       values.EdgeWearTintStrength) &&
+                   FloatApproximately(edgeWearBreakup, values.EdgeWearBreakup) &&
                    FloatApproximately(creaseAmount, values.CreaseAmount) &&
                    FloatApproximately(creaseWidth, values.CreaseWidth) &&
                    FloatApproximately(creaseLength, values.CreaseLength) &&
@@ -1064,6 +1134,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 case GeneratedMassFeatureRecipe.ColdGreyStone:
                     values.StoneSurfaceProfile =
                         StoneSurfaceProfile.ColdGreyStone;
+                    values.EdgeWearResponseStrength = 0.45f;
+                    values.EdgeWearBrightnessLift = 0.24f;
+                    values.EdgeWearTint = new Color(0.68f, 0.69f, 0.65f, 1f);
+                    values.EdgeWearTintStrength = 0.12f;
+                    values.EdgeWearBreakup = 0.16f;
                     return values;
 
                 case GeneratedMassFeatureRecipe.WetRiverStone:
@@ -1081,6 +1156,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     values.DirtDepositResponse = 1.1f;
                     values.EdgeWearAmount = 1.2f;
                     values.EdgeWearSoftness = 0.65f;
+                    values.EdgeWearResponseStrength = 0f;
+                    values.EdgeWearTintStrength = 0f;
+                    values.EdgeWearBreakup = 0f;
                     return values;
 
                 case GeneratedMassFeatureRecipe.PaleFrostStone:
@@ -1095,6 +1173,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     values.DirtCoverage = 0.55f;
                     values.CreaseAmount = 1.25f;
                     values.CreaseSoftness = 0.45f;
+                    values.EdgeWearResponseStrength = 0f;
+                    values.EdgeWearTintStrength = 0f;
+                    values.EdgeWearBreakup = 0f;
                     return values;
 
                 case GeneratedMassFeatureRecipe.BlackSacredStone:
@@ -1109,6 +1190,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     values.DirtCoverage = 0.4f;
                     values.EdgeWearAmount = 0.55f;
                     values.CreaseAmount = 0.35f;
+                    values.EdgeWearResponseStrength = 0f;
+                    values.EdgeWearTintStrength = 0f;
+                    values.EdgeWearBreakup = 0f;
                     values.LightingTintInfluence = 0.2f;
                     return values;
 
@@ -1150,6 +1234,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EdgeWearWidth = 1f,
                 EdgeWearCoverage = 1f,
                 EdgeWearSoftness = 0.45f,
+                EdgeWearResponseStrength = 0.65f,
+                EdgeWearBrightnessLift = 0.38f,
+                EdgeWearTint = new Color(0.72f, 0.70f, 0.60f, 1f),
+                EdgeWearTintStrength = 0.18f,
+                EdgeWearBreakup = 0.22f,
                 CreaseAmount = 1f,
                 CreaseWidth = 1f,
                 CreaseLength = 1f,
@@ -1239,6 +1328,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             materialProperties.SetFloat(
                 GeneratedMassEdgeWearSoftnessId,
                 Mathf.Clamp01(edgeWearSoftness));
+            materialProperties.SetFloat(
+                GeneratedMassEdgeWearResponseStrengthId,
+                Mathf.Clamp01(edgeWearResponseStrength));
+            materialProperties.SetFloat(
+                GeneratedMassEdgeWearBrightnessLiftId,
+                Mathf.Clamp01(edgeWearBrightnessLift));
+            materialProperties.SetColor(
+                GeneratedMassEdgeWearTintId,
+                edgeWearTint);
+            materialProperties.SetFloat(
+                GeneratedMassEdgeWearTintStrengthId,
+                Mathf.Clamp01(edgeWearTintStrength));
+            materialProperties.SetFloat(
+                GeneratedMassEdgeWearBreakupId,
+                Mathf.Clamp01(edgeWearBreakup));
             materialProperties.SetFloat(
                 GeneratedMassCreaseLengthId,
                 Mathf.Clamp(creaseLength, 0.25f, 2f));

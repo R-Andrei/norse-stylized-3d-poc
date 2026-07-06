@@ -23,6 +23,17 @@ namespace ProgrammaticStylized3D.Rendering
         GroundCompaction = 11,
         GroundShore = 12,
         GroundRockyDry = 13,
-        GroundCombined = 14
+        GroundCombined = 14,
+
+        // GeneratedMass FeatureAtlas0 channel diagnostics. These are
+        // intentionally placed after the ground debug modes so existing
+        // serialized GeneratedMass debug values 0-6 remain stable.
+        ConvexRidgeProximity = 15,
+        ConvexRidgeWeight = 16,
+        ConvexRidgeComposite = 17,
+        ConcaveCreaseProximity = 18,
+        ConcaveCreaseWeight = 19,
+        ConcaveCreaseComposite = 20,
+        BoundaryFieldDiagnostic = 21
     }
 }

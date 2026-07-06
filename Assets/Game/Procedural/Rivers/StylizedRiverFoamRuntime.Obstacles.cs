@@ -382,18 +382,38 @@ namespace ProgrammaticStylized3D.Rivers
             float neutralThreshold = ResolveNeutralThreshold(
                 motionLaneRawValues,
                 Mathf.Clamp01(neutralCoverage));
+            const float minimumLaneMotionMagnitude = 0.065f;
             float denominator = Mathf.Max(0.0001f, 1f - neutralThreshold);
             for (int index = 0; index < cellCount; index++)
             {
                 float raw = motionLaneRawValues[index];
                 float magnitude = Mathf.Abs(raw);
                 float resolved = 0f;
-                if (magnitude > neutralThreshold)
+                if (magnitude > 0.0001f)
                 {
-                    float normalized = Mathf.Clamp01(
-                        (magnitude - neutralThreshold) / denominator);
-                    normalized = normalized * normalized * (3f - 2f * normalized);
-                    resolved = Mathf.Sign(raw) * normalized;
+                    float sign = Mathf.Sign(raw);
+                    if (neutralThreshold > 0.0001f &&
+                        magnitude <= neutralThreshold)
+                    {
+                        float lowMotionT = Mathf.Clamp01(
+                            magnitude / neutralThreshold);
+                        lowMotionT = lowMotionT * lowMotionT *
+                            (3f - 2f * lowMotionT);
+                        resolved = sign *
+                            minimumLaneMotionMagnitude *
+                            lowMotionT;
+                    }
+                    else
+                    {
+                        float normalized = Mathf.Clamp01(
+                            (magnitude - neutralThreshold) / denominator);
+                        normalized = normalized * normalized *
+                            (3f - 2f * normalized);
+                        resolved = sign * Mathf.Lerp(
+                            minimumLaneMotionMagnitude,
+                            1f,
+                            normalized);
+                    }
                 }
 
                 motionLaneHalfData[index] = Mathf.FloatToHalf(resolved);

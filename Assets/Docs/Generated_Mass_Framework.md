@@ -1548,7 +1548,7 @@ Patch 14C
 Generated Mass Surface-Chart Feature Atlas Foundation. Create the dedicated feature-atlas UV channel, generated surface-chart atlas mapping, FeatureAtlas0 texture, shader binding, and main-surface debug preview. Patch 14C.1b removes the old raised secondary feature meshes. Patch 14C.2 replaces the failed per-triangle decal bake with surface-patch charts and ridge-distance fields. Patch 14C.3 hardens that system so convex/concave boundaries are first-class semantic data, the exact ridge/crease core is written into the field, and chart gutters carry semantic feature values instead of black. Atlas0.R/G store ConvexEdgeWear proximity/weight data and Atlas0.B/A store ConcaveCrease proximity/weight data. Normal rendering remains unchanged. This is now a prerequisite before serious final surface-feature implementation.
 
 Patch 14D
-Generic Edge Wear via Feature Atlas. Interpret the already-baked ConvexEdgeWear atlas channel through the main generated-mass shader using generic controls.
+Generic Edge Wear via Feature Atlas. Interpret the already-baked ConvexEdgeWear atlas channels through the main generated-mass shader using a small, categorized set of generic response controls. Patch 14D starts with convex ridge lightening only; concave darkening remains data/debug-only until concave geometry/crack generation produces reliable inputs.
 
 Patch 14E+
 Implement reusable features one by one using the atlas where practical, validating each on Generic Test Mass before adding archetype recipe values.
@@ -1683,3 +1683,90 @@ Important non-goals remain unchanged:
 - no local X/Z projection fallback;
 - no changes to `MeshData.cs` or `MeshBuilder.cs`.
 
+
+
+### Patch 14C.5 implementation correction — raw boundary-field diagnostics
+
+Patch 14C.5 does not introduce final edge-wear rendering. It hardens the supporting architecture by making the packed boundary fields directly inspectable. The important distinction is now explicit:
+
+```text
+FeatureAtlas0.R = convex ridge proximity
+FeatureAtlas0.G = convex ridge weight / importance
+FeatureAtlas0.B = concave crease proximity
+FeatureAtlas0.A = concave crease weight / importance
+```
+
+The normal ConvexEdgeWear debug view remains the composite `R * G`, and the normal ConcaveCrease debug view remains `B * A`. Patch 14C.5 adds diagnostic views for the raw channels (`R`, `G`, `B`, `A`), both composites, and an RGB boundary-field diagnostic view where red is convex proximity, green is convex weight, and blue is concave proximity.
+
+This matters because final material response should not be built on a guess. If the composite looks binary, the diagnostics must be able to show whether the problem is the distance/proximity field, the boundary weight field, or the composite preview.
+
+Patch 14C.5 also tightens the semantic proximity falloff. The atlas should read as a clean data field: a narrow bright ridge/crease core, a visible mid-gradient, and a soft outer fade. It should not bake decorative breakup, final white paint, profile-specific colour, pitting, frost, water wear, bevels, or shader normal tricks. Boundary weight remains stable per boundary for now; along-ridge variation belongs in the future visual-response layer unless a later feature explicitly requires semantic along-boundary data.
+
+
+### Patch 14D implementation — generic convex edge-wear response
+
+Patch 14D is the first normal-render interpretation of the Patch 14C semantic boundary fields. It does not rewrite the atlas baker or surface graph. The key contract remains:
+
+```text
+FeatureAtlas0.R = convex ridge proximity
+FeatureAtlas0.G = convex ridge weight / importance
+FeatureAtlas0.B = concave crease proximity
+FeatureAtlas0.A = concave crease weight / importance
+```
+
+The normal-render response uses only the convex pair for now:
+
+```text
+convex edge-wear field = FeatureAtlas0.R * FeatureAtlas0.G
+```
+
+This field drives a generic material response on the main generated-mass shader:
+
+```text
+base stone colour
+→ brightness lift on worn convex ridges
+→ optional worn-edge tint influence
+→ optional response breakup from existing generated surface noise
+```
+
+The response controls are intentionally limited and grouped in the inspector:
+
+```text
+Edge Wear
+  Data Field / Atlas Bake
+    Amount
+    Width
+    Coverage
+    Softness
+
+  Visual Response
+    Response Strength
+    Brightness Lift
+    Worn Edge Tint
+    Tint Influence
+    Breakup
+```
+
+Do not collapse these two layers. Data Field / Atlas Bake controls decide where the semantic feature exists and may require atlas regeneration. Visual Response controls decide how the shader displays already-baked data and should not mutate the atlas.
+
+Patch 14D also keeps the debug layer human-sized. The main Surface Mask Debug selector should stay curated for common authoring views. Raw boundary-channel inspection belongs under Advanced Feature Diagnostics:
+
+```text
+Surface Mask Debug
+  None
+  Convex Edge Wear
+  Boundary Field Diagnostic
+  Exposure
+  Crevice / Base
+  Dirt / Deposit
+
+Advanced Feature Diagnostics
+  Convex Ridge Proximity
+  Convex Ridge Weight
+  Convex Ridge Composite
+  Concave Crease Proximity
+  Concave Crease Weight
+  Concave Crease Composite
+```
+
+Deferred deliberately: concave darkening response, smoothness offset, falloff contrast, breakup scale, shader-side ridge normals, generated bevels/chamfers, pitting, water wear, frost, sacred features, and crack-network generation.

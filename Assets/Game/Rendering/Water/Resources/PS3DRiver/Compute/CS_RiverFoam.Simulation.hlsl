@@ -330,6 +330,7 @@ float2 FoamResolveAreaBalancedWobbleCells(
 float4 FoamApplyPersistentMaterialMorph(
     float4 currentPacked,
     int2 coordinate,
+    float2 motionSampleCoordinate,
     float2 physicalPosition,
     float2 physicalCellSpacing,
     float2 surfaceUv,
@@ -356,7 +357,7 @@ float4 FoamApplyPersistentMaterialMorph(
             materialTopology,
             edgeExposure);
     FoamMotionFieldSample motionField = FoamResolveMotionFieldSample(
-        coordinate,
+        motionSampleCoordinate,
         validFluid);
 
     float2 morphCells = FoamResolveAreaBalancedWobbleCells(
@@ -402,7 +403,7 @@ float4 FoamApplyPersistentMaterialMorph(
     float counterPresence = FoamDecodeMaterialState(counterPacked).presence;
     float crossPresence = FoamDecodeMaterialState(crossPacked).presence;
     float nearbyPresence = max(
-        max(currentState.presence, advectedBasePresence),
+        advectedBasePresence,
         max(primaryPresence, max(counterPresence, crossPresence)));
     if (nearbyPresence <= FoamMaterialStateEpsilon)
     {
@@ -434,12 +435,12 @@ float4 FoamApplyPersistentMaterialMorph(
         (0.45 + surfaceCalibration * 0.55));
     float morphWeight = saturate(surfaceRate * _FoamDeltaTime * activity * mobility);
 
-    float baseTransportInfluence = saturate(
-        abs(motionField.lateralCells) * (0.42 + activity * 0.42));
-    float4 basePacked = lerp(
-        currentPacked,
-        advectedBasePacked,
-        baseTransportInfluence);
+    // Material transport should be source-sampled, not union-preserved.
+    // The previous current/advected blend left source cells behind while also
+    // filling the destination, which read as stretching/growth instead of
+    // actual lateral movement. With zero lateral motion, macroBase equals the
+    // current pixel, so advectedBasePacked naturally preserves stationary foam.
+    float4 basePacked = advectedBasePacked;
 
     float baseWeight = 1.0 - morphWeight * 0.66;
     float primaryWeight = morphWeight * 0.25;
@@ -460,9 +461,10 @@ float4 FoamApplyPersistentMaterialMorph(
         FoamClampPackedMaterialState(mixedPacked));
 
     // Do not allow interpolation haze to accumulate into new full material.
-    // Existing cells are not forcibly preserved at full strength; that previous
-    // union behavior caused monotonic area growth. Lifespan remains governed by
-    // Remaining Life because this pass contains no explicit Presence erosion.
+    // Current-cell material no longer gets a free preservation vote during
+    // lateral transport; output is sourced from the field-advected samples.
+    // Lifespan remains governed by Remaining Life because this pass contains no
+    // explicit Presence erosion.
     mixedState.presence = min(
         mixedState.presence,
         nearbyPresence + 0.025);
