@@ -240,8 +240,9 @@ namespace ProgrammaticStylized3D.Rivers
         {
             if (computeShader == null || currentState == null ||
                 shapeMaskTexture == null || boundaryTexture == null ||
-                obstacleExclusionTexture == null || evaluateShapeKernel < 0 ||
-                fieldWidth <= 0 || fieldHeight <= 0)
+                obstacleExclusionTexture == null || metricBuffer == null ||
+                evaluateShapeKernel < 0 || fieldWidth <= 0 ||
+                fieldHeight <= 0)
             {
                 return;
             }
@@ -253,6 +254,14 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamSimulationLength",
                 simulationFieldLength);
+            computeShader.SetFloat("_FoamTime", river.MotionTime);
+            computeShader.SetFloat("_FoamSeed", river.VisualSeed);
+            computeShader.SetFloat("_FoamGlobalStart", allocatedGlobalStart);
+            computeShader.SetFloat("_FoamFieldLength", fieldLength);
+            computeShader.SetBuffer(
+                evaluateShapeKernel,
+                "_FoamMetricRows",
+                metricBuffer);
             computeShader.SetInt("_FoamRangeStart", 0);
             computeShader.SetInt("_FoamRangeCount", fieldWidth);
             computeShader.SetTexture(

@@ -1162,3 +1162,38 @@ Foam Shape Difference ~= black
 ```
 
 That baseline is intentional. Future Layer D work must now prove visible benefit explicitly, starting with the local procedural breakup probe and then the low-resolution Film Source / Film Support system for broad structural sheet/contact/bridge behavior.
+
+## 2026-07-07 — River Foam 4.11C.5.11 Local Procedural Breakup Probe
+
+`4.11C.5.11` implements the first intentionally isolated Layer D local-breakup probe after `4.11C.5.10B` restored the clean pass-through baseline. The goal is to test the cheapest possible no-neighbour visual breakup layer before adding low-resolution structural Film Source / Film Support fields.
+
+Implementation facts:
+
+```text
+EvaluateFoamShape remains the only writer of _FoamShapeMask.
+Persistent FoamState is not written by the probe.
+Remaining Life and Material Pattern are read but not modified.
+Final Foam is not changed and still does not consume _FoamShapeMask.
+No pocket IDs, connected components, entity records, neighbour FoamState sampling, Motion Field bias, obstacle-routing bias, topology support reads, or low-res helper fields are introduced.
+```
+
+New compute-side local helpers in `CS_RiverFoam.compute`:
+
+```text
+FoamResolveMaterialPhysicalPosition(...)
+FoamEvaluateLocalBreakupField(...)
+FoamEvaluateLocalProceduralBreakupShape(...)
+```
+
+`DispatchEvaluateShape()` now binds `_FoamTime`, `_FoamSeed`, `_FoamGlobalStart`, `_FoamFieldLength`, and `_FoamMetricRows` to the shape-evaluation kernel because the local procedural field is animated and physical-space based. This is still gated behind Layer D debug use, so the probe does not run in normal Final Foam view.
+
+Validation expectation:
+
+```text
+Material Presence = raw persistent material truth.
+Foam Evaluated Shape = local procedural breakup product.
+Foam Shape Difference = non-black where the probe removes visible shape coverage, mostly around contours/fragile areas.
+Final Foam = unchanged.
+```
+
+The probe is not expected to solve broad bank-hugging film, contact sheets, bridge/rejoin behavior, or context-aware merging. Those remain the job of future low-resolution Layer D Film Source / Film Support fields if local-only breakup proves insufficient.

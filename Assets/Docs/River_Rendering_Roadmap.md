@@ -283,6 +283,8 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 
 **Canonical document:** `River_Foam_Stage6_Architecture.md` owns the Foam architecture. It is now the guiding source of truth for data ownership, dependencies, allowed/forbidden reads, visual target decomposition, debug requirements, rejected approaches, and implementation sequence. `River_Foam_Active_Blockers_and_Next_Patches.md` owns only the current recovery queue.
 
+`4.11C.5.11` begins the first post-baseline Layer D visual probe: local procedural breakup. It remains debug/product-only, writes only `_FoamShapeMask`, uses no neighbour sampling and no helper fields, and keeps Final Foam disconnected. Its purpose is to prove or reject the cheap local chipping/fray layer before low-res Film Source / Film Support is added for broad sheet/contact/bridge behavior.
+
 ### Current status after architecture lock
 
 Stage 6 is in the `4.11C` manually-born persistent material phase. The code already has persistent `FoamState`, external Motion Field / obstacle-routing inputs, `_FoamShapeMask`, `Foam Evaluated Shape`, and `Foam Shape Difference` debug views. The 5.9z coherent coordinate-warp prototype proved the Layer D product slot and C# binding path, and 5.10 validation proved it produced nonzero signed differences, but it was visually ineffective because tiny inverse-sampled coordinate displacement cannot create broad sheet/bridge/pinch behavior from solid masks. 5.10B retires that warp and resets Layer D to a clean pass-through baseline.

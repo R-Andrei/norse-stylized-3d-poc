@@ -166,27 +166,53 @@ DispatchEvaluateShape no longer binds Motion Field / obstacle-routing inputs bec
 Foam Shape Difference remains available and should now be mostly black until a new Layer D component is added.
 ```
 
-The next patch remains the local procedural breakup probe.
+4.11C.5.11 implements the isolated local procedural breakup probe on top of that clean baseline.
+
+5.11 facts:
+
+```text
+EvaluateFoamShape remains the only writer of _FoamShapeMask.
+The new breakup logic reads only current cell material, local physical position, time, seed, and existing domain/valid-fluid data.
+It does not sample neighbouring FoamState cells.
+It does not read Motion Field, obstacle routing, topology support, or any low-res helper field.
+It does not write FoamState, Remaining Life, Material Pattern, topology, support, or Final Foam.
+DispatchEvaluateShape binds _FoamTime, _FoamSeed, _FoamGlobalStart, _FoamFieldLength, and _FoamMetricRows because the local procedural field is physical-space and animated.
+```
+
+Purpose:
+
+```text
+Test how much edge chipping/fray/small-cut behavior can be obtained from cheap local procedural math before adding low-res structural helpers.
+```
+
+Expected validation:
+
+```text
+Material Presence = persistent truth.
+Foam Evaluated Shape = local-breakup Layer D product.
+Foam Shape Difference = non-black mostly around contours/fragile regions where local breakup removes visible coverage.
+Final Foam = unchanged, because it still does not consume _FoamShapeMask.
+```
 
 ---
 
 # Active blockers
 
-## Blocker 1 — Local procedural breakup has not been isolated
+## Blocker 1 — Local procedural breakup requires validation
 
 Current problem:
 
 ```text
-We do not yet know how much edge chipping/fracture/detail can be obtained from cheap local procedural math before adding low-res structural helper fields.
+4.11C.5.11 implements the cheapest no-neighbour local breakup probe, but it has not yet been visually validated in Unity.
 ```
 
-Required test:
+Validation question:
 
 ```text
-Implement a local procedural breakup probe that does not use wide neighbourhood sampling and does not mutate persistent material.
+Can local procedural math alone produce useful edge chipping/fracture/detail without Swiss-cheese interiors or useless barely-visible changes?
 ```
 
-This should test:
+The probe intentionally tests:
 
 ```text
 edge chipping
@@ -194,10 +220,10 @@ small cuts
 life-based fragility
 material-pattern variation
 animated local chaos
-thin/streak-like detail if appropriate
+very small thin-cut detail
 ```
 
-It must not attempt broad bridge/sheet support.
+It intentionally does not attempt broad bridge/sheet/contact support.
 
 ## Blocker 2 — Broad sheet/support behavior requires Layer D helpers
 

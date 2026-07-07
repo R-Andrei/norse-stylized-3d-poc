@@ -183,6 +183,8 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -432,6 +434,8 @@ MonoBehaviour:
     depthBias: 0.903
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -870,6 +874,8 @@ MonoBehaviour:
     depthBias: 0.761
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -1084,6 +1090,8 @@ MonoBehaviour:
     depthBias: 0.971
     surfaceVariation: 0.735
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -1298,6 +1306,8 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -1686,6 +1696,8 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -2534,6 +2546,8 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -3764,6 +3778,8 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33333334, g: 0.34117648, b: 0.34901962, a: 1}
@@ -3993,6 +4009,8 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -4662,6 +4680,8 @@ MonoBehaviour:
     depthBias: 0.95
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -5116,6 +5136,8 @@ MonoBehaviour:
     depthBias: 0.7
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -5554,6 +5576,8 @@ MonoBehaviour:
     depthBias: 0.7
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -5768,6 +5792,8 @@ MonoBehaviour:
     depthBias: 0.7
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -6025,6 +6051,8 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -6512,6 +6540,8 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -6846,6 +6876,8 @@ MonoBehaviour:
     depthBias: 1.073
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -7157,6 +7189,8 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.49056602, g: 0.47947407, b: 0.46511212, a: 1}
@@ -7534,6 +7568,8 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -8225,10 +8261,12 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.225
   regenerateOnValidate: 1
+  generationBudget: 0
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 1
   baseColor: {r: 0.39061943, g: 0.39342293, b: 0.3962264, a: 1}
-  surfaceMaskDebug: 0
+  surfaceMaskDebug: 15
   surfaceMaskBaseLift: 0.0517
   creviceReach: 1.024
   creviceSmoothness: 0.995
@@ -8250,16 +8288,16 @@ MonoBehaviour:
   overallRockTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   overallRockTintStrength: 0
   lightingTintInfluence: 0.8
-  edgeWearAmount: 0.245
-  edgeWearWidth: 0.652
-  edgeWearCoverage: 2
-  edgeWearSoftness: 0.851
-  edgeWearResponseStrength: 0.45
-  edgeWearBrightnessLift: 0.117
+  edgeWearAmount: 1
+  edgeWearWidth: 1
+  edgeWearCoverage: 1.394
+  edgeWearSoftness: 0.638
+  edgeWearResponseStrength: 1
+  edgeWearBrightnessLift: 1
   edgeWearTint: {r: 0.7, g: 0.69, b: 0.62, a: 1}
   edgeWearTintStrength: 0
-  edgeWearMacroVariation: 0.856
-  edgeWearMicroVariation: 0.937
+  edgeWearMacroVariation: 0
+  edgeWearMicroVariation: 0
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -8570,6 +8608,8 @@ MonoBehaviour:
     depthBias: 1.3
     surfaceVariation: 0.237
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -9187,17 +9227,17 @@ MonoBehaviour:
   foamNegativeAgingRate: 7
   foamMaterialFlowSpeedMultiplier: 0.77
   foamSurfaceMorphStrength: 2.53
+  foamSurfaceMorphCalibrationVersion: 1
   foamMotionFieldStrength: 1
   foamMotionFieldScrollHz: 0.01
   foamMotionFieldNeutralCoverage: 0.1
   foamMotionFieldLaneScale: 1
   foamMaterialLifecycleTuningVersion: 1
-  foamSurfaceMorphCalibrationVersion: 1
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}
-  foamDebugView: 5
-  foamSpawnDistanceNormalized: 0.599
-  foamSpawnAcrossNormalized: 0.125
-  foamSpawnScale: 0.375
+  foamDebugView: 3
+  foamSpawnDistanceNormalized: 0.634
+  foamSpawnAcrossNormalized: -0.27
+  foamSpawnScale: 0.538
   foamSpawnAmount: 1
   foamSpawnRemainingLife: 1
   foamSpawnRibbonDuration: 1.993
@@ -9944,6 +9984,8 @@ MonoBehaviour:
     depthBias: 1.094
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -10158,6 +10200,8 @@ MonoBehaviour:
     depthBias: 0.7
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -10776,6 +10820,8 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}
@@ -11022,6 +11068,8 @@ MonoBehaviour:
     depthBias: 1
     surfaceVariation: 0.35
   regenerateOnValidate: 1
+  generationBudget: 1
+  customFeatureAtlasResolution: 256
   featureRecipe: 0
   stoneSurfaceProfile: 0
   baseColor: {r: 0.33423817, g: 0.3410176, b: 0.3490566, a: 1}

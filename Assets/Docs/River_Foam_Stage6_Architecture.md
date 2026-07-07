@@ -793,7 +793,7 @@ Material Presence ~= Foam Evaluated Shape
 Foam Shape Difference ~= black
 ```
 
-This is the desired baseline until local procedural breakup or low-res film support is added.
+4.11C.5.11 adds the first deliberately isolated local procedural breakup probe on top of this clean baseline. The probe is still a Layer D product only: it writes `_FoamShapeMask`, does not mutate persistent material, and remains disconnected from Final Foam.
 
 ## 5.4 Allowed reads
 
@@ -1038,6 +1038,81 @@ Therefore:
 ```text
 local procedural math = decorative breakup/detail
 low-res support field = structural bridge/sheet/contact behavior
+```
+
+## 5.11 Local procedural breakup probe contract
+
+`4.11C.5.11` implements the first cheap local-only Layer D breakup test. The purpose is to test the best-case version of the no-neighbour "magical" approach before paying for low-resolution structural support fields.
+
+Current code path:
+
+```text
+CS_RiverFoam.compute
+  EvaluateFoamShape(...)
+    FoamClipPackedToValidFluid(...)
+    FoamDecodeMaterialState(...)
+    FoamEvaluateLocalProceduralBreakupShape(...)
+      FoamResolveMaterialPhysicalPosition(...)
+      FoamEvaluateLocalBreakupField(...)
+      FoamSourceFillValueNoise(...) / EvaluateFoamSourceFillField(...)
+    _FoamShapeMaskWrite[coordinate] = result
+
+StylizedRiverFoamRuntime.Compute.cs
+  DispatchEvaluateShape()
+    binds _FoamBoundary
+    binds _FoamObstacleExclusionRead
+    binds _FoamStateRead
+    binds _FoamShapeMaskWrite
+    binds _FoamTime / _FoamSeed
+    binds _FoamGlobalStart / _FoamFieldLength
+    binds _FoamMetricRows
+```
+
+Allowed inputs:
+
+```text
+current cell persistent Presence
+current cell Remaining Life, read-only
+current cell Material Pattern, read-only
+current valid-fluid clipping
+river-domain physical position
+physical cell spacing
+time
+seed
+procedural value-noise fields
+```
+
+Forbidden inputs for this probe:
+
+```text
+neighbouring FoamState cells
+Motion Field lane
+Obstacle Routing field
+Topology support fields
+low-res Film Source / Film Support
+Final Foam shader mask
+any entity or pocket identity
+```
+
+The probe computes edge exposure from local `Presence` only. Strong full-presence cores are preserved; partial/soft cells near contours are allowed to chip. Older material becomes visually more fragile by reading `Remaining Life`, but the probe never writes life. `Material Pattern` varies breakup response per material sample without becoming a tracked patch identity.
+
+Expected result:
+
+```text
+Material Presence remains persistent truth.
+Foam Evaluated Shape should show chipping/fray/cuts produced by the local Layer D probe.
+Foam Shape Difference should show non-black signed difference where the probe removes visible coverage.
+Final Foam should remain unchanged until the production shader is intentionally switched to _FoamShapeMask.
+```
+
+Failure conditions:
+
+```text
+Shape Difference remains black: the probe is not active.
+Evaluated Shape looks identical: local-only breakup is visually too weak.
+Evaluated Shape becomes Swiss-cheese or noisy scratches: local-only breakup is too destructive.
+The whole body flickers: the procedural time field is too unstable.
+The result cannot create broad contact/bridge/sheet behavior: expected limitation, not a bug.
 ```
 
 ## 5.11 Performance target

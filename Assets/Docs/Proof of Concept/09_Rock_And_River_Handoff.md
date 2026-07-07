@@ -1374,3 +1374,8 @@ FoamDecodeMaterialState(...)
 RiverWaterFoamResult.materialUV
 ```
 
+## Addendum — River Foam 4.11C.5.11 Local Procedural Breakup Probe
+
+After the failed 5.9z coordinate warp was retired in `4.11C.5.10B`, `4.11C.5.11` adds the first cheap local-only Layer D breakup probe. The probe writes `_FoamShapeMask` from `EvaluateFoamShape`, reads only current-cell material data plus river physical position/time/seed, and does not sample neighbouring FoamState cells. It is designed to answer whether local procedural math can provide useful edge chipping, fray, small cuts, life-based fragility, and semi-organized local chaos before a low-res structural support field is added.
+
+This remains a diagnostic/product-layer test only. Final Foam is not switched to `_FoamShapeMask`. Persistent FoamState remains Layer C truth. If validation shows the result is weak, too noisy, or unable to create the desired broad film behavior, the next architecture step remains low-resolution Layer D Film Source / Film Support for broad sheet/contact/bridge behavior.
