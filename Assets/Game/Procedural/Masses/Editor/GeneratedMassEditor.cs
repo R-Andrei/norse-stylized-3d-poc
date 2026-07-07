@@ -485,9 +485,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 EditorStyles.boldLabel);
 
             EditorGUILayout.HelpBox(
-                "Budget caps generated feature-data cost. Active features/debug " +
-                "views decide whether Atlas0 or Atlas1 exists; this budget only " +
-                "caps atlas resolution and future mesh/detail cost.",
+                "Budget caps generated support-data cost. Temporary atlas debug " +
+                "views decide whether Atlas0 or Atlas1 exists; normal edge wear " +
+                "no longer requests runtime atlases.",
                 MessageType.Info);
 
             if (generationBudget != null)
@@ -530,7 +530,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 generationBudget.hasMultipleDifferentValues)
             {
                 EditorGUILayout.HelpBox(
-                    "Atlas budget preview is unavailable while editing multiple generated masses or mixed budgets.",
+                    "Debug atlas preview is unavailable while editing multiple generated masses or mixed budgets.",
                     MessageType.None);
                 return;
             }
@@ -554,8 +554,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 : 0f;
 
             string atlasSummary = atlasCount == 0
-                ? "No feature atlas required by current normal render/debug settings."
-                : $"Atlas request: {FormatAtlasRequest(request)} at {resolution}x{resolution}; estimated GPU pixel data {atlasMemoryMb:0.###} MB.";
+                ? "No temporary debug atlas required by current Surface Mask Debug mode."
+                : $"Temporary debug atlas request: {FormatAtlasRequest(request)} at {resolution}x{resolution}; estimated GPU pixel data {atlasMemoryMb:0.###} MB.";
 
             EditorGUILayout.HelpBox(
                 atlasSummary +
@@ -567,19 +567,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         {
             GeneratedMassFeatureAtlasRequest request =
                 GeneratedMassFeatureAtlasRequest.None;
-
-            bool visibleEdgeWear =
-                edgeWearAmount.floatValue > 0.001f &&
-                edgeWearResponseStrength.floatValue > 0.0001f;
-            if (visibleEdgeWear)
-            {
-                request |= GeneratedMassFeatureAtlasRequest.FeatureAtlas0;
-
-                if (edgeWearMicroVariation.floatValue > 0.001f)
-                {
-                    request |= GeneratedMassFeatureAtlasRequest.FeatureAtlas1;
-                }
-            }
 
             StoneSurfaceMaskDebug debugMode =
                 (StoneSurfaceMaskDebug)surfaceMaskDebug.intValue;
@@ -1188,50 +1175,51 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             using (new EditorGUI.IndentLevelScope())
             {
                 EditorGUILayout.HelpBox(
-                    "Edge Wear is split into two layers. Data Field / Atlas Bake " +
-                    "controls where the semantic convex ridge field exists and may " +
-                    "regenerate the feature atlas. Visual Response controls how the " +
-                    "material interprets that existing data in normal rendering.",
+                    "Runtime atlas-based edge wear has been decommissioned. These " +
+                    "controls are retained as reserved authoring inputs for the next " +
+                    "geometry bevel/chamfer edge-wear pass. Temporary atlas debug views " +
+                    "may still use the Data Field values, but normal rendering no longer " +
+                    "samples FeatureAtlas0/1 for edge wear.",
                     MessageType.Info);
 
                 EditorGUILayout.LabelField(
-                    "Data Field / Atlas Bake",
+                    "Reserved Geometry Inputs / Temporary Debug Atlas",
                     EditorStyles.miniBoldLabel);
                 EditorGUILayout.PropertyField(
                     edgeWearAmount,
                     new GUIContent(
                         "Amount",
-                        "How much ConvexEdgeWear semantic atlas data is generated."));
+                        "Reserved edge-wear amount. Temporary atlas debug views may still use this value until the geometry bevel/chamfer path replaces the debug atlas."));
                 EditorGUILayout.PropertyField(
                     edgeWearWidth,
                     new GUIContent(
                         "Width",
-                        "Controls semantic field width around convex ridge boundaries."));
+                        "Reserved edge-wear width for generated bevel/chamfer geometry. Temporary atlas debug views may still use this value."));
                 EditorGUILayout.PropertyField(
                     edgeWearCoverage,
                     new GUIContent(
                         "Coverage",
-                        "Controls semantic ridge eligibility: lower values keep only the strongest ridges, higher values include more ridge boundaries."));
+                        "Reserved convex edge selection coverage for generated bevel/chamfer geometry. Temporary atlas debug views may still use this value."));
                 EditorGUILayout.PropertyField(
                     edgeWearSoftness,
                     new GUIContent(
                         "Softness",
-                        "Controls how softly the generated convex ridge proximity field fades."));
+                        "Reserved softness/material blend control for generated bevel/chamfer edge wear. Temporary atlas debug views may still use this value."));
 
                 EditorGUILayout.Space(3f);
                 EditorGUILayout.LabelField(
                     "Visual Response",
                     EditorStyles.miniBoldLabel);
                 EditorGUILayout.HelpBox(
-                    "These controls do not change the atlas. They only control " +
-                    "how the shader displays the convex ridge field when Surface " +
-                    "Mask Debug is None.",
+                    "Reserved for the upcoming geometry-based worn-edge material " +
+                    "response. These controls currently do not make the temporary " +
+                    "debug atlas visible in normal rendering.",
                     MessageType.None);
                 EditorGUILayout.PropertyField(
                     edgeWearResponseStrength,
                     new GUIContent(
                         "Response Strength",
-                        "Master intensity for visible convex edge wear in normal rendering. Zero leaves normal rendering unchanged."));
+                        "Reserved master intensity for geometry-based convex edge wear. The temporary atlas no longer affects normal rendering."));
                 EditorGUILayout.PropertyField(
                     edgeWearBrightnessLift,
                     new GUIContent(
@@ -1251,12 +1239,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     edgeWearMacroVariation,
                     new GUIContent(
                         "Macro Variation",
-                        "Controls stable variation between different convex ridges. Higher values let some eligible ridges read stronger or weaker than others."));
+                        "Reserved inter-edge variation for generated bevel/chamfer edge wear."));
                 EditorGUILayout.PropertyField(
                     edgeWearMicroVariation,
                     new GUIContent(
                         "Micro Variation",
-                        "Controls visible variation along the same ridge: local width wobble, thinning, and intensity unevenness without changing the semantic atlas data."));
+                        "Reserved intra-edge variation for generated bevel/chamfer edge wear."));
             }
         }
 

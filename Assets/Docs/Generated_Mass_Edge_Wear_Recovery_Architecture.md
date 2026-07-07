@@ -1,295 +1,228 @@
 # Generated Mass Edge Wear Recovery Architecture
 
 Status: active recovery plan  
-Current implementation patch: EW-3A.1 — Resolution-Invariant Boundary Field Width  
-Current code foundation: EW-Atlas-1 + EW-2A + EW-2B accepted after debug validation
+Current patch: EW-3A.6 — Runtime Edge-Wear Atlas Decommission  
+Next production patch: EW-4 — Main-Mesh Geometry Edge Wear
 
 ---
 
-## 1. Summary
+## 1. Decision
 
-Edge wear stalled because the system tried to make worn stone from an albedo/tint band around hard polygon edges. Better noise changed the band but did not solve the material/form problem.
+Convex generated-mass edge wear will not use FeatureAtlas0/1 for final normal rendering.
 
-The recovery direction is now:
+The production direction is:
 
 ```text
-1. Keep the generic boundary atlas foundation.
-2. Make boundary atlases optional and budgeted before more features are added.
-3. Add real main-mesh worn bevel/chamfer support.
-4. Add bevel normals and bevel-aware material response.
-5. Add separate concave crack/crease response.
-6. Add broad stone face variation.
+actual generated bevel/chamfer geometry
++ bevel-face material markers
++ bevel/custom normals
++ simple shader response on marked faces
 ```
 
-The immediate next implementation is not another Micro/Macro tuning pass and not bevels yet. It is EW-3: generated-mass feature budget and optional atlas policy.
+FeatureAtlas0 and FeatureAtlas1 are retained only as temporary authoring/debug views until EW-4 is designed and validated.
 
 ---
 
-## 2. Current accepted atlas foundation
+## 2. Why the atlas-first approach failed
 
-```text
-FeatureAtlas0 — Boundary Structure Atlas
-R = convex boundary proximity
-G = concave boundary proximity
-B = dominant boundary structural salience
-A = dominant boundary stable identity / seed
+The atlas-first path tried to represent a line-like hard edge feature as a packed texture distance field.
+That is the wrong representation.
 
-FeatureAtlas1 — Boundary Coordinate / Modulation Atlas
-R = dominant boundary along-chain coordinate / phase
-G = dominant boundary cross-boundary coordinate
-B = dominant boundary coarse local modulation
-A = dominant boundary fine local modulation
-```
-
-`FeatureAtlas1.G` is side-aware:
-
-```text
-0.5 = boundary core
-< 0.5 = one adjacent patch side
-> 0.5 = the other adjacent patch side
-```
-
-It is not proximity/falloff.
-
-Coordinate/identity/modulation channels are dominant-boundary facts. They must not be MaxByte-merged like intensity masks. Only true proximity channels accumulate by maximum.
-
----
-
-## 3. Macro / Micro control contract
-
-```text
-Macro Variation = inter-edge variation
-  Which boundary chains are stronger or weaker than other boundary chains?
-  Macro 0 ignores salience/identity as visible edge-strength variation.
-  Macro 1 allows some boundaries to stay strong while others recede.
-  Macro must not create same-edge noise or width wobble.
-
-Micro Variation = intra-edge variation
-  How does the same boundary vary along itself?
-  Micro 0 ignores boundary-local coordinate/modulation.
-  Micro 1 uses along coordinate and modulation to vary local strength/spread.
-  Micro must not decide which edge is globally important.
-```
-
-Macro now works from generic boundary salience/identity. Micro has usable boundary-local data, but a painted albedo band is still not enough to match the reference rocks.
-
----
-
-## 4. Why EW-3 budget work comes before bevels
-
-Current code facts:
-
-```text
-GeneratedMassFeatureAtlasBaker.DefaultResolution remains 512 for legacy/default caller compatibility.
-EW-3A makes FeatureAtlas0 and FeatureAtlas1 independently optional by feature/debug requirement.
-EW-3A resolves atlas resolution from GenerationBudget: Compact 128, Standard/Detailed 256, Hero 512, Custom quantized manual.
-EW-3A uploads generated atlases with Apply(false, true), discarding retained CPU-readable atlas memory after upload.
-EW-3A.1 keeps boundary-field width resolution-invariant: lower atlas resolutions reduce fidelity, not intended world-space edge-wear width.
-```
-
-Current default atlas cost:
-
-```text
-512 Atlas0 + 512 Atlas1 = ~2 MB GPU pixel data per mass.
-Before EW-3A, CPU-readable copies could make practical retained memory approach ~4 MB per mass before overhead. EW-3A discards those CPU-side copies after upload.
-```
-
-That cannot be the default in a scene with many generated masses. Bevel geometry cost is acceptable only after atlas memory stops scaling blindly.
-
-Therefore the next work is:
-
-```text
-EW-3 — Feature-gated atlas generation and generated-mass budget policy.
-```
-
----
-
-## 5. EW-3 target policy
-
-### 5.1 Atlas generation is demand-driven
-
-```text
-Do not generate an atlas because an object is a Generated Mass.
-Generate an atlas only because an active feature or debug view requests that atlas.
-```
-
-Both atlases are independently optional:
-
-```text
-FeatureAtlas0: generated only when boundary structure is required.
-FeatureAtlas1: generated only when boundary coordinates/modulation are required.
-```
-
-Current edge-wear dependency:
-
-```text
-Edge wear disabled:
-  no FeatureAtlas0
-  no FeatureAtlas1
-
-Edge wear enabled, Micro Variation = 0:
-  FeatureAtlas0 required
-  FeatureAtlas1 not required
-
-Edge wear enabled, Micro Variation > 0:
-  FeatureAtlas0 required
-  FeatureAtlas1 required
-```
-
-Debug modes may request the atlas they inspect during authoring.
-
-### 5.2 Budgets are numeric ceilings
-
-There is no `Background` tier. Generated masses are gameplay-reachable objects in an isometric action/roguelike game.
-
-Use these budgets:
-
-| Budget | Rendered vertex target | Atlas cap | Use |
-|---|---:|---:|---|
-| Compact | <= 800 | 128 | Small/simple gameplay masses |
-| Standard | <= 1,600 | 256 | Default gameplay masses |
-| Detailed | <= 3,000 | 256 | Important/larger visible masses |
-| Hero | <= 8,000 | 512 | Showcase/large/inspected/debug masses |
-| Custom / Debug | manual | manual | Testing/override only |
-
-The budget is not a philosophical preset. It is a cap. Artist-requested settings are preserved when the estimated/generated cost fits.
-
-### 5.3 Default shape targets
-
-| Budget | Default effective shape | Estimated normal verts | Estimated harsh/fractured verts |
-|---|---|---:|---:|
-| Compact | Simple + Medium | ~504 | ~756 |
-| Standard | Complex + Medium | ~864 | ~1,152 |
-| Detailed | Complex + High | ~1,296 | ~1,728 |
-| Hero | HighlyComplex + High | ~1,674 | ~2,160 |
-| Hero Max / Debug | HighlyComplex + VeryHigh | ~2,232 | ~2,880 |
-
-Avoid defaulting to poor-value pairs such as `HighlyComplex + Low`, `Complex + Low`, or `HighlyComplex + Sparse`.
-
-Clamp order when over budget:
-
-```text
-1. Lower atlas resolution first.
-2. Lower SurfaceFacetDensity next.
-3. Lower FormComplexity last.
-```
-
-### 5.4 Atlas memory targets
-
-| Setup | GPU atlas memory |
-|---|---:|
-| No atlas | 0 MB |
-| 128 Atlas0 only | ~0.0625 MB |
-| 128 Atlas0 + Atlas1 | ~0.125 MB |
-| 256 Atlas0 only | ~0.25 MB |
-| 256 Atlas0 + Atlas1 | ~0.5 MB |
-| 512 Atlas0 only | ~1.0 MB |
-| 512 Atlas0 + Atlas1 | ~2.0 MB |
-
-Texture upload should release CPU-readable copies:
+Current width formula:
 
 ```csharp
-atlas.Apply(false, true);
+float edgeWearWidth =
+    scale * 0.018f * Mathf.Max(0.05f, settings.EdgeWearWidth);
 ```
+
+The actual hard core was far smaller than the outer falloff:
+
+```text
+core  ≈ 0.014–0.030 × featureWidth
+outer ≈ 0.68–1.02 × featureWidth
+```
+
+Approximate cube-like chart density:
+
+```text
+128 atlas:
+  featureWidth ≈ 0.75 atlas px
+  useful outer field ≈ 0.6 atlas px
+  hard ridge core ≈ 0.01–0.02 atlas px
+
+256 atlas:
+  featureWidth ≈ 1.55 atlas px
+  useful outer field ≈ 1.3 atlas px
+  hard ridge core ≈ 0.02–0.05 atlas px
+
+512 atlas:
+  featureWidth ≈ 3.1 atlas px
+  useful outer field ≈ 2.6 atlas px
+```
+
+A hard ridge core that is sub-pixel at 128/256 cannot be recovered with supersampling, weighted averaging, dominant groups, or shader Micro tuning. The data needed for a stable hard edge is not present at the required resolution.
 
 ---
 
-## 6. EW-3 implementation checklist
+## 3. Superseded patch lessons
 
-### EW-3 Documentation — this patch
+```text
+EW-3A.1:
+  Fixed resolution-dependent width inflation.
+  Did not solve sub-pixel feature representation.
 
-- [x] Replace stale fixed two-atlas assumptions in the active docs.
-- [x] Define feature-gated Atlas0 / Atlas1 policy.
-- [x] Define Compact / Standard / Detailed / Hero budgets.
-- [x] Remove `Background` tier language.
-- [x] Document atlas memory numbers.
-- [x] Move atlas budget work before bevel work.
+EW-3A.2:
+  Added adaptive supersampling.
+  Did not make 128/256 visually stable.
 
-### EW-3A — optional atlas generation and atlas memory budget
+EW-3A.3:
+  Reduced low-res Micro shape instability.
+  Made symptoms less chaotic but did not solve representation.
 
-- [x] Add feature/debug requirement resolver for `FeatureAtlas0`.
-- [x] Add feature/debug requirement resolver for `FeatureAtlas1`.
-- [x] Skip Atlas0 bake when no active feature/debug mode needs it.
-- [x] Skip Atlas1 bake when no active feature/debug mode needs it.
-- [x] Resolve atlas resolution from active budget.
-- [x] Make 512 Hero/debug, not default.
-- [x] Use `Apply(false, true)` after atlas upload.
-- [x] Add inspector preview for atlas requirement, resolution, and estimated memory.
+EW-3A.4:
+  Tried ridge-core preservation and Cross stabilization.
+  Did not fix the underlying representation problem.
 
-### EW-3A.1 — resolution-invariant boundary field width
+EW-3A.5:
+  Tried dominant boundary-side groups.
+  Did not fix the result because the atlas remained too low-density for the hard edge feature.
+```
 
-- [x] Fix boundary proximity bake so feature width comes from object/artist width, not texel size.
-- [x] Use texel size only for a small bounded raster/AA allowance.
-- [x] Prevent Compact/128 and Standard/256 atlases from materially widening edge wear compared with Hero/512.
-- [x] Document that lower atlas budgets may reduce detail, but must not redefine feature scale.
-
-### EW-3B — generated-mass numeric budget resolver
-
-- [x] Add Generated Mass Budget: Compact / Standard / Detailed / Hero / Custom.
-- [ ] Preserve artist-requested shape settings when they fit the budget.
-- [ ] Estimate or measure rendered vertex count for budget checks.
-- [ ] Clamp SurfaceFacetDensity before FormComplexity when over budget.
-- [ ] Show effective FormComplexity / SurfaceFacetDensity in the inspector.
-- [ ] Warn about poor-value combinations such as HighlyComplex + Low.
+These patches should not be extended as the final edge-wear path.
 
 ---
 
-## 7. Next visual feature sequence after EW-3
+## 4. Current EW-3A.6 code intent
+
+EW-3A.6 does this:
 
 ```text
-EW-4 — Main-mesh worn bevel/chamfer foundation
-  Create physical support on selected convex boundary chains.
-  No secondary meshes.
-  Same main mesh and material path.
+GeneratedMass.cs:
+  normal-render edge wear no longer requests FeatureAtlas0/1
+  debug views may still request FeatureAtlas0/1
 
-EW-5 — Explicit bevel normal policy
-  Supply or control normals for bevel faces.
-  Stop relying on albedo bands for form.
+GeneratedMassEditor.cs:
+  budget preview describes temporary debug atlas use only
+  edge-wear controls are labeled as reserved inputs for EW-4 geometry
 
-EW-6 — Bevel-region material marking
-  Mark bevel/worn regions through reusable mesh data.
-  Prefer existing vertex/UV channels where safe.
+SH_PixelSurfaceLit.shader:
+  normal rendering no longer samples FeatureAtlas0/1 for edge wear
+  atlas sampling remains available for debug modes
 
-EW-7 — Bevel-aware material response
-  Use bevel marker + optional boundary atlases.
-  Edge wear becomes material response on real support geometry, not only a painted line.
-
-EW-8 — Concave cracks / crease response
-  Separate dark crease/lip behavior from convex edge wear.
-
-EW-9 — Broad stone face material variation
-  Add large-scale mottling/exposure/deposit variation so edge wear is not pasted onto flat base material.
+GeneratedMassFeatureAtlasBaker.cs:
+  retained as temporary/debug boundary-field baker
 ```
 
-Do not start EW-4 until EW-3 code makes atlas memory scalable.
+No new public control is added.
+No new debug mode is added.
 
 ---
 
-## 8. Rule for future feature libraries
+## 5. EW-4 production architecture
 
-Good reusable generated data:
+EW-4 should implement edge wear before final mesh upload, not as runtime texture sampling.
 
-```text
-boundary proximity
-boundary salience
-boundary identity
-boundary-local along coordinate
-boundary-local side coordinate
-boundary-local modulation
-bevel/worn support marker
-broad exposure/deposit/material variation
-```
-
-Bad framework data:
+Target generation flow:
 
 ```text
-edge-wear macro factor
-edge-wear opacity atlas
-edge-wear chip atlas
-frost-only atlas
-moss-only atlas
-sacred-only atlas
-one new atlas per feature
+Generated compact mass base polyhedron
+→ identify eligible convex edges
+→ create bevel/chamfer faces on main mesh
+→ mark bevel faces as convex edge-wear material region
+→ emit mesh with bevel normals/custom normals
+→ shader shades marked bevel faces
 ```
 
-Features should interpret shared facts. They should not force the framework to become a pile of feature-specific texture layers.
+The preferred mesh marker is:
+
+```text
+UV2.z = convex edge-wear / bevel-face strength
+```
+
+Existing material-data channels already include UV2, so EW-4 should avoid adding a new channel unless proven necessary.
+
+---
+
+## 6. Expected visual improvement
+
+Atlas edge wear could only paint over existing hard faces. Geometry edge wear changes the form:
+
+```text
+bevel faces catch light
+worn edges have actual width in mesh space
+normals can make the worn strip read from the isometric camera
+material response is applied only where geometry says the edge exists
+```
+
+This directly targets the desired stylized rock reference: worn/chipped/softened edges, not white mask bands painted over polygon boundaries.
+
+---
+
+## 7. Performance comparison
+
+Atlas path:
+
+```text
+128 Atlas0+Atlas1 = 128 KiB per mass
+256 Atlas0+Atlas1 = 512 KiB per mass
+512 Atlas0+Atlas1 = 2,048 KiB per mass
++ one or two runtime texture samples per shaded pixel
+```
+
+Simple bevel path:
+
+```text
+1 bevel edge ≈ 1 quad = 2 triangles = 6 rendered vertices
+estimated vertex cost ≈ 80 bytes / vertex
+per bevel edge ≈ 492 bytes including indices
+```
+
+Examples:
+
+```text
+24 bevel edges ≈ 11.5 KiB
+48 bevel edges ≈ 23 KiB
+80 bevel edges ≈ 38 KiB
+```
+
+Even with richer bevel segmentation, generated geometry is usually far cheaper than unique 512 atlases and produces better visual form.
+
+---
+
+## 8. Atlas future-use policy
+
+FeatureAtlas0/1 should not be preserved as a default production dependency.
+
+Potential future valid uses are limited to cases where an atlas is genuinely better than geometry, vertex data, or procedural shader data:
+
+```text
+large broad baked surface masks
+unique high-frequency surface painting
+debug visualization of boundary facts
+```
+
+Do not use FeatureAtlas0/1 for:
+
+```text
+convex edge wear
+edge-local hard highlights
+thin cracks/creases
+chipped edge lines
+```
+
+Those are line/edge features and should use geometry, strips, grooves, or mesh-carried data.
+
+---
+
+## 9. Next work
+
+```text
+EW-4 — Main-Mesh Geometry Edge Wear
+1. Inspect MassGenerator polygon/cut/triangulation flow.
+2. Identify convex edge candidates before triangulation.
+3. Generate controlled bevel/chamfer faces.
+4. Mark bevel faces through UV2.z.
+5. Emit correct normals or an explicit bevel-normal policy.
+6. Update shader to shade UV2.z marked bevel faces as worn material.
+7. Keep FeatureAtlas0/1 out of normal rendering.
+```

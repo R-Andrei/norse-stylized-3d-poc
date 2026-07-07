@@ -34,6 +34,7 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.FindKernel("MeasureTopologyMetrics");
             phaseCommitKernel = computeShader.FindKernel("CommitPhaseTransport");
             simulateKernel = computeShader.FindKernel("SimulateFoam");
+            evaluateShapeKernel = computeShader.FindKernel("EvaluateFoamShape");
             applyBoundaryKernel = computeShader.FindKernel("ApplyBoundary");
         }
 
@@ -235,6 +236,46 @@ namespace ProgrammaticStylized3D.Rivers
             Dispatch(simulateKernel, countX, fieldHeight);
         }
 
+        private void DispatchEvaluateShape()
+        {
+            if (computeShader == null || currentState == null ||
+                shapeMaskTexture == null || boundaryTexture == null ||
+                obstacleExclusionTexture == null || evaluateShapeKernel < 0 ||
+                fieldWidth <= 0 || fieldHeight <= 0)
+            {
+                return;
+            }
+
+            using var profilerScope = EvaluateShapeProfilerMarker.Auto();
+
+            computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetFloat("_FoamValidLength", validFieldLength);
+            computeShader.SetFloat(
+                "_FoamSimulationLength",
+                simulationFieldLength);
+            computeShader.SetFloat("_FoamTime", river.MotionTime);
+            computeShader.SetInt("_FoamRangeStart", 0);
+            computeShader.SetInt("_FoamRangeCount", fieldWidth);
+            computeShader.SetTexture(
+                evaluateShapeKernel,
+                "_FoamBoundary",
+                boundaryTexture);
+            computeShader.SetTexture(
+                evaluateShapeKernel,
+                "_FoamObstacleExclusionRead",
+                obstacleExclusionTexture);
+            computeShader.SetTexture(
+                evaluateShapeKernel,
+                "_FoamStateRead",
+                currentState);
+            computeShader.SetTexture(
+                evaluateShapeKernel,
+                "_FoamShapeMaskWrite",
+                shapeMaskTexture);
+
+            Dispatch(evaluateShapeKernel, fieldWidth, fieldHeight);
+        }
+
         private bool DispatchPhaseCommit(int committedCells)
         {
             if (computeShader == null || currentState == null ||
@@ -250,6 +291,7 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamSimulationLength",
                 simulationFieldLength);
+            computeShader.SetFloat("_FoamTime", river.MotionTime);
             computeShader.SetInt("_FoamRangeStart", 0);
             computeShader.SetInt("_FoamRangeCount", fieldWidth);
             computeShader.SetInt("_FoamPhaseCommitCells", committedCells);
@@ -330,6 +372,7 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamSimulationLength",
                 simulationFieldLength);
+            computeShader.SetFloat("_FoamTime", river.MotionTime);
             computeShader.SetInt("_FoamRangeStart", 0);
             computeShader.SetInt("_FoamRangeCount", fieldWidth);
             computeShader.SetTexture(

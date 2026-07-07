@@ -720,7 +720,8 @@ namespace ProgrammaticStylized3D.Rivers
         public bool InitializationComplete =>
             initializationPhase == InitializationPhase.Ready;
         public bool ResourcesAllocated =>
-            InitializationComplete && currentState != null;
+            InitializationComplete && currentState != null &&
+            shapeMaskTexture != null;
         public bool ConservativeTransportActive => false;
         public bool IsSleeping =>
             currentState == null &&
@@ -729,6 +730,7 @@ namespace ProgrammaticStylized3D.Rivers
             !IsTopologyDebugActive &&
             !IsProgressiveBirthSourceDebugActive &&
             !IsMotionFieldDebugActive &&
+            !IsEvaluatedShapeDebugActive &&
             !materialLifetimeAuthorityActive &&
             pendingInjections.Count == 0 &&
             !pendingIsolatedLifeProbe &&
@@ -737,6 +739,7 @@ namespace ProgrammaticStylized3D.Rivers
         public long EstimatedMemoryBytes =>
             EstimateTextureBytes(stateA) +
             EstimateTextureBytes(stateB) +
+            EstimateTextureBytes(shapeMaskTexture) +
             EstimateTextureBytes(progressiveBirthDebugTexture) +
             EstimateTextureBytes(topologyTexture) +
             EstimateTextureBytes(topologySourcesTexture) +
@@ -846,6 +849,16 @@ namespace ProgrammaticStylized3D.Rivers
                         StylizedRiverFoamDebugView.FoamMotionField ||
                     river.FoamDebugView ==
                         StylizedRiverFoamDebugView.FoamMotionFieldCellGrid;
+            }
+        }
+
+        private bool IsEvaluatedShapeDebugActive
+        {
+            get
+            {
+                return river != null &&
+                    river.FoamDebugView ==
+                        StylizedRiverFoamDebugView.FoamEvaluatedShape;
             }
         }
 

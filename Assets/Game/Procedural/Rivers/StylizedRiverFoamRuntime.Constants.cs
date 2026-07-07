@@ -397,6 +397,8 @@ namespace ProgrammaticStylized3D.Rivers
             new ProfilerMarker("RiverFoam.Replacement.Activate");
         private static readonly ProfilerMarker TopologyTransitionCaptureProfilerMarker =
             new ProfilerMarker("RiverFoam.Replacement.CaptureTransition");
+        private static readonly ProfilerMarker EvaluateShapeProfilerMarker =
+            new ProfilerMarker("RiverFoam.Shape.Evaluate");
 
         private static readonly int FoamEnabledId =
             Shader.PropertyToID("_FoamEnabled");
@@ -404,6 +406,8 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamPrevious");
         private static readonly int FoamCurrentId =
             Shader.PropertyToID("_FoamCurrent");
+        private static readonly int FoamShapeMaskId =
+            Shader.PropertyToID("_FoamShapeMask");
         private static readonly int FoamBirthDebugId =
             Shader.PropertyToID("_FoamBirthDebug");
         private static readonly int FoamTopologyId =

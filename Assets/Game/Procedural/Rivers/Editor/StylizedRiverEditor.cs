@@ -1751,7 +1751,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Material Presence",
                 "Material Remaining Life",
                 "Foam Motion Field",
-                "Foam Motion Field + Cell Grid"
+                "Foam Motion Field + Cell Grid",
+                "Foam Evaluated Shape"
             };
             int[] foamDebugValues =
             {
@@ -1761,7 +1762,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.MaterialPresence,
                 (int)StylizedRiverFoamDebugView.MaterialRemainingLife,
                 (int)StylizedRiverFoamDebugView.FoamMotionField,
-                (int)StylizedRiverFoamDebugView.FoamMotionFieldCellGrid
+                (int)StylizedRiverFoamDebugView.FoamMotionFieldCellGrid,
+                (int)StylizedRiverFoamDebugView.FoamEvaluatedShape
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -1775,7 +1777,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             int selectedDebugIndex = EditorGUILayout.Popup(
                 new GUIContent(
                     "Debug View",
-                    "Final Foam for normal validation. Foam Motion Field shows dense left/right routing intent, obstacle overrides, and a semi-transparent white raw stored Foam Presence overlay."),
+                    "Final Foam is the normal render. Foam Motion Field views show the generated routing/deformation intent texture and a semi-transparent white raw stored Foam Presence overlay; they do not indicate active lateral material transport."),
                 currentDebugIndex,
                 foamDebugLabels);
             if (EditorGUI.EndChangeCheck())
@@ -1814,30 +1816,25 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Material Flow Speed",
                     "Multiplier for persistent Foam downstream travel."));
             EditorGUILayout.PropertyField(
-                Find("foamSurfaceMorphStrength"),
-                new GUIContent(
-                    "Surface Morph Strength",
-                    "Strength for stored Foam morphology driven by waves, pressure, lee, and wake fields. Zero disables the stored-state response; one is the normal readable authored response, with higher values for strong or stress-test behavior."));
-            EditorGUILayout.PropertyField(
                 Find("foamMotionFieldStrength"),
                 new GUIContent(
                     "Motion Field Strength",
-                    "Strength for dense field-driven lateral macro motion. Zero disables the field; one is the normal authored field; higher values exaggerate lateral body routing without changing birth, lifetime, topology, or final visual fragmentation."));
+                    "Strength of the generated dense Foam Motion Field intent/debug texture. The field is currently used for visualization and future routing/deformation work; it does not currently move persistent Foam material."));
             EditorGUILayout.PropertyField(
                 Find("foamMotionFieldScrollHz"),
                 new GUIContent(
                     "Motion Field Scroll Hz",
-                    "Complete downstream wraps per second for the dense lane field. This is a sample-coordinate phase scroll only, not a field rebuild rate."));
+                    "Complete downstream wraps per second for the generated intent/debug lane field. This is a sample-coordinate phase scroll only, not active persistent Foam material motion and not a field rebuild rate."));
             EditorGUILayout.PropertyField(
                 Find("foamMotionFieldNeutralCoverage"),
                 new GUIContent(
                     "Motion Field Neutral Coverage",
-                    "Approximate fraction of the dense lane field that resolves to neutral/no lateral direction. Changing it regenerates the lane texture only."));
+                    "Approximate fraction of the generated intent/debug lane field that resolves to neutral/no lateral direction. Changing it regenerates the lane texture only; it does not activate lateral material transport."));
             EditorGUILayout.PropertyField(
                 Find("foamMotionFieldLaneScale"),
                 new GUIContent(
                     "Motion Field Lane Scale",
-                    "Broadness of the dense lane pattern. Lower values produce larger lanes; higher values produce finer lanes. Changing it regenerates the lane texture only."));
+                    "Broadness of the generated intent/debug lane pattern. Lower values produce larger lanes; higher values produce finer lanes. Changing it regenerates the lane texture only; it does not activate lateral material transport."));
 
             if (runtime == null)
             {
@@ -1848,7 +1845,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUILayout.LabelField(
                 "Transport Mode",
-                "Phase + integer commit + lateral motion field");
+                "Downstream phase + integer commit; lateral field debug/future only");
             EditorGUILayout.LabelField(
                 "Motion Field",
                 $"scroll {runtime.FoamMotionLaneScrollCells:0.00} cells / lane sig {runtime.FoamMotionLaneSignature} / obstacle sig {runtime.FoamObstacleRoutingSignature}");
@@ -2003,7 +2000,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Material Presence",
                 "Material Remaining Life",
                 "Foam Motion Field",
-                "Foam Motion Field + Cell Grid"
+                "Foam Motion Field + Cell Grid",
+                "Foam Evaluated Shape"
             };
             int[] foamDebugValues =
             {
@@ -2013,7 +2011,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.MaterialPresence,
                 (int)StylizedRiverFoamDebugView.MaterialRemainingLife,
                 (int)StylizedRiverFoamDebugView.FoamMotionField,
-                (int)StylizedRiverFoamDebugView.FoamMotionFieldCellGrid
+                (int)StylizedRiverFoamDebugView.FoamMotionFieldCellGrid,
+                (int)StylizedRiverFoamDebugView.FoamEvaluatedShape
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -3069,11 +3068,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.FoamMotionField:
                     return
-                        "Dense lateral Foam Motion Field. Blue/cyan means leftward routing intent, red/orange means rightward routing intent, black means intentional neutral/calm field, green/yellow marks obstacle override influence, and semi-transparent white overlays raw stored Foam Presence rather than the final render mask.";
+                        "Dense Foam Motion Field intent/debug texture. Blue/cyan means leftward routing intent, red/orange means rightward routing intent, black means intentional neutral/calm field, green/yellow marks obstacle override influence, and semi-transparent white overlays raw stored Foam Presence rather than the final render mask. This view does not mean lateral material transport is currently active.";
 
                 case StylizedRiverFoamDebugView.FoamMotionFieldCellGrid:
                     return
-                        "Dense lateral Foam Motion Field plus the persistent Foam simulation cell grid. The white overlay is raw stored Foam Presence, not the final render mask. Fine dark lines show individual Foam cells; brighter pale lines show eight-cell blocks.";
+                        "Dense Foam Motion Field intent/debug texture plus the persistent Foam simulation cell grid. The white overlay is raw stored Foam Presence, not the final render mask. Fine dark lines show individual Foam cells; brighter pale lines show eight-cell blocks. This view does not mean lateral material transport is currently active.";
+
+                case StylizedRiverFoamDebugView.FoamEvaluatedShape:
+                    return
+                        "Stage 2 evaluated Foam Shape product. In this foundation patch it is intentionally a pass-through copy of clipped raw persistent Presence; future morphology, breakup, and disturbance response should be added here instead of mutating Persistent Foam State or final rendering.";
 
                 default:
                     return

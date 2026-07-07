@@ -78,6 +78,7 @@ Shader "PS3D/Pixel Surface Lit"
         [HideInInspector] _GeneratedMassFeatureAtlas0Enabled("Generated Mass Feature Atlas 0 Enabled", Float) = 0
         [HideInInspector] _GeneratedMassFeatureAtlas1("Generated Mass Feature Atlas 1", 2D) = "black" {}
         [HideInInspector] _GeneratedMassFeatureAtlas1Enabled("Generated Mass Feature Atlas 1 Enabled", Float) = 0
+        [HideInInspector] _GeneratedMassFeatureAtlasQuality("Generated Mass Feature Atlas Quality", Float) = 1
         [HideInInspector] _GeneratedMassEdgeWearCoverage("Generated Mass Edge Wear Coverage", Float) = 1
         [HideInInspector] _GeneratedMassEdgeWearSoftness("Generated Mass Edge Wear Softness", Float) = 0.45
         [HideInInspector] _GeneratedMassEdgeWearResponseStrength("Generated Mass Edge Wear Response Strength", Float) = 0
@@ -221,6 +222,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassDirtDepositResponse;
                 float _GeneratedMassFeatureAtlas0Enabled;
                 float _GeneratedMassFeatureAtlas1Enabled;
+                float _GeneratedMassFeatureAtlasQuality;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;
@@ -900,118 +902,6 @@ Shader "PS3D/Pixel Surface Lit"
                 return saturate(atlas0.g);
             }
 
-            half3 ApplyGeneratedMassEdgeWearResponse(
-                half3 albedo,
-                Varyings input,
-                float generatedMassSurface)
-            {
-                float responseStrength =
-                    saturate(_GeneratedMassEdgeWearResponseStrength) *
-                    saturate(generatedMassSurface);
-
-                if (responseStrength <= 0.0001)
-                {
-                    return albedo;
-                }
-
-                float4 atlas0 = ResolveGeneratedMassFeatureAtlas0(input);
-                float4 atlas1 = ResolveGeneratedMassFeatureAtlas1(input);
-
-                // FeatureAtlas0 is the generic Boundary Structure Atlas:
-                // R = convex boundary proximity, G = concave boundary proximity,
-                // B = dominant boundary salience, A = dominant boundary identity.
-                float convexProximity = saturate(atlas0.r);
-                float boundarySalience = saturate(atlas0.b);
-                float boundaryIdentity = saturate(atlas0.a);
-
-                if (convexProximity <= 0.0001)
-                {
-                    return albedo;
-                }
-
-                float macroVariation = saturate(_GeneratedMassEdgeWearMacroVariation);
-                float microVariation = saturate(_GeneratedMassEdgeWearMicroVariation);
-                float atlas1Enabled = step(0.5, _GeneratedMassFeatureAtlas1Enabled);
-
-                // FeatureAtlas1 is the generic Boundary Coordinate/Modulation Atlas:
-                // R = along-boundary phase, G = side-aware cross-boundary coordinate,
-                // B = coarse boundary-local modulation, A = fine boundary-local modulation.
-                // The current edge-wear response intentionally keeps its shape driven by
-                // convex proximity; Atlas1.G is reserved for diagnostic/future asymmetric
-                // feature interpretation and is not treated as a falloff field.
-                float alongPhase = lerp(0.5, saturate(atlas1.r), atlas1Enabled);
-                float coarseModulation = lerp(0.5, saturate(atlas1.b), atlas1Enabled);
-                float fineModulation = lerp(0.5, saturate(atlas1.a), atlas1Enabled);
-
-                // Macro Variation is strictly inter-edge. At zero it does nothing;
-                // at one it maps stable boundary identity plus structural salience
-                // into a per-boundary multiplier. It must not introduce same-edge
-                // noise or width wobble.
-                float salienceWeight = smoothstep(0.05, 0.95, boundarySalience);
-                float identityWeight = smoothstep(0.08, 0.92, boundaryIdentity);
-                float macroSource = saturate(identityWeight * 0.72 + salienceWeight * 0.28);
-                float macroMultiplier = lerp(1.0, lerp(0.08, 1.0, macroSource), macroVariation);
-
-                // Micro Variation is strictly intra-edge. It interprets generic
-                // boundary-local modulation as local opacity/width variation along
-                // the same ridge, while leaving inter-edge selection to Macro.
-                float localAmplitude = lerp(
-                    1.0,
-                    lerp(0.32, 1.44, coarseModulation),
-                    microVariation);
-                float localSpread = lerp(
-                    0.0,
-                    (fineModulation - 0.5) * 0.56,
-                    microVariation);
-
-                float shapedProximity = saturate(convexProximity + localSpread);
-                float ridgeCore = smoothstep(0.80, 0.995, shapedProximity);
-                float ridgeShoulder = pow(saturate(shapedProximity), lerp(1.82, 0.92, fineModulation));
-                float outerFade = smoothstep(0.018, lerp(0.22, 0.56, fineModulation), shapedProximity);
-
-                float phaseNoise = lerp(
-                    1.0,
-                    lerp(0.90, 1.10, sin((alongPhase * 6.2831853 + boundaryIdentity * 3.17)) * 0.5 + 0.5),
-                    microVariation * 0.22);
-
-                float ridgeShape = saturate(
-                    ridgeCore * 0.76 +
-                    ridgeShoulder * outerFade * 0.46);
-
-                float responseGain = responseStrength * lerp(1.0, 1.85, responseStrength);
-                float edgeMask = saturate(
-                    ridgeShape *
-                    macroMultiplier *
-                    responseGain *
-                    localAmplitude *
-                    phaseNoise);
-
-                if (edgeMask <= 0.0001)
-                {
-                    return albedo;
-                }
-
-                float valueLift = max(0.0, _GeneratedMassEdgeWearBrightnessLift);
-
-                // Multiplicative brightening alone is too weak on dark stone.
-                // Blend in a controlled value lift toward a pale worn surface so
-                // Brightness Lift = 1 can be visibly useful without exposing an
-                // overdrive range in the inspector.
-                half3 multipliedLift =
-                    albedo * (half)max(0.0, 1.0 + valueLift * 1.15);
-                half3 valueLifted = lerp(
-                    multipliedLift,
-                    half3(1.0h, 1.0h, 1.0h),
-                    (half)saturate(valueLift * 0.42));
-
-                half3 tinted = PS3D_ApplyValuePreservingTint(
-                    valueLifted,
-                    _GeneratedMassEdgeWearTint.rgb,
-                    _GeneratedMassEdgeWearTintStrength);
-
-                return lerp(albedo, tinted, (half)edgeMask);
-            }
-
             half3 ResolveMaskDebugColor(Varyings input)
             {
                 int mode = (int)round(_MaskDebugMode);
@@ -1526,10 +1416,6 @@ Shader "PS3D/Pixel Surface Lit"
                     wetDampTarget,
                     (half)saturate(wetDampStrength));
 
-                albedo = ApplyGeneratedMassEdgeWearResponse(
-                    albedo,
-                    input,
-                    generatedMassSurface);
 
                 float frostNoise =
                     PS3D_ValueNoise31(broadCoordinate * 1.7 + 71.31);
@@ -1821,6 +1707,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassDirtCoverage;
                 float _GeneratedMassFeatureAtlas0Enabled;
                 float _GeneratedMassFeatureAtlas1Enabled;
+                float _GeneratedMassFeatureAtlasQuality;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;
@@ -1990,6 +1877,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassDirtCoverage;
                 float _GeneratedMassFeatureAtlas0Enabled;
                 float _GeneratedMassFeatureAtlas1Enabled;
+                float _GeneratedMassFeatureAtlasQuality;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;
@@ -2153,6 +2041,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassDirtCoverage;
                 float _GeneratedMassFeatureAtlas0Enabled;
                 float _GeneratedMassFeatureAtlas1Enabled;
+                float _GeneratedMassFeatureAtlasQuality;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;

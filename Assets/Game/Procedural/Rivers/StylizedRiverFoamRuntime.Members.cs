@@ -20,6 +20,7 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture previousState;
         private RenderTexture currentState;
         private RenderTexture writeState;
+        private RenderTexture shapeMaskTexture;
         private RenderTexture topologyTexture;
         private RenderTexture topologySourcesTexture;
         private RenderTexture topologyGeneratedTexture;
@@ -396,6 +397,7 @@ namespace ProgrammaticStylized3D.Rivers
         private int measureTopologyMetricsKernel = -1;
         private int phaseCommitKernel = -1;
         private int simulateKernel = -1;
+        private int evaluateShapeKernel = -1;
         private int applyBoundaryKernel = -1;
         private int obstacleGeometryVersion = -1;
         private StylizedRiverQuality allocatedQuality;

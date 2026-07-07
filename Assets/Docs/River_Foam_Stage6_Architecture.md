@@ -8,30 +8,27 @@ It replaces the older persistent-morph, lateral-row-commit, and final-shader-str
 
 The roadmap owns macro stage order. The active blocker document owns the next patch sequence. This document owns what Foam is allowed to be.
 
-## Current implementation state after 4.11C.5.9t audit
+## Current implementation state after 4.11C.5.9y.2
 
-The current implementation is a stable but reduced Foam baseline with known debug/UI contract drift:
+The current implementation is a stable field-based Foam baseline with a real evaluated-shape product but no accepted morphology behavior yet:
 
 - persistent Foam material birth exists;
 - downstream phase transport exists;
 - Remaining Life aging exists;
-- topology/support/negative aging influence still exists;
+- topology/support/negative aging influence still exists and owns actual lifetime changes together with lifetime controls;
 - valid-fluid and obstacle clipping still exist;
 - the stale neighbour-sampling persistent morph path was removed from the compute simulation path;
-- the unsafe lateral row-commit paths were disabled after they caused smearing, pulsing, and then cell-scale shredding;
-- the Unified Foam Motion Field and obstacle-routing field still exist as generated/debug-visible intent fields;
+- unsafe lateral row-commit paths remain disabled after they caused smearing, pulsing, and cell-scale shredding;
+- the Unified Foam Motion Field and obstacle-routing field exist as generated/debug-visible intent fields;
 - dynamic/static disturbance fields still exist and remain important inputs for future shape behavior, but they no longer drive stored-state morphing;
 - actual lateral material transport is currently not active;
-- the safe evaluated shape/morphology layer is not implemented yet.
+- `_FoamShapeMask` exists and `Foam Evaluated Shape` debug displays it;
+- as of 5.9y.2, Stage 2 is reset to pass-through clipped Persistent `Presence`;
+- final Foam still does not consume `_FoamShapeMask`.
 
-Known 5.9t audit mismatches that must be corrected before Stage 2 work:
+Previously identified debug/UI contract drift has been corrected through 5.9w: Motion Field debug uses raw `Presence`, Motion Field + Cell Grid exists, stale Surface Morph Strength UI was quarantined, and Motion Field wording no longer claims active lateral material transport.
 
-- this contract requires `Foam Motion Field` debug to overlay raw stored `Presence`, but the uploaded shader still used final `foam.mask`;
-- this contract wants `Foam Motion Field + Cell Grid`, but the uploaded code audit did not find the enum/editor/shader path for that view;
-- `Surface Morph Strength` still exists in the C#/Inspector surface even though persistent stored-state morphing is no longer active;
-- some Motion Field labels still imply active lateral material movement even though the Motion Field is currently intent/debug/future input only.
-
-The current baseline is intentionally conservative. It is not the target final Foam behavior. Its purpose is to preserve stable material while the system is rebuilt around clear ownership boundaries. Debug truth must be repaired before new morphology or transport is added.
+The current baseline is intentionally conservative. It is not the target final Foam behavior. Its purpose is to preserve stable material and a truthful evaluated-shape slot while field-based coherent deformation and cheap visual bridge/break behavior are designed.
 
 ## Non-negotiable architecture rule
 
@@ -221,9 +218,24 @@ Stage 2 may sample Persistent Foam State to produce a deformed/evaluated visible
 
 Stage 2 must not write back to Persistent Foam State. It must not move durable foam material. It must not destroy durable foam material. It must not pretend to be Stage 1 lateral transport. It must not create large fake motion that contradicts raw material location.
 
+### Stage 2 field-based identity rule
+
+The foam system is field-based, not pocket/entity based. Stage 2 does not track pocket IDs, connected components, per-pocket children, or object-like fragment histories. A foam patch made of 200 cells is represented by 200 field samples, not by one tracked entity.
+
+This is intentional unless future evidence proves a region-aware system is necessary. Desired split/join/merge-like visuals should first emerge from formulas over scalar/vector fields:
+
+- smooth vector deformation for coherent ribbon motion;
+- low-resolution or mip-filtered presence/life fields for cheap visual bridge/break decisions;
+- read-only Remaining Life metadata for older/weaker visual tearing;
+- Stage 1 mass-weighted field merging later if actual material transport creates collisions.
+
+Do not introduce pocket IDs, connected-component tracking, or per-pocket properties without explicit approval.
+
 ### Stage 2 current status
 
-Not yet implemented as a separate safe evaluated-shape product. This is the next major feature family after the docs/code compliance pass.
+Stage 2 now exists as a separate evaluated-shape product: `_FoamShapeMask`, visible through `Foam Evaluated Shape`. As of 5.9y.2 it is intentionally reset to pass-through clipped Persistent `Presence`. The 5.9y interior-hole morphology and 5.9y.1 tiny edge-fray retune are superseded: one was visually wrong, the other was practically invisible.
+
+Current Stage 2 is a product foundation, not the final morphology system. The next accepted direction is field-based coherent deformation, followed by cheap formula-driven bridge/break behavior.
 
 ---
 
@@ -864,7 +876,7 @@ Forbidden:
 
 # 5. Stage 2 detailed design target
 
-Stage 2 is the missing feature family. It should be implemented as an evaluated-shape layer, not as a resurrected persistent morph path.
+Stage 2 is now present as `_FoamShapeMask`, but it is only a pass-through foundation after the rejected 5.9y/5.9y.1 morphology experiments. It remains an evaluated-shape layer, not a resurrected persistent morph path.
 
 ## Stage 2 inputs
 
@@ -896,6 +908,10 @@ G = breakup / edge activity
 B = disturbance response
 A = reserved
 ```
+
+## Stage 2 cost rule
+
+Avoid naive wide-kernel classification as a default. A radius 1/3/5 box-sampling classifier costs `9 + 49 + 121 = 179` presence samples per cell, or about `2.93M` samples for a 128×128 field evaluation. The preferred next algorithms should target roughly `4–5` samples per cell for coherent deformation, or use low-resolution/mip-filtered helper fields for bridge/break behavior.
 
 ## Stage 2 sub-steps
 
@@ -1081,7 +1097,7 @@ Contract requirement: show lateral/obstacle intent plus raw stored `Presence` ov
 
 Use it to compare stored foam footprint against Motion Field intent. It does not prove movement unless Stage 1 has an active movement consumer.
 
-5.9t audit note: the uploaded shader still used final `foam.mask` for this overlay. That is non-compliant because final mask can include render-side shaping. The next code patch must make this view use raw stored `Presence`.
+Status: corrected after the 5.9t audit. This view now uses raw stored `Presence`, not final `foam.mask`.
 
 ## Foam Motion Field + Cell Grid
 
@@ -1089,11 +1105,11 @@ Contract requirement: show Motion Field plus raw stored `Presence` plus actual p
 
 Use it to understand cell scale, one-row shifts, texel-size artifacts, and whether a behavior is cell-scale or patch-scale.
 
-5.9t audit note: this view is documented and still desired, but the uploaded code audit did not find the required enum/editor/shader branch. The next code alignment pass should implement it or explicitly roll back the claim. Preferred direction is implementation.
+Status: implemented after the 5.9t audit.
 
-## Future Evaluated Shape
+## Foam Evaluated Shape
 
-Should show Evaluated Foam Shape after Stage 2, before Stage 3 final colour/lighting.
+Shows `_FoamShapeMask` after Stage 2, before Stage 3 final colour/lighting. As of 5.9y.2 this is intentionally pass-through clipped Persistent `Presence` so future deformation/bridge/break work has a truthful baseline.
 
 ## Final Foam
 
@@ -1131,14 +1147,15 @@ Memory is acceptable if runtime compute remains bounded and the texture is compa
 
 The recovery order is part of the architecture contract because order prevents systems from fighting.
 
-1. Architecture contract and docs alignment.
-2. Code compliance audit against this contract.
-3. Shape Evaluation foundation: create the evaluated-shape product and debug view with minimal/no deformation.
-4. Intrinsic morphology: restore baseline living foam everywhere through Stage 2 only.
-5. Disturbance-driven morphology: reconnect static pressure, lee, dynamic wake, ripples, and waves as Stage 2 modifiers.
-6. Coherent deformation: add smooth, bounded inverse deformation for ribbon bending/compression/stretch.
-7. Soft split/join: add evaluated local breakup/reconnection behavior.
-8. Real lateral transport: redesign Stage 1 lateral movement without row-weight smearing or per-cell dither shredding.
-9. Final rendering polish: make Stage 3 draw the evaluated result without inventing macro behavior.
+1. Architecture contract and docs alignment — complete.
+2. Code compliance audit and debug/UI truth fixes — complete through 5.9w.
+3. Shape Evaluation foundation: create `_FoamShapeMask` and `Foam Evaluated Shape` debug — complete through 5.9x.
+4. Reset rejected morphology experiments and fix Stage 2 time binding — complete through 5.9y.2.
+5. Field-based coherent deformation: add smooth, bounded inverse deformation for ribbon bending/compression/stretch.
+6. Cheap formula-driven bridge/break: use low-resolution or mip-filtered fields, not pocket IDs or naive wide-kernel sampling.
+7. Final Foam consumes `_FoamShapeMask` once the evaluated product is visually useful.
+8. Disturbance-driven morphology: reconnect static pressure, lee, dynamic wake, ripples, and waves as Stage 2 modifiers.
+9. Real lateral transport: redesign Stage 1 lateral movement without row-weight smearing or per-cell dither shredding.
+10. Final rendering polish: make Stage 3 draw the evaluated result without inventing macro behavior.
 
 Automatic anchored/open-water birth population remains deferred until manually-born material, evaluated shape, and transport contracts are healthy.

@@ -8,6 +8,7 @@
 // B/R only when Presence is non-zero.
 RWTexture2D<float4> _FoamStateWrite;
 Texture2D<float4> _FoamStateRead;
+RWTexture2D<float> _FoamShapeMaskWrite;
 RWTexture2D<float4> _FoamBirthDebugWrite;
 RWStructuredBuffer<uint> _FoamBirthDebugCounters;
 Texture2D<float4> _FoamBoundary;

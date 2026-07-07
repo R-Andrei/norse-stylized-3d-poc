@@ -96,7 +96,8 @@ namespace ProgrammaticStylized3D.Rivers
         MaterialPresence = 3,
         MaterialRemainingLife = 4,
         FoamMotionField = 5,
-        FoamMotionFieldCellGrid = 6
+        FoamMotionFieldCellGrid = 6,
+        FoamEvaluatedShape = 7
     }
 
 
@@ -177,7 +178,6 @@ namespace ProgrammaticStylized3D.Rivers
             "PS3DRiver/Textures/T_RiverNormal";
 
         private const int CurrentFoamMaterialLifecycleTuningVersion = 1;
-        private const int CurrentFoamSurfaceMorphCalibrationVersion = 1;
         private const float MinimumFoamNeutralLifetime = 1f;
         private const float MaximumFoamNeutralLifetime = 10f;
         private const float DefaultFoamNeutralLifetime = 4f;
@@ -190,9 +190,6 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamMaterialFlowSpeedMultiplier = 0f;
         private const float MaximumFoamMaterialFlowSpeedMultiplier = 6f;
         private const float DefaultFoamMaterialFlowSpeedMultiplier = 1f;
-        private const float MinimumFoamSurfaceMorphStrength = 0f;
-        private const float MaximumFoamSurfaceMorphStrength = 5f;
-        private const float DefaultFoamSurfaceMorphStrength = 1f;
         private const float MinimumFoamMotionFieldStrength = 0f;
         private const float MaximumFoamMotionFieldStrength = 4f;
         private const float DefaultFoamMotionFieldStrength = 1f;
@@ -802,15 +799,17 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamMaterialFlowSpeedMultiplier =
             DefaultFoamMaterialFlowSpeedMultiplier;
 
-        [Tooltip("Strength for surface-driven persistent Foam material morphing. Zero disables the stored-state response to waves, pressure, lee, and wake fields; one is the normal readable authored response after 4.11C.5.7c; higher values push into strong and stress-test behavior without changing birth, lifetime, or topology.")]
-        [Range(
-            MinimumFoamSurfaceMorphStrength,
-            MaximumFoamSurfaceMorphStrength)]
-        [SerializeField]
-        private float foamSurfaceMorphStrength =
-            DefaultFoamSurfaceMorphStrength;
+        // Legacy serialized fields retained only to avoid scene/prefab
+        // serialization churn. Persistent stored-state surface morphing was
+        // removed after 4.11C.5.9n; these values are no longer read, migrated,
+        // clamped, exposed, or bound to runtime/shader systems.
+        [SerializeField, HideInInspector]
+        private float foamSurfaceMorphStrength;
 
-        [Tooltip("Strength of the dense Foam Motion Field. Zero disables field-driven lateral macro motion; one is the normal authored drift field; values above one exaggerate body-scale lateral routing without changing birth, lifetime, topology, or final visual fragmentation.")]
+        [SerializeField, HideInInspector]
+        private int foamSurfaceMorphCalibrationVersion;
+
+        [Tooltip("Strength of the generated dense Foam Motion Field intent/debug texture. The field is currently used for visualization and future routing/deformation work; it does not currently move persistent Foam material.")]
         [Range(
             MinimumFoamMotionFieldStrength,
             MaximumFoamMotionFieldStrength)]
@@ -818,7 +817,7 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamMotionFieldStrength =
             DefaultFoamMotionFieldStrength;
 
-        [Tooltip("Scroll rate for the dense Foam Motion Field in complete downstream wraps per second. This is only a UV/sample phase offset, not a field rebuild rate. The default 0.01 means one full wrap every 100 seconds.")]
+        [Tooltip("Scroll rate for the generated dense Foam Motion Field intent/debug texture in complete downstream wraps per second. This is a UV/sample phase offset for the field texture, not active persistent Foam material motion and not a field rebuild rate. The default 0.01 means one full wrap every 100 seconds.")]
         [Range(
             MinimumFoamMotionFieldScrollHz,
             MaximumFoamMotionFieldScrollHz)]
@@ -826,7 +825,7 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamMotionFieldScrollHz =
             DefaultFoamMotionFieldScrollHz;
 
-        [Tooltip("Approximate fraction of the dense Foam Motion Field that resolves to neutral/no lateral direction. Changing this regenerates the lane texture only; it does not add per-frame cost.")]
+        [Tooltip("Approximate fraction of the generated dense Foam Motion Field intent/debug texture that resolves to neutral/no lateral direction. Changing this regenerates the lane texture only; it does not add per-frame cost or activate lateral material transport.")]
         [Range(
             MinimumFoamMotionFieldNeutralCoverage,
             MaximumFoamMotionFieldNeutralCoverage)]
@@ -834,7 +833,7 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamMotionFieldNeutralCoverage =
             DefaultFoamMotionFieldNeutralCoverage;
 
-        [Tooltip("Feature scale for the dense Foam Motion Field lanes. Lower values produce broader lanes; higher values produce finer lanes. Changing this regenerates the lane texture only; it does not add per-frame cost.")]
+        [Tooltip("Feature scale for the generated dense Foam Motion Field intent/debug lanes. Lower values produce broader lanes; higher values produce finer lanes. Changing this regenerates the lane texture only; it does not add per-frame cost or activate lateral material transport.")]
         [Range(
             MinimumFoamMotionFieldLaneScale,
             MaximumFoamMotionFieldLaneScale)]
@@ -844,9 +843,6 @@ namespace ProgrammaticStylized3D.Rivers
 
         [SerializeField, HideInInspector]
         private int foamMaterialLifecycleTuningVersion;
-
-        [SerializeField, HideInInspector]
-        private int foamSurfaceMorphCalibrationVersion;
 
         [Tooltip("Lit, non-emissive Foam tint. The alpha channel controls maximum Foam opacity, so no separate opacity control is required.")]
         [SerializeField] private Color foamColour =
@@ -1377,11 +1373,6 @@ namespace ProgrammaticStylized3D.Rivers
                 foamMaterialFlowSpeedMultiplier,
                 MinimumFoamMaterialFlowSpeedMultiplier,
                 MaximumFoamMaterialFlowSpeedMultiplier);
-        public float FoamSurfaceMorphStrength =>
-            Mathf.Clamp(
-                foamSurfaceMorphStrength,
-                MinimumFoamSurfaceMorphStrength,
-                MaximumFoamSurfaceMorphStrength);
         public float FoamMotionFieldStrength =>
             Mathf.Clamp(
                 foamMotionFieldStrength,
@@ -1624,7 +1615,6 @@ namespace ProgrammaticStylized3D.Rivers
         private void OnEnable()
         {
             MigrateFoamMaterialLifecycleTuningIfRequired();
-            MigrateFoamSurfaceMorphCalibrationIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -1713,9 +1703,17 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.FoamMotionField;
                 case (int)StylizedRiverFoamDebugView.FoamMotionFieldCellGrid:
                     return StylizedRiverFoamDebugView.FoamMotionFieldCellGrid;
+                case (int)StylizedRiverFoamDebugView.FoamEvaluatedShape:
+                    return StylizedRiverFoamDebugView.FoamEvaluatedShape;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }
+        }
+
+        private void PreserveLegacyFoamSurfaceMorphSerializationOnly()
+        {
+            _ = foamSurfaceMorphStrength;
+            _ = foamSurfaceMorphCalibrationVersion;
         }
 
         private void MigrateFoamMaterialLifecycleTuningIfRequired()
@@ -1735,23 +1733,9 @@ namespace ProgrammaticStylized3D.Rivers
                 CurrentFoamMaterialLifecycleTuningVersion;
         }
 
-        private void MigrateFoamSurfaceMorphCalibrationIfRequired()
-        {
-            if (foamSurfaceMorphCalibrationVersion >=
-                CurrentFoamSurfaceMorphCalibrationVersion)
-            {
-                return;
-            }
-
-            foamSurfaceMorphStrength = DefaultFoamSurfaceMorphStrength;
-            foamSurfaceMorphCalibrationVersion =
-                CurrentFoamSurfaceMorphCalibrationVersion;
-        }
-
         private void OnValidate()
         {
             MigrateFoamMaterialLifecycleTuningIfRequired();
-            MigrateFoamSurfaceMorphCalibrationIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -3016,10 +3000,6 @@ namespace ProgrammaticStylized3D.Rivers
                 foamMaterialFlowSpeedMultiplier,
                 MinimumFoamMaterialFlowSpeedMultiplier,
                 MaximumFoamMaterialFlowSpeedMultiplier);
-            foamSurfaceMorphStrength = Mathf.Clamp(
-                foamSurfaceMorphStrength,
-                MinimumFoamSurfaceMorphStrength,
-                MaximumFoamSurfaceMorphStrength);
             foamMotionFieldStrength = Mathf.Clamp(
                 foamMotionFieldStrength,
                 MinimumFoamMotionFieldStrength,

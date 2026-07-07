@@ -1059,3 +1059,13 @@ The audit also found several contract mismatches in the debug/UI layer that must
 - final shader foam warp/stretch/mask shaping remains temporary Stage 3 debt and should not be expanded as the source of macro morphology.
 
 The active blocker order is now updated in `River_Foam_Active_Blockers_and_Next_Patches.md`. The first implementation item is a narrow debug-truth patch: make `Foam Motion Field` overlay raw stored `Presence` rather than final `foam.mask`.
+
+## 2026-07-07 — River Foam 4.11C.5.9y.2 Reset Shape Morphology and Fix Stage 2 Time
+
+Validation of 5.9y and 5.9y.1 showed that the Stage 2 product exists, but the first morphology attempts were not the right direction. 5.9y proved that `_FoamShapeMask` could generate non-pass-through shape data, but the dense interior hole cuts produced marbled/scratched foam interiors that did not match the reference river. 5.9y.1 removed that interior fragmentation but left only very weak local edge dimming, which spent compute for practically no visible benefit.
+
+5.9y.2 resets Stage 2 morphology to a truthful pass-through baseline: `Foam Evaluated Shape` now writes clipped Persistent `Presence` into `_FoamShapeMask`. The product/debug path remains, but the rejected edge/noise morphology is removed so future work does not build on misleading behavior.
+
+The patch also fixes Stage 2 time binding. `_FoamTime` is now refreshed immediately before `DispatchEvaluateShape()`, instead of relying only on the material simulation configuration path. This prevents future animated Stage 2 shape logic from accidentally inheriting the lower material-update cadence.
+
+The accepted design direction after this reset is field-based and formula-driven, not pocket/entity tracking. Stage 2 should not introduce pocket IDs, connected-component tracking, or per-pocket properties unless field-based deformation fails. The next visual target is coherent field deformation: sample Persistent Presence through a smooth bounded vector field so neighbouring cells in a ribbon receive similar offsets. Naive radius 1/3/5 edge classification is rejected as a default because it costs `179` samples per cell, or about `2.93M` samples for a 128×128 field evaluation. Preferred next algorithms should target about `4–5` samples per cell or use low-resolution/mip-filtered helper fields for bridge/break behavior.

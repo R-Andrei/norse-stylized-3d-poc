@@ -36,6 +36,7 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(FoamEnabledId, 1f);
             propertyBlock.SetTexture(FoamPreviousId, snapshot.PreviousState);
             propertyBlock.SetTexture(FoamCurrentId, snapshot.CurrentState);
+            propertyBlock.SetTexture(FoamShapeMaskId, snapshot.CurrentState);
             propertyBlock.SetTexture(
                 FoamBirthDebugId,
                 ResolveBoundTexture(progressiveBirthDebugTexture));
@@ -73,7 +74,8 @@ namespace ProgrammaticStylized3D.Rivers
         private void BindField()
         {
             if (surfaceRenderer == null || river == null ||
-                currentState == null || previousState == null)
+                currentState == null || previousState == null ||
+                shapeMaskTexture == null)
             {
                 BindDisabled();
                 return;
@@ -84,6 +86,9 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(FoamEnabledId, 1f);
             propertyBlock.SetTexture(FoamPreviousId, previousState);
             propertyBlock.SetTexture(FoamCurrentId, currentState);
+            propertyBlock.SetTexture(
+                FoamShapeMaskId,
+                ResolveBoundTexture(shapeMaskTexture));
             propertyBlock.SetTexture(
                 FoamBirthDebugId,
                 ResolveBoundTexture(progressiveBirthDebugTexture));
@@ -134,6 +139,7 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(FoamEnabledId, 0f);
             propertyBlock.SetTexture(FoamPreviousId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamCurrentId, Texture2D.blackTexture);
+            propertyBlock.SetTexture(FoamShapeMaskId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamBirthDebugId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamTopologyId, Texture2D.blackTexture);
             propertyBlock.SetTexture(

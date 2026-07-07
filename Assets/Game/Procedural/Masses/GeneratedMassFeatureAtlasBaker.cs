@@ -124,30 +124,369 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             public BoundaryFieldSample(
                 float proximity,
+                float coreProximity,
                 float salience,
                 float identity,
                 float along,
                 float cross,
                 float coarseModulation,
-                float fineModulation)
+                float fineModulation,
+                int groupKey)
             {
                 Proximity = Mathf.Clamp01(proximity);
+                CoreProximity = Mathf.Clamp01(coreProximity);
                 Salience = Mathf.Clamp01(salience);
                 Identity = Mathf.Clamp01(identity);
                 Along = Mathf.Repeat(along, 1f);
                 Cross = Mathf.Clamp01(cross);
                 CoarseModulation = Mathf.Clamp01(coarseModulation);
                 FineModulation = Mathf.Clamp01(fineModulation);
+                GroupKey = groupKey;
             }
 
             public float Proximity { get; }
+            public float CoreProximity { get; }
             public float Salience { get; }
             public float Identity { get; }
             public float Along { get; }
             public float Cross { get; }
             public float CoarseModulation { get; }
             public float FineModulation { get; }
-            public float Composite => Proximity * Mathf.Lerp(0.55f, 1f, Salience);
+            public int GroupKey { get; }
+            public float Composite => Mathf.Max(Proximity, CoreProximity) * Mathf.Lerp(0.55f, 1f, Salience);
+        }
+
+        private struct BoundaryFieldGroupAccumulator
+        {
+            private const float MinimumWeight = 0.0001f;
+
+            public BoundaryFieldGroupAccumulator(int key)
+            {
+                Key = key;
+                Weight = 0f;
+                SideSignalWeight = 0f;
+                CrossSideSignalSum = 0f;
+                ModulationWeightSum = 0f;
+                CoarseModulationSum = 0f;
+                FineModulationSum = 0f;
+                BestComposite = 0f;
+                BestSample = default;
+            }
+
+            public int Key { get; private set; }
+            public float Weight { get; private set; }
+            public float SideSignalWeight { get; private set; }
+            public float CrossSideSignalSum { get; private set; }
+            public float ModulationWeightSum { get; private set; }
+            public float CoarseModulationSum { get; private set; }
+            public float FineModulationSum { get; private set; }
+            public float BestComposite { get; private set; }
+            public BoundaryFieldSample BestSample { get; private set; }
+            public bool HasValue => Weight > MinimumWeight;
+
+            public void Add(BoundaryFieldSample sample, float weight)
+            {
+                weight = Mathf.Max(MinimumWeight, weight);
+                Weight += weight;
+
+                // Cross is a side/distance coordinate. Exact ridge-core samples
+                // legitimately have Cross = 0.5, but they should not dominate a
+                // low-resolution texel's side classification. Weight Cross by
+                // its side signal so the resolved value comes from the dominant
+                // side of the boundary neighborhood rather than from neutral core
+                // samples or from a mixed average of both sides.
+                float sideSignal = Mathf.Clamp01(Mathf.Abs(sample.Cross - 0.5f) * 2f);
+                float sideWeight = weight * sideSignal;
+                if (sideWeight > MinimumWeight)
+                {
+                    SideSignalWeight += sideWeight;
+                    CrossSideSignalSum += sample.Cross * sideWeight;
+                }
+
+                ModulationWeightSum += weight;
+                CoarseModulationSum += sample.CoarseModulation * weight;
+                FineModulationSum += sample.FineModulation * weight;
+
+                float composite = sample.Composite;
+                if (composite >= BestComposite)
+                {
+                    BestComposite = composite;
+                    BestSample = sample;
+                }
+            }
+
+            public float ResolveCross()
+            {
+                return SideSignalWeight > MinimumWeight
+                    ? Mathf.Clamp01(CrossSideSignalSum / SideSignalWeight)
+                    : BestSample.Cross;
+            }
+
+            public float ResolveCoarseModulation()
+            {
+                return ModulationWeightSum > MinimumWeight
+                    ? Mathf.Clamp01(CoarseModulationSum / ModulationWeightSum)
+                    : BestSample.CoarseModulation;
+            }
+
+            public float ResolveFineModulation()
+            {
+                return ModulationWeightSum > MinimumWeight
+                    ? Mathf.Clamp01(FineModulationSum / ModulationWeightSum)
+                    : BestSample.FineModulation;
+            }
+        }
+
+        private struct BoundaryFieldAccumulator
+        {
+            private const int MaxGroupsPerTexel = 8;
+
+            private readonly int totalSamples;
+            private int contributingSamples;
+            private float proximitySum;
+            private float maxProximity;
+            private float maxCoreProximity;
+            private float bestComposite;
+            private BoundaryFieldSample bestSample;
+            private int groupCount;
+            private BoundaryFieldGroupAccumulator group0;
+            private BoundaryFieldGroupAccumulator group1;
+            private BoundaryFieldGroupAccumulator group2;
+            private BoundaryFieldGroupAccumulator group3;
+            private BoundaryFieldGroupAccumulator group4;
+            private BoundaryFieldGroupAccumulator group5;
+            private BoundaryFieldGroupAccumulator group6;
+            private BoundaryFieldGroupAccumulator group7;
+
+            public BoundaryFieldAccumulator(int totalSamples)
+            {
+                this.totalSamples = Mathf.Max(1, totalSamples);
+                contributingSamples = 0;
+                proximitySum = 0f;
+                maxProximity = 0f;
+                maxCoreProximity = 0f;
+                bestComposite = 0f;
+                bestSample = default;
+                groupCount = 0;
+                group0 = default;
+                group1 = default;
+                group2 = default;
+                group3 = default;
+                group4 = default;
+                group5 = default;
+                group6 = default;
+                group7 = default;
+            }
+
+            public void Add(BoundaryFieldSample sample)
+            {
+                float proximity = Mathf.Clamp01(sample.Proximity);
+                float coreProximity = Mathf.Clamp01(sample.CoreProximity);
+                if (proximity <= 0.001f && coreProximity <= 0.001f)
+                {
+                    return;
+                }
+
+                contributingSamples++;
+                proximitySum += proximity;
+                maxProximity = Mathf.Max(maxProximity, proximity);
+                maxCoreProximity = Mathf.Max(maxCoreProximity, coreProximity);
+
+                float composite = sample.Composite;
+                float groupWeight = Mathf.Max(0.0001f, composite);
+                AddToGroup(sample, groupWeight);
+
+                if (composite >= bestComposite)
+                {
+                    bestComposite = composite;
+                    bestSample = sample;
+                }
+            }
+
+            public BoundaryFieldSample Resolve()
+            {
+                if (contributingSamples <= 0 ||
+                    (maxProximity <= 0.001f && maxCoreProximity <= 0.001f))
+                {
+                    return default;
+                }
+
+                float coverage = contributingSamples / (float)Mathf.Max(1, totalSamples);
+                float average = proximitySum / Mathf.Max(1, totalSamples);
+
+                // Low atlas resolutions cannot rely on a single texel-center
+                // point sample for broad boundary shoulders. Use a conservative
+                // coverage/max hybrid for the shoulder, but preserve the narrow
+                // ridge core separately. Otherwise Compact/128 keeps the blur
+                // band while losing the semantic hard edge that should anchor it.
+                float conservative = maxProximity * Mathf.Pow(Mathf.Clamp01(coverage), 0.45f);
+                float shoulderProximity = Mathf.Clamp01(Mathf.Max(average, conservative));
+                float resolvedProximity = Mathf.Clamp01(Mathf.Max(shoulderProximity, maxCoreProximity));
+
+                // Atlas1 channels are boundary-local coordinates/facts. At 128
+                // and 256, one texel can cover multiple incompatible boundary
+                // neighborhoods. Resolving Cross/B/A from a pooled average makes
+                // side assignment and modulation follow the same jagged mixed
+                // pattern. Pick the dominant boundary-side group first, then
+                // resolve the coordinate/modulation fields only inside that group.
+                BoundaryFieldGroupAccumulator dominantGroup = ResolveDominantGroup();
+                BoundaryFieldSample dominantSample = dominantGroup.HasValue
+                    ? dominantGroup.BestSample
+                    : bestSample;
+                float resolvedCross = dominantGroup.HasValue
+                    ? dominantGroup.ResolveCross()
+                    : dominantSample.Cross;
+                float resolvedCoarseModulation = dominantGroup.HasValue
+                    ? dominantGroup.ResolveCoarseModulation()
+                    : dominantSample.CoarseModulation;
+                float resolvedFineModulation = dominantGroup.HasValue
+                    ? dominantGroup.ResolveFineModulation()
+                    : dominantSample.FineModulation;
+
+                return new BoundaryFieldSample(
+                    resolvedProximity,
+                    maxCoreProximity,
+                    dominantSample.Salience,
+                    dominantSample.Identity,
+                    dominantSample.Along,
+                    resolvedCross,
+                    resolvedCoarseModulation,
+                    resolvedFineModulation,
+                    dominantSample.GroupKey);
+            }
+
+            private void AddToGroup(BoundaryFieldSample sample, float weight)
+            {
+                int groupIndex = FindGroupIndex(sample.GroupKey);
+                if (groupIndex < 0)
+                {
+                    if (groupCount < MaxGroupsPerTexel)
+                    {
+                        groupIndex = groupCount;
+                        SetGroup(groupIndex, new BoundaryFieldGroupAccumulator(sample.GroupKey));
+                        groupCount++;
+                    }
+                    else
+                    {
+                        groupIndex = FindWeakestGroupIndex();
+                        BoundaryFieldGroupAccumulator weakest = GetGroup(groupIndex);
+                        if (weakest.HasValue && weakest.Weight > weight)
+                        {
+                            return;
+                        }
+
+                        SetGroup(groupIndex, new BoundaryFieldGroupAccumulator(sample.GroupKey));
+                    }
+                }
+
+                BoundaryFieldGroupAccumulator group = GetGroup(groupIndex);
+                group.Add(sample, weight);
+                SetGroup(groupIndex, group);
+            }
+
+            private int FindGroupIndex(int key)
+            {
+                for (int i = 0; i < groupCount; i++)
+                {
+                    if (GetGroup(i).Key == key)
+                    {
+                        return i;
+                    }
+                }
+
+                return -1;
+            }
+
+            private int FindWeakestGroupIndex()
+            {
+                int weakestIndex = 0;
+                float weakestWeight = GetGroup(0).Weight;
+                for (int i = 1; i < groupCount; i++)
+                {
+                    float weight = GetGroup(i).Weight;
+                    if (weight < weakestWeight)
+                    {
+                        weakestWeight = weight;
+                        weakestIndex = i;
+                    }
+                }
+
+                return weakestIndex;
+            }
+
+            private BoundaryFieldGroupAccumulator ResolveDominantGroup()
+            {
+                BoundaryFieldGroupAccumulator dominant = default;
+                float dominantWeight = 0f;
+                for (int i = 0; i < groupCount; i++)
+                {
+                    BoundaryFieldGroupAccumulator group = GetGroup(i);
+                    if (!group.HasValue)
+                    {
+                        continue;
+                    }
+
+                    // Prefer accumulated boundary support, with a small bonus for
+                    // groups that also carry a clear side signal. This keeps exact
+                    // ridge-core texels valid while preventing mixed side samples
+                    // from dragging the result toward Cross = 0.5.
+                    float weight = group.Weight + group.SideSignalWeight * 0.25f;
+                    if (weight >= dominantWeight)
+                    {
+                        dominantWeight = weight;
+                        dominant = group;
+                    }
+                }
+
+                return dominant;
+            }
+
+            private BoundaryFieldGroupAccumulator GetGroup(int index)
+            {
+                return index switch
+                {
+                    0 => group0,
+                    1 => group1,
+                    2 => group2,
+                    3 => group3,
+                    4 => group4,
+                    5 => group5,
+                    6 => group6,
+                    7 => group7,
+                    _ => default
+                };
+            }
+
+            private void SetGroup(int index, BoundaryFieldGroupAccumulator value)
+            {
+                switch (index)
+                {
+                    case 0:
+                        group0 = value;
+                        break;
+                    case 1:
+                        group1 = value;
+                        break;
+                    case 2:
+                        group2 = value;
+                        break;
+                    case 3:
+                        group3 = value;
+                        break;
+                    case 4:
+                        group4 = value;
+                        break;
+                    case 5:
+                        group5 = value;
+                        break;
+                    case 6:
+                        group6 = value;
+                        break;
+                    case 7:
+                        group7 = value;
+                        break;
+                }
+            }
         }
 
         public static Result Bake(
@@ -806,60 +1145,80 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             int maxX = Mathf.Clamp(chart.X + chart.WidthPixels - 1 + ChartPaddingPixels, 0, resolution - 1);
             int maxY = Mathf.Clamp(chart.Y + chart.HeightPixels - 1 + ChartPaddingPixels, 0, resolution - 1);
             float texelWorld = 1f / Mathf.Max(0.0001f, chart.PixelsPerWorld);
+            int sampleAxis = ResolveSupersampleAxis(resolution);
+            int sampleCount = sampleAxis * sampleAxis;
 
             for (int y = minY; y <= maxY; y++)
             {
                 for (int x = minX; x <= maxX; x++)
                 {
-                    Vector2 pixel = new(x + 0.5f, y + 0.5f);
-                    Vector2 local = AtlasPixelToLocalUnclamped(pixel, chart);
-                    bool insideSurface = IsPointInsideAnyTriangle(local, projectedTriangles);
+                    BoundaryFieldAccumulator convexAccumulator = new(sampleCount);
+                    BoundaryFieldAccumulator concaveAccumulator = new(sampleCount);
 
-                    BoundaryFieldSample convex = default;
-                    if (bakeConvex && chart.ConvexSegments.Count > 0)
+                    for (int sampleY = 0; sampleY < sampleAxis; sampleY++)
                     {
-                        convex = ResolveBoundaryDataFieldSample(
-                            local,
-                            chart.ConvexSegments,
-                            edgeWearWidth,
-                            edgeSoftness,
-                            texelWorld,
-                            edgeAmount01,
-                            edgeCoverage01,
-                            false,
-                            surfaceSeed,
-                            131);
+                        for (int sampleX = 0; sampleX < sampleAxis; sampleX++)
+                        {
+                            Vector2 pixel = new(
+                                x + (sampleX + 0.5f) / sampleAxis,
+                                y + (sampleY + 0.5f) / sampleAxis);
+                            Vector2 local = AtlasPixelToLocalUnclamped(pixel, chart);
+                            bool insideSurface = IsPointInsideAnyTriangle(local, projectedTriangles);
+
+                            BoundaryFieldSample convexSample = default;
+                            if (bakeConvex && chart.ConvexSegments.Count > 0)
+                            {
+                                convexSample = ResolveBoundaryDataFieldSample(
+                                    local,
+                                    chart.ConvexSegments,
+                                    edgeWearWidth,
+                                    edgeSoftness,
+                                    texelWorld,
+                                    edgeAmount01,
+                                    edgeCoverage01,
+                                    false,
+                                    surfaceSeed,
+                                    131);
+                            }
+
+                            BoundaryFieldSample concaveSample = default;
+                            if (bakeConcave && chart.ConcaveSegments.Count > 0)
+                            {
+                                concaveSample = ResolveBoundaryDataFieldSample(
+                                    local,
+                                    chart.ConcaveSegments,
+                                    creaseWidth,
+                                    0.82f,
+                                    texelWorld,
+                                    creaseAmount01,
+                                    creaseCoverage01,
+                                    true,
+                                    surfaceSeed,
+                                    353);
+                            }
+
+                            if (!insideSurface)
+                            {
+                                // Outside-polygon samples are only allowed to act as
+                                // chart gutters close to the feature core. This is
+                                // evaluated per sub-sample so low-resolution atlases
+                                // retain seam-safe gutters without painting empty
+                                // chart space as valid boundary data.
+                                convexSample = Mathf.Max(convexSample.Proximity, convexSample.CoreProximity) >= 0.20f
+                                    ? convexSample
+                                    : default;
+                                concaveSample = Mathf.Max(concaveSample.Proximity, concaveSample.CoreProximity) >= 0.20f
+                                    ? concaveSample
+                                    : default;
+                            }
+
+                            convexAccumulator.Add(convexSample);
+                            concaveAccumulator.Add(concaveSample);
+                        }
                     }
 
-                    BoundaryFieldSample concave = default;
-                    if (bakeConcave && chart.ConcaveSegments.Count > 0)
-                    {
-                        concave = ResolveBoundaryDataFieldSample(
-                            local,
-                            chart.ConcaveSegments,
-                            creaseWidth,
-                            0.82f,
-                            texelWorld,
-                            creaseAmount01,
-                            creaseCoverage01,
-                            true,
-                            surfaceSeed,
-                            353);
-                    }
-
-                    if (!insideSurface)
-                    {
-                        // Outside-polygon pixels are only allowed to act as chart
-                        // gutters close to the feature core. This prevents black
-                        // seam bleed without turning empty atlas space into a broad
-                        // fake feature field.
-                        convex = convex.Proximity >= 0.20f
-                            ? convex
-                            : default;
-                        concave = concave.Proximity >= 0.20f
-                            ? concave
-                            : default;
-                    }
+                    BoundaryFieldSample convex = convexAccumulator.Resolve();
+                    BoundaryFieldSample concave = concaveAccumulator.Resolve();
 
                     if (convex.Proximity <= 0.001f &&
                         concave.Proximity <= 0.001f)
@@ -896,9 +1255,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     }
 
                     // Proximity channels are masks and can accumulate by maximum.
-                    // Dominant-boundary facts are coordinates/seeds/modulation values,
-                    // not intensities, so they must be copied from the strongest
-                    // boundary sample for this texel instead of MaxByte-combined.
+                    // Dominant identity/salience/along facts are copied from the
+                    // strongest resolved boundary; Atlas1.G/B/A have already been
+                    // side/coverage-stabilized inside the accumulator.
                     if (dominant.Proximity > 0.001f &&
                         dominant.Composite >= dominantComposite[pixelIndex])
                     {
@@ -920,6 +1279,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     }
                 }
             }
+        }
+
+        private static int ResolveSupersampleAxis(int resolution)
+        {
+            if (resolution <= 128)
+            {
+                return 4;
+            }
+
+            if (resolution <= 256)
+            {
+                return 2;
+            }
+
+            return 1;
         }
 
         private static float Hash01(int a, int b, int c)
@@ -1011,6 +1385,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     sharper ? 0.88f : 1.02f,
                     softness01));
             float rasterAllowance = Mathf.Min(texelWorld * 0.35f, featureWidth * 0.20f);
+            float coreRasterAllowance = Mathf.Min(texelWorld * 0.42f, featureWidth * 0.16f);
+            float corePreservationOuter = core + coreRasterAllowance;
             float falloffOuter = outer + rasterAllowance;
 
             for (int i = 0; i < segments.Count; i++)
@@ -1037,7 +1413,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         sharper ? 1.45f : 1.28f);
                 }
 
-                if (proximity <= 0.001f)
+                // The authored core is intentionally narrow, but at Compact/128
+                // it can become a sub-texel peak inside a much wider shoulder.
+                // Preserve only the semantic ridge core with a bounded texel
+                // allowance; this does not expand the broad wear width.
+                float coreProximity = distance <= corePreservationOuter ? 1f : 0f;
+
+                if (proximity <= 0.001f && coreProximity <= 0.001f)
                 {
                     continue;
                 }
@@ -1082,12 +1464,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
                 BoundaryFieldSample sample = new(
                     proximity,
+                    coreProximity,
                     salience,
                     identity,
                     chainU,
                     cross,
                     coarse,
-                    fine);
+                    fine,
+                    ResolveBoundaryGroupKey(segment));
                 float composite = sample.Composite;
                 if (composite > bestComposite)
                 {
@@ -1097,6 +1481,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             return bestSample;
+        }
+
+        private static int ResolveBoundaryGroupKey(BoundarySegment segment)
+        {
+            // Use the concrete boundary segment rather than the larger chain for
+            // low-resolution field resolution. Chain identity is still used by
+            // Macro/identity, but the atlas texel needs one local boundary-side
+            // neighborhood so corners and adjacent ridges do not average their
+            // Cross/modulation fields into an invalid hybrid.
+            int sideKey = segment.SideSign < 0f ? 1 : segment.SideSign > 0f ? 2 : 0;
+            return segment.BoundaryIndex * 4 + sideKey;
         }
 
         private static float ResolveBoundaryIdentity(

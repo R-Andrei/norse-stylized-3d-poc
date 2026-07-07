@@ -85,6 +85,7 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamEnabled("Foam Enabled", Float) = 0
         [HideInInspector] _FoamPrevious("Foam Previous", 2D) = "black" {}
         [HideInInspector] _FoamCurrent("Foam Current", 2D) = "black" {}
+        [HideInInspector] _FoamShapeMask("Foam Shape Mask", 2D) = "black" {}
         [HideInInspector] _FoamBirthDebug("Foam Progressive Birth Debug", 2D) = "black" {}
         [HideInInspector] _FoamTopology("Foam Topology", 2D) = "black" {}
         [HideInInspector] _FoamTopologySources("Foam Topology Sources", 2D) = "black" {}
@@ -278,6 +279,7 @@ Shader "PS3D/Stylized River Water"
             SAMPLER(sampler_FoamPrevious);
             TEXTURE2D(_FoamCurrent);
             SAMPLER(sampler_FoamCurrent);
+            TEXTURE2D(_FoamShapeMask);
             TEXTURE2D(_FoamBirthDebug);
             // Topology diagnostics reuse sampler_FoamCurrent, which is already
             // allocated by the normal Foam path, so no extra fragment sampler
@@ -921,6 +923,16 @@ Shader "PS3D/Stylized River Water"
                     }
 
                     return half4(saturate(fieldColour), 1.0);
+                }
+
+                if (foamDebug == 7)
+                {
+                    float evaluatedShape = saturate(
+                        SAMPLE_TEXTURE2D(
+                            _FoamShapeMask,
+                            sampler_FoamCurrent,
+                            foam.materialUV).r);
+                    return half4(evaluatedShape.xxx, 1.0);
                 }
 
                 if (foamDebug == 4)

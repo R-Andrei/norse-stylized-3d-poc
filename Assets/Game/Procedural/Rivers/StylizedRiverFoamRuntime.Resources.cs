@@ -72,6 +72,8 @@ namespace ProgrammaticStylized3D.Rivers
         {
             return !resourcesDirty &&
                 currentState != null &&
+                shapeMaskTexture != null &&
+                shapeMaskTexture.IsCreated() &&
                 topologyTexture != null &&
                 topologySourcesTexture != null &&
                 topologyGeneratedTexture != null &&
@@ -177,6 +179,8 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         stateA = CreateFieldTexture("PS3D_RiverFoam_A");
                         stateB = CreateFieldTexture("PS3D_RiverFoam_B");
+                        shapeMaskTexture = CreateShapeMaskTexture(
+                            "PS3D_RiverFoam_ShapeMask");
                     }
 
                     initializationPhase =
@@ -427,6 +431,7 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         DispatchClear(stateA, 0, fieldWidth);
                         DispatchClear(stateB, 0, fieldWidth);
+                        ClearRenderTexture(shapeMaskTexture);
                     }
 
                     initializationPhase =
@@ -711,6 +716,27 @@ namespace ProgrammaticStylized3D.Rivers
             return texture;
         }
 
+        private RenderTexture CreateShapeMaskTexture(string textureName)
+        {
+            RenderTexture texture = new RenderTexture(
+                fieldWidth,
+                fieldHeight,
+                0,
+                RenderTextureFormat.RHalf,
+                RenderTextureReadWrite.Linear)
+            {
+                name = textureName,
+                enableRandomWrite = true,
+                useMipMap = false,
+                autoGenerateMips = false,
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+            texture.Create();
+            return texture;
+        }
+
 
         private RenderTexture CreateStructuralTexture(string textureName)
         {
@@ -889,6 +915,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
             ReleaseTexture(ref stateA);
             ReleaseTexture(ref stateB);
+            ReleaseTexture(ref shapeMaskTexture);
             ReleaseProgressiveBirthDiagnosticResources();
             ReleaseTexture(ref topologyTexture);
             ReleaseTexture(ref topologySourcesTexture);
@@ -1029,6 +1056,7 @@ namespace ProgrammaticStylized3D.Rivers
             measureTopologyMetricsKernel = -1;
             phaseCommitKernel = -1;
             simulateKernel = -1;
+            evaluateShapeKernel = -1;
             applyBoundaryKernel = -1;
             fieldWidth = 0;
             fieldHeight = 0;

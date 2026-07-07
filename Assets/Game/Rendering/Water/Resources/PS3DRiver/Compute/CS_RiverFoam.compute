@@ -14,6 +14,7 @@
 #pragma kernel MeasureTopologyMetrics
 #pragma kernel CommitPhaseTransport
 #pragma kernel SimulateFoam
+#pragma kernel EvaluateFoamShape
 #pragma kernel ApplyBoundary
 #pragma target 5.0
 
@@ -95,6 +96,62 @@ void ClearRange(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     _FoamStateWrite[int2(x, dispatchId.y)] = 0.0.xxxx;
+}
+
+
+float FoamEvaluateIntrinsicShapeMask(
+    FoamMaterialState material,
+    float validFluid)
+{
+    // 5.9y.2: reset Stage 2 morphology to a truthful pass-through
+    // baseline after the rejected 5.9y/5.9y.1 experiments. Stage 2
+    // currently proves the evaluated-shape product and debug path only.
+    // Coherent field deformation, visual bridge/break, and disturbance-
+    // driven morphology must be introduced deliberately in later passes.
+    //
+    // Remaining Life may be read by future Stage 2 shape logic, but this
+    // foundation path does not use it and never writes it. Actual durable
+    // lifetime remains owned only by Stage 1 lifecycle/support topology.
+    return saturate(material.presence * validFluid);
+}
+
+
+[numthreads(8, 8, 1)]
+void EvaluateFoamShape(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    int y = (int)dispatchId.y;
+    if (x < 0 || x >= _FoamDimensions.x)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(x, y);
+    float validFluid = FoamValidFluidAt(coordinate);
+    if (validFluid <= FoamMaterialStateEpsilon)
+    {
+        _FoamShapeMaskWrite[coordinate] = 0.0;
+        return;
+    }
+
+    // 4.11C.5.9y.2: Stage 2 currently writes a truthful pass-through
+    // evaluated shape product. It reads Persistent State and writes only
+    // _FoamShapeMask. It must not move, destroy, or mutate durable foam
+    // material; coherent deformation, bridge/break, and disturbance response
+    // remain future Stage 2 work.
+    float4 packed = FoamClipPackedToValidFluid(
+        _FoamStateRead.Load(int3(coordinate, 0)),
+        validFluid);
+    FoamMaterialState material = FoamDecodeMaterialState(packed);
+    _FoamShapeMaskWrite[coordinate] = FoamEvaluateIntrinsicShapeMask(
+        material,
+        validFluid);
 }
 
 [numthreads(8, 8, 1)]

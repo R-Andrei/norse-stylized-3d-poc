@@ -8,47 +8,52 @@ Canonical architecture lives in `River_Foam_Stage6_Architecture.md`. Macro stage
 
 This document must not preserve stale active plans. Historical patch notes may appear only as clearly superseded context.
 
-## Current working state after 4.11C.5.9t audit
+## Current working state after 4.11C.5.9y.2
 
-The Foam system is currently a stable, reduced manually-born persistent material baseline with a partially stale debug/UI layer.
+The Foam system now has the correct two-product slot, but Stage 2 is deliberately reset to a truthful pass-through baseline while the next field-based morphology approach is designed.
 
 Active and trusted:
 
 - manual source birth creates persistent Foam material;
 - Persistent Foam State stores `Presence`, `Remaining Life`, and `Material Pattern`;
-- downstream phase transport moves material downstream;
+- downstream phase transport moves durable material downstream;
 - lifecycle aging and valid-fluid clipping still work;
-- topology/support/negative aging still influence survival;
+- topology/support/negative aging still influence actual Remaining Life;
 - static pressure/lee support still feeds topology/lifecycle where implemented;
-- Foam Motion Field generation and shader debug colouring still exist;
-- final rendering still draws Foam, but final presentation must not be treated as macro movement authority.
+- `Foam Motion Field` debug overlays raw stored `Presence`;
+- `Foam Motion Field + Cell Grid` exists as a diagnostic view;
+- `Foam Evaluated Shape` exists and reads `_FoamShapeMask`;
+- Stage 2 currently writes `_FoamShapeMask` as clipped pass-through persistent `Presence`;
+- `_FoamTime` is refreshed immediately before Stage 2 evaluation so later animated shape work does not inherit the lower material-step cadence.
 
-Removed, disabled, or superseded in the compute/simulation path:
+Completed alignment work since the 5.9t audit:
 
-- persistent neighbour-sampling morph was removed by 5.9n;
-- fractional lateral row weighting is rejected because it smeared and pulsed material;
-- per-cell stochastic/source-owned lateral row commit is rejected because it shredded material into ribbons;
-- lateral row commit is disabled after 5.9p;
-- Motion Field currently does not move persistent material;
-- disturbance fields no longer drive stored-state morphing/breakup because that path was removed.
+- Motion Field debug was corrected to use raw stored `Presence`;
+- Motion Field + Cell Grid was implemented;
+- stale `Surface Morph Strength` UI/control remnants were quarantined;
+- Motion Field Inspector wording now describes intent/debug/future input rather than active lateral material motion;
+- `_FoamShapeMask` and `Foam Evaluated Shape` debug were added;
+- rejected 5.9y/5.9y.1 morphology experiments are superseded.
 
-Audit findings that must be fixed before Stage 2 work:
+Rejected or superseded Stage 2 experiments:
 
-- `Foam Motion Field` debug is supposed to overlay raw stored `Presence`, but the uploaded shader still overlays final `foam.mask` through the final foam evaluation path. This contaminates the transport diagnostic and is the first blocker.
-- `Foam Motion Field + Cell Grid` is documented as present, but the uploaded code audit did not find the enum/editor/shader branch needed for that view. Either implement it or roll the docs back. The preferred direction is to implement it because cell-scale diagnosis remains useful.
-- `Surface Morph Strength` is still present in serialized/editor-facing C# even though persistent stored-state morphing was removed. This is stale and misleading.
-- Several Motion Field labels/tooltips still imply active lateral material movement. Current truth: Motion Field is an intent/debug/future input field only until real Stage 1 lateral transport is rebuilt.
-- final rendering still performs some visible foam warp/stretch/mask shaping. This may remain temporarily, but it is Stage 3 debt and must not be treated as the long-term source of macro foam morphology.
+- dense interior hole cutting: rejected because it produced marbled/scratched interiors not present in the reference river;
+- whole-body/life thinning as a default look: rejected as a baseline because it made broad ribbons collapse visually before Stage 1 lifecycle actually removed them;
+- tiny local edge-fray retune: rejected because it spent compute for practically no visible effect;
+- naive multi-radius edge classification: rejected as a default because radius 1/3/5 box sampling costs roughly `179` presence samples per cell, or about `2.93M` samples per 128×128 field per evaluation.
 
 Current missing feature families:
 
-- safe Stage 2 Shape Evaluation product;
-- baseline intrinsic morphology/living foam;
+- field-based coherent deformation;
+- cheap mathematical bridge/break/merge-like visual shaping;
 - disturbance-driven shape breakup/morph speed;
-- coherent ribbon deformation;
-- evaluated split/join behavior;
+- final render consumption of `_FoamShapeMask`;
 - real Stage 1 lateral material transport;
-- final render cleanup against the evaluated shape product.
+- mature final Foam rendering polish.
+
+Important architecture clarification:
+
+The current foam architecture is field-based, not pocket/entity based. Stage 2 does not track Foam pocket IDs, connected components, child fragments, or per-pocket properties. It evaluates scalar/vector fields at foam-grid resolution. Merge/split behavior should first be pursued through formulas and field operations, not tracked Foam entities.
 
 ## Current canonical architecture summary
 
@@ -85,232 +90,77 @@ Do not restore old chaotic drift as a hidden stored-state morph path.
 
 Do not proceed to real lateral transport until the stable baseline, Stage 2 product, and debug views are compliant with the architecture contract.
 
-## Immediate next work
+## Immediate next work after 5.9y.2
 
-### Blocker 1 — Foam Motion Field debug must use raw stored Presence
+### Work item 1 — Field-based coherent deformation prototype
 
 #### Goal
 
-Make `Foam Motion Field` debug show the Motion Field background plus raw Persistent Foam State `Presence`, not final `foam.mask`.
+Make `Foam Evaluated Shape` visibly differ from `Material Presence` by coherently bending/offsetting the evaluated mask, without moving Persistent Foam State.
 
-#### Why it matters
+#### Correct model
 
-This is the highest-priority audit contradiction. The purpose of the Motion Field debug view is to compare stored material location against lateral/obstacle intent. If the overlay comes from final render mask, the view can include presentation-only warp, stretch, erosion, filtering, or other Stage 3 behavior. That makes it impossible to diagnose whether Stage 1 material actually moved.
-
-#### Concrete first-step code target
-
-Patch the Foam Motion Field debug branch in:
-
-```text
-Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
-```
-
-The current branch uses final evaluated/render foam data roughly like:
+Use field math, not pocket IDs:
 
 ```hlsl
-float foamOverlay = saturate(smoothstep(0.08, 0.46, foam.mask) * 0.58);
+float2 deformationCells = ResolveSmoothFoamDeformation(coordinate, time, materialPattern);
+float shape = SamplePersistentPresenceBilinear(coordinate - deformationCells);
 ```
 
-The corrected branch should use raw stored presence from the foam sample/evaluation data available in that shader path, conceptually:
+The deformation field must be smooth over multiple foam cells, bounded, and cheap. It should make whole ribbons/sheets bend together because neighbouring cells receive similar offsets. It must not use per-cell random row shifts, neighbour-written feedback, or entity tracking.
 
-```hlsl
-float foamOverlay = saturate(smoothstep(rawPresenceLow, rawPresenceHigh, foam.presence) * overlayStrength);
-```
+#### Cost target
 
-Exact variable names and thresholds must be chosen after inspecting the current shader structures. Do not guess them without reading the actual file.
-
-#### Scope limits
-
-This patch should not change foam simulation, transport, birth, topology, disturbance fields, final normal rendering, or Stage 2 behavior.
-
-It is a debug-truth fix only.
-
-#### Acceptance gate
-
-- `Foam Motion Field` debug still shows the field background.
-- The white/bright overlay follows raw stored material presence.
-- Toggling render-side foam warp/stretch/mask polish should not move the Motion Field overlay.
-- `Material Presence` and the overlay footprint in `Foam Motion Field` should agree on stored material location, allowing for different colouring/thresholding.
-- Final Foam may still look different because it is final presentation.
-
-### Blocker 2 — Foam Motion Field + Cell Grid implementation/contract alignment
-
-#### Goal
-
-Resolve the mismatch between docs and uploaded code around `Foam Motion Field + Cell Grid`.
-
-#### Preferred direction
-
-Implement the debug view because cell scale remains important for diagnosing row-level transport, cell-scale shredding, patch coherence, and future lateral movement.
-
-#### Concrete targets
-
-Likely files:
+The intended prototype should be close to:
 
 ```text
-Game/Procedural/Rivers/StylizedRiver.cs
-Game/Procedural/Rivers/Editor/StylizedRiverEditor.cs
-Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+1 low-frequency vector/noise lookup
++ 1 bilinear persistent-presence sample
+≈ 4–5 texture/state samples per foam cell
+≈ 80k samples per 128×128 field evaluation
 ```
 
-Expected behavior:
-
-- add a distinct debug enum value;
-- add Inspector label/description;
-- render Motion Field background;
-- overlay raw stored `Presence`;
-- draw faint persistent foam simulation cell boundaries;
-- optionally draw brighter 8-cell blocks for scale reading.
-
-#### Scope limits
-
-No simulation behavior change.
-
-### Blocker 3 — Remove or quarantine stale Surface Morph Strength UI
-
-#### Goal
-
-Remove misleading public control surface for the removed persistent stored-state morph path.
-
-#### Why it matters
-
-`Surface Morph Strength` currently suggests that stored foam morphology is active or tunable. That is false after the architecture reset. Keeping it visible invites wrong testing and wrong tuning.
-
-#### Concrete targets
-
-Likely files:
+This is much cheaper than naive radius-1/3/5 classification:
 
 ```text
-Game/Procedural/Rivers/StylizedRiver.cs
-Game/Procedural/Rivers/Editor/StylizedRiverEditor.cs
-```
-
-#### Preferred behavior
-
-- remove it from active Inspector drawing;
-- remove active binding/public property if unused;
-- preserve serialized migration only if needed to avoid breaking existing scenes;
-- do not replace it with a new Stage 2 control until Stage 2 exists.
-
-### Blocker 4 — Reword Motion Field UI as intent/debug/future input
-
-#### Goal
-
-Make Inspector labels, tooltips, and debug descriptions match current truth.
-
-#### Correct wording
-
-Motion Field currently means:
-
-```text
-intent/debug field for lateral routing and future material transport / shape deformation
-```
-
-It does not currently mean:
-
-```text
-active lateral movement of persistent foam material
+9 + 49 + 121 = 179 samples per cell
+≈ 2.93M samples per 128×128 field evaluation
 ```
 
 #### Scope limits
 
-Text/label/comment cleanup only unless the same patch is explicitly approved to change behavior.
+- Do not switch final rendering to `_FoamShapeMask` yet.
+- Do not add pocket IDs or connected-component tracking.
+- Do not add naive multi-radius sampling.
+- Do not mutate Persistent Foam State or Remaining Life.
 
-### Blocker 5 — Final render morphology/stage ownership review
-
-#### Goal
-
-Classify final-shader warp/stretch/mask shaping as temporary Stage 3 debt.
-
-#### Correct near-term behavior
-
-Do not rip it out before Stage 2 exists, because that could make foam visually worse without providing the correct replacement. But do not build new macro morphology in final rendering.
-
-#### Future migration
-
-After `_FoamShapeMask` or equivalent exists, move macro shape behavior into Stage 2 and reduce Stage 3 to colour, opacity, lighting, blend, and small polish.
-
-### Blocker 6 — Shape Evaluation foundation
+### Work item 2 — Cheap visual bridge/break field
 
 #### Goal
 
-Create the Stage 2 evaluated-shape product with minimal behavior first.
+After coherent deformation is validated, add formula-driven visual merge/split approximation to Stage 2.
+
+Preferred directions:
+
+- low-resolution blurred presence/life field;
+- mip-filtered presence/life field if texture setup supports it cleanly;
+- approximate morphological closing/opening only if implemented through cheap helper fields, not direct wide-kernel sampling.
 
 #### Correct behavior
 
-A future patch should introduce an evaluated shape output, likely a compact `_FoamShapeMask` or equivalent. First pass should prove:
+Visual bridge/break may use Remaining Life as read-only metadata:
 
-- Persistent Foam State remains stable;
-- Evaluated Foam Shape is derived from Persistent Foam State;
-- debug can show raw Persistent Foam State and Evaluated Foam Shape separately;
-- final render can consume Evaluated Foam Shape rather than independently inventing macro shape behavior.
+- newer/stronger foam can visually bridge/hold together more;
+- older/weaker foam can visually tear more;
+- Stage 2 must not change actual Remaining Life.
 
-#### Explicit exclusions
+### Work item 3 — Final Foam consumes `_FoamShapeMask`
 
-No aggressive deformation, breakup, split/join, or lateral transport in the foundation patch.
+Only after `Foam Evaluated Shape` is visually useful and directionally aligned, switch Final Foam from the old render-side macro mask to `_FoamShapeMask`. Stage 3 should then keep colour, opacity, lighting, blend, and small polish only.
 
-### Blocker 7 — Intrinsic morphology
+### Work item 4 — Disturbance-driven Stage 2 response
 
-#### Goal
-
-Restore baseline living foam everywhere without requiring disturbance.
-
-#### Correct behavior
-
-Stage 2 should add:
-
-- slow breathing;
-- edge fray;
-- small holes;
-- chipping;
-- subtle ribbon/body wobble;
-- pattern-stable variation.
-
-This must affect Evaluated Foam Shape only.
-
-### Blocker 8 — Disturbance-driven morphology
-
-#### Goal
-
-Reconnect pressure, lee, wake, ripple, and wave inputs as Stage 2 modifiers.
-
-#### Correct behavior
-
-Foam should morph faster, break more, fray more, or deform more in active water while still allowing support/lifetime effects to remain Stage 1 lifecycle behavior.
-
-Disturbance does not directly move, destroy, or spawn foam.
-
-### Blocker 9 — Coherent deformation
-
-#### Goal
-
-Add smooth, bounded inverse deformation inside Stage 2.
-
-#### Correct behavior
-
-Ribbons should bend, compress, narrow, and stretch visually as coherent shapes. Deformation must be smooth over multiple foam cells, bounded, gradient-limited, and non-persistent.
-
-### Blocker 10 — Evaluated split/join behavior
-
-#### Goal
-
-Add local evaluated breakup and reconnection.
-
-#### Correct behavior
-
-Ribbons may visually split, chip, fracture, and softly reconnect through Stage 2. This must not spawn persistent material or shred stored material.
-
-### Blocker 11 — Real lateral transport redesign
-
-#### Goal
-
-Rebuild Stage 1 lateral material movement after the evaluated shape layer is stable.
-
-#### Correct behavior
-
-Lateral movement must move durable material coherently through the Motion Field. It must not use fractional row weighting or per-cell random stay/move decisions.
-
-Likely future direction: accumulated lateral phase/residual or an equivalent patch-coherent transport method.
+Reconnect pressure, lee, wake, ripple, and wave inputs as shape modifiers after the base field deformation/bridge-break model is accepted. Disturbance should increase deformation, breakup, edge activity, or morph speed, not directly move/destroy/spawn durable material.
 
 ## Deferred work
 
@@ -329,13 +179,13 @@ The following patch families are historical and must not be treated as active ar
 - 5.5-5.7 stored-state morphing: useful visual proof, rejected implementation authority.
 - 5.8 local chaotic drift: proof that macro lateral motion is needed, rejected as hidden morph/movement authority.
 - 5.9j/5.9k/5.9l/5.9o lateral commit attempts: rejected because row-weight and per-cell commit variants smeared or shredded material.
-- 5.9m transport diagnostic isolation: intended to make Motion Field debug use raw presence, but the 5.9t audit found the uploaded shader still used final `foam.mask`; this remains unresolved until Blocker 1 is patched.
-- 5.9n persistent morph cleanup: accepted compute/simulation cleanup result, but the 5.9t audit found stale `Surface Morph Strength` UI/property remnants.
+- 5.9m transport diagnostic isolation: intended to make Motion Field debug use raw presence; the later 5.9u code patch completed the raw-presence debug correction.
+- 5.9n persistent morph cleanup: accepted compute/simulation cleanup result; later 5.9w quarantined the stale `Surface Morph Strength` UI/property remnants.
 - 5.9p lateral commit disable: accepted stabilization result.
 - 5.9q dead-weight cleanup: accepted cleanup result.
-- 5.9r Foam Cell Grid debug view: intended and still desired, but the 5.9t audit did not find the required uploaded code path; resolve through Blocker 2.
+- 5.9r Foam Cell Grid debug view: intended diagnostic; later 5.9v implemented the missing code path.
 - 5.9s architecture contract docs: accepted contract reset.
-- 5.9t compliance audit/docs update: current source of active blocker order.
+- 5.9t compliance audit/docs update: superseded by the 5.9y.2 active order in this document.
 
 ## Maintenance rule
 

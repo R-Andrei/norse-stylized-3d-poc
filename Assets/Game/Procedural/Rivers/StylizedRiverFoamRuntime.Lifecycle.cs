@@ -160,6 +160,7 @@ namespace ProgrammaticStylized3D.Rivers
             bool progressiveBirthDebugActive =
                 IsProgressiveBirthSourceDebugActive;
             bool motionFieldDebugActive = IsMotionFieldDebugActive;
+            bool evaluatedShapeDebugActive = IsEvaluatedShapeDebugActive;
             // Patch 4.11C.5.4d: no liveness scheduler remains. Once the
             // runtime owns allocated material textures, the lifecycle ticks the
             // full field every material step until an explicit ClearFoam,
@@ -173,7 +174,8 @@ namespace ProgrammaticStylized3D.Rivers
                 pendingIsolatedLifeProbe ||
                 activeFoamCompositionEventCount > 0;
             bool hasWork = materialWork || topologyDebugActive ||
-                progressiveBirthDebugActive || motionFieldDebugActive;
+                progressiveBirthDebugActive || motionFieldDebugActive ||
+                evaluatedShapeDebugActive;
 
             if (!hasWork && currentState == null &&
                 !HasTopologyTransitionVisibleHold)
@@ -389,6 +391,7 @@ namespace ProgrammaticStylized3D.Rivers
                 idleSince = 0.0;
             }
 
+            DispatchEvaluateShape();
             BindField();
             UpdateRecentPeaks();
         }
