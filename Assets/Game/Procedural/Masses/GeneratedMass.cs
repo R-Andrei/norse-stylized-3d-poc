@@ -48,6 +48,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         VeryHigh
     }
 
+    public enum GeneratedMassGenerationBudget
+    {
+        Compact,
+        Standard,
+        Detailed,
+        Hero,
+        Custom
+    }
+
     public enum EdgeCharacter
     {
         Sharp,
@@ -347,8 +356,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             "GeneratedMass_EdgeWearFeatures";
         private const string LegacyCreaseFeatureObjectName =
             "GeneratedMass_CreaseFeatures";
-        private const int FeatureAtlasResolution =
-            GeneratedMassFeatureAtlasBaker.DefaultResolution;
+        private const int CompactFeatureAtlasResolution = 128;
+        private const int StandardFeatureAtlasResolution = 256;
+        private const int DetailedFeatureAtlasResolution = 256;
+        private const int HeroFeatureAtlasResolution = 512;
         private static readonly int BaseColorId =
             Shader.PropertyToID("_BaseColor");
         private static readonly int LegacyBaseColorId =
@@ -486,6 +497,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         [SerializeField]
         private bool regenerateOnValidate = true;
+
+        [Header("Generation Budget")]
+        [Tooltip("Caps generated-mass feature data cost. Feature use decides whether atlases are generated; this budget caps atlas resolution and future mesh/detail cost.")]
+        [SerializeField]
+        private GeneratedMassGenerationBudget generationBudget =
+            GeneratedMassGenerationBudget.Standard;
+
+        [Tooltip("Atlas resolution used only when Generation Budget is Custom. Values are quantized to 128, 256 or 512.")]
+        [Range(128, 512)]
+        [SerializeField]
+        private int customFeatureAtlasResolution = 256;
 
         [Tooltip("Editable feature recipe used by the Generated Mass framework. Changing this field does not overwrite current controls; use Apply Selected Feature Recipe or Reset Feature Controls to Recipe in the inspector.")]
         [SerializeField]
@@ -738,6 +760,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public GeneratedMassFeatureRecipe FeatureRecipe => featureRecipe;
         public GeneratedMassFeatureRecipe LastAppliedFeatureRecipe =>
             lastAppliedFeatureRecipe;
+        public GeneratedMassGenerationBudget GenerationBudget => generationBudget;
+        public int CustomFeatureAtlasResolution => customFeatureAtlasResolution;
         public StoneSurfaceProfile StoneSurfaceProfile => stoneSurfaceProfile;
         public StoneSurfaceMaskDebug SurfaceMaskDebug => surfaceMaskDebug;
         public Color BaseColor => baseColor;
@@ -838,6 +862,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             riverInteraction ??= new GeneratedRiverInteractionSettings();
             riverInteraction.Validate();
+            customFeatureAtlasResolution = QuantizeFeatureAtlasResolution(
+                customFeatureAtlasResolution);
 
             bool archetypeChanged =
                 recipeInitialized &&
@@ -871,13 +897,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ReleaseGeneratedFeatureAtlas();
 
             MeshData sourceMeshData = MassGenerator.Generate(recipe);
+            GeneratedMassFeatureAtlasRequest atlasRequest =
+                ResolveFeatureAtlasRequest();
+            int featureAtlasResolution =
+                ResolveFeatureAtlasResolution(atlasRequest);
             MassSurfaceFeatureSettings featureSettings =
                 CreateSurfaceFeatureSettings();
             GeneratedMassFeatureAtlasBaker.Result featureAtlas =
-                GeneratedMassFeatureAtlasBaker.Bake(
-                    sourceMeshData,
-                    featureSettings,
-                    FeatureAtlasResolution);
+                atlasRequest != GeneratedMassFeatureAtlasRequest.None
+                    ? GeneratedMassFeatureAtlasBaker.Bake(
+                        sourceMeshData,
+                        featureSettings,
+                        featureAtlasResolution,
+                        atlasRequest)
+                    : null;
 
             string meshName =
                 $"GeneratedMass_{recipe.Archetype}_Shape{recipe.ShapeSeed}_Surface{recipe.SurfaceSeed}";
@@ -1512,6 +1545,122 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             meshRenderer.sharedMaterial = selectedMaterial;
+        }
+
+        public GeneratedMassFeatureAtlasRequest ResolveFeatureAtlasRequest()
+        {
+            GeneratedMassFeatureAtlasRequest request =
+                GeneratedMassFeatureAtlasRequest.None;
+
+            bool visibleEdgeWear =
+                edgeWearAmount > 0.001f &&
+                edgeWearResponseStrength > 0.0001f;
+            if (visibleEdgeWear)
+            {
+                request |= GeneratedMassFeatureAtlasRequest.FeatureAtlas0;
+
+                if (edgeWearMicroVariation > 0.001f)
+                {
+                    request |= GeneratedMassFeatureAtlasRequest.FeatureAtlas1;
+                }
+            }
+
+            if (DebugModeRequiresFeatureAtlas0(surfaceMaskDebug))
+            {
+                request |= GeneratedMassFeatureAtlasRequest.FeatureAtlas0;
+            }
+
+            if (DebugModeRequiresFeatureAtlas1(surfaceMaskDebug))
+            {
+                request |= GeneratedMassFeatureAtlasRequest.FeatureAtlas0 |
+                    GeneratedMassFeatureAtlasRequest.FeatureAtlas1;
+            }
+
+            return request;
+        }
+
+        public int ResolveFeatureAtlasResolutionForRequest(
+            GeneratedMassFeatureAtlasRequest atlasRequest)
+        {
+            return ResolveFeatureAtlasResolution(atlasRequest);
+        }
+
+        public static bool DebugModeRequiresFeatureAtlas0(
+            StoneSurfaceMaskDebug debugMode)
+        {
+            switch (debugMode)
+            {
+                case StoneSurfaceMaskDebug.ConvexEdgeWear:
+                case StoneSurfaceMaskDebug.ConcaveCrease:
+                case StoneSurfaceMaskDebug.ConvexBoundaryProximity:
+                case StoneSurfaceMaskDebug.ConcaveBoundaryProximity:
+                case StoneSurfaceMaskDebug.ConvexBoundarySalienceComposite:
+                case StoneSurfaceMaskDebug.BoundarySalience:
+                case StoneSurfaceMaskDebug.BoundaryIdentity:
+                case StoneSurfaceMaskDebug.ConcaveBoundarySalienceComposite:
+                case StoneSurfaceMaskDebug.BoundaryFieldDiagnostic:
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
+        public static bool DebugModeRequiresFeatureAtlas1(
+            StoneSurfaceMaskDebug debugMode)
+        {
+            switch (debugMode)
+            {
+                case StoneSurfaceMaskDebug.BoundaryModulationDiagnostic:
+                case StoneSurfaceMaskDebug.BoundaryAlongCoordinate:
+                case StoneSurfaceMaskDebug.BoundaryCrossCoordinate:
+                case StoneSurfaceMaskDebug.BoundaryCoarseModulation:
+                case StoneSurfaceMaskDebug.BoundaryFineModulation:
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
+        private int ResolveFeatureAtlasResolution(
+            GeneratedMassFeatureAtlasRequest atlasRequest)
+        {
+            if (atlasRequest == GeneratedMassFeatureAtlasRequest.None)
+            {
+                return 0;
+            }
+
+            return generationBudget switch
+            {
+                GeneratedMassGenerationBudget.Compact =>
+                    CompactFeatureAtlasResolution,
+                GeneratedMassGenerationBudget.Standard =>
+                    StandardFeatureAtlasResolution,
+                GeneratedMassGenerationBudget.Detailed =>
+                    DetailedFeatureAtlasResolution,
+                GeneratedMassGenerationBudget.Hero =>
+                    HeroFeatureAtlasResolution,
+                GeneratedMassGenerationBudget.Custom =>
+                    QuantizeFeatureAtlasResolution(
+                        customFeatureAtlasResolution),
+                _ => StandardFeatureAtlasResolution
+            };
+        }
+
+        private static int QuantizeFeatureAtlasResolution(int requestedResolution)
+        {
+            if (requestedResolution <= 128)
+            {
+                return 128;
+            }
+
+            if (requestedResolution <= 256)
+            {
+                return 256;
+            }
+
+            return 512;
         }
 
         private MassSurfaceFeatureSettings CreateSurfaceFeatureSettings()

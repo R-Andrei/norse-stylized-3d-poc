@@ -95,7 +95,8 @@ namespace ProgrammaticStylized3D.Rivers
         ProgressiveBirthSource = 2,
         MaterialPresence = 3,
         MaterialRemainingLife = 4,
-        FoamMotionField = 5
+        FoamMotionField = 5,
+        FoamMotionFieldCellGrid = 6
     }
 
 
@@ -1710,6 +1711,8 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.MaterialRemainingLife;
                 case (int)StylizedRiverFoamDebugView.FoamMotionField:
                     return StylizedRiverFoamDebugView.FoamMotionField;
+                case (int)StylizedRiverFoamDebugView.FoamMotionFieldCellGrid:
+                    return StylizedRiverFoamDebugView.FoamMotionFieldCellGrid;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }

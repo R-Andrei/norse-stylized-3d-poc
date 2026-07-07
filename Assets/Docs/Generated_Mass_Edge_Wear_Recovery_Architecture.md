@@ -1,7 +1,7 @@
 # Generated Mass Edge Wear Recovery Architecture
 
 Status: active recovery plan  
-Current documentation patch: EW-3 Documentation — Generated Mass Feature Budget Policy  
+Current implementation patch: EW-3A.1 — Resolution-Invariant Boundary Field Width  
 Current code foundation: EW-Atlas-1 + EW-2A + EW-2B accepted after debug validation
 
 ---
@@ -80,16 +80,18 @@ Macro now works from generic boundary salience/identity. Micro has usable bounda
 Current code facts:
 
 ```text
-GeneratedMassFeatureAtlasBaker.DefaultResolution = 512.
-The current baker creates FeatureAtlas0 and FeatureAtlas1 together.
-The current upload keeps CPU-readable atlas memory with Apply(false, false).
+GeneratedMassFeatureAtlasBaker.DefaultResolution remains 512 for legacy/default caller compatibility.
+EW-3A makes FeatureAtlas0 and FeatureAtlas1 independently optional by feature/debug requirement.
+EW-3A resolves atlas resolution from GenerationBudget: Compact 128, Standard/Detailed 256, Hero 512, Custom quantized manual.
+EW-3A uploads generated atlases with Apply(false, true), discarding retained CPU-readable atlas memory after upload.
+EW-3A.1 keeps boundary-field width resolution-invariant: lower atlas resolutions reduce fidelity, not intended world-space edge-wear width.
 ```
 
 Current default atlas cost:
 
 ```text
 512 Atlas0 + 512 Atlas1 = ~2 MB GPU pixel data per mass.
-With CPU-readable copies retained, practical retained memory can approach ~4 MB per mass before overhead.
+Before EW-3A, CPU-readable copies could make practical retained memory approach ~4 MB per mass before overhead. EW-3A discards those CPU-side copies after upload.
 ```
 
 That cannot be the default in a scene with many generated masses. Bevel geometry cost is acceptable only after atlas memory stops scaling blindly.
@@ -203,20 +205,27 @@ atlas.Apply(false, true);
 - [x] Document atlas memory numbers.
 - [x] Move atlas budget work before bevel work.
 
-### EW-3 Code A — optional atlas generation and atlas memory budget
+### EW-3A — optional atlas generation and atlas memory budget
 
-- [ ] Add feature/debug requirement resolver for `FeatureAtlas0`.
-- [ ] Add feature/debug requirement resolver for `FeatureAtlas1`.
-- [ ] Skip Atlas0 bake when no active feature/debug mode needs it.
-- [ ] Skip Atlas1 bake when no active feature/debug mode needs it.
-- [ ] Resolve atlas resolution from active budget.
-- [ ] Make 512 Hero/debug, not default.
-- [ ] Use `Apply(false, true)` after atlas upload.
-- [ ] Add inspector preview for atlas requirement, resolution, and estimated memory.
+- [x] Add feature/debug requirement resolver for `FeatureAtlas0`.
+- [x] Add feature/debug requirement resolver for `FeatureAtlas1`.
+- [x] Skip Atlas0 bake when no active feature/debug mode needs it.
+- [x] Skip Atlas1 bake when no active feature/debug mode needs it.
+- [x] Resolve atlas resolution from active budget.
+- [x] Make 512 Hero/debug, not default.
+- [x] Use `Apply(false, true)` after atlas upload.
+- [x] Add inspector preview for atlas requirement, resolution, and estimated memory.
 
-### EW-3 Code B — generated-mass numeric budget resolver
+### EW-3A.1 — resolution-invariant boundary field width
 
-- [ ] Add Generated Mass Budget: Compact / Standard / Detailed / Hero / Custom.
+- [x] Fix boundary proximity bake so feature width comes from object/artist width, not texel size.
+- [x] Use texel size only for a small bounded raster/AA allowance.
+- [x] Prevent Compact/128 and Standard/256 atlases from materially widening edge wear compared with Hero/512.
+- [x] Document that lower atlas budgets may reduce detail, but must not redefine feature scale.
+
+### EW-3B — generated-mass numeric budget resolver
+
+- [x] Add Generated Mass Budget: Compact / Standard / Detailed / Hero / Custom.
 - [ ] Preserve artist-requested shape settings when they fit the budget.
 - [ ] Estimate or measure rendered vertex count for budget checks.
 - [ ] Clamp SurfaceFacetDensity before FormComplexity when over budget.

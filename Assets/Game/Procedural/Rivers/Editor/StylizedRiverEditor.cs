@@ -1750,7 +1750,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Progressive Birth Source",
                 "Material Presence",
                 "Material Remaining Life",
-                "Foam Motion Field"
+                "Foam Motion Field",
+                "Foam Motion Field + Cell Grid"
             };
             int[] foamDebugValues =
             {
@@ -1759,7 +1760,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.ProgressiveBirthSource,
                 (int)StylizedRiverFoamDebugView.MaterialPresence,
                 (int)StylizedRiverFoamDebugView.MaterialRemainingLife,
-                (int)StylizedRiverFoamDebugView.FoamMotionField
+                (int)StylizedRiverFoamDebugView.FoamMotionField,
+                (int)StylizedRiverFoamDebugView.FoamMotionFieldCellGrid
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -1773,7 +1775,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             int selectedDebugIndex = EditorGUILayout.Popup(
                 new GUIContent(
                     "Debug View",
-                    "Final Foam for normal validation. Foam Motion Field shows dense left/right lateral motion, obstacle overrides, and a semi-transparent white Foam overlay."),
+                    "Final Foam for normal validation. Foam Motion Field shows dense left/right routing intent, obstacle overrides, and a semi-transparent white raw stored Foam Presence overlay."),
                 currentDebugIndex,
                 foamDebugLabels);
             if (EditorGUI.EndChangeCheck())
@@ -2000,7 +2002,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Progressive Birth Source",
                 "Material Presence",
                 "Material Remaining Life",
-                "Foam Motion Field"
+                "Foam Motion Field",
+                "Foam Motion Field + Cell Grid"
             };
             int[] foamDebugValues =
             {
@@ -2009,7 +2012,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.ProgressiveBirthSource,
                 (int)StylizedRiverFoamDebugView.MaterialPresence,
                 (int)StylizedRiverFoamDebugView.MaterialRemainingLife,
-                (int)StylizedRiverFoamDebugView.FoamMotionField
+                (int)StylizedRiverFoamDebugView.FoamMotionField,
+                (int)StylizedRiverFoamDebugView.FoamMotionFieldCellGrid
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -3065,7 +3069,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.FoamMotionField:
                     return
-                        "Dense lateral Foam Motion Field. Blue/cyan means leftward stored-material motion, red/orange means rightward motion, black means intentional neutral/calm field, green/yellow marks obstacle override influence, and semi-transparent white overlays the current Foam mask.";
+                        "Dense lateral Foam Motion Field. Blue/cyan means leftward routing intent, red/orange means rightward routing intent, black means intentional neutral/calm field, green/yellow marks obstacle override influence, and semi-transparent white overlays raw stored Foam Presence rather than the final render mask.";
+
+                case StylizedRiverFoamDebugView.FoamMotionFieldCellGrid:
+                    return
+                        "Dense lateral Foam Motion Field plus the persistent Foam simulation cell grid. The white overlay is raw stored Foam Presence, not the final render mask. Fine dark lines show individual Foam cells; brighter pale lines show eight-cell blocks.";
 
                 default:
                     return

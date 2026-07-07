@@ -843,7 +843,9 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 return river.FoamDebugView ==
-                    StylizedRiverFoamDebugView.FoamMotionField;
+                        StylizedRiverFoamDebugView.FoamMotionField ||
+                    river.FoamDebugView ==
+                        StylizedRiverFoamDebugView.FoamMotionFieldCellGrid;
             }
         }
 

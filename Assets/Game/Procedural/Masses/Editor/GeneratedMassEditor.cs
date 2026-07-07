@@ -76,6 +76,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty blackSacredStoneMaterial;
         private SerializedProperty recipe;
         private SerializedProperty regenerateOnValidate;
+        private SerializedProperty generationBudget;
+        private SerializedProperty customFeatureAtlasResolution;
         private SerializedProperty featureRecipe;
         private SerializedProperty stoneSurfaceProfile;
         private SerializedProperty baseColor;
@@ -153,6 +155,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "recipe");
             regenerateOnValidate = serializedObject.FindProperty(
                 "regenerateOnValidate");
+            generationBudget = serializedObject.FindProperty(
+                "generationBudget");
+            customFeatureAtlasResolution = serializedObject.FindProperty(
+                "customFeatureAtlasResolution");
             featureRecipe = serializedObject.FindProperty(
                 "featureRecipe");
             stoneSurfaceProfile = serializedObject.FindProperty(
@@ -274,6 +280,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             EnsureDefaultStoneMaterials();
 
             DrawFeatureRecipeWorkflow();
+            DrawGenerationBudget();
             DrawCoreShapeRecipe();
             DrawRenderingAndProfile();
 
@@ -282,6 +289,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "m_Script",
                 "recipe",
                 "regenerateOnValidate",
+                "generationBudget",
+                "customFeatureAtlasResolution",
                 "featureRecipe",
                 "stoneSurfaceProfile",
                 "baseColor",
@@ -466,6 +475,195 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     ? "Recipe Status: current feature controls match the selected recipe."
                     : "Recipe Status: current feature controls are modified/custom relative to the selected recipe.",
                 MessageType.None);
+        }
+
+        private void DrawGenerationBudget()
+        {
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Generation Budget",
+                EditorStyles.boldLabel);
+
+            EditorGUILayout.HelpBox(
+                "Budget caps generated feature-data cost. Active features/debug " +
+                "views decide whether Atlas0 or Atlas1 exists; this budget only " +
+                "caps atlas resolution and future mesh/detail cost.",
+                MessageType.Info);
+
+            if (generationBudget != null)
+            {
+                EditorGUILayout.PropertyField(
+                    generationBudget,
+                    new GUIContent(
+                        "Budget",
+                        "Compact/Standard/Detailed/Hero cap generated data cost. Custom enables a manual atlas resolution override."));
+            }
+
+            bool isCustom = generationBudget != null &&
+                !generationBudget.hasMultipleDifferentValues &&
+                generationBudget.enumValueIndex ==
+                (int)GeneratedMassGenerationBudget.Custom;
+            if (isCustom && customFeatureAtlasResolution != null)
+            {
+                EditorGUILayout.PropertyField(
+                    customFeatureAtlasResolution,
+                    new GUIContent(
+                        "Custom Atlas Resolution",
+                        "Manual atlas resolution for Custom budget. Runtime generation quantizes this to 128, 256 or 512."));
+            }
+
+            DrawFeatureAtlasBudgetPreview();
+        }
+
+        private void DrawFeatureAtlasBudgetPreview()
+        {
+            if (surfaceMaskDebug == null ||
+                edgeWearAmount == null ||
+                edgeWearResponseStrength == null ||
+                edgeWearMicroVariation == null ||
+                generationBudget == null)
+            {
+                return;
+            }
+
+            if (serializedObject.isEditingMultipleObjects ||
+                generationBudget.hasMultipleDifferentValues)
+            {
+                EditorGUILayout.HelpBox(
+                    "Atlas budget preview is unavailable while editing multiple generated masses or mixed budgets.",
+                    MessageType.None);
+                return;
+            }
+
+            GeneratedMassFeatureAtlasRequest request =
+                ResolveInspectorFeatureAtlasRequest();
+            int resolution = ResolveInspectorFeatureAtlasResolution(request);
+            int atlasCount = 0;
+            if ((request & GeneratedMassFeatureAtlasRequest.FeatureAtlas0) != 0)
+            {
+                atlasCount++;
+            }
+
+            if ((request & GeneratedMassFeatureAtlasRequest.FeatureAtlas1) != 0)
+            {
+                atlasCount++;
+            }
+
+            float atlasMemoryMb = resolution > 0
+                ? (resolution * resolution * 4f * atlasCount) / (1024f * 1024f)
+                : 0f;
+
+            string atlasSummary = atlasCount == 0
+                ? "No feature atlas required by current normal render/debug settings."
+                : $"Atlas request: {FormatAtlasRequest(request)} at {resolution}x{resolution}; estimated GPU pixel data {atlasMemoryMb:0.###} MB.";
+
+            EditorGUILayout.HelpBox(
+                atlasSummary +
+                " CPU-readable texture copies are discarded after upload by the baker.",
+                MessageType.None);
+        }
+
+        private GeneratedMassFeatureAtlasRequest ResolveInspectorFeatureAtlasRequest()
+        {
+            GeneratedMassFeatureAtlasRequest request =
+                GeneratedMassFeatureAtlasRequest.None;
+
+            bool visibleEdgeWear =
+                edgeWearAmount.floatValue > 0.001f &&
+                edgeWearResponseStrength.floatValue > 0.0001f;
+            if (visibleEdgeWear)
+            {
+                request |= GeneratedMassFeatureAtlasRequest.FeatureAtlas0;
+
+                if (edgeWearMicroVariation.floatValue > 0.001f)
+                {
+                    request |= GeneratedMassFeatureAtlasRequest.FeatureAtlas1;
+                }
+            }
+
+            StoneSurfaceMaskDebug debugMode =
+                (StoneSurfaceMaskDebug)surfaceMaskDebug.intValue;
+            if (GeneratedMass.DebugModeRequiresFeatureAtlas0(debugMode))
+            {
+                request |= GeneratedMassFeatureAtlasRequest.FeatureAtlas0;
+            }
+
+            if (GeneratedMass.DebugModeRequiresFeatureAtlas1(debugMode))
+            {
+                request |= GeneratedMassFeatureAtlasRequest.FeatureAtlas0 |
+                    GeneratedMassFeatureAtlasRequest.FeatureAtlas1;
+            }
+
+            return request;
+        }
+
+        private int ResolveInspectorFeatureAtlasResolution(
+            GeneratedMassFeatureAtlasRequest request)
+        {
+            if (request == GeneratedMassFeatureAtlasRequest.None)
+            {
+                return 0;
+            }
+
+            GeneratedMassGenerationBudget budget =
+                (GeneratedMassGenerationBudget)generationBudget.enumValueIndex;
+            switch (budget)
+            {
+                case GeneratedMassGenerationBudget.Compact:
+                    return 128;
+                case GeneratedMassGenerationBudget.Hero:
+                    return 512;
+                case GeneratedMassGenerationBudget.Custom:
+                    return QuantizeInspectorAtlasResolution(
+                        customFeatureAtlasResolution != null
+                            ? customFeatureAtlasResolution.intValue
+                            : 256);
+                case GeneratedMassGenerationBudget.Detailed:
+                case GeneratedMassGenerationBudget.Standard:
+                default:
+                    return 256;
+            }
+        }
+
+        private static int QuantizeInspectorAtlasResolution(int requestedResolution)
+        {
+            if (requestedResolution <= 128)
+            {
+                return 128;
+            }
+
+            if (requestedResolution <= 256)
+            {
+                return 256;
+            }
+
+            return 512;
+        }
+
+        private static string FormatAtlasRequest(
+            GeneratedMassFeatureAtlasRequest request)
+        {
+            bool atlas0 =
+                (request & GeneratedMassFeatureAtlasRequest.FeatureAtlas0) != 0;
+            bool atlas1 =
+                (request & GeneratedMassFeatureAtlasRequest.FeatureAtlas1) != 0;
+
+            if (atlas0 && atlas1)
+            {
+                return "Atlas0 + Atlas1";
+            }
+
+            if (atlas0)
+            {
+                return "Atlas0 only";
+            }
+
+            if (atlas1)
+            {
+                return "Atlas1 only";
+            }
+
+            return "None";
         }
 
         private void DrawCoreShapeRecipe()

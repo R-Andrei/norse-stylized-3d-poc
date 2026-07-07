@@ -283,7 +283,7 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 
 **Canonical document:** `River_Foam_Stage6_Architecture.md` owns the Foam architecture. `River_Foam_Active_Blockers_and_Next_Patches.md` owns current blockers and next patch order. This roadmap only keeps the macro sequence and current status.
 
-### Current status after 4.11C.5.9r
+### Current status after 4.11C.5.9t audit
 
 Stage 6 is in the `4.11C` manually-born persistent material phase.
 
@@ -297,10 +297,11 @@ Accepted/stable foundations:
 - consolidated manual Foam birth controls;
 - 5.4l composition-event refactor;
 - 5.4m manual source realignment;
-- 5.9n persistent morph cleanup;
+- 5.9n persistent morph cleanup in the compute/simulation path;
 - 5.9p lateral commit shredder disable;
 - 5.9q dead-weight cleanup;
-- 5.9r Foam Motion Field + Cell Grid debug view.
+- 5.9s two-product/three-stage architecture contract reset;
+- 5.9t audit of current code against that contract.
 
 Superseded/rejected foundations:
 
@@ -314,10 +315,17 @@ Current active state:
 
 - downstream transport is active;
 - lateral material transport is not active;
-- the Motion Field is an intent/debug field, not an active mover;
+- the Motion Field is an intent/debug/future input field, not an active mover;
 - safe Stage 2 Shape Evaluation is not implemented;
 - disturbance-driven stored morph/breakup is not active;
 - final rendering should be treated as presentation only until the evaluated shape product exists.
+
+5.9t audit contradictions to fix before Stage 2:
+
+- `Foam Motion Field` debug must use raw stored `Presence`, but the uploaded shader still overlays final `foam.mask`;
+- `Foam Motion Field + Cell Grid` is documented, but the uploaded code audit did not find the required enum/editor/shader path;
+- stale `Surface Morph Strength` UI/property remnants still exist even though persistent stored-state morphing was removed;
+- some Motion Field labels/tooltips still imply active lateral movement.
 
 ### Canonical architecture summary
 
@@ -338,15 +346,18 @@ Input fields such as Motion Field, Disturbance Fields, and Topology/Support Fiel
 
 The current approved order is:
 
-1. Architecture/docs alignment around the two-product, three-stage contract.
-2. Code compliance audit against that contract.
-3. Shape Evaluation foundation: add the evaluated-shape product and debug path with minimal behavior.
-4. Intrinsic morphology: restore baseline living foam everywhere through Stage 2 only.
-5. Disturbance-driven morphology: reconnect pressure, lee, dynamic wake, ripples, and waves as Stage 2 modifiers.
-6. Coherent deformation: smooth bounded inverse deformation for ribbon bend/stretch/compression.
-7. Evaluated split/join: local visual breakup and reconnection.
-8. Real lateral transport redesign: Stage 1 material movement through Motion Field without row-weight smearing or per-cell shredding.
-9. Final rendering polish against the evaluated shape product.
+1. Fix `Foam Motion Field` debug so its overlay uses raw stored `Presence`, not final `foam.mask`.
+2. Implement or explicitly reconcile the documented `Foam Motion Field + Cell Grid` debug view. Preferred direction: implement it.
+3. Remove or quarantine stale `Surface Morph Strength` UI/property remnants.
+4. Reword Motion Field labels/tooltips as intent/debug/future input, not active lateral material movement.
+5. Classify final-shader macro warp/stretch as temporary Stage 3 debt, with no new macro morphology added there.
+6. Shape Evaluation foundation: add the evaluated-shape product and debug path with minimal behavior.
+7. Intrinsic morphology: restore baseline living foam everywhere through Stage 2 only.
+8. Disturbance-driven morphology: reconnect pressure, lee, dynamic wake, ripples, and waves as Stage 2 modifiers.
+9. Coherent deformation: smooth bounded inverse deformation for ribbon bend/stretch/compression.
+10. Evaluated split/join: local visual breakup and reconnection.
+11. Real lateral transport redesign: Stage 1 material movement through Motion Field without row-weight smearing or per-cell shredding.
+12. Final rendering polish against the evaluated shape product.
 
 Do not continue to automatic birth population until manually-born material, evaluated shape, and transport pass the new contracts.
 
@@ -360,7 +371,7 @@ Do not continue to automatic birth population until manually-born material, eval
 
 ### Public workflow
 
-Primary debug views now include:
+Primary debug views should include:
 
 - Final Foam;
 - Foam + Aging Topology;
@@ -368,6 +379,8 @@ Primary debug views now include:
 - Progressive Birth Transfer;
 - Foam Motion Field;
 - Foam Motion Field + Cell Grid.
+
+5.9t audit note: `Foam Motion Field` and `Foam Motion Field + Cell Grid` are not yet code-compliant in the uploaded baseline. The former must use raw stored `Presence`; the latter must be implemented or the docs must be corrected.
 
 Debug views must identify what product they show: raw Persistent Foam State, Motion Field intent, future Evaluated Foam Shape, or final rendered result.
 

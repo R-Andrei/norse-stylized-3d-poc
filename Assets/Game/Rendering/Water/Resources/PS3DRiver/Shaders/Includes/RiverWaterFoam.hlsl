@@ -348,6 +348,7 @@ struct RiverWaterFoamResult
     float mask;
     float surfaceEnergy;
     float2 fieldUV;
+    float2 materialUV;
 };
 
 RiverWaterFoamResult RiverWaterEvaluateFoam(
@@ -371,6 +372,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     result.mask = 0.0;
     result.surfaceEnergy = 0.0;
     result.fieldUV = 0.0;
+    result.materialUV = 0.0;
 
     if (enabled < 0.5 || fieldLength <= 0.0001)
     {
@@ -414,6 +416,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     result.presence = storedPresence;
     result.remainingLife = storedRemainingLife;
     result.fieldUV = fieldUV;
+    result.materialUV = foamUV;
 
     float liquidFactor = 1.0 - saturate(freezeAmount);
     float surfaceEnergy = RiverWaterFoamResolveSurfaceEnergy(

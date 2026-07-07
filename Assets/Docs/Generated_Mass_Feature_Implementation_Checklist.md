@@ -2,7 +2,7 @@
 
 Status: active implementation tracker  
 Companion document: `Generated_Mass_Framework.md`  
-Current documentation patch: EW-3 Documentation — Generated Mass Feature Budget Policy
+Current implementation patch: EW-3A.1 — Resolution-Invariant Boundary Field Width
 
 ---
 
@@ -77,7 +77,7 @@ A = dominant boundary fine local modulation
 
 ---
 
-## 4. EW-3 Code A — optional atlas generation and memory budget
+## 4. EW-3A — optional atlas generation and memory budget — implemented
 
 ### Goal
 
@@ -85,30 +85,30 @@ Make atlas memory proportional to feature use and budget.
 
 ### Checklist
 
-- [ ] Add feature/debug data-requirement resolver:
-  - [ ] `requiresFeatureAtlas0`
-  - [ ] `requiresFeatureAtlas1`
-- [ ] Skip `FeatureAtlas0` creation when not required.
-- [ ] Skip `FeatureAtlas1` creation when not required.
-- [ ] Preserve existing shader enable flags:
-  - [ ] `_GeneratedMassFeatureAtlas0Enabled`
-  - [ ] `_GeneratedMassFeatureAtlas1Enabled`
-- [ ] Resolve atlas resolution from budget:
-  - [ ] Compact -> 128 cap
-  - [ ] Standard -> 256 cap
-  - [ ] Detailed -> 256 cap
-  - [ ] Hero -> 512 cap
-  - [ ] Custom / Debug -> manual
-- [ ] Make 512 hero/debug, not default.
-- [ ] Use `atlas.Apply(false, true)` after atlas upload.
-- [ ] Add inspector preview:
-  - [ ] Atlas0 required? yes/no
-  - [ ] Atlas0 resolution
-  - [ ] Atlas0 estimated memory
-  - [ ] Atlas1 required? yes/no
-  - [ ] Atlas1 resolution
-  - [ ] Atlas1 estimated memory
-  - [ ] total estimated atlas memory
+- [x] Add feature/debug data-requirement resolver:
+  - [x] `requiresFeatureAtlas0`
+  - [x] `requiresFeatureAtlas1`
+- [x] Skip `FeatureAtlas0` creation when not required.
+- [x] Skip `FeatureAtlas1` creation when not required.
+- [x] Preserve existing shader enable flags:
+  - [x] `_GeneratedMassFeatureAtlas0Enabled`
+  - [x] `_GeneratedMassFeatureAtlas1Enabled`
+- [x] Resolve atlas resolution from budget:
+  - [x] Compact -> 128 cap
+  - [x] Standard -> 256 cap
+  - [x] Detailed -> 256 cap
+  - [x] Hero -> 512 cap
+  - [x] Custom / Debug -> manual
+- [x] Make 512 hero/debug, not default.
+- [x] Use `atlas.Apply(false, true)` after atlas upload.
+- [x] Add inspector preview:
+  - [x] Atlas0 required? yes/no
+  - [x] Atlas0 resolution
+  - [x] Atlas0 estimated memory
+  - [x] Atlas1 required? yes/no
+  - [x] Atlas1 resolution
+  - [x] Atlas1 estimated memory
+  - [x] total estimated atlas memory
 
 ### Acceptance
 
@@ -128,7 +128,37 @@ No path keeps CPU-readable atlas memory after upload unless explicitly required.
 
 ---
 
-## 5. EW-3 Code B — numeric mesh budget resolver
+## 5. EW-3A.1 — resolution-invariant boundary field width — implemented
+
+### Goal
+
+Atlas budget changes must alter fidelity, not authored feature scale.
+
+### Checklist
+
+- [x] Remove texel-size minimums from boundary feature width.
+- [x] Keep core/outer boundary distances derived from object/world-space feature width.
+- [x] Use texel size only as a small bounded raster/AA allowance.
+- [x] Keep cross-boundary coordinate based on the authored boundary influence band.
+- [x] Update docs so lower atlas resolution is allowed to look chunkier, but not materially wider.
+
+### Acceptance
+
+```text
+Hero / 512:
+  cleanest boundary field.
+
+Detailed or Standard / 256:
+  similar world-space width, reduced detail.
+
+Compact / 128:
+  similar world-space width, chunkier/blockier mask.
+
+Rejected:
+  lower atlas resolution creates broad face smearing or redefines Edge Wear Width.
+```
+
+## 6. EW-3B — numeric mesh budget resolver
 
 ### Goal
 
@@ -190,7 +220,7 @@ If it exceeds the target, density is reduced before major form complexity.
 
 ---
 
-## 6. EW-4+ visual feature sequence
+## 7. EW-4+ visual feature sequence
 
 Do not start these until EW-3 code makes atlas memory scalable.
 
@@ -233,7 +263,7 @@ Do not start these until EW-3 code makes atlas memory scalable.
 
 ---
 
-## 7. Reusable feature-library rules
+## 8. Reusable feature-library rules
 
 Good data:
 

@@ -970,7 +970,7 @@ The validation goal is now binary: if raw Material Presence moves laterally, the
 
 After the 5.9m isolation patch, the remaining cleanup target was the stale persistent morph machinery itself. The audit showed that the old stored-state morph helpers were no longer active after the bypass, but they still existed in `CS_RiverFoam.Simulation.hlsl` and could be reconnected accidentally. 5.9n removes that dead neighbour-resampling machinery and replaces the old morph function with `FoamPreservePersistentMaterialState`, which clamps current packed material and clips it to valid fluid only.
 
-The unused `Surface Morph Strength` control and compute binding were also removed because persistent stored-state surface morphing is no longer an active layer. At the time of 5.9n, this patch did not change phase transport, lane generation, obstacle routing, topology, birth, lifecycle math, or final shader presentation. The then-active source-owned lateral row commit was later rejected and disabled by 5.9p after validation showed it shredded foam at cell scale. The durable result from 5.9n is only the persistent morph cleanup: persistent simulation preserves/clips/ages material and no longer owns morphology.
+The 5.9n intent was also to remove the unused `Surface Morph Strength` control and compute binding because persistent stored-state surface morphing is no longer an active layer. A later 5.9t audit found that stale C#/Inspector-facing remnants still exist in the uploaded baseline, so that UI/property cleanup remains an active blocker. At the time of 5.9n, this patch did not change phase transport, lane generation, obstacle routing, topology, birth, lifecycle math, or final shader presentation. The then-active source-owned lateral row commit was later rejected and disabled by 5.9p after validation showed it shredded foam at cell scale. The durable result from 5.9n is only the persistent morph cleanup: persistent simulation preserves/clips/ages material and no longer owns morphology.
 
 ---
 
@@ -1005,16 +1005,18 @@ Kept intact:
 
 ## 2026-07-07 — River Foam 4.11C.5.9r Foam Cell Grid Debug View
 
-Added a Foam Motion Field + Cell Grid debug view.
+5.9r intended to add a Foam Motion Field + Cell Grid debug view.
 
-The new view shows:
+The intended view shows:
 
 - Motion Field background;
 - obstacle-routing influence;
 - raw stored Foam `Presence` overlay;
 - actual persistent foam simulation cell/grid boundaries.
 
-This is a diagnostic tool only. It does not alter simulation, transport, morphology, disturbance, or rendering behavior.
+This is a diagnostic tool only. It should not alter simulation, transport, morphology, disturbance, or rendering behavior.
+
+A later 5.9t audit did not find the required enum/editor/shader branch in the uploaded baseline, so the cell-grid view remains an active implementation/contract-alignment blocker.
 
 ## 2026-07-07 — River Foam Architecture Contract Reset
 
@@ -1041,3 +1043,19 @@ Important current truth:
 - The previous broken tearing was persistent material shredded by cell-scale transport and remains rejected.
 
 Superseded historical entries in this log remain as history only. Any old entry implying active stored-state morphing, active lateral row commit, active field-driven lateral material movement, or final shader macro stretch as the intended Foam behavior is superseded by `River_Foam_Stage6_Architecture.md`.
+
+## 2026-07-07 — River Foam 4.11C.5.9t Compliance Audit Documentation Update
+
+A post-contract audit compared the uploaded foam code against the 5.9s two-product/three-stage architecture contract. No behavior patch was applied in this documentation step.
+
+The audit confirmed that the core persistent simulation is mostly in the intended stripped-down state: persistent material birth remains, downstream phase transport remains active, lifecycle/valid-fluid clipping remain active, persistent neighbour-sampled morphing is removed from the compute simulation path, and the rejected lateral row-commit shredder remains disabled.
+
+The audit also found several contract mismatches in the debug/UI layer that must be fixed before Stage 2 Shape Evaluation work begins:
+
+- `Foam Motion Field` debug is supposed to overlay raw stored Foam `Presence`, but the uploaded shader still overlays final `foam.mask`. This contaminates the transport diagnostic with final-render presentation behavior and is the first required code fix.
+- `Foam Motion Field + Cell Grid` is documented as present, but the uploaded code audit did not find the enum/editor/shader branch needed for that view. The preferred correction is to implement it because grid-scale diagnosis remains useful.
+- `Surface Morph Strength` still exists in C#/Inspector-facing surfaces even though persistent stored-state morphing is no longer active.
+- Some Motion Field labels/tooltips still imply active lateral material movement even though Motion Field is currently only an intent/debug/future input field.
+- final shader foam warp/stretch/mask shaping remains temporary Stage 3 debt and should not be expanded as the source of macro morphology.
+
+The active blocker order is now updated in `River_Foam_Active_Blockers_and_Next_Patches.md`. The first implementation item is a narrow debug-truth patch: make `Foam Motion Field` overlay raw stored `Presence` rather than final `foam.mask`.

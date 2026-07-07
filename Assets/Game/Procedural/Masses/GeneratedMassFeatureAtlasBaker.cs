@@ -1,9 +1,18 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using ProgrammaticStylized3D.Geometry;
 
 namespace ProgrammaticStylized3D.Geometry.Masses
 {
+    [Flags]
+    public enum GeneratedMassFeatureAtlasRequest
+    {
+        None = 0,
+        FeatureAtlas0 = 1 << 0,
+        FeatureAtlas1 = 1 << 1
+    }
+
     /// <summary>
     /// Builds generated-mass surface-chart atlases used by the main material
     /// path. The atlases store reusable boundary facts: convex/concave
@@ -144,14 +153,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public static Result Bake(
             MeshData meshData,
             MassSurfaceFeatureSettings settings,
-            int requestedResolution = DefaultResolution)
+            int requestedResolution = DefaultResolution,
+            GeneratedMassFeatureAtlasRequest atlasRequest =
+                GeneratedMassFeatureAtlasRequest.FeatureAtlas0 |
+                GeneratedMassFeatureAtlasRequest.FeatureAtlas1)
         {
             if (meshData == null ||
                 meshData.VertexCount < 3 ||
-                meshData.Triangles.Count < 3)
+                meshData.Triangles.Count < 3 ||
+                atlasRequest == GeneratedMassFeatureAtlasRequest.None)
             {
                 return null;
             }
+
+            bool buildAtlas1 =
+                (atlasRequest & GeneratedMassFeatureAtlasRequest.FeatureAtlas1) != 0;
+
+            // FeatureAtlas1 stores coordinates/modulation that are meaningful only
+            // against the same boundary layout as FeatureAtlas0. A request for
+            // Atlas1 therefore implies Atlas0 rather than allowing an orphaned
+            // coordinate atlas.
+            bool buildAtlas0 =
+                (atlasRequest & GeneratedMassFeatureAtlasRequest.FeatureAtlas0) != 0 ||
+                buildAtlas1;
 
             int resolution = SanitizeResolution(requestedResolution);
             Bounds bounds = CalculateBounds(meshData.Vertices);
@@ -177,20 +201,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 charts,
                 resolution);
 
-            Texture2D atlas0 = CreateAtlasTexture(
-                resolution,
-                "GeneratedMass_FeatureAtlas0_Temporary");
-            Texture2D atlas1 = CreateAtlasTexture(
-                resolution,
-                "GeneratedMass_FeatureAtlas1_Temporary");
-            Color32[] pixels0 = new Color32[resolution * resolution];
-            Color32[] pixels1 = new Color32[resolution * resolution];
+            Texture2D atlas0 = buildAtlas0
+                ? CreateAtlasTexture(
+                    resolution,
+                    "GeneratedMass_FeatureAtlas0_Temporary")
+                : null;
+            Texture2D atlas1 = buildAtlas1
+                ? CreateAtlasTexture(
+                    resolution,
+                    "GeneratedMass_FeatureAtlas1_Temporary")
+                : null;
+            Color32[] pixels0 = buildAtlas0
+                ? new Color32[resolution * resolution]
+                : null;
+            Color32[] pixels1 = buildAtlas1
+                ? new Color32[resolution * resolution]
+                : null;
             float[] dominantComposite = new float[resolution * resolution];
-            for (int i = 0; i < pixels0.Length; i++)
-            {
-                pixels0[i] = new Color32(0, 0, 0, 0);
-                pixels1[i] = new Color32(0, 0, 0, 0);
-            }
+
+            InitializePixels(pixels0);
+            InitializePixels(pixels1);
 
             BakePatchDistanceFields(
                 graph,
@@ -202,14 +232,35 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 dominantComposite,
                 resolution);
 
-            atlas0.SetPixels32(pixels0);
-            atlas0.Apply(false, false);
-            atlas1.SetPixels32(pixels1);
-            atlas1.Apply(false, false);
+            if (atlas0 != null && pixels0 != null)
+            {
+                atlas0.SetPixels32(pixels0);
+                atlas0.Apply(false, true);
+            }
+
+            if (atlas1 != null && pixels1 != null)
+            {
+                atlas1.SetPixels32(pixels1);
+                atlas1.Apply(false, true);
+            }
+
             return new Result(atlas0, atlas1, featureAtlasUV);
         }
 
-        private static int SanitizeResolution(int requestedResolution)
+        private static void InitializePixels(Color32[] pixels)
+        {
+            if (pixels == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                pixels[i] = new Color32(0, 0, 0, 0);
+            }
+        }
+
+        public static int SanitizeResolution(int requestedResolution)
         {
             int resolution = Mathf.Clamp(
                 requestedResolution,
@@ -834,12 +885,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     // G = dominant boundary cross-boundary coordinate
                     // B = dominant boundary coarse local modulation
                     // A = dominant boundary fine local modulation
-                    if (convex.Proximity > 0.001f)
+                    if (pixels0 != null && convex.Proximity > 0.001f)
                     {
                         pixels0[pixelIndex].r = MaxByte(pixels0[pixelIndex].r, convex.Proximity);
                     }
 
-                    if (concave.Proximity > 0.001f)
+                    if (pixels0 != null && concave.Proximity > 0.001f)
                     {
                         pixels0[pixelIndex].g = MaxByte(pixels0[pixelIndex].g, concave.Proximity);
                     }
@@ -852,12 +903,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         dominant.Composite >= dominantComposite[pixelIndex])
                     {
                         dominantComposite[pixelIndex] = dominant.Composite;
-                        pixels0[pixelIndex].b = ToByte(dominant.Salience);
-                        pixels0[pixelIndex].a = ToByte(dominant.Identity);
-                        pixels1[pixelIndex].r = ToByte(dominant.Along);
-                        pixels1[pixelIndex].g = ToByte(dominant.Cross);
-                        pixels1[pixelIndex].b = ToByte(dominant.CoarseModulation);
-                        pixels1[pixelIndex].a = ToByte(dominant.FineModulation);
+
+                        if (pixels0 != null)
+                        {
+                            pixels0[pixelIndex].b = ToByte(dominant.Salience);
+                            pixels0[pixelIndex].a = ToByte(dominant.Identity);
+                        }
+
+                        if (pixels1 != null)
+                        {
+                            pixels1[pixelIndex].r = ToByte(dominant.Along);
+                            pixels1[pixelIndex].g = ToByte(dominant.Cross);
+                            pixels1[pixelIndex].b = ToByte(dominant.CoarseModulation);
+                            pixels1[pixelIndex].a = ToByte(dominant.FineModulation);
+                        }
                     }
                 }
             }
@@ -934,25 +993,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             BoundaryFieldSample bestSample = default;
             float bestComposite = 0f;
-            float safeWidth = Mathf.Max(texelWorld * 2f, widthWorld);
+            float featureWidth = Mathf.Max(0.0001f, widthWorld);
             float softness01 = Mathf.Clamp01(softness);
 
-            // Proximity remains a clean distance field. Coverage controls which
-            // boundaries are admitted; salience/identity/modulation are facts
-            // carried by admitted boundaries, not final decorative paint.
-            float core = Mathf.Max(
-                texelWorld * (sharper ? 0.95f : 1.10f),
-                safeWidth * Mathf.Lerp(sharper ? 0.024f : 0.030f, sharper ? 0.008f : 0.014f, softness01));
+            // Proximity is an object/world-space distance field. Atlas resolution
+            // may reduce fidelity, but it must not redefine the artist-authored
+            // feature width. Texel size is therefore used only as a tiny bounded
+            // raster/AA allowance, never as a minimum physical edge-wear width.
+            float core = featureWidth * Mathf.Lerp(
+                sharper ? 0.024f : 0.030f,
+                sharper ? 0.008f : 0.014f,
+                softness01);
             float outer = Mathf.Max(
-                core + texelWorld * 2f,
-                safeWidth * Mathf.Lerp(sharper ? 0.56f : 0.68f, sharper ? 0.88f : 1.02f, softness01));
+                core + featureWidth * 0.025f,
+                featureWidth * Mathf.Lerp(
+                    sharper ? 0.56f : 0.68f,
+                    sharper ? 0.88f : 1.02f,
+                    softness01));
+            float rasterAllowance = Mathf.Min(texelWorld * 0.35f, featureWidth * 0.20f);
+            float falloffOuter = outer + rasterAllowance;
 
             for (int i = 0; i < segments.Count; i++)
             {
                 BoundarySegment segment = segments[i];
                 float t;
                 float distance = DistanceToSegment(local, segment.Start, segment.End, out t);
-                if (distance > outer * GutterDistanceMultiplier)
+                if (distance > falloffOuter * GutterDistanceMultiplier)
                 {
                     continue;
                 }
@@ -964,7 +1030,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
                 else
                 {
-                    float distance01 = Mathf.InverseLerp(core, outer, distance);
+                    float distance01 = Mathf.InverseLerp(core, falloffOuter, distance);
                     float falloff = 1f - Mathf.SmoothStep(0f, 1f, distance01);
                     proximity = Mathf.Pow(
                         Mathf.Clamp01(falloff),

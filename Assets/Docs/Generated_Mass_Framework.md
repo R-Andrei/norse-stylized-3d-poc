@@ -1,7 +1,7 @@
 # Generated Mass Framework
 
 Status: active framework definition  
-Current documentation patch: EW-3 Documentation — Generated Mass Feature Budget Policy  
+Current implementation patch: EW-3A.1 — Resolution-Invariant Boundary Field Width  
 Supersedes as active planning source: `Rock_Generated_Mass_Upgrade_Plan.md` and older Patch 14C/14D historical atlas notes.
 
 ---
@@ -40,18 +40,19 @@ The current code state matters because the next work is a budget correction, not
 ```text
 GeneratedMass.cs
 - FormComplexity and SurfaceFacetDensity are separate artist-facing controls.
-- FeatureAtlasResolution currently resolves to GeneratedMassFeatureAtlasBaker.DefaultResolution.
-- GeneratedMass currently calls GeneratedMassFeatureAtlasBaker.Bake(...) during regeneration.
-- Atlas enable flags already exist in the material path:
+- GenerationBudget now caps feature-atlas resolution: Compact 128, Standard/Detailed 256, Hero 512, Custom quantized manual.
+- Regeneration resolves feature/debug atlas requirements before calling GeneratedMassFeatureAtlasBaker.Bake(...).
+- Atlas enable flags already exist in the material path and now reflect optional atlas generation:
   _GeneratedMassFeatureAtlas0Enabled
   _GeneratedMassFeatureAtlas1Enabled
 
 GeneratedMassFeatureAtlasBaker.cs
-- DefaultResolution = 512.
+- DefaultResolution remains 512 for legacy/default caller compatibility.
 - MinimumResolution = 128.
 - MaximumResolution = 512.
-- The current baker creates FeatureAtlas0 and FeatureAtlas1 together.
-- The current texture upload keeps CPU-readable texture memory with Apply(false, false).
+- The baker accepts a GeneratedMassFeatureAtlasRequest and can create Atlas0 only, Atlas0+Atlas1, or no result when no atlas is requested.
+- Generated atlas upload uses Apply(false, true), discarding CPU-readable texture memory after upload.
+- Boundary distance-field width is artist/object-space driven, not atlas-resolution driven; lower atlas budgets may reduce fidelity but must not materially inflate edge-wear width.
 
 MassGenerator.cs
 - FormComplexity controls major cut count / dominant plane count.
@@ -66,8 +67,9 @@ MassGenerator.cs
 Consequence:
 
 ```text
-The current fixed two-atlas 512x512 policy is too expensive as a default.
-The next implementation work must make feature data demand-driven and budgeted before more visual layers are added.
+The old fixed two-atlas 512x512 policy was too expensive as a default.
+EW-3A makes feature data demand-driven and budgeted before more visual layers are added.
+EW-3A.1 fixes the exposed width-invariance bug: Compact/Standard/Detailed/Hero atlas resolution may change fidelity, but not the intended world-space feature width.
 ```
 
 ---
@@ -255,9 +257,12 @@ Per RGBA32 atlas:
 | 512 Atlas0 only | ~1.0 MB |
 | 512 Atlas0 + Atlas1 | ~2.0 MB |
 
-Current fixed `512 Atlas0 + Atlas1` is a development/debug-level cost, not a production default.
+The old fixed `512 Atlas0 + Atlas1` path is retained only as a Hero/Custom/debug-level possibility, not as the normal generation path.
 
 ### 6.2 Resolution rule
+
+Atlas resolution controls fidelity, not authored feature scale. A lower atlas resolution may make boundary masks chunkier or less detailed, but it must not redefine Edge Wear Width or any other object/world-space feature width. The baker may use texel size only for bounded raster safety and antialiasing; it must not use texel size as a minimum physical band width.
+
 
 ```text
 Compact: 128 cap
@@ -279,7 +284,7 @@ Required implementation target:
 atlas.Apply(false, true);
 ```
 
-The current code uses `Apply(false, false)`, which keeps CPU-readable texture memory. That is a known cleanup target for the budget patch.
+EW-3A changes generated feature atlas upload to `Apply(false, true)`, so retained CPU-readable texture copies are discarded after upload.
 
 ---
 
@@ -405,18 +410,25 @@ EW-2B — Coordinate atlas write/debug correction
 
 ```text
 EW-3 Documentation — Generated Mass Feature Budget Policy
-  Status: this document update.
+  Status: complete.
   Purpose: replace stale fixed two-atlas assumptions with demand-driven atlas generation and numeric budget rules.
 
-EW-3 Code A — Optional atlas generation and atlas memory budget
+EW-3A — Optional atlas generation and atlas memory budget
+  Status: implemented.
   - Generate FeatureAtlas0 only when requested.
   - Generate FeatureAtlas1 only when requested.
   - Resolve atlas resolution from active budget.
   - Use Apply(false, true) after texture upload.
   - Add inspector preview for atlas requirement/resolution/memory.
 
-EW-3 Code B — Numeric mesh budget resolver
-  - Add generated-mass budget setting.
+EW-3A.1 — Resolution-invariant boundary field width
+  Status: implemented.
+  - Keep boundary proximity width based on artist/object-space width.
+  - Use texel size only for a small bounded raster/AA allowance.
+  - Prevent Compact/128 and Standard/256 atlases from inflating the apparent edge-wear width.
+
+EW-3B — Numeric mesh budget resolver
+  - Resolve effective generated-mass shape settings from numeric budget.
   - Resolve effective FormComplexity / SurfaceFacetDensity from numeric budget.
   - Preserve artist requested settings when they fit budget.
   - Clamp SurfaceFacetDensity before FormComplexity when over budget.

@@ -248,6 +248,7 @@ Shader "PS3D/Stylized River Water"
                 float _FoamSharpness;
                 float _FoamDebugView;
                 float _FoamMotionLaneScrollCells;
+                float4 _FoamCurrent_TexelSize;
                 float4 _FoamBirthDebug_TexelSize;
                 float4 _FoamObstacleExclusion_TexelSize;
                 float4 _FoamMotionLane_TexelSize;
@@ -803,7 +804,7 @@ Shader "PS3D/Stylized River Water"
 
                 int foamDebug = (int)round(_FoamDebugView);
 
-                if (foamDebug == 5)
+                if (foamDebug == 5 || foamDebug == 6)
                 {
                     int2 laneDimensions = int2(
                         max(1.0, _FoamMotionLane_TexelSize.z),
@@ -863,12 +864,62 @@ Shader "PS3D/Stylized River Water"
                         float3(1.0, 0.85, 0.10),
                         obstacleRouting.y * 0.35);
 
+                    // 5.9u: Foam Motion Field diagnostics must show raw stored
+                    // material ownership, not the final/evaluated render mask.
                     float foamOverlay = saturate(
-                        smoothstep(0.08, 0.46, foam.mask) * 0.58);
+                        smoothstep(0.08, 0.46, foam.presence) * 0.58);
                     fieldColour = lerp(
                         saturate(fieldColour),
                         float3(1.0, 1.0, 0.95),
                         foamOverlay);
+
+                    if (foamDebug == 6)
+                    {
+                        int2 foamDimensions = int2(
+                            max(1.0, _FoamCurrent_TexelSize.z),
+                            max(1.0, _FoamCurrent_TexelSize.w));
+                        if (foamDimensions.x <= 1 || foamDimensions.y <= 1)
+                        {
+                            foamDimensions = laneDimensions;
+                        }
+
+                        // 5.9v: draw the persistent material texture cells in the
+                        // same UV space used to sample raw stored Foam Presence.
+                        float2 cellCoordinate =
+                            saturate(foam.materialUV) * (float2)foamDimensions;
+                        float2 cellFraction = frac(cellCoordinate);
+                        float2 cellEdgeDistance = min(
+                            cellFraction,
+                            1.0 - cellFraction);
+                        float2 fineWidth = max(
+                            fwidth(cellCoordinate) * 1.35,
+                            float2(0.0001, 0.0001));
+                        float fineGrid = max(
+                            1.0 - smoothstep(0.0, fineWidth.x, cellEdgeDistance.x),
+                            1.0 - smoothstep(0.0, fineWidth.y, cellEdgeDistance.y));
+
+                        float2 majorCoordinate = cellCoordinate * 0.125;
+                        float2 majorFraction = frac(majorCoordinate);
+                        float2 majorEdgeDistance = min(
+                            majorFraction,
+                            1.0 - majorFraction);
+                        float2 majorWidth = max(
+                            fwidth(majorCoordinate) * 1.65,
+                            float2(0.0001, 0.0001));
+                        float majorGrid = max(
+                            1.0 - smoothstep(0.0, majorWidth.x, majorEdgeDistance.x),
+                            1.0 - smoothstep(0.0, majorWidth.y, majorEdgeDistance.y));
+
+                        fieldColour = lerp(
+                            fieldColour,
+                            fieldColour * 0.52,
+                            saturate(fineGrid * 0.32));
+                        fieldColour = lerp(
+                            fieldColour,
+                            float3(1.0, 0.96, 0.72),
+                            saturate(majorGrid * 0.50));
+                    }
+
                     return half4(saturate(fieldColour), 1.0);
                 }
 

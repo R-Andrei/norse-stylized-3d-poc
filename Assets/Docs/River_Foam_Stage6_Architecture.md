@@ -8,25 +8,30 @@ It replaces the older persistent-morph, lateral-row-commit, and final-shader-str
 
 The roadmap owns macro stage order. The active blocker document owns the next patch sequence. This document owns what Foam is allowed to be.
 
-## Current implementation state after 4.11C.5.9r
+## Current implementation state after 4.11C.5.9t audit
 
-The current implementation is a stable but reduced Foam baseline:
+The current implementation is a stable but reduced Foam baseline with known debug/UI contract drift:
 
 - persistent Foam material birth exists;
 - downstream phase transport exists;
 - Remaining Life aging exists;
 - topology/support/negative aging influence still exists;
 - valid-fluid and obstacle clipping still exist;
-- the stale neighbour-sampling persistent morph path was removed;
+- the stale neighbour-sampling persistent morph path was removed from the compute simulation path;
 - the unsafe lateral row-commit paths were disabled after they caused smearing, pulsing, and then cell-scale shredding;
 - the Unified Foam Motion Field and obstacle-routing field still exist as generated/debug-visible intent fields;
-- the Foam Motion Field debug overlay uses raw stored `Presence` rather than final render mask;
-- the Foam Motion Field + Cell Grid debug view shows the actual persistent foam simulation grid;
 - dynamic/static disturbance fields still exist and remain important inputs for future shape behavior, but they no longer drive stored-state morphing;
 - actual lateral material transport is currently not active;
 - the safe evaluated shape/morphology layer is not implemented yet.
 
-The current baseline is intentionally conservative. It is not the target final Foam behavior. Its purpose is to preserve stable material while the system is rebuilt around clear ownership boundaries.
+Known 5.9t audit mismatches that must be corrected before Stage 2 work:
+
+- this contract requires `Foam Motion Field` debug to overlay raw stored `Presence`, but the uploaded shader still used final `foam.mask`;
+- this contract wants `Foam Motion Field + Cell Grid`, but the uploaded code audit did not find the enum/editor/shader path for that view;
+- `Surface Morph Strength` still exists in the C#/Inspector surface even though persistent stored-state morphing is no longer active;
+- some Motion Field labels still imply active lateral material movement even though the Motion Field is currently intent/debug/future input only.
+
+The current baseline is intentionally conservative. It is not the target final Foam behavior. Its purpose is to preserve stable material while the system is rebuilt around clear ownership boundaries. Debug truth must be repaired before new morphology or transport is added.
 
 ## Non-negotiable architecture rule
 
@@ -1072,15 +1077,19 @@ Use it to verify stored material, lifetime, transport, and clipping.
 
 ## Foam Motion Field
 
-Shows lateral/obstacle intent plus raw stored presence overlay.
+Contract requirement: show lateral/obstacle intent plus raw stored `Presence` overlay.
 
 Use it to compare stored foam footprint against Motion Field intent. It does not prove movement unless Stage 1 has an active movement consumer.
 
+5.9t audit note: the uploaded shader still used final `foam.mask` for this overlay. That is non-compliant because final mask can include render-side shaping. The next code patch must make this view use raw stored `Presence`.
+
 ## Foam Motion Field + Cell Grid
 
-Shows Motion Field plus raw stored presence plus actual persistent foam simulation cell boundaries.
+Contract requirement: show Motion Field plus raw stored `Presence` plus actual persistent foam simulation cell boundaries.
 
 Use it to understand cell scale, one-row shifts, texel-size artifacts, and whether a behavior is cell-scale or patch-scale.
+
+5.9t audit note: this view is documented and still desired, but the uploaded code audit did not find the required enum/editor/shader branch. The next code alignment pass should implement it or explicitly roll back the claim. Preferred direction is implementation.
 
 ## Future Evaluated Shape
 
