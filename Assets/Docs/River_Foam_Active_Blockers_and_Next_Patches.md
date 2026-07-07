@@ -4,349 +4,218 @@
 
 This is the short working document for current Stage 6 Foam blockers and immediate patch order.
 
-Use this instead of the old problem-register document. Keep it current and compact. Do not turn it into a patch diary.
-
 Canonical architecture lives in `River_Foam_Stage6_Architecture.md`. Macro stage order lives in `River_Rendering_Roadmap.md`.
 
-## Current working state
+This document must not preserve stale active plans. Historical patch notes may appear only as clearly superseded context.
 
-The Foam system is in the `4.11C` manually-born persistent material phase.
+## Current working state after 4.11C.5.9r
 
-The 5.4l refactor fixed the hidden spawn-scaling issue: one manual spawn now maps to one budgeted composition event instead of several hidden progressive writers.
+The Foam system is currently a stable, reduced manually-born persistent material baseline.
 
-The 5.4m realignment removes the old pattern/complexity/density birth controls from the active manual workflow and makes manual birth a single canonical source again. The source-fill field is keyed from source controls rather than event count, so repeated starts with the same settings keep the same broad footprint. This is intentionally plainer: birth should create stable candidate material, while later material evolution owns macro/meso breakup and the renderer owns micro breakup.
+Active and trusted:
 
-Current visual/lifecycle state after 5.5b/5.5c/5.5d:
+- manual source birth creates persistent Foam material;
+- Persistent Foam State stores `Presence`, `Remaining Life`, and `Material Pattern`;
+- downstream phase transport moves material downstream;
+- lifecycle aging and valid-fluid clipping still work;
+- topology/support/negative aging still influence survival;
+- static pressure/lee support still feeds topology/lifecycle where implemented;
+- Foam Motion Field generation/debug still exists;
+- Foam Motion Field + Cell Grid debug exists and shows the actual persistent foam simulation grid;
+- final rendering still draws Foam, but final presentation must not be treated as macro movement authority.
 
-- 5.5b made intrinsic macro deformation visible, but introduced an unacceptable lifecycle regression by letting `Presence` depletion shorten material life independently of `Remaining Life`;
-- 5.5c repairs lifecycle authority: `Remaining Life`, Neutral Lifetime, and topology aging are the only systems allowed to decide when material dies;
-- 5.5d changes the deformation from a current-preserving union into an area-balanced intrinsic wobble so Foam can bend back and forth without monotonic footprint growth;
-- intrinsic runtime morphology is accepted as good enough for now;
-- 5.6 adds render-only coupling between Final Foam and the existing river surface layer: macro waves, static pressure, lee/depression, ripples, disturbance gradients, and wake energy;
-- 5.6b filters Foam interior lighting so ordinary granular water-surface variation does not dirty the clean white stylized Foam body, while strong surface features can still show through at reduced strength;
-- 5.7/5.7b/5.7c add stored-state disturbance/surface coupling; validation shows the path works, with a practical authored `Surface Morph Strength` range around 2-4 and approximately 2.5 as the current working setting;
-- 5.8/5.8b/5.8c/5.8d proved that lateral material motion needs body-scale authority rather than only edge crawl, but the local chaotic drift implementation is now treated as an interim experiment rather than the long-term macro movement authority;
-- 5.9 replaces that local chaotic drift path with the Unified Foam Motion Field: a dense scrolling lane field plus a fixed obstacle-routing override field. The field owns lateral macro movement only, but actual stored-material relocation is committed inside downstream phase transport. 5.9l replaces fractional lateral row splitting with source-owned single-row relocation so the field moves material instead of diffusing it; Remaining Life still owns death, topology still owns support/negative aging, and birth still creates source material only;
-- better source-shape spawning, topology proof/calibration, and final visual fragmentation remain future work.
+Removed, disabled, or superseded:
 
-## Hard rules for the next patches
+- persistent neighbour-sampling morph was removed by 5.9n;
+- `Surface Morph Strength` was removed because stored-state morphing is no longer active;
+- fractional lateral row weighting is rejected because it smeared and pulsed material;
+- per-cell stochastic/source-owned lateral row commit is rejected because it shredded material into ribbons;
+- lateral row commit is disabled after 5.9p;
+- Motion Field currently does not move persistent material;
+- disturbance fields no longer drive stored-state morphing/breakup because that path was removed.
 
-Do not rethink the river architecture.
+Current missing feature families:
 
-Do not split thin Foam/current lines into a separate system during this milestone.
+- safe Stage 2 Shape Evaluation product;
+- baseline intrinsic morphology/living foam;
+- disturbance-driven shape breakup/morph speed;
+- coherent ribbon deformation;
+- evaluated split/join behavior;
+- real Stage 1 lateral material transport;
+- final render cleanup against the new product/stage contract.
 
-Do not add automatic anchored births yet.
+## Current canonical architecture summary
 
-Do not add new source families as a substitute for fixing manually-born material.
+Foam has two foam data products:
 
-Do not use topology as direct Foam painting.
+1. `Persistent Foam State` — durable material: Presence, Remaining Life, Material Pattern.
+2. `Evaluated Foam Shape` — current visible shape derived from Persistent Foam State.
 
-Do not tune random presets as a replacement for fixing material behavior.
+Foam has three processing stages:
 
-Do not let birth-time randomness decide whether a source becomes a chip, slug, sheet, or empty gap.
+1. `Stage 1 — Persistent State Update` writes Persistent Foam State. It owns birth, transport, lifecycle, and valid-fluid clipping. Only this stage moves stored foam material.
+2. `Stage 2 — Shape Evaluation` writes Evaluated Foam Shape. It owns coherent deformation, morphology, breakup, split/join appearance, and disturbance-reactive shape animation. It does not write back to Persistent Foam State.
+3. `Stage 3 — Rendering` draws Evaluated Foam Shape. It owns colour, lighting, opacity, blending, and small final polish. It does not create macro movement or macro shape behavior.
 
-Do not proceed to automatic population until manually-born material can move, morph, age, and interact correctly.
+Input fields such as Motion Field, Disturbance Fields, and Topology/Support Fields provide data. They do not directly mutate Foam by themselves.
 
-Keep the layer split explicit: birth creates stable source material; persistent material simulation owns macro/meso reconfiguration, but must not shorten lifespan outside the Remaining Life equation; the final shader owns micro breakup, crisp presentation, Foam interior clarity, and render-only water-surface coupling. Render coupling may warp/thin/stretch the Final Foam mask near existing material, but it must not change `Material Presence`, Remaining Life, or Foam population. Ordinary high-frequency water detail should be suppressed on Foam interiors; strong waves/wakes/disturbances may imprint at reduced strength.
+## Hard rules for next patches
 
-## Completed precondition — Manual source realignment
+Do not reintroduce neighbour-sampled persistent morphing.
 
-### Symptom
+Do not reintroduce fractional lateral row weighting.
 
-Before 5.4m, the manual birth path could produce wildly different macro results with the same settings: tiny fragments, short tadpoles, fat blobs, or disconnected islands.
+Do not reintroduce per-cell stochastic lateral row commit.
 
-### Why it matters
+Do not make the final shader the source of macro bending, macro stretching, fake downstream shedding, fake lateral drift, split/join, or obstacle routing.
 
-All later validation depends on a trustworthy manual source. If the source is already malformed, temporal morphing, topology aging, and obstacle behavior cannot be judged cleanly.
+Do not let any input field directly mutate foam.
 
-### Likely current cause
+Do not use topology as direct Foam painting or steering.
 
-Compute-side birth injection still starts from a swept capsule/segment and applies destructive pattern/noise masks. Pattern logic is trying to create final Foam art at birth instead of creating stable source material for later persistent behavior.
+Do not add automatic anchored/open-water births as a substitute for fixing manually-born material behavior.
 
-### Correct behavior
+Do not restore old chaotic drift as a hidden stored-state morph path.
 
-Manual birth should create a bounded, stable candidate source with predictable macro footprint. Randomness may vary edge damage, local holes, and small gaps, but it must not change the broad source identity.
+Do not proceed to real lateral transport until the stable baseline, Stage 2 product, and debug views are compliant with the architecture contract.
 
-`Amount` remains source-only spatial fill. It must not act as life, opacity, or random macro deletion.
+## Immediate next work
 
-### Implemented target
+### Blocker 1 — Architecture/code compliance audit
 
-`4.11C.5.4m — Manual Source Realignment`
+#### Goal
 
+Check current code against `River_Foam_Stage6_Architecture.md` before rebuilding features.
 
-### Inspector organization rule
+#### Why it matters
 
-All manual birth controls live under `Foam Debug > Manual Birth Source`. Persistent travel diagnostics live under `Material Motion`; stored/visible footprint diagnostics live under `Material Shape`. Do not scatter source controls into unrelated foldouts.
+The system recently failed because multiple paths acted like movement or morph authority at the same time. Before adding Stage 2, the codebase must be checked for stale active paths, misleading controls, debug contradictions, and final-render macro behavior that violates the new contract.
 
-### Acceptance gate
+#### Audit targets
 
-With fixed settings and repeated starts:
+- Stage 1: verify only birth/transport/lifecycle/clipping write Persistent Foam State.
+- Stage 2: confirm no safe Evaluated Foam Shape product exists yet.
+- Stage 3: identify any final shader macro stretch/warp that should move into Stage 2 or be reduced later.
+- Input fields: confirm Motion Field and Disturbance Fields are data providers only.
+- Debug: verify views clearly distinguish raw persistent state, motion field, grid, future evaluated shape, and final render.
+- UI/docs: verify controls and labels do not claim inactive behavior is active.
 
-- approximate footprint remains stable;
-- a higher Amount is visibly more filled than a lower Amount;
-- source shape is not a random chip/slug lottery;
-- topology aging and lifetime probes remain unchanged;
-- one spawn still starts one budgeted composition event.
+#### Acceptance gate
 
-### Explicit exclusions
+Produce a short compliance report identifying:
 
-No automatic births. No obstacle-flow feature. No final beauty pass. No new broad architecture.
+- contract-compliant code;
+- contract-risky code;
+- stale/dead code;
+- missing products/stages;
+- safe next implementation target.
 
-## Blocker 1 — Static shape / no temporal morphing
+No feature behavior should be changed during this audit unless a compile/dead-weight cleanup is explicitly approved.
 
-### Symptom
+### Blocker 2 — Shape Evaluation foundation
 
-Foam material is born and then remains too static in shape. It moves downstream, but the internal silhouette and breakup do not evolve enough.
+#### Goal
 
-### Why it matters
+Create the Stage 2 evaluated-shape product with minimal behavior first.
 
-The reference river is alive: sheets tear, edges crawl, connections appear/disappear, and fragments peel away. Static decals moving downstream will not match that language.
+#### Correct behavior
 
-### Likely current cause
+A future patch should introduce an evaluated shape output, likely a compact `_FoamShapeMask` or equivalent. First pass should prove:
 
-Too much visual identity is defined at birth. Existing render/material breakup is not strong enough to evolve the material footprint while preserving state correctness.
+- Persistent Foam State remains stable;
+- Evaluated Foam Shape is derived from Persistent Foam State;
+- debug can show raw Persistent Foam State and Evaluated Foam Shape separately;
+- final render can consume Evaluated Foam Shape rather than independently inventing macro shape behavior.
 
-### Correct behavior
+#### Explicit exclusions
 
-Existing Foam should visibly change over time without creating hidden material and without using topology as motion guidance. Edges should crawl, interiors should breathe/break, and near-death material should visibly fragment or thin.
+No aggressive deformation, breakup, split/join, or lateral transport in the foundation patch.
 
-### Implemented targets
+### Blocker 3 — Intrinsic morphology
 
-`4.11C.5.5 — Persistent Foam Morphing and Gradual Erosion` added the first conservative pass, but validation showed it was too local and edge-biased.
+#### Goal
 
-`4.11C.5.5b — Macro Material Deformation` strengthens persistent-state deformation so the stored material body bends, stretches, and changes width distribution over time.
+Restore baseline living foam everywhere without requiring disturbance.
 
-`4.11C.5.5c — Lifecycle Authority Repair` removes the regression where simulation-side `Presence` erosion and empty-sample blending could make Foam disappear before `Remaining Life` expired.
+#### Correct behavior
 
-`4.11C.5.5d — Area-Balanced Foam Wobble` removes the current-preserving union behavior that made deformation accumulate/grow. Morphing now uses opposed, normalized wobble samples so material can locally widen, narrow, bend, and relax while average occupied area remains roughly stable until lifecycle/topology actually removes it.
+Stage 2 should add:
 
-### Accepted layer split
+- slow breathing;
+- edge fray;
+- small holes;
+- chipping;
+- subtle ribbon/body wobble;
+- pattern-stable variation.
 
-This is persistent material-simulation behavior, not topology and not final shader-only polish. The simulation may reconfigure stored `Presence` over time so a patch can stretch, bend, and crawl. It may not delete material independently of `Remaining Life`; visual thinning/fragmentation must either be driven by the lifecycle equation or remain presentation-only until a lifecycle-safe stored-fragmentation design is approved. The renderer remains responsible for micro fracture and final crispness.
+This must affect Evaluated Foam Shape only.
 
-### Acceptance gate
+### Blocker 4 — Disturbance-driven morphology
 
-A manually-born patch observed over several seconds changes `Material Presence`, not only Final Foam. It should show clear macro change: altered curvature, different width distribution, local stretch/compression, and visible back-and-forth wobble/relaxation. The average occupied area should remain roughly stable before lifecycle/topology removal. It must not grow without bounds, snap, create new topology-painted material, or disappear independently of `Remaining Life`. This blocker is accepted as good enough for now after 5.5d.
+#### Goal
 
-## Blocker 2 — Final Foam surface coupling and clarity
+Reconnect pressure, lee, wake, ripple, and wave inputs as Stage 2 modifiers.
 
-### Symptom
+#### Correct behavior
 
-Material Presence now morphs acceptably, but Final Foam can still read as a flat white layer sliding over the water. After first surface coupling, the opposite problem also appears: fine water-surface/noise variation can contaminate the Foam interior and make the clean stylized white body look too granular.
+Foam should morph faster, break more, fray more, or deform more in active water while still allowing support/lifetime effects to remain Stage 1 lifecycle behavior.
 
-### Why it matters
+Disturbance does not directly move, destroy, or spawn foam.
 
-The reference reads as pale surface film attached to moving water, not paper floating over it and not noisy water texture painted on top of Foam. Intrinsic Foam morphology is necessary, but the final mask also needs controlled coupling to waves, pressure ridges, lee depressions, ripples, and wake energy.
+### Blocker 5 — Coherent deformation
 
-### Correct behavior
+#### Goal
 
-Final Foam may be visually warped, stretched, compressed, or edge-modulated by macro waves, static pressure, lee/depression, ripple gradients, disturbance velocity, and transported wake energy. Foam interiors should remain clean and mostly white: ordinary high-frequency water detail is suppressed, while strong surface peaks/valleys may show through at reduced strength. Render coupling itself must not create Foam or change lifecycle state; stored-state surface coupling is limited to the approved 5.7 morphology input.
+Add smooth, bounded inverse deformation inside Stage 2.
 
-### Implemented targets
+#### Correct behavior
 
-`4.11C.5.6 — Surface-Coupled Foam Rendering`
+Ribbons should bend, compress, narrow, and stretch visually as coherent shapes. Deformation must be smooth over multiple foam cells, bounded, gradient-limited, and non-persistent.
 
-`4.11C.5.6b — Foam Surface Clarity Filter`
+### Blocker 6 — Evaluated split/join behavior
 
-`4.11C.5.7 — Surface-Driven Material Morphing`
+#### Goal
 
-`4.11C.5.7b — Surface Morph Calibration`
+Add local evaluated breakup and reconnection.
 
-`4.11C.5.7c — Surface Morph Formula Rebalance`
+#### Correct behavior
 
-### Acceptance gate
+Ribbons may visually split, chip, fracture, and softly reconnect through Stage 2. This must not spawn persistent material or shred stored material.
 
-In Final Foam view, existing Foam visibly reacts to the same surface disturbances that move/shape the water while the body remains stylistically clean. In Material Presence view, stored material should show approved 5.7 surface-amplified morphology, but lifetime and population must remain unchanged. `Surface Morph Strength = 0` should remove the stored-state surface response. After 5.7c, `1` should be the normal readable authored response, `2` should read strong, and `3+` should be treated as overdrive/stress-test behavior rather than the expected operating point.
+### Blocker 7 — Real lateral transport redesign
 
-### Follow-up
+#### Goal
 
-5.7 now samples the same river surface/disturbance fields in the persistent material simulation and uses them only as a bounded morphology-strength/bias input. 5.7b adds a single calibration control for A/B testing. 5.7c rebalances the internal response curve so mid-strength disturbance values become visually meaningful at strength `1` while overdrive remains clamped. It must remain separate from birth, topology painting, and lifecycle authority.
+Rebuild Stage 1 lateral material movement after the evaluated shape layer is stable.
 
-## Completed Blocker 3/4 — Unified Foam Motion Field
+#### Correct behavior
 
-### Why 5.8 was superseded
+Lateral movement must move durable material coherently through the Motion Field. It must not use fractional row weighting or per-cell random stay/move decisions.
 
-`4.11C.5.8/5.8b/5.8c/5.8d` proved the right visual direction: stored `Material Presence` needs coherent, body-scale lateral movement instead of a stiff lane-locked strip or edge-only crawling. However, that implementation lived as a local chaotic drift resolver inside the persistent material morph function. It was hard to inspect directly, mixed macro body motion with meso/edge activity, and could not also solve obstacle routing without adding another competing steering path.
-
-The approved correction is not to tune the local drift path. The approved correction is to remove it as an active macro movement authority and replace it with one explicit, inspectable motion-field layer.
-
-### Implemented target
-
-`4.11C.5.9 — Unified Foam Motion Field`
-
-### Correct behavior
-
-The Foam Motion Field answers one question: `at this river/Foam position, which lateral direction should stored Foam material prefer?`
-
-The field is dense across valid river area. It should be red/orange or blue/cyan almost everywhere in its debug view, with black only where the generated lane field intentionally resolves near neutral/calm. It is not an activity mask and not an obstacle-only field.
-
-### Data model
-
-The implementation uses two separate logical fields because the dense lane field scrolls while obstacle routing must stay fixed in river space:
-
-- `PS3D_RiverFoam_MotionLane` / `_FoamMotionLane` stores one signed lateral lane value in `RHalf`: `-1` for left, `0` for neutral, `+1` for right. The lane generator is a denser layered/domain-warped fractal field rather than a small set of broad bands, so the debug view should read closer to a granular turbulent noise map split into two colours.
-- `PS3D_RiverFoam_ObstacleRouting` / `_FoamObstacleRouting` stores fixed obstacle override data in `RGHalf`: `R` is signed lateral routing direction, `G` is obstacle influence/override weight.
-
-A one-texture implementation was rejected because a valid version still needs two different sample coordinates: scrolled UV for the lane field and fixed UV for obstacle routing. Packing them would not reduce the actual simulation sample count and would make the two responsibilities easier to confuse.
-
-### Runtime performance contract
-
-Steady-state simulation cost is deliberately small:
-
-- two lane texture loads along X plus interpolation for smooth fractional scrolling;
-- one obstacle-routing texture load at the fixed coordinate;
-- no procedural multi-octave lane noise inside `SimulateFoam`;
-- no local obstacle search inside `SimulateFoam`;
-- no full-field rebuild because time passes;
-- no CPU Foam-cell loops;
-- no GPU readback.
-
-Lane evolution is a sample-coordinate phase scroll controlled by `Motion Field Scroll Hz`, not a rebuild rate.
-
-### Regeneration rules
-
-The dense lane field regenerates only when its inputs change: domain/dimensions, visual seed, neutral coverage, or lane scale.
-
-The obstacle-routing field regenerates only when obstacle/domain data changes. It is generated by grouping the existing obstacle exclusion cells into connected obstacle bodies, stamping one coherent lateral routing region per body, and then uploading the routing texture. It deliberately does not stamp per obstacle cell, because per-cell side choice creates left/right striping and indecisive routing around a single stone.
-
-### Controls
-
-The active controls under `Foam Debug > Material Motion` are:
-
-- `Motion Field Strength` — lateral macro field strength; `0` disables field-driven lateral movement, `1` is normal, higher values exaggerate.
-- `Motion Field Scroll Hz` — full downstream lane-field wraps per second; default `0.01`, meaning one full wrap every 100 seconds.
-- `Motion Field Neutral Coverage` — approximate fraction of the dense lane field that resolves to neutral/black; default `0.10`.
-- `Motion Field Lane Scale` — broadness/fineness of the generated lane pattern; changing it regenerates the lane texture only.
-
-The old `Chaotic Drift Strength` and `Chaotic Drift Rhythm` controls are removed from active code and UI.
-
-### Obstacle routing contract
-
-Obstacle routing is lateral-only. It must not produce upstream compression, downstream acceleration, radial repulsion, attraction, Foam death, Foam birth, or topology painting.
-
-Obstacle influence overrides the lane field near obstacles and blends only through its falloff edge:
-
-`finalLateral = lerp(laneLateral, obstacleLateral, obstacleInfluence)`
-
-Each obstacle body writes a longer, weaker upstream approach region so incoming Foam begins redirecting before contact. The near-obstacle region is stronger and reaches override authority. Direction is resolved relative to the whole obstacle body centerline, with a stable lane-informed tie-break only for centerline cases; neighboring cells inside the same rock must not alternate left/right.
-
-### Debug contract
-
-`Foam Motion Field` debug view shows the same fields sampled by the simulation:
-
-- blue/cyan = leftward lateral stored-material motion;
-- red/orange = rightward lateral stored-material motion;
-- black = intentional neutral/calm region;
-- green/yellow = obstacle override influence;
-- semi-transparent white = current Foam mask overlay.
-
-The debug view is required in Play Mode. It must not silently fall back to the final river render when selected.
-
-### Acceptance gate
-
-In Motion Field debug, most valid river area should show left/right directional colour, not black. Spawned Foam should appear as a translucent white overlay over the field. In Material Presence / Final validation, the broad Foam body should move laterally according to the field, obstacle regions should override the lane direction, Foam should begin weakly redirecting upstream of obstacles and route around them near contact, and there should be no upstream push, radial repulsion, compression stutter, hidden early death, or birth/topology changes.
-
-## Blocker 5 — Source shapes still need improvement
-
-### Symptom
-
-Manual birth is stable enough for testing, but it can still create source material that reads too broad, fat, or blob/ribbon-like for the intended final river Foam language.
-
-### Why it matters
-
-Final visual fragmentation cannot fully compensate for bad source geometry. Birth should not decide the final art species, but it does need to create usable initial source shapes for the persistent simulation to evolve.
-
-### Correct behavior
-
-Birth should create stable but usable source shapes such as thin downstream ribbons, broken sheets, forked bands, and smaller seeded clusters. It should not return to destructive birth-time randomness or hidden chip/slug/blob lotteries.
-
-### Next patch target
-
-`4.11C.5.10 — Better Manual Source Shape Spawning`
-
-### Acceptance gate
-
-Repeated starts with identical settings remain comparable, Amount remains source-fill semantics, and the source shape is better suited for downstream evolution without pretending to be the final visual beauty pass.
-
-## Blocker 6 — Topology proof and calibration still needed
-
-### Symptom
-
-The debug topology shows support and negative regions, but the visible material response is not yet proven clearly enough across typical test cases.
-
-### Why it matters
-
-Topology is the main reason Foam should persist in some places and open dark pockets in others. Better movement and better source shapes should make this easier to judge, but the support/negative aging contract still needs a focused proof pass.
-
-### Correct behavior
-
-Foam in positive support should survive and remain more coherent. Foam in negative aging pressure should thin, fragment, and die faster. Overlap should resolve according to the approved aging equation.
-
-### Next patch target
-
-`4.11C.5.11 — Topology Aging Proof and Calibration`
-
-### Acceptance gate
-
-Using the Foam + Aging Topology view and Final Foam view, the same material source must show a clear lifetime/shape difference when passing through neutral, supported, negative, and overlapping regions.
-
-## Recommended sequence
-
-1. Validate `4.11C.5.9l — Source-Owned Lateral Commit` in `Foam Motion Field`, `Material Presence`, and `Final Foam` views. Confirm the field is laterally coherent across Foam width, varies downstream, Foam overlays in white, lateral movement is body-scale relocation rather than smear/growth, obstacle routing overrides near obstacles, and no lifecycle/birth/topology ownership changed.
-2. `4.11C.5.10 — Better Manual Source Shape Spawning`
-3. `4.11C.5.11 — Topology Aging Proof and Calibration`
-4. `4.11C.5.12 — Final Foam Visual Fragmentation and Reference-Matching`
-
-Only after these pass should the project continue to automatic anchored/open-water birth population.
+Likely future direction: accumulated lateral phase/residual or an equivalent patch-coherent transport method.
 
 ## Deferred work
 
-Deferred until manual material is accepted:
+Deferred until manual material, evaluated shape, and transport are accepted:
 
-- anchored automatic birth events;
+- automatic anchored birth events;
 - open-water birth scheduling;
 - spatial fairness/population control;
-- mature Foam rendering polish / final visual fragmentation;
-- final reference-matching pass;
+- mature final Foam rendering polish;
 - production performance/regression closure.
+
+## Historical notes retained for context only
+
+The following patch families are historical and must not be treated as active architecture:
+
+- 5.5-5.7 stored-state morphing: useful visual proof, rejected implementation authority.
+- 5.8 local chaotic drift: proof that macro lateral motion is needed, rejected as hidden morph/movement authority.
+- 5.9j/5.9k/5.9l/5.9o lateral commit attempts: rejected because row-weight and per-cell commit variants smeared or shredded material.
+- 5.9m/5.9n persistent morph isolation/cleanup: accepted cleanup result.
+- 5.9p lateral commit disable: accepted stabilization result.
+- 5.9q dead-weight cleanup: accepted cleanup result.
+- 5.9r Foam Cell Grid debug view: accepted debug foundation.
 
 ## Maintenance rule
 
-This document should stay short. When a blocker is solved, move its result into a brief status line and continue. Do not paste long patch histories here.
-
-## 4.11C.5.9e obstacle routing correction note
-
-The 5.9 obstacle-routing field was corrected after debug validation. Obstacle influence is now collision-risk based rather than raw proximity based. Strong override is reserved for Foam on a likely collision course directly upstream of an obstacle. Foam beside an obstacle receives only low influence and should generally be carried downstream by phase transport. The routing field uses a rounded flow-relative envelope with weak upstream approach, strong direct-front collision correction, minimal side influence, and no downstream tail after the obstacle is cleared. Runtime simulation cost is unchanged: two lane loads plus one obstacle-routing load.
-
-## 4.11C.5.9f collision-shadow routing note
-
-After 5.9e, debug validation still showed outward/rectangular obstacle edges. The obstacle-routing stamp was tightened again so the override acts as an upstream collision shadow rather than a proximity envelope. Component bounds are only used as the iteration window. Written influence is narrow far upstream, grows toward the obstacle footprint near the leading edge, reaches full strength only for likely direct collision, stays minimal beside the obstacle, and releases almost immediately downstream. Runtime cost is unchanged.
-
-## 4.11C.5.9g obstacle shadow ramp note
-
-After 5.9f, validation showed the collision shadow was close but still had a small downstream residue, a visible dip right before the obstacle exclusion zone, and an approach ramp that started too strong. 5.9g removes the downstream tail, forces a strong direct-front contact band immediately before the obstacle footprint, and eases the upstream ramp so far-ahead routing starts weaker and becomes strong only near imminent collision. Runtime cost is unchanged.
-
-## 4.11C.5.9h field shape calibration note
-
-After 5.9g, validation showed two remaining debug-field content problems: the dense lane field could still form large same-direction bands, and the obstacle collision shadow could still soften right before the obstacle boundary. 5.9h changes only dirty-time field generation. The dense lane generator now uses stronger medium/high-frequency sign-flipping and breaker layers so red/blue direction changes are more granular. The obstacle-routing generator now assigns component ids during flood fill and uses row-specific obstacle leading edges so the shadow peaks at the last valid upstream cells instead of fading symmetrically at both ends. Runtime simulation cost remains unchanged: two lane loads plus one obstacle-routing load.
-
-## 4.11C.5.9i obstacle front-contact closure
-
-After 5.9h, debug validation showed the motion lane field was close enough for functional Foam tests and the obstacle shadow was mostly correct, but the front-contact region could stop one or two cells before the obstacle/negative topology boundary. 5.9i keeps the obstacle shadow position and extends only the direct-front contact band by one to two cells so collision-bound material receives continuous guidance right up to the blocked zone. It also applies a small cutoff to near-zero obstacle-routing influence to remove tiny stray sliver artifacts. The patch changes only dirty-time obstacle-routing texture generation. Runtime cost and ownership boundaries are unchanged.
-
-## 4.11C.5.9j motion-field material advection fix
-
-Functional testing after 5.9i showed the debug field was now sufficiently shaped, but stored Foam did not behave like moved material at practical strengths. At high Motion Field Strength, the Foam stretched and expanded in the field direction instead of relocating as a body. Code inspection found two causes: the motion field was sampled in stored texture coordinates while topology/debug were sampled at the visible phase-shifted coordinate, and the morph pass blended `currentPacked` with the advected source sample, preserving old cells while also filling the destination. 5.9j aligns motion-field sampling with `worldSampleCoordinate`, matching the topology/boundary/obstacle sampling space. It also changes the motion-field transport base to use the advected source sample directly instead of a current/advected union blend, and removes current-cell presence from the movement validity vote. The dense lane field no longer writes large exact-zero neutral areas; neutral coverage now produces very low-strength signed motion instead of hard lateral dead zones, avoiding abrupt stops without adding a stored momentum field. Runtime sample count remains unchanged: two lane-field loads plus one obstacle-routing load.
-
-## 4.11C.5.9k phase transport lateral commit
-
-Functional testing after 5.9j showed that moving the field sample inside the morph pass was still the wrong level of ownership. Foam could be influenced by the field, but it stretched and occupied the width of its current colour band because the movement was still a morphology/backtrace operation rather than a transport commit. 5.9k therefore moves macro lateral field motion into `CommitPhaseTransport`, the existing downstream material movement kernel. During each downstream commit, the destination cell gathers from the same source column and three candidate source rows. Each source candidate samples the dense lane plus obstacle-routing field at its visible phase-shifted coordinate and contributes according to its lateral landing row. This lets material actually relocate laterally during real downstream transport while keeping the operation bounded and avoiding atomics. `FoamApplyPersistentMaterialMorph` no longer samples the motion field for macro movement; it only performs local material morphology. The dense lane field also gets stronger downstream cross-cutting breakup and a higher minimum nonzero movement magnitude so Foam does not remain trapped in long same-sign ribbons or broad zero regions. This patch preserves lifecycle authority and does not add momentum state, extra textures, runtime obstacle search, or field rebuilds from scrolling.
-
-
-## 4.11C.5.9l source-owned lateral commit
-
-Functional testing after 5.9k showed that the ownership move was correct but the implementation still behaved like diffusion. Fractional row weighting meant each source cell could contribute part of itself to the old row and part to a neighbouring row. For broad Foam bodies, neighbouring rows refilled each other, so the visible result was mostly downstream travel, stretching, and occasional pulsing rather than true lateral traversal.
-
-5.9l keeps lateral macro movement inside `CommitPhaseTransport` and keeps the three-row destination gather, because a destination row must still ask whether source rows `y - 1`, `y`, or `y + 1` chose to land there. The change is that each source cell now makes one source-owned target-row decision per downstream commit: stay, shift left one row, or shift right one row. Fractional field strength is converted to deterministic per-source dither, not fractional material splitting. When multiple source rows converge, their packed material moments are merged with presence-weighted life/pattern averaging instead of blind sum-and-clamp corruption.
-
-The dense lane generator was also retuned as dirty-time data for more downstream variation and less across-width contradiction. It now uses anisotropic downstream-heavy octaves plus a small lateral smoothing pass, so one Foam body is less likely to receive conflicting row-by-row instructions while still seeing new left/right suggestions as it travels downstream. Runtime cost remains bounded: no momentum texture, no atomics/scatter pass, no runtime noise, no obstacle search, and no field rebuild from lane scrolling.
+Keep this document short and current. Do not turn it into a patch diary. Completed implementation detail belongs in the implementation log; canonical rules belong in `River_Foam_Stage6_Architecture.md`.

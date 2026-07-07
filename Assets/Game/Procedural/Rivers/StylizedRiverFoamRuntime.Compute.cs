@@ -69,12 +69,6 @@ namespace ProgrammaticStylized3D.Rivers
                 river.Domain.GlobalDistanceMinimum);
             computeShader.SetFloat("_FoamFieldLength", fieldLength);
             computeShader.SetFloat(
-                "_FoamFlowSpeed",
-                river.FlowSpeedMetresPerSecond *
-                river.LiquidFactor *
-                river.FoamMaterialFlowSpeedMultiplier *
-                river.FlowDirection);
-            computeShader.SetFloat(
                 "_FoamFlowDirection",
                 river.FlowDirection);
             computeShader.SetFloat(
@@ -91,9 +85,6 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamPresenceMetricThreshold",
                 PresenceMetricThreshold);
-            computeShader.SetFloat(
-                "_FoamSurfaceMorphStrength",
-                river.FoamSurfaceMorphStrength);
             computeShader.SetFloat(
                 "_FoamMotionFieldStrength",
                 river.FoamMotionFieldStrength);

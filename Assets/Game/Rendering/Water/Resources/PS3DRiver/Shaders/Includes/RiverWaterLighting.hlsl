@@ -163,22 +163,6 @@ RiverWaterLightingResult RiverWaterEvaluateLighting(
     return result;
 }
 
-float3 RiverWaterResolveBodyLighting(
-    RiverWaterLightingResult lighting,
-    float lightDependence,
-    float minimumNightVisibility)
-{
-    float3 responsiveLighting =
-        max(
-            lighting.combined,
-            max(0.0, minimumNightVisibility).xxx);
-
-    return lerp(
-        1.0.xxx,
-        responsiveLighting,
-        saturate(lightDependence));
-}
-
 float3 RiverWaterResolveBodyLightingWithMainShadowPolicy(
     RiverWaterLightingResult lighting,
     float lightDependence,

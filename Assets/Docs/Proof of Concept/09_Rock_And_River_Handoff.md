@@ -1,5 +1,9 @@
 # Rock And River Refactor Handoff
 
+> **River Foam supersession notice — 2026-07-07**
+>
+> This handoff is historical for earlier rock/river refactor context. Any river Foam architecture, static-foam, morphing, lateral motion, or rendering responsibility statement in this document is superseded by `Docs/River_Foam_Stage6_Architecture.md` and `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`. Use those documents as the active Foam source of truth.
+
 ## Purpose
 
 This document is a refactor-grade handoff for the current generated-rock and river files requested from the workspace.

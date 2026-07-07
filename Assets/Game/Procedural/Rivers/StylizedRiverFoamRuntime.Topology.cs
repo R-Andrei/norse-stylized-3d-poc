@@ -548,9 +548,6 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat("_FoamFieldLength", fieldLength);
             computeShader.SetFloat("_FoamDeltaTime", deltaTime);
             computeShader.SetFloat(
-                "_FoamFlowSpeed",
-                river.FlowSpeedMetresPerSecond * river.LiquidFactor);
-            computeShader.SetFloat(
                 "_FoamFlowDirection",
                 river.FlowDirection);
             computeShader.SetFloat(

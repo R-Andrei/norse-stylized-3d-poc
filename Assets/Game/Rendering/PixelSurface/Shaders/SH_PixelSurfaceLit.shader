@@ -891,13 +891,13 @@ Shader "PS3D/Pixel Surface Lit"
             float ResolveGeneratedMassAtlasEdgeWearMask(Varyings input)
             {
                 float4 atlas0 = ResolveGeneratedMassFeatureAtlas0(input);
-                return saturate(atlas0.r * atlas0.g);
+                return saturate(atlas0.r);
             }
 
             float ResolveGeneratedMassAtlasCreaseMask(Varyings input)
             {
                 float4 atlas0 = ResolveGeneratedMassFeatureAtlas0(input);
-                return saturate(atlas0.b * atlas0.a);
+                return saturate(atlas0.g);
             }
 
             half3 ApplyGeneratedMassEdgeWearResponse(
@@ -916,10 +916,15 @@ Shader "PS3D/Pixel Surface Lit"
 
                 float4 atlas0 = ResolveGeneratedMassFeatureAtlas0(input);
                 float4 atlas1 = ResolveGeneratedMassFeatureAtlas1(input);
-                float convexProximity = saturate(atlas0.r);
-                float convexWeight = saturate(atlas0.g);
 
-                if (convexProximity <= 0.0001 || convexWeight <= 0.0001)
+                // FeatureAtlas0 is the generic Boundary Structure Atlas:
+                // R = convex boundary proximity, G = concave boundary proximity,
+                // B = dominant boundary salience, A = dominant boundary identity.
+                float convexProximity = saturate(atlas0.r);
+                float boundarySalience = saturate(atlas0.b);
+                float boundaryIdentity = saturate(atlas0.a);
+
+                if (convexProximity <= 0.0001)
                 {
                     return albedo;
                 }
@@ -928,65 +933,58 @@ Shader "PS3D/Pixel Surface Lit"
                 float microVariation = saturate(_GeneratedMassEdgeWearMicroVariation);
                 float atlas1Enabled = step(0.5, _GeneratedMassFeatureAtlas1Enabled);
 
-                // Patch 14D.3: Atlas0 remains semantic boundary data.
-                // Atlas1 is a generated visual-irregularity layer using the
-                // same surface charts: R = amplitude variation, G = width/smear
-                // variation, B = continuity/chip-thinning variation. The shader
-                // still performs only cheap sampling/ALU at runtime.
-                float amplitudeVariation = lerp(0.5, saturate(atlas1.r), atlas1Enabled);
-                float widthVariation = lerp(0.5, saturate(atlas1.g), atlas1Enabled);
-                float continuityVariation = lerp(0.72, saturate(atlas1.b), atlas1Enabled);
+                // FeatureAtlas1 is the generic Boundary Coordinate/Modulation Atlas:
+                // R = along-boundary phase, G = side-aware cross-boundary coordinate,
+                // B = coarse boundary-local modulation, A = fine boundary-local modulation.
+                // The current edge-wear response intentionally keeps its shape driven by
+                // convex proximity; Atlas1.G is reserved for diagnostic/future asymmetric
+                // feature interpretation and is not treated as a falloff field.
+                float alongPhase = lerp(0.5, saturate(atlas1.r), atlas1Enabled);
+                float coarseModulation = lerp(0.5, saturate(atlas1.b), atlas1Enabled);
+                float fineModulation = lerp(0.5, saturate(atlas1.a), atlas1Enabled);
 
-                // Macro Variation is strictly inter-edge variation. At 0, all
-                // eligible ridges keep comparable strength. At 1, the baked
-                // convex ridge importance field is mapped aggressively so weak
-                // eligible ridges visibly recede while important ridges remain
-                // pronounced. Do not feed same-ridge noise or width variation
-                // into this path; that belongs to Micro Variation below.
-                float ridgeEligibility = smoothstep(0.025, 0.12, convexWeight);
-                float macroImportance = smoothstep(0.12, 0.92, convexWeight);
-                float weightedRidge = lerp(0.06, 1.55, pow(macroImportance, 1.85));
-                float macroWeight = ridgeEligibility * lerp(1.0, weightedRidge, macroVariation);
+                // Macro Variation is strictly inter-edge. At zero it does nothing;
+                // at one it maps stable boundary identity plus structural salience
+                // into a per-boundary multiplier. It must not introduce same-edge
+                // noise or width wobble.
+                float salienceWeight = smoothstep(0.05, 0.95, boundarySalience);
+                float identityWeight = smoothstep(0.08, 0.92, boundaryIdentity);
+                float macroSource = saturate(identityWeight * 0.72 + salienceWeight * 0.28);
+                float macroMultiplier = lerp(1.0, lerp(0.08, 1.0, macroSource), macroVariation);
 
-                float broadNoise = ResolveGeneratedMassSoftPatchNoise(input, 0.42, 271.0);
-                float fineNoise = ResolveGeneratedMassPatchNoise(input, 3.15, 349.0);
-
-                // Micro Variation should change the shape of the visible mask,
-                // not only the final brightness. Width variation shifts apparent
-                // proximity; continuity variation preserves the ridge core while
-                // allowing the shoulder to thin, smear, or fade irregularly.
-                float widthOffset = (widthVariation - 0.5) * 0.74 * microVariation;
-                float shapedProximity = saturate(convexProximity + widthOffset);
-
-                float ridgeCore = smoothstep(0.80, 0.995, shapedProximity);
-                float shoulderPower = lerp(1.95, 0.88, widthVariation);
-                float ridgeShoulder = pow(saturate(shapedProximity), shoulderPower);
-                float outerFade = smoothstep(0.018, lerp(0.18, 0.54, widthVariation), shapedProximity);
-
-                float continuityKeep = lerp(0.26, 1.18, continuityVariation);
-                float shoulderKeep = lerp(1.0, saturate(continuityKeep + shapedProximity * 0.42), microVariation);
-                float coreKeep = lerp(1.0, lerp(0.72, 1.10, continuityVariation), microVariation * 0.40);
-
-                float ridgeShape = saturate(
-                    ridgeCore * coreKeep * 0.76 +
-                    ridgeShoulder * outerFade * shoulderKeep * 0.46);
-
+                // Micro Variation is strictly intra-edge. It interprets generic
+                // boundary-local modulation as local opacity/width variation along
+                // the same ridge, while leaving inter-edge selection to Macro.
                 float localAmplitude = lerp(
                     1.0,
-                    lerp(0.26, 1.62, amplitudeVariation),
+                    lerp(0.32, 1.44, coarseModulation),
                     microVariation);
-                float fineMottle = lerp(
+                float localSpread = lerp(
+                    0.0,
+                    (fineModulation - 0.5) * 0.56,
+                    microVariation);
+
+                float shapedProximity = saturate(convexProximity + localSpread);
+                float ridgeCore = smoothstep(0.80, 0.995, shapedProximity);
+                float ridgeShoulder = pow(saturate(shapedProximity), lerp(1.82, 0.92, fineModulation));
+                float outerFade = smoothstep(0.018, lerp(0.22, 0.56, fineModulation), shapedProximity);
+
+                float phaseNoise = lerp(
                     1.0,
-                    lerp(0.82, 1.10, fineNoise) * lerp(0.92, 1.08, broadNoise),
-                    microVariation * 0.38);
+                    lerp(0.90, 1.10, sin((alongPhase * 6.2831853 + boundaryIdentity * 3.17)) * 0.5 + 0.5),
+                    microVariation * 0.22);
+
+                float ridgeShape = saturate(
+                    ridgeCore * 0.76 +
+                    ridgeShoulder * outerFade * 0.46);
 
                 float responseGain = responseStrength * lerp(1.0, 1.85, responseStrength);
                 float edgeMask = saturate(
                     ridgeShape *
-                    macroWeight *
+                    macroMultiplier *
                     responseGain *
                     localAmplitude *
-                    fineMottle);
+                    phaseNoise);
 
                 if (edgeMask <= 0.0001)
                 {
@@ -1023,7 +1021,7 @@ Shader "PS3D/Pixel Surface Lit"
                     return half3(-1.0h, -1.0h, -1.0h);
                 }
 
-                if (mode == 4 || mode == 17)
+                if (mode == 4)
                 {
                     float mask = ResolveGeneratedMassAtlasEdgeWearMask(input);
 
@@ -1033,9 +1031,31 @@ Shader "PS3D/Pixel Surface Lit"
                         mask);
                 }
 
-                if (mode == 5 || mode == 20)
+                if (mode == 17)
+                {
+                    float4 atlas0 = ResolveGeneratedMassFeatureAtlas0(input);
+                    float mask = saturate(atlas0.r * atlas0.b);
+
+                    return (half3)lerp(
+                        float3(0.025, 0.025, 0.035),
+                        float3(1.0, 0.92, 0.55),
+                        mask);
+                }
+
+                if (mode == 5)
                 {
                     float mask = ResolveGeneratedMassAtlasCreaseMask(input);
+
+                    return (half3)lerp(
+                        float3(0.025, 0.025, 0.035),
+                        float3(0.20, 0.36, 1.0),
+                        mask);
+                }
+
+                if (mode == 20)
+                {
+                    float4 atlas0 = ResolveGeneratedMassFeatureAtlas0(input);
+                    float mask = saturate(atlas0.g * atlas0.b);
 
                     return (half3)lerp(
                         float3(0.025, 0.025, 0.035),
@@ -1066,7 +1086,7 @@ Shader "PS3D/Pixel Surface Lit"
                     float4 atlas0 = ResolveGeneratedMassFeatureAtlas0(input);
                     return (half3)lerp(
                         float3(0.025, 0.025, 0.035),
-                        float3(0.20, 0.36, 1.0),
+                        float3(1.0, 0.78, 0.28),
                         saturate(atlas0.b));
                 }
 
@@ -1075,7 +1095,7 @@ Shader "PS3D/Pixel Surface Lit"
                     float4 atlas0 = ResolveGeneratedMassFeatureAtlas0(input);
                     return (half3)lerp(
                         float3(0.025, 0.025, 0.035),
-                        float3(1.0, 0.35, 0.95),
+                        float3(0.85, 0.45, 1.0),
                         saturate(atlas0.a));
                 }
 
@@ -1108,11 +1128,18 @@ Shader "PS3D/Pixel Surface Lit"
 
                 if (mode == 24)
                 {
+                    float4 atlas0 = ResolveGeneratedMassFeatureAtlas0(input);
                     float4 atlas1 = ResolveGeneratedMassFeatureAtlas1(input);
+                    float boundaryPresence = saturate(max(atlas0.r, atlas0.g));
+                    float cross = saturate(atlas1.g);
+                    float sideAmount = saturate(abs(cross - 0.5) * 2.0) * boundaryPresence;
+                    float3 negativeSide = float3(0.22, 0.42, 1.0);
+                    float3 positiveSide = float3(1.0, 0.46, 0.22);
+                    float3 sideColour = lerp(negativeSide, positiveSide, step(0.5, cross));
                     return (half3)lerp(
                         float3(0.025, 0.025, 0.035),
-                        float3(0.35, 0.90, 1.0),
-                        saturate(atlas1.g));
+                        sideColour,
+                        sideAmount);
                 }
 
                 if (mode == 25)
@@ -1122,6 +1149,15 @@ Shader "PS3D/Pixel Surface Lit"
                         float3(0.025, 0.025, 0.035),
                         float3(0.82, 0.55, 1.0),
                         saturate(atlas1.b));
+                }
+
+                if (mode == 26)
+                {
+                    float4 atlas1 = ResolveGeneratedMassFeatureAtlas1(input);
+                    return (half3)lerp(
+                        float3(0.025, 0.025, 0.035),
+                        float3(0.55, 0.82, 1.0),
+                        saturate(atlas1.a));
                 }
 
                 float mask = 0.0;

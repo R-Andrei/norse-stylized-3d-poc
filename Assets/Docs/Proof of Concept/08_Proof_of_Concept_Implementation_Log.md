@@ -4,9 +4,9 @@ title: "Proof of Concept Implementation Log"
 version: 0.2
 status: working-log
 scope: proof-of-concept
-authoritative_for: "current Unity implementation state, provisional decisions, known limitations, implemented filenames and functions, and the next continuation point"
+authoritative_for: "chronological implementation history; current state only in latest entries and canonical architecture docs"
 related_documents: [PS3D-06, PS3D-07, PS3D-09, PS3D-10]
-last_updated: 2026-06-22
+last_updated: 2026-07-07
 ---
 
 # Proof of Concept Implementation Log
@@ -14,6 +14,10 @@ last_updated: 2026-06-22
 ## Purpose
 
 Record enough implementation detail to resume work without reconstructing decisions from conversation history.
+
+## Current-state reading rule
+
+This is a chronological log. Older entries record what was implemented or believed at that time. For active River Foam architecture, use `Docs/River_Foam_Stage6_Architecture.md` first and `Docs/River_Foam_Active_Blockers_and_Next_Patches.md` second. Any older log entry implying active stored-state morphing, active lateral row commit, active field-driven lateral material movement, or final shader macro stretch as intended Foam behavior is superseded.
 
 ---
 
@@ -876,9 +880,9 @@ A new `Foam Motion Field` debug view is added. In Play Mode it shows the same te
 - red/orange = rightward stored-material motion;
 - black = intentional neutral/calm lane value;
 - green/yellow = obstacle override influence;
-- semi-transparent white = current Foam mask overlay.
+- semi-transparent white = raw stored Material Presence overlay, not final Foam mask.
 
-This debug view is intended to be dense. Most of the valid river should be red/orange or blue/cyan. Mostly black output means the field generation or binding is wrong, not merely a tuning preference. Spawned Foam should remain visible as a translucent white overlay so field direction and actual material can be validated together.
+This debug view is intended to be dense. Most of the valid river should be red/orange or blue/cyan. Mostly black output means the field generation or binding is wrong, not merely a tuning preference. Spawned Foam should remain visible as a translucent white raw-presence overlay so field direction and stored material can be validated together without final-mask warp/stretch contamination.
 
 ### Preserved ownership boundaries
 
@@ -953,11 +957,87 @@ Functional testing after 5.9j showed that Foam still expanded/stretched sideways
 
 The morphology pass no longer samples the motion field for macro lateral movement. It remains responsible for local wobble/reconfiguration and continues to respect the lifecycle contract: Remaining Life owns death, topology owns support/negative aging, and birth creates stable source material only. The dense lane field also receives additional downstream cross-cutting breakup and a higher minimum weak-motion magnitude so Foam advancing downstream is less likely to stay inside one long same-colour ribbon or encounter hard zero-motion strips. No momentum texture, extra field texture, runtime obstacle search, or field rebuild from scrolling was added.
 
+## 2026-07-06 — River Foam 4.11C.5.9m transport diagnostic isolation
 
-## 2026-07-06 — River Foam 4.11C.5.9l source-owned lateral commit
+Validation after 5.9l showed no reliable lateral material movement: Foam still appeared to pulse and stretch downstream in the Foam Motion Field view. The audit found that the debug view itself was not a clean material diagnostic because it overlaid final `foam.mask`, which includes render-only surface warp and lead/trail stretch. The audit also found that `FoamApplyPersistentMaterialMorph` still spatially resampled neighbouring persistent material every simulation tick, meaning the simulation had a second stored-state deformation path running immediately after phase transport.
 
-After 5.9k, functional testing showed that moving lateral motion into `CommitPhaseTransport` was the correct ownership decision, but the fractional row-weight implementation still did not produce readable lateral material relocation. Each source could contribute a percentage of its packed material to the old row and a percentage to the adjacent row. For a broad Foam body, neighbouring rows then continuously refilled each other, which read as diffusion, stretch, or downstream pulsing rather than actual traversal across the motion field.
+5.9m makes two narrow diagnostic changes. First, Foam Motion Field debug now overlays raw stored `Material Presence` from `foam.presence` instead of final `foam.mask`. Second, the persistent morph function now bypasses stored-state spatial resampling and returns the current packed material state clipped to valid fluid; Remaining Life aging still happens in the caller, and final Foam rendering can still apply presentation-only mask breakup/warp. No birth, topology, obstacle routing, lane generation, phase transport, inspector controls, or final normal rendering behavior was changed.
 
-5.9l keeps the destination-owned three-row gather but changes the source contribution rule. Each candidate source cell now samples the Unified Foam Motion Field, clamps the per-commit lateral intent below one row, then chooses one target row: stay, shift left, or shift right. Fractional motion strength becomes deterministic source-owned dither rather than fractional Presence splitting. The commit merge was also made packed-state aware, so converging rows average Remaining Life and Material Pattern by contribution presence instead of corrupting moments through blind sum-and-clamp.
+The validation goal is now binary: if raw Material Presence moves laterally, the previous failure was caused by morph/debug contamination; if raw Material Presence still does not move laterally while phase commit telemetry is nonzero, the remaining bug is inside the phase-transport/motion-field sampling path.
 
-The dense lane generator was retuned to support this transport model. It now uses downstream-heavy anisotropic noise plus a small lateral smoothing pass, reducing contradictory row-by-row instructions across one Foam body while preserving direction changes along downstream travel. The lane field signature was versioned so the new dirty-time field rebuilds. The patch does not add momentum state, atomics, scatter writes, runtime obstacle search, runtime procedural noise, extra textures, birth changes, topology changes, or lifecycle changes.
+
+## 2026-07-06 — River Foam 4.11C.5.9n persistent morph cleanup
+
+After the 5.9m isolation patch, the remaining cleanup target was the stale persistent morph machinery itself. The audit showed that the old stored-state morph helpers were no longer active after the bypass, but they still existed in `CS_RiverFoam.Simulation.hlsl` and could be reconnected accidentally. 5.9n removes that dead neighbour-resampling machinery and replaces the old morph function with `FoamPreservePersistentMaterialState`, which clamps current packed material and clips it to valid fluid only.
+
+The unused `Surface Morph Strength` control and compute binding were also removed because persistent stored-state surface morphing is no longer an active layer. At the time of 5.9n, this patch did not change phase transport, lane generation, obstacle routing, topology, birth, lifecycle math, or final shader presentation. The then-active source-owned lateral row commit was later rejected and disabled by 5.9p after validation showed it shredded foam at cell scale. The durable result from 5.9n is only the persistent morph cleanup: persistent simulation preserves/clips/ages material and no longer owns morphology.
+
+---
+
+## 2026-07-07 — River Foam 4.11C.5.9p Disable Lateral Commit Shredder
+
+Validation after restoring source-owned lateral row commit showed that the upstream/downstream pulsing was reduced, but the foam still fragmented violently into many small ribbons. The source was the per-texel lateral row-shift decision inside phase transport. Each stored foam texel independently decided whether to stay or move laterally, which shredded visible foam patches at cell scale instead of moving them coherently.
+
+5.9p disables the lateral row-shift path entirely and restores phase transport to downstream-only material movement. This removes the active shredder. It intentionally leaves real lateral material transport missing for now.
+
+Accepted result:
+
+- violent lateral commit tearing stops;
+- downstream phase transport remains active;
+- persistent morph cleanup remains active;
+- Motion Field remains generated/debug-visible but does not move stored material.
+
+## 2026-07-07 — River Foam 4.11C.5.9q Dead Weight Cleanup
+
+Removed only confirmed dead weight:
+
+- `_FoamFlowSpeed` compute uniform and C# bindings;
+- unused `RiverWaterResolveFoamColour(...)` helper;
+- unused `RiverWaterResolveBodyLighting(...)` helper.
+
+Kept intact:
+
+- Material Flow Speed / `FoamMaterialFlowSpeedMultiplier` downstream transport behavior;
+- Foam Colour inspector control and active filtered colour path;
+- river lighting controls and active shadow-policy body-lighting path;
+- motion-field infrastructure;
+- disturbance/static/dynamic field infrastructure.
+
+## 2026-07-07 — River Foam 4.11C.5.9r Foam Cell Grid Debug View
+
+Added a Foam Motion Field + Cell Grid debug view.
+
+The new view shows:
+
+- Motion Field background;
+- obstacle-routing influence;
+- raw stored Foam `Presence` overlay;
+- actual persistent foam simulation cell/grid boundaries.
+
+This is a diagnostic tool only. It does not alter simulation, transport, morphology, disturbance, or rendering behavior.
+
+## 2026-07-07 — River Foam Architecture Contract Reset
+
+The Stage 6 Foam docs were rewritten around the new canonical contract:
+
+```text
+Two foam data products:
+  Persistent Foam State
+  Evaluated Foam Shape
+
+Three processing stages:
+  Stage 1 — Persistent State Update
+  Stage 2 — Shape Evaluation
+  Stage 3 — Rendering
+```
+
+Important current truth:
+
+- Stage 1 owns birth, transport, lifecycle, and clipping.
+- Stage 2 will own coherent deformation, morphology, breakup, and disturbance-reactive visible shape animation.
+- Stage 3 owns colour, lighting, opacity, blending, and small final polish.
+- Motion Field, Disturbance Fields, and Topology/Support Fields are inputs, not independent foam mutators.
+- Desired reference-river tearing belongs to Stage 2 evaluated shape behavior.
+- The previous broken tearing was persistent material shredded by cell-scale transport and remains rejected.
+
+Superseded historical entries in this log remain as history only. Any old entry implying active stored-state morphing, active lateral row commit, active field-driven lateral material movement, or final shader macro stretch as the intended Foam behavior is superseded by `River_Foam_Stage6_Architecture.md`.

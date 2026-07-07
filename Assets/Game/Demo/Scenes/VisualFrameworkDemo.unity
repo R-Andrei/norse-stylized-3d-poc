@@ -8254,12 +8254,12 @@ MonoBehaviour:
   edgeWearWidth: 0.652
   edgeWearCoverage: 2
   edgeWearSoftness: 0.851
-  edgeWearResponseStrength: 0.15
-  edgeWearBrightnessLift: 0.109
+  edgeWearResponseStrength: 0.45
+  edgeWearBrightnessLift: 0.117
   edgeWearTint: {r: 0.7, g: 0.69, b: 0.62, a: 1}
   edgeWearTintStrength: 0
-  edgeWearMacroVariation: 1
-  edgeWearMicroVariation: 1
+  edgeWearMacroVariation: 0.856
+  edgeWearMicroVariation: 0.937
   creaseAmount: 1
   creaseWidth: 1
   creaseLength: 1
@@ -9194,7 +9194,7 @@ MonoBehaviour:
   foamMaterialLifecycleTuningVersion: 1
   foamSurfaceMorphCalibrationVersion: 1
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}
-  foamDebugView: 0
+  foamDebugView: 5
   foamSpawnDistanceNormalized: 0.599
   foamSpawnAcrossNormalized: 0.125
   foamSpawnScale: 0.375

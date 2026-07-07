@@ -25,19 +25,20 @@ namespace ProgrammaticStylized3D.Rendering
         GroundRockyDry = 13,
         GroundCombined = 14,
 
-        // GeneratedMass FeatureAtlas0 channel diagnostics. These are
+        // GeneratedMass generic boundary-atlas diagnostics. These are
         // intentionally placed after the ground debug modes so existing
         // serialized GeneratedMass debug values 0-6 remain stable.
-        ConvexRidgeProximity = 15,
-        ConvexRidgeWeight = 16,
-        ConvexRidgeComposite = 17,
-        ConcaveCreaseProximity = 18,
-        ConcaveCreaseWeight = 19,
-        ConcaveCreaseComposite = 20,
+        ConvexBoundaryProximity = 15,
+        ConcaveBoundaryProximity = 16,
+        ConvexBoundarySalienceComposite = 17,
+        BoundarySalience = 18,
+        BoundaryIdentity = 19,
+        ConcaveBoundarySalienceComposite = 20,
         BoundaryFieldDiagnostic = 21,
-        EdgeWearIrregularity = 22,
-        EdgeWearAmplitudeVariation = 23,
-        EdgeWearWidthVariation = 24,
-        EdgeWearContinuityVariation = 25
+        BoundaryModulationDiagnostic = 22,
+        BoundaryAlongCoordinate = 23,
+        BoundaryCrossCoordinate = 24,
+        BoundaryCoarseModulation = 25,
+        BoundaryFineModulation = 26
     }
 }

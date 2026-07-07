@@ -107,6 +107,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 PatchB = -1;
                 Score = 0f;
                 ChainIndex = -1;
+                ChainDistanceAtStart = 0f;
+                ChainDistanceAtEnd = 0f;
             }
 
             public int Index { get; }
@@ -121,6 +123,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int PatchB { get; internal set; }
             public float Score { get; internal set; }
             public int ChainIndex { get; internal set; }
+            public float ChainDistanceAtStart { get; internal set; }
+            public float ChainDistanceAtEnd { get; internal set; }
         }
 
         public sealed class BoundaryChain
@@ -131,12 +135,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Kind = kind;
                 BoundaryIndices = new List<int>();
                 Length = 0f;
+                AverageScore = 0f;
+                Salience = 0f;
             }
 
             public int Index { get; }
             public MassSurfaceBoundaryKind Kind { get; }
             public List<int> BoundaryIndices { get; }
             public float Length { get; internal set; }
+            public float AverageScore { get; internal set; }
+            public float Salience { get; internal set; }
         }
 
         public sealed class Patch
@@ -582,33 +590,65 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             bool[] visited = new bool[boundaries.Count];
-            Queue<int> queue = new();
+
+            // Trace open paths first. Endpoints and junctions intentionally split
+            // chains so boundary-local coordinates do not smear across unrelated
+            // ridge/crease branches at a corner.
             for (int i = 0; i < boundaries.Count; i++)
             {
-                Boundary seed = boundaries[i];
-                if (visited[i] || !CanChainBoundary(seed))
+                Boundary boundary = boundaries[i];
+                if (visited[i] || !CanChainBoundary(boundary))
                 {
                     continue;
                 }
 
-                BoundaryChain chain = new(chains.Count, seed.Kind);
-                chains.Add(chain);
-                visited[i] = true;
-                queue.Enqueue(i);
+                PositionKey startKey = new(boundary.Start);
+                PositionKey endKey = new(boundary.End);
+                bool startBreak = CountEndpointBoundaries(
+                    byEndpoint,
+                    startKey,
+                    boundaries,
+                    boundary.Kind) != 2;
+                bool endBreak = CountEndpointBoundaries(
+                    byEndpoint,
+                    endKey,
+                    boundaries,
+                    boundary.Kind) != 2;
 
-                while (queue.Count > 0)
+                if (!startBreak && !endBreak)
                 {
-                    int boundaryIndex = queue.Dequeue();
-                    Boundary boundary = boundaries[boundaryIndex];
-                    boundary.ChainIndex = chain.Index;
-                    chain.BoundaryIndices.Add(boundaryIndex);
-                    chain.Length += Mathf.Max(0f, boundary.Length);
-
-                    EnqueueBoundaryNeighbors(boundary.Start, boundary.Kind, boundaries, byEndpoint, visited, queue);
-                    EnqueueBoundaryNeighbors(boundary.End, boundary.Kind, boundaries, byEndpoint, visited, queue);
+                    continue;
                 }
+
+                TraceBoundaryChain(
+                    boundaries,
+                    byEndpoint,
+                    visited,
+                    chains,
+                    i,
+                    startBreak ? startKey : endKey);
             }
 
+            // Remaining boundaries are closed loops. Trace them from their stable
+            // stored start endpoint so the coordinate field remains deterministic.
+            for (int i = 0; i < boundaries.Count; i++)
+            {
+                Boundary boundary = boundaries[i];
+                if (visited[i] || !CanChainBoundary(boundary))
+                {
+                    continue;
+                }
+
+                TraceBoundaryChain(
+                    boundaries,
+                    byEndpoint,
+                    visited,
+                    chains,
+                    i,
+                    new PositionKey(boundary.Start));
+            }
+
+            ResolveBoundaryChainSalience(chains, boundaries);
             return chains;
         }
 
@@ -631,35 +671,187 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             indices.Add(boundaryIndex);
         }
 
-        private static void EnqueueBoundaryNeighbors(
-            Vector3 endpoint,
-            MassSurfaceBoundaryKind kind,
+        private static int CountEndpointBoundaries(
+            Dictionary<PositionKey, List<int>> byEndpoint,
+            PositionKey endpoint,
+            List<Boundary> boundaries,
+            MassSurfaceBoundaryKind kind)
+        {
+            if (!byEndpoint.TryGetValue(endpoint, out List<int> indices))
+            {
+                return 0;
+            }
+
+            int count = 0;
+            for (int i = 0; i < indices.Count; i++)
+            {
+                Boundary boundary = boundaries[indices[i]];
+                if (boundary.Kind == kind && CanChainBoundary(boundary))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static void TraceBoundaryChain(
             List<Boundary> boundaries,
             Dictionary<PositionKey, List<int>> byEndpoint,
             bool[] visited,
-            Queue<int> queue)
+            List<BoundaryChain> chains,
+            int seedBoundaryIndex,
+            PositionKey entryEndpoint)
         {
-            if (!byEndpoint.TryGetValue(new PositionKey(endpoint), out List<int> neighbors))
+            Boundary seed = boundaries[seedBoundaryIndex];
+            BoundaryChain chain = new(chains.Count, seed.Kind);
+            chains.Add(chain);
+
+            int currentIndex = seedBoundaryIndex;
+            PositionKey currentEntry = entryEndpoint;
+            float distance = 0f;
+
+            while (currentIndex >= 0 && !visited[currentIndex])
             {
-                return;
+                Boundary boundary = boundaries[currentIndex];
+                if (!CanChainBoundary(boundary) || boundary.Kind != chain.Kind)
+                {
+                    break;
+                }
+
+                visited[currentIndex] = true;
+                boundary.ChainIndex = chain.Index;
+                chain.BoundaryIndices.Add(currentIndex);
+
+                PositionKey startKey = new(boundary.Start);
+                PositionKey endKey = new(boundary.End);
+                bool enteredAtStart = startKey.Equals(currentEntry) || !endKey.Equals(currentEntry);
+                PositionKey exitKey = enteredAtStart ? endKey : startKey;
+                float nextDistance = distance + Mathf.Max(0f, boundary.Length);
+
+                if (enteredAtStart)
+                {
+                    boundary.ChainDistanceAtStart = distance;
+                    boundary.ChainDistanceAtEnd = nextDistance;
+                }
+                else
+                {
+                    boundary.ChainDistanceAtStart = nextDistance;
+                    boundary.ChainDistanceAtEnd = distance;
+                }
+
+                distance = nextDistance;
+
+                if (CountEndpointBoundaries(
+                        byEndpoint,
+                        exitKey,
+                        boundaries,
+                        chain.Kind) != 2)
+                {
+                    break;
+                }
+
+                int nextIndex = FindNextBoundaryAtEndpoint(
+                    byEndpoint,
+                    exitKey,
+                    boundaries,
+                    visited,
+                    chain.Kind);
+                if (nextIndex < 0)
+                {
+                    break;
+                }
+
+                currentEntry = exitKey;
+                currentIndex = nextIndex;
             }
 
-            for (int i = 0; i < neighbors.Count; i++)
+            chain.Length = Mathf.Max(0.0001f, distance);
+        }
+
+        private static int FindNextBoundaryAtEndpoint(
+            Dictionary<PositionKey, List<int>> byEndpoint,
+            PositionKey endpoint,
+            List<Boundary> boundaries,
+            bool[] visited,
+            MassSurfaceBoundaryKind kind)
+        {
+            if (!byEndpoint.TryGetValue(endpoint, out List<int> indices))
             {
-                int neighborIndex = neighbors[i];
-                if (visited[neighborIndex])
+                return -1;
+            }
+
+            int bestIndex = -1;
+            for (int i = 0; i < indices.Count; i++)
+            {
+                int boundaryIndex = indices[i];
+                if (visited[boundaryIndex])
                 {
                     continue;
                 }
 
-                Boundary neighbor = boundaries[neighborIndex];
-                if (neighbor.Kind != kind || !CanChainBoundary(neighbor))
+                Boundary boundary = boundaries[boundaryIndex];
+                if (boundary.Kind != kind || !CanChainBoundary(boundary))
                 {
                     continue;
                 }
 
-                visited[neighborIndex] = true;
-                queue.Enqueue(neighborIndex);
+                if (bestIndex < 0 || boundaryIndex < bestIndex)
+                {
+                    bestIndex = boundaryIndex;
+                }
+            }
+
+            return bestIndex;
+        }
+
+        private static void ResolveBoundaryChainSalience(
+            List<BoundaryChain> chains,
+            List<Boundary> boundaries)
+        {
+            float maxConvexLength = 0.0001f;
+            float maxConcaveLength = 0.0001f;
+            for (int i = 0; i < chains.Count; i++)
+            {
+                BoundaryChain chain = chains[i];
+                if (chain.Kind == MassSurfaceBoundaryKind.ConvexRidge)
+                {
+                    maxConvexLength = Mathf.Max(maxConvexLength, chain.Length);
+                }
+                else if (chain.Kind == MassSurfaceBoundaryKind.ConcaveCrease)
+                {
+                    maxConcaveLength = Mathf.Max(maxConcaveLength, chain.Length);
+                }
+            }
+
+            for (int i = 0; i < chains.Count; i++)
+            {
+                BoundaryChain chain = chains[i];
+                float weightedScore = 0f;
+                float weightedLength = 0f;
+                for (int b = 0; b < chain.BoundaryIndices.Count; b++)
+                {
+                    Boundary boundary = boundaries[chain.BoundaryIndices[b]];
+                    float length = Mathf.Max(0.0001f, boundary.Length);
+                    weightedScore += boundary.Score * length;
+                    weightedLength += length;
+                }
+
+                float averageScore =
+                    weightedLength > 0.0001f
+                        ? weightedScore / weightedLength
+                        : 0f;
+                float lengthReference =
+                    chain.Kind == MassSurfaceBoundaryKind.ConvexRidge
+                        ? maxConvexLength
+                        : maxConcaveLength;
+                float lengthScore = Mathf.Clamp01(chain.Length / Mathf.Max(0.0001f, lengthReference));
+
+                // Salience is a reusable structural boundary fact. It deliberately
+                // mixes geometric score and chain length, but it is not an edge-wear
+                // macro control; material features decide how to interpret it.
+                chain.AverageScore = Mathf.Clamp01(averageScore);
+                chain.Salience = Mathf.Clamp01(averageScore * 0.70f + lengthScore * 0.30f);
             }
         }
 

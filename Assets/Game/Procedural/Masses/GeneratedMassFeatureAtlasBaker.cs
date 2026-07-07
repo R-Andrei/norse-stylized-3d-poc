@@ -5,11 +5,12 @@ using ProgrammaticStylized3D.Geometry;
 namespace ProgrammaticStylized3D.Geometry.Masses
 {
     /// <summary>
-    /// Builds the generated-mass surface-chart feature atlas used by the main
-    /// material path. Patch 14C.5 keeps the atlas semantic: surface patches,
-    /// boundary proximity, and boundary weight are baked as clean data, not
-    /// final decorative paint. Raw channel diagnostics make the field contract
-    /// inspectable before any final material response is built.
+    /// Builds generated-mass surface-chart atlases used by the main material
+    /// path. The atlases store reusable boundary facts: convex/concave
+    /// proximity, structural salience, stable boundary identity, and
+    /// boundary-local coordinates/modulation. Material features such as edge
+    /// wear interpret those facts; the atlases themselves do not bake final
+    /// decorative paint or feature-specific macro/micro controls.
     /// </summary>
     public static class GeneratedMassFeatureAtlasBaker
     {
@@ -61,23 +62,38 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Vector2 start,
                 Vector2 end,
                 float score,
+                float salience,
                 int boundaryIndex,
                 int chainIndex,
+                float chainDistanceAtStart,
+                float chainDistanceAtEnd,
+                float chainLengthWorld,
+                float sideSign,
                 float lengthWorld)
             {
                 Start = start;
                 End = end;
                 Score = Mathf.Clamp01(score);
+                Salience = Mathf.Clamp01(salience);
                 BoundaryIndex = boundaryIndex;
                 ChainIndex = chainIndex;
+                ChainDistanceAtStart = Mathf.Max(0f, chainDistanceAtStart);
+                ChainDistanceAtEnd = Mathf.Max(0f, chainDistanceAtEnd);
+                ChainLengthWorld = Mathf.Max(0.0001f, chainLengthWorld);
+                SideSign = sideSign < 0f ? -1f : sideSign > 0f ? 1f : 0f;
                 LengthWorld = Mathf.Max(0.0001f, lengthWorld);
             }
 
             public Vector2 Start { get; }
             public Vector2 End { get; }
             public float Score { get; }
+            public float Salience { get; }
             public int BoundaryIndex { get; }
             public int ChainIndex { get; }
+            public float ChainDistanceAtStart { get; }
+            public float ChainDistanceAtEnd { get; }
+            public float ChainLengthWorld { get; }
+            public float SideSign { get; }
             public float LengthWorld { get; }
         }
 
@@ -97,15 +113,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private readonly struct BoundaryFieldSample
         {
-            public BoundaryFieldSample(float proximity, float weight)
+            public BoundaryFieldSample(
+                float proximity,
+                float salience,
+                float identity,
+                float along,
+                float cross,
+                float coarseModulation,
+                float fineModulation)
             {
                 Proximity = Mathf.Clamp01(proximity);
-                Weight = Mathf.Clamp01(weight);
+                Salience = Mathf.Clamp01(salience);
+                Identity = Mathf.Clamp01(identity);
+                Along = Mathf.Repeat(along, 1f);
+                Cross = Mathf.Clamp01(cross);
+                CoarseModulation = Mathf.Clamp01(coarseModulation);
+                FineModulation = Mathf.Clamp01(fineModulation);
             }
 
             public float Proximity { get; }
-            public float Weight { get; }
-            public float Composite => Proximity * Weight;
+            public float Salience { get; }
+            public float Identity { get; }
+            public float Along { get; }
+            public float Cross { get; }
+            public float CoarseModulation { get; }
+            public float FineModulation { get; }
+            public float Composite => Proximity * Mathf.Lerp(0.55f, 1f, Salience);
         }
 
         public static Result Bake(
@@ -152,6 +185,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 "GeneratedMass_FeatureAtlas1_Temporary");
             Color32[] pixels0 = new Color32[resolution * resolution];
             Color32[] pixels1 = new Color32[resolution * resolution];
+            float[] dominantComposite = new float[resolution * resolution];
             for (int i = 0; i < pixels0.Length; i++)
             {
                 pixels0[i] = new Color32(0, 0, 0, 0);
@@ -165,6 +199,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 bounds,
                 pixels0,
                 pixels1,
+                dominantComposite,
                 resolution);
 
             atlas0.SetPixels32(pixels0);
@@ -483,12 +518,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     continue;
                 }
 
-                AddBoundarySegmentToPatch(boundary, boundary.PatchA, byPatch);
-                AddBoundarySegmentToPatch(boundary, boundary.PatchB, byPatch);
+                AddBoundarySegmentToPatch(graph, boundary, boundary.PatchA, byPatch);
+                AddBoundarySegmentToPatch(graph, boundary, boundary.PatchB, byPatch);
             }
         }
 
         private static void AddBoundarySegmentToPatch(
+            MassSurfaceFeatureGraph graph,
             MassSurfaceFeatureGraph.Boundary boundary,
             int patchIndex,
             Dictionary<int, PatchChart> byPatch)
@@ -498,12 +534,34 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return;
             }
 
+            float chainSalience = boundary.Score;
+            float chainLength = boundary.Length;
+            if (boundary.ChainIndex >= 0 &&
+                boundary.ChainIndex < graph.BoundaryChains.Count)
+            {
+                MassSurfaceFeatureGraph.BoundaryChain chain =
+                    graph.BoundaryChains[boundary.ChainIndex];
+                chainSalience = chain.Salience;
+                chainLength = chain.Length;
+            }
+
+            float sideSign = patchIndex == boundary.PatchA
+                ? -1f
+                : patchIndex == boundary.PatchB
+                    ? 1f
+                    : 0f;
+
             BoundarySegment segment = new(
                 Project(boundary.Start, chart.Origin, chart.AxisU, chart.AxisV),
                 Project(boundary.End, chart.Origin, chart.AxisU, chart.AxisV),
                 boundary.Score,
+                chainSalience,
                 boundary.Index,
                 boundary.ChainIndex,
+                boundary.ChainDistanceAtStart,
+                boundary.ChainDistanceAtEnd,
+                chainLength,
+                sideSign,
                 boundary.Length);
 
             if (boundary.Kind == MassSurfaceBoundaryKind.ConvexRidge)
@@ -612,6 +670,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Bounds bounds,
             Color32[] pixels0,
             Color32[] pixels1,
+            float[] dominantComposite,
             int resolution)
         {
             float scale = Mathf.Max(0.0001f, Mathf.Max(bounds.size.x, Mathf.Max(bounds.size.y, bounds.size.z)));
@@ -647,6 +706,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     settings.SurfaceSeed,
                     pixels0,
                     pixels1,
+                    dominantComposite,
                     resolution);
             }
         }
@@ -666,6 +726,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             int surfaceSeed,
             Color32[] pixels0,
             Color32[] pixels1,
+            float[] dominantComposite,
             int resolution)
         {
             if ((!bakeConvex || chart.ConvexSegments.Count == 0) &&
@@ -706,7 +767,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     BoundaryFieldSample convex = default;
                     if (bakeConvex && chart.ConvexSegments.Count > 0)
                     {
-                        convex = ResolveSemanticDistanceFieldSample(
+                        convex = ResolveBoundaryDataFieldSample(
                             local,
                             chart.ConvexSegments,
                             edgeWearWidth,
@@ -714,13 +775,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             texelWorld,
                             edgeAmount01,
                             edgeCoverage01,
-                            false);
+                            false,
+                            surfaceSeed,
+                            131);
                     }
 
                     BoundaryFieldSample concave = default;
                     if (bakeConcave && chart.ConcaveSegments.Count > 0)
                     {
-                        concave = ResolveSemanticDistanceFieldSample(
+                        concave = ResolveBoundaryDataFieldSample(
                             local,
                             chart.ConcaveSegments,
                             creaseWidth,
@@ -728,7 +791,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             texelWorld,
                             creaseAmount01,
                             creaseCoverage01,
-                            true);
+                            true,
+                            surfaceSeed,
+                            353);
                     }
 
                     if (!insideSurface)
@@ -746,133 +811,56 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     }
 
                     if (convex.Proximity <= 0.001f &&
-                        convex.Weight <= 0.001f &&
-                        concave.Proximity <= 0.001f &&
-                        concave.Weight <= 0.001f)
+                        concave.Proximity <= 0.001f)
                     {
                         continue;
                     }
 
                     int pixelIndex = y * resolution + x;
 
-                    // FeatureAtlas0 channel contract:
-                    // R = convex ridge proximity
-                    // G = convex ridge weight / importance
-                    // B = concave crease proximity
-                    // A = concave crease weight / importance
+                    BoundaryFieldSample dominant =
+                        convex.Composite >= concave.Composite
+                            ? convex
+                            : concave;
+
+                    // FeatureAtlas0 — Boundary Structure Atlas:
+                    // R = convex boundary proximity
+                    // G = concave boundary proximity
+                    // B = dominant boundary structural salience
+                    // A = dominant boundary stable identity/seed
+                    //
+                    // FeatureAtlas1 — Boundary Coordinate/Modulation Atlas:
+                    // R = dominant boundary along-chain coordinate / phase
+                    // G = dominant boundary cross-boundary coordinate
+                    // B = dominant boundary coarse local modulation
+                    // A = dominant boundary fine local modulation
                     if (convex.Proximity > 0.001f)
                     {
                         pixels0[pixelIndex].r = MaxByte(pixels0[pixelIndex].r, convex.Proximity);
-                        pixels0[pixelIndex].g = MaxByte(pixels0[pixelIndex].g, convex.Weight);
-
-                        Color edgeIrregularity = ResolveEdgeWearIrregularitySample(
-                            local,
-                            chart.ConvexSegments,
-                            edgeWearWidth,
-                            texelWorld,
-                            surfaceSeed,
-                            convex.Proximity);
-
-                        // FeatureAtlas1 channel contract:
-                        // R = baked edge-wear amplitude variation
-                        // G = baked edge-wear width/smear variation
-                        // B = baked edge-wear continuity / chip-thinning variation
-                        // A = reserved
-                        pixels1[pixelIndex].r = MaxByte(pixels1[pixelIndex].r, edgeIrregularity.r);
-                        pixels1[pixelIndex].g = MaxByte(pixels1[pixelIndex].g, edgeIrregularity.g);
-                        pixels1[pixelIndex].b = MaxByte(pixels1[pixelIndex].b, edgeIrregularity.b);
                     }
 
                     if (concave.Proximity > 0.001f)
                     {
-                        pixels0[pixelIndex].b = MaxByte(pixels0[pixelIndex].b, concave.Proximity);
-                        pixels0[pixelIndex].a = MaxByte(pixels0[pixelIndex].a, concave.Weight);
+                        pixels0[pixelIndex].g = MaxByte(pixels0[pixelIndex].g, concave.Proximity);
+                    }
+
+                    // Proximity channels are masks and can accumulate by maximum.
+                    // Dominant-boundary facts are coordinates/seeds/modulation values,
+                    // not intensities, so they must be copied from the strongest
+                    // boundary sample for this texel instead of MaxByte-combined.
+                    if (dominant.Proximity > 0.001f &&
+                        dominant.Composite >= dominantComposite[pixelIndex])
+                    {
+                        dominantComposite[pixelIndex] = dominant.Composite;
+                        pixels0[pixelIndex].b = ToByte(dominant.Salience);
+                        pixels0[pixelIndex].a = ToByte(dominant.Identity);
+                        pixels1[pixelIndex].r = ToByte(dominant.Along);
+                        pixels1[pixelIndex].g = ToByte(dominant.Cross);
+                        pixels1[pixelIndex].b = ToByte(dominant.CoarseModulation);
+                        pixels1[pixelIndex].a = ToByte(dominant.FineModulation);
                     }
                 }
             }
-        }
-
-        private static Color ResolveEdgeWearIrregularitySample(
-            Vector2 local,
-            List<BoundarySegment> segments,
-            float widthWorld,
-            float texelWorld,
-            int surfaceSeed,
-            float proximity)
-        {
-            if (segments == null || segments.Count == 0)
-            {
-                return new Color(0.5f, 0.5f, 0.72f, 0f);
-            }
-
-            float searchDistance = Mathf.Max(texelWorld * 2f, widthWorld) * GutterDistanceMultiplier;
-            BoundarySegment bestSegment = default;
-            float bestT = 0f;
-            float bestScore = -1f;
-
-            for (int i = 0; i < segments.Count; i++)
-            {
-                BoundarySegment segment = segments[i];
-                float t;
-                float distance = DistanceToSegment(local, segment.Start, segment.End, out t);
-                if (distance > searchDistance)
-                {
-                    continue;
-                }
-
-                float distanceScore = 1f - Mathf.Clamp01(distance / Mathf.Max(0.0001f, searchDistance));
-                float score = distanceScore * Mathf.Lerp(0.55f, 1.0f, segment.Score);
-                if (score > bestScore)
-                {
-                    bestScore = score;
-                    bestSegment = segment;
-                    bestT = t;
-                }
-            }
-
-            if (bestScore < 0f)
-            {
-                return new Color(0.5f, 0.5f, 0.72f, 0f);
-            }
-
-            float seedBase = surfaceSeed * 0.00137f + bestSegment.BoundaryIndex * 0.173f;
-            float chainSeed = (bestSegment.ChainIndex + 17) * 0.319f;
-            float lengthScale = Mathf.Clamp(bestSegment.LengthWorld / Mathf.Max(widthWorld, texelWorld * 3f), 1.0f, 24.0f);
-            float along = bestT * Mathf.Lerp(1.35f, 5.25f, Mathf.InverseLerp(1.0f, 18.0f, lengthScale));
-
-            float chainBias = Hash01(surfaceSeed, bestSegment.ChainIndex + 101, 19);
-            float boundaryBias = Hash01(surfaceSeed, bestSegment.BoundaryIndex + 211, 29);
-            float low = Mathf.PerlinNoise(seedBase + chainSeed + along * 0.72f, 11.37f + chainBias * 19.0f);
-            float mid = Mathf.PerlinNoise(seedBase * 1.73f + along * 1.85f, 31.11f + boundaryBias * 23.0f);
-            float fine = Mathf.PerlinNoise(seedBase * 2.41f + along * 4.10f, 71.91f + chainBias * 13.0f);
-
-            // Atlas1 stores visual-irregularity fields, not final color.
-            // Keep the values stable and ridge-aware so the shader can cheaply
-            // vary opacity, apparent width, and local thinning without adding
-            // more runtime topology work or extra user-facing controls.
-            float amplitude = Mathf.Clamp01(
-                0.08f +
-                chainBias * 0.18f +
-                boundaryBias * 0.15f +
-                low * 0.42f +
-                mid * 0.26f -
-                fine * 0.08f);
-
-            float width = Mathf.Clamp01(
-                0.10f +
-                low * 0.24f +
-                mid * 0.50f +
-                fine * 0.16f +
-                (boundaryBias - 0.5f) * 0.16f);
-
-            float continuity = Mathf.Clamp01(
-                0.12f +
-                low * 0.30f +
-                mid * 0.16f +
-                fine * 0.36f +
-                proximity * 0.18f);
-
-            return new Color(amplitude, width, continuity, 0f);
         }
 
         private static float Hash01(int a, int b, int c)
@@ -890,9 +878,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
+        private static byte ToByte(float value01)
+        {
+            return (byte)Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(value01) * 255f), 0, 255);
+        }
+
         private static byte MaxByte(byte existing, float value01)
         {
-            byte value = (byte)Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(value01) * 255f), 0, 255);
+            byte value = ToByte(value01);
             return value > existing ? value : existing;
         }
 
@@ -927,7 +920,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return (point.x - b.x) * (a.y - b.y) - (a.x - b.x) * (point.y - b.y);
         }
 
-        private static BoundaryFieldSample ResolveSemanticDistanceFieldSample(
+        private static BoundaryFieldSample ResolveBoundaryDataFieldSample(
             Vector2 local,
             List<BoundarySegment> segments,
             float widthWorld,
@@ -935,18 +928,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float texelWorld,
             float amount01,
             float coverage01,
-            bool sharper)
+            bool sharper,
+            int surfaceSeed,
+            int kindSalt)
         {
             BoundaryFieldSample bestSample = default;
             float bestComposite = 0f;
             float safeWidth = Mathf.Max(texelWorld * 2f, widthWorld);
             float softness01 = Mathf.Clamp01(softness);
 
-            // Keep the semantic field inspectable. Earlier debug builds let too
-            // much of the band sit at full proximity, which made the atlas read
-            // like a binary selected-edge strip. The ridge/crease core must
-            // remain present, but it should be narrow enough that the raw
-            // proximity channel exposes a visible distance gradient.
+            // Proximity remains a clean distance field. Coverage controls which
+            // boundaries are admitted; salience/identity/modulation are facts
+            // carried by admitted boundaries, not final decorative paint.
             float core = Mathf.Max(
                 texelWorld * (sharper ? 0.95f : 1.10f),
                 safeWidth * Mathf.Lerp(sharper ? 0.024f : 0.030f, sharper ? 0.008f : 0.014f, softness01));
@@ -973,10 +966,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     float distance01 = Mathf.InverseLerp(core, outer, distance);
                     float falloff = 1f - Mathf.SmoothStep(0f, 1f, distance01);
-
-                    // A mild power curve makes the raw proximity diagnostic show
-                    // a clearer bright-core / mid-falloff / outer-fade structure
-                    // without adding decorative breakup to the data channel.
                     proximity = Mathf.Pow(
                         Mathf.Clamp01(falloff),
                         sharper ? 1.45f : 1.28f);
@@ -987,25 +976,52 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     continue;
                 }
 
-                // Coverage is semantic boundary inclusion, not decorative
-                // line fragmentation. Low coverage keeps only the strongest
-                // ridge/crease chains; high coverage includes weaker boundaries.
                 float scoreThreshold = Mathf.Lerp(sharper ? 0.72f : 0.78f, 0.025f, coverage01);
                 if (segment.Score < scoreThreshold)
                 {
                     continue;
                 }
 
-                // Keep proximity and boundary weight separate. Proximity is the
-                // clean distance field; weight is the semantic importance/eligibility
-                // for final material interpretation. Decorative breakup/noise is
-                // deferred to the material response patch.
-                float normalizedScore = Mathf.InverseLerp(scoreThreshold, 1f, segment.Score);
-                float semanticWeight = Mathf.SmoothStep(0f, 1f, normalizedScore);
-                semanticWeight = Mathf.Lerp(sharper ? 0.32f : 0.38f, 1f, semanticWeight);
-                semanticWeight *= Mathf.Clamp01(amount01);
+                float amount = Mathf.Clamp01(amount01);
+                float chainU = Mathf.Repeat(
+                    Mathf.Lerp(
+                        segment.ChainDistanceAtStart,
+                        segment.ChainDistanceAtEnd,
+                        t) /
+                    Mathf.Max(0.0001f, segment.ChainLengthWorld),
+                    1f);
+                float crossDistance01 = distance <= core
+                    ? 0f
+                    : Mathf.InverseLerp(core, outer, distance);
+                float cross = Mathf.Clamp01(0.5f + segment.SideSign * crossDistance01 * 0.5f);
+                float identity = ResolveBoundaryIdentity(surfaceSeed, segment, kindSalt);
+                float salience = Mathf.Clamp01(segment.Salience * amount);
 
-                BoundaryFieldSample sample = new(proximity, semanticWeight);
+                float coarse = ResolveBoundaryLocalModulation(
+                    surfaceSeed,
+                    segment,
+                    chainU,
+                    identity,
+                    kindSalt,
+                    0.85f,
+                    0.0f);
+                float fine = ResolveBoundaryLocalModulation(
+                    surfaceSeed,
+                    segment,
+                    chainU,
+                    identity,
+                    kindSalt,
+                    3.15f,
+                    41.0f);
+
+                BoundaryFieldSample sample = new(
+                    proximity,
+                    salience,
+                    identity,
+                    chainU,
+                    cross,
+                    coarse,
+                    fine);
                 float composite = sample.Composite;
                 if (composite > bestComposite)
                 {
@@ -1015,6 +1031,49 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             return bestSample;
+        }
+
+        private static float ResolveBoundaryIdentity(
+            int surfaceSeed,
+            BoundarySegment segment,
+            int kindSalt)
+        {
+            int stableIndex = segment.ChainIndex >= 0
+                ? segment.ChainIndex
+                : segment.BoundaryIndex;
+            float seedOffset = Hash01(surfaceSeed + kindSalt, 101, 17);
+            float raw = Mathf.Repeat(seedOffset + stableIndex * 0.61803398875f, 1f);
+
+            // Use a golden-ratio stride so multiple chains on the same mass occupy
+            // a broad stable identity range instead of clustering. This remains a
+            // generic boundary identity/seed field; features decide how to map it.
+            return Mathf.Clamp01(0.04f + raw * 0.96f);
+        }
+
+        private static float ResolveBoundaryLocalModulation(
+            int surfaceSeed,
+            BoundarySegment segment,
+            float chainU,
+            float identity,
+            int kindSalt,
+            float frequency,
+            float offset)
+        {
+            int stableIndex = segment.ChainIndex >= 0
+                ? segment.ChainIndex
+                : segment.BoundaryIndex;
+            float seedX =
+                surfaceSeed * 0.00137f +
+                kindSalt * 0.011f +
+                stableIndex * 0.173f +
+                identity * 5.31f +
+                offset;
+            float seedY =
+                19.37f +
+                kindSalt * 0.071f +
+                identity * 23.0f +
+                offset * 0.37f;
+            return Mathf.PerlinNoise(seedX + chainU * frequency, seedY);
         }
 
         private static float DistanceToSegment(

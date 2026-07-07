@@ -23,7 +23,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             (int)StoneSurfaceMaskDebug.None,
             (int)StoneSurfaceMaskDebug.ConvexEdgeWear,
             (int)StoneSurfaceMaskDebug.BoundaryFieldDiagnostic,
-            (int)StoneSurfaceMaskDebug.EdgeWearIrregularity,
+            (int)StoneSurfaceMaskDebug.BoundaryModulationDiagnostic,
             (int)StoneSurfaceMaskDebug.Exposure,
             (int)StoneSurfaceMaskDebug.CreviceBase,
             (int)StoneSurfaceMaskDebug.DirtDeposit
@@ -34,7 +34,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             new GUIContent("None"),
             new GUIContent("Convex Edge Wear"),
             new GUIContent("Boundary Field Diagnostic"),
-            new GUIContent("Edge Wear Irregularity"),
+            new GUIContent("Boundary Modulation Diagnostic"),
             new GUIContent("Exposure"),
             new GUIContent("Crevice / Base"),
             new GUIContent("Dirt / Deposit")
@@ -43,29 +43,31 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private static readonly int[] AdvancedDebugValues =
         {
             (int)StoneSurfaceMaskDebug.None,
-            (int)StoneSurfaceMaskDebug.ConvexRidgeProximity,
-            (int)StoneSurfaceMaskDebug.ConvexRidgeWeight,
-            (int)StoneSurfaceMaskDebug.ConvexRidgeComposite,
-            (int)StoneSurfaceMaskDebug.ConcaveCreaseProximity,
-            (int)StoneSurfaceMaskDebug.ConcaveCreaseWeight,
-            (int)StoneSurfaceMaskDebug.ConcaveCreaseComposite,
-            (int)StoneSurfaceMaskDebug.EdgeWearAmplitudeVariation,
-            (int)StoneSurfaceMaskDebug.EdgeWearWidthVariation,
-            (int)StoneSurfaceMaskDebug.EdgeWearContinuityVariation
+            (int)StoneSurfaceMaskDebug.ConvexBoundaryProximity,
+            (int)StoneSurfaceMaskDebug.ConcaveBoundaryProximity,
+            (int)StoneSurfaceMaskDebug.ConvexBoundarySalienceComposite,
+            (int)StoneSurfaceMaskDebug.BoundarySalience,
+            (int)StoneSurfaceMaskDebug.BoundaryIdentity,
+            (int)StoneSurfaceMaskDebug.ConcaveBoundarySalienceComposite,
+            (int)StoneSurfaceMaskDebug.BoundaryAlongCoordinate,
+            (int)StoneSurfaceMaskDebug.BoundaryCrossCoordinate,
+            (int)StoneSurfaceMaskDebug.BoundaryCoarseModulation,
+            (int)StoneSurfaceMaskDebug.BoundaryFineModulation
         };
 
         private static readonly GUIContent[] AdvancedDebugLabels =
         {
             new GUIContent("None"),
-            new GUIContent("Convex Ridge Proximity"),
-            new GUIContent("Convex Ridge Weight"),
-            new GUIContent("Convex Ridge Composite"),
-            new GUIContent("Concave Crease Proximity"),
-            new GUIContent("Concave Crease Weight"),
-            new GUIContent("Concave Crease Composite"),
-            new GUIContent("Edge-Wear Amplitude Variation"),
-            new GUIContent("Edge-Wear Width / Smear Variation"),
-            new GUIContent("Edge-Wear Continuity / Thinning")
+            new GUIContent("Convex Boundary Proximity"),
+            new GUIContent("Concave Boundary Proximity"),
+            new GUIContent("Convex Boundary + Salience"),
+            new GUIContent("Boundary Salience"),
+            new GUIContent("Boundary Identity"),
+            new GUIContent("Concave Boundary + Salience"),
+            new GUIContent("Boundary Along Coordinate"),
+            new GUIContent("Boundary Cross Coordinate"),
+            new GUIContent("Boundary Coarse Modulation"),
+            new GUIContent("Boundary Fine Modulation")
         };
 
         private SerializedProperty coldGreyStoneMaterial;
@@ -608,8 +610,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             {
                 EditorGUILayout.HelpBox(
                     "Raw generated feature-atlas inspection. FeatureAtlas0 stores " +
-                    "semantic boundary fields; FeatureAtlas1 stores baked " +
-                    "edge-wear irregularity fields. These views are for validation, " +
+                    "boundary structure fields; FeatureAtlas1 stores boundary " +
+                    "coordinate/modulation fields. These views are for validation, " +
                     "not normal material authoring.",
                     MessageType.None);
 
@@ -1075,8 +1077,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             using (new EditorGUI.IndentLevelScope())
             {
                 EditorGUILayout.HelpBox(
-                    "ConcaveCrease uses FeatureAtlas0.B as concave crease proximity " +
-                    "and FeatureAtlas0.A as concave crease weight/importance. This " +
+                    "ConcaveCrease uses FeatureAtlas0.G as concave boundary proximity " +
+                    "and the shared salience/identity channels for future interpretation. This " +
                     "remains data/debug-only; final crease darkening is deferred until " +
                     "the mask is validated.",
                     MessageType.Info);

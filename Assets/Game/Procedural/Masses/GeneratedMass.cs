@@ -88,17 +88,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         // FeatureAtlas0 diagnostics. Values intentionally match
         // PixelSurfaceMaskDebugMode and avoid the shared ground-debug range.
-        ConvexRidgeProximity = 15,
-        ConvexRidgeWeight = 16,
-        ConvexRidgeComposite = 17,
-        ConcaveCreaseProximity = 18,
-        ConcaveCreaseWeight = 19,
-        ConcaveCreaseComposite = 20,
+        ConvexBoundaryProximity = 15,
+        ConcaveBoundaryProximity = 16,
+        ConvexBoundarySalienceComposite = 17,
+        BoundarySalience = 18,
+        BoundaryIdentity = 19,
+        ConcaveBoundarySalienceComposite = 20,
         BoundaryFieldDiagnostic = 21,
-        EdgeWearIrregularity = 22,
-        EdgeWearAmplitudeVariation = 23,
-        EdgeWearWidthVariation = 24,
-        EdgeWearContinuityVariation = 25
+        BoundaryModulationDiagnostic = 22,
+        BoundaryAlongCoordinate = 23,
+        BoundaryCrossCoordinate = 24,
+        BoundaryCoarseModulation = 25,
+        BoundaryFineModulation = 26
     }
 
     public enum ShapeDiversity

@@ -606,20 +606,6 @@ float3 RiverWaterResolveFoamInteriorLighting(
         interior);
 }
 
-float3 RiverWaterResolveFoamColour(
-    float3 foamColour,
-    float3 lighting,
-    float minimumNightVisibility)
-{
-    float3 lit = max(
-        float3(
-            minimumNightVisibility,
-            minimumNightVisibility,
-            minimumNightVisibility),
-        lighting);
-    return max(0.0, foamColour * lit);
-}
-
 float3 RiverWaterResolveFoamColourFiltered(
     float3 foamColour,
     float3 lighting,
