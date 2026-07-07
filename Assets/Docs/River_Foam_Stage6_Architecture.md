@@ -793,7 +793,7 @@ Material Presence ~= Foam Evaluated Shape
 Foam Shape Difference ~= black
 ```
 
-4.11C.5.11 adds the first deliberately isolated local procedural breakup probe on top of this clean baseline. The probe is still a Layer D product only: it writes `_FoamShapeMask`, does not mutate persistent material, and remains disconnected from Final Foam.
+4.11C.5.11 tested a deliberately isolated local procedural breakup probe on top of this clean baseline. Validation proved the probe was active, but it produced cell/ribbon-shaped removals because `_FoamShapeMask` is too coarse for atomic fine breakup. 4.11C.5.11B retires that probe and returns Layer D to pass-through. Fine breakup now belongs in Layer E shader composition; Layer D remains the future macro film-structure layer.
 
 ## 5.4 Allowed reads
 
@@ -1014,7 +1014,7 @@ visual history must not become material history.
 
 ## 5.10 Local-only breakup limit
 
-A local function can produce convincing chipping and semi-organized chaos:
+A local function can produce convincing chipping and semi-organized chaos when it runs at the right visual scale:
 
 ```text
 visible = broadMask * proceduralPattern(position, riverUV, time, life, materialPattern)
@@ -1040,11 +1040,26 @@ local procedural math = decorative breakup/detail
 low-res support field = structural bridge/sheet/contact behavior
 ```
 
-## 5.11 Local procedural breakup probe contract
+The `4.11C.5.11` validation adds a second, stricter lesson:
 
-`4.11C.5.11` implements the first cheap local-only Layer D breakup test. The purpose is to test the best-case version of the no-neighbour "magical" approach before paying for low-resolution structural support fields.
+```text
+local procedural breakup should not be baked into _FoamShapeMask when the desired detail is finer than a foam field cell.
+```
 
-Current code path:
+Layer D writes a foam-field texture. Removing cells inside `_FoamShapeMask` exposes simulation-cell scale and creates long ribbon/cell-shaped holes. The inspiration reference's fine breakup is much more granular, closer to rendered-pixel/sub-cell detail.
+
+Corrected ownership:
+
+```text
+Layer D owns macro visual structure: broad film, sheet support, bridge/pinch/split, bank/rock/contact film, smooth mask foundation.
+Layer E owns micro visual detail: granular edge breakup, tiny cuts, thin streaks, highlight scratches, final polish.
+```
+
+## 5.11 Layer D local procedural breakup probe — validation and rejection
+
+`4.11C.5.11` implemented the first cheap local-only Layer D breakup test. Its purpose was to test the best-case version of the no-neighbour "magical" approach before paying for low-resolution structural support fields.
+
+Implemented code path in 5.11:
 
 ```text
 CS_RiverFoam.compute
@@ -1059,63 +1074,75 @@ CS_RiverFoam.compute
 
 StylizedRiverFoamRuntime.Compute.cs
   DispatchEvaluateShape()
+    bound _FoamBoundary
+    bound _FoamObstacleExclusionRead
+    bound _FoamStateRead
+    bound _FoamShapeMaskWrite
+    bound _FoamTime / _FoamSeed
+    bound _FoamGlobalStart / _FoamFieldLength
+    bound _FoamMetricRows
+```
+
+The probe correctly obeyed the dependency rules:
+
+```text
+no neighbouring FoamState sampling
+no Motion Field lane
+no Obstacle Routing field
+no Topology support fields
+no low-res Film Source / Film Support
+no Final Foam shader mask
+no entity or pocket identity
+no persistent FoamState mutation
+```
+
+Validation result:
+
+```text
+Foam Shape Difference became clearly non-black, mostly magenta/removal.
+The removals were long cell/ribbon-shaped gaps.
+The result exposed _FoamShapeMask cell scale.
+It did not resemble the granular, almost atomic breakup in the inspiration river.
+Final Foam remained unchanged, as intended.
+```
+
+Conclusion:
+
+```text
+5.11 proved that Layer D local-only breakup can produce difference values, but it is rejected as the fine-fragmentation solution.
+The issue is layer/resolution mismatch, not inactivity.
+Do not tune this Layer D breakup probe further.
+Fine fragmentation must be tested in Layer E shader composition at rendered-pixel scale.
+Layer D should stay focused on macro film structure.
+```
+
+`4.11C.5.11B` retires the 5.11 probe as active code. The baseline shape path is again:
+
+```text
+CS_RiverFoam.compute
+  EvaluateFoamShape(...)
+    FoamClipPackedToValidFluid(...)
+    FoamDecodeMaterialState(...)
+    FoamEvaluateIntrinsicShapeMask(...)
+    _FoamShapeMaskWrite[coordinate] = result
+
+StylizedRiverFoamRuntime.Compute.cs
+  DispatchEvaluateShape()
     binds _FoamBoundary
     binds _FoamObstacleExclusionRead
     binds _FoamStateRead
     binds _FoamShapeMaskWrite
-    binds _FoamTime / _FoamSeed
-    binds _FoamGlobalStart / _FoamFieldLength
-    binds _FoamMetricRows
 ```
 
-Allowed inputs:
+Expected baseline after 5.11B:
 
 ```text
-current cell persistent Presence
-current cell Remaining Life, read-only
-current cell Material Pattern, read-only
-current valid-fluid clipping
-river-domain physical position
-physical cell spacing
-time
-seed
-procedural value-noise fields
+Material Presence ~= Foam Evaluated Shape
+Foam Shape Difference = black or effectively black
+Final Foam unchanged
 ```
 
-Forbidden inputs for this probe:
-
-```text
-neighbouring FoamState cells
-Motion Field lane
-Obstacle Routing field
-Topology support fields
-low-res Film Source / Film Support
-Final Foam shader mask
-any entity or pocket identity
-```
-
-The probe computes edge exposure from local `Presence` only. Strong full-presence cores are preserved; partial/soft cells near contours are allowed to chip. Older material becomes visually more fragile by reading `Remaining Life`, but the probe never writes life. `Material Pattern` varies breakup response per material sample without becoming a tracked patch identity.
-
-Expected result:
-
-```text
-Material Presence remains persistent truth.
-Foam Evaluated Shape should show chipping/fray/cuts produced by the local Layer D probe.
-Foam Shape Difference should show non-black signed difference where the probe removes visible coverage.
-Final Foam should remain unchanged until the production shader is intentionally switched to _FoamShapeMask.
-```
-
-Failure conditions:
-
-```text
-Shape Difference remains black: the probe is not active.
-Evaluated Shape looks identical: local-only breakup is visually too weak.
-Evaluated Shape becomes Swiss-cheese or noisy scratches: local-only breakup is too destructive.
-The whole body flickers: the procedural time field is too unstable.
-The result cannot create broad contact/bridge/sheet behavior: expected limitation, not a bug.
-```
-
-## 5.11 Performance target
+## Layer D structural performance target
 
 For a High 32 m chunk:
 
@@ -1660,23 +1687,26 @@ Foam Film Support debug.
 Verification that all new Layer D helpers write only Layer D products and do not feed Layer B or C.
 ```
 
-## Phase 3 — Local procedural breakup probe
+## Phase 3 — Layer E shader-side local detail probe
 
-Test the cheapest “magical” layer honestly.
+Retest the cheapest “magical” layer at the correct scale: shader pixels rather than Layer D cells.
 
 Scope:
 
 ```text
-local procedural chipping/fray/cuts based on position, river UV, time, life, materialPattern
+shader-side local procedural chipping/fray/cuts based on position, river UV, time, life/material pattern where available
+sub-cell granular edge breakup
+thin bright scratches/streaks
 no neighbourhood search
 no persistent mutation
+no _FoamShapeMask mutation
 no broad bridge support
 ```
 
 Purpose:
 
 ```text
-determine how much reference-like chaos can be achieved with local math alone
+determine how much reference-like fine chaos can be achieved with local shader math before/alongside the structural Layer D film-support system
 ```
 
 ## Phase 4 — Low-res Visual Film Source and Sheet Support

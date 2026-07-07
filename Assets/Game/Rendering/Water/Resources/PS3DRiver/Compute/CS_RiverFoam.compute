@@ -106,125 +106,6 @@ float FoamEvaluateIntrinsicShapeMask(
     return saturate(material.presence * validFluid);
 }
 
-float2 FoamResolveMaterialPhysicalPosition(
-    int2 coordinate,
-    out float2 physicalCellSpacing)
-{
-    FoamMetricRow metric = _FoamMetricRows[coordinate.x];
-    float across01 = FoamAcross01AtTexel(coordinate.y);
-    float lateralMetres = FoamAcross01ToMetres(
-        across01,
-        metric.widthsAndSpacing.x,
-        metric.widthsAndSpacing.y);
-    float globalDistance = _FoamGlobalStart +
-        FoamLocalDistanceAtTexel(coordinate.x);
-    physicalCellSpacing = float2(
-        max(0.01, metric.widthsAndSpacing.z),
-        max(0.01, metric.widthsAndSpacing.w));
-    return float2(globalDistance, lateralMetres);
-}
-
-float FoamEvaluateLocalBreakupField(
-    float2 physicalPosition,
-    float2 physicalCellSpacing,
-    FoamMaterialState material)
-{
-    float maximumCellSpacing = max(
-        max(0.01, physicalCellSpacing.x),
-        max(0.01, physicalCellSpacing.y));
-    float patternSeed = _FoamSeed +
-        material.materialPattern * 197.31;
-
-    // 4.11C.5.11 probe: local-only procedural breakup. The feature sizes
-    // are physical and clamped against cell size so Low quality does not turn
-    // into one-cell checkerboard noise. These fields deliberately read no
-    // neighbours and do not infer context-aware bridge/sheet support.
-    float2 broadPosition = physicalPosition +
-        float2(_FoamTime * 0.18, _FoamTime * 0.07);
-    float broad = EvaluateFoamSourceFillField(
-        broadPosition,
-        patternSeed + 17.0,
-        max(0.95, maximumCellSpacing * 5.0));
-
-    float2 cutPosition = physicalPosition +
-        float2(-_FoamTime * 0.09, _FoamTime * 0.13) +
-        float2(material.materialPattern * 1.7, material.materialPattern * -1.1);
-    float cut = EvaluateFoamSourceFillField(
-        cutPosition,
-        patternSeed + 59.0,
-        max(0.42, maximumCellSpacing * 3.0));
-
-    float2 linePosition = float2(
-        physicalPosition.x * 0.58 + _FoamTime * 0.22,
-        physicalPosition.y * 2.10 - _FoamTime * 0.05 +
-            material.materialPattern * 6.0);
-    float lineNoise = FoamSourceFillValueNoise(
-        linePosition,
-        patternSeed + 113.0);
-    float narrowCut = 1.0 - smoothstep(
-        0.10,
-        0.24,
-        abs(lineNoise - 0.5));
-
-    return saturate(broad * 0.58 + cut * 0.32 + narrowCut * 0.10);
-}
-
-float FoamEvaluateLocalProceduralBreakupShape(
-    FoamMaterialState material,
-    int2 coordinate,
-    float validFluid)
-{
-    float baseShape = FoamEvaluateIntrinsicShapeMask(material, validFluid);
-    if (baseShape <= FoamMaterialStateEpsilon)
-    {
-        return 0.0;
-    }
-
-    float presence = saturate(material.presence);
-    float remainingLife = saturate(material.remainingLife);
-
-    // Presence is the only local, no-neighbour proxy available for edge
-    // exposure. Strong cores are preserved; soft/partial cells near contours
-    // are allowed to chip. Older material becomes more fragile, but life is
-    // read-only and never modified here.
-    float edgeExposure = 1.0 - smoothstep(0.70, 0.96, presence);
-    float lifeFragility = 1.0 - smoothstep(0.28, 0.82, remainingLife);
-    float patternFragility = lerp(0.82, 1.18, material.materialPattern);
-    float breakupPermission = saturate(
-        edgeExposure * lerp(0.42, 1.0, lifeFragility) *
-        patternFragility);
-
-    if (breakupPermission <= 0.001)
-    {
-        return baseShape;
-    }
-
-    float2 physicalCellSpacing;
-    float2 physicalPosition = FoamResolveMaterialPhysicalPosition(
-        coordinate,
-        physicalCellSpacing);
-    float breakupField = FoamEvaluateLocalBreakupField(
-        physicalPosition,
-        physicalCellSpacing,
-        material);
-
-    float threshold = lerp(0.12, 0.64, breakupPermission);
-    float transitionWidth = lerp(0.16, 0.055, breakupPermission);
-    float cutAmount = (1.0 - smoothstep(
-        threshold - transitionWidth,
-        threshold + transitionWidth,
-        breakupField)) * breakupPermission;
-
-    float maximumRemoval = lerp(0.24, 0.86, edgeExposure) *
-        lerp(0.62, 1.0, lifeFragility);
-    float keep = saturate(1.0 - cutAmount * maximumRemoval);
-
-    // Keep a little soft shoulder in partially covered cells so the probe
-    // reads as frayed film rather than hard binary noise.
-    float softenedKeep = lerp(keep, smoothstep(0.04, 0.96, keep), 0.35);
-    return saturate(baseShape * softenedKeep);
-}
-
 [numthreads(8, 8, 1)]
 void EvaluateFoamShape(uint3 dispatchId : SV_DispatchThreadID)
 {
@@ -249,20 +130,18 @@ void EvaluateFoamShape(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    // 4.11C.5.11: first isolated Layer D local-breakup probe. This keeps
-    // Layer C material truth untouched and uses only per-cell material data,
-    // physical position, time, seed, and local procedural fields. It is not
-    // intended to solve structural bridge/sheet support; it tests the cheapest
-    // no-neighbour chipping/fray layer before any low-res helper fields exist.
+    // 4.11C.5.11B: Layer D is intentionally reset to a truthful
+    // pass-through baseline. Validation proved the 5.9z coordinate-warp
+    // changed values without useful visible structure, and the 5.11 local
+    // breakup probe exposed cell/ribbon artifacts. Future Layer D work should
+    // add macro film-support/bridge/pinch structure on top of this clean
+    // baseline; fine breakup belongs in Layer E shader composition.
     float4 packed = FoamClipPackedToValidFluid(
         _FoamStateRead.Load(int3(coordinate, 0)),
         validFluid);
     FoamMaterialState material = FoamDecodeMaterialState(packed);
     _FoamShapeMaskWrite[coordinate] =
-        FoamEvaluateLocalProceduralBreakupShape(
-            material,
-            coordinate,
-            validFluid);
+        FoamEvaluateIntrinsicShapeMask(material, validFluid);
 }
 
 [numthreads(8, 8, 1)]

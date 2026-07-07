@@ -3080,7 +3080,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.FoamEvaluatedShape:
                     return
-                        "Layer D evaluated Foam Shape product sampled from _FoamShapeMask. In 4.11C.5.11 this applies a local-only procedural breakup probe over clipped raw Persistent Presence. It is not Final Foam and not a separate material truth.";
+                        "Layer D evaluated Foam Shape product sampled from _FoamShapeMask. After 4.11C.5.11B this is intentionally reset to clipped raw Persistent Presence as a clean baseline; the 5.11 Layer D local-breakup probe was retired because it exposed cell/ribbon artifacts. It is not Final Foam and not a separate material truth.";
 
                 case StylizedRiverFoamDebugView.FoamShapeDifference:
                     return

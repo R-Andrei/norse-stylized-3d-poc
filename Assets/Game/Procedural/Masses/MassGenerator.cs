@@ -946,9 +946,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             if (selected.Count == 0)
             {
-                rejectReason = EdgeWearBevelRejectReason.Validation;
+                rejectReason = EdgeWearBevelRejectReason.ValidationGlobal;
                 return false;
             }
+
+            float localBaseFaceMinArea = Mathf.Max(
+                TinyFaceAreaEpsilon * 4f,
+                minimumStableFaceArea * 0.2f);
+            float localBevelFaceMinArea = Mathf.Max(
+                TinyFaceAreaEpsilon * 4f,
+                minimumStableFaceArea * 0.12f);
+            float localCapFaceMinArea = Mathf.Max(
+                TinyFaceAreaEpsilon * 2f,
+                minimumStableFaceArea * 0.05f);
+            float localBaseMinEdgeLength = Mathf.Max(
+                PlaneEpsilon * 8f,
+                minimumStableEdgeLength * 0.35f);
+            float localBevelMinEdgeLength = Mathf.Max(
+                PlaneEpsilon * 8f,
+                minimumStableEdgeLength * 0.25f);
+            float localCapMinEdgeLength = Mathf.Max(
+                PlaneEpsilon * 4f,
+                minimumStableEdgeLength * 0.15f);
 
             List<PolygonFace> localRebuiltFaces =
                 new List<PolygonFace>(sourceFaces.Count + selected.Count * 5);
@@ -984,6 +1003,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     CalculatePolygonArea(polygon) <= minimumStableFaceArea)
                 {
                     rejectReason = EdgeWearBevelRejectReason.FaceClip;
+                    return false;
+                }
+
+                if (cutsByFace.ContainsKey(faceIndex) &&
+                    !ValidateLocalEdgeWearFace(
+                        polygon,
+                        localBaseFaceMinArea,
+                        localBaseMinEdgeLength))
+                {
+                    rejectReason = EdgeWearBevelRejectReason.ValidationBaseFace;
                     return false;
                 }
 
@@ -1061,6 +1090,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     return false;
                 }
 
+                if (!ValidateLocalEdgeWearFace(
+                        cleanBevel,
+                        localBevelFaceMinArea,
+                        localBevelMinEdgeLength) ||
+                    Vector3.Dot(
+                        CalculatePolygonNormal(cleanBevel),
+                        candidate.BevelNormal) < 0.35f)
+                {
+                    rejectReason = EdgeWearBevelRejectReason.ValidationBevelFace;
+                    return false;
+                }
+
                 localRebuiltFaces.Add(
                     new PolygonFace(
                         cleanBevel,
@@ -1075,7 +1116,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     candidate.Strength,
                     railA.Start,
                     railB.Start,
-                    minimumStableFaceArea);
+                    localCapFaceMinArea,
+                    localCapMinEdgeLength);
                 AddEndpointCapFace(
                     localRebuiltFaces,
                     bounds,
@@ -1083,18 +1125,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     candidate.Strength,
                     railA.End,
                     railB.End,
-                    minimumStableFaceArea);
+                    localCapFaceMinArea,
+                    localCapMinEdgeLength);
             }
 
             WeldSharedVertices(localRebuiltFaces);
             SanitizeAllFaces(localRebuiltFaces);
 
-            if (!ValidatePolyhedronFaces(
+            if (CountFeatureFaces(
                     localRebuiltFaces,
-                    minimumStableFaceArea,
-                    minimumStableEdgeLength))
+                    PolygonFaceFeature.ConvexEdgeWear) < selected.Count)
             {
-                rejectReason = EdgeWearBevelRejectReason.Validation;
+                rejectReason = EdgeWearBevelRejectReason.ValidationBevelFace;
                 return false;
             }
 
@@ -1102,20 +1144,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return true;
         }
 
-        private static void AddEndpointCapFace(
+        private static bool AddEndpointCapFace(
             List<PolygonFace> rebuiltFaces,
             Bounds bounds,
             Vector3 origin,
             float strength,
             Vector3 firstRailPoint,
             Vector3 secondRailPoint,
-            float minimumStableFaceArea)
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength)
         {
             if (AreSamePoint(origin, firstRailPoint) ||
                 AreSamePoint(origin, secondRailPoint) ||
                 AreSamePoint(firstRailPoint, secondRailPoint))
             {
-                return;
+                return false;
             }
 
             Vector3 normal = Vector3.Cross(
@@ -1123,7 +1166,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 secondRailPoint - origin);
             if (normal.sqrMagnitude <= MinimumEdgeLengthSqr)
             {
-                return;
+                return false;
             }
 
             normal.Normalize();
@@ -1145,8 +1188,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 capFace.Vertices,
                 capFace.Normal);
 
-            if (cleanCap.Count >= 3 &&
-                CalculatePolygonArea(cleanCap) > minimumStableFaceArea)
+            if (ValidateLocalEdgeWearFace(
+                    cleanCap,
+                    minimumStableFaceArea,
+                    minimumStableEdgeLength))
             {
                 rebuiltFaces.Add(
                     new PolygonFace(
@@ -1154,7 +1199,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         capFace.Normal,
                         capFace.Feature,
                         capFace.FeatureStrength));
+                return true;
             }
+
+            return false;
         }
 
         private static void AddFaceInsetCut(
@@ -1638,6 +1686,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             return count;
+        }
+
+        private static bool ValidateLocalEdgeWearFace(
+            List<Vector3> vertices,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength)
+        {
+            if (vertices.Count < 3 ||
+                CalculatePolygonArea(vertices) <= minimumStableFaceArea)
+            {
+                return false;
+            }
+
+            float minimumEdgeLengthSqr =
+                minimumStableEdgeLength * minimumStableEdgeLength;
+            for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
+            {
+                Vector3 start = vertices[vertexIndex];
+                Vector3 end = vertices[(vertexIndex + 1) % vertices.Count];
+                if ((end - start).sqrMagnitude <= minimumEdgeLengthSqr)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static bool ValidatePolyhedronFaces(
@@ -3798,7 +3872,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             FaceClip,
             RailExtraction,
             BevelFace,
-            Validation
+            ValidationBaseFace,
+            ValidationBevelFace,
+            ValidationCapFace,
+            ValidationGlobal
         }
 
         private struct EdgeWearBevelBuildStats
@@ -3810,7 +3887,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int RejectedFaceClip;
             public int RejectedRailExtraction;
             public int RejectedBevelFace;
-            public int RejectedValidation;
+            public int RejectedValidationBaseFace;
+            public int RejectedValidationBevelFace;
+            public int RejectedValidationCapFace;
+            public int RejectedValidationGlobal;
             public int RejectedUnknown;
 
             public EdgeWearBevelBuildStats(int candidateCount, int selectedCount)
@@ -3822,7 +3902,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 RejectedFaceClip = 0;
                 RejectedRailExtraction = 0;
                 RejectedBevelFace = 0;
-                RejectedValidation = 0;
+                RejectedValidationBaseFace = 0;
+                RejectedValidationBevelFace = 0;
+                RejectedValidationCapFace = 0;
+                RejectedValidationGlobal = 0;
                 RejectedUnknown = 0;
             }
 
@@ -3842,8 +3925,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     case EdgeWearBevelRejectReason.BevelFace:
                         RejectedBevelFace++;
                         break;
-                    case EdgeWearBevelRejectReason.Validation:
-                        RejectedValidation++;
+                    case EdgeWearBevelRejectReason.ValidationBaseFace:
+                        RejectedValidationBaseFace++;
+                        break;
+                    case EdgeWearBevelRejectReason.ValidationBevelFace:
+                        RejectedValidationBevelFace++;
+                        break;
+                    case EdgeWearBevelRejectReason.ValidationCapFace:
+                        RejectedValidationCapFace++;
+                        break;
+                    case EdgeWearBevelRejectReason.ValidationGlobal:
+                        RejectedValidationGlobal++;
                         break;
                     default:
                         RejectedUnknown++;
@@ -3857,7 +3949,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     $"candidates={CandidateCount}, selected={SelectedCount}, accepted={AcceptedCount}, " +
                     $"rejectedInsetCut={RejectedInsetCut}, rejectedFaceClip={RejectedFaceClip}, " +
                     $"rejectedRailExtraction={RejectedRailExtraction}, rejectedBevelFace={RejectedBevelFace}, " +
-                    $"rejectedValidation={RejectedValidation}, rejectedUnknown={RejectedUnknown}.";
+                    $"rejectedValidationBaseFace={RejectedValidationBaseFace}, " +
+                    $"rejectedValidationBevelFace={RejectedValidationBevelFace}, " +
+                    $"rejectedValidationCapFace={RejectedValidationCapFace}, " +
+                    $"rejectedValidationGlobal={RejectedValidationGlobal}, " +
+                    $"rejectedUnknown={RejectedUnknown}.";
             }
         }
 

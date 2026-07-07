@@ -1,8 +1,8 @@
 # Generated Mass Feature Implementation Checklist
 
 Status: active implementation checklist  
-Current patch: EW-4B.3 — Geometry Edge-Wear Diagnostics and Rejection Evidence  
-Next patch: determined by EW-4B.3 rejection evidence
+Current patch: EW-4B.4 — Candidate-Local Bevel Validation  
+Next patch: visual/topology tuning after accepted bevel faces are confirmed
 
 ---
 
@@ -329,3 +329,20 @@ Validation focus after EW-4B.3:
 1. Use `Surface Mask Debug = ConvexEdgeWear`, not Convex Boundary Proximity.
 2. If it is dark, check the editor console warning for rejection counts.
 3. Fix the bevel generator based on the dominant rejection bucket.
+
+## EW-4B.4 checklist status
+
+Completed in EW-4B.4:
+
+- Removed whole-rebuilt-polyhedron validation as the per-candidate acceptance gate for local edge-strip bevels.
+- Added candidate-local face validation for clipped base faces and generated bevel strips.
+- Added relaxed validation for optional endpoint cap faces; invalid caps are skipped rather than rejecting the candidate.
+- Split the former broad `rejectedValidation` console bucket into `rejectedValidationBaseFace`, `rejectedValidationBevelFace`, `rejectedValidationCapFace`, and `rejectedValidationGlobal`.
+- Kept FeatureAtlas0/1 debug-only and did not modify shader, MeshData, MeshBuilder, GeneratedGround, or ground generation.
+
+Validation focus after EW-4B.4:
+
+1. Use `Surface Mask Debug = ConvexEdgeWear`.
+2. Confirm the warning is gone or `accepted > 0` appears in the console summary.
+3. If still failing, use the split validation bucket to identify whether the remaining blocker is base-face, bevel-face, cap-face, or global validation.
+4. Only tune visual controls after physical bevel faces exist.

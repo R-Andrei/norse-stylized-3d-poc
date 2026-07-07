@@ -1136,7 +1136,7 @@ Transition-hold fallback for _FoamShapeMask may still be product-imprecise durin
 Shader-side Final Foam still owns legacy macro shaping until Layer D earns the production switch.
 ```
 
-Next active implementation direction is the local procedural breakup probe, followed by low-res Layer D Film Source / Film Support for broad structural sheet behavior.
+Current active direction after later validation: the Layer D local-breakup probe was tested in `4.11C.5.11` and retired in `4.11C.5.11B` because it exposed cell/ribbon artifacts. The next active implementation direction is a Layer E shader-side local-detail probe, followed by low-res Layer D Film Source / Film Support for broad structural sheet behavior.
 
 
 
@@ -1161,7 +1161,7 @@ Material Presence ~= Foam Evaluated Shape
 Foam Shape Difference ~= black
 ```
 
-That baseline is intentional. Future Layer D work must now prove visible benefit explicitly, starting with the local procedural breakup probe and then the low-resolution Film Source / Film Support system for broad structural sheet/contact/bridge behavior.
+That baseline is intentional. `4.11C.5.11` then tested the local procedural breakup idea inside Layer D and `4.11C.5.11B` retired it after validation showed cell/ribbon-shaped artifacts. Future Layer D work must now prove broad structural benefit explicitly through low-resolution Film Source / Film Support; fine breakup should be tested in Layer E shader composition.
 
 ## 2026-07-07 — River Foam 4.11C.5.11 Local Procedural Breakup Probe
 
@@ -1197,3 +1197,42 @@ Final Foam = unchanged.
 ```
 
 The probe is not expected to solve broad bank-hugging film, contact sheets, bridge/rejoin behavior, or context-aware merging. Those remain the job of future low-resolution Layer D Film Source / Film Support fields if local-only breakup proves insufficient.
+
+## 2026-07-07 — River Foam 4.11C.5.11B Retire Layer D Local Breakup Probe
+
+Validation of `4.11C.5.11` confirmed that the local breakup probe was active: `Foam Shape Difference` became clearly non-black, mostly magenta/removal. However, the removals appeared as long simulation-cell or ribbon-shaped gaps. The result exposed `_FoamShapeMask` cell scale instead of producing the granular, almost atomic breakup seen in the inspiration river.
+
+Conclusion:
+
+```text
+Layer D local-only breakup is rejected as the fine-fragmentation solution.
+The failure is not inactivity; it is a layer/resolution mismatch.
+_FoamShapeMask is appropriate for macro film structure, not per-pixel granular edge damage.
+Fine breakup, tiny cuts, and thin streaks belong in Layer E shader composition.
+Layer D should focus on broad sheets, contact support, bridge/pinch/split, and smooth macro shape.
+```
+
+`4.11C.5.11B` retires the active Layer D local-breakup code. `EvaluateFoamShape` is reset to pass-through clipped persistent `Presence`, and the local helpers are removed from `CS_RiverFoam.compute`:
+
+```text
+FoamResolveMaterialPhysicalPosition(...)
+FoamEvaluateLocalBreakupField(...)
+FoamEvaluateLocalProceduralBreakupShape(...)
+```
+
+`DispatchEvaluateShape()` no longer binds `_FoamTime`, `_FoamSeed`, `_FoamGlobalStart`, `_FoamFieldLength`, or `_FoamMetricRows` for the baseline shape pass. The intended validation state returns to:
+
+```text
+Material Presence ~= Foam Evaluated Shape
+Foam Shape Difference = black or effectively black
+Final Foam = unchanged
+```
+
+Current active implementation direction after this cleanup:
+
+```text
+1. Test Layer E shader-side local detail for sub-cell chipping/fray/thin streaks.
+2. Add low-res Layer D Film Source / Film Support for broad sheet/contact/bridge behavior.
+3. Integrate accepted macro support into _FoamShapeMask.
+4. Switch Final Foam to _FoamShapeMask only after Layer D visibly outperforms current final foam.
+```

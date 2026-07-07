@@ -1,8 +1,8 @@
 # Generated Mass Edge Wear Recovery Architecture
 
 Status: active recovery plan  
-Current patch: EW-4B.3 — Geometry Edge-Wear Diagnostics and Rejection Evidence  
-Next production patch: determined by EW-4B.3 rejection evidence
+Current patch: EW-4B.4 — Candidate-Local Bevel Validation  
+Next production patch: visual/topology tuning after accepted bevel faces are confirmed
 
 ---
 
@@ -288,15 +288,32 @@ The goal is topology robustness first. It is still not the final rounded/chipped
 
 EW-4B.3 corrects the debugging workflow rather than adding a new visual mode. The existing `ConvexEdgeWear` surface-mask mode is the geometry-mask view and should be used to validate UV2.z bevel/wear faces. `Convex Boundary Proximity` remains an atlas diagnostic and must not be used as proof of geometry bevel generation.
 
-The generator now tracks why local bevel candidates are rejected:
+The generator now tracks why local bevel candidates are rejected. EW-4B.4 splits the former broad `Validation` bucket into base-face, bevel-face, cap-face, and global validation buckets.
 
 ```text
 InsetCut
 FaceClip
 RailExtraction
 BevelFace
-Validation
+ValidationBaseFace
+ValidationBevelFace
+ValidationCapFace
+ValidationGlobal
 Unknown
 ```
 
 If edge wear is enabled and all selected candidates fail, the editor receives a warning with candidate, selected, accepted, and rejection counts. The next bevel-topology fix must be based on those counts instead of screenshot inference.
+
+## EW-4B.4 update — candidate-local validation replaces whole-mesh candidate rejection
+
+EW-4B.3 console evidence showed the important pattern: local bevel candidates were selected and constructed, but accepted count stayed at zero because every attempted candidate failed only in the final validation bucket. Code inspection identified the reason: the local bevel build used `ValidatePolyhedronFaces(localRebuiltFaces, ...)` as the per-candidate acceptance gate. That function validates every face and every edge in the rebuilt mass, which is too broad for a local optional bevel candidate.
+
+EW-4B.4 changes the acceptance rule. A candidate is now rejected by validation only when the candidate-local changed geometry is unstable:
+
+- a clipped base face touched by the candidate fails local face/edge checks;
+- the generated bevel strip fails local face/edge/normal checks;
+- a required global sanity condition fails.
+
+Endpoint cap faces are treated as optional. If a cap degenerates or falls below the relaxed cap threshold, it is skipped rather than killing the bevel strip. The final whole-polyhedron validator remains available for older global clipping code paths, but it is no longer the local edge-strip candidate killer.
+
+Validation after this patch must use `Surface Mask Debug = ConvexEdgeWear`. A successful first result is not “beautiful bevels”; it is `accepted > 0` in the console and visible UV2.z geometry-mask faces. Visual width/coverage/tint tuning comes after that proof.

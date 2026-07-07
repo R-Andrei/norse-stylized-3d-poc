@@ -1,7 +1,7 @@
 # Generated Mass Framework
 
 Status: active framework definition  
-Current implementation patch: EW-4B.3 — Geometry Edge-Wear Diagnostics and Rejection Evidence  
+Current implementation patch: EW-4B.4 — Candidate-Local Bevel Validation  
 Supersedes: older Patch 14C/14D and EW-3A.1 through EW-3A.6 atlas-first/runtime edge-wear plans.
 
 ---
@@ -455,3 +455,17 @@ Only `ConvexEdgeWear` proves that geometry bevel faces reached the final mesh da
 EW-4B.3 records local bevel candidate counts, selected counts, accepted counts, and concrete rejection buckets. If edge wear is enabled but no local bevel faces are accepted, the editor console reports the counts instead of silently returning the unmodified mass.
 
 This patch is intentionally diagnostic/evidence-oriented. It does not change bevel selection, bevel width, shader response, or atlas policy.
+
+## EW-4B.4 candidate-local bevel validation update
+
+EW-4B.3 rejection evidence isolated the current geometry blocker: selected local bevel candidates were reaching construction, but every attempted build was rejected by the final whole-polyhedron `ValidatePolyhedronFaces(localRebuiltFaces, ...)` gate. That validator checked every rebuilt face and edge, so one unrelated or harmless tiny edge could reject the candidate even after inset cuts, face clipping, rail extraction, and bevel-face construction had already succeeded.
+
+EW-4B.4 removes that whole-polyhedron validation as the per-candidate acceptance gate. Candidate acceptance now validates the candidate-local changed geometry instead:
+
+- clipped base faces touched by bevel inset cuts;
+- generated bevel strip faces;
+- optional endpoint cap faces using relaxed cap thresholds.
+
+Endpoint caps remain optional closure helpers. Degenerate or too-small caps are skipped instead of rejecting an otherwise valid bevel strip. After welding/sanitizing, the pass only requires that the rebuilt candidate set still contains at least one generated `ConvexEdgeWear` face per selected accepted candidate.
+
+The rejection statistics are also split so future console warnings identify whether a candidate failed base-face, bevel-face, cap-face, or global validation instead of reporting one broad `Validation` bucket. EW-4B.4 does not modify the shader, FeatureAtlas0/1, MeshData, MeshBuilder, GeneratedGround, or the ground generator.

@@ -1319,12 +1319,12 @@ No downstream layer may feed an upstream layer.
 
 ## Active implementation direction
 
-Do not tune 5.9z coordinate warp as the primary solution. The compliance/debug audit and `Foam Shape Difference` debug view were completed in `4.11C.5.10`; the failed coordinate warp was retired in `4.11C.5.10B`. The next work should be:
+Do not tune 5.9z coordinate warp as the primary solution. The compliance/debug audit and `Foam Shape Difference` debug view were completed in `4.11C.5.10`; the failed coordinate warp was retired in `4.11C.5.10B`. `4.11C.5.11` then tested local procedural breakup inside Layer D, but validation showed cell/ribbon-shaped artifacts because `_FoamShapeMask` is too coarse for atomic detail. `4.11C.5.11B` retires that probe and restores the clean pass-through Layer D baseline. The next work should be:
 
 ```text
-1. Test cheap local procedural breakup for edge chipping/fray/cuts.
+1. Test Layer E shader-side local detail for sub-cell chipping/fray/thin streaks.
 2. Add low-res Layer D Film Source / Film Support for broad sheet/contact/bridge behavior.
-3. Integrate those fields into full-res _FoamShapeMask.
+3. Integrate accepted macro support into full-res _FoamShapeMask.
 4. Switch Final Foam to _FoamShapeMask only after the evaluated shape is visibly better than current final foam.
 ```
 
@@ -1374,8 +1374,12 @@ FoamDecodeMaterialState(...)
 RiverWaterFoamResult.materialUV
 ```
 
-## Addendum — River Foam 4.11C.5.11 Local Procedural Breakup Probe
+## Addendum — River Foam 4.11C.5.11 / 5.11B Local Breakup Probe Retired
 
-After the failed 5.9z coordinate warp was retired in `4.11C.5.10B`, `4.11C.5.11` adds the first cheap local-only Layer D breakup probe. The probe writes `_FoamShapeMask` from `EvaluateFoamShape`, reads only current-cell material data plus river physical position/time/seed, and does not sample neighbouring FoamState cells. It is designed to answer whether local procedural math can provide useful edge chipping, fray, small cuts, life-based fragility, and semi-organized local chaos before a low-res structural support field is added.
+After the failed 5.9z coordinate warp was retired in `4.11C.5.10B`, `4.11C.5.11` tested a cheap local-only Layer D breakup probe. The probe obeyed the dependency rules: it wrote only `_FoamShapeMask`, read only current-cell material data plus river physical position/time/seed, did not sample neighbouring FoamState cells, did not mutate persistent material, and kept Final Foam disconnected.
 
-This remains a diagnostic/product-layer test only. Final Foam is not switched to `_FoamShapeMask`. Persistent FoamState remains Layer C truth. If validation shows the result is weak, too noisy, or unable to create the desired broad film behavior, the next architecture step remains low-resolution Layer D Film Source / Film Support for broad sheet/contact/bridge behavior.
+Validation showed the probe was active, but unsuitable: `Foam Shape Difference` showed mostly magenta/removal, and the removals appeared as long simulation-cell/ribbon-shaped holes. The result exposed `_FoamShapeMask` cell scale instead of producing granular, almost atomic breakup.
+
+`4.11C.5.11B` retires the probe as active code. `EvaluateFoamShape` is reset to pass-through clipped Persistent Presence, the local helper functions are removed from `CS_RiverFoam.compute`, and `DispatchEvaluateShape()` no longer binds the physical-position/time/seed data required only by that rejected probe.
+
+Current rule: Layer D owns macro film structure, broad sheet/contact/bridge/pinch behavior, and a clean `_FoamShapeMask` foundation. Fine fragmentation, tiny cuts, edge granularity, and thin streaks belong in Layer E shader composition.

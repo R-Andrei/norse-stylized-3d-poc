@@ -283,11 +283,11 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 
 **Canonical document:** `River_Foam_Stage6_Architecture.md` owns the Foam architecture. It is now the guiding source of truth for data ownership, dependencies, allowed/forbidden reads, visual target decomposition, debug requirements, rejected approaches, and implementation sequence. `River_Foam_Active_Blockers_and_Next_Patches.md` owns only the current recovery queue.
 
-`4.11C.5.11` begins the first post-baseline Layer D visual probe: local procedural breakup. It remains debug/product-only, writes only `_FoamShapeMask`, uses no neighbour sampling and no helper fields, and keeps Final Foam disconnected. Its purpose is to prove or reject the cheap local chipping/fray layer before low-res Film Source / Film Support is added for broad sheet/contact/bridge behavior.
+`4.11C.5.11` tested the first post-baseline Layer D local procedural breakup probe. Validation rejected it as the fine-fragmentation solution: it was active, but the removals were cell/ribbon-shaped because `_FoamShapeMask` is the wrong resolution for atomic detail. `4.11C.5.11B` retires that code and restores the clean pass-through Layer D baseline. Fine breakup now belongs in Layer E shader composition; Layer D should focus on macro sheet/contact/bridge structure.
 
 ### Current status after architecture lock
 
-Stage 6 is in the `4.11C` manually-born persistent material phase. The code already has persistent `FoamState`, external Motion Field / obstacle-routing inputs, `_FoamShapeMask`, `Foam Evaluated Shape`, and `Foam Shape Difference` debug views. The 5.9z coherent coordinate-warp prototype proved the Layer D product slot and C# binding path, and 5.10 validation proved it produced nonzero signed differences, but it was visually ineffective because tiny inverse-sampled coordinate displacement cannot create broad sheet/bridge/pinch behavior from solid masks. 5.10B retires that warp and resets Layer D to a clean pass-through baseline.
+Stage 6 is in the `4.11C` manually-born persistent material phase. The code already has persistent `FoamState`, external Motion Field / obstacle-routing inputs, `_FoamShapeMask`, `Foam Evaluated Shape`, and `Foam Shape Difference` debug views. The 5.9z coherent coordinate-warp prototype proved the Layer D product slot and C# binding path, and 5.10 validation proved it produced nonzero signed differences, but it was visually ineffective because tiny inverse-sampled coordinate displacement cannot create broad sheet/bridge/pinch behavior from solid masks. 5.10B retired that warp and reset Layer D to a clean pass-through baseline. 5.11 then proved that Layer D local breakup is also the wrong place for fine detail because it exposes foam-field cell/ribbon artifacts; 5.11B retires that probe and restores the clean pass-through baseline again.
 
 Therefore the active direction is no longer “tune coherent deformation harder.” The active direction is the corrected acyclic layer architecture:
 
@@ -330,6 +330,7 @@ Rejected or superseded as active planning direction:
 - 5.9y dense interior holes are rejected because they produced marbled/scratched interiors unlike the reference river;
 - 5.9y.1 tiny local edge-fray is rejected because it spent compute for practically no visible effect;
 - 5.9z coordinate warp is rejected and retired because it produced numeric differences without useful visible structural change and cannot create structural sheet/bridge/pinch behavior by itself;
+- 5.11 Layer D local procedural breakup is rejected and retired because it produced visible but cell/ribbon-shaped removals; fine breakup belongs in Layer E shader composition at rendered-pixel scale;
 - naive multi-radius edge classification is rejected as a default: radius 1/3/5 box sampling costs `179` samples per cell, about `2.93M` samples for a 128×128 field evaluation;
 - final shader macro stretch/warp must not be treated as the source of broad Foam structure;
 - pocket IDs, connected components, and foam entity databases remain rejected unless explicitly reopened.
@@ -360,11 +361,11 @@ The current approved order is:
 1. Documentation lock and acyclic architecture correction — complete in the canonical docs update.
 2. Compliance and debug truth audit — complete in 4.11C.5.10; Foam Shape Difference now compares _FoamShapeMask against raw Persistent Presence, stale movement labels were corrected, and current Layer D dispatch is gated to Layer D debug use while Final Foam remains disconnected.
 3. Failed 5.9z warp retirement — complete in 4.11C.5.10B; EvaluateFoamShape is back to pass-through clipped Persistent Presence so future work starts from a clean Layer D baseline.
-4. Local procedural breakup probe — next implementation step; test cheap local chipping/fray/cuts before adding structural helper fields.
+4. Layer E shader-side local detail probe — test cheap sub-cell chipping/fray/cuts/thin streaks at rendered-pixel scale, without mutating `_FoamShapeMask` or `FoamState`.
 5. Low-res Layer D Film Source / Film Support — add fixed-grid visual sheet/contact/bridge support without entities or feedback.
-6. Full-res _FoamShapeMask integration — combine persistent material, visual support, local breakup, valid fluid, and exclusion.
+6. Full-res _FoamShapeMask integration — combine persistent material, visual support, valid fluid, and exclusion into macro structure.
 7. Final Foam consumes _FoamShapeMask — only after Layer D visibly outperforms current final foam.
-8. Thin bright streak layer — shader-side local detail, separate from broad film structure.
+8. Thin bright streak layer — shader-side local detail, separate from broad film structure; this may merge with item 4 if the probe is accepted.
 9. Optional visual-only history — only if flicker becomes a real issue.
 10. Performance tiers and chunk scheduling — formalize update rates, resolution tiers, active chunk caps, and profiling counters.
 

@@ -166,64 +166,59 @@ DispatchEvaluateShape no longer binds Motion Field / obstacle-routing inputs bec
 Foam Shape Difference remains available and should now be mostly black until a new Layer D component is added.
 ```
 
-4.11C.5.11 implements the isolated local procedural breakup probe on top of that clean baseline.
+4.11C.5.11 then implemented an isolated local procedural breakup probe on top of the clean baseline. Validation showed that the probe was active, but it was the wrong layer for fine fragmentation.
 
-5.11 facts:
+5.11 validation facts:
 
 ```text
-EvaluateFoamShape remains the only writer of _FoamShapeMask.
-The new breakup logic reads only current cell material, local physical position, time, seed, and existing domain/valid-fluid data.
-It does not sample neighbouring FoamState cells.
-It does not read Motion Field, obstacle routing, topology support, or any low-res helper field.
-It does not write FoamState, Remaining Life, Material Pattern, topology, support, or Final Foam.
-DispatchEvaluateShape binds _FoamTime, _FoamSeed, _FoamGlobalStart, _FoamFieldLength, and _FoamMetricRows because the local procedural field is physical-space and animated.
+Foam Shape Difference became clearly non-black, mostly magenta/removal.
+The removals appeared as long cell/ribbon-shaped holes, not granular foam breakup.
+The effect exposed the foam-field cell structure instead of hiding it.
+Material Presence and Final Foam remained separate as intended.
 ```
 
-Purpose:
+Conclusion:
 
 ```text
-Test how much edge chipping/fray/small-cut behavior can be obtained from cheap local procedural math before adding low-res structural helpers.
+Layer D local-only procedural removal is rejected as the fine fragmentation solution.
+The problem was not that the probe was inactive; the problem was that _FoamShapeMask cell resolution is the wrong scale for atomic/chipped edge detail.
+Fine fragmentation, tiny cuts, and thin streaks belong in Layer E shader composition where the unit is a rendered pixel, not a foam simulation cell.
+Layer D should remain responsible for macro film structure only: broad sheets, contact support, bridge/pinch/split, and smooth shape foundation.
 ```
 
-Expected validation:
+5.11B cleanup:
 
 ```text
-Material Presence = persistent truth.
-Foam Evaluated Shape = local-breakup Layer D product.
-Foam Shape Difference = non-black mostly around contours/fragile regions where local breakup removes visible coverage.
-Final Foam = unchanged, because it still does not consume _FoamShapeMask.
+EvaluateFoamShape is reset again to pass-through clipped Persistent Presence.
+The local-breakup helper functions are removed from CS_RiverFoam.compute.
+DispatchEvaluateShape no longer binds _FoamTime, _FoamSeed, _FoamGlobalStart, _FoamFieldLength, or _FoamMetricRows for the baseline shape pass.
+Foam Shape Difference should again be fully black or nearly black until a new Layer D structural component is intentionally added.
 ```
 
 ---
 
 # Active blockers
 
-## Blocker 1 — Local procedural breakup requires validation
+## Blocker 1 — Fine breakup belongs in Layer E, not Layer D cells
 
 Current problem:
 
 ```text
-4.11C.5.11 implements the cheapest no-neighbour local breakup probe, but it has not yet been visually validated in Unity.
+4.11C.5.11 proved that local no-neighbour breakup inside _FoamShapeMask creates visible difference, but the difference is cell/ribbon-shaped because Layer D writes a foam-field texture, not final pixels.
 ```
 
-Validation question:
+Required future system:
 
 ```text
-Can local procedural math alone produce useful edge chipping/fracture/detail without Swiss-cheese interiors or useless barely-visible changes?
+A shader-side Layer E local-detail probe that samples the clean Layer D mask and applies sub-cell/per-pixel procedural edge breakup, granular cuts, thin scratches, and highlight streaks without writing FoamState or _FoamShapeMask.
 ```
 
-The probe intentionally tests:
+Strict limit:
 
 ```text
-edge chipping
-small cuts
-life-based fragility
-material-pattern variation
-animated local chaos
-very small thin-cut detail
+Layer E may create local visual detail and thin streaks.
+Layer E must not own broad structural connectivity and must never feed back into compute.
 ```
-
-It intentionally does not attempt broad bridge/sheet/contact support.
 
 ## Blocker 2 — Broad sheet/support behavior requires Layer D helpers
 
@@ -310,29 +305,26 @@ no final rendering change
 no low-res helper textures yet
 ```
 
-## Patch C — Local procedural breakup probe
+## Patch C — Layer E shader-side local detail probe
 
 Scope:
 
 ```text
-Try the cheapest local-only visual breakup layer.
+Retest the cheap local-only visual-breakup idea at the correct resolution: shader pixels, not _FoamShapeMask cells.
+Sample the clean Layer D mask and apply local procedural edge breakup, granular cuts, thin scratches, and highlight/streak detail in a debug/final-shader path.
 No new entity system.
 No wide neighbourhood sampling.
 No persistent material mutation.
-```
-
-Allowed location:
-
-```text
-Stage D final shape evaluation or Stage E debug/final shader path, depending on whether it needs to be baked into _FoamShapeMask.
+No _FoamShapeMask mutation.
 ```
 
 Acceptance:
 
 ```text
-Visible edge chipping / local cuts / fray must appear without damaging interiors into marbled scratches.
-If useful, keep it as local detail.
-If not useful, do not keep tuning it endlessly.
+Fine breakup should read as sub-cell/per-pixel foam detail rather than simulation-grid holes.
+It may improve edge chipping, fray, thin cuts, and streaks.
+It is not expected to solve broad bridge/sheet/contact structure.
+If it still reads as noise or dirt, reject it quickly and do not keep tuning it endlessly.
 ```
 
 ## Patch D — Low-res Layer D Film Source / Film Support prototype

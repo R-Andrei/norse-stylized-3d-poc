@@ -8288,10 +8288,10 @@ MonoBehaviour:
   overallRockTint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   overallRockTintStrength: 0
   lightingTintInfluence: 0.8
-  edgeWearAmount: 1
-  edgeWearWidth: 1
-  edgeWearCoverage: 1.394
-  edgeWearSoftness: 0.638
+  edgeWearAmount: 0.741
+  edgeWearWidth: 0.956
+  edgeWearCoverage: 2
+  edgeWearSoftness: 0.463
   edgeWearResponseStrength: 1
   edgeWearBrightnessLift: 1
   edgeWearTint: {r: 0.7, g: 0.69, b: 0.62, a: 1}
