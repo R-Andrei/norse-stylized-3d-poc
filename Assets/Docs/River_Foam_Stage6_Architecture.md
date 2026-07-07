@@ -1,1161 +1,1708 @@
-# River Foam Stage 6 Architecture
+# River Foam Stage 6 Canonical Architecture
 
 ## Purpose
 
-This is the canonical architecture document for Stage 6 river Foam.
+This is the canonical architecture contract for Stage 6 river Foam.
 
-It replaces the older persistent-morph, lateral-row-commit, and final-shader-stretch plans as the long-term source of truth. Older patch notes remain historical only. Any statement in older docs, logs, or handoff notes that contradicts this document is superseded by this architecture contract.
+This document is the active source of truth for how the Foam system is allowed to work. It supersedes older persistent-morph, lateral-row-commit, pocket/entity, shader-macro-stretch, local-edge-fray, and one-off coherent-warp plans wherever they conflict with this contract.
 
-The roadmap owns macro stage order. The active blocker document owns the next patch sequence. This document owns what Foam is allowed to be.
+The goal is to reproduce the broad behavior of the visual inspiration river: stylized pale surface-film sheets, connected ribbons, bank and obstacle skirts, temporary bridges, pinches, fractures, edge chipping, small fragments, and thin bright surface streaks, while preserving a performance-safe field-based architecture.
 
-## Current implementation state after 4.11C.5.9y.2
+The target is not a physically exact fluid solver and not a foam entity database. The target is a fixed-grid mathematical field system with strict ownership boundaries and no circular dependencies.
 
-The current implementation is a stable field-based Foam baseline with a real evaluated-shape product but no accepted morphology behavior yet:
+---
 
-- persistent Foam material birth exists;
-- downstream phase transport exists;
-- Remaining Life aging exists;
-- topology/support/negative aging influence still exists and owns actual lifetime changes together with lifetime controls;
-- valid-fluid and obstacle clipping still exist;
-- the stale neighbour-sampling persistent morph path was removed from the compute simulation path;
-- unsafe lateral row-commit paths remain disabled after they caused smearing, pulsing, and cell-scale shredding;
-- the Unified Foam Motion Field and obstacle-routing field exist as generated/debug-visible intent fields;
-- dynamic/static disturbance fields still exist and remain important inputs for future shape behavior, but they no longer drive stored-state morphing;
-- actual lateral material transport is currently not active;
-- `_FoamShapeMask` exists and `Foam Evaluated Shape` debug displays it;
-- as of 5.9y.2, Stage 2 is reset to pass-through clipped Persistent `Presence`;
-- final Foam still does not consume `_FoamShapeMask`.
+# 0. Non-negotiable design goals
 
-Previously identified debug/UI contract drift has been corrected through 5.9w: Motion Field debug uses raw `Presence`, Motion Field + Cell Grid exists, stale Surface Morph Strength UI was quarantined, and Motion Field wording no longer claims active lateral material transport.
+## 0.1 Visual target decomposition
 
-The current baseline is intentionally conservative. It is not the target final Foam behavior. Its purpose is to preserve stable material and a truthful evaluated-shape slot while field-based coherent deformation and cheap visual bridge/break behavior are designed.
+The reference river is not one effect. It is a stack of visual phenomena:
 
-## Non-negotiable architecture rule
+1. **Broad pale surface film**  
+   Large white/pale sheets sit on the water surface. They read as continuous film rather than as discrete particles.
 
-Foam has exactly two foam data products and three processing stages.
+2. **Connected ribbons and current seams**  
+   Foam forms long broken bands along flow lanes, banks, rocks, and darker water pockets.
 
-Do not describe input fields, helper systems, or debug views as independent foam-authority layers. They are data sources or inspection tools. They do not get to mutate Foam by themselves.
+3. **Split / merge / pinch / reunite appearance**  
+   Visible film narrows, breaks, rejoins, and creates temporary necks. This must be visual field behavior, not per-pocket identity tracking.
+
+4. **Chipping and edge chaos**  
+   Edges chip, fray, crack, and flutter. This can be largely procedural and local.
+
+5. **Thin bright streaks**  
+   Narrow fast white scratches/streaks in the reference are not the same layer as broad film. They should be shader-side detail or a separate lightweight detail layer.
+
+6. **Bank / rock / obstacle contact foam**  
+   Pale film gathers around banks and obstacles. This is not merely transported material; the visual system needs external contact/support fields.
+
+## 0.2 Performance target
+
+The solution must remain viable for desktop PC first, including low-to-medium hardware. Mobile is not a target, but the game must not rely on high-end GPU headroom.
+
+The architecture must scale with:
+
+```text
+river field cells × update rate × active visible river chunks
+```
+
+not with:
+
+```text
+number of foam islands / pockets / entities
+```
+
+and not primarily with:
+
+```text
+screen pixels × frame rate × wide neighbourhood shader samples
+```
+
+## 0.3 Data authority rule
+
+Every data product has exactly one writer.
+
+```text
+Layer A writes/owns River Domain data.
+Layer B writes/owns External Influence Fields.
+Layer C writes/owns Persistent Foam Material.
+Layer D writes/owns Visual Foam/Film products such as _FoamShapeMask.
+Layer E writes only final rendered pixels.
+Layer F schedules/binds/debugs; it does not own foam behavior.
+```
+
+If Foam looks wrong, diagnose the owner of the wrong product instead of adding another hidden authority.
+
+## 0.4 No circular dependencies
+
+The dependency graph must be acyclic.
+
+Allowed flow:
+
+```text
+Layer A — River Domain
+        ↓
+Layer B — External Influence Fields
+        ↓
+Layer C — Persistent Foam Material
+        ↓
+Layer D — Visual Foam / Film Evaluation
+        ↓
+Layer E — Shader Composition
+```
+
+Layer A may also be read directly by B, C, D, and E. Layer B may be read by C, D, and E. Layer C may be read by D and E. Layer D may be read by E.
+
+Forbidden flow:
+
+```text
+Layer D → Layer C
+Layer D → Layer B
+Layer C → Layer B
+Layer E → any compute/simulation layer
+Layer E → Layer C
+Layer E → Layer D
+```
+
+Foam-derived visual helper fields belong inside Layer D. They are not External Influence Fields and must never feed Layer C.
+
+## 0.5 No entity database by default
+
+Do not introduce foam pocket IDs, connected-component tracking, per-pocket state, or a foam island database unless field methods fail and the user explicitly approves that architectural pivot.
+
+The default solution is field math:
+
+```text
+for each cell/pixel, compute output from upstream fields and local/limited-neighbour information
+```
+
+not:
+
+```text
+for each foam island, track identity, split history, merge history, velocity, and shape state
+```
+
+---
+
+# 1. Canonical layer stack
+
+The previous three-stage summary remains useful, but the complete architecture is six named layers. The letters are intentional: do not use `Stage 1.5` because it implies an arbitrary half-stage and caused confusion.
+
+```text
+Layer A — River Domain
+Layer B — External Influence Fields
+Layer C — Persistent Foam Material
+Layer D — Visual Foam / Film Evaluation
+Layer E — Shader Composition
+Layer F — Scheduling, Quality, Debug
+```
+
+The condensed user-facing summary is:
+
+```text
+Stage 1 = Layer C: persistent material simulation.
+Stage 2 = Layer D: visual film/shape compute evaluation.
+Stage 3 = Layer E: shader composition and local polish.
+```
+
+Layer A and Layer B are upstream foundations. Layer F is orchestration.
+
+---
+
+# 2. Layer A — River Domain
+
+## 2.1 Abstract responsibility
+
+Layer A defines the coordinate system and river-space truth.
+
+It answers:
+
+```text
+Where is the river?
+What direction is downstream?
+What is across-river coordinate here?
+Which cells are valid water?
+Where are banks and boundaries?
+How do world/surface pixels map into foam/material textures?
+```
+
+Layer A does not know or care whether Foam exists.
+
+## 2.2 Current relevant code
+
+Current and related code paths include:
+
+```text
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/RiverDomainSnapshot.cs
+Assets/Game/Procedural/Rivers/StylizedRiverCorridorGeometry.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Coordinates.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Sampling.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl
+```
+
+Important current symbols/functions include:
+
+```text
+RiverDomainSnapshot
+BuildSharedSplineSamples(...)
+_FoamDimensions
+_FoamValidLength
+_FoamSimulationLength
+_FoamGlobalStart
+_FoamFieldLength
+_FoamBoundary
+_FoamCurrentShoreEdgesRead / _FoamCurrentShoreEdgesWrite
+FoamValidFluidAt(int2 coordinate)
+LoadBoundaryCoverage(...)
+SampleBoundaryCoverageBilinear(...)
+FoamUVToTexelCoordinate(...)
+RiverWaterFoamResult.materialUV
+```
+
+## 2.3 Owned data
+
+Layer A owns or defines:
+
+```text
+river-space coordinate convention
+full-resolution foam grid dimensions
+valid/simulation length
+boundary/coverage texture
+shore edge texture
+river/global start offset
+field length
+material-space UV mapping
+flow direction conventions
+```
+
+## 2.4 Allowed reads
+
+Layer A may read:
+
+```text
+river spline/domain data
+river width and shape settings
+corridor/water mesh settings
+terrain/corridor geometry where required for masks
+```
+
+Layer A must not read:
 
 ```text
 Persistent Foam State
-    ↓ Stage 1 — Persistent State Update
-Persistent Foam State after update
-    ↓ Stage 2 — Shape Evaluation
-Evaluated Foam Shape
-    ↓ Stage 3 — Rendering
-Final pixels
+_FoamShapeMask
+Stage D visual helper textures
+shader output
 ```
 
-The anti-soup rule:
+## 2.5 Writers and consumers
+
+Layer A writes domain data. It may be consumed by:
 
 ```text
-Only one stage writes each product.
+Layer B — to place external influence fields in river space.
+Layer C — to transport and clip persistent material.
+Layer D — to evaluate visible shape in the same coordinate system.
+Layer E — to sample foam and render debug/final output.
 ```
 
-- Stage 1 is the only writer of Persistent Foam State.
-- Stage 2 is the only writer of Evaluated Foam Shape.
-- Stage 3 is the only producer of final rendered pixels.
+## 2.6 Connectivity invariant
 
-Input fields may feed stages. Input fields do not directly move, erase, deform, or render Foam.
+All directional concepts must use this layer's coordinate basis.
+
+If one field says “left,” “right,” “upstream,” “downstream,” “across,” or “cell,” it must mean the same thing to every consumer. Any disagreement here is a Layer A bug, not a Foam artistic issue.
 
 ---
 
-# 1. Foam data products
+# 3. Layer B — External Influence Fields
 
-## Product A — Persistent Foam State
+## 3.1 Abstract responsibility
 
-Persistent Foam State is the durable simulation state.
+Layer B contains foam-agnostic environmental influence. It answers:
+
+```text
+Where is foam encouraged?
+Where is foam suppressed?
+Where is material or visual film shaped by banks, rocks, wakes, pressure, or motion intent?
+```
+
+Layer B does not mean “foam exists here.” It means the environment provides a reason for foam to be born, preserved, suppressed, bent, visually supported, or locally agitated.
+
+## 3.2 Critical correction
+
+Layer B must not read Foam data.
+
+This is the correction to the earlier ambiguous `Stage 1.5` wording.
+
+Allowed:
+
+```text
+River Domain → External Influence Fields → Persistent Foam Material
+River Domain → External Influence Fields → Visual Foam/Film Evaluation
+```
+
+Forbidden:
+
+```text
+Persistent Foam Material → External Influence Fields → Persistent Foam Material
+Visual Foam/Film → External Influence Fields
+```
+
+Foam-derived sheet-support fields are Layer D internal fields, not Layer B fields.
+
+## 3.3 Current relevant code
+
+Current and related code paths include:
+
+```text
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Obstacles.cs
+Assets/Game/Procedural/Rivers/FoamTopology/*
+Assets/Game/Procedural/Rivers/StylizedRiverDisturbanceRuntime.*.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Topology.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Support.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Motion.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Evolution.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.TopologyTransition.hlsl
+```
+
+Important current texture/symbol names include:
+
+```text
+_FoamTopologyRead / _FoamTopologyWrite
+_FoamTopologySourcesRead / _FoamTopologySourcesWrite
+_FoamTopologyGeneratedRead
+_FoamTopologyTransitionFromRead
+_FoamObstacleExclusionRead / _FoamObstacleExclusionWrite
+_FoamMotionLaneRead
+_FoamObstacleRoutingRead
+_FoamRippleField
+_FoamWakeField
+_FoamStaticWakeField
+_FoamStaticPressureField
+_FoamEvolvingMajorRead / Write
+_FoamEvolvingHostedNegativeRead / Write
+_FoamEvolvingFreeWaterNegativeRead / Write
+_FoamEvolvingConnectorRead / Write
+_FoamCurrentShoreEdgesRead / Write
+FoamResolveMotionFieldSample(...)
+FoamLoadObstacleRoutingCell(...)
+FoamSampleMotionLaneSmooth(...)
+FoamValidFluidAt(...)
+```
+
+## 3.4 Owned data
+
+Layer B owns external influence textures and fields, including current or future versions of:
+
+```text
+valid-fluid support context
+obstacle/solid exclusion
+positive support/topology
+negative/free-water suppression or aging pressure
+bank/shore/contact support
+rock/contact support
+wake support and lee context
+pressure/ripple disturbance influence
+motion/lateral intent
+birth support
+lifetime support
+visual contact support
+```
+
+## 3.5 Allowed reads
+
+Layer B may read:
+
+```text
+Layer A river domain and coordinate data
+rocks/obstacles/banks/collider-derived river interactions
+static disturbance emitters
+dynamic disturbance emitters
+time
+its own previous influence texture when a field is intentionally persistent, such as wake decay
+```
+
+Layer B must not read:
+
+```text
+_FoamStateRead
+_FoamStateWrite
+_FoamShapeMask
+Layer D visual helper textures
+Final shader output
+```
+
+## 3.6 Writers and consumers
+
+Layer B writes External Influence Fields.
+
+Layer B may be consumed by:
+
+```text
+Layer C — birth, lifetime, exclusion, future real material transport.
+Layer D — visual support, visual deformation, bridge/pinch context, contact film.
+Layer E — debug or local polish if useful.
+```
+
+## 3.7 Resolver requirement
+
+Layer B should resolve raw contradictory inputs before consumers read them.
+
+Do not expose several raw fields that can mean different directions to different layers. Instead, raw inputs should be combined into canonical resolved fields with fixed meanings.
+
+Raw inputs may include:
+
+```text
+bank contact
+rock contact
+obstacle exclusion
+lane motion
+obstacle routing
+pressure/wake/ripple
+negative zones
+dynamic emitter influence
+```
+
+Canonical resolved outputs should eventually include explicit meanings such as:
+
+```text
+birthSupport
+lifetimeSupport
+exclusion
+motionIntent
+visualContactSupport
+breakupAgitation
+```
+
+If two raw influences conflict, Layer B resolves the conflict once. Layer C and Layer D then read the same resolved intent instead of inventing separate interpretations.
+
+## 3.8 Connectivity invariant
+
+Layer B is upstream context. It is not Foam state.
+
+Correct language:
+
+```text
+The motion field says the environment would prefer visual/material lateral influence here.
+The obstacle routing field says this area has local obstacle-driven routing intent.
+The support field says foam should survive or appear more strongly here.
+```
+
+Incorrect language:
+
+```text
+The motion field moved this foam cell.
+The support field created persistent foam by itself.
+The visual sheet field caused Stage 1 material to merge.
+```
+
+Only Layer C can move persistent material. Only Layer D can create visual-only broad film shape.
+
+---
+
+# 4. Layer C — Persistent Foam Material
+
+## 4.1 Abstract responsibility
+
+Layer C is the durable Foam simulation.
 
 It answers:
 
 ```text
-Where does foam material exist?
-How long does it have left?
-What stable material identity/pattern does it carry?
+Where does actual foam material exist?
+How old is it?
+What stable material pattern does it carry?
+How does it move downstream?
+Where is it born, preserved, clipped, or killed?
 ```
 
-Current packed state:
+Layer C is the only writer of Persistent Foam State.
+
+## 4.2 Current relevant code
+
+Current and related code paths include:
+
+```text
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.*.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Sampling.hlsl
+```
+
+Important current kernels include:
+
+```text
+InjectFoam
+CommitPhaseTransport
+SimulateFoam
+ApplyBoundary
+ClearRange
+```
+
+Important current texture/symbol names include:
+
+```text
+_FoamStateRead
+_FoamStateWrite
+currentState
+previousState
+writeState
+DispatchPhaseCommit(...)
+DispatchSimulationRange(...)
+DispatchApplyBoundary(...)
+FoamDecodeMaterialState(...)
+FoamEncodeMaterialState(...)
+FoamMergeBornPresence(...)
+FoamClipPackedToValidFluid(...)
+FoamApplyPersistentMaterialMorph(...)
+```
+
+## 4.3 Persistent state packing
+
+Canonical packed state:
 
 ```text
 R = Presence
-G = Presence × Remaining Life
-B = Presence × Material Pattern
+G = Presence × normalized Remaining Life
+B = Presence × normalized Material Pattern
 A = reserved / future use
 ```
 
+Decoded state:
+
+```hlsl
+struct FoamMaterialState
+{
+    float presence;
+    float remainingLife;
+    float materialPattern;
+};
+```
+
+## 4.4 Meaning of fields
+
 ### Presence
 
-`Presence` means material coverage in a persistent foam simulation cell. It is not opacity, source amount, support, topology, visual breakup, or remaining life.
+Persistent material coverage in a foam simulation cell.
+
+It is not:
+
+```text
+final opacity
+visual support
+topology pressure
+shader streak strength
+shape-mask brightness
+```
 
 ### Remaining Life
 
-`Remaining Life` is the durable survival clock. It is the ordinary stored-state death authority, subject to the approved lifecycle/topology equation and valid-fluid clipping.
+The actual durable survival clock.
+
+Only Layer C may change it.
+
+Layer D and Layer E may read it as metadata for visual fragility, but they must not write or reinterpret it as a visual mask owner.
 
 ### Material Pattern
 
-`Material Pattern` is stable material identity. It should travel with the stored material and can be used later by Stage 2 for deterministic holes, edge behavior, fracture thresholds, and visual identity.
+Stable material identity/pattern data that travels with persistent foam.
 
-### What Persistent Foam State must not store
+Layer D and Layer E may use it for deterministic procedural variation.
 
-Persistent Foam State must not store temporary visual bending, temporary holes, render-time cracks, one-frame disturbance breakup, final colour, final opacity, or evaluated shape artifacts.
+## 4.5 Allowed reads
+
+Layer C may read:
+
+```text
+previous Persistent Foam State
+Layer A River Domain data
+Layer B External Influence Fields
+time/update delta
+source injection/birth events
+```
+
+Layer C must not read:
+
+```text
+_FoamShapeMask
+Layer D visual helper textures
+shader local noise result
+final rendered pixels
+```
+
+## 4.6 Owned behavior
+
+Layer C owns:
+
+```text
+foam birth/source-to-persistent merge
+persistent presence
+downstream material transport
+future real lateral material transport if approved
+future real obstacle-guided material transport if approved
+Remaining Life aging
+support/negative aging response
+valid-fluid clipping
+obstacle/solid exclusion clipping
+real material merge rules if added later
+```
+
+Layer C must not own:
+
+```text
+temporary visual chipping
+temporary visual bending
+temporary visual bridge/pinch behavior
+shader-local streaks
+final color/opacity
+large hidden neighbour-sampled morphology that writes back to FoamState
+```
+
+## 4.7 Current status
+
+Active/trusted:
+
+```text
+manual/source birth
+source-to-persistent merge
+downstream phase transport
+lifecycle aging
+support/negative aging influence
+valid-fluid and obstacle clipping
+```
+
+Rejected/superseded:
+
+```text
+persistent stored-state morph as visual breakup
+fractional lateral row weighting
+per-cell stochastic lateral row commit
+hidden neighbour-resampling morphology that writes persistent state
+```
+
+Actual lateral material transport is currently not active and must not be implied by debug labels.
+
+## 4.8 Connectivity invariant
+
+Layer C is the only layer that can truthfully say:
+
+```text
+actual foam material moved
+actual foam material was born
+actual foam material died
+actual Remaining Life changed
+```
+
+If Layer D displays foam slightly offset from the material, that is visual interpretation only. It must never be described as actual material movement.
 
 ---
 
-## Product B — Evaluated Foam Shape
+# 5. Layer D — Visual Foam / Film Evaluation
 
-Evaluated Foam Shape is the current visible foam shape derived from Persistent Foam State.
+## 5.1 Abstract responsibility
+
+Layer D is runtime GPU compute that derives visible broad foam/film shape from upstream data.
 
 It answers:
 
 ```text
-What does the foam look like right now?
-Where are its visible holes?
-Where are its frayed edges?
-Where is it temporarily bent, thinned, cracked, chipped, or joined?
-Where does disturbance make it more active?
+Given persistent foam material plus river/support/motion context,
+what should the broad visible foam film look like right now?
 ```
 
-This product is where the reference-river behavior should be recovered: bending ribbons, broken sheets, chipping edges, holes, splits, soft joins, disturbance-reactive activity, and baseline living motion.
+Layer D is the only writer of Evaluated Foam Shape products.
 
-Evaluated Foam Shape may animate aggressively. It must not be written back into Persistent Foam State.
+## 5.2 Current relevant code
 
-Likely future texture:
+Current and related code paths include:
+
+```text
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Binding.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Sampling.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Motion.hlsl
+```
+
+Current important symbols:
+
+```text
+EvaluateFoamShape kernel
+DispatchEvaluateShape()
+evaluateShapeKernel
+shapeMaskTexture
+_FoamShapeMaskWrite
+_FoamShapeMask
+FoamEvaluatedShape = 7
+FoamShapeDifference = 8
+IsShapeProductDebugActive
+FoamEvaluateIntrinsicShapeMask(...)
+BindField()
+```
+
+## 5.3 Current implementation state after 4.11C.5.10B
+
+The current code has a Layer D output slot, `_FoamShapeMask`, and two Layer D debug views:
+
+```text
+Foam Evaluated Shape = displays _FoamShapeMask directly.
+Foam Shape Difference = compares _FoamShapeMask against raw persistent Presence.
+```
+
+After validation of 5.10, the 5.9z coordinate-warp prototype was retired and `EvaluateFoamShape` was reset to a clean pass-through baseline:
+
+```hlsl
+float FoamEvaluateIntrinsicShapeMask(
+    FoamMaterialState material,
+    float validFluid)
+{
+    return saturate(material.presence * validFluid);
+}
+
+_FoamShapeMaskWrite[coordinate] =
+    FoamEvaluateIntrinsicShapeMask(material, validFluid);
+```
+
+The 5.10 validation screenshots showed clear green/magenta signed values in `Foam Shape Difference`, proving the 5.9z product was numerically changing `_FoamShapeMask`. However, `Material Presence` and `Foam Evaluated Shape` still looked and behaved basically identical in normal mask display. The conclusion is precise:
+
+```text
+5.9z did work at the value/difference level.
+5.9z did not work at the visible structural-shape level.
+```
+
+The failure reason remains architectural, not merely amplitude tuning:
+
+```text
+- one-to-two-cell coordinate displacement affects mostly contours;
+- broad solid masks remain broad and solid after nearby sampling;
+- blend-to-base damped visible differences;
+- the operation redistributed coverage inside the same overall ribbon/blob;
+- coordinate warp cannot create visual bridge/pinch/sheet/contact support by itself.
+```
+
+Therefore 5.9z is no longer present as active code in Layer D. Its lesson is retained in documentation as a rejected/superseded prototype. Layer D now starts from a truthful baseline where `Foam Shape Difference` should be mostly black until a new Layer D component is intentionally added.
+
+`DispatchEvaluateShape()` remains gated behind Layer D debug use because Final Foam still does not consume `_FoamShapeMask`.
+
+## 5.3.1 4.11C.5.10 compliance audit result
+
+The first source audit after the architecture lock found the current code broadly compatible with the acyclic Layer A-F graph:
+
+```text
+Layer B external influence generation was not found reading FoamState or _FoamShapeMask.
+Layer C persistent material kernels were not found reading _FoamShapeMask or Layer D helper products.
+Layer D writes _FoamShapeMask only, not FoamState.
+Layer E debug/final paths render pixels only and do not feed compute.
+Final Foam remains disconnected from _FoamShapeMask.
+```
+
+Cleanups made from that audit:
+
+```text
+Added Foam Shape Difference debug.
+Corrected stale Foam Evaluated Shape descriptions.
+Corrected Water Body help text so persistent Foam is described as downstream material transport, not active lateral disturbance transport.
+Removed unused wake/pressure disturbance-transport constants left from abandoned material-motion experiments.
+Gated DispatchEvaluateShape to Layer D debug use until Final Foam actually consumes the product.
+```
+
+Known non-urgent caveats:
+
+```text
+The transition-hold fallback may still bind persistent state where the shape mask is expected; evaluated-shape debug during topology transition should be treated cautiously until a dedicated transition ShapeMask snapshot exists.
+Shader-side Final Foam still owns legacy macro shaping until the accepted Layer D film/shape product replaces it.
+No low-res Layer D Film Source or Film Support helpers exist yet.
+```
+
+## 5.3.2 4.11C.5.10B validation response and reset
+
+The first validation after `Foam Shape Difference` showed the exact problem:
+
+```text
+Foam Shape Difference: clearly non-black, with green/magenta bands.
+Material Presence: visually broad white ribbon/blob.
+Foam Evaluated Shape: visually broad white ribbon/blob, effectively the same silhouette and behavior.
+Final Foam: unchanged, as intended.
+```
+
+Interpretation:
+
+```text
+The 5.9z coordinate warp changed values but not useful visible structure.
+A debug difference view can look dramatic while the actual shape remains player-useless.
+Future Layer D work must prove visible structural benefit, not just nonzero numeric difference.
+```
+
+5.10B therefore removes the warp helpers and Motion Field/routing bindings from `DispatchEvaluateShape()`. The pass-through baseline is deliberately boring so future probes have a clean comparison target:
+
+```text
+Material Presence ~= Foam Evaluated Shape
+Foam Shape Difference ~= black
+```
+
+This is the desired baseline until local procedural breakup or low-res film support is added.
+
+## 5.4 Allowed reads
+
+Layer D may read:
+
+```text
+Layer A River Domain data
+Layer B External Influence Fields
+Layer C Persistent Foam State
+time
+read-only previous visual shape only if visual history is explicitly added
+```
+
+Layer D may not read:
+
+```text
+final shader output
+screen-space result
+any future downstream product that would create a cycle
+```
+
+## 5.5 Owned products
+
+Current product:
+
+```text
+_FoamShapeMask
+R = evaluated broad visible foam/film mask
+```
+
+Future possible products, if justified:
+
+```text
+_FoamFilmSourceHalf
+_FoamFilmSupportHalf
+_FoamBreakMask
+_FoamEdgeMask
+_FoamShapeHistory
+```
+
+Any foam-derived helper field belongs here, not in Layer B.
+
+## 5.6 Allowed behavior
+
+Layer D may visually:
+
+```text
+widen foam
+connect nearby foam
+bridge small gaps
+pinch weak links
+soften contours
+bend/ripple broad film using motion fields
+increase old-foam fragility based on Remaining Life
+use contact/support fields to create bank/rock film support
+use low-res helper fields for broad sheet behavior
+use visual-only history to reduce flicker if needed
+```
+
+## 5.7 Forbidden behavior
+
+Layer D must not:
+
+```text
+write _FoamStateWrite
+modify Presence
+modify Remaining Life
+modify Material Pattern
+move durable material
+spawn durable material
+kill durable material
+feed back into Layer B
+feed back into Layer C
+track pocket IDs
+own connected-component identity
+hide broken Stage C transport with visual-only macro movement
+```
+
+## 5.8 Correct meaning of visual offset
+
+Incorrect:
+
+```text
+Stage D moved this foam cell right.
+```
+
+Correct:
+
+```text
+Stage D displayed the broad visible film slightly right of durable material, within bounded visual-shape rules.
+```
+
+Layer D may lie visually. It may not corrupt material truth.
+
+## 5.9 Required internal structure
+
+Layer D should become a small fixed-grid pipeline, not one all-powerful pass.
+
+### D1 — Visual Film Source
+
+Build a low-res source field from upstream data.
+
+Inputs:
+
+```text
+Persistent Presence
+Remaining Life
+Material Pattern
+valid fluid
+exclusion
+bank/contact support
+rock/contact support
+wake/pressure/ripple support
+motion intent
+negative suppression
+```
+
+Output:
+
+```text
+_FoamFilmSourceHalf
+```
+
+Meaning:
+
+```text
+Where is broad visible film allowed or encouraged?
+```
+
+This is not persistent material.
+
+### D2 — Visual Sheet Support
+
+Create broad field support for reference-like sheets/ribbons.
+
+Inputs:
+
+```text
+_FoamFilmSourceHalf
+Layer B visual/contact support
+flow direction / river basis
+optional disturbance agitation
+```
+
+Operations should be cheap field operations such as:
+
+```text
+directional spread along flow
+weaker spread across flow
+separable blur/spread
+small-gap closing approximation
+thresholded sheet support
+contact/bank support expansion
+```
+
+Output:
+
+```text
+_FoamFilmSupportHalf
+```
+
+Meaning:
+
+```text
+Where can broad visible surface film structurally exist?
+```
+
+### D3 — Full-resolution Evaluated Shape
+
+Create `_FoamShapeMask`.
+
+Inputs:
+
+```text
+Persistent Foam State
+_FoamFilmSourceHalf
+_FoamFilmSupportHalf
+valid fluid
+obstacle exclusion
+Remaining Life
+Material Pattern
+Motion Field / obstacle routing
+optional local procedural breakup seed data
+```
+
+Output:
 
 ```text
 _FoamShapeMask
 ```
 
-A first implementation may only need one channel:
+This pass combines durable material truth with broad visual support, while preserving the rule that only Layer C owns real material.
 
-```text
-R = evaluated visible foam mask
-```
+### D4 — Optional Visual History
 
-Possible future channels, if justified:
-
-```text
-G = breakup / edge activity / thinness helper
-B = disturbance response / surface energy helper
-A = reserved
-```
-
-The exact packing is not locked here. The contract is locked: Evaluated Foam Shape is derived, inspectable, and non-persistent.
-
----
-
-# 2. Processing stages
-
-## Stage 1 — Persistent State Update
-
-Stage 1 writes Persistent Foam State.
-
-It owns:
-
-- birth/source-to-persistent merge;
-- downstream material transport;
-- future real lateral material transport;
-- future obstacle-guided material transport;
-- Remaining Life aging;
-- support/negative aging response;
-- valid-fluid clipping;
-- obstacle/solid exclusion clipping.
-
-Stage 1 decides where durable foam material exists over time.
-
-### Stage 1 allowed behavior
-
-Stage 1 may move stored material through an approved transport model. It may age or clip stored material through the lifecycle/valid-fluid contract. It may create stored material through approved birth/source events.
-
-### Stage 1 forbidden behavior
-
-Stage 1 must not perform temporary visual breakup, render stretch, fake cracks, coherent visual deformation, per-cell random lateral row shifting, or neighbour-sampled morphing that writes back into persistent state.
-
-### Stage 1 current status
-
-Currently active:
-
-- manual birth;
-- downstream phase transport;
-- lifecycle aging;
-- support/negative aging influence;
-- valid-fluid clipping.
-
-Currently disabled/missing:
-
-- real lateral transport;
-- obstacle-guided material transport.
-
----
-
-## Stage 2 — Shape Evaluation
-
-Stage 2 writes Evaluated Foam Shape.
-
-It reads Persistent Foam State plus input fields, then produces the current visible foam shape.
-
-It owns:
-
-- coherent deformation;
-- ribbon bending;
-- ribbon stretching/compression appearance;
-- edge bending/curling/flutter;
-- edge fray;
-- internal holes;
-- fractures;
-- chipping;
-- ribbon splitting appearance;
-- ribbon joining/reconnection appearance;
-- disturbance-reactive breakup;
-- baseline living morphology away from disturbances.
-
-Stage 2 decides how stored foam looks this frame.
-
-### Stage 2 allowed behavior
-
-Stage 2 may sample Persistent Foam State to produce a deformed/evaluated visible mask. It may apply time-varying shape logic. It may use motion, disturbance, topology, life, pattern, and intrinsic morph fields to change the evaluated mask.
-
-### Stage 2 forbidden behavior
-
-Stage 2 must not write back to Persistent Foam State. It must not move durable foam material. It must not destroy durable foam material. It must not pretend to be Stage 1 lateral transport. It must not create large fake motion that contradicts raw material location.
-
-### Stage 2 field-based identity rule
-
-The foam system is field-based, not pocket/entity based. Stage 2 does not track pocket IDs, connected components, per-pocket children, or object-like fragment histories. A foam patch made of 200 cells is represented by 200 field samples, not by one tracked entity.
-
-This is intentional unless future evidence proves a region-aware system is necessary. Desired split/join/merge-like visuals should first emerge from formulas over scalar/vector fields:
-
-- smooth vector deformation for coherent ribbon motion;
-- low-resolution or mip-filtered presence/life fields for cheap visual bridge/break decisions;
-- read-only Remaining Life metadata for older/weaker visual tearing;
-- Stage 1 mass-weighted field merging later if actual material transport creates collisions.
-
-Do not introduce pocket IDs, connected-component tracking, or per-pocket properties without explicit approval.
-
-### Stage 2 current status
-
-Stage 2 now exists as a separate evaluated-shape product: `_FoamShapeMask`, visible through `Foam Evaluated Shape`. As of 5.9y.2 it is intentionally reset to pass-through clipped Persistent `Presence`. The 5.9y interior-hole morphology and 5.9y.1 tiny edge-fray retune are superseded: one was visually wrong, the other was practically invisible.
-
-Current Stage 2 is a product foundation, not the final morphology system. The next accepted direction is field-based coherent deformation, followed by cheap formula-driven bridge/break behavior.
-
----
-
-## Stage 3 — Rendering
-
-Stage 3 draws Evaluated Foam Shape.
-
-It owns:
-
-- colour;
-- opacity;
-- lighting response;
-- minimum night visibility;
-- final blend;
-- small edge polish;
-- small pixel/anti-alias-style treatment.
-
-Stage 3 decides how the evaluated shape is drawn.
-
-### Stage 3 allowed behavior
-
-Stage 3 may use the evaluated mask, foam colour, water lighting, night visibility, and material controls to produce final pixels. It may perform small final polish that does not create macro motion or macro shape changes.
-
-### Stage 3 forbidden behavior
-
-Stage 3 must not create macro stretch, macro lateral drift, fake obstacle routing, fake downstream shedding, large deformation, or fake split/join behavior as the primary source of foam behavior.
-
----
-
-# 3. Input fields
-
-Input fields are not foam products and not processing stages. They are data that stages consume.
-
-## Intrinsic Morph Field
-
-The Intrinsic Morph Field is the baseline "foam is alive even in ordinary water" driver.
-
-It exists because foam must morph even away from rocks, waves, ripples, lee depressions, and static pressure.
-
-Possible ingredients:
-
-- foam grid coordinates;
-- time;
-- Material Pattern;
-- low-frequency generated morph noise;
-- medium-frequency generated breakup noise;
-- optional stable pattern identity carried by the material.
-
-Feeds:
-
-- Stage 2 coherent deformation;
-- Stage 2 breakup;
-- Stage 2 edge fray;
-- Stage 2 split/join appearance.
-
-Does not feed:
-
-- Stage 1 material movement.
-
-## Motion Field
-
-The Motion Field describes lateral/current/routing intent.
-
-Ingredients:
-
-- dense lane field;
-- fixed obstacle-routing field;
-- future flow curvature or current structure;
-- future object routing influence.
-
-Feeds:
-
-- Stage 1 future real lateral transport;
-- Stage 2 coherent deformation direction;
-- Stage 2 ribbon bend/compression direction.
-
-It does not move foam by itself.
-
-Current status:
-
-- field generation exists;
-- obstacle-routing generation exists;
-- debug view exists;
-- cell-grid debug view exists;
-- no active material movement consumes it after 5.9p.
-
-## Disturbance Fields
-
-Disturbance fields describe water activity and obstacle/wake pressure.
-
-Includes:
-
-- static pressure;
-- static lee wake;
-- dynamic wake;
-- ripples;
-- waves;
-- surface energy;
-- obstacle proximity/turbulence information where available.
-
-Feeds:
-
-- Stage 1 lifecycle/support/decay where explicitly approved;
-- Stage 2 deformation strength;
-- Stage 2 breakup strength;
-- Stage 2 morph speed;
-- Stage 2 edge activity;
-- Stage 3 minor lighting/surface presentation.
-
-Disturbance fields do not directly move or destroy foam by themselves.
-
-## Topology / Support Fields
-
-Topology/support fields describe where foam is supported, unsupported, excluded, or negatively aged.
-
-Includes:
-
-- major support;
-- connector support;
-- negative aging pressure;
-- shore support;
-- pressure/lee support;
-- obstacle footprint / solid exclusion;
-- valid-fluid mask.
-
-Feeds:
-
-- Stage 1 lifecycle;
-- Stage 1 valid-fluid clipping;
-- Stage 2 stability / breakup bias;
-- Stage 2 joining/fracture bias.
-
-Topology may help foam survive or destabilize visually. It must not become a direct movement or painting system.
-
----
-
-# 4. Complete visual-feature mapping
-
-Every foam feature must be mapped to a stage and input set before implementation. If a feature appears to belong to multiple places, split it into durable material behavior and evaluated visual behavior.
-
-## Downstream travel
-
-Belongs to:
-
-```text
-Stage 1 — Persistent State Update / Transport
-```
+Only add if flicker becomes a real problem.
 
 Inputs:
 
-- river flow speed;
-- foam material flow multiplier;
-- phase accumulator;
-- river/foam coordinate grid.
-
-Writes:
-
-- Persistent Foam State.
-
-Meaning:
-
-- durable material moves downstream.
-
-Forbidden:
-
-- render shader stretching foam downstream as the primary travel mechanism;
-- Shape Evaluation pretending to move the stored footprint downstream.
-
-## Real lateral drift of the foam body
-
-Belongs to:
-
 ```text
-Stage 1 — Persistent State Update / Transport
+previous _FoamShapeMask
+current desired _FoamShapeMask
 ```
-
-Inputs:
-
-- Motion Field;
-- obstacle routing intent;
-- future lateral residual/phase or other approved coherent transport state;
-- river/foam coordinate grid.
-
-Writes:
-
-- Persistent Foam State.
-
-Meaning:
-
-- durable foam material changes lateral position over time.
-
-Current status:
-
-- not active.
-
-Forbidden:
-
-- fractional row weighting that smears material;
-- per-cell stochastic row shifting that shreds material;
-- render-only lateral warp pretending to be transport;
-- persistent morph neighbour-sampling pretending to be transport.
-
-Likely future direction:
-
-- coherent lateral transport with accumulated lateral phase/residual or an equivalent patch-coherent method;
-- motion influence smoothed at a visible patch scale;
-- no independent random stay/move decision per texel.
-
-## Obstacle-guided movement around rocks
-
-Belongs to:
-
-```text
-Stage 1 for durable route change
-Stage 2 for visible bend/compression/fray around the route
-```
-
-Inputs:
-
-- Motion Field obstacle routing;
-- static obstacle footprint;
-- pressure field;
-- lee field;
-- valid-fluid boundary.
-
-Stage 1 role:
-
-- future durable lateral routing around the obstacle.
-
-Stage 2 role:
-
-- visible bending, compression, narrowing, chipping, and fraying near obstacle influence.
-
-Forbidden:
-
-- obstacle field independently erasing foam;
-- shader faking obstacle bypass while stored foam goes straight through;
-- per-cell obstacle routing that tears the patch apart.
-
-## Chaotic wandering / non-obstacle lateral liveliness
-
-Belongs to:
-
-```text
-Stage 1 for future slow durable lateral drift
-Stage 2 for visible body/edge wobble
-```
-
-Inputs:
-
-- Intrinsic Morph Field;
-- Motion Field lane component;
-- Material Pattern;
-- time.
-
-Stage 1 future role:
-
-- slow persistent lateral path variation, if approved.
-
-Stage 2 role:
-
-- visible ribbon wiggle, bend, breathing, and non-rigid motion.
-
-Forbidden:
-
-- old chaotic drift as hidden stored morph;
-- random per-cell movement;
-- independent shader drift unrelated to stored/evaluated shape.
-
-## Ribbon bending
-
-Belongs to:
-
-```text
-Stage 2 — Shape Evaluation / Coherent Deformation
-```
-
-Inputs:
-
-- Persistent Presence;
-- Intrinsic Morph Field;
-- Motion Field direction;
-- disturbance deformation strength;
-- Material Pattern;
-- time.
-
-Implementation concept:
-
-```text
-evaluatedMask(x) = samplePersistentPresence(x - deformationVector(x, t))
-```
-
-Rules:
-
-- deformation vector is smooth over multiple foam cells;
-- bounded in amplitude;
-- gradient-limited;
-- pattern-stable;
-- disturbance-modulated;
-- never written back to Persistent Foam State.
-
-## Ribbon stretching / narrowing / compression
-
-Belongs to:
-
-```text
-Stage 2 — Shape Evaluation / Coherent Deformation
-```
-
-Inputs:
-
-- flow/motion direction;
-- pressure/lee/wake influence;
-- Intrinsic Morph Field;
-- support/topology.
-
-Meaning:
-
-- the visible foam shape elongates, narrows, or compresses coherently.
-
-Forbidden:
-
-- final render lead/trail stretch as the primary behavior;
-- stored-state neighbour resampling;
-- cell-scale tearing.
-
-## Edge bending / curling / flutter
-
-Belongs to:
-
-```text
-Stage 2 — Shape Evaluation / Edge Morphology
-```
-
-Inputs:
-
-- local edge estimate from Persistent Presence or deformed mask;
-- Intrinsic Morph Field;
-- Material Pattern;
-- disturbance agitation;
-- Motion Field direction;
-- time.
-
-Behavior:
-
-- edges wobble;
-- edges curl inward/outward;
-- edges fray more than interiors;
-- thin protrusions appear temporarily.
-
-Forbidden:
-
-- moving persistent material edge cells randomly.
-
-## Internal holes opening and closing
-
-Belongs to:
-
-```text
-Stage 2 — Shape Evaluation / Breakup Morphology
-```
-
-Inputs:
-
-- Persistent Presence;
-- Material Pattern;
-- Intrinsic Morph Field;
-- Remaining Life;
-- disturbance agitation;
-- support/topology;
-- time.
-
-Behavior:
-
-- holes appear inside foam patches;
-- holes expand/contract;
-- holes close visually;
-- older or disturbed foam may perforate more.
-
-## Chipping / edge erosion / fraying
-
-Belongs to:
-
-```text
-Stage 2 — Shape Evaluation / Breakup Morphology
-```
-
-Inputs:
-
-- edge exposure;
-- Intrinsic Morph Field;
-- Material Pattern;
-- disturbance agitation;
-- Remaining Life;
-- support/topology.
-
-Behavior:
-
-- small chunks visually disappear from edges;
-- edges become ragged;
-- thin fingers chip away.
-
-Stage 1 may later age unsupported material, but fast visible chipping belongs to Stage 2.
-
-Forbidden:
-
-- hidden lifecycle death based purely on visual breakup noise.
-
-## Ribbon splitting
-
-Belongs to:
-
-```text
-Stage 2 — Shape Evaluation / Breakup Morphology
-```
-
-Inputs:
-
-- deformed mask;
-- Intrinsic Morph Field;
-- disturbance agitation;
-- strain from deformation field;
-- Material Pattern;
-- Remaining Life.
-
-Behavior:
-
-- a continuous ribbon visually opens into two strands;
-- fracture lines cut through it;
-- thin necks break visually.
-
-Initial implementation should be evaluated/visual only. Persistent split is not needed first.
-
-Forbidden:
-
-- stored material being shredded into independent texel ribbons.
-
-## Ribbon joining / reuniting
-
-Belongs to:
-
-```text
-Stage 2 — Shape Evaluation / Soft Reconnection
-```
-
-Inputs:
-
-- nearby evaluated/deformed foam mask;
-- support/topology;
-- Intrinsic Morph Field;
-- low disturbance or lee support;
-- flow alignment;
-- Material Pattern.
-
-Behavior:
-
-- nearby strands visually bridge;
-- small gaps close;
-- thin ribbons reconnect.
-
-Implementation direction:
-
-- local dilation/bridge test in evaluated shape pass;
-- limited radius;
-- support-biased;
-- flow-aligned;
-- does not create persistent material.
-
-Forbidden:
-
-- permanent material spawn outside birth rules;
-- large visual bridges far from stored foam.
-
-## Foam breaking more around lee depressions
-
-Belongs to:
-
-```text
-Stage 2 — Shape Evaluation / disturbance-driven breakup
-```
-
-Inputs:
-
-- static lee wake;
-- dynamic wake;
-- support/topology;
-- Intrinsic Morph Field.
-
-Behavior:
-
-- higher breakup agitation;
-- more internal holes;
-- faster edge fray;
-- possible longer survival if lee support is high.
-
-Important split:
-
-```text
-Stage 1: lee/support may increase lifetime.
-Stage 2: lee/turbulence may increase visible breakup and morph activity.
-```
-
-These are not contradictory because they write different products.
-
-## Foam breaking more around static pressure
-
-Belongs to:
-
-```text
-Stage 2 — Shape Evaluation / pressure agitation
-```
-
-Inputs:
-
-- static pressure field;
-- obstacle footprint;
-- Motion Field obstacle routing;
-- Intrinsic Morph Field.
-
-Behavior:
-
-- foam compresses visually near pressure ridge;
-- edges become more active;
-- ribbons bend around pressure zone;
-- breakup increases at sharp pressure gradients.
-
-Stage 1 may also use pressure/support for lifetime/topology.
-
-## Foam responding to waves/ripples
-
-Belongs to:
-
-```text
-Stage 2 for shape animation
-Stage 3 for small presentation shimmer
-```
-
-Inputs:
-
-- dynamic ripple field;
-- wave/surface motion field;
-- surface energy;
-- Intrinsic Morph Field.
-
-Stage 2 behavior:
-
-- faster small-scale breakup;
-- pulsing hole thresholds;
-- edge flutter;
-- temporary thinning/thickening.
-
-Stage 3 behavior:
-
-- small brightness/opacity response;
-- minor surface-light interaction.
-
-Forbidden:
-
-- large render-only shape relocation.
-
-## Foam responding to dynamic wakes
-
-Belongs to:
-
-```text
-Stage 2 for temporary agitation/deformation
-Stage 1 maybe later for lifecycle/local support if explicitly approved
-```
-
-Inputs:
-
-- dynamic wake field;
-- ripple field;
-- moving object disturbance.
-
-Behavior:
-
-- short-lived increased breakup;
-- local deformation;
-- faster visible morph rate;
-- temporary churning.
-
-Dynamic wake should use the same Stage 2 breakup/deformation controls as static disturbance. It must not become a separate foam mover.
-
-## Foam aging / fading out
-
-Belongs to:
-
-```text
-Stage 1 — Lifecycle
-```
-
-Inputs:
-
-- Remaining Life;
-- support/topology;
-- negative fields;
-- valid fluid.
-
-Writes:
-
-- Persistent Foam State.
-
-Stage 2 may make old foam visually thinner/more broken, but it must not own durable death.
-
-```text
-life expiration = Stage 1
-old/thin fragmented look = Stage 2
-```
-
-## Foam colour, brightness, opacity, lighting
-
-Belongs to:
-
-```text
-Stage 3 — Rendering
-```
-
-Inputs:
-
-- Evaluated Foam Shape;
-- Foam Colour;
-- lighting;
-- minimum night visibility;
-- surface values.
-
-Behavior:
-
-- draw the evaluated shape attractively.
-
-Forbidden:
-
-- macro movement;
-- macro deformation;
-- fake split/join.
-
----
-
-# 5. Stage 2 detailed design target
-
-Stage 2 is now present as `_FoamShapeMask`, but it is only a pass-through foundation after the rejected 5.9y/5.9y.1 morphology experiments. It remains an evaluated-shape layer, not a resurrected persistent morph path.
-
-## Stage 2 inputs
-
-- Persistent Presence;
-- Remaining Life;
-- Material Pattern;
-- Intrinsic Morph Field;
-- Motion Field;
-- Static pressure;
-- Static lee wake;
-- Dynamic wake;
-- Ripple/wave field;
-- Topology/support;
-- time;
-- foam grid coordinates.
-
-## Stage 2 output
-
-At minimum:
-
-```text
-R = visible evaluated mask
-```
-
-Optional later channels:
-
-```text
-G = breakup / edge activity
-B = disturbance response
-A = reserved
-```
-
-## Stage 2 cost rule
-
-Avoid naive wide-kernel classification as a default. A radius 1/3/5 box-sampling classifier costs `9 + 49 + 121 = 179` presence samples per cell, or about `2.93M` samples for a 128×128 field evaluation. The preferred next algorithms should target roughly `4–5` samples per cell for coherent deformation, or use low-resolution/mip-filtered helper fields for bridge/break behavior.
-
-## Stage 2 sub-steps
-
-### 2A — Resolve shape influences
-
-For each foam cell, combine inputs into one set of shape controls:
-
-```text
-baseMorph
-morphSpeed
-deformationStrength
-breakupStrength
-edgeFrayStrength
-reconnectStrength
-supportStability
-```
-
-All disturbance, motion, topology, life, and intrinsic inputs that affect visible shape are resolved here. Later sub-steps consume these resolved values rather than independently inventing their own strengths.
-
-### 2B — Coherent deformation
-
-Compute a smooth deformation vector.
-
-Inputs:
-
-- Intrinsic Morph Field;
-- Motion Field direction;
-- disturbance gradients;
-- Material Pattern;
-- time.
 
 Output:
 
 ```text
-deformationVector
+smoothed _FoamShapeMask or _FoamShapeHistory
 ```
 
 Rules:
 
-- smooth over multiple cells;
-- bounded amplitude;
-- no per-cell random offsets;
-- no unbounded stretch;
-- no writeback to Persistent Foam State.
-
-Then sample:
-
 ```text
-deformedMask = samplePersistentPresence(cell - deformationVector)
+visual history may smooth appearance;
+visual history must not feed Layer C;
+visual history must not become material history.
 ```
 
-This creates ribbon bending, stretching, narrowing, compression, and local flow appearance without moving stored material.
+## 5.10 Local-only breakup limit
 
-### 2C — Breakup morphology
-
-Compute breakup from:
-
-- Material Pattern;
-- Intrinsic Morph Field;
-- Remaining Life;
-- edge exposure;
-- disturbance agitation;
-- deformation strain;
-- support/topology.
-
-Apply to the deformed mask:
+A local function can produce convincing chipping and semi-organized chaos:
 
 ```text
-brokenMask = deformedMask × breakupMask
+visible = broadMask * proceduralPattern(position, riverUV, time, life, materialPattern)
 ```
 
-This creates holes, cracks, frayed edges, chipping, and thin-strand breakup.
+This can create:
 
-### 2D — Soft reconnection
+```text
+edge chipping
+animated breakup
+small cuts
+apparent fragments
+thin cracks
+life-based fragility
+```
 
-Use the local evaluated/deformed neighborhood.
+But a purely local function cannot reliably bridge based on nearby foam, because an empty cell between two foam patches and an empty cell in open water have identical local foam presence.
 
-Inputs:
+Therefore:
 
-- brokenMask;
-- support/topology;
-- flow alignment;
-- reconnectStrength;
-- low/moderate agitation.
+```text
+local procedural math = decorative breakup/detail
+low-res support field = structural bridge/sheet/contact behavior
+```
 
-Behavior:
+## 5.11 Performance target
 
-- nearby strands can bridge visually;
-- small gaps can close;
-- ribbons can reunite.
+For a High 32 m chunk:
 
-Rules:
+```text
+Full field: 128×128 = 16,384 cells
+Half field: 64×64 = 4,096 cells
+```
 
-- small radius only;
-- support-biased;
-- does not spawn persistent material;
-- does not bridge huge gaps.
+Proposed core Layer D cost target:
 
-### 2E — Output evaluated shape
+```text
+D1 Film Source:     ~32k reads/update,  ~4k writes/update
+D2 Sheet Support:   ~40k–60k reads/update, ~8k writes/update
+D3 Full Shape:      ~100k–150k reads/update, ~16k writes/update
+Total:              ~175k–240k reads/update/chunk, ~28k writes/update/chunk
+```
 
-Write the evaluated mask into the evaluated shape product, then allow debug/final rendering to sample the same product.
+Recommended update rates:
+
+```text
+Low:    8 Hz
+Medium: 12–16 Hz
+High:   16–24 Hz
+```
+
+Avoid default full-res wide neighbourhood classifiers. Radius 1/3/5 box sampling costs:
+
+```text
+3×3 + 7×7 + 11×11 = 9 + 49 + 121 = 179 samples/cell
+128×128×179 ≈ 2.93M samples/update/chunk
+```
+
+That is not the default architecture.
 
 ---
 
-# 6. How influences combine without fighting
+# 6. Layer E — Shader Composition
 
-Every foam-related influence must be classified as one or more of these types:
+## 6.1 Abstract responsibility
 
-```text
-movement influence
-deformation influence
-breakup influence
-lifetime influence
-render influence
-```
+Layer E is the water render shader. It turns upstream textures into final pixels.
 
-Then it may affect only the matching stage output.
-
-Examples:
+It answers:
 
 ```text
-Motion Field:
-  movement influence → Stage 1 future transport
-  deformation influence → Stage 2 bend direction
-
-Static pressure:
-  lifetime/support influence → Stage 1 lifecycle/topology
-  deformation/breakup influence → Stage 2 pressure agitation
-
-Dynamic wake:
-  breakup/deformation influence → Stage 2
-  possible lifetime influence → Stage 1 only if explicitly approved
-
-Material Pattern:
-  carried material identity → Stage 1 storage
-  morphology identity → Stage 2
-
-Remaining Life:
-  durable survival → Stage 1
-  old/thin visual look → Stage 2
+How should this water pixel look right now?
 ```
 
-No direct cross-writing is allowed.
+It does not own simulation or broad structure.
+
+## 6.2 Current relevant code
+
+Current and related code paths include:
+
+```text
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl
+```
+
+Important current symbols include:
+
+```text
+_FoamShapeMask
+_FoamDebugView
+_FoamMotionLane
+_FoamObstacleRouting
+RiverWaterEvaluateFoam(...)
+RiverWaterFoamResult
+RiverWaterFoamResult.materialUV
+foam.presence
+foam.remainingLife
+foam.mask
+Foam Evaluated Shape debug branch
+Foam Motion Field debug branch
+Foam Motion Field + Cell Grid debug branch
+```
+
+## 6.3 Allowed reads
+
+Layer E may read:
+
+```text
+Layer A coordinate/material UV data
+Layer B influence fields if needed for debug or local polish
+Layer C Persistent Foam State if needed
+Layer D _FoamShapeMask and visual helper products
+local procedural noise
+time
+```
+
+Layer E writes:
+
+```text
+screen pixels only
+```
+
+Layer E must not feed back into any compute texture or simulation state.
+
+## 6.4 Owned behavior
+
+Layer E owns:
+
+```text
+final foam color
+opacity
+edge softness
+small local chipping
+small local fray
+thin bright streaks
+sparkle/highlights
+reflection/refraction blending
+water lighting/composition
+debug visualization
+```
+
+Layer E should not own:
+
+```text
+broad sheet creation
+macro split/join decisions
+bank/rock film support as structure
+wide neighbourhood bridge logic
+persistent material movement
+```
+
+## 6.5 Broad structure vs local detail rule
+
+Use this rule:
+
+```text
+If the effect needs context/nearby foam/support, do it in Layer D compute.
+If the effect is local per-pixel polish, do it in Layer E shader.
+```
+
+More precise correction:
+
+```text
+Decorative breakup should try local procedural math first.
+Structural film connectivity should use cheap Layer D field support.
+```
+
+This prevents the shader from doing expensive wide neighbourhood searches per visible screen pixel, while still allowing rich local chaos cheaply.
+
+## 6.6 Final Foam switch rule
+
+Final Foam must not consume `_FoamShapeMask` as the production shape until Layer D is visibly better than current final foam.
+
+Before the switch, debug views compare:
+
+```text
+Material Presence
+Foam Evaluated Shape
+Foam Shape Difference
+```
+
+After the switch, shader-side legacy macro foam shaping should be reduced or demoted so there is only one broad-structure authority.
 
 ---
 
-# 7. Forbidden patterns from failed patches
+# 7. Layer F — Scheduling, Quality, Debug
 
-The following are explicitly rejected:
+## 7.1 Abstract responsibility
 
-- no persistent morph pass that samples neighbouring foam and writes it back;
-- no fractional lateral row weighting as material movement;
-- no per-cell stochastic lateral commit;
-- no final shader macro stretch pretending to be foam behavior;
-- no input field directly mutates foam;
-- no debug view may imply stored state if it is showing final render mask;
-- no layer may conceal broken transport by adding unrelated visual noise.
+Layer F is orchestration. It controls when layers update, which textures are allocated, what debug view is shown, and which quality tier is active.
 
-Reference-river tearing and our failed tearing are different phenomena:
+It does not own foam behavior.
+
+## 7.2 Current relevant code
+
+Current and related code paths include:
 
 ```text
-Reference tearing = coherent evaluated shape behavior.
-Our broken tearing = persistent material shredded by cell-scale transport.
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.*.cs
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.cs
 ```
 
-This distinction is permanent. Desired tearing belongs to Stage 2. Cell-scale material shredding is a bug.
-
----
-
-# 8. Debug contract
-
-Debug views must identify which product they show.
-
-## Raw Material Presence
-
-Shows Persistent Foam State only.
-
-Use it to verify stored material, lifetime, transport, and clipping.
-
-## Foam Motion Field
-
-Contract requirement: show lateral/obstacle intent plus raw stored `Presence` overlay.
-
-Use it to compare stored foam footprint against Motion Field intent. It does not prove movement unless Stage 1 has an active movement consumer.
-
-Status: corrected after the 5.9t audit. This view now uses raw stored `Presence`, not final `foam.mask`.
-
-## Foam Motion Field + Cell Grid
-
-Contract requirement: show Motion Field plus raw stored `Presence` plus actual persistent foam simulation cell boundaries.
-
-Use it to understand cell scale, one-row shifts, texel-size artifacts, and whether a behavior is cell-scale or patch-scale.
-
-Status: implemented after the 5.9t audit.
-
-## Foam Evaluated Shape
-
-Shows `_FoamShapeMask` after Stage 2, before Stage 3 final colour/lighting. As of 5.9y.2 this is intentionally pass-through clipped Persistent `Presence` so future deformation/bridge/break work has a truthful baseline.
-
-## Final Foam
-
-Shows final rendered result.
-
-Use it for final presentation judgment only after raw/evaluated products behave correctly.
-
----
-
-# 9. Performance contract
-
-Stage 2 should preferably run at foam texture resolution rather than screen-pixel resolution for macro shape behavior.
-
-Recommended direction:
+Important current symbols include:
 
 ```text
-one compute pass over foam grid
-writes compact evaluated mask texture
-shader samples evaluated mask
+StylizedRiverFoamDebugView
+ResolveFoamDebugView(...)
+IsMotionFieldDebugActive(...)
+BindField()
+BindDisabled()
+DispatchEvaluateShape()
+EnsureResources(...)
+shapeMaskTexture
+motionLaneTexture
+obstacleRoutingTexture
+FoamEvaluatedShape = 7
 ```
 
-Why:
+## 7.3 Owned behavior
 
-- cost scales with foam field resolution;
-- debug and final render can use the same evaluated result;
-- macro behavior is inspectable;
-- rendering remains focused on colour/light/blend;
-- avoids hidden screen-space macro deformation in the final shader.
+Layer F owns:
 
-Memory is acceptable if runtime compute remains bounded and the texture is compact.
+```text
+update cadence
+quality tiers
+active chunk culling/freezing
+debug view selection
+texture allocation/release
+compute kernel lookup
+compute texture binding
+Inspector display and labels
+profiling marker placement
+```
+
+Layer F must not own:
+
+```text
+foam birth logic
+foam material motion math
+visual bridge/break math
+shader breakup math
+```
+
+## 7.4 Recommended quality/update targets
+
+For broad foam/film:
+
+```text
+Layer C Persistent Material:
+Low    ~8 Hz
+Medium ~12 Hz
+High   ~16 Hz
+
+Layer D Visual Film:
+Low    ~8 Hz helper/support, 8–16 Hz shape
+Medium ~12–16 Hz helper/support, 16–24 Hz shape
+High   ~16–24 Hz helper/support, 24 Hz shape unless profiling proves 60 is cheap
+
+Layer E Shader:
+Every rendered frame, local-only detail.
+```
+
+Distant, frozen, or offscreen chunks should reduce or skip Layer C and Layer D updates where safe.
+
+## 7.5 Required debug views
+
+Existing useful debug views:
+
+```text
+Final Foam
+Foam + Aging Topology
+Progressive Birth Source
+Material Presence
+Material Remaining Life
+Foam Motion Field
+Foam Motion Field + Cell Grid
+Foam Evaluated Shape
+Foam Shape Difference
+```
+
+Needed next debug views:
+
+```text
+Foam Film Source
+Foam Film Support
+```
+
+Each debug view must explicitly state what product it displays:
+
+```text
+Persistent material truth
+External influence field
+Layer D visual helper
+Evaluated shape
+Final shader output
+```
+
+Do not reuse a final-render mask in a raw material debug view.
 
 ---
 
-# 10. Feature recovery order
+# 8. Canonical connectivity table
 
-The recovery order is part of the architecture contract because order prevents systems from fighting.
+| Layer | May read | Must not read | Writes | Consumers |
+|---|---|---|---|---|
+| A — River Domain | River geometry, spline/domain, corridor/terrain geometry as needed | FoamState, ShapeMask, shader output | domain snapshots, boundary/coverage, coordinate mapping | B, C, D, E |
+| B — External Influence | A, obstacles, banks, emitters, time, own previous influence history | FoamState, ShapeMask, D helper fields, shader output | topology/support/exclusion/motion/wake/pressure influence fields | C, D, E/debug |
+| C — Persistent Material | A, B, previous FoamState, source events, time | ShapeMask, D helpers, shader output | FoamState | D, E/debug |
+| D — Visual Foam/Film | A, B, C, time, optional previous visual shape | shader output, future downstream products | ShapeMask, visual helper fields | E |
+| E — Shader Composition | A, B, C, D, local noise, time | nothing downstream; no feedback | final pixels | screen only |
+| F — Scheduling/Debug | settings, runtime state, visibility | behavior internals as authority | dispatch/binding/debug decisions | all layers indirectly |
 
-1. Architecture contract and docs alignment — complete.
-2. Code compliance audit and debug/UI truth fixes — complete through 5.9w.
-3. Shape Evaluation foundation: create `_FoamShapeMask` and `Foam Evaluated Shape` debug — complete through 5.9x.
-4. Reset rejected morphology experiments and fix Stage 2 time binding — complete through 5.9y.2.
-5. Field-based coherent deformation: add smooth, bounded inverse deformation for ribbon bending/compression/stretch.
-6. Cheap formula-driven bridge/break: use low-resolution or mip-filtered fields, not pocket IDs or naive wide-kernel sampling.
-7. Final Foam consumes `_FoamShapeMask` once the evaluated product is visually useful.
-8. Disturbance-driven morphology: reconnect static pressure, lee, dynamic wake, ripples, and waves as Stage 2 modifiers.
-9. Real lateral transport: redesign Stage 1 lateral movement without row-weight smearing or per-cell dither shredding.
-10. Final rendering polish: make Stage 3 draw the evaluated result without inventing macro behavior.
+If a proposed feature violates this table, stop and redesign before coding.
 
-Automatic anchored/open-water birth population remains deferred until manually-born material, evaluated shape, and transport contracts are healthy.
+---
+
+# 9. Conflict examples and resolutions
+
+## 9.1 “Layer C says left, Layer D says right”
+
+This is only a contradiction if both layers claim to move material.
+
+Canonical resolution:
+
+```text
+Layer C owns material movement.
+Layer D owns visual interpretation only.
+```
+
+If Layer D's visible offset fights the material so strongly that foam appears to move the wrong way, the fix is to bound or retune Layer D. Do not let Layer D write material state.
+
+## 9.2 “Motion Field moves foam”
+
+Incorrect.
+
+Canonical language:
+
+```text
+Motion Field is an external influence/input field.
+Layer C may use it later for approved real material transport.
+Layer D may use it for visible film deformation.
+The Motion Field itself does not move foam.
+```
+
+## 9.3 “Support created foam”
+
+Incorrect unless Layer C used support during an approved birth rule.
+
+Canonical language:
+
+```text
+Support encourages birth/survival/visual film.
+Persistent material only exists if Layer C writes it.
+Visual film only appears if Layer D writes it.
+```
+
+## 9.4 “Stage D bridge is a material merge”
+
+Incorrect.
+
+Canonical language:
+
+```text
+Layer D bridge is visual-only surface film connectivity.
+Real material merge, if ever needed, belongs to Layer C.
+```
+
+## 9.5 “Shader breakup split the foam”
+
+Incorrect.
+
+Canonical language:
+
+```text
+Shader breakup split the rendered appearance at this pixel.
+It did not split Persistent Foam State.
+```
+
+---
+
+# 10. Accepted and rejected techniques
+
+## 10.1 Accepted primary techniques
+
+Accepted as architectural direction:
+
+```text
+fixed-grid field math
+read/write ownership per layer
+External Influence Fields upstream of Persistent Material and Visual Film
+Persistent Foam State as durable material truth
+Visual Foam/Film Evaluation as broad structural interpretation
+shader-side local procedural breakup and thin streaks
+low-res Layer D helper fields for sheet support/bridging
+bounded visual-only offsets
+quality-tiered update cadence
+explicit debug views for every product
+```
+
+## 10.2 Rejected as primary techniques
+
+Rejected/superseded as primary architecture:
+
+```text
+foam pocket IDs
+connected-component foam islands
+per-pocket entity database
+persistent stored-state morph as visual breakup
+neighbour-resampled morphology that writes FoamState
+fractional lateral row weighting
+per-cell stochastic lateral row commit
+dense interior hole cutting as the main look
+tiny local edge-fray as the main look
+5.9z coordinate warp as the final shape solution
+naive full-res 179-sample wide-neighbour classifiers as default
+shader-side wide-neighbour structural foam search
+using final shader masks as raw material debug truth
+```
+
+## 10.3 Techniques allowed only with caution
+
+Allowed but not as first resort:
+
+```text
+mip/pyramid helper fields
+jump-flood/distance fields
+visual-only temporal history
+real lateral material transport
+real material merge rules
+```
+
+These require separate approved plans and validation.
+
+---
+
+# 11. Performance model
+
+## 11.1 Resolution assumptions
+
+Typical per 32 m river chunk:
+
+```text
+Low:    full 64×64  = 4,096 cells;  half 32×32 = 1,024 cells
+Medium: full 96×96  = 9,216 cells;  half 48×48 = 2,304 cells
+High:   full 128×128 = 16,384 cells; half 64×64 = 4,096 cells
+```
+
+## 11.2 Proposed Layer D cost target
+
+For High, per 32 m chunk:
+
+```text
+D1 Film Source:
+~32k reads/update
+~4k writes/update
+
+D2 Sheet Support:
+~40k–60k reads/update
+~8k writes/update
+
+D3 Full Shape:
+~100k–150k reads/update
+~16k writes/update
+
+Core total:
+~175k–240k reads/update/chunk
+~28k writes/update/chunk
+```
+
+At 16 Hz:
+
+```text
+~3–4M reads/sec/chunk
+```
+
+For 3 active High chunks:
+
+```text
+~9–12M reads/sec
+```
+
+This is acceptable as a target for low-end desktop-class GPUs if shader work remains local and chunk/update scheduling is respected.
+
+## 11.3 Why not shader-side structural search
+
+At 1080p, if water covers 25% of the screen:
+
+```text
+1920×1080×0.25 ≈ 518k water pixels
+```
+
+A shader-side 8-sample structural neighbourhood effect at 60 FPS costs roughly:
+
+```text
+518k×8×60 ≈ 249M samples/sec
+```
+
+This scales with screen coverage and frame rate. Broad structure should therefore be computed into compact fields, not rediscovered per rendered pixel.
+
+## 11.4 Why not naive wide full-res classifiers
+
+A radius 1/3/5 full-res classifier costs:
+
+```text
+3×3 + 7×7 + 11×11 = 179 samples/cell
+128×128×179 ≈ 2.93M samples/update/chunk
+```
+
+At 60 FPS:
+
+```text
+~176M samples/sec/chunk
+```
+
+That is too expensive as a default and still not as clean as low-res sheet support for broad film.
+
+## 11.5 Memory target
+
+High chunk approximate additional Layer D memory:
+
+```text
+_FoamShapeMask RHalf 128×128 ≈ 32 KB
+Two half-res RHalf helpers 64×64 ≈ 16 KB total
+Optional previous shape RHalf ≈ 32 KB
+```
+
+Expected added memory:
+
+```text
+~16–48 KB/chunk without richer RG helpers
+```
+
+This is a reasonable memory trade for lower runtime cost.
+
+---
+
+# 12. Implementation roadmap
+
+## Phase 1 — Documentation lock
+
+Status: this document.
+
+Purpose:
+
+```text
+make dependencies, ownership, rejected paths, and target layers canonical
+```
+
+## Phase 2 — Compliance/debug visibility
+
+Status after 4.11C.5.10: partially complete.
+
+Completed:
+
+```text
+Foam Shape Difference debug.
+A/B/C/D/E/F source-level compliance audit.
+Stale editor/help text cleanup.
+Layer D dispatch gating while Final Foam does not consume _FoamShapeMask.
+```
+
+Still needed when low-res Layer D helpers are added:
+
+```text
+Foam Film Source debug.
+Foam Film Support debug.
+Verification that all new Layer D helpers write only Layer D products and do not feed Layer B or C.
+```
+
+## Phase 3 — Local procedural breakup probe
+
+Test the cheapest “magical” layer honestly.
+
+Scope:
+
+```text
+local procedural chipping/fray/cuts based on position, river UV, time, life, materialPattern
+no neighbourhood search
+no persistent mutation
+no broad bridge support
+```
+
+Purpose:
+
+```text
+determine how much reference-like chaos can be achieved with local math alone
+```
+
+## Phase 4 — Low-res Visual Film Source and Sheet Support
+
+Add Layer D low-res helper textures.
+
+Scope:
+
+```text
+_FoamFilmSourceHalf
+_FoamFilmSupportHalf
+fixed-tap/separable directional spread
+small-gap visual bridging support
+bank/rock/contact film support
+flow-aware sheet elongation
+```
+
+Purpose:
+
+```text
+create broad film/sheet behavior that local noise cannot know
+```
+
+## Phase 5 — Full-res Evaluated Shape
+
+Combine upstream material, support, and local breakup into `_FoamShapeMask`.
+
+Acceptance:
+
+```text
+Foam Evaluated Shape visibly differs from Material Presence in broad structural ways.
+Interiors remain mostly solid.
+Edges chip/fray.
+Small gaps can bridge visually.
+Weak/old regions can pinch.
+No durable material is mutated.
+```
+
+## Phase 6 — Switch Final Foam to Layer D
+
+Only after Layer D earns it.
+
+Scope:
+
+```text
+Final shader samples _FoamShapeMask as broad structure.
+Legacy shader macro-shape logic is demoted/removed.
+Shader retains local detail and thin streaks.
+```
+
+## Phase 7 — Thin bright streak layer
+
+Add separate shader-side streaks.
+
+Scope:
+
+```text
+fast narrow white scratches/streaks
+local/no-neighbour procedural math
+separate from broad film mask
+```
+
+## Phase 8 — Optional visual history
+
+Only if flicker is a real problem.
+
+Scope:
+
+```text
+visual-only smoothing/hysteresis for _FoamShapeMask
+no feedback into Layer C
+```
+
+## Phase 9 — Performance tiers and chunk scheduling
+
+Formalize:
+
+```text
+resolution per quality tier
+Layer C update rate
+Layer D helper/shape update rate
+active chunk caps
+culling/freezing rules
+debug/profiling counters
+```
+
+---
+
+# 13. Current active conclusion
+
+The current architecture is compatible with the final solution if corrected as follows:
+
+```text
+Keep Layer C Persistent Foam Material.
+Keep Layer D _FoamShapeMask as the visual product.
+Keep Layer E shader composition.
+Rename the old ambiguous Stage 1.5 concept to Layer B — External Influence Fields.
+Do not let Layer B read foam.
+Move foam-derived sheet support into Layer D.
+Treat 5.9z coherent coordinate warp as a failed/superseded prototype, not as the main path.
+```
+
+The next implementation work should start from compliance and debug visibility, not another visual patch.
+

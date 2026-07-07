@@ -925,13 +925,28 @@ Shader "PS3D/Stylized River Water"
                     return half4(saturate(fieldColour), 1.0);
                 }
 
-                if (foamDebug == 7)
+                if (foamDebug == 7 || foamDebug == 8)
                 {
                     float evaluatedShape = saturate(
                         SAMPLE_TEXTURE2D(
                             _FoamShapeMask,
                             sampler_FoamCurrent,
                             foam.materialUV).r);
+
+                    if (foamDebug == 8)
+                    {
+                        float materialPresence = saturate(foam.presence);
+                        float addedByShape = saturate(
+                            (evaluatedShape - materialPresence) * 4.0);
+                        float removedByShape = saturate(
+                            (materialPresence - evaluatedShape) * 4.0);
+                        float3 differenceColour = float3(
+                            removedByShape + addedByShape * 0.10,
+                            addedByShape,
+                            removedByShape * 0.85);
+                        return half4(saturate(differenceColour), 1.0);
+                    }
+
                     return half4(evaluatedShape.xxx, 1.0);
                 }
 

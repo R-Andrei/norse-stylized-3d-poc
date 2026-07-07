@@ -253,7 +253,6 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamSimulationLength",
                 simulationFieldLength);
-            computeShader.SetFloat("_FoamTime", river.MotionTime);
             computeShader.SetInt("_FoamRangeStart", 0);
             computeShader.SetInt("_FoamRangeCount", fieldWidth);
             computeShader.SetTexture(

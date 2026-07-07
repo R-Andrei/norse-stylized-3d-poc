@@ -97,7 +97,8 @@ namespace ProgrammaticStylized3D.Rivers
         MaterialRemainingLife = 4,
         FoamMotionField = 5,
         FoamMotionFieldCellGrid = 6,
-        FoamEvaluatedShape = 7
+        FoamEvaluatedShape = 7,
+        FoamShapeDifference = 8
     }
 
 
@@ -1705,6 +1706,8 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.FoamMotionFieldCellGrid;
                 case (int)StylizedRiverFoamDebugView.FoamEvaluatedShape:
                     return StylizedRiverFoamDebugView.FoamEvaluatedShape;
+                case (int)StylizedRiverFoamDebugView.FoamShapeDifference:
+                    return StylizedRiverFoamDebugView.FoamShapeDifference;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }

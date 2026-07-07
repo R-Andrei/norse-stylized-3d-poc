@@ -1256,42 +1256,121 @@ I inspected the files directly from disk. Earlier, `git status` hit an unrelated
 
 ---
 
-# Latest River Foam Addendum — 4.11C.5.9t Compliance Audit Docs Update
+# Latest River Foam Addendum — Canonical Architecture Lock
+
+## Supersession note
+
+This handoff remains useful for older generated-rock and river refactor context, but the active Foam architecture is now owned by:
+
+```text
+Docs/River_Foam_Stage6_Architecture.md
+Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+```
+
+Any older statement in this handoff about static foam, Stage 1.5, coherent deformation as the next primary solution, persistent morphing, lateral row commits, or shader-side macro foam shaping is historical only if it contradicts those docs.
 
 ## Current foam state
 
-The river foam system is still in Stage 6 / `4.11C` manually-born persistent material recovery. The current stable baseline is downstream-only persistent material movement with persistent morph removed and lateral row commit disabled.
-
-The current architecture contract remains:
+The river Foam system is in Stage 6 / `4.11C` manually-born persistent material recovery. The current code has:
 
 ```text
-Product A: Persistent Foam State
-Product B: Evaluated Foam Shape
-
-Stage 1: Persistent State Update
-Stage 2: Shape Evaluation
-Stage 3: Rendering
+Persistent Foam State / FoamState
+_FoamShapeMask
+Foam Evaluated Shape debug
+Foam Shape Difference debug
+Motion Field debug
+Motion Field + Cell Grid debug
 ```
 
-Only Stage 1 may move durable stored foam material. Stage 2 will later own visible morphology/deformation/breakup/split-join. Stage 3 should own final colour/lighting/opacity/blend and only small polish.
+5.9z added a coherent coordinate-warp prototype for `_FoamShapeMask`. Validation with `Foam Shape Difference` showed the warp was numerically active, but normal `Material Presence` and `Foam Evaluated Shape` still looked essentially identical. In 4.11C.5.10B, the warp was retired and `EvaluateFoamShape` was reset to pass-through clipped Persistent Presence so future Layer D probes start from a clean baseline.
 
-## River Foam current implementation note after 5.9y.2
+## Canonical layer graph
 
-The 5.9t audit blockers were addressed through the subsequent patch chain: Motion Field debug now uses raw stored Presence, Motion Field + Cell Grid exists, stale Surface Morph Strength UI was quarantined, and Motion Field wording was corrected to intent/debug/future input. `_FoamShapeMask` and `Foam Evaluated Shape` debug now exist.
+The active architecture is no longer described as a loose `Stage 1 / Stage 1.5 / Stage 2 / Stage 3` sequence. Use the acyclic layer graph:
 
-The 5.9y and 5.9y.1 Stage 2 morphology attempts are superseded. 5.9y produced too much interior fragmentation; 5.9y.1 produced practically no useful visible edge behavior. As of 5.9y.2, Stage 2 is intentionally reset to pass-through clipped Persistent Presence, with `_FoamTime` refreshed immediately before shape evaluation.
+```text
+Layer A — River Domain
+Layer B — External Influence Fields
+Layer C — Persistent Foam Material
+Layer D — Visual Foam / Film Evaluation
+Layer E — Shader Composition
+Layer F — Scheduling, Quality, Debug
+```
 
-The next implementation direction is field-based coherent deformation, not pocket/entity tracking. Do not introduce foam pocket IDs, connected components, or per-pocket state without explicit approval. Avoid naive multi-radius edge classifiers as a default because radius 1/3/5 sampling costs `179` samples per cell. Prefer smooth vector-field deformation first, then cheap bridge/break fields using low-resolution or mip-filtered presence/life data.
+Hard dependency rule:
 
-## River Foam 4.11C.5.9y.2 handoff note
+```text
+A → B → C → D → E
+A may also feed C/D/E directly.
+B may feed C/D/E.
+C may feed D/E.
+D may feed E.
+No downstream layer may feed an upstream layer.
+```
 
-Current foam truth after 5.9y.2:
+## Layer ownership summary
 
-- Persistent Foam State remains the durable material authority: Presence, Remaining Life, Material Pattern.
-- Actual Remaining Life is still owned only by Stage 1 lifecycle/support topology. Stage 2 may read Remaining Life in future as metadata, but must not write or mutate it.
-- `_FoamShapeMask` exists and `Foam Evaluated Shape` debug samples it.
-- Stage 2 is currently reset to pass-through clipped Persistent Presence after rejecting the 5.9y interior-hole pass and the 5.9y.1 nearly invisible edge-fray pass.
-- `_FoamTime` is refreshed immediately before Stage 2 evaluation so later animated shape logic can update at current frame time.
-- Final Foam still does not consume `_FoamShapeMask`.
+- `Layer A — River Domain` owns river-space coordinates, valid fluid, boundary/shore mapping, and material UV conventions.
+- `Layer B — External Influence Fields` owns foam-agnostic support/contact/motion/exclusion/wake/pressure influence fields. It may feed Layer C and Layer D, but it must not read `FoamState`, `_FoamShapeMask`, or Layer D helper fields.
+- `Layer C — Persistent Foam Material` owns durable `Presence`, `Remaining Life`, `Material Pattern`, birth, death, and real material movement.
+- `Layer D — Visual Foam / Film Evaluation` owns `_FoamShapeMask` and future foam-derived visual helper fields such as film source/support. It may visually widen, bridge, pinch, bend, and fragment foam, but it must not write persistent material.
+- `Layer E — Shader Composition` owns final color, opacity, soft edges, local procedural chipping/fray, thin streaks, reflection/refraction integration, and debug pixels. It must not own broad structural foam connectivity or feed back into compute.
+- `Layer F — Scheduling, Quality, Debug` owns update cadence, allocation, binding, quality tiers, debug view selection, and Inspector labels. It must not own foam behavior math.
 
-Do not resume local edge-fray tuning as the main Stage 2 direction. Do not introduce pocket IDs or connected-component tracking. The next planned work is field-based coherent deformation: sample Persistent Presence through a smooth, bounded vector field so broad foam ribbons/sheets bend as coherent fields without moving durable material. After that, investigate cheap visual bridge/break behavior using low-resolution or mip-filtered presence/life fields rather than naive wide-kernel sampling.
+## Active implementation direction
+
+Do not tune 5.9z coordinate warp as the primary solution. The compliance/debug audit and `Foam Shape Difference` debug view were completed in `4.11C.5.10`; the failed coordinate warp was retired in `4.11C.5.10B`. The next work should be:
+
+```text
+1. Test cheap local procedural breakup for edge chipping/fray/cuts.
+2. Add low-res Layer D Film Source / Film Support for broad sheet/contact/bridge behavior.
+3. Integrate those fields into full-res _FoamShapeMask.
+4. Switch Final Foam to _FoamShapeMask only after the evaluated shape is visibly better than current final foam.
+```
+
+Do not introduce pocket IDs, connected-component tracking, or per-pocket state without explicit approval. Do not use naive full-res radius 1/3/5 classifiers as the default, because they cost `179` samples per cell, or about `2.93M` samples for one 128×128 field evaluation. Do not let shader-side wide-neighbour sampling become the source of broad foam structure.
+
+## Code locations to inspect for future Foam work
+
+Core runtime and owner/scheduler code:
+
+```text
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.*.cs
+```
+
+Core compute files:
+
+```text
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Sampling.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Motion.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Topology.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Support.hlsl
+```
+
+Render files:
+
+```text
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl
+```
+
+Important symbols:
+
+```text
+StylizedRiverFoamDebugView
+FoamEvaluatedShape
+EvaluateFoamShape
+DispatchEvaluateShape()
+shapeMaskTexture
+_FoamShapeMask / _FoamShapeMaskWrite
+_FoamStateRead / _FoamStateWrite
+_FoamMotionLaneRead
+_FoamObstacleRoutingRead
+FoamDecodeMaterialState(...)
+RiverWaterFoamResult.materialUV
+```
+

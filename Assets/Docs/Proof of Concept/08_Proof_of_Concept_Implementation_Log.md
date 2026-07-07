@@ -1069,3 +1069,96 @@ Validation of 5.9y and 5.9y.1 showed that the Stage 2 product exists, but the fi
 The patch also fixes Stage 2 time binding. `_FoamTime` is now refreshed immediately before `DispatchEvaluateShape()`, instead of relying only on the material simulation configuration path. This prevents future animated Stage 2 shape logic from accidentally inheriting the lower material-update cadence.
 
 The accepted design direction after this reset is field-based and formula-driven, not pocket/entity tracking. Stage 2 should not introduce pocket IDs, connected-component tracking, or per-pocket properties unless field-based deformation fails. The next visual target is coherent field deformation: sample Persistent Presence through a smooth bounded vector field so neighbouring cells in a ribbon receive similar offsets. Naive radius 1/3/5 edge classification is rejected as a default because it costs `179` samples per cell, or about `2.93M` samples for a 128×128 field evaluation. Preferred next algorithms should target about `4–5` samples per cell or use low-resolution/mip-filtered helper fields for bridge/break behavior.
+
+## 2026-07-07 — River Foam 4.11C.5.9z Stage 2 coherent deformation prototype
+
+5.9z turns `Foam Evaluated Shape` from a pass-through product into the first active Stage 2 coherent-deformation prototype. `EvaluateFoamShape` now writes `_FoamShapeMask` by inverse-sampling Persistent Foam Presence through a smooth, bounded deformation field. The field combines low-frequency mathematical motion with read-only Motion Field / obstacle-routing intent so broad sheets and ribbons can bend coherently without pocket IDs or connected-component tracking.
+
+Persistent Foam State remains unchanged: Stage 2 does not write `_FoamStateWrite`, does not move durable Presence, and does not mutate Remaining Life or Material Pattern. Final Foam also remains unchanged and still does not consume `_FoamShapeMask`; validation should compare `Material Presence` against `Foam Evaluated Shape`. The C# runtime now binds the Motion Field lane/routing textures, Motion Field strength, lane scroll, seed, and current time before dispatching `EvaluateFoamShape`.
+
+## 2026-07-07 — River Foam Canonical Architecture Lock
+
+After validation of 4.11C.5.9z, the Foam planning direction was corrected before further implementation. The coherent deformation prototype proved the `_FoamShapeMask` dispatch/binding/product slot, but user comparison of `Material Presence` and `Foam Evaluated Shape` showed no meaningful visible difference. The diagnosis is that a small inverse-sampled coordinate warp can only affect contours of broad solid masks; it cannot create reference-like broad sheet support, visual bridges, pinches, bank/rock skirts, or structural film behavior by itself.
+
+The new canonical architecture is documented in `Docs/River_Foam_Stage6_Architecture.md`. It replaces the ambiguous earlier `Stage 1.5` language with a strict acyclic layer graph:
+
+```text
+Layer A — River Domain
+Layer B — External Influence Fields
+Layer C — Persistent Foam Material
+Layer D — Visual Foam / Film Evaluation
+Layer E — Shader Composition
+Layer F — Scheduling, Quality, Debug
+```
+
+The most important correction is dependency ownership. `Layer B` contains foam-agnostic external influence fields: support, contact, suppression, exclusion, motion intent, wake/pressure/ripple context, and similar environmental fields. It may feed `Layer C` and `Layer D`, but it must not read `FoamState`, `_FoamShapeMask`, or any Layer D helper field. Foam-derived sheet/source/support fields belong inside `Layer D` only. This prevents the circular dependency where support fields are computed from foam and then feed the persistent foam simulation again.
+
+Persistent material truth remains `Layer C`. It alone owns durable Presence, Remaining Life, Material Pattern, birth, death, and real material movement. Visual broad film remains `Layer D`. It may visually widen, connect, pinch, soften, bend, and fragment foam, but it writes only visual products such as `_FoamShapeMask`; it must never write persistent material state. Shader composition remains `Layer E`. It should own final color, opacity, soft edges, local procedural breakup, thin streaks, and rendering polish, but must not own broad structural foam connectivity or feed back into compute.
+
+The final solution is therefore not an entity database and not a pure shader trick. It is a fixed-grid mathematical field pipeline: persistent material → foam-agnostic influence → visual film support/shape → shader polish. Local procedural math is still valuable for chipping, fray, cuts, and thin streaks, but true context-aware broad sheet/bridge behavior requires low-resolution Layer D helper fields because a local-only function cannot know whether an empty cell is between two nearby foam bodies or isolated in open water.
+
+Active next work after the docs lock is not another shape-tuning patch. The next implementation should be a compliance/debug pass: audit Layer B/C/D/E read-write boundaries and add a `Foam Shape Difference` debug view so future work can immediately show whether `_FoamShapeMask` differs from raw persistent `Presence`. After that, test local procedural breakup as the cheapest possible visual detail layer, then add low-resolution Layer D film-source/sheet-support helpers for broad structural behavior.
+
+## 2026-07-07 — River Foam 4.11C.5.10 compliance/debug cleanup
+
+This was the first implementation pass after the Foam canonical architecture lock. No final-render Foam behavior was intentionally changed. The purpose was to record the source audit findings, clean stale claims, and make Layer D truth visible before any new visual behavior work.
+
+Source audit findings:
+
+```text
+Layer A/B/C/D/E/F ownership is broadly compatible with the canonical acyclic graph.
+Layer B external influence generation was not found reading FoamState or _FoamShapeMask.
+Layer C persistent material was not found reading _FoamShapeMask.
+Layer D still contains the 5.9z coordinate-warp prototype; it writes only _FoamShapeMask and remains a failed/superseded visual approach, not the future solution.
+Layer E Final Foam still uses legacy shader-side macro shaping and does not consume _FoamShapeMask.
+Old comments/labels overstated accepted disturbance material transport and described Foam Evaluated Shape as pass-through.
+Unused wake/pressure material-motion constants remained from abandoned disturbance transport experiments.
+```
+
+Implemented cleanup:
+
+```text
+Added StylizedRiverFoamDebugView.FoamShapeDifference = 8.
+Added editor labels and descriptions for Foam Shape Difference.
+Added shader debug branch: black means _FoamShapeMask matches raw Material Presence, green means evaluated shape adds coverage, magenta/red means evaluated shape removes coverage.
+Updated Foam Evaluated Shape description to identify the current 5.9z coordinate-warp as a failed/superseded prototype.
+Updated Water Body help text to describe the Layer A-F split and stop claiming active lateral disturbance material transport.
+Removed unused WakeMotionInfluence, PressureMotionInfluence, and TransportMaximumAxisCourant constants.
+Replaced IsEvaluatedShapeDebugActive with IsShapeProductDebugActive so both Evaluated Shape and Shape Difference request the Layer D product.
+Gated DispatchEvaluateShape behind Layer D debug use, because Final Foam still does not consume _FoamShapeMask.
+```
+
+Known remaining caveats:
+
+```text
+No low-res Film Source / Film Support helpers exist yet.
+Transition-hold fallback for _FoamShapeMask may still be product-imprecise during topology transitions.
+Shader-side Final Foam still owns legacy macro shaping until Layer D earns the production switch.
+```
+
+Next active implementation direction is the local procedural breakup probe, followed by low-res Layer D Film Source / Film Support for broad structural sheet behavior.
+
+
+
+## 2026-07-07 — River Foam 4.11C.5.10B Retire Failed Shape Warp Baseline
+
+Validation of `4.11C.5.10` confirmed that the new `Foam Shape Difference` view works and that the 5.9z coordinate-warp prototype was numerically active: the difference view showed strong green/magenta signed bands where `_FoamShapeMask` differed from raw persistent `Presence`. However, the normal `Material Presence` and `Foam Evaluated Shape` views still looked and behaved basically identical. Final Foam also remained unchanged, as intended, because Final Foam still does not consume `_FoamShapeMask`.
+
+The conclusion is now recorded as evidence rather than speculation:
+
+```text
+5.9z changed values.
+5.9z did not create useful visible structure.
+A coordinate warp can produce signed differences without changing the readable foam silhouette/behavior.
+```
+
+`4.11C.5.10B` therefore retires the failed 5.9z warp as active code. `EvaluateFoamShape` is reset to pass-through clipped persistent `Presence`, and the coordinate-warp helper functions are removed. `DispatchEvaluateShape()` no longer binds Motion Field lane or obstacle-routing textures for the baseline shape pass because the pass-through baseline does not read them.
+
+This restores a clean Layer D baseline:
+
+```text
+Material Presence ~= Foam Evaluated Shape
+Foam Shape Difference ~= black
+```
+
+That baseline is intentional. Future Layer D work must now prove visible benefit explicitly, starting with the local procedural breakup probe and then the low-resolution Film Source / Film Support system for broad structural sheet/contact/bridge behavior.

@@ -428,6 +428,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Shader.PropertyToID("_GeneratedMassFeatureAtlas1Enabled");
         private static readonly int GeneratedMassFeatureAtlasQualityId =
             Shader.PropertyToID("_GeneratedMassFeatureAtlasQuality");
+        private static readonly int GeneratedMassGeometryEdgeWearEnabledId =
+            Shader.PropertyToID("_GeneratedMassGeometryEdgeWearEnabled");
         private static readonly int GeneratedMassEdgeWearCoverageId =
             Shader.PropertyToID("_GeneratedMassEdgeWearCoverage");
         private static readonly int GeneratedMassEdgeWearSoftnessId =
@@ -631,27 +633,27 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float lightingTintInfluence = 0.35f;
 
-        [Tooltip("Reserved convex edge-wear strength. Final edge wear is moving to generated bevel/chamfer geometry; the temporary boundary atlas is generated only for edge-wear debug views.")]
+        [Tooltip("Convex edge-wear amount. For EW-4 plane-cut masses, this enables generated bevel/chamfer edge wear and controls worn-face material strength, not physical bevel width.")]
         [Range(0f, 2f)]
         [SerializeField]
         private float edgeWearAmount = 1f;
 
-        [Tooltip("Reserved convex edge-wear width for the upcoming generated bevel/chamfer path. Temporary atlas debug views may still use this value.")]
+        [Tooltip("Convex edge-wear bevel/chamfer width. Higher values cut deeper generated worn-edge faces.")]
         [Range(0.25f, 2f)]
         [SerializeField]
         private float edgeWearWidth = 1f;
 
-        [Tooltip("Reserved convex edge selection coverage for the upcoming generated bevel/chamfer path. Temporary atlas debug views may still use this value.")]
+        [Tooltip("How many eligible convex edges receive generated bevel/chamfer wear.")]
         [Range(0.1f, 2f)]
         [SerializeField]
         private float edgeWearCoverage = 1f;
 
-        [Tooltip("Reserved edge-wear softness/material blend control for the upcoming generated bevel/chamfer path. Temporary atlas debug views may still use this value.")]
+        [Tooltip("Softens the visible worn-edge material response. EW-4A.1 no longer changes physical bevel width from this control.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float edgeWearSoftness = 0.45f;
 
-        [Tooltip("Reserved master intensity for the upcoming geometry-based convex edge-wear material response. The temporary boundary atlas no longer affects normal rendering.")]
+        [Tooltip("Master visible intensity for UV2.z-marked generated bevel/chamfer edge-wear faces. Set above zero to see worn-edge response in normal rendering.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float edgeWearResponseStrength;
@@ -670,13 +672,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float edgeWearTintStrength;
 
-        [Tooltip("How strongly different convex ridges can vary in visible edge-wear strength. Uses the baked ridge weight field; this does not change the semantic atlas data.")]
+        [Tooltip("Reserved for richer inter-edge variation on generated bevel/chamfer wear. The first EW-4 pass uses deterministic edge scoring only.")]
         [Range(0f, 1f)]
         [SerializeField]
         [FormerlySerializedAs("edgeWearBreakup")]
         private float edgeWearMacroVariation;
 
-        [Tooltip("How strongly visible edge wear varies along the same ridge. This modulates apparent width and local intensity without changing the semantic atlas data.")]
+        [Tooltip("Reserved for future along-edge chipping/segmentation on generated bevel/chamfer wear. The first EW-4 pass does not segment bevel faces.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float edgeWearMicroVariation;
@@ -898,13 +900,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             EnsureGeneratedMesh();
             ReleaseGeneratedFeatureAtlas();
 
-            MeshData sourceMeshData = MassGenerator.Generate(recipe);
+            MassSurfaceFeatureSettings featureSettings =
+                CreateSurfaceFeatureSettings();
+            MeshData sourceMeshData = MassGenerator.Generate(
+                recipe,
+                featureSettings);
             GeneratedMassFeatureAtlasRequest atlasRequest =
                 ResolveFeatureAtlasRequest();
             int featureAtlasResolution =
                 ResolveFeatureAtlasResolution(atlasRequest);
-            MassSurfaceFeatureSettings featureSettings =
-                CreateSurfaceFeatureSettings();
             GeneratedMassFeatureAtlasBaker.Result featureAtlas =
                 atlasRequest != GeneratedMassFeatureAtlasRequest.None
                     ? GeneratedMassFeatureAtlasBaker.Bake(
@@ -1403,6 +1407,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 GeneratedMassFeatureAtlasQualityId,
                 ResolveCurrentFeatureAtlasQuality());
             materialProperties.SetFloat(
+                GeneratedMassGeometryEdgeWearEnabledId,
+                1f);
+            materialProperties.SetFloat(
                 GeneratedMassEdgeWearCoverageId,
                 Mathf.Clamp(edgeWearCoverage, 0.1f, 2f));
             materialProperties.SetFloat(
@@ -1582,10 +1589,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             GeneratedMassFeatureAtlasRequest request =
                 GeneratedMassFeatureAtlasRequest.None;
 
-            // Normal-render convex edge wear no longer requests FeatureAtlas0/1.
-            // The atlas path is retained only for temporary authoring/debug
-            // inspection until EW-4 replaces edge wear with generated
-            // bevel/chamfer geometry and mesh-carried material markers.
+            // Normal-render convex edge wear is geometry-first. It uses generated
+            // bevel/chamfer faces and mesh-carried UV2.z material markers, not
+            // FeatureAtlas0/1. Atlases remain temporary boundary diagnostics only.
             if (DebugModeRequiresFeatureAtlas0(surfaceMaskDebug))
             {
                 request |= GeneratedMassFeatureAtlasRequest.FeatureAtlas0;
@@ -1611,7 +1617,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             switch (debugMode)
             {
-                case StoneSurfaceMaskDebug.ConvexEdgeWear:
                 case StoneSurfaceMaskDebug.ConcaveCrease:
                 case StoneSurfaceMaskDebug.ConvexBoundaryProximity:
                 case StoneSurfaceMaskDebug.ConcaveBoundaryProximity:

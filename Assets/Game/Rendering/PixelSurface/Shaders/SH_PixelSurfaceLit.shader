@@ -79,6 +79,7 @@ Shader "PS3D/Pixel Surface Lit"
         [HideInInspector] _GeneratedMassFeatureAtlas1("Generated Mass Feature Atlas 1", 2D) = "black" {}
         [HideInInspector] _GeneratedMassFeatureAtlas1Enabled("Generated Mass Feature Atlas 1 Enabled", Float) = 0
         [HideInInspector] _GeneratedMassFeatureAtlasQuality("Generated Mass Feature Atlas Quality", Float) = 1
+        [HideInInspector] _GeneratedMassGeometryEdgeWearEnabled("Generated Mass Geometry Edge Wear Enabled", Float) = 0
         [HideInInspector] _GeneratedMassEdgeWearCoverage("Generated Mass Edge Wear Coverage", Float) = 1
         [HideInInspector] _GeneratedMassEdgeWearSoftness("Generated Mass Edge Wear Softness", Float) = 0.45
         [HideInInspector] _GeneratedMassEdgeWearResponseStrength("Generated Mass Edge Wear Response Strength", Float) = 0
@@ -223,6 +224,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassFeatureAtlas0Enabled;
                 float _GeneratedMassFeatureAtlas1Enabled;
                 float _GeneratedMassFeatureAtlasQuality;
+                float _GeneratedMassGeometryEdgeWearEnabled;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;
@@ -860,6 +862,45 @@ Shader "PS3D/Pixel Surface Lit"
                 return lerp(neutralTarget, hueTarget, strength);
             }
 
+            half3 ApplyGeneratedMassGeometryEdgeWearResponse(
+                half3 albedo,
+                Varyings input)
+            {
+                // EW-4 edge wear is carried by actual generated bevel/chamfer
+                // faces through UV2.z. It intentionally does not sample the
+                // temporary FeatureAtlas0/1 boundary diagnostics. Use a
+                // dedicated GeneratedMass enable flag instead of SurfaceContract
+                // so the final response follows the same UV2.z mask validated
+                // by Surface Mask Debug = ConvexEdgeWear.
+                float softness = saturate(_GeneratedMassEdgeWearSoftness);
+                float responseSoftening = lerp(1.0, 0.72, softness);
+                float edgeWearMask =
+                    saturate(input.materialMasks.z) *
+                    saturate(_GeneratedMassGeometryEdgeWearEnabled) *
+                    saturate(_GeneratedMassEdgeWearResponseStrength) *
+                    responseSoftening;
+
+                if (edgeWearMask <= 0.0001)
+                {
+                    return albedo;
+                }
+
+                half lift =
+                    (half)(_GeneratedMassEdgeWearBrightnessLift * edgeWearMask * lerp(1.0, 0.82, softness));
+
+                // Additive lift is intentionally used here because multiplying
+                // already-dark stone albedo can be visually invisible even when
+                // the UV2.z bevel mask is correct. Keep it bounded and then tint
+                // the lifted value so Response/Brightness/Tint can be validated
+                // independently of bevel topology.
+                half3 lifted = saturate(albedo + lift * 0.58h);
+                half3 tinted = PS3D_ApplyValuePreservingTint(
+                    lifted,
+                    _GeneratedMassEdgeWearTint.rgb,
+                    _GeneratedMassEdgeWearTintStrength * responseSoftening);
+                return lerp(albedo, tinted, (half)edgeWearMask);
+            }
+
             float4 ResolveGeneratedMassFeatureAtlas0(Varyings input)
             {
                 if (_GeneratedMassFeatureAtlas0Enabled < 0.5)
@@ -913,7 +954,7 @@ Shader "PS3D/Pixel Surface Lit"
 
                 if (mode == 4)
                 {
-                    float mask = ResolveGeneratedMassAtlasEdgeWearMask(input);
+                    float mask = saturate(input.materialMasks.z);
 
                     return (half3)lerp(
                         float3(0.025, 0.025, 0.035),
@@ -1612,6 +1653,9 @@ Shader "PS3D/Pixel Surface Lit"
                     albedo,
                     _GeneratedMassOverallRockTint.rgb,
                     _GeneratedMassOverallRockTintStrength);
+                albedo = ApplyGeneratedMassGeometryEdgeWearResponse(
+                    albedo,
+                    input);
 
                 InputData inputData = BuildInputData(input, normalWS);
                 SurfaceData surfaceData = BuildSurfaceData(albedo);
@@ -1708,6 +1752,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassFeatureAtlas0Enabled;
                 float _GeneratedMassFeatureAtlas1Enabled;
                 float _GeneratedMassFeatureAtlasQuality;
+                float _GeneratedMassGeometryEdgeWearEnabled;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;
@@ -1878,6 +1923,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassFeatureAtlas0Enabled;
                 float _GeneratedMassFeatureAtlas1Enabled;
                 float _GeneratedMassFeatureAtlasQuality;
+                float _GeneratedMassGeometryEdgeWearEnabled;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;
@@ -2042,6 +2088,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassFeatureAtlas0Enabled;
                 float _GeneratedMassFeatureAtlas1Enabled;
                 float _GeneratedMassFeatureAtlasQuality;
+                float _GeneratedMassGeometryEdgeWearEnabled;
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;

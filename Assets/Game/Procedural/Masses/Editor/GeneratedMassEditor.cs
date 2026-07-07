@@ -1175,51 +1175,49 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             using (new EditorGUI.IndentLevelScope())
             {
                 EditorGUILayout.HelpBox(
-                    "Runtime atlas-based edge wear has been decommissioned. These " +
-                    "controls are retained as reserved authoring inputs for the next " +
-                    "geometry bevel/chamfer edge-wear pass. Temporary atlas debug views " +
-                    "may still use the Data Field values, but normal rendering no longer " +
-                    "samples FeatureAtlas0/1 for edge wear.",
+                    "EW-4 geometry edge wear is active for plane-cut mass archetypes. " +
+                    "These controls drive generated bevel/chamfer faces and their " +
+                    "worn-edge material response. FeatureAtlas0/1 remain temporary " +
+                    "boundary diagnostics only and are not sampled by normal edge wear.",
                     MessageType.Info);
 
                 EditorGUILayout.LabelField(
-                    "Reserved Geometry Inputs / Temporary Debug Atlas",
+                    "Geometry Edge-Wear Inputs",
                     EditorStyles.miniBoldLabel);
                 EditorGUILayout.PropertyField(
                     edgeWearAmount,
                     new GUIContent(
                         "Amount",
-                        "Reserved edge-wear amount. Temporary atlas debug views may still use this value until the geometry bevel/chamfer path replaces the debug atlas."));
+                        "Controls worn-face material mask intensity. A value of zero disables generated edge-wear bevels; physical bevel width is controlled by Width."));
                 EditorGUILayout.PropertyField(
                     edgeWearWidth,
                     new GUIContent(
                         "Width",
-                        "Reserved edge-wear width for generated bevel/chamfer geometry. Temporary atlas debug views may still use this value."));
+                        "Controls generated bevel/chamfer depth on selected convex edges."));
                 EditorGUILayout.PropertyField(
                     edgeWearCoverage,
                     new GUIContent(
                         "Coverage",
-                        "Reserved convex edge selection coverage for generated bevel/chamfer geometry. Temporary atlas debug views may still use this value."));
+                        "Controls how many eligible convex edges are selected for bevel wear. Max selects all eligible structural candidates unless a cut is rejected for stability."));
                 EditorGUILayout.PropertyField(
                     edgeWearSoftness,
                     new GUIContent(
                         "Softness",
-                        "Reserved softness/material blend control for generated bevel/chamfer edge wear. Temporary atlas debug views may still use this value."));
+                        "Controls visible material softness on marked bevel faces. EW-4A.1 does not let this change physical bevel depth."));
 
                 EditorGUILayout.Space(3f);
                 EditorGUILayout.LabelField(
                     "Visual Response",
                     EditorStyles.miniBoldLabel);
                 EditorGUILayout.HelpBox(
-                    "Reserved for the upcoming geometry-based worn-edge material " +
-                    "response. These controls currently do not make the temporary " +
-                    "debug atlas visible in normal rendering.",
+                    "Visual response is applied to mesh bevel faces marked in UV2.z. " +
+                    "Response Strength must be above zero for bevel faces to visibly brighten/tint.",
                     MessageType.None);
                 EditorGUILayout.PropertyField(
                     edgeWearResponseStrength,
                     new GUIContent(
                         "Response Strength",
-                        "Reserved master intensity for geometry-based convex edge wear. The temporary atlas no longer affects normal rendering."));
+                        "Master visible intensity for UV2.z-marked generated bevel/chamfer faces."));
                 EditorGUILayout.PropertyField(
                     edgeWearBrightnessLift,
                     new GUIContent(
@@ -1239,12 +1237,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     edgeWearMacroVariation,
                     new GUIContent(
                         "Macro Variation",
-                        "Reserved inter-edge variation for generated bevel/chamfer edge wear."));
+                        "Reserved for richer per-edge selection/material variation. First EW-4 pass uses deterministic edge scoring only."));
                 EditorGUILayout.PropertyField(
                     edgeWearMicroVariation,
                     new GUIContent(
                         "Micro Variation",
-                        "Reserved intra-edge variation for generated bevel/chamfer edge wear."));
+                        "Reserved for future along-edge chipping/segmentation. First EW-4 pass does not segment bevel faces."));
             }
         }
 

@@ -730,7 +730,7 @@ namespace ProgrammaticStylized3D.Rivers
             !IsTopologyDebugActive &&
             !IsProgressiveBirthSourceDebugActive &&
             !IsMotionFieldDebugActive &&
-            !IsEvaluatedShapeDebugActive &&
+            !IsShapeProductDebugActive &&
             !materialLifetimeAuthorityActive &&
             pendingInjections.Count == 0 &&
             !pendingIsolatedLifeProbe &&
@@ -852,13 +852,19 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
-        private bool IsEvaluatedShapeDebugActive
+        private bool IsShapeProductDebugActive
         {
             get
             {
-                return river != null &&
+                if (river == null)
+                {
+                    return false;
+                }
+
+                return river.FoamDebugView ==
+                        StylizedRiverFoamDebugView.FoamEvaluatedShape ||
                     river.FoamDebugView ==
-                        StylizedRiverFoamDebugView.FoamEvaluatedShape;
+                        StylizedRiverFoamDebugView.FoamShapeDifference;
             }
         }
 

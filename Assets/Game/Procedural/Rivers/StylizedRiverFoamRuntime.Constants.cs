@@ -153,31 +153,18 @@ namespace ProgrammaticStylized3D.Rivers
         private const float ConnectorSelectionJitterMinimum = 0.90f;
         private const float ConnectorSelectionJitterMaximum = 1.10f;
 
-        // Patch 4.11C.5 removes the inherited autonomous material network and
-        // all of its spread/capture controls. The remaining constants have one
-        // explicit job each: rendering transported Presence coverage, generating manual
-        // proof shapes, keeping conservative transport stable, and applying
-        // accepted physical disturbance motion.
+        // Patch 4.11C.5 keeps Foam material work at a deliberate animation
+        // cadence. Layer C owns durable persistent material: stored Presence,
+        // Remaining Life, Material Pattern, explicit birth/death, and
+        // downstream phase transport. External motion/support fields are
+        // Layer B inputs/debug/future routing data; they do not currently move
+        // persistent material laterally.
         private const float MaterialContourSharpness = 0.78f;
-        // Patch 4.11C.5.2d keeps Foam material work at a deliberate
-        // animation cadence. Base downstream movement is phase-driven in the
-        // shader and committed as whole texture cells, while these rates own
-        // durable lifecycle, source transfer, topology aging, and disturbance
-        // transport.
         private const float LowMaterialTemporalUpdateRate = 8f;
         private const float MediumMaterialTemporalUpdateRate = 12f;
         private const float HighMaterialTemporalUpdateRate = 16f;
         private const float ManualTestShapeVariety = 0f;
         private const float PresenceMetricThreshold = 0.16432f;
-        // Preserve the accepted pre-C.5 wake/pressure deformation strength
-        // after removing the unrelated network, bank-attraction, spread, and
-        // capture terms that previously surrounded it. X is along-river and Y
-        // is across-river influence.
-        private static readonly Vector2 WakeMotionInfluence =
-            new(0.25135992f, 0.81691974f);
-        private static readonly Vector2 PressureMotionInfluence =
-            new(0.0280944f, 0.085844f);
-        private const float TransportMaximumAxisCourant = 0.28f;
         private const float IntegratedAreaFixedPointScale = 4096f;
 
         private enum TopologyCacheStartupResolution

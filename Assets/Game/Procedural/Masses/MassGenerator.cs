@@ -64,6 +64,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         public static MeshData Generate(MassRecipe recipe)
         {
+            return Generate(recipe, null);
+        }
+
+        public static MeshData Generate(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings? surfaceFeatures)
+        {
             if (recipe == null)
             {
                 throw new ArgumentNullException(nameof(recipe));
@@ -71,7 +78,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             Vector3 dimensions = ResolveDimensions(recipe);
 
-            TriangleSoup soup = BuildMassSoup(recipe);
+            TriangleSoup soup = BuildMassSoup(recipe, surfaceFeatures);
 
             ApplyDimensions(soup.Positions, dimensions);
             ApplyLean(soup.Positions, recipe.Lean, recipe.ShapeSeed);
@@ -86,7 +93,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return archetype == MassArchetype.PolishedStone;
         }
 
-        private static TriangleSoup BuildMassSoup(MassRecipe recipe)
+        private static TriangleSoup BuildMassSoup(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings? surfaceFeatures)
         {
             return recipe.Archetype switch
             {
@@ -94,13 +103,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 MassArchetype.CarvedMarkerStone => BuildCarvedMarkerMass(recipe),
                 _ => UsesRadialBuilder(recipe.Archetype)
                     ? BuildRadialMass(recipe)
-                    : BuildPlaneCutMass(recipe)
+                    : BuildPlaneCutMass(recipe, surfaceFeatures)
             };
         }
 
         #region Plane-cut mass
 
-        private static TriangleSoup BuildPlaneCutMass(MassRecipe recipe)
+        private static TriangleSoup BuildPlaneCutMass(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings? surfaceFeatures)
         {
             System.Random shapeRandom =
                 CreateRandom(recipe.ShapeSeed, 0x27101987);
@@ -186,6 +197,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
                 ApplyCut(faces, normal, depth);
             }
+
+            ApplyGeneratedEdgeWearBevels(
+                faces,
+                recipe,
+                surfaceFeatures);
 
             return TriangulatePolyhedron(
                 faces,
@@ -583,6 +599,885 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 new CutPlane(normal, distance));
         }
 
+        private static void ApplyGeneratedEdgeWearBevels(
+            List<PolygonFace> faces,
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings? surfaceFeatures)
+        {
+            if (!surfaceFeatures.HasValue || faces.Count < 4)
+            {
+                return;
+            }
+
+            MassSurfaceFeatureSettings settings = surfaceFeatures.Value;
+            float amount01 = Mathf.Clamp01(settings.EdgeWearAmount * 0.5f);
+            if (amount01 <= 0.001f)
+            {
+                return;
+            }
+
+            Bounds bounds = CalculateFaceBounds(faces);
+            float maximumDimension = Mathf.Max(
+                0.0001f,
+                Mathf.Max(
+                    bounds.size.x,
+                    Mathf.Max(bounds.size.y, bounds.size.z)));
+
+            // EW-4B keeps the EW-4A.1 control contract: Width owns the
+            // physical chamfer depth, Amount owns generated material strength,
+            // and Softness is reserved for material/normal response. The bevel
+            // construction below is local edge-strip geometry, not global
+            // polyhedron clipping, so accepted bevels cannot slice unrelated
+            // faces elsewhere on the mass.
+            float width01 = Mathf.InverseLerp(0.25f, 2f, settings.EdgeWearWidth);
+            float bevelDepth = maximumDimension * Mathf.Lerp(0.0035f, 0.0115f, width01);
+            bevelDepth = Mathf.Clamp(
+                bevelDepth,
+                maximumDimension * 0.0025f,
+                maximumDimension * 0.016f);
+
+            List<EdgeWearBevelCandidate> candidates =
+                BuildEdgeWearBevelCandidates(
+                    faces,
+                    bounds,
+                    maximumDimension,
+                    recipe,
+                    settings,
+                    amount01);
+            if (candidates.Count == 0)
+            {
+                WarnEdgeWearBevelFailure(new EdgeWearBevelBuildStats(0, 0));
+                return;
+            }
+
+            candidates.Sort((left, right) => right.Score.CompareTo(left.Score));
+
+            float coverage01 = Mathf.Clamp01(settings.EdgeWearCoverage * 0.5f);
+            float coverageFraction = Mathf.Lerp(0.0f, 1.0f, coverage01);
+            int selectedCount = Mathf.Clamp(
+                Mathf.CeilToInt(candidates.Count * coverageFraction),
+                0,
+                candidates.Count);
+
+            if (selectedCount <= 0)
+            {
+                return;
+            }
+
+            float minimumStableFaceArea = Mathf.Max(
+                TinyFaceAreaEpsilon * 12f,
+                maximumDimension * maximumDimension * 0.0000007f);
+            float minimumStableEdgeLength = maximumDimension * 0.0012f;
+
+            EdgeWearBevelBuildStats stats = new EdgeWearBevelBuildStats(
+                candidates.Count,
+                selectedCount);
+
+            if (!TryApplyLocalEdgeWearBevels(
+                    faces,
+                    candidates,
+                    selectedCount,
+                    bevelDepth,
+                    bounds,
+                    minimumStableFaceArea,
+                    minimumStableEdgeLength,
+                    ref stats))
+            {
+                // Fail closed. Edge wear is optional; broken bevel topology is not.
+                WarnEdgeWearBevelFailure(stats);
+                return;
+            }
+        }
+
+        private static List<EdgeWearBevelCandidate> BuildEdgeWearBevelCandidates(
+            List<PolygonFace> faces,
+            Bounds bounds,
+            float maximumDimension,
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings settings,
+            float amount01)
+        {
+            Dictionary<EdgeKey, EdgeWearEdgeAggregate> edges =
+                new Dictionary<EdgeKey, EdgeWearEdgeAggregate>();
+
+            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
+            {
+                PolygonFace face = faces[faceIndex];
+                if (face.Feature != PolygonFaceFeature.Base)
+                {
+                    continue;
+                }
+
+                for (int vertexIndex = 0; vertexIndex < face.Vertices.Count; vertexIndex++)
+                {
+                    Vector3 start = face.Vertices[vertexIndex];
+                    Vector3 end = face.Vertices[(vertexIndex + 1) % face.Vertices.Count];
+                    if ((end - start).sqrMagnitude <= MinimumEdgeLengthSqr)
+                    {
+                        continue;
+                    }
+
+                    EdgeKey key = new EdgeKey(start, end);
+                    if (!edges.TryGetValue(key, out EdgeWearEdgeAggregate edge))
+                    {
+                        edge = new EdgeWearEdgeAggregate(start, end);
+                        edges.Add(key, edge);
+                    }
+
+                    edge.AddFace(faceIndex);
+                }
+            }
+
+            List<EdgeWearBevelCandidate> candidates =
+                new List<EdgeWearBevelCandidate>(edges.Count);
+            int candidateIndex = 0;
+
+            foreach (EdgeWearEdgeAggregate edge in edges.Values)
+            {
+                if (edge.FaceIndices.Count != 2)
+                {
+                    continue;
+                }
+
+                int faceA = edge.FaceIndices[0];
+                int faceB = edge.FaceIndices[1];
+                PolygonFace first = faces[faceA];
+                PolygonFace second = faces[faceB];
+                Vector3 normalSum = first.Normal + second.Normal;
+                if (normalSum.sqrMagnitude <= MinimumEdgeLengthSqr)
+                {
+                    continue;
+                }
+
+                Vector3 bevelNormal = normalSum.normalized;
+                Vector3 edgeVector = edge.End - edge.Start;
+                float length = edgeVector.magnitude;
+                if (length <= Mathf.Max(0.0001f, maximumDimension * 0.015f))
+                {
+                    continue;
+                }
+
+                float angleScore = Mathf.Clamp01(
+                    (1f - Vector3.Dot(first.Normal, second.Normal)) * 0.72f);
+                if (angleScore <= 0.035f)
+                {
+                    continue;
+                }
+
+                Vector3 midpoint = (edge.Start + edge.End) * 0.5f;
+                float vertical01 = Mathf.InverseLerp(
+                    bounds.min.y,
+                    bounds.max.y,
+                    midpoint.y);
+                float baseSuppression = Mathf.SmoothStep(0.06f, 0.20f, vertical01);
+                if (baseSuppression <= 0.001f)
+                {
+                    continue;
+                }
+
+                float lengthScore = Mathf.Clamp01(
+                    length / Mathf.Max(0.0001f, maximumDimension * 0.34f));
+                float upwardEdgeBoost = Mathf.Lerp(
+                    0.82f,
+                    1.08f,
+                    Mathf.Clamp01((first.Normal.y + second.Normal.y) * 0.5f + 0.5f));
+                float characterBoost = recipe.EdgeCharacter switch
+                {
+                    EdgeCharacter.Sharp => 1.08f,
+                    EdgeCharacter.Chipped => 1.22f,
+                    EdgeCharacter.Worn => 0.86f,
+                    EdgeCharacter.Polished => 0.62f,
+                    _ => 1f
+                };
+                float random = HashPosition01(
+                    settings.SurfaceSeed + 0x4A17,
+                    midpoint + bevelNormal * 0.173f);
+                float score =
+                    (angleScore * 0.58f + lengthScore * 0.27f + random * 0.15f) *
+                    baseSuppression *
+                    upwardEdgeBoost *
+                    characterBoost;
+
+                // Amount controls generated worn-face material strength, not
+                // physical bevel depth. Macro/Micro remain reserved controls;
+                // this deterministic variation keeps selected edges from looking
+                // cloned without exposing it as final Macro behaviour yet.
+                float deterministicVariation = Mathf.Lerp(
+                    0.90f,
+                    1.08f,
+                    Hash01(settings.SurfaceSeed + 0x29AF, candidateIndex));
+                float strength = Mathf.Clamp01(
+                    amount01 *
+                    Mathf.Lerp(0.86f, 1.06f, random) *
+                    deterministicVariation);
+                float depthMultiplier = Mathf.Clamp(
+                    Mathf.Lerp(0.88f, 1.08f, random) *
+                    Mathf.Lerp(0.96f, 1.04f, angleScore),
+                    0.78f,
+                    1.15f);
+
+                candidates.Add(
+                    new EdgeWearBevelCandidate(
+                        candidateIndex,
+                        edge.Start,
+                        edge.End,
+                        faceA,
+                        faceB,
+                        first.Normal,
+                        second.Normal,
+                        midpoint,
+                        bevelNormal,
+                        score,
+                        strength,
+                        depthMultiplier));
+                candidateIndex++;
+            }
+
+            return candidates;
+        }
+
+        private static bool TryApplyLocalEdgeWearBevels(
+            List<PolygonFace> faces,
+            List<EdgeWearBevelCandidate> candidates,
+            int selectedCount,
+            float bevelDepth,
+            Bounds bounds,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength,
+            ref EdgeWearBevelBuildStats stats)
+        {
+            // EW-4B.1: local bevels must be tolerant of individual bad
+            // candidates. A single difficult corner/edge should not collapse the
+            // entire optional edge-wear pass back to an un-bevelled mesh. Build
+            // cumulatively from the original face set and keep only candidates
+            // that produce valid local topology.
+            List<EdgeWearBevelCandidate> accepted =
+                new List<EdgeWearBevelCandidate>(selectedCount);
+            List<PolygonFace> bestFaces = null;
+
+            for (int i = 0; i < selectedCount; i++)
+            {
+                accepted.Add(candidates[i]);
+
+                if (TryBuildLocalEdgeWearBevelFaces(
+                        faces,
+                        accepted,
+                        bevelDepth,
+                        bounds,
+                        minimumStableFaceArea,
+                        minimumStableEdgeLength,
+                        out List<PolygonFace> rebuiltFaces,
+                        out EdgeWearBevelRejectReason rejectReason))
+                {
+                    bestFaces = rebuiltFaces;
+                    stats.AcceptedCount = accepted.Count;
+                }
+                else
+                {
+                    stats.RegisterReject(rejectReason);
+                    accepted.RemoveAt(accepted.Count - 1);
+                }
+            }
+
+            if (accepted.Count == 0 || bestFaces == null)
+            {
+                return false;
+            }
+
+            faces.Clear();
+            faces.AddRange(bestFaces);
+            return true;
+        }
+
+        private static void WarnEdgeWearBevelFailure(EdgeWearBevelBuildStats stats)
+        {
+#if UNITY_EDITOR
+            Debug.LogWarning(
+                "GeneratedMass edge wear generated no local bevel faces. " +
+                stats.ToSummaryString());
+#endif
+        }
+
+        private static bool TryBuildLocalEdgeWearBevelFaces(
+            List<PolygonFace> sourceFaces,
+            List<EdgeWearBevelCandidate> selected,
+            float bevelDepth,
+            Bounds bounds,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength,
+            out List<PolygonFace> rebuiltFaces,
+            out EdgeWearBevelRejectReason rejectReason)
+        {
+            rebuiltFaces = null;
+            rejectReason = EdgeWearBevelRejectReason.None;
+
+            Dictionary<int, List<FaceInsetCut>> cutsByFace =
+                new Dictionary<int, List<FaceInsetCut>>();
+            Dictionary<long, FaceInsetCut> cutsByCandidateFace =
+                new Dictionary<long, FaceInsetCut>();
+
+            for (int i = 0; i < selected.Count; i++)
+            {
+                EdgeWearBevelCandidate candidate = selected[i];
+                float candidateDepth = bevelDepth * candidate.DepthMultiplier;
+
+                if (!TryBuildFaceInsetCut(
+                        candidate,
+                        candidate.FaceA,
+                        sourceFaces[candidate.FaceA],
+                        candidateDepth,
+                        out FaceInsetCut cutA) ||
+                    !TryBuildFaceInsetCut(
+                        candidate,
+                        candidate.FaceB,
+                        sourceFaces[candidate.FaceB],
+                        candidateDepth,
+                        out FaceInsetCut cutB))
+                {
+                    rejectReason = EdgeWearBevelRejectReason.InsetCut;
+                    return false;
+                }
+
+                AddFaceInsetCut(cutsByFace, cutA);
+                AddFaceInsetCut(cutsByFace, cutB);
+                cutsByCandidateFace[MakeCandidateFaceKey(candidate.CandidateIndex, candidate.FaceA)] = cutA;
+                cutsByCandidateFace[MakeCandidateFaceKey(candidate.CandidateIndex, candidate.FaceB)] = cutB;
+            }
+
+            if (selected.Count == 0)
+            {
+                rejectReason = EdgeWearBevelRejectReason.Validation;
+                return false;
+            }
+
+            List<PolygonFace> localRebuiltFaces =
+                new List<PolygonFace>(sourceFaces.Count + selected.Count * 5);
+            Dictionary<int, List<Vector3>> rebuiltBasePolygons =
+                new Dictionary<int, List<Vector3>>(sourceFaces.Count);
+
+            for (int faceIndex = 0; faceIndex < sourceFaces.Count; faceIndex++)
+            {
+                PolygonFace face = sourceFaces[faceIndex];
+                List<Vector3> polygon = new List<Vector3>(face.Vertices);
+
+                if (cutsByFace.TryGetValue(faceIndex, out List<FaceInsetCut> faceCuts))
+                {
+                    for (int cutIndex = 0; cutIndex < faceCuts.Count; cutIndex++)
+                    {
+                        polygon = ClipPolygon(
+                            polygon,
+                            faceCuts[cutIndex].Plane,
+                            new List<Vector3>());
+                        polygon = SanitizePolygon(polygon, face.Normal);
+
+                        if (polygon.Count < 3 ||
+                            CalculatePolygonArea(polygon) <= minimumStableFaceArea)
+                        {
+                            rejectReason = EdgeWearBevelRejectReason.FaceClip;
+                            return false;
+                        }
+                    }
+                }
+
+                polygon = SanitizePolygon(polygon, face.Normal);
+                if (polygon.Count < 3 ||
+                    CalculatePolygonArea(polygon) <= minimumStableFaceArea)
+                {
+                    rejectReason = EdgeWearBevelRejectReason.FaceClip;
+                    return false;
+                }
+
+                rebuiltBasePolygons[faceIndex] = polygon;
+                localRebuiltFaces.Add(
+                    new PolygonFace(
+                        polygon,
+                        face.Normal,
+                        face.Feature,
+                        face.FeatureStrength));
+            }
+
+            Dictionary<long, BevelRail> railsByCandidateFace =
+                new Dictionary<long, BevelRail>(selected.Count * 2);
+            float railTolerance = Mathf.Max(
+                PlaneEpsilon * 8f,
+                minimumStableEdgeLength * 0.55f);
+
+            for (int i = 0; i < selected.Count; i++)
+            {
+                EdgeWearBevelCandidate candidate = selected[i];
+
+                if (!cutsByCandidateFace.TryGetValue(
+                        MakeCandidateFaceKey(candidate.CandidateIndex, candidate.FaceA),
+                        out FaceInsetCut cutA) ||
+                    !cutsByCandidateFace.TryGetValue(
+                        MakeCandidateFaceKey(candidate.CandidateIndex, candidate.FaceB),
+                        out FaceInsetCut cutB) ||
+                    !rebuiltBasePolygons.TryGetValue(candidate.FaceA, out List<Vector3> polygonA) ||
+                    !rebuiltBasePolygons.TryGetValue(candidate.FaceB, out List<Vector3> polygonB) ||
+                    !TryExtractCutRail(
+                        polygonA,
+                        cutA,
+                        railTolerance,
+                        minimumStableEdgeLength,
+                        out BevelRail railA) ||
+                    !TryExtractCutRail(
+                        polygonB,
+                        cutB,
+                        railTolerance,
+                        minimumStableEdgeLength,
+                        out BevelRail railB))
+                {
+                    rejectReason = EdgeWearBevelRejectReason.RailExtraction;
+                    return false;
+                }
+
+                railsByCandidateFace[MakeCandidateFaceKey(candidate.CandidateIndex, candidate.FaceA)] = railA;
+                railsByCandidateFace[MakeCandidateFaceKey(candidate.CandidateIndex, candidate.FaceB)] = railB;
+            }
+
+            for (int i = 0; i < selected.Count; i++)
+            {
+                EdgeWearBevelCandidate candidate = selected[i];
+                BevelRail railA = railsByCandidateFace[
+                    MakeCandidateFaceKey(candidate.CandidateIndex, candidate.FaceA)];
+                BevelRail railB = railsByCandidateFace[
+                    MakeCandidateFaceKey(candidate.CandidateIndex, candidate.FaceB)];
+
+                PolygonFace bevelFace = CreateOrientedFace(
+                    candidate.BevelNormal,
+                    PolygonFaceFeature.ConvexEdgeWear,
+                    candidate.Strength,
+                    railA.Start,
+                    railA.End,
+                    railB.End,
+                    railB.Start);
+                List<Vector3> cleanBevel = SanitizePolygon(
+                    bevelFace.Vertices,
+                    bevelFace.Normal);
+                if (cleanBevel.Count < 3 ||
+                    CalculatePolygonArea(cleanBevel) <= minimumStableFaceArea)
+                {
+                    rejectReason = EdgeWearBevelRejectReason.BevelFace;
+                    return false;
+                }
+
+                localRebuiltFaces.Add(
+                    new PolygonFace(
+                        cleanBevel,
+                        bevelFace.Normal,
+                        bevelFace.Feature,
+                        bevelFace.FeatureStrength));
+
+                AddEndpointCapFace(
+                    localRebuiltFaces,
+                    bounds,
+                    candidate.Start,
+                    candidate.Strength,
+                    railA.Start,
+                    railB.Start,
+                    minimumStableFaceArea);
+                AddEndpointCapFace(
+                    localRebuiltFaces,
+                    bounds,
+                    candidate.End,
+                    candidate.Strength,
+                    railA.End,
+                    railB.End,
+                    minimumStableFaceArea);
+            }
+
+            WeldSharedVertices(localRebuiltFaces);
+            SanitizeAllFaces(localRebuiltFaces);
+
+            if (!ValidatePolyhedronFaces(
+                    localRebuiltFaces,
+                    minimumStableFaceArea,
+                    minimumStableEdgeLength))
+            {
+                rejectReason = EdgeWearBevelRejectReason.Validation;
+                return false;
+            }
+
+            rebuiltFaces = localRebuiltFaces;
+            return true;
+        }
+
+        private static void AddEndpointCapFace(
+            List<PolygonFace> rebuiltFaces,
+            Bounds bounds,
+            Vector3 origin,
+            float strength,
+            Vector3 firstRailPoint,
+            Vector3 secondRailPoint,
+            float minimumStableFaceArea)
+        {
+            if (AreSamePoint(origin, firstRailPoint) ||
+                AreSamePoint(origin, secondRailPoint) ||
+                AreSamePoint(firstRailPoint, secondRailPoint))
+            {
+                return;
+            }
+
+            Vector3 normal = Vector3.Cross(
+                firstRailPoint - origin,
+                secondRailPoint - origin);
+            if (normal.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                return;
+            }
+
+            normal.Normalize();
+            Vector3 outward = origin - bounds.center;
+            if (outward.sqrMagnitude > MinimumEdgeLengthSqr &&
+                Vector3.Dot(normal, outward) < 0f)
+            {
+                normal = -normal;
+            }
+
+            PolygonFace capFace = CreateOrientedFace(
+                normal,
+                PolygonFaceFeature.ConvexEdgeWear,
+                strength,
+                origin,
+                firstRailPoint,
+                secondRailPoint);
+            List<Vector3> cleanCap = SanitizePolygon(
+                capFace.Vertices,
+                capFace.Normal);
+
+            if (cleanCap.Count >= 3 &&
+                CalculatePolygonArea(cleanCap) > minimumStableFaceArea)
+            {
+                rebuiltFaces.Add(
+                    new PolygonFace(
+                        cleanCap,
+                        capFace.Normal,
+                        capFace.Feature,
+                        capFace.FeatureStrength));
+            }
+        }
+
+        private static void AddFaceInsetCut(
+            Dictionary<int, List<FaceInsetCut>> cutsByFace,
+            FaceInsetCut cut)
+        {
+            if (!cutsByFace.TryGetValue(cut.FaceIndex, out List<FaceInsetCut> cuts))
+            {
+                cuts = new List<FaceInsetCut>();
+                cutsByFace.Add(cut.FaceIndex, cuts);
+            }
+
+            cuts.Add(cut);
+        }
+
+        private static bool TryBuildFaceInsetCut(
+            EdgeWearBevelCandidate candidate,
+            int faceIndex,
+            PolygonFace face,
+            float candidateDepth,
+            out FaceInsetCut cut)
+        {
+            cut = default;
+
+            if (!TryResolveFaceEdge(
+                    face,
+                    candidate.Start,
+                    candidate.End,
+                    out Vector3 orientedStart,
+                    out Vector3 orientedEnd))
+            {
+                return false;
+            }
+
+            Vector3 orientedDirection = orientedEnd - orientedStart;
+            float edgeLength = orientedDirection.magnitude;
+            if (edgeLength <= PlaneEpsilon)
+            {
+                return false;
+            }
+
+            orientedDirection /= edgeLength;
+            Vector3 canonicalDirection = candidate.End - candidate.Start;
+            float canonicalLength = canonicalDirection.magnitude;
+            if (canonicalLength <= PlaneEpsilon)
+            {
+                return false;
+            }
+
+            canonicalDirection /= canonicalLength;
+            Vector3 inward = Vector3.Cross(face.Normal, orientedDirection);
+            if (inward.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                return false;
+            }
+
+            inward.Normalize();
+            Vector3 faceCentre = CalculateAverage(face.Vertices);
+            Vector3 edgeMidpoint = (orientedStart + orientedEnd) * 0.5f;
+            if (Vector3.Dot(inward, faceCentre - edgeMidpoint) < 0f)
+            {
+                inward = -inward;
+            }
+
+            float projection = Mathf.Abs(Vector3.Dot(candidate.BevelNormal, inward));
+            float faceInset = candidateDepth / Mathf.Max(0.22f, projection);
+            faceInset = Mathf.Clamp(
+                faceInset,
+                candidateDepth * 0.55f,
+                candidateDepth * 3.5f);
+
+            Vector3 cutPoint = edgeMidpoint + inward * faceInset;
+            Vector3 keepNormal = -inward;
+            CutPlane plane = new CutPlane(
+                keepNormal,
+                Vector3.Dot(keepNormal, cutPoint));
+
+            cut = new FaceInsetCut(
+                candidate.CandidateIndex,
+                faceIndex,
+                candidate.Start,
+                candidate.End,
+                canonicalDirection,
+                inward,
+                plane);
+            return true;
+        }
+
+        private static bool TryResolveFaceEdge(
+            PolygonFace face,
+            Vector3 edgeStart,
+            Vector3 edgeEnd,
+            out Vector3 orientedStart,
+            out Vector3 orientedEnd)
+        {
+            for (int i = 0; i < face.Vertices.Count; i++)
+            {
+                Vector3 current = face.Vertices[i];
+                Vector3 next = face.Vertices[(i + 1) % face.Vertices.Count];
+
+                if (AreSamePoint(current, edgeStart) &&
+                    AreSamePoint(next, edgeEnd))
+                {
+                    orientedStart = current;
+                    orientedEnd = next;
+                    return true;
+                }
+
+                if (AreSamePoint(current, edgeEnd) &&
+                    AreSamePoint(next, edgeStart))
+                {
+                    orientedStart = current;
+                    orientedEnd = next;
+                    return true;
+                }
+            }
+
+            orientedStart = Vector3.zero;
+            orientedEnd = Vector3.zero;
+            return false;
+        }
+
+        private static bool TryExtractCutRail(
+            List<Vector3> polygon,
+            FaceInsetCut cut,
+            float tolerance,
+            float minimumStableEdgeLength,
+            out BevelRail rail)
+        {
+            rail = default;
+
+            // Prefer the actual clipped polygon edge created by this inset cut.
+            // EW-4B's original version gathered every vertex near the cut plane
+            // and picked min/max along the source edge. Around corners or faces
+            // with several cuts that can accidentally choose unrelated points.
+            Vector3 bestStart = Vector3.zero;
+            Vector3 bestEnd = Vector3.zero;
+            float bestScore = 0f;
+            float minimumLength = Mathf.Max(
+                minimumStableEdgeLength,
+                tolerance * 0.45f);
+            float originalLength = (cut.OriginalEnd - cut.OriginalStart).magnitude;
+            float alongTolerance = Mathf.Max(tolerance * 2f, minimumStableEdgeLength * 0.75f);
+
+            for (int i = 0; i < polygon.Count; i++)
+            {
+                Vector3 start = polygon[i];
+                Vector3 end = polygon[(i + 1) % polygon.Count];
+                float startDistance = Mathf.Abs(cut.Plane.SignedDistance(start));
+                float endDistance = Mathf.Abs(cut.Plane.SignedDistance(end));
+
+                if (startDistance > tolerance || endDistance > tolerance)
+                {
+                    continue;
+                }
+
+                Vector3 edge = end - start;
+                float length = edge.magnitude;
+                if (length <= minimumLength)
+                {
+                    continue;
+                }
+
+                Vector3 direction = edge / length;
+                float alignment = Mathf.Abs(Vector3.Dot(direction, cut.EdgeDirection));
+                if (alignment < 0.72f)
+                {
+                    continue;
+                }
+
+                float startAlong = Vector3.Dot(start - cut.OriginalStart, cut.EdgeDirection);
+                float endAlong = Vector3.Dot(end - cut.OriginalStart, cut.EdgeDirection);
+                float minAlong = Mathf.Min(startAlong, endAlong);
+                float maxAlong = Mathf.Max(startAlong, endAlong);
+                if (maxAlong < -alongTolerance ||
+                    minAlong > originalLength + alongTolerance)
+                {
+                    continue;
+                }
+
+                float score = length * alignment;
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestStart = startAlong <= endAlong ? start : end;
+                    bestEnd = startAlong <= endAlong ? end : start;
+                }
+            }
+
+            if (bestScore > 0f)
+            {
+                rail = new BevelRail(bestStart, bestEnd);
+                return true;
+            }
+
+            // Fallback: use near-plane points only if an aligned rail edge was not
+            // present. This keeps thin/edge-case bevels from disappearing while
+            // still filtering points outside the source-edge interval.
+            List<Vector3> railPoints = new List<Vector3>(2);
+            for (int i = 0; i < polygon.Count; i++)
+            {
+                Vector3 start = polygon[i];
+                Vector3 end = polygon[(i + 1) % polygon.Count];
+                float startDistance = Mathf.Abs(cut.Plane.SignedDistance(start));
+                float endDistance = Mathf.Abs(cut.Plane.SignedDistance(end));
+
+                if (startDistance <= tolerance)
+                {
+                    float along = Vector3.Dot(start - cut.OriginalStart, cut.EdgeDirection);
+                    if (along >= -alongTolerance &&
+                        along <= originalLength + alongTolerance)
+                    {
+                        AddPointIfDifferent(railPoints, start);
+                    }
+                }
+
+                if (endDistance <= tolerance)
+                {
+                    float along = Vector3.Dot(end - cut.OriginalStart, cut.EdgeDirection);
+                    if (along >= -alongTolerance &&
+                        along <= originalLength + alongTolerance)
+                    {
+                        AddPointIfDifferent(railPoints, end);
+                    }
+                }
+            }
+
+            railPoints = GetUniquePoints(railPoints);
+            if (railPoints.Count < 2)
+            {
+                return false;
+            }
+
+            Vector3 startPoint = railPoints[0];
+            Vector3 endPoint = railPoints[0];
+            float minPointAlong = Vector3.Dot(startPoint - cut.OriginalStart, cut.EdgeDirection);
+            float maxPointAlong = minPointAlong;
+
+            for (int i = 1; i < railPoints.Count; i++)
+            {
+                float along = Vector3.Dot(railPoints[i] - cut.OriginalStart, cut.EdgeDirection);
+                if (along < minPointAlong)
+                {
+                    minPointAlong = along;
+                    startPoint = railPoints[i];
+                }
+
+                if (along > maxPointAlong)
+                {
+                    maxPointAlong = along;
+                    endPoint = railPoints[i];
+                }
+            }
+
+            if ((endPoint - startPoint).magnitude <= minimumLength)
+            {
+                return false;
+            }
+
+            rail = new BevelRail(startPoint, endPoint);
+            return true;
+        }
+
+        private static void AddEndpointCapPoints(
+            Dictionary<VertexKey, EndpointCapAccumulator> endpointCaps,
+            Vector3 origin,
+            float strength,
+            Vector3 firstRailPoint,
+            Vector3 secondRailPoint)
+        {
+            VertexKey key = new VertexKey(origin);
+            if (!endpointCaps.TryGetValue(key, out EndpointCapAccumulator cap))
+            {
+                cap = new EndpointCapAccumulator(origin);
+                endpointCaps.Add(key, cap);
+            }
+
+            cap.Add(origin, strength);
+            cap.Add(firstRailPoint, strength);
+            cap.Add(secondRailPoint, strength);
+        }
+
+        private static bool AreSamePoint(Vector3 left, Vector3 right)
+        {
+            return (left - right).sqrMagnitude <= PointMergeDistanceSqr;
+        }
+
+        private static long MakeCandidateFaceKey(int candidateIndex, int faceIndex)
+        {
+            return ((long)candidateIndex << 32) ^ (uint)faceIndex;
+        }
+
+        private static Bounds CalculateFaceBounds(List<PolygonFace> faces)
+        {
+            if (faces == null || faces.Count == 0)
+            {
+                return new Bounds(Vector3.zero, Vector3.one);
+            }
+
+            bool initialized = false;
+            Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
+            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
+            {
+                List<Vector3> vertices = faces[faceIndex].Vertices;
+                for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
+                {
+                    if (!initialized)
+                    {
+                        bounds = new Bounds(vertices[vertexIndex], Vector3.zero);
+                        initialized = true;
+                    }
+                    else
+                    {
+                        bounds.Encapsulate(vertices[vertexIndex]);
+                    }
+                }
+            }
+
+            return initialized
+                ? bounds
+                : new Bounds(Vector3.zero, Vector3.one);
+        }
+
         private static float GetCurrentSupport(
             List<PolygonFace> faces,
             Vector3 normal)
@@ -606,7 +1501,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private static void ClipPolyhedron(
             List<PolygonFace> faces,
-            CutPlane plane)
+            CutPlane plane,
+            PolygonFaceFeature capFeature = PolygonFaceFeature.Base,
+            float capFeatureStrength = 0f)
         {
             List<PolygonFace> clippedFaces = new List<PolygonFace>();
             List<Vector3> capPoints = new List<Vector3>();
@@ -626,7 +1523,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     CalculatePolygonArea(clipped) > TinyFaceAreaEpsilon)
                 {
                     clippedFaces.Add(
-                        new PolygonFace(clipped, faces[i].Normal));
+                        new PolygonFace(
+                            clipped,
+                            faces[i].Normal,
+                            faces[i].Feature,
+                            faces[i].FeatureStrength));
                 }
             }
 
@@ -637,6 +1538,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 PolygonFace capFace = CreateOrientedFace(
                     plane.Normal,
+                    capFeature,
+                    capFeatureStrength,
                     uniqueCapPoints.ToArray());
 
                 List<Vector3> sanitizedCap = SanitizePolygon(
@@ -649,7 +1552,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     clippedFaces.Add(
                         new PolygonFace(
                             sanitizedCap,
-                            capFace.Normal));
+                            capFace.Normal,
+                            capFace.Feature,
+                            capFace.FeatureStrength));
                 }
             }
 
@@ -661,6 +1566,112 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 faces.Clear();
                 faces.AddRange(clippedFaces);
             }
+        }
+
+        private static bool TryClipPolyhedron(
+            List<PolygonFace> faces,
+            CutPlane plane,
+            PolygonFaceFeature capFeature,
+            float capFeatureStrength,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength)
+        {
+            if (faces.Count < 4)
+            {
+                return false;
+            }
+
+            List<PolygonFace> snapshot = ClonePolygonFaces(faces);
+            int previousFeatureFaceCount = CountFeatureFaces(faces, capFeature);
+
+            ClipPolyhedron(
+                faces,
+                plane,
+                capFeature,
+                capFeatureStrength);
+
+            bool accepted =
+                CountFeatureFaces(faces, capFeature) > previousFeatureFaceCount &&
+                ValidatePolyhedronFaces(
+                    faces,
+                    minimumStableFaceArea,
+                    minimumStableEdgeLength);
+
+            if (accepted)
+            {
+                return true;
+            }
+
+            faces.Clear();
+            faces.AddRange(snapshot);
+            return false;
+        }
+
+        private static List<PolygonFace> ClonePolygonFaces(
+            List<PolygonFace> faces)
+        {
+            List<PolygonFace> clone = new List<PolygonFace>(faces.Count);
+            for (int i = 0; i < faces.Count; i++)
+            {
+                clone.Add(
+                    new PolygonFace(
+                        new List<Vector3>(faces[i].Vertices),
+                        faces[i].Normal,
+                        faces[i].Feature,
+                        faces[i].FeatureStrength));
+            }
+
+            return clone;
+        }
+
+        private static int CountFeatureFaces(
+            List<PolygonFace> faces,
+            PolygonFaceFeature feature)
+        {
+            int count = 0;
+            for (int i = 0; i < faces.Count; i++)
+            {
+                if (faces[i].Feature == feature)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static bool ValidatePolyhedronFaces(
+            List<PolygonFace> faces,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength)
+        {
+            if (faces.Count < 4)
+            {
+                return false;
+            }
+
+            float minimumEdgeLengthSqr = minimumStableEdgeLength * minimumStableEdgeLength;
+            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
+            {
+                List<Vector3> vertices = faces[faceIndex].Vertices;
+                if (vertices.Count < 3 ||
+                    CalculatePolygonArea(vertices) <= minimumStableFaceArea)
+                {
+                    return false;
+                }
+
+                for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
+                {
+                    Vector3 start = vertices[vertexIndex];
+                    Vector3 end = vertices[(vertexIndex + 1) % vertices.Count];
+                    if ((end - start).sqrMagnitude <= minimumEdgeLengthSqr)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
         }
 
         private static List<Vector3> ClipPolygon(
@@ -738,6 +1749,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Vector3 outwardNormal,
             params Vector3[] points)
         {
+            return CreateOrientedFace(
+                outwardNormal,
+                PolygonFaceFeature.Base,
+                0f,
+                points);
+        }
+
+        private static PolygonFace CreateOrientedFace(
+            Vector3 outwardNormal,
+            PolygonFaceFeature feature,
+            float featureStrength,
+            params Vector3[] points)
+        {
             List<Vector3> ordered = new List<Vector3>(points);
             Vector3 centre = CalculateAverage(ordered);
 
@@ -771,7 +1795,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ordered.Reverse();
             }
 
-            return new PolygonFace(ordered, outwardNormal.normalized);
+            return new PolygonFace(
+                ordered,
+                outwardNormal.normalized,
+                feature,
+                featureStrength);
         }
 
         private static Vector3 CalculatePolygonNormal(
@@ -821,9 +1849,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
                 PolygonFace face = new PolygonFace(
                     cleanFaceVertices,
-                    sourceFace.Normal);
+                    sourceFace.Normal,
+                    sourceFace.Feature,
+                    sourceFace.FeatureStrength);
 
-                if (density == SurfaceFacetDensity.Sparse)
+                if (density == SurfaceFacetDensity.Sparse ||
+                    face.Feature == PolygonFaceFeature.ConvexEdgeWear)
                 {
                     for (int i = 1; i < face.Vertices.Count - 1; i++)
                     {
@@ -832,7 +1863,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             face.Vertices[0],
                             face.Vertices[i],
                             face.Vertices[i + 1],
-                            face.Normal);
+                            face.Normal,
+                            face.Feature,
+                            face.FeatureStrength);
                     }
 
                     continue;
@@ -863,7 +1896,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         centre,
                         current,
                         next,
-                        face.Normal);
+                        face.Normal,
+                        face.Feature,
+                        face.FeatureStrength);
                 }
             }
 
@@ -1384,6 +2419,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Vector3 faceNormal = normal.sqrMagnitude > MinimumEdgeLengthSqr
                     ? normal.normalized
                     : Vector3.up;
+                PolygonFaceFeature faceFeature = soup.ResolveFeature(i);
+                float faceFeatureStrength = soup.ResolveFeatureStrength(i);
 
                 int indexA = AddRenderedVertex(
                     meshData,
@@ -1396,7 +2433,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     safeHeight,
                     safeDepth,
                     faceNormal,
-                    recipe);
+                    recipe,
+                    faceFeature,
+                    faceFeatureStrength);
 
                 int indexB = AddRenderedVertex(
                     meshData,
@@ -1409,7 +2448,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     safeHeight,
                     safeDepth,
                     faceNormal,
-                    recipe);
+                    recipe,
+                    faceFeature,
+                    faceFeatureStrength);
 
                 int indexC = AddRenderedVertex(
                     meshData,
@@ -1422,7 +2463,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     safeHeight,
                     safeDepth,
                     faceNormal,
-                    recipe);
+                    recipe,
+                    faceFeature,
+                    faceFeatureStrength);
 
                 meshData.AddTriangle(indexA, indexB, indexC);
             }
@@ -1441,7 +2484,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float height,
             float depth,
             Vector3 faceNormal,
-            MassRecipe recipe)
+            MassRecipe recipe,
+            PolygonFaceFeature faceFeature,
+            float faceFeatureStrength)
         {
             Vector2 uv = new Vector2(
                 (position.x - bounds.min.x) / width,
@@ -1470,11 +2515,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 green,
                 randomValue);
 
-            // Patch 12C deliberately keeps line-like masks neutral. The earlier
-            // scalar/edge-band attempts produced triangle wedges instead of
-            // readable stylized ridge wear or cracks. Convex edge wear and
-            // concave crease rendering need a later line/overlay representation.
-            float edgeWear = 0f;
+            // Geometry-first edge wear writes only actual generated bevel faces.
+            // Broad interpolated masks remain safe here, but line-like edge wear
+            // must not be reconstructed from vertex gradients or packed atlases.
+            float edgeWear = faceFeature == PolygonFaceFeature.ConvexEdgeWear
+                ? Mathf.Clamp01(faceFeatureStrength)
+                : 0f;
             float concaveCrease = 0f;
 
             float dirtDeposit = ResolveDirtDepositMask(
@@ -1488,7 +2534,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Vector4 materialMasks = new Vector4(
                 concaveCrease,
                 dirtDeposit,
-                0f,
+                edgeWear,
                 0f);
 
             return meshData.AddVertex(
@@ -1502,13 +2548,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         // R = existing deterministic surface variation.
         // G = upward/flat exposure mask for lighter worn or frosted planes.
         // B = base/side/occlusion mask for darker crevice-like broad grounding.
-        // A = reserved for future convex ridge/edge wear. Patch 12C writes it neutral
-        //     because interpolated scalar edge masks produced triangle wedges.
+        // A = generated convex edge-wear strength on actual bevel/chamfer faces only.
+        //     It mirrors UV2.z for inspection/backward compatibility.
         //
         // UV2 material contract:
         // X = reserved for future concave crease or selected crack-darkening strength.
         // Y = dirty deposit / mineral stain area mask.
-        // Z = reserved for future convex edge localization data.
+        // Z = generated convex edge-wear strength on actual bevel/chamfer faces.
         // W = reserved for future concave crease localization data.
         //
         // Line-like features need a later line/overlay or per-edge representation.
@@ -1831,9 +2877,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 c = temporary;
             }
 
-            soup.Positions.Add(a);
-            soup.Positions.Add(b);
-            soup.Positions.Add(c);
+            soup.AddTriangle(
+                a,
+                b,
+                c,
+                PolygonFaceFeature.Base,
+                0f);
         }
 
         private static void AddRectRingCap(
@@ -2043,7 +3092,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Vector3 a,
             Vector3 b,
             Vector3 c,
-            Vector3 expectedNormal)
+            Vector3 expectedNormal,
+            PolygonFaceFeature feature = PolygonFaceFeature.Base,
+            float featureStrength = 0f)
         {
             Vector3 ab = b - a;
             Vector3 ac = c - a;
@@ -2080,9 +3131,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 c = temporary;
             }
 
-            soup.Positions.Add(a);
-            soup.Positions.Add(b);
-            soup.Positions.Add(c);
+            soup.AddTriangle(
+                a,
+                b,
+                c,
+                feature,
+                featureStrength);
         }
 
         private static void AddPointIfDifferent(
@@ -2716,9 +3770,257 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Any
         }
 
+        private sealed class EdgeWearEdgeAggregate
+        {
+            public readonly Vector3 Start;
+            public readonly Vector3 End;
+            public readonly List<int> FaceIndices = new List<int>(2);
+
+            public EdgeWearEdgeAggregate(Vector3 start, Vector3 end)
+            {
+                Start = start;
+                End = end;
+            }
+
+            public void AddFace(int faceIndex)
+            {
+                if (!FaceIndices.Contains(faceIndex))
+                {
+                    FaceIndices.Add(faceIndex);
+                }
+            }
+        }
+
+        private enum EdgeWearBevelRejectReason
+        {
+            None,
+            InsetCut,
+            FaceClip,
+            RailExtraction,
+            BevelFace,
+            Validation
+        }
+
+        private struct EdgeWearBevelBuildStats
+        {
+            public readonly int CandidateCount;
+            public readonly int SelectedCount;
+            public int AcceptedCount;
+            public int RejectedInsetCut;
+            public int RejectedFaceClip;
+            public int RejectedRailExtraction;
+            public int RejectedBevelFace;
+            public int RejectedValidation;
+            public int RejectedUnknown;
+
+            public EdgeWearBevelBuildStats(int candidateCount, int selectedCount)
+            {
+                CandidateCount = candidateCount;
+                SelectedCount = selectedCount;
+                AcceptedCount = 0;
+                RejectedInsetCut = 0;
+                RejectedFaceClip = 0;
+                RejectedRailExtraction = 0;
+                RejectedBevelFace = 0;
+                RejectedValidation = 0;
+                RejectedUnknown = 0;
+            }
+
+            public void RegisterReject(EdgeWearBevelRejectReason reason)
+            {
+                switch (reason)
+                {
+                    case EdgeWearBevelRejectReason.InsetCut:
+                        RejectedInsetCut++;
+                        break;
+                    case EdgeWearBevelRejectReason.FaceClip:
+                        RejectedFaceClip++;
+                        break;
+                    case EdgeWearBevelRejectReason.RailExtraction:
+                        RejectedRailExtraction++;
+                        break;
+                    case EdgeWearBevelRejectReason.BevelFace:
+                        RejectedBevelFace++;
+                        break;
+                    case EdgeWearBevelRejectReason.Validation:
+                        RejectedValidation++;
+                        break;
+                    default:
+                        RejectedUnknown++;
+                        break;
+                }
+            }
+
+            public string ToSummaryString()
+            {
+                return
+                    $"candidates={CandidateCount}, selected={SelectedCount}, accepted={AcceptedCount}, " +
+                    $"rejectedInsetCut={RejectedInsetCut}, rejectedFaceClip={RejectedFaceClip}, " +
+                    $"rejectedRailExtraction={RejectedRailExtraction}, rejectedBevelFace={RejectedBevelFace}, " +
+                    $"rejectedValidation={RejectedValidation}, rejectedUnknown={RejectedUnknown}.";
+            }
+        }
+
+        private readonly struct EdgeWearBevelCandidate
+        {
+            public readonly int CandidateIndex;
+            public readonly Vector3 Start;
+            public readonly Vector3 End;
+            public readonly int FaceA;
+            public readonly int FaceB;
+            public readonly Vector3 NormalA;
+            public readonly Vector3 NormalB;
+            public readonly Vector3 Midpoint;
+            public readonly Vector3 BevelNormal;
+            public readonly float Score;
+            public readonly float Strength;
+            public readonly float DepthMultiplier;
+
+            public EdgeWearBevelCandidate(
+                int candidateIndex,
+                Vector3 start,
+                Vector3 end,
+                int faceA,
+                int faceB,
+                Vector3 normalA,
+                Vector3 normalB,
+                Vector3 midpoint,
+                Vector3 bevelNormal,
+                float score,
+                float strength,
+                float depthMultiplier)
+            {
+                CandidateIndex = candidateIndex;
+                Start = start;
+                End = end;
+                FaceA = faceA;
+                FaceB = faceB;
+                NormalA = normalA;
+                NormalB = normalB;
+                Midpoint = midpoint;
+                BevelNormal = bevelNormal;
+                Score = score;
+                Strength = strength;
+                DepthMultiplier = depthMultiplier;
+            }
+        }
+
+        private readonly struct FaceInsetCut
+        {
+            public readonly int CandidateIndex;
+            public readonly int FaceIndex;
+            public readonly Vector3 OriginalStart;
+            public readonly Vector3 OriginalEnd;
+            public readonly Vector3 EdgeDirection;
+            public readonly Vector3 Inward;
+            public readonly CutPlane Plane;
+
+            public FaceInsetCut(
+                int candidateIndex,
+                int faceIndex,
+                Vector3 originalStart,
+                Vector3 originalEnd,
+                Vector3 edgeDirection,
+                Vector3 inward,
+                CutPlane plane)
+            {
+                CandidateIndex = candidateIndex;
+                FaceIndex = faceIndex;
+                OriginalStart = originalStart;
+                OriginalEnd = originalEnd;
+                EdgeDirection = edgeDirection.normalized;
+                Inward = inward.normalized;
+                Plane = plane;
+            }
+        }
+
+        private readonly struct BevelRail
+        {
+            public readonly Vector3 Start;
+            public readonly Vector3 End;
+
+            public BevelRail(Vector3 start, Vector3 end)
+            {
+                Start = start;
+                End = end;
+            }
+        }
+
+        private sealed class EndpointCapAccumulator
+        {
+            public readonly Vector3 Origin;
+            public readonly List<Vector3> Points = new List<Vector3>();
+            private float strengthSum;
+            private int strengthCount;
+
+            public EndpointCapAccumulator(Vector3 origin)
+            {
+                Origin = origin;
+            }
+
+            public float AverageStrength => strengthCount > 0
+                ? Mathf.Clamp01(strengthSum / strengthCount)
+                : 0f;
+
+            public void Add(Vector3 point, float strength)
+            {
+                Points.Add(point);
+                strengthSum += Mathf.Clamp01(strength);
+                strengthCount++;
+            }
+        }
+
+        private enum PolygonFaceFeature
+        {
+            Base,
+            ConvexEdgeWear
+        }
+
         private sealed class TriangleSoup
         {
             public readonly List<Vector3> Positions = new List<Vector3>();
+            private readonly List<PolygonFaceFeature> features =
+                new List<PolygonFaceFeature>();
+            private readonly List<float> featureStrengths = new List<float>();
+
+            public void AddTriangle(
+                Vector3 a,
+                Vector3 b,
+                Vector3 c,
+                PolygonFaceFeature feature,
+                float featureStrength)
+            {
+                Positions.Add(a);
+                Positions.Add(b);
+                Positions.Add(c);
+
+                feature = feature == PolygonFaceFeature.ConvexEdgeWear
+                    ? PolygonFaceFeature.ConvexEdgeWear
+                    : PolygonFaceFeature.Base;
+                featureStrength = Mathf.Clamp01(featureStrength);
+
+                features.Add(feature);
+                features.Add(feature);
+                features.Add(feature);
+
+                featureStrengths.Add(featureStrength);
+                featureStrengths.Add(featureStrength);
+                featureStrengths.Add(featureStrength);
+            }
+
+            public PolygonFaceFeature ResolveFeature(int vertexIndex)
+            {
+                return vertexIndex >= 0 && vertexIndex < features.Count
+                    ? features[vertexIndex]
+                    : PolygonFaceFeature.Base;
+            }
+
+            public float ResolveFeatureStrength(int vertexIndex)
+            {
+                return vertexIndex >= 0 && vertexIndex < featureStrengths.Count
+                    ? featureStrengths[vertexIndex]
+                    : 0f;
+            }
         }
 
         private sealed class FaceMaterialMaskLookup
@@ -3536,11 +4838,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             public readonly List<Vector3> Vertices;
             public readonly Vector3 Normal;
+            public readonly PolygonFaceFeature Feature;
+            public readonly float FeatureStrength;
 
-            public PolygonFace(List<Vector3> vertices, Vector3 normal)
+            public PolygonFace(
+                List<Vector3> vertices,
+                Vector3 normal,
+                PolygonFaceFeature feature = PolygonFaceFeature.Base,
+                float featureStrength = 0f)
             {
                 Vertices = vertices;
                 Normal = normal.normalized;
+                Feature = feature == PolygonFaceFeature.ConvexEdgeWear
+                    ? PolygonFaceFeature.ConvexEdgeWear
+                    : PolygonFaceFeature.Base;
+                FeatureStrength = Mathf.Clamp01(featureStrength);
             }
         }
 

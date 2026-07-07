@@ -1752,7 +1752,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Material Remaining Life",
                 "Foam Motion Field",
                 "Foam Motion Field + Cell Grid",
-                "Foam Evaluated Shape"
+                "Foam Evaluated Shape",
+                "Foam Shape Difference"
             };
             int[] foamDebugValues =
             {
@@ -1763,7 +1764,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.MaterialRemainingLife,
                 (int)StylizedRiverFoamDebugView.FoamMotionField,
                 (int)StylizedRiverFoamDebugView.FoamMotionFieldCellGrid,
-                (int)StylizedRiverFoamDebugView.FoamEvaluatedShape
+                (int)StylizedRiverFoamDebugView.FoamEvaluatedShape,
+                (int)StylizedRiverFoamDebugView.FoamShapeDifference
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -1777,7 +1779,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             int selectedDebugIndex = EditorGUILayout.Popup(
                 new GUIContent(
                     "Debug View",
-                    "Final Foam is the normal render. Foam Motion Field views show the generated routing/deformation intent texture and a semi-transparent white raw stored Foam Presence overlay; they do not indicate active lateral material transport."),
+                    "Final Foam is the normal render. Foam Motion Field views show external routing/deformation intent and raw stored Foam Presence overlay; Foam Evaluated Shape and Shape Difference show the Layer D visual product, not persistent material truth."),
                 currentDebugIndex,
                 foamDebugLabels);
             if (EditorGUI.EndChangeCheck())
@@ -2001,7 +2003,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Material Remaining Life",
                 "Foam Motion Field",
                 "Foam Motion Field + Cell Grid",
-                "Foam Evaluated Shape"
+                "Foam Evaluated Shape",
+                "Foam Shape Difference"
             };
             int[] foamDebugValues =
             {
@@ -2012,7 +2015,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.MaterialRemainingLife,
                 (int)StylizedRiverFoamDebugView.FoamMotionField,
                 (int)StylizedRiverFoamDebugView.FoamMotionFieldCellGrid,
-                (int)StylizedRiverFoamDebugView.FoamEvaluatedShape
+                (int)StylizedRiverFoamDebugView.FoamEvaluatedShape,
+                (int)StylizedRiverFoamDebugView.FoamShapeDifference
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -2608,7 +2612,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.Space(8f);
             EditorGUILayout.LabelField("Water Body", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Stage 2 provides the accepted body, Stage 3 coherent motion, Stage 4 optical distortion, Stage 5 Pressure/Wake/Ripples, and Stage 6 transports explicitly born persistent Foam through downstream flow and accepted disturbance motion while topology modifies its lifetime. Detached spray, droplets, caustics, reflections, and final performance closure remain later gated work.",
+                "Water is split into explicit layers: the river domain defines coordinates, external influence fields describe support/contact/motion context, persistent Foam material moves downstream and ages, the Layer D shape product is a visual interpretation, and the shader performs final composition. Persistent Foam does not currently perform lateral disturbance transport; motion/support fields are inputs, diagnostics, and future routing/visual data. Detached spray, droplets, caustics, reflections, and final performance closure remain later gated work.",
                 MessageType.Info);
 
             SerializedProperty surfaceState = Find("surfaceState");
@@ -3076,7 +3080,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.FoamEvaluatedShape:
                     return
-                        "Stage 2 evaluated Foam Shape product. In this foundation patch it is intentionally a pass-through copy of clipped raw persistent Presence; future morphology, breakup, and disturbance response should be added here instead of mutating Persistent Foam State or final rendering.";
+                        "Layer D evaluated Foam Shape product sampled from _FoamShapeMask. After 4.11C.5.10B this is intentionally reset to clipped raw Persistent Presence as a clean baseline. It is not Final Foam and not a separate material truth.";
+
+                case StylizedRiverFoamDebugView.FoamShapeDifference:
+                    return
+                        "Layer D difference diagnostic. Black means _FoamShapeMask matches raw persistent Material Presence, green means evaluated shape adds visual coverage, and magenta/red means evaluated shape removes visual coverage. This exists so Stage D changes are visible without guessing between two similar masks.";
 
                 default:
                     return

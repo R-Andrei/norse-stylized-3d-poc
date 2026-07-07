@@ -103,18 +103,8 @@ float FoamEvaluateIntrinsicShapeMask(
     FoamMaterialState material,
     float validFluid)
 {
-    // 5.9y.2: reset Stage 2 morphology to a truthful pass-through
-    // baseline after the rejected 5.9y/5.9y.1 experiments. Stage 2
-    // currently proves the evaluated-shape product and debug path only.
-    // Coherent field deformation, visual bridge/break, and disturbance-
-    // driven morphology must be introduced deliberately in later passes.
-    //
-    // Remaining Life may be read by future Stage 2 shape logic, but this
-    // foundation path does not use it and never writes it. Actual durable
-    // lifetime remains owned only by Stage 1 lifecycle/support topology.
     return saturate(material.presence * validFluid);
 }
-
 
 [numthreads(8, 8, 1)]
 void EvaluateFoamShape(uint3 dispatchId : SV_DispatchThreadID)
@@ -140,18 +130,17 @@ void EvaluateFoamShape(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    // 4.11C.5.9y.2: Stage 2 currently writes a truthful pass-through
-    // evaluated shape product. It reads Persistent State and writes only
-    // _FoamShapeMask. It must not move, destroy, or mutate durable foam
-    // material; coherent deformation, bridge/break, and disturbance response
-    // remain future Stage 2 work.
+    // 4.11C.5.10B: Layer D is intentionally reset to a truthful
+    // pass-through baseline after validation proved the 5.9z coordinate-warp
+    // prototype produced visible difference values but no useful broad shape
+    // behavior. Future Layer D work must add an explicit local-breakup or
+    // film-support component on top of this clean baseline.
     float4 packed = FoamClipPackedToValidFluid(
         _FoamStateRead.Load(int3(coordinate, 0)),
         validFluid);
     FoamMaterialState material = FoamDecodeMaterialState(packed);
-    _FoamShapeMaskWrite[coordinate] = FoamEvaluateIntrinsicShapeMask(
-        material,
-        validFluid);
+    _FoamShapeMaskWrite[coordinate] =
+        FoamEvaluateIntrinsicShapeMask(material, validFluid);
 }
 
 [numthreads(8, 8, 1)]
