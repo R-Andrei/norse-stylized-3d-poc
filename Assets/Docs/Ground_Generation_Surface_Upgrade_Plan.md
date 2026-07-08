@@ -1506,7 +1506,8 @@ The first milestone is complete when:
 - [~] Patch 5 - Ground material property block. First profile-to-material binding implemented and shared with generated river corridors; color/seed/debug binding still deferred.
 - [~] Patch 6 - First ground shader response. Dedicated ground shader, final response, and debug modes implemented; material asset tuning still pending.
 - [x] Patch C - Ground surface mask quality pass. Implemented and Unity debug-view validated.
-- [~] Patch D - Ground mask contrast and shore restraint pass. Code implemented; Unity debug-view validation pending.
+- [x] Patch D - Ground mask contrast and shore restraint pass. Implemented and Unity debug-view validated; shore/exposure needed one more focused correction.
+- [~] Patch E - Shore semantic correction and exposure/combined debug balance. Code implemented; Unity debug-view validation pending.
 - [ ] Patch 7 - Terrain profile asset set.
 - [ ] Patch 8 - Runtime state design stub.
 - [ ] Patch 9 - Footprint prototype.

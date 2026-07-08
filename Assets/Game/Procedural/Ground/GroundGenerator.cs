@@ -933,29 +933,35 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
                     float exposureRaw =
                         Mathf.Clamp01(
-                            upFacing * 0.30f +
-                            heightValue * 0.12f +
-                            exposurePatch * 0.36f +
+                            upFacing * 0.24f +
+                            heightValue * 0.08f +
+                            exposurePatch * 0.46f +
                             broadPatch * 0.08f +
                             exposureBias * 0.14f);
 
                     float exposure =
-                        ApplyCenteredMaskContrast(
-                            exposureRaw,
-                            Mathf.Lerp(1.10f, 1.34f, snowEligibility));
+                        SmoothStep(
+                            0.16f,
+                            0.84f,
+                            exposureRaw);
 
-                    exposure *= Mathf.Lerp(0.66f, 1.12f, snowEligibility);
-                    exposure *= Mathf.Lerp(1f, 0.92f, shore * rainAbsorption);
-                    exposure *= Mathf.Lerp(1f, 0.92f, compaction);
+                    exposure =
+                        ApplyCenteredMaskContrast(
+                            exposure,
+                            Mathf.Lerp(1.18f, 1.58f, snowEligibility));
+
+                    exposure *= Mathf.Lerp(0.72f, 1.18f, snowEligibility);
+                    exposure *= Mathf.Lerp(1f, 0.96f, shore * rainAbsorption);
+                    exposure *= Mathf.Lerp(1f, 0.94f, compaction);
                     exposureMasks[index] = Mathf.Clamp01(exposure);
 
                     float dampDeposit =
                         Mathf.Clamp01(
                             lowArea * 0.18f +
                             flatness * 0.07f +
-                            dampPatch * 0.24f +
-                            depositPocket * 0.10f +
-                            shore * 0.12f +
+                            dampPatch * 0.26f +
+                            depositPocket * 0.11f +
+                            shore * 0.07f +
                             compaction * 0.08f +
                             dampBias * 0.13f);
 
@@ -1168,36 +1174,58 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     continue;
                 }
 
-                float bankWidth =
-                    Mathf.Max(
-                        spacing * 1.25f,
-                        river.BankBlend * 0.36f);
-
                 float safeSurfaceHalfWidth =
                     Mathf.Max(0.001f, surfaceHalfWidth);
 
+                float waterlineWidth =
+                    Mathf.Max(
+                        spacing * 0.85f,
+                        river.BankBlend * 0.22f);
+
+                float outerFadeWidth =
+                    Mathf.Max(
+                        spacing * 0.95f,
+                        river.BankBlend * 0.26f);
+
+                float distanceFromWaterline =
+                    Mathf.Abs(distance - safeSurfaceHalfWidth);
+
                 float waterlineBand =
-                    0.72f *
+                    0.66f *
                     (1f - SmoothStep(
                         0f,
-                        bankWidth * 0.55f,
-                        Mathf.Abs(distance - surfaceHalfWidth)));
+                        waterlineWidth,
+                        distanceFromWaterline));
 
-                float bedInfluence =
-                    distance < surfaceHalfWidth
-                        ? Mathf.Lerp(
-                            0.12f,
-                            0.44f,
-                            Mathf.Clamp01(distance / safeSurfaceHalfWidth))
+                float inside01 =
+                    distance < safeSurfaceHalfWidth
+                        ? Mathf.Clamp01(distance / safeSurfaceHalfWidth)
                         : 0f;
 
+                float innerEdge =
+                    SmoothStep(
+                        0.52f,
+                        1f,
+                        inside01);
+
+                float bedInfluence =
+                    distance < safeSurfaceHalfWidth
+                        ? Mathf.Lerp(
+                            0.04f,
+                            0.22f,
+                            innerEdge)
+                        : 0f;
+
+                float outerDistance =
+                    Mathf.Max(0f, distance - safeSurfaceHalfWidth);
+
                 float outerBankInfluence =
-                    distance > surfaceHalfWidth
-                        ? 0.50f *
+                    distance > safeSurfaceHalfWidth
+                        ? 0.32f *
                           (1f - SmoothStep(
-                              surfaceHalfWidth,
-                              surfaceHalfWidth + bankWidth,
-                              distance))
+                              0f,
+                              outerFadeWidth,
+                              outerDistance))
                         : 0f;
 
                 float riverInfluence =
@@ -1206,6 +1234,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         Mathf.Max(
                             bedInfluence,
                             outerBankInfluence));
+
+                riverInfluence =
+                    Mathf.Pow(
+                        Mathf.Clamp01(riverInfluence),
+                        1.45f);
 
                 influence = Mathf.Max(influence, riverInfluence);
             }

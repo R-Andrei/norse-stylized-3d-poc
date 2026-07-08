@@ -43,8 +43,8 @@
                 {
                     float exposure = ResolveGroundExposureMask(input);
                     float damp = saturate(
-                        ResolveGroundDampDepositMask(input) * 0.75 +
-                        ResolveGroundShoreMask(input) * 0.45);
+                        ResolveGroundDampDepositMask(input) * 0.82 +
+                        ResolveGroundShoreMask(input) * 0.24);
                     float vegetationOrDry = max(
                         ResolveGroundVegetationMask(input),
                         ResolveGroundRockyDryMask(input));
