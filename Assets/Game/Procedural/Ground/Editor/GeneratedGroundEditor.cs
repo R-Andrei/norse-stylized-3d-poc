@@ -258,6 +258,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 new GUIContent(
                     "Material Variation",
                     "Overall strength of generated tonal variation written to vertex colour red."));
+
+            if (targets.Length == 1)
+            {
+                GeneratedGround ground =
+                    target as GeneratedGround;
+
+                if (ground != null)
+                {
+                    EditorGUILayout.Space(4f);
+                    EditorGUILayout.HelpBox(
+                        ground.LastSurfaceMaskDiagnostics,
+                        MessageType.None);
+                }
+            }
         }
 
         private void DrawModifierSection()

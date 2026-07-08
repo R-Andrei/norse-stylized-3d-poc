@@ -56,6 +56,23 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             IReadOnlyList<StylizedRiverGroundSnapshot> rivers,
             out GroundHeightFieldSnapshot baseSurface)
         {
+            return Generate(
+                recipe,
+                surfaceProfile,
+                modifiers,
+                rivers,
+                out baseSurface,
+                out _);
+        }
+
+        public static MeshData Generate(
+            GroundRecipe recipe,
+            GroundSurfaceProfile surfaceProfile,
+            IReadOnlyList<GroundModifierSnapshot> modifiers,
+            IReadOnlyList<StylizedRiverGroundSnapshot> rivers,
+            out GroundHeightFieldSnapshot baseSurface,
+            out string surfaceMaskDiagnostics)
+        {
             if (recipe == null)
             {
                 throw new ArgumentNullException(nameof(recipe));
@@ -174,6 +191,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 out float[] vegetationSuitabilityMasks,
                 out float[] materialClassifications,
                 out Vector4[] secondarySurfaceMasks);
+
+            surfaceMaskDiagnostics =
+                BuildSurfaceMaskDiagnostics(
+                    surfaceVariations,
+                    exposureMasks,
+                    dampDepositMasks,
+                    vegetationSuitabilityMasks,
+                    secondarySurfaceMasks);
 
             baseSurface =
                 new GroundHeightFieldSnapshot(
@@ -1167,83 +1192,267 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     !river.TryEvaluate(
                         point,
                         out float distance,
+                        out float signedLateralDistance,
                         out _,
-                        out _,
+                        out float visibleHalfWidth,
                         out float surfaceHalfWidth))
                 {
                     continue;
                 }
 
-                float safeSurfaceHalfWidth =
-                    Mathf.Max(0.001f, surfaceHalfWidth);
+                float safeVisibleHalfWidth =
+                    Mathf.Max(0.001f, visibleHalfWidth);
+                float signedDistance =
+                    Mathf.Abs(signedLateralDistance);
 
-                float waterlineWidth =
+                // Ground UV2.y is stored on a coarse playable-ground grid.
+                // It should therefore hold only a broad, low-amplitude bank
+                // hint. The river corridor owns the precise waterline mask.
+                // Use the visible half-width here; surfaceHalfWidth includes
+                // hidden overlap and caused the previous broad corridor band.
+                float distanceFromVisibleBank =
+                    Mathf.Abs(signedDistance - safeVisibleHalfWidth);
+
+                float bankBandWidth =
                     Mathf.Max(
-                        spacing * 0.85f,
-                        river.BankBlend * 0.22f);
+                        spacing * 0.55f,
+                        river.BankBlend * 0.12f);
 
-                float outerFadeWidth =
-                    Mathf.Max(
-                        spacing * 0.95f,
-                        river.BankBlend * 0.26f);
-
-                float distanceFromWaterline =
-                    Mathf.Abs(distance - safeSurfaceHalfWidth);
-
-                float waterlineBand =
-                    0.66f *
+                float bankBand =
+                    0.34f *
                     (1f - SmoothStep(
                         0f,
-                        waterlineWidth,
-                        distanceFromWaterline));
+                        bankBandWidth,
+                        distanceFromVisibleBank));
 
                 float inside01 =
-                    distance < safeSurfaceHalfWidth
-                        ? Mathf.Clamp01(distance / safeSurfaceHalfWidth)
+                    signedDistance < safeVisibleHalfWidth
+                        ? Mathf.Clamp01(
+                            signedDistance / safeVisibleHalfWidth)
                         : 0f;
 
-                float innerEdge =
-                    SmoothStep(
-                        0.52f,
-                        1f,
-                        inside01);
-
-                float bedInfluence =
-                    distance < safeSurfaceHalfWidth
+                float innerBedInfluence =
+                    signedDistance < safeVisibleHalfWidth
                         ? Mathf.Lerp(
-                            0.04f,
-                            0.22f,
-                            innerEdge)
+                            0.015f,
+                            0.095f,
+                            SmoothStep(0.68f, 1f, inside01))
                         : 0f;
 
                 float outerDistance =
-                    Mathf.Max(0f, distance - safeSurfaceHalfWidth);
+                    Mathf.Max(0f, signedDistance - safeVisibleHalfWidth);
+
+                float outerFadeWidth =
+                    Mathf.Max(
+                        spacing * 0.65f,
+                        river.BankBlend * 0.16f);
 
                 float outerBankInfluence =
-                    distance > safeSurfaceHalfWidth
-                        ? 0.32f *
+                    signedDistance > safeVisibleHalfWidth
+                        ? 0.18f *
                           (1f - SmoothStep(
                               0f,
                               outerFadeWidth,
                               outerDistance))
                         : 0f;
 
+                // Avoid carrying shore hints out to the generated river
+                // handoff/hidden surface boundary. That boundary is not the
+                // waterline and is already handled by corridor geometry.
+                float handoffHalfWidth =
+                    river.ResolveHandoffHalfWidth(surfaceHalfWidth);
+
+                if (distance > handoffHalfWidth)
+                {
+                    continue;
+                }
+
                 float riverInfluence =
                     Mathf.Max(
-                        waterlineBand,
+                        bankBand,
                         Mathf.Max(
-                            bedInfluence,
+                            innerBedInfluence,
                             outerBankInfluence));
 
                 riverInfluence =
                     Mathf.Pow(
                         Mathf.Clamp01(riverInfluence),
-                        1.45f);
+                        1.18f);
 
                 influence = Mathf.Max(influence, riverInfluence);
             }
 
             return Mathf.Clamp01(influence);
+        }
+
+        private static string BuildSurfaceMaskDiagnostics(
+            float[] surfaceVariations,
+            float[] exposureMasks,
+            float[] dampDepositMasks,
+            float[] vegetationSuitabilityMasks,
+            Vector4[] secondarySurfaceMasks)
+        {
+            return
+                "Surface masks (min/max/avg/p05/p95)\n" +
+                FormatMaskStats("Tonal", surfaceVariations) + "\n" +
+                FormatMaskStats("Exposure", exposureMasks) + "\n" +
+                FormatMaskStats("DampDeposit", dampDepositMasks) + "\n" +
+                FormatMaskStats("Vegetation", vegetationSuitabilityMasks) + "\n" +
+                FormatMaskStats("Compaction", secondarySurfaceMasks, 0) + "\n" +
+                FormatMaskStats("Shore", secondarySurfaceMasks, 1) + "\n" +
+                FormatMaskStats("RockyDry", secondarySurfaceMasks, 2);
+        }
+
+        private static string FormatMaskStats(
+            string label,
+            float[] values)
+        {
+            MaskStats stats = CalculateMaskStats(values);
+            return FormatMaskStats(label, stats);
+        }
+
+        private static string FormatMaskStats(
+            string label,
+            Vector4[] values,
+            int component)
+        {
+            if (values == null || values.Length == 0)
+            {
+                return $"{label}: n/a";
+            }
+
+            float[] scalarValues = new float[values.Length];
+
+            for (int index = 0; index < values.Length; index++)
+            {
+                scalarValues[index] = component switch
+                {
+                    0 => values[index].x,
+                    1 => values[index].y,
+                    2 => values[index].z,
+                    3 => values[index].w,
+                    _ => 0f
+                };
+            }
+
+            return FormatMaskStats(
+                label,
+                CalculateMaskStats(scalarValues));
+        }
+
+        private static string FormatMaskStats(
+            string label,
+            MaskStats stats)
+        {
+            if (!stats.IsValid)
+            {
+                return $"{label}: n/a";
+            }
+
+            return
+                $"{label}: " +
+                $"{stats.Minimum:0.000}/{stats.Maximum:0.000}/" +
+                $"{stats.Average:0.000}/" +
+                $"{stats.Percentile05:0.000}/" +
+                $"{stats.Percentile95:0.000}";
+        }
+
+        private static MaskStats CalculateMaskStats(
+            float[] values)
+        {
+            if (values == null || values.Length == 0)
+            {
+                return MaskStats.Invalid;
+            }
+
+            float[] sorted = (float[])values.Clone();
+            Array.Sort(sorted);
+
+            float sum = 0f;
+
+            for (int index = 0; index < values.Length; index++)
+            {
+                sum += values[index];
+            }
+
+            return new MaskStats(
+                sorted[0],
+                sorted[sorted.Length - 1],
+                sum / values.Length,
+                SamplePercentile(sorted, 0.05f),
+                SamplePercentile(sorted, 0.95f));
+        }
+
+        private static float SamplePercentile(
+            float[] sortedValues,
+            float percentile)
+        {
+            if (sortedValues == null || sortedValues.Length == 0)
+            {
+                return 0f;
+            }
+
+            if (sortedValues.Length == 1)
+            {
+                return sortedValues[0];
+            }
+
+            float position =
+                Mathf.Clamp01(percentile) *
+                (sortedValues.Length - 1);
+            int lower = Mathf.FloorToInt(position);
+            int upper = Mathf.Min(sortedValues.Length - 1, lower + 1);
+            float t = position - lower;
+
+            return Mathf.Lerp(
+                sortedValues[lower],
+                sortedValues[upper],
+                t);
+        }
+
+        private readonly struct MaskStats
+        {
+            public static readonly MaskStats Invalid =
+                new MaskStats(false, 0f, 0f, 0f, 0f, 0f);
+
+            public MaskStats(
+                float minimum,
+                float maximum,
+                float average,
+                float percentile05,
+                float percentile95)
+                : this(
+                    true,
+                    minimum,
+                    maximum,
+                    average,
+                    percentile05,
+                    percentile95)
+            {
+            }
+
+            private MaskStats(
+                bool isValid,
+                float minimum,
+                float maximum,
+                float average,
+                float percentile05,
+                float percentile95)
+            {
+                IsValid = isValid;
+                Minimum = minimum;
+                Maximum = maximum;
+                Average = average;
+                Percentile05 = percentile05;
+                Percentile95 = percentile95;
+            }
+
+            public bool IsValid { get; }
+            public float Minimum { get; }
+            public float Maximum { get; }
+            public float Average { get; }
+            public float Percentile05 { get; }
+            public float Percentile95 { get; }
         }
 
         private static MeshData BuildMeshData(

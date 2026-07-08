@@ -176,6 +176,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private Mesh generatedMesh;
         private GroundHeightFieldSnapshot baseSurface =
             GroundHeightFieldSnapshot.Empty;
+        [SerializeField, HideInInspector]
+        private string lastSurfaceMaskDiagnostics =
+            "Surface masks have not been generated yet.";
         private MaterialPropertyBlock materialProperties;
 
         private static readonly int SurfaceContractId =
@@ -203,6 +206,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             meshRenderer != null
                 ? meshRenderer.sharedMaterial
                 : null;
+        public string LastSurfaceMaskDiagnostics =>
+            string.IsNullOrWhiteSpace(lastSurfaceMaskDiagnostics)
+                ? "Surface masks have not been generated yet."
+                : lastSurfaceMaskDiagnostics;
         public float PatchSize =>
             recipe != null
                 ? GroundGenerator.ResolvePatchSize(recipe.PatchSize)
@@ -274,7 +281,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 surfaceProfile,
                 snapshots,
                 riverSnapshots,
-                out baseSurface);
+                out baseSurface,
+                out lastSurfaceMaskDiagnostics);
 
             string meshName =
                 $"GeneratedGround_{recipe.PatchSize}_{recipe.Resolution}_Seed{recipe.ShapeSeed}";
@@ -664,6 +672,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private void ClearGeneratedAssignments()
         {
             baseSurface = GroundHeightFieldSnapshot.Empty;
+            lastSurfaceMaskDiagnostics =
+                "Surface masks have not been generated yet.";
 
             if (meshFilter != null &&
                 meshFilter.sharedMesh == generatedMesh)

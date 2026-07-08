@@ -503,10 +503,18 @@ namespace ProgrammaticStylized3D.Rivers
                             groundSample.VegetationSuitability);
 
                     renderData.AddVertex(localPosition, uv, colour);
+                    float corridorShoreInfluence =
+                        ResolveCorridorShoreInfluence(
+                            crossPoint,
+                            acrossDistance,
+                            visibleHalfWidth,
+                            surfaceHalfWidth,
+                            handoffHalfWidth);
+
                     renderData.UV2.Add(
                         new Vector4(
                             groundSample.Compaction,
-                            groundSample.ShoreInfluence,
+                            corridorShoreInfluence,
                             groundSample.RockyDry,
                             groundSample.ReservedSurfaceMask));
                     terrainIntegrationWeights.Add(
@@ -1095,6 +1103,106 @@ namespace ProgrammaticStylized3D.Rivers
                 groundNormal.z * direction.z;
 
             return -horizontalDot / vertical;
+        }
+
+
+        private static float ResolveCorridorShoreInfluence(
+            CrossPoint point,
+            float acrossDistance,
+            float visibleHalfWidth,
+            float surfaceHalfWidth,
+            float handoffHalfWidth)
+        {
+            float safeVisibleHalfWidth =
+                Mathf.Max(0.001f, visibleHalfWidth);
+            float safeSurfaceHalfWidth =
+                Mathf.Max(safeVisibleHalfWidth, surfaceHalfWidth);
+            float safeHandoffHalfWidth =
+                Mathf.Max(safeSurfaceHalfWidth, handoffHalfWidth);
+
+            if (point.Region == CrossRegion.BuriedApron)
+            {
+                return 0f;
+            }
+
+            float waterlineWidth =
+                Mathf.Max(
+                    0.08f,
+                    (safeSurfaceHalfWidth - safeVisibleHalfWidth) * 0.45f);
+
+            float distanceFromWaterline =
+                Mathf.Abs(acrossDistance - safeVisibleHalfWidth);
+
+            float waterlineBand =
+                0.78f *
+                (1f - SmoothStep(
+                    0f,
+                    waterlineWidth,
+                    distanceFromWaterline));
+
+            float bedInfluence = 0f;
+
+            if (acrossDistance < safeVisibleHalfWidth)
+            {
+                float bed01 =
+                    Mathf.Clamp01(
+                        acrossDistance / safeVisibleHalfWidth);
+
+                bedInfluence =
+                    Mathf.Lerp(
+                        0.025f,
+                        0.14f,
+                        SmoothStep(0.62f, 1f, bed01));
+            }
+
+            float hiddenCoverInfluence = 0f;
+
+            if (point.Region == CrossRegion.HiddenCover)
+            {
+                hiddenCoverInfluence =
+                    Mathf.Lerp(
+                        0.46f,
+                        0.22f,
+                        Mathf.Clamp01(point.T));
+            }
+
+            float outerBlendInfluence = 0f;
+
+            if (point.Region == CrossRegion.OuterBlend)
+            {
+                outerBlendInfluence =
+                    0.20f *
+                    (1f - SmoothStep(
+                        0f,
+                        1f,
+                        Mathf.Clamp01(point.T)));
+            }
+            else if (acrossDistance > safeSurfaceHalfWidth)
+            {
+                float outer01 =
+                    Mathf.InverseLerp(
+                        safeSurfaceHalfWidth,
+                        safeHandoffHalfWidth,
+                        acrossDistance);
+
+                outerBlendInfluence =
+                    0.16f *
+                    (1f - SmoothStep(0f, 1f, outer01));
+            }
+
+            float influence =
+                Mathf.Max(
+                    waterlineBand,
+                    Mathf.Max(
+                        bedInfluence,
+                        Mathf.Max(
+                            hiddenCoverInfluence,
+                            outerBlendInfluence)));
+
+            return Mathf.Clamp01(
+                Mathf.Pow(
+                    Mathf.Clamp01(influence),
+                    1.08f));
         }
 
         private static float ResolveTerrainIntegrationWeight(

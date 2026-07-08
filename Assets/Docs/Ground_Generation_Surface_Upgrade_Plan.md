@@ -1507,7 +1507,8 @@ The first milestone is complete when:
 - [~] Patch 6 - First ground shader response. Dedicated ground shader, final response, and debug modes implemented; material asset tuning still pending.
 - [x] Patch C - Ground surface mask quality pass. Implemented and Unity debug-view validated.
 - [x] Patch D - Ground mask contrast and shore restraint pass. Implemented and Unity debug-view validated; shore/exposure needed one more focused correction.
-- [~] Patch E - Shore semantic correction and exposure/combined debug balance. Code implemented; Unity debug-view validation pending.
+- [x] Patch E - Shore semantic correction and exposure/combined debug balance. Implemented and Unity debug-view validated; audit showed shore still used the wrong owner/model.
+- [~] Patch F - Ground shore model and mask diagnostics. Implemented: ground-side shore now uses visible-bank distance as a low-amplitude coarse hint; corridor-side shore is computed from corridor cross-section; generated ground exposes numeric mask diagnostics. Unity validation pending.
 - [ ] Patch 7 - Terrain profile asset set.
 - [ ] Patch 8 - Runtime state design stub.
 - [ ] Patch 9 - Footprint prototype.
