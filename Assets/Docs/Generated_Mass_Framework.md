@@ -1,14 +1,15 @@
 # Generated Mass Framework
 
 Status: active framework definition  
-Current implementation patch: EW-4B.6 — Topology Hardening and Atlas Debug Label Clarification  
-Supersedes: older Patch 14C/14D and EW-3A.1 through EW-3A.6 atlas-first/runtime edge-wear plans.
+Current implementation target: EW-4D0 — Variable-Profile Topology Bevel Graph  
+Current implementation step: EW-4D0.5 — Rail-Sampled Base Boundaries + Bevel Ribbon Emission  
+Supersedes: atlas-first/runtime edge-wear plans, EW-4A global cuts, EW-4B local strips, and EW-4C.0 half-space bevel planes as production convex edge-wear construction paths.
 
 ---
 
 ## 1. Purpose
 
-The Generated Mass system is the reusable compact-mass framework for procedural rocks, boulders, ice chunks, ore chunks, ruin fragments, sacred monoliths, bone/fossil chunks, and similar compact generated objects.
+Generated Mass is the reusable compact-mass framework for procedural rocks, boulders, ice chunks, ore chunks, ruin fragments, monoliths, fossils, and similar compact generated objects.
 
 It owns:
 
@@ -22,13 +23,13 @@ feature-oriented inspector controls
 debug views for validating generated data
 ```
 
-Core rule:
+Core representation rule:
 
 ```text
-Generated Mass features must use the representation that matches the visual problem.
-Line/edge features belong in mesh geometry or mesh-carried per-edge/per-face data.
+Use the representation that matches the feature.
+Hard edge features belong in mesh geometry or mesh-carried per-edge/per-face data.
 Broad soft fields may use vertex masks, procedural shader data, or temporary/debug atlases when justified.
-Do not force hard edge wear into packed low-resolution texture atlases.
+Do not force hard convex edge wear into packed low-resolution runtime atlases.
 ```
 
 ---
@@ -39,96 +40,118 @@ Do not force hard edge wear into packed low-resolution texture atlases.
 GeneratedMass.cs
 - FormComplexity and SurfaceFacetDensity are separate artist-facing controls.
 - GenerationBudget still caps generated support-data cost.
-- Normal-render convex edge wear now passes MassSurfaceFeatureSettings into MassGenerator.
+- Normal-render convex edge wear passes MassSurfaceFeatureSettings into MassGenerator.
 - Feature atlases are generated only for temporary boundary Surface Mask Debug views.
 
 GeneratedMassFeatureAtlasBaker.cs
 - Retained as a temporary/debug boundary-field baker.
-- Can generate FeatureAtlas0 only, FeatureAtlas0+FeatureAtlas1, or no atlas.
-- Generated atlas upload uses Apply(false, true), discarding CPU-readable texture memory after upload.
 - The atlas path is not the final representation for hard convex edge wear.
 
 MassGenerator.cs
 - FormComplexity controls major cut count / dominant plane count.
 - SurfaceFacetDensity controls surface triangulation density across major planes.
 - The rendered mesh emits one rendered vertex per triangle corner.
-- EW-4A applies generated convex bevel/chamfer cuts after plane-cut shape cuts and before triangulation.
-- Bevel/chamfer cap faces are marked as ConvexEdgeWear and emitted through UV2.z.
-- EW-4A affects plane-cut archetypes first; radial, layered and carved-marker archetypes are intentionally unchanged in this first pass.
+- EW-4D0 is the active recovery target for generated convex edge wear on plane-cut masses.
+- EW-4D0.1 built a real topology graph and maps selected candidates before any new geometry is emitted.
+- EW-4D0.2 preflights per-face selected-edge clipping and shared rail extraction.
+- EW-4D0.3 preflights sampled profile grids from paired rails.
+- EW-4D0.4 builds temporary clipped base-face replacement workspaces.
+- EW-4D0.5 inserts protected rail samples into those base-face boundaries and appends sampled ConvexEdgeWear ribbon faces to the temporary workspace.
+- Later EW-4D0 steps will emit sampled variable-profile bevel ribbons, add corner patches, and commit only after topology audit.
 
 SH_PixelSurfaceLit.shader
 - FeatureAtlas0/1 sampling remains available for boundary debug modes.
 - Normal rendering no longer samples FeatureAtlas0/1 for convex edge-wear material response.
-- Normal rendering shades UV2.z-marked bevel/chamfer faces with the generated mass edge-wear material controls.
-```
-
-Important conclusion:
-
-```text
-The atlas-first edge-wear path was a failed representation choice.
-EW-4A is the first production replacement: main-mesh bevel/chamfer edge wear on plane-cut masses with bevel-face material markers. Explicit custom-normal refinement remains a later step if the first-pass bevel normals are not sufficient.
+- Normal rendering shades UV2.z-marked bevel/chamfer/ribbon faces with generated mass edge-wear material controls.
 ```
 
 ---
 
-## 3. Why runtime edge-wear atlases were decommissioned
+## 3. Active convex edge-wear architecture
 
-The previous atlas path tried to represent convex edge wear as a packed boundary distance field.
-That failed at Compact/128 and remained marginal at Standard/Detailed/256 because the authored edge feature is narrower than the available atlas texel density.
-
-Approximate cube-like chart math:
+EW-4D0 pipeline:
 
 ```text
-featureWidthWorld = objectMaxDimension * 0.018 * EdgeWearWidth
-
-128 atlas:
-  featureWidth ≈ 0.75 atlas px
-  useful outer field ≈ 0.6 atlas px
-  hard ridge core ≈ 0.01–0.02 atlas px
-
-256 atlas:
-  featureWidth ≈ 1.55 atlas px
-  useful outer field ≈ 1.3 atlas px
-  hard ridge core ≈ 0.02–0.05 atlas px
-
-512 atlas:
-  featureWidth ≈ 3.1 atlas px
-  useful outer field ≈ 2.6 atlas px
+source PolygonFace list
+→ topology graph
+→ selected convex graph edges
+→ affected-face clipping
+→ shared rail extraction
+→ sampled profile-grid preparation
+→ clipped base-face replacement
+→ variable-profile bevel ribbon emission
+→ corner vertex patches
+→ topology audit
+→ UV2.z / vertex color ConvexEdgeWear markers
 ```
 
-A sub-pixel hard edge core cannot be made reliable by more sampling, cross-coordinate averaging, dominant groups, or shader interpretation. Those patches mostly disguised symptoms.
+The current implementation is still in rebuild-workspace stages. EW-4D0.5 inserts protected rail samples into clipped base-face boundaries and appends sampled `ConvexEdgeWear` bevel ribbon faces to the temporary workspace. It still does not final-commit visible bevel geometry because corner vertex patches and final topology validation are reserved for later steps. Until final commit is implemented, `Surface Mask Debug = Convex Edge Wear` may remain black even when ribbon preflight succeeds.
 
-The correct representation for hard edge wear is:
+---
+
+## 4. Full EW-4D0 roadmap
 
 ```text
-actual generated bevel/chamfer/groove geometry
-+ bevel-face or edge-strip material markers
-+ bevel/custom normals
-+ simple shader response on marked geometry
+EW-4D0.1 — topology graph foundation — completed
+EW-4D0.2 — per-face selected-edge clipping / shared rail preflight — completed
+EW-4D0.3 — rail/profile storage and sampled profile-grid preflight — completed
+EW-4D0.4 — clipped base-face replacement workspace — completed
+EW-4D0.5 — rail-sampled base boundaries + sampled variable-profile bevel ribbon emission — current
+EW-4D0.6 — corner vertex patches
+EW-4D0.7 — final topology validation and active-path switch
+EW-4D0.8 — variation tuning
+EW-4D1   — corner quality refinement and crack/groove planning
+```
+
+Roadmap rule:
+
+```text
+Each step must leave docs current and must expose enough stats to prove whether the step succeeded before the next geometry layer is added.
 ```
 
 ---
 
-## 4. Generated Mass feature budget policy
-
-### 4.1 Budget is a numeric ceiling, not a style preset
-
-The inspector may present named budgets, but the implementation must treat them as numeric cost ceilings.
+## 5. Control contract
 
 ```text
-artist-requested shape settings
-+ active generated feature requirements
-+ budget target
-→ resolved effective settings
+Edge Wear Amount:
+  generation enable/strength and material response strength.
+
+Edge Wear Width:
+  base physical bevel depth before variation.
+
+Edge Wear Coverage:
+  selected eligible convex edge fraction.
+
+Edge Wear Softness:
+  material/normal/profile response. It should not secretly change physical bevel width in the current path.
+
+Macro Variation:
+  future per-edge variation: width, profile curve, material strength, chip tendency.
+
+Micro Variation:
+  future along-edge variation: taper, noise, chip masks, safe rail wobble.
 ```
 
-A requested setting is preserved if the estimated/generated cost fits the active budget. It is clamped only when the math says it exceeds the budget.
+Selected candidates are authored intent. EW-4D should not hide errors by silently dropping individual selected edges. If the full selected set is too aggressive, global width/profile richness may scale down, or the whole result should fail closed.
 
-### 4.2 Active budget tiers
+---
 
-There is no `Background` tier for this game. The project uses an isometric action/roguelike camera, and generated masses are generally reachable gameplay objects.
+## 6. Budget and performance policy
 
-Use these budgets:
+Dirty-time generation may be more expensive because generated masses can be cached or generated offline.
+
+Runtime priorities:
+
+```text
+avoid unique per-object multi-megabyte runtime atlases
+avoid runtime per-frame generation work
+avoid secondary overlay renderers as final output
+allow more mesh triangles within budget
+allow existing UV2.z / vertex color material markers
+```
+
+Active budget tiers:
 
 | Budget | Rendered vertex target | Temporary debug atlas cap | Intended use |
 |---|---:|---:|---|
@@ -138,351 +161,90 @@ Use these budgets:
 | Hero | <= 8,000 rendered verts | 512 | Showcase, inspected, very large, or debug/hero masses |
 | Custom / Debug | manual | manual | Testing and deliberate override only |
 
-The budget becomes the cap for EW-4 bevel/chamfer geometry and other generated support data. The atlas cap is now only for temporary debug views unless a future broad-mask feature proves a production atlas is actually necessary.
-
-### 4.3 Approximate current mesh estimates
-
-Current estimates assume the existing plane-cut/facet-density model and one rendered vertex per triangle corner:
-
-| Budget | Default effective shape | Estimated normal verts | Estimated harsh/fractured verts | Budget fit |
-|---|---|---:|---:|---|
-| Compact | Simple + Medium | ~504 | ~756 | Fits <= 800 |
-| Standard | Complex + Medium | ~864 | ~1,152 | Fits <= 1,600 |
-| Detailed | Complex + High | ~1,296 | ~1,728 | Fits <= 3,000 |
-| Hero | HighlyComplex + High | ~1,674 | ~2,160 | Fits <= 8,000 with room for bevels |
-| Hero Max / Debug | HighlyComplex + VeryHigh | ~2,232 | ~2,880 | Still acceptable before bevels |
-
-### 4.4 Clamp order after EW-4
-
-When generated or estimated cost exceeds the active budget, clamp in this order:
+If generated cost exceeds budget, clamp in this order:
 
 ```text
-1. Reduce optional/debug atlas resolution first, if an atlas is actually requested by a debug view.
-2. Reduce bevel/chamfer richness or selected edge count.
-3. Reduce SurfaceFacetDensity.
-4. Reduce FormComplexity last.
-```
-
-Reason:
-
-```text
-FormComplexity changes the major silhouette and should be protected longest.
-EW-4 geometry cost is visible but local and controllable.
-Temporary debug atlas cost is not part of the shipping edge-wear solution.
+1. optional/debug atlas resolution first, if a debug atlas is actually requested
+2. bevel/chamfer richness or selected edge count
+3. SurfaceFacetDensity
+4. FormComplexity last
 ```
 
 ---
 
-## 5. EW-4A geometry edge-wear policy
-
-EW-4A implements convex edge wear as generated main-mesh bevel/chamfer geometry for plane-cut mass archetypes.
-
-```text
-Supported in EW-4A:
-  TerrainBoulder
-  SquatBoulder
-  StandingStone
-  FlatSlab
-  BrokenChunk
-  FracturedPillar
-
-Not yet affected in EW-4A:
-  PolishedStone
-  LayeredStone
-  CarvedMarkerStone
-```
-
-Controls are wired as follows:
-
-```text
-Edge Wear Amount:
-  enables/disables bevel generation and contributes to bevel-face material strength
-
-Edge Wear Width:
-  controls bevel/chamfer cut depth
-
-Edge Wear Coverage:
-  controls how many eligible convex edges are selected
-
-Edge Wear Softness:
-  makes the first-pass bevel cuts shallower/less aggressive
-
-Response Strength / Brightness Lift / Tint / Tint Strength:
-  control shader response on UV2.z-marked bevel faces
-
-Macro Variation / Micro Variation:
-  retained for later richer per-edge and along-edge variation; first pass uses deterministic edge scoring only
-```
-
-EW-4A writes:
-
-```text
-UV2.z = generated convex edge-wear strength on actual bevel/chamfer faces
-Vertex Color A = same edge-wear strength for inspection/backward compatibility
-```
-
-The first pass relies on generated bevel face normals produced by the existing mesh-normal path. It does not add a new mesh channel and does not touch ground or other procedural mesh generators.
-
----
-
-## 6. Temporary atlas policy
+## 7. Temporary atlas policy
 
 Atlases are not generated because an object is a Generated Mass. Atlases are not generated for normal-render convex edge wear.
 
-Atlases may be generated only because an active authoring/debug view requests them.
+Atlases may be generated only because an active authoring/debug view requests them or because a future broad-mask feature explicitly justifies them.
 
-### 6.1 FeatureAtlas0 — temporary boundary structure debug atlas
-
-```text
-R = convex boundary proximity
-G = concave boundary proximity
-B = dominant boundary structural salience
-A = dominant boundary stable identity / seed
-```
-
-### 6.2 FeatureAtlas1 — temporary boundary coordinate/modulation debug atlas
+Do not use FeatureAtlas0/1 for:
 
 ```text
-R = dominant boundary along-chain coordinate / phase
-G = dominant boundary cross-boundary coordinate
-B = dominant boundary coarse local modulation
-A = dominant boundary fine local modulation
-```
-
-These atlases are retained only as temporary diagnostic tools. They are not the foundation for final convex edge wear.
-
-### 6.3 Current atlas request policy
-
-```text
-Surface Mask Debug = None:
-  FeatureAtlas0 not required.
-  FeatureAtlas1 not required.
-
-Surface Mask Debug requires Atlas0 diagnostics:
-  FeatureAtlas0 required.
-  FeatureAtlas1 not required unless the selected debug mode needs it.
-
-Surface Mask Debug requires Atlas1 diagnostics:
-  FeatureAtlas0 required.
-  FeatureAtlas1 required.
-```
-
-Edge Wear Amount, Width, Coverage, Softness, Response Strength, Brightness Lift and Tint now drive EW-4A geometry edge wear. Macro Variation and Micro Variation are retained for later richer geometry variation. None of these controls make FeatureAtlas0/1 visible in normal rendering.
-
-### 6.4 Temporary atlas memory table
-
-Per RGBA32 atlas:
-
-| Setup | GPU atlas memory |
-|---|---:|
-| No atlas | 0 MB |
-| 128 Atlas0 only | ~0.0625 MB |
-| 128 Atlas0 + Atlas1 | ~0.125 MB |
-| 256 Atlas0 only | ~0.25 MB |
-| 256 Atlas0 + Atlas1 | ~0.5 MB |
-| 512 Atlas0 only | ~1.0 MB |
-| 512 Atlas0 + Atlas1 | ~2.0 MB |
-
-A two-atlas 512 debug setup costs about 2 MB per generated mass. This is acceptable for debug/hero inspection but not as the default solution for hard edge wear.
-
-Generated feature atlas textures must continue to discard CPU-readable copies after upload:
-
-```csharp
-atlas.Apply(false, true);
+convex edge wear
+edge-local hard highlights
+thin cracks/creases
+chipped edge lines
 ```
 
 ---
 
-## 7. EW-4A implementation notes
+## 8. Supported archetype scope for EW-4D0
 
-EW-4A implements convex edge wear as generated main-mesh geometry for plane-cut mass archetypes.
-
-Implemented target:
+EW-4D0 targets plane-cut mass archetypes first:
 
 ```text
-identify eligible convex edges after all plane-cut shape cuts
-create narrow bevel/chamfer cap faces on the main mesh
-mark bevel faces through UV2.z
-mirror the marker into Vertex Color A for inspection/backward compatibility
-triangulate bevel faces minimally so surface facet density does not explode bevel cost
-shade marked faces as worn material in SH_PixelSurfaceLit.shader
-avoid FeatureAtlas0/1 in normal edge-wear rendering
+TerrainBoulder
+SquatBoulder
+StandingStone
+FlatSlab
+BrokenChunk
+FracturedPillar
 ```
 
-Current first-pass normal policy:
+Separate paths may be needed later for:
 
 ```text
-GeneratedMass already emits one rendered vertex per triangle corner.
-The existing mesh normal recalculation therefore gives bevel/chamfer faces their own faceted normals.
-Custom softened normals remain a later refinement, not part of EW-4A.
+PolishedStone
+LayeredStone
+CarvedMarkerStone
 ```
-
-Preferred material-data channel:
-
-```text
-UV2.z = convex edge-wear / bevel-face strength
-```
-
-Existing UV2 contract already reserved Z for convex edge localization data. EW-4A uses it without adding a new vertex channel.
 
 ---
 
-## 8. Cost comparison: atlas path vs bevel path
+## 9. Data emission contract
 
-Two RGBA32 atlases:
-
-```text
-128 Atlas0+Atlas1 = 128 KiB
-256 Atlas0+Atlas1 = 512 KiB
-512 Atlas0+Atlas1 = 2,048 KiB
-```
-
-Simple generated bevel estimate:
+Final EW-4D bevel/ribbon/corner faces should write:
 
 ```text
-1 bevel quad = 2 triangles
-current rendered mesh = one rendered vertex per triangle corner
-2 triangles = 6 rendered vertices
-estimated vertex cost ≈ 80 bytes / vertex without UV3 atlas channel
-per bevel edge ≈ 6 * 80 + 12 index bytes ≈ 492 bytes
+UV2.z = generated convex edge-wear strength
+Vertex Color A = same marker for inspection/backward compatibility
+PolygonFaceFeature = ConvexEdgeWear
 ```
 
-Examples:
-
-| Selected bevel edges | Simple bevel memory |
-|---:|---:|
-| 24 | ~11.5 KiB |
-| 48 | ~23 KiB |
-| 80 | ~38 KiB |
-
-Even richer bevels generally remain far below a unique 512 two-atlas path. Geometry also removes one or two runtime atlas texture samples per shaded pixel.
+The existing shader response should read the generated marker. Shader changes are not part of EW-4D preflight unless validation later proves the existing response path is insufficient after geometry exists.
 
 ---
 
-## 9. Feature representation map
+## 10. Validation policy
 
-| Feature | Preferred representation | FeatureAtlas0/1? |
-|---|---|---:|
-| Convex edge wear | Bevel/chamfer geometry + UV2.z marker + normals | No |
-| Edge macro variation | Per-edge selection/strength during generation | No |
-| Edge micro variation | Bevel segmentation, edge hash, along-edge procedural data | No |
-| Concave cracks/creases | Groove/crease geometry or dark line strips | Probably no |
-| Broad stone face variation | Vertex colors + object-space shader noise | No |
-| Dirt/mineral deposits | UV2.y + height/normal/procedural noise | No |
-| Frost/snow exposure | vertex exposure mask + normal/up vector + noise | No |
-| Arbitrary high-frequency surface painting | TBD, possibly atlas/decal | Maybe |
+A step is not complete because code exists. It is complete only when console stats prove the step succeeded.
 
-Do not keep FeatureAtlas0/1 alive out of inertia. Keep them only until a future feature proves they are the best representation.
-
----
-
-## 10. Patch history status
+Current EW-4D0.4 success target:
 
 ```text
-EW-Atlas-1 through EW-3A.5:
-  Useful for learning/debugging boundary facts.
-  Superseded as final edge-wear architecture.
-  Do not continue patching the atlas path for normal edge wear.
-
-EW-3A.6:
-  Decommissions runtime atlas-based edge wear.
-  Keeps atlases as temporary debug tools only.
-  Updates docs and inspector messaging to prevent stale atlas-first guidance.
-
-EW-4A:
-  Implements first-pass plane-cut main-mesh bevel/chamfer edge wear.
-  Writes UV2.z bevel-face markers and shades them in normal rendering.
-  Leaves radial/layered/carved-marker archetypes unchanged.
-
-EW-4B:
-  Next work item if validation requires it.
-  Refine bevel normals, edge selection, depth tuning, or chip segmentation.
+selectedGraphEdges == selected
+faceClipFailedFaces == 0
+extractedRails == expectedRails
+profileEdgesPrepared == selectedGraphEdges
+profileEdgesFailed == 0
+profileInvalidPoints == 0
+profileZeroWidth == 0
+profileGridPoints > 0
+affectedBaseFaces == faceClipAffectedFaces
+replacedBaseFaces == faceClipSucceededFaces
+baseFaceValidationFailures == 0
+workspaceBaseFaces == graphFaces
 ```
 
-
-## EW-4A.1 bevel control and stability cleanup
-
-EW-4A.1 keeps the geometry-first edge-wear direction but corrects the first-pass control contract. Width is now the only control that changes physical single-plane bevel depth. Amount controls generated worn-face strength, Coverage controls the selected fraction of eligible structural edges, and Softness is limited to material response until custom normals or multi-strip bevels exist.
-
-The first-pass single-plane bevel now uses a conservative depth range because broad one-plane cuts read as shaved facets and can destabilize the global clipping method. Max Coverage now attempts all eligible structural candidates, with individual cuts allowed to fail if they would create unstable slivers or invalid faces. This is still the conservative global-cut implementation; the proper local edge-strip bevel remains a required later bevel milestone before the bevel system is considered complete.
-
-## EW-4B local edge-strip bevel foundation
-
-EW-4B supersedes the EW-4A/EW-4A.1 global clipping bevel prototype for normal GeneratedMass edge wear. Convex edge wear for plane-cut masses is now built as local edge-strip geometry: each selected structural edge trims only its two adjacent base faces, inserts a marked bevel strip between the two trimmed rails, and adds endpoint cap faces to close the bevel at edge ends.
-
-This removes the main EW-4A failure mode where a bevel candidate produced a whole-polyhedron cut that could slice unrelated faces or leave long sliver/gap-like feature faces. The corrected control contract remains unchanged: Width controls physical chamfer depth, Amount controls generated worn-face material strength, Coverage controls selected eligible structural edges, and Softness is reserved for shader/normal response rather than physical size.
-
-The implementation remains intentionally scoped to the plane-cut mass archetypes. It does not modify MeshData, MeshBuilder, GeneratedGround, the ground generator, or non-mass procedural meshes. FeatureAtlas0/1 remain debug-only and are not used by normal edge wear.
-
-## EW-4B.1 robust local bevel assembly update
-
-EW-4B validation showed that the first local-strip implementation could still fail closed when one selected edge or corner produced invalid rail/cap topology. In that case `ConvexEdgeWear` debug became fully dark because no `ConvexEdgeWear` faces survived to UV2.z. EW-4B.1 keeps the local-strip direction but changes the assembly policy:
-
-- selected candidates are now accepted cumulatively;
-- one invalid candidate is skipped instead of aborting the entire edge-wear pass;
-- rail extraction now prefers actual clipped polygon edges aligned with the source edge instead of arbitrary near-plane point min/max selection;
-- endpoint closure uses per-edge triangular cap faces instead of one merged non-planar cap polygon per original vertex;
-- the pass still fails closed if no candidate can produce valid topology.
-
-EW-4B.1 remains plane-cut only and does not add FeatureAtlas0/1 back into normal rendering.
-
-## EW-4B.2 final response fix
-
-EW-4B.1 validation showed the local bevel geometry and UV2.z mask were present in `Surface Mask Debug = ConvexEdgeWear`, but the normal final render stayed visually unchanged. EW-4B.2 fixes the final material response path rather than changing bevel topology.
-
-Changes:
-
-- Adds `_GeneratedMassGeometryEdgeWearEnabled`, set by `GeneratedMass` material property blocks.
-- The normal edge-wear shader response now gates on this dedicated property and UV2.z instead of relying on `_SurfaceContract`.
-- Brightness Lift now uses a bounded additive lift so worn bevel faces are visible on dark stone albedo.
-- FeatureAtlas0/1 remain debug-only and are still not sampled by normal edge wear.
-
-This patch is intended to make Response Strength, Brightness Lift, Tint Influence, and Amount-driven UV2.z strength visible in final render once the ConvexEdgeWear debug mask confirms bevel geometry exists.
-
-## EW-4B.3 geometry diagnostics update
-
-EW-4B.3 does not add a new visual debug mode. It repairs the current investigation path by using the existing `Surface Mask Debug = ConvexEdgeWear` view as the geometry-mask view and by adding code-level rejection statistics in `MassGenerator`.
-
-Important distinction:
-
-```text
-ConvexEdgeWear = UV2.z geometry bevel/wear face mask.
-Convex Boundary Proximity = temporary FeatureAtlas0.R boundary diagnostic.
-```
-
-Only `ConvexEdgeWear` proves that geometry bevel faces reached the final mesh data path. Convex Boundary Proximity can look correct even when no bevel geometry exists, because it is still atlas/debug data.
-
-EW-4B.3 records local bevel candidate counts, selected counts, accepted counts, and concrete rejection buckets. If edge wear is enabled but no local bevel faces are accepted, the editor console reports the counts instead of silently returning the unmodified mass.
-
-This patch is intentionally diagnostic/evidence-oriented. It does not change bevel selection, bevel width, shader response, or atlas policy.
-
-## EW-4B.4 candidate-local bevel validation update
-
-EW-4B.3 rejection evidence isolated the current geometry blocker: selected local bevel candidates were reaching construction, but every attempted build was rejected by the final whole-polyhedron `ValidatePolyhedronFaces(localRebuiltFaces, ...)` gate. That validator checked every rebuilt face and edge, so one unrelated or harmless tiny edge could reject the candidate even after inset cuts, face clipping, rail extraction, and bevel-face construction had already succeeded.
-
-EW-4B.4 removes that whole-polyhedron validation as the per-candidate acceptance gate. Candidate acceptance now validates the candidate-local changed geometry instead:
-
-- clipped base faces touched by bevel inset cuts;
-- generated bevel strip faces;
-- optional endpoint cap faces using relaxed cap thresholds.
-
-Endpoint caps remain optional closure helpers. Degenerate or too-small caps are skipped instead of rejecting an otherwise valid bevel strip. After welding/sanitizing, the pass only requires that the rebuilt candidate set still contains at least one generated `ConvexEdgeWear` face per selected accepted candidate.
-
-The rejection statistics are also split so future console warnings identify whether a candidate failed base-face, bevel-face, cap-face, or global validation instead of reporting one broad `Validation` bucket. EW-4B.4 does not modify the shader, FeatureAtlas0/1, MeshData, MeshBuilder, GeneratedGround, or the ground generator.
-
-
-## EW-4B.5 shared corner closure update
-
-EW-4B.4 proved that local edge-strip bevel faces can now reach the final mesh, but validation screenshots showed triangular artifacts and actual holes around bevel joints. The relevant code path was the endpoint closure policy: every beveled edge independently attempted two triangular endpoint caps, and cap failure did not stop or report the accepted bevel strip.
-
-EW-4B.5 keeps the local edge-strip foundation but changes closure ownership from per-edge endpoint caps to per-source-vertex corner closures. Each accepted bevel contributes its two rail endpoints to the original vertex at each end. When multiple bevels meet at the same original vertex, the generator builds one shared `ConvexEdgeWear` corner patch from the unique rail points. When only one bevel terminates at a vertex, the previous triangular endpoint cap remains as a fallback.
-
-The build summary now carries `cornerClosures` and `skippedCornerClosures`. A skipped-corner warning means physical bevel strips were accepted, but at least one closure patch could not be generated cleanly and the remaining visible artifact should be investigated as corner topology rather than shader or atlas behavior.
-
-## EW-4B.6 topology hardening and atlas debug label clarification
-
-EW-4B.5 validation restored physical bevel strips and proved that controls affect the generated mesh, but the editor warning `skippedCornerClosures > 0` showed that the generator could still commit a mesh after at least one required corner closure failed. EW-4B.6 changes the local-strip bevel policy from "warn after committing" to "fail closed": if a candidate set produces any skipped corner closure, that attempted set is rejected with `ValidationCapFace` and cumulative candidate acceptance continues with that newest candidate removed.
-
-EW-4B.6 also adds conservative rail-fragment detection. `TryExtractCutRail` previously selected the single best aligned rail segment from a clipped face. When the same cut exposes more than one valid aligned rail segment, or when the fallback near-plane extraction yields more than two unique rail points, the candidate is now rejected as `RailFragmented` instead of silently using one partial rail. This favors fewer accepted bevels over long slit-like topology artifacts.
-
-The GeneratedMass editor labels for atlas boundary views are now explicitly prefixed with `Atlas`. `Convex Edge Wear` remains the geometry/UV2.z validation view for physical bevel faces. Atlas boundary modes remain useful diagnostics, but they are legacy generated-mass atlas views and must not be used as proof of bevel geometry.
+Visible bevels are not expected until the later ribbon emission and final commit steps. Temporary workspace open edges are allowed at EW-4D0.4 because bevel ribbons and corner patches have not been appended yet.

@@ -37,6 +37,15 @@ Shader "PS3D/Pixel Ground Surface Lit"
         _GroundVegetationTint("Ground Vegetation Tint", Color) = (0.50, 0.58, 0.42, 1)
         _GroundVegetationTintStrength("Ground Vegetation Tint Strength", Range(0, 1)) = 0.1
 
+        [Header(Ground Surface Features)]
+        [HideInInspector] _GroundFeatureMode("Ground Feature Mode", Float) = 0
+        [HideInInspector] _GroundFeatureStrength("Ground Feature Strength", Range(0, 1)) = 0
+        [HideInInspector] _GroundFeatureScale("Ground Feature Scale", Range(0.1, 30)) = 5
+        [HideInInspector] _GroundFeatureContrast("Ground Feature Contrast", Range(0, 1)) = 0.5
+        [HideInInspector] _GroundFeatureMaskInfluence("Ground Feature Mask Influence", Range(0, 1)) = 0.5
+        [HideInInspector] _GroundFeatureDirection("Ground Feature Direction", Vector) = (1, 0, 0, 0)
+        [HideInInspector] _GroundFeatureSeed("Ground Feature Seed", Float) = 0
+
         [Header(Stylized Value Shaping)]
         _HighlightCompressStrength("Highlight Compress Strength", Range(0, 0.5)) = 0.08
         _HighlightCompressStart("Highlight Compress Start", Range(0, 1)) = 0.72

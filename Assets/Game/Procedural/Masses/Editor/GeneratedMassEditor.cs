@@ -22,8 +22,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         {
             (int)StoneSurfaceMaskDebug.None,
             (int)StoneSurfaceMaskDebug.ConvexEdgeWear,
-            (int)StoneSurfaceMaskDebug.BoundaryFieldDiagnostic,
-            (int)StoneSurfaceMaskDebug.BoundaryModulationDiagnostic,
             (int)StoneSurfaceMaskDebug.Exposure,
             (int)StoneSurfaceMaskDebug.CreviceBase,
             (int)StoneSurfaceMaskDebug.DirtDeposit
@@ -32,9 +30,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private static readonly GUIContent[] CommonDebugLabels =
         {
             new GUIContent("None"),
-            new GUIContent("Convex Edge Wear"),
-            new GUIContent("Atlas Boundary Field Diagnostic", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry."),
-            new GUIContent("Atlas Boundary Modulation Diagnostic", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry."),
+            new GUIContent("Convex Edge Wear", "Physical generated bevel/chamfer geometry mask carried by UV2.z. This is the correct edge-wear validation view."),
             new GUIContent("Exposure"),
             new GUIContent("Crevice / Base"),
             new GUIContent("Dirt / Deposit")
@@ -728,9 +724,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "Surface Debug",
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.HelpBox(
-                "Common debug views stay in the main selector. Raw boundary " +
-                "channels live in Advanced Feature Diagnostics so normal use " +
-                "does not turn into a long debug-control list.",
+                "Common debug views stay in the main selector. Legacy atlas " +
+                "diagnostics are isolated below because they do not validate " +
+                "physical bevel geometry.",
                 MessageType.None);
 
             int currentValue = surfaceMaskDebug.intValue;
@@ -783,7 +779,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             showAdvancedFeatureDiagnostics = EditorGUILayout.Foldout(
                 showAdvancedFeatureDiagnostics,
-                "Advanced Feature Diagnostics",
+                "Legacy Atlas Diagnostics",
                 true);
 
             if (!showAdvancedFeatureDiagnostics)
@@ -794,10 +790,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             using (new EditorGUI.IndentLevelScope())
             {
                 EditorGUILayout.HelpBox(
-                    "Raw generated feature-atlas inspection. FeatureAtlas0 stores " +
-                    "boundary structure fields; FeatureAtlas1 stores boundary " +
-                    "coordinate/modulation fields. These views are for validation, " +
-                    "not normal material authoring.",
+                    "Legacy generated-mass atlas inspection only. These channels " +
+                    "are not final convex edge wear and are not proof of physical " +
+                    "bevel geometry. Use Convex Edge Wear for UV2.z bevel masks.",
                     MessageType.None);
 
                 int advancedIndex =
@@ -811,8 +806,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 EditorGUI.BeginChangeCheck();
                 int nextAdvancedIndex = EditorGUILayout.Popup(
                     new GUIContent(
-                        "Raw Feature Channel",
-                        "Inspects separated semantic and baked irregularity channels for generated mass features."),
+                        "Legacy Atlas Channel",
+                        "Inspects legacy temporary FeatureAtlas0/1 channels only; not normal edge-wear geometry."),
                     advancedIndex,
                     AdvancedDebugLabels);
                 if (EditorGUI.EndChangeCheck())

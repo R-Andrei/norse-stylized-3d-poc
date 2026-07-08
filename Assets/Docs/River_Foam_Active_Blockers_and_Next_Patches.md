@@ -333,36 +333,48 @@ If it still reads as noise or dirt, reject it quickly and do not keep tuning it 
 
 ## Patch D — Low-res Layer D Film Source / Film Support prototype
 
-Scope:
+Status: implemented in `4.11C.5.13`, pending Unity validation.
+
+Implemented scope:
 
 ```text
-Add _FoamFilmSourceHalf and _FoamFilmSupportHalf or equivalent.
-Downsample material + external support.
-Apply cheap directional spread/bridge support.
-Expose debug views for Film Source and Film Support.
-Do not feed these fields back into Layer B or Layer C.
+Added half-resolution Layer D Film Source and Film Support textures.
+Film Source is built from persistent material Presence plus Layer B external support/contact fields: topology support, anchored pressure/lee/shore support, valid fluid, and obstacle exclusion.
+Film Support is a half-resolution directional spread field using cheap fixed taps along flow, across flow, and diagonals.
+Added Foam Film Source and Foam Film Support debug views.
+EvaluateFoamShape now combines raw Persistent Presence with Film Source / Film Support into _FoamShapeMask.
+No Layer B or Layer C feedback was added.
+No FoamState, Remaining Life, or Material Pattern mutation was added.
+Final Foam still does not consume _FoamShapeMask.
 ```
 
-Acceptance:
+Validation acceptance:
 
 ```text
-Foam Film Support visibly shows broad sheet/contact/bridge support that is not merely a coordinate-warped copy of Presence.
-```
-
-## Patch E — Full Layer D _FoamShapeMask integration
-
-Scope:
-
-```text
-Combine Persistent Presence + Film Support + local breakup + exclusion into _FoamShapeMask.
-```
-
-Acceptance:
-
-```text
-Foam Evaluated Shape visibly differs from Material Presence in broad structural ways.
+Foam Film Source should show where visual film is allowed/seeded by material and support.
+Foam Film Support should show broader sheet/contact/bridge support than raw Material Presence.
+Foam Evaluated Shape should visibly differ from Material Presence in broad structural ways.
+Foam Shape Difference should now show mostly green additions where Layer D adds visual film coverage.
 No durable material corruption.
 No circular dependencies.
+No Final Foam change.
+```
+
+## Patch E — Layer D structural tuning / containment
+
+Scope:
+
+```text
+Tune Film Source and Film Support thresholds, spread taps, support weighting, and negative suppression after Unity validation.
+Keep Film Source/Support fixed-grid and low-resolution.
+Keep fine pixel-scale breakup in Layer E.
+Do not switch Final Foam to _FoamShapeMask until the evaluated shape is visually accepted.
+```
+
+Acceptance:
+
+```text
+Broad film sheets and contact/bridge behavior become directionally similar to the inspiration river without revealing the simulation grid or flooding the whole river.
 ```
 
 ## Patch F — Final Foam consumes _FoamShapeMask
@@ -393,3 +405,41 @@ a new feature creates a second authority over material movement;
 a new patch cannot state which layer owns each written texture.
 ```
 
+
+## Patch D.1 — Layer D domain-space film sampling fix
+
+Status: implemented in `4.11C.5.13B`, pending Unity validation.
+
+Reason:
+
+```text
+After 4.11C.5.13, Foam Film Source, Foam Film Support, Foam Evaluated Shape, and Foam Shape Difference visibly pulsed/stuttered with the same rhythm as the material cell-grid residual phase. The root cause was a coordinate ownership mistake: Layer D visual products were being sampled through material-following UVs even though Film Source / Film Support include domain-anchored Layer B support/contact data.
+```
+
+Canonical correction:
+
+```text
+Layer C FoamState remains material-space and may be sampled through phase-corrected material UVs.
+Layer B support/contact fields remain domain-space.
+Layer D Film Source, Film Support, and _FoamShapeMask are domain-space visual products.
+Layer E debug/render sampling of Layer D products must use fieldUV/domain UV, not materialUV.
+```
+
+Implemented scope:
+
+```text
+BuildFoamFilmSource now writes a domain-space Film Source. It samples Layer B support/contact fields at domainUV, but samples persistent FoamState at domainUV - phaseTransport / fieldLength.
+EvaluateFoamShape now writes a domain-space _FoamShapeMask. It samples persistent FoamState with the same phase correction, and samples Film Source / Film Support at domainUV.
+DispatchEvaluateShape explicitly binds _FoamPhaseTransportMetres before building Film Source / Film Support / Shape.
+Shader debug views for Foam Evaluated Shape, Foam Shape Difference, Foam Shader Detail Probe, Foam Shader Detail Difference, Foam Film Source, and Foam Film Support now sample Layer D products through foam.fieldUV.
+The shader-side detail probe now uses stable river-space detail coordinates for its diagnostic layer, so it does not inherit material-cell phase snap.
+```
+
+Expected validation:
+
+```text
+Foam Motion Field + Cell Grid may still show material-cell residual movement/snap; that is expected for that debug view.
+Material Presence should still represent material-space truth with residual render travel.
+Foam Film Source, Foam Film Support, Foam Evaluated Shape, and Foam Shape Difference should no longer pulse or snap with the material cell grid.
+Final Foam remains unchanged.
+```

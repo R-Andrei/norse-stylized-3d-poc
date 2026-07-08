@@ -1755,7 +1755,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam Evaluated Shape",
                 "Foam Shape Difference",
                 "Foam Shader Detail Probe",
-                "Foam Shader Detail Difference"
+                "Foam Shader Detail Difference",
+                "Foam Film Source",
+                "Foam Film Support"
             };
             int[] foamDebugValues =
             {
@@ -1769,7 +1771,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.FoamEvaluatedShape,
                 (int)StylizedRiverFoamDebugView.FoamShapeDifference,
                 (int)StylizedRiverFoamDebugView.FoamShaderDetailProbe,
-                (int)StylizedRiverFoamDebugView.FoamShaderDetailDifference
+                (int)StylizedRiverFoamDebugView.FoamShaderDetailDifference,
+                (int)StylizedRiverFoamDebugView.FoamFilmSource,
+                (int)StylizedRiverFoamDebugView.FoamFilmSupport
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -2010,7 +2014,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam Evaluated Shape",
                 "Foam Shape Difference",
                 "Foam Shader Detail Probe",
-                "Foam Shader Detail Difference"
+                "Foam Shader Detail Difference",
+                "Foam Film Source",
+                "Foam Film Support"
             };
             int[] foamDebugValues =
             {
@@ -2024,7 +2030,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.FoamEvaluatedShape,
                 (int)StylizedRiverFoamDebugView.FoamShapeDifference,
                 (int)StylizedRiverFoamDebugView.FoamShaderDetailProbe,
-                (int)StylizedRiverFoamDebugView.FoamShaderDetailDifference
+                (int)StylizedRiverFoamDebugView.FoamShaderDetailDifference,
+                (int)StylizedRiverFoamDebugView.FoamFilmSource,
+                (int)StylizedRiverFoamDebugView.FoamFilmSupport
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -3101,6 +3109,14 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 case StylizedRiverFoamDebugView.FoamShaderDetailDifference:
                     return
                         "Layer E shader-side local detail difference diagnostic. Black means the shader detail probe matches _FoamShapeMask, green means local shader detail adds coverage, and magenta/red means local shader detail removes coverage. This proves whether sub-cell detail is happening at rendered-pixel scale rather than foam-cell scale.";
+
+                case StylizedRiverFoamDebugView.FoamFilmSource:
+                    return
+                        "Layer D half-resolution Film Source diagnostic. It is built from persistent material plus external support/contact fields and means visual-film permission, not durable FoamState.";
+
+                case StylizedRiverFoamDebugView.FoamFilmSupport:
+                    return
+                        "Layer D half-resolution Film Support diagnostic after directional spread. This is the first structural broad-sheet/bridge support product; it does not mutate persistent material.";
 
                 default:
                     return

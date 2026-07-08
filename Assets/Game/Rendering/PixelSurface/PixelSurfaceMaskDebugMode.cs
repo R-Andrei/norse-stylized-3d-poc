@@ -25,6 +25,11 @@ namespace ProgrammaticStylized3D.Rendering
         GroundRockyDry = 13,
         GroundCombined = 14,
 
+        // Authored ground modifier standing-water/puddle-potential mask.
+        // Kept outside the existing 15-26 generated-mass diagnostic range so
+        // those serialized debug values remain stable.
+        GroundStandingWaterPotential = 27,
+
         // GeneratedMass generic boundary-atlas diagnostics. These are
         // intentionally placed after the ground debug modes so existing
         // serialized GeneratedMass debug values 0-6 remain stable.

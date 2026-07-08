@@ -86,6 +86,8 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamPrevious("Foam Previous", 2D) = "black" {}
         [HideInInspector] _FoamCurrent("Foam Current", 2D) = "black" {}
         [HideInInspector] _FoamShapeMask("Foam Shape Mask", 2D) = "black" {}
+        [HideInInspector] _FoamFilmSource("Foam Film Source", 2D) = "black" {}
+        [HideInInspector] _FoamFilmSupport("Foam Film Support", 2D) = "black" {}
         [HideInInspector] _FoamBirthDebug("Foam Progressive Birth Debug", 2D) = "black" {}
         [HideInInspector] _FoamTopology("Foam Topology", 2D) = "black" {}
         [HideInInspector] _FoamTopologySources("Foam Topology Sources", 2D) = "black" {}
@@ -280,6 +282,8 @@ Shader "PS3D/Stylized River Water"
             TEXTURE2D(_FoamCurrent);
             SAMPLER(sampler_FoamCurrent);
             TEXTURE2D(_FoamShapeMask);
+            TEXTURE2D(_FoamFilmSource);
+            TEXTURE2D(_FoamFilmSupport);
             TEXTURE2D(_FoamBirthDebug);
             // Topology diagnostics reuse sampler_FoamCurrent, which is already
             // allocated by the normal Foam path, so no extra fragment sampler
@@ -926,13 +930,34 @@ Shader "PS3D/Stylized River Water"
                 }
 
                 if (foamDebug == 7 || foamDebug == 8 ||
-                    foamDebug == 9 || foamDebug == 10)
+                    foamDebug == 9 || foamDebug == 10 ||
+                    foamDebug == 11 || foamDebug == 12)
                 {
                     float evaluatedShape = saturate(
                         SAMPLE_TEXTURE2D(
                             _FoamShapeMask,
                             sampler_FoamCurrent,
-                            foam.materialUV).r);
+                            foam.fieldUV).r);
+
+                    if (foamDebug == 11)
+                    {
+                        float filmSource = saturate(
+                            SAMPLE_TEXTURE2D(
+                                _FoamFilmSource,
+                                sampler_FoamCurrent,
+                                foam.fieldUV).r);
+                        return half4(filmSource.xxx, 1.0);
+                    }
+
+                    if (foamDebug == 12)
+                    {
+                        float filmSupport = saturate(
+                            SAMPLE_TEXTURE2D(
+                                _FoamFilmSupport,
+                                sampler_FoamCurrent,
+                                foam.fieldUV).r);
+                        return half4(filmSupport.xxx, 1.0);
+                    }
 
                     if (foamDebug == 8)
                     {
@@ -956,7 +981,7 @@ Shader "PS3D/Stylized River Water"
                                 foam.presence,
                                 foam.remainingLife,
                                 foam.materialPattern,
-                                foam.materialUV,
+                                foam.fieldUV,
                                 input.domainData.x,
                                 input.domainData.y,
                                 _FoamRenderTravelMetres,

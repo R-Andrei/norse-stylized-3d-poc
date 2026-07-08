@@ -31,6 +31,13 @@
                 float _GroundRockyDryTintStrength;
                 half4 _GroundVegetationTint;
                 float _GroundVegetationTintStrength;
+                float _GroundFeatureMode;
+                float _GroundFeatureStrength;
+                float _GroundFeatureScale;
+                float _GroundFeatureContrast;
+                float _GroundFeatureMaskInfluence;
+                float4 _GroundFeatureDirection;
+                float _GroundFeatureSeed;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;

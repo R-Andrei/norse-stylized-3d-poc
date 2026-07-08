@@ -16,6 +16,50 @@ The desired result is a broad plane that is easy to walk and fight on, but whose
 
 ## Current State
 
+### Current Implementation Status After Patch T
+
+The ground upgrade has moved beyond the original single snow-material improvement pass. The current system now has a real surface-style framework:
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Dedicated ground shader | Implemented | `SH_PixelGroundSurfaceLit.shader` owns ground rendering separately from generated masses. |
+| Static semantic masks | Implemented baseline | Vertex color and UV2 carry tonal, exposure, damp/deposit, vegetation, compaction, shore, rocky/dry, and authored standing-water/puddle-potential data. |
+| Ground/corridor material contract | Implemented | `GeneratedGround` resolves visual state and applies it by `MaterialPropertyBlock`; river corridors remain dependent renderers. |
+| Component-owned surface authoring | Implemented | `GeneratedGround` exposes top-level Surface Family and Surface Variant controls. |
+| Asset-backed visual families | Implemented baseline | `GroundSurfaceStyleProfile` assets own visual families such as Snowfield and Wet Mudflat. |
+| Asset-backed variants | Implemented baseline | `GroundSurfaceVariantRecipe` stores stable ids, display names, material controls, and feature recipes. |
+| Feature-module recipe layer | Implemented baseline | `GroundSurfaceFeatureRecipe` supports explicit cost classes and the first shader-only features. |
+| Snowfield family | Implemented baseline | `GSSP_Snowfield` and `GSP_Snowfield` exist. Variants are temporary art baselines. |
+| Wet Mudflat family | Implemented baseline | `GSSP_WetMudflat` and `GSP_WetMudflat` exist. Patch Q intentionally reset the family to matte earth until explicit puddle/rut/debris features exist. |
+| Style profile editor | Implemented in Patch R | Style assets now have a readable custom editor with variant cards, feature summaries, duplicate support, and validation warnings. |
+| Ground modifier surface/height contract | Implemented in Patch T | `GroundModifier` can now affect height, authored surface masks, or both; legacy Flatten compaction behavior is preserved. |
+| Runtime surface state | Not started | Wetness, snow depth, compression, footprints, and trample maps remain future work. |
+| Explicit path/rut/track features | Contract ready | Patch T provides authored compaction, damp/deposit boost, and standing-water potential; visual feature modules still need to consume those masks. |
+
+Current conceptual split:
+
+```text
+GroundSurfaceProfile
+  semantic / mask-generation profile
+
+GroundSurfaceStyleProfile
+  visual family asset
+
+GroundSurfaceVariantRecipe
+  variant recipe inside a visual family
+
+GroundMaterialControls
+  material / shader response recipe
+
+GroundSurfaceFeatureRecipe
+  optional feature-module recipe with explicit cost class
+
+GeneratedGround
+  resolver, top-level authoring surface, and per-object override owner
+```
+
+Future terrain families must be added as style/profile assets, not as new hardcoded `GeneratedGround` enum branches.
+
 Primary implementation files:
 
 - `Assets/Game/Procedural/Ground/GeneratedGround.cs`
@@ -23,10 +67,18 @@ Primary implementation files:
 - `Assets/Game/Procedural/Ground/GroundModifier.cs`
 - `Assets/Game/Procedural/Ground/GroundHeightFieldSnapshot.cs`
 - `Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs`
+- `Assets/Game/Procedural/Ground/Editor/GroundSurfaceStyleProfileEditor.cs`
+- `Assets/Game/Procedural/Ground/GroundSurfaceProfile.cs`
+- `Assets/Game/Procedural/Ground/GroundSurfaceStyleProfile.cs`
+- `Assets/Game/Procedural/Ground/GroundSurfaceVariantRecipe.cs`
+- `Assets/Game/Procedural/Ground/GroundSurfaceFeatureRecipe.cs`
+- `Assets/Game/Procedural/Ground/GroundMaterialControls.cs`
 - `Assets/Game/Procedural/Core/MeshData.cs`
 - `Assets/Game/Procedural/Core/MeshBuilder.cs`
 - `Assets/Game/Procedural/Rivers/StylizedRiverGroundSnapshot.cs`
-- `Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelSurfaceLit.shader`
+- `Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaterialProperties.hlsl`
 - `Assets/Game/Rendering/PixelSurface/Includes/PixelCellVariation.hlsl`
 - `Assets/Game/Demo/Materials/Ground/M_PixelFrozenDirt.mat`
 
@@ -37,7 +89,7 @@ Related art and system documents:
 - `Assets/Docs/Proof of Concept/05_Project_Application_Norse_Game.md`
 - `Assets/Docs/Proof of Concept/06_Proof_of_Concept.md`
 
-The current ground implementation already has useful foundations:
+The original ground implementation already had useful foundations, and these remain relevant:
 
 - `GroundRecipe` controls patch size, resolution, patch coordinate, transition slope, broad shape, roughness, surface detail, edge blending, and material variation.
 - `GroundModifier` supports deterministic flatten, raise, and lower regions for authored traversal and scene composition.
@@ -46,17 +98,17 @@ The current ground implementation already has useful foundations:
 - `MeshData` supports vertex colors and optional UV2 data.
 - `SH_PixelSurfaceLit.shader` already has generic pixel surface features such as broad variation, warped cell lookup, profile contrast, wetness, frost, semantic brightening/darkening, and material profile controls.
 
-Current limitations:
+Original limitations that motivated this upgrade. Items marked as implemented are kept here as historical context rather than active blockers:
 
-- Ground shape and ground surface are coupled inside `GroundRecipe`.
-- `GroundProfile` only describes the heightfield family, not the material family.
-- `BuildSurfaceMetadata` writes one broad variation value and leaves material classification at `0`.
-- `BuildMeshData` writes vertex color as `R = surface variation`, `G = 0.5`, `B = 0.5`, `A = 1`.
-- The ground has no object-owned material property block equivalent to `GeneratedMass`.
-- The ground has no authored surface profile asset.
-- The ground has no static mask contract for snow potential, wetness potential, dirt/deposit, vegetation suitability, or terrain type blending.
-- The ground has no runtime surface state texture for rain, footprints, snow compression, grass trampling, or mud/water accumulation.
-- The current material can read as pale, low-contrast procedural fuzz because it receives little semantic information from the mesh.
+- [~] Ground shape and ground surface began coupled inside `GroundRecipe`; semantic and visual style ownership are now split, but future path/compaction work still needs clearer authored modifier rules.
+- [x] `GroundProfile` only describes the heightfield family, not the material family. Material family ownership now lives in `GroundSurfaceStyleProfile`.
+- [x] `BuildSurfaceMetadata` originally wrote one broad variation value and left material classification at `0`; it now writes semantic masks.
+- [x] `BuildMeshData` originally wrote neutral vertex color channels; it now writes the documented vertex color/UV2 surface contract.
+- [x] The ground originally had no object-owned material property block equivalent to `GeneratedMass`; `GeneratedGround` now applies resolved material controls through `MaterialPropertyBlock`.
+- [x] The ground originally had no authored surface profile asset; `GSP_Snowfield` and `GSP_WetMudflat` now exist.
+- [x] The ground originally had no static mask contract for snow potential, wetness potential, dirt/deposit, vegetation suitability, or terrain type blending; the baseline semantic contract now exists.
+- [ ] The ground still has no runtime surface state texture for rain, footprints, snow compression, grass trampling, or mud/water accumulation.
+- [~] Early material output read as pale, low-contrast procedural fuzz. Baseline Snowfield and Wet Mudflat now exist, but final detail still needs explicit feature modules and runtime state.
 
 ## Design Constraints
 
@@ -931,6 +983,29 @@ Suggested ground material properties:
 
 If the first implementation reuses `_BaseColor` and existing pixel properties, document the migration path to ground-specific names.
 
+## Current Roadmap After Patch T
+
+The original patch list below is retained for historical context, but the active roadmap is now organized around the asset-backed surface-style architecture introduced by Patches J through T.
+
+Patch T implemented the modifier contract needed before path, rut, puddle, and trampled-wear features can become credible. `GroundModifier` can now affect height, authored surface masks, or both.
+
+| Priority | Patch | Concrete goal |
+| --- | --- | --- |
+| 1 | Patch U — Trampled Wear Feature | Add a feature recipe that interprets compaction/path masks for trampled mud, worn earth, and future compacted snow/grass paths. |
+| 2 | Patch V — Ground Surface Runtime State Stub | Add the no-cost API and binding contract for wetness, snow depth, compression, footprints, and disturbance state. |
+| 3 | Patch W — Footprint / Compression Prototype | Stamp compression into runtime state and let Snowfield/Wet Mudflat interpret it differently. |
+| 4 | Patch X — Rain / Wetness Prototype | Add wetness accumulation and drying through runtime state, not full-surface permanent material gloss. |
+| 5 | Patch Y — Style/Feature Authoring Polish | Improve style/profile editing further only after more real content exposes actual authoring pain. |
+| 6 | Patch Z — Grass Integration Contract | Connect vegetation suitability, runtime compression, and future grass rendering/trampling. |
+| 7 | Future | Mixed Terrain / Profile Blending | Add explicit support for blended surface families such as snow over mud, rocky scrub over soil, or worn path through snow. |
+
+Surface modifier note:
+
+- Surface-only masks are preferred when the same visual effect can be achieved without changing playable height.
+- Small denivelations are acceptable for roads, wagon tracks, camp pads, and other authored terrain features when they remain combat-safe and camera-stable.
+- Snow paths and grass paths should eventually come from snow/grass accumulation and runtime interaction systems, not be hard-baked into the base ground as final content.
+- Patch T inspected the current `GroundModifier` and ground mask code before implementing the path.
+
 ## Implementation Plan
 
 ### Patch 1 - Document, Baseline, and Safety Values
@@ -1163,30 +1238,36 @@ Acceptance:
 
 ### Patch 7 - Terrain Profile Asset Set
 
-Status: not started.
+Status: partially superseded by Patches L through R.
 
 Goal:
 
-- prove that multiple terrain types can be selected from the Inspector.
+- prove that multiple terrain families can be selected from the Inspector without duplicating materials or adding hardcoded `GeneratedGround` terrain-family branches.
+
+Current result:
+
+- `GroundSurfaceProfile` now owns semantic/mask-generation tendencies.
+- `GroundSurfaceStyleProfile` now owns visual surface families.
+- `GroundSurfaceVariantRecipe` now owns variants inside a family.
+- `GeneratedGround` now exposes top-level Surface Family and Surface Variant controls.
 
 Checklist:
 
-- [ ] Create `GSP_Snowfield`.
-- [ ] Create `GSP_WetSoil`.
-- [ ] Create `GSP_FertileSoil`.
-- [ ] Create `GSP_DrySoil`.
-- [ ] Create `GSP_MossyGround`.
-- [ ] Create `GSP_RockyScrub`.
-- [ ] Optionally create `GSP_FrozenMud`.
-- [ ] Optionally create `GSP_DesertSand`.
-- [ ] Tune each with the same shader and generated mask contract.
+- [x] Create `GSP_Snowfield`.
+- [x] Create `GSSP_Snowfield`.
+- [x] Create `GSP_WetMudflat`.
+- [x] Create `GSSP_WetMudflat`.
+- [x] Make style families selectable from `GeneratedGround` without manual asset dragging for common profiles.
+- [x] Keep river corridor material response dependent on the parent ground, not on its own style state.
+- [ ] Create future style/profile pairs such as Rocky Ground, Mossy Ground, Dry Dust, or Fertile Soil only after the current authoring and feature contracts remain stable.
 - [ ] Add a demo comparison area or duplicate ground patch for visual checks.
 
 Acceptance:
 
-- selecting a different profile changes terrain identity without changing mesh geometry;
-- at least four terrain profiles read differently from the game camera;
-- shared shader/material architecture remains intact.
+- selecting a different surface family changes terrain identity without changing the ground material asset;
+- at least two terrain families are proven through the same style/profile architecture;
+- shared shader/material-property-block architecture remains intact;
+- future families can be added as assets before requiring new code.
 
 ### Patch 8 - Runtime State Design Stub
 
@@ -1588,3 +1669,576 @@ GeneratedGround
 ```
 
 Do not add dozens of hardcoded surface types indefinitely. When the second or third surface type is introduced, move from enum recipes to style-profile assets so new ground families can be authored without expanding `GeneratedGround.cs` into a preset registry.
+
+---
+
+## Patch J-L Implementation Update: Ground Visual Authoring and Style Profiles
+
+### Patch J — GeneratedGround material controls
+
+Patch J moved the normal ground visual authoring path from material-asset editing to the `GeneratedGround` component.
+
+Implemented direction:
+
+- `GeneratedGround` owns per-ground visual material controls.
+- The shared ground material remains a backend/default asset.
+- Ground visual values are applied through `MaterialPropertyBlock`.
+- River corridor renderers receive the resolved parent-ground property block instead of owning a separate ground style.
+- Visual-only control changes refresh material properties without requiring ground or corridor mesh regeneration.
+
+This established the correct renderer path:
+
+```text
+GeneratedGround resolves visual controls
+→ applies MaterialPropertyBlock to its renderer
+→ refreshes child StylizedRiver corridor material properties
+```
+
+Material duplication is intentionally avoided.
+
+### Patch K — Surface Type / Snowfield Variant bridge
+
+Patch K replaced the flat temporary `Ground Visual Preset` concept with an explicit hierarchy:
+
+```text
+Surface Type: Snowfield
+Snowfield Variant: Clean / Patchy / Dirty Thawing / Wind-Scoured / Custom
+```
+
+It also expanded snowfield variants from small value tweaks into fuller visual recipes controlling palette, semantic response, pixel/macro variation, wetness, frost, smoothness, and specular response.
+
+Patch K was a bridge, not the final architecture. Its enums made the hierarchy clearer, but hardcoded terrain families and hardcoded recipe switches would not scale to muddy, rocky, waterlogged, desert, or future feature-heavy surface families.
+
+### Patch L — Ground Surface Style Profile architecture
+
+Patch L introduces the asset-backed architecture that future ground families should use.
+
+The conceptual split is now:
+
+```text
+GroundSurfaceProfile
+  Semantic/mask-generation profile.
+  Controls generated surface-mask tendencies such as exposure,
+  damp/deposit, vegetation suitability, rocky/dry suitability,
+  snow eligibility, and rain absorption.
+
+GroundSurfaceStyleProfile
+  Visual surface family asset.
+  Owns a default GroundSurfaceProfile and a list of variant recipes.
+  Example: Snowfield.
+
+GroundSurfaceVariantRecipe
+  One named visual recipe inside a style profile.
+  Uses a stable id such as snowfield.clean or snowfield.dirty_thawing.
+  Owns GroundMaterialControls.
+
+GroundMaterialControls
+  Renderer/material response recipe.
+  Contains palette, pixel/macro variation, semantic response,
+  weather/finish, and shader response values.
+
+GeneratedGround
+  Resolver and per-object override owner.
+  Selects a GroundSurfaceStyleProfile and variant id, optionally overrides
+  the semantic profile and/or material controls, then pushes the resolved
+  result through MaterialPropertyBlock.
+```
+
+Current asset path:
+
+```text
+Assets/Game/Demo/Profiles/Ground/Styles/GSSP_Snowfield.asset
+```
+
+Current Snowfield variant ids:
+
+```text
+snowfield.clean
+snowfield.patchy
+snowfield.dirty_thawing
+snowfield.wind_scoured
+```
+
+The Inspector now treats style data as asset-owned by default:
+
+```text
+Surface Style Profile: Snowfield
+Surface Variant: Clean / Patchy / Dirty Thawing / Wind-Scoured
+Override Surface Profile: optional
+Advanced Material Overrides: optional local custom copy
+```
+
+Important behavior:
+
+- Selecting a variant uses the recipe from the style asset.
+- Advanced material overrides are local to the selected `GeneratedGround` object.
+- Enabling material override copies the currently resolved recipe first, so local edits start from the selected variant.
+- Existing Patch K enum data is retained only for migration and compatibility.
+- The active material recipe should no longer be hardcoded inside `GeneratedGround` for future styles.
+
+### Rules for future ground families
+
+Do not add future terrain families as hardcoded enums in `GeneratedGround`.
+
+Do not add large `switch` blocks for Mudflat, Rocky Ground, Desert, Waterlogged Ground, and similar families.
+
+Do not duplicate material assets per variant.
+
+Do not make river corridors own ground style state. They should continue to receive the resolved parent-ground renderer contract through material property blocks.
+
+Do not merge `GroundSurfaceProfile` and `GroundSurfaceStyleProfile` yet. The semantic mask-generation profile and the visual style family are related but not the same layer.
+
+The expected path for a new visual family is:
+
+```text
+Create a GroundSurfaceStyleProfile asset
+→ assign or create its default GroundSurfaceProfile
+→ add variant recipes
+→ only add code if a truly new shader/feature module is needed
+```
+
+### Next architecture step after Patch L
+
+The next scalable addition should be feature-module support inside style variants, not another hardcoded terrain-family branch.
+
+Potential future variant feature modules:
+
+- directional snow streaks;
+- melt patches;
+- pebble or scree scatter;
+- mud crust cracks;
+- wet pooled lowlands;
+- trampled path wear;
+- frosted rock dust.
+
+Each future feature should declare whether it is shader-only, mesh-mask driven, texture/atlas driven, or runtime-state driven, so styles only pay for the features they actually use.
+
+### Patch M — Surface Variant Feature Module Foundation
+
+Patch M adds the first feature-module layer inside the asset-backed ground style architecture.
+
+The important architectural change is that a `GroundSurfaceVariantRecipe` is no longer only a material-control preset. It can now own optional `GroundSurfaceFeatureRecipe` entries. This lets a variant define a small feature vocabulary without adding terrain-family branches to `GeneratedGround`.
+
+The new feature data types are:
+
+```text
+GroundSurfaceFeatureKind
+  Names reusable feature modules such as Directional Streaks, Melt Patches,
+  Pooled Wetness, Pebble Scatter, Mud Crust Cracks, Trampled Wear, and
+  Frosted Rock Dust.
+
+GroundSurfaceFeatureCostClass
+  Declares the broad cost bucket: Shader Only, Mesh Mask Driven,
+  Generated Texture, or Runtime State.
+
+GroundSurfaceFeatureRecipe
+  A per-variant feature entry containing kind, enabled state, cost class,
+  strength, scale, contrast, mask influence, direction, and seed offset.
+```
+
+Patch M intentionally implements only one renderable proof feature:
+
+```text
+Directional Streaks
+  Cost class: Shader Only
+  Owner: GroundSurfaceVariantRecipe
+  Resolver: GeneratedGround
+  Renderer path: MaterialPropertyBlock
+  Shader path: Pixel Ground Surface Lit
+```
+
+Directional Streaks exists because wind-scoured snow, sand, ash, and dust cannot be represented convincingly by colour and macro-noise sliders alone. The first implementation is deliberately cheap: it uses world-position noise, a stable direction vector, the existing pixel seed, and the selected variant's feature recipe. It does not allocate textures, add atlases, change generated mesh data, or create runtime state.
+
+The renderer contract added by Patch M is:
+
+```text
+_GroundFeatureMode
+_GroundFeatureStrength
+_GroundFeatureScale
+_GroundFeatureContrast
+_GroundFeatureMaskInfluence
+_GroundFeatureDirection
+_GroundFeatureSeed
+```
+
+`GeneratedGround` resolves the selected style variant, picks the first enabled shader-only feature, and pushes those values through the existing material-property-block path. If no shader-only feature is active, it writes neutral feature values. River corridor renderers remain style-agnostic and continue to receive the resolved parent-ground material contract through the same property block refresh path.
+
+Current Snowfield feature usage:
+
+```text
+Clean
+  Weak Directional Streaks, mostly masked to snow/exposure.
+
+Patchy
+  Mild Directional Streaks, still secondary to patch variation.
+
+Dirty Thawing
+  No directional streak feature in Patch M; its identity remains damp/melt-biased.
+
+Wind-Scoured
+  Strong Directional Streaks, broad scale, lower semantic masking.
+```
+
+Patch M does not implement melt patches, pebble scatter, mud cracks, trampled wear, or frosted rock dust yet. Pooled Wetness is implemented in Patch N as the second shader-only proof feature. Remaining kinds are valid feature kinds in the asset contract, but each should only become renderable when it has a concrete cost model and visual need.
+
+Rules after Patch M:
+
+- Do not add a new hardcoded enum branch to `GeneratedGround` for every future terrain family.
+- Do not add all features to every style at full runtime cost.
+- Do not add generated textures or atlases until a feature demonstrably needs them.
+- Do not make river corridors understand style names or feature kinds.
+- Keep feature recipes variant-owned and renderer application resolved by `GeneratedGround`.
+- Keep the material-property-block path as the final per-renderer contract.
+
+The next architectural proof should be a second style family or a second cheap feature, not a large feature explosion. A good next candidate is either a minimal Mudflat/Waterlogged style using existing material controls, or a shader-only Pooled Wetness feature if the snowfield/river-adjacent ground needs more expressive thaw/melt response.
+
+### Patch N — Second Surface Family Proof and Pooled Wetness
+
+Patch N proves that the Patch L/M architecture can add a second visual ground family without adding a hardcoded terrain-family branch to `GeneratedGround`.
+
+New assets:
+
+```text
+Assets/Game/Demo/Profiles/Ground/GSP_WetMudflat.asset
+Assets/Game/Demo/Profiles/Ground/Styles/GSSP_WetMudflat.asset
+```
+
+`GSP_WetMudflat` is the semantic/mask-generation profile for wet mud: high damp/deposit tendency, high rain absorption, low snow eligibility, and high footprint visibility. It reuses the existing generated ground vertex/UV2 mask contract; no new mesh channels are added.
+
+`GSSP_WetMudflat` is the visual style profile. Its variants are:
+
+```text
+mudflat.damp_mud
+  balanced damp mud, moderate pooled wetness.
+
+mudflat.waterlogged
+  darker, wetter, smoother, strongest pooled wetness.
+
+mudflat.trampled
+  higher contrast, compacted-looking mud response, moderate pooled wetness.
+
+mudflat.frozen_thaw
+  colder thawing mud, partial frost response, lighter pooled wetness.
+```
+
+Patch N also makes `Pooled Wetness` a renderable shader-only feature. It uses the same feature property-block contract added in Patch M:
+
+```text
+_GroundFeatureMode
+_GroundFeatureStrength
+_GroundFeatureScale
+_GroundFeatureContrast
+_GroundFeatureMaskInfluence
+_GroundFeatureDirection
+_GroundFeatureSeed
+```
+
+Feature mode values are currently:
+
+```text
+0 = no shader-only feature
+1 = Directional Streaks
+2 = Pooled Wetness
+```
+
+Pooled Wetness is deliberately cheap. It uses world-position procedural noise, damp/deposit mask, shore mask, rocky/dry suppression, the feature recipe seed, and the selected variant's strength/scale/contrast/mask influence. It darkens and damp-tints local pools and adds local smoothness/specular response in the ground shader. It does not allocate textures, add atlases, generate new mesh data, or create runtime state.
+
+The important architectural result is this workflow:
+
+```text
+new style family
+→ new GroundSurfaceProfile asset
+→ new GroundSurfaceStyleProfile asset
+→ variant recipes with material controls and feature recipes
+→ GeneratedGround resolves selected style/variant generically
+→ MaterialPropertyBlock pushes the resolved contract
+```
+
+No terrain-family switch was added to `GeneratedGround`. The river corridor remains style-agnostic and continues to receive the parent ground's resolved material-property block.
+
+Rules after Patch N:
+
+- Add future ground families as `GroundSurfaceStyleProfile` assets, not `GeneratedGround` enum branches.
+- Add future visual vocabulary as `GroundSurfaceFeatureRecipe` entries, with explicit cost class.
+- Keep shader-only features cheap and procedural until a feature proves it needs texture/atlas/state support.
+- Do not make river corridor code understand surface style names.
+- Do not polish every variant before proving the architecture; visual tuning belongs after the contract is stable.
+
+The next recommended step is authoring UX: create a compact custom editor for `GroundSurfaceStyleProfile` assets so variant IDs, material controls, and feature recipes are easier to edit and validate before many more styles are added.
+
+
+### Patch O — Generated Ground Surface Authoring UX
+
+Patch O moves the normal surface-family workflow to the top of the `GeneratedGround` Inspector.
+
+Patch L and Patch M made ground styles asset-backed, but Patch N exposed an authoring problem: users had to manually drag `GroundSurfaceStyleProfile` assets onto the generated ground object and scroll down to find the style and variant controls. That is acceptable for a technical proof, but not for regular level-authoring.
+
+Patch O keeps the asset-backed architecture and changes only the authoring path.
+
+The top of the `GeneratedGround` Inspector now begins with:
+
+```text
+Ground Surface
+  Surface Family
+  Surface Variant
+  Override Surface Profile
+  Resolved Surface Profile
+  Feature Summary
+  Advanced Style Asset
+```
+
+`Surface Family` is an editor-populated dropdown. The editor discovers `GroundSurfaceStyleProfile` assets from:
+
+```text
+Assets/Game/Demo/Profiles/Ground/Styles
+```
+
+and falls back to all project `GroundSurfaceStyleProfile` assets if none are found in that folder. This means normal authoring can switch between families such as `Snowfield` and `Wet Mudflat` without manually dragging assets.
+
+`Surface Variant` is populated from the selected style profile's variant recipes. Switching family assigns the chosen style asset, validates the stored variant id, and falls back to the first valid variant if the previous id does not exist in the new family.
+
+Patch O also adds top-level authoring validation warnings for:
+
+- missing style profile;
+- missing default surface profile on a style;
+- missing or empty variant lists;
+- stored variant id not present in the selected style;
+- duplicate variant ids inside a style asset.
+
+The raw style asset reference still exists under `Advanced Style Asset` for custom or externally stored profiles, but it is no longer the primary workflow.
+
+Patch O does not change rendering, shader behavior, feature recipes, material controls, river corridor logic, or generated mesh data. The architecture remains:
+
+```text
+GeneratedGround top-level authoring selection
+→ GroundSurfaceStyleProfile asset
+→ GroundSurfaceVariantRecipe
+→ optional local overrides
+→ MaterialPropertyBlock
+→ ground renderer and child river corridor renderers
+```
+
+Rules after Patch O:
+
+- Surface family and variant selection should remain at the top of `GeneratedGround`.
+- Do not make normal users manually drag style assets for common families.
+- Keep the raw style asset field as an advanced escape hatch.
+- Add new surface families as style assets discoverable by the editor dropdown.
+- Keep river corridors style-agnostic.
+- Keep visual tuning separate from authoring UX patches.
+
+The next recommended step is a dedicated `GroundSurfaceStyleProfile` editor if nested variant/material/feature editing remains awkward after the number of style assets grows. That editor should improve authoring of style assets themselves, not move style ownership back into `GeneratedGround`.
+
+
+### Patch P — Wet Mudflat Material Sanity Pass
+
+Patch P is a small visual sanity pass for the first non-snowfield style family created by Patch N.
+
+Patch N intentionally proved that `GroundSurfaceStyleProfile` assets can define a second surface family and that `Pooled Wetness` can run as a shader-only feature without textures, atlases, runtime state, or new mesh channels. The first values were deliberately broad proof values, and validation showed that Wet Mudflat was much too glossy: the darker variants read closer to oil, tar, polished plastic, or wet metal than mud.
+
+Patch P keeps the same architecture and changes only wet mud material response and Wet Mudflat recipe values.
+
+Changed response rules:
+
+```text
+Pooled Wetness shape contrast:
+  reduced from 1.0–4.25 to 0.85–3.10
+
+Pooled Wetness albedo darkening:
+  reduced from 0.20 + Strength × 0.28
+  to           0.12 + Strength × 0.18
+
+Pooled Wetness damp tint addition:
+  reduced from pooled × 0.58
+  to           pooled × 0.32
+
+Pooled Wetness albedo blend:
+  reduced from pooled × 0.88
+  to           pooled × 0.62
+
+Global wetness darkening:
+  reduced from Wetness × WetDarkenStrength × 0.36
+  to           Wetness × WetDarkenStrength × 0.26
+
+Smoothness contribution:
+  reduced from Smoothness + Wetness × WetSmoothnessBoost + PooledWetness × 0.24
+  to           Smoothness + Wetness × WetSmoothnessBoost × 0.55 + PooledWetness × 0.10
+
+Specular wetness multiplier:
+  reduced from 1.25 at full Wetness
+  to           1.08 at full Wetness
+
+Specular pooled-wetness multiplier:
+  reduced from 1.38 at full Pooled Wetness
+  to           1.12 at full Pooled Wetness
+```
+
+Wet Mudflat recipe values were also pulled back:
+
+```text
+Damp Mud:
+  lower Wetness, WetSmoothnessBoost, Smoothness, Specular Strength, and Pooled Wetness strength.
+
+Waterlogged:
+  remains the wettest mudflat variant, but no longer uses extreme global smoothness/specular values.
+
+Trampled:
+  remains higher-contrast and compacted, but its wet finish is reduced so it reads more like walked mud than oil.
+
+Frozen Thaw:
+  remains colder and partially frosted, with the weakest pooled-wetness finish among the wet variants.
+```
+
+Patch P does not change style-family discovery, variant selection, `GeneratedGround` authoring UX, river corridor refresh logic, mesh generation, semantic mask generation, material property names, feature asset contracts, textures, atlases, or runtime state.
+
+Rules after Patch P:
+
+- Wet Mudflat may still need major future shader/features work, but baseline variants should not be mirror-glossy.
+- Keep wet ground response mostly matte unless a specific feature intentionally requests stronger shine.
+- Do not solve future mud quality by raising global smoothness/specular back to extreme values.
+- Prefer local pooled-wetness breakup and semantic masks over full-surface reflectivity.
+
+The next recommended step is either a dedicated `GroundSurfaceStyleProfile` editor, if asset editing remains painful, or a focused new feature/family proof once Wet Mudflat is visually stable enough to stop distracting from architecture validation.
+
+
+
+### Patch Q — Wet Mudflat Matte Baseline Reset
+
+Patch Q follows Patch P after validation showed the opposite failure: after reducing the mirror/oil response, the Wet Mudflat variants still read like smooth plastic or playdough because the style was still trying to imply an entire muddy scene through full-surface colour, smoothness, and wetness.
+
+The architectural decision after this validation is important:
+
+```text
+Mud ground should not be globally reflective.
+The earth body should be mostly matte.
+Future reflectivity should come from explicit local features such as puddles, wet stones, water-filled ruts, potholes, and standing-water patches, not from making the whole terrain surface shiny.
+```
+
+Patch Q therefore resets Wet Mudflat to a conservative matte-earth baseline. The four variants are allowed to be somewhat samey for now. Their names describe future feature targets, not fully delivered final art.
+
+Changed recipe direction:
+
+```text
+Damp Mud:
+  ordinary damp brown earth, low wetness, very low specular.
+
+Waterlogged:
+  darker and more moisture-biased, but still mostly matte earth until explicit puddle/standing-water features exist.
+
+Trampled:
+  slightly darker, higher variation and contrast, but not glossy.
+
+Frozen Thaw:
+  colder and paler, with restrained frost and low wet finish.
+```
+
+Changed shader response:
+
+```text
+Pooled Wetness is now treated as a matte damp-earth breakup cue, not as a water/puddle substitute.
+Its smoothness and specular contributions are reduced to minimal values.
+```
+
+Rules after Patch Q:
+
+- Do not attempt to make final mud variants using only full-surface colour/smoothness/specular controls.
+- Keep baseline earth surfaces matte unless an explicit feature owns the local reflective surface.
+- Future waterlogged quality should come from features such as `StandingWaterPuddles`, water-filled ruts, potholes, debris scatter, and terrain/prop context.
+- It is acceptable for early Wet Mudflat variants to look similar if they remain plausible ground.
+
+
+### Patch R — Ground Plan Reconciliation and Style Profile Editor
+
+Patch R reconciles the ground roadmap with the architecture that now exists after Patches J through Q and adds a custom editor for `GroundSurfaceStyleProfile` assets.
+
+The documentation update records the current split between semantic surface profiles, visual style profiles, variant recipes, material controls, feature recipes, and the `GeneratedGround` resolver. It also replaces the old active roadmap with the current next-step roadmap: surface path/compaction authoring, trampled wear, runtime state, footprints, rain/wetness, grass integration, and mixed terrain blending.
+
+The `GroundSurfaceStyleProfile` editor makes style assets practical to edit before more surface families are added. It adds:
+
+- readable variant cards instead of a raw variant array as the primary editing view;
+- stable ID and display-name editing per variant;
+- compact feature summaries per variant;
+- material-control and feature foldouts;
+- Add Variant, Duplicate Variant, Remove Variant, and Add Feature actions;
+- warnings for missing default surface profiles;
+- warnings for empty or duplicate variant IDs;
+- warnings for enabled `None` features;
+- informational warnings for reserved feature kinds or cost classes that do not currently render.
+
+Patch R does not change visuals, shader behavior, generated mesh data, river corridor logic, material values, style-family discovery, textures, atlases, or runtime state.
+
+Rules after Patch R:
+
+- Keep `GeneratedGround` as the top-level level-authoring surface.
+- Keep `GroundSurfaceStyleProfile` as the style-family asset, edited through its custom editor.
+- Do not add new terrain families as `GeneratedGround` enum branches.
+- Do not infer final muddy/snowy/rocky detail from global material controls alone; add explicit feature modules when needed.
+- For path/compaction work, prefer visual-only masks where equally effective, but allow small safe height changes where the terrain feature justifies them.
+
+
+### Patch S — Ground Style Asset Live Refresh
+
+Patch S fixes an authoring gap introduced by the asset-backed style workflow. After Patch R, `GroundSurfaceStyleProfile` assets were much easier to edit, but editing a style asset did not immediately update open `GeneratedGround` instances that referenced that asset.
+
+The intended authoring behavior is now:
+
+```text
+Edit GSSP_Snowfield or GSSP_WetMudflat
+→ open GeneratedGround objects using that style refresh their resolved style state
+→ material and shader-only feature edits reapply MaterialPropertyBlock values
+→ child river corridors receive the same refreshed ground material contract
+```
+
+Patch S adds automatic delayed refresh from `GroundSurfaceStyleProfileEditor` whenever serialized style data changes, plus an explicit `Apply To Open Generated Grounds` button for manual refresh.
+
+The refresh path intentionally calls `GeneratedGround.RefreshSurfaceStyleState()` rather than rebuilding unconditionally. Material-control and shader-only feature edits should remain material-property-block updates. If the resolved semantic `GroundSurfaceProfile` changes and the generated ground is configured to regenerate on validation, the existing generation-signature path performs the necessary regeneration.
+
+Patch S does not change visuals, style assets, shader code, mesh data, river corridor code, textures, atlases, runtime state, or modifier behavior.
+
+### Patch T — Ground Modifier Surface/Height Contract
+
+Patch T separates two concepts that were previously coupled inside `GroundModifier`:
+
+```text
+Does this modifier change playable terrain height?
+Does this modifier write authored ground-surface meaning?
+```
+
+Before Patch T, `Flatten` was the only modifier mode that wrote the `UV2.x` compaction/path mask, and there was no way to author a path, damp/deposit boost, or standing-water/puddle potential without using an ordinary height modifier.
+
+Patch T adds:
+
+```text
+GroundModifierMode.None
+GroundModifierSurfaceEffectMode.AutoFromHeight
+GroundModifierSurfaceEffectMode.None
+GroundModifierSurfaceEffectMode.Custom
+Surface Compaction Strength
+Surface Damp/Deposit Strength
+Surface Standing Water Strength
+```
+
+The generated ground mask contract is now:
+
+```text
+Vertex Color R = tonal surface variation
+Vertex Color G = exposure / accumulation eligibility
+Vertex Color B = damp/deposit potential, including authored modifier boost
+Vertex Color A = vegetation suitability
+UV2.x = compaction/path/flatten influence
+UV2.y = shore influence
+UV2.z = rocky/dry patch
+UV2.w = authored standing-water / puddle potential
+```
+
+Legacy behavior is preserved: existing `Flatten` modifiers using `AutoFromHeight` continue to write compaction/path influence. `Raise` and `Lower` keep their height behavior.
+
+Authoring rules after Patch T:
+
+- Use `Mode = None` with `Surface Effect Mode = Custom` for pure visual/path/damp/standing-water masks.
+- Use `Flatten`, `Lower`, or `Raise` with `Surface Effect Mode = Custom` when a road, wagon rut, camp pad, drainage dip, or puddle basin needs both a small height change and explicit surface metadata.
+- Use `Surface Effect Mode = None` for physical height edits that should not imply path, damp, or standing-water surface meaning.
+- Keep denivelations small and combat-safe unless a later gameplay/navigation pass explicitly approves stronger terrain deformation.
+
+Patch T does not add final trampled rendering, puddle rendering, splines, footprints, runtime wetness, atlases, textures, or new mesh channels. It only establishes the static authored modifier contract that future features can read.
+

@@ -5,11 +5,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 {
     public enum GroundModifierMode
     {
-        Flatten,
-        Raise,
-        Lower
+        Flatten = 0,
+        Raise = 1,
+        Lower = 2,
+        None = 3
     }
-    
+
+    public enum GroundModifierSurfaceEffectMode
+    {
+        AutoFromHeight = 0,
+        None = 1,
+        Custom = 2
+    }
 
     public enum GroundModifierShape
     {
@@ -41,7 +48,27 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private GroundModifierPriority priority =
             GroundModifierPriority.Normal;
 
-        [Tooltip("Overall influence of this modifier.")]
+        [Tooltip("Controls whether this modifier writes authored surface metadata independently from height. Auto From Height preserves the legacy Flatten-to-compaction behavior.")]
+        [SerializeField]
+        private GroundModifierSurfaceEffectMode surfaceEffectMode =
+            GroundModifierSurfaceEffectMode.AutoFromHeight;
+
+        [Tooltip("Compaction/path mask strength written to UV2.x when Surface Effect Mode is Custom.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float surfaceCompactionStrength = 1f;
+
+        [Tooltip("Additional damp/deposit mask strength applied to Vertex Color B when Surface Effect Mode is Custom.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float surfaceDampDepositStrength;
+
+        [Tooltip("Authored standing-water or puddle-potential mask strength written to UV2.w when Surface Effect Mode is Custom.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float surfaceStandingWaterStrength;
+
+        [Tooltip("Overall height influence of this modifier.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float strength = 1f;
@@ -77,6 +104,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public GroundModifierMode Mode => mode;
         public GroundModifierShape Shape => shape;
         public GroundModifierPriority Priority => priority;
+        public GroundModifierSurfaceEffectMode SurfaceEffectMode => surfaceEffectMode;
+        public float SurfaceCompactionStrength => surfaceCompactionStrength;
+        public float SurfaceDampDepositStrength => surfaceDampDepositStrength;
+        public float SurfaceStandingWaterStrength => surfaceStandingWaterStrength;
         public float Strength => strength;
         public float BlendDistance => blendDistance;
         public float CircleRadius => circleRadius;
@@ -113,6 +144,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             blendDistance =
                 Mathf.Max(0f, blendDistance);
+
+            surfaceCompactionStrength =
+                Mathf.Clamp01(surfaceCompactionStrength);
+
+            surfaceDampDepositStrength =
+                Mathf.Clamp01(surfaceDampDepositStrength);
+
+            surfaceStandingWaterStrength =
+                Mathf.Clamp01(surfaceStandingWaterStrength);
 
             if (autoRegenerateParent)
             {
@@ -171,6 +211,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 mode,
                 shape,
                 PriorityValue,
+                surfaceEffectMode,
+                surfaceCompactionStrength,
+                surfaceDampDepositStrength,
+                surfaceStandingWaterStrength,
                 strength,
                 blendDistance,
                 new Vector2(
@@ -220,19 +264,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     Vector3.one);
 
             Gizmos.color =
-                mode switch
-                {
-                    GroundModifierMode.Flatten =>
-                        new Color(0.25f, 0.85f, 1f, 0.9f),
-
-                    GroundModifierMode.Raise =>
-                        new Color(0.35f, 1f, 0.35f, 0.9f),
-
-                    GroundModifierMode.Lower =>
-                        new Color(1f, 0.45f, 0.25f, 0.9f),
-
-                    _ => Color.white
-                };
+                ResolveGizmoColor();
 
             if (shape == GroundModifierShape.Circle)
             {
@@ -259,6 +291,46 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             Gizmos.matrix = oldMatrix;
             Gizmos.color = oldColor;
+        }
+
+        private Color ResolveGizmoColor()
+        {
+            if (mode == GroundModifierMode.None)
+            {
+                if (surfaceEffectMode == GroundModifierSurfaceEffectMode.Custom)
+                {
+                    if (surfaceStandingWaterStrength > 0.001f)
+                    {
+                        return new Color(0.20f, 0.75f, 1f, 0.9f);
+                    }
+
+                    if (surfaceDampDepositStrength > 0.001f)
+                    {
+                        return new Color(0.55f, 0.75f, 1f, 0.9f);
+                    }
+
+                    if (surfaceCompactionStrength > 0.001f)
+                    {
+                        return new Color(1f, 0.86f, 0.22f, 0.9f);
+                    }
+                }
+
+                return new Color(0.82f, 0.82f, 0.82f, 0.9f);
+            }
+
+            return mode switch
+            {
+                GroundModifierMode.Flatten =>
+                    new Color(0.25f, 0.85f, 1f, 0.9f),
+
+                GroundModifierMode.Raise =>
+                    new Color(0.35f, 1f, 0.35f, 0.9f),
+
+                GroundModifierMode.Lower =>
+                    new Color(1f, 0.45f, 0.25f, 0.9f),
+
+                _ => Color.white
+            };
         }
 
         private static void DrawWireCircle(float radius)
@@ -294,6 +366,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             GroundModifierMode mode,
             GroundModifierShape shape,
             int priority,
+            GroundModifierSurfaceEffectMode surfaceEffectMode,
+            float surfaceCompactionStrength,
+            float surfaceDampDepositStrength,
+            float surfaceStandingWaterStrength,
             float strength,
             float blendDistance,
             Vector2 centre,
@@ -308,6 +384,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Mode = mode;
             Shape = shape;
             Priority = priority;
+            SurfaceEffectMode = surfaceEffectMode;
+            SurfaceCompactionStrength =
+                Mathf.Clamp01(surfaceCompactionStrength);
+            SurfaceDampDepositStrength =
+                Mathf.Clamp01(surfaceDampDepositStrength);
+            SurfaceStandingWaterStrength =
+                Mathf.Clamp01(surfaceStandingWaterStrength);
             Strength = Mathf.Clamp01(strength);
             BlendDistance = Mathf.Max(0f, blendDistance);
             Centre = centre;
@@ -329,6 +412,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public GroundModifierMode Mode { get; }
         public GroundModifierShape Shape { get; }
         public int Priority { get; }
+        public GroundModifierSurfaceEffectMode SurfaceEffectMode { get; }
+        public float SurfaceCompactionStrength { get; }
+        public float SurfaceDampDepositStrength { get; }
+        public float SurfaceStandingWaterStrength { get; }
         public float Strength { get; }
         public float BlendDistance { get; }
         public Vector2 Centre { get; }

@@ -100,7 +100,9 @@ namespace ProgrammaticStylized3D.Rivers
         FoamEvaluatedShape = 7,
         FoamShapeDifference = 8,
         FoamShaderDetailProbe = 9,
-        FoamShaderDetailDifference = 10
+        FoamShaderDetailDifference = 10,
+        FoamFilmSource = 11,
+        FoamFilmSupport = 12
     }
 
 
@@ -1714,6 +1716,10 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.FoamShaderDetailProbe;
                 case (int)StylizedRiverFoamDebugView.FoamShaderDetailDifference:
                     return StylizedRiverFoamDebugView.FoamShaderDetailDifference;
+                case (int)StylizedRiverFoamDebugView.FoamFilmSource:
+                    return StylizedRiverFoamDebugView.FoamFilmSource;
+                case (int)StylizedRiverFoamDebugView.FoamFilmSupport:
+                    return StylizedRiverFoamDebugView.FoamFilmSupport;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }

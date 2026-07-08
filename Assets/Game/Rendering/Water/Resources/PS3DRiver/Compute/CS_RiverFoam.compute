@@ -14,6 +14,8 @@
 #pragma kernel MeasureTopologyMetrics
 #pragma kernel CommitPhaseTransport
 #pragma kernel SimulateFoam
+#pragma kernel BuildFoamFilmSource
+#pragma kernel BuildFoamFilmSupport
 #pragma kernel EvaluateFoamShape
 #pragma kernel ApplyBoundary
 #pragma target 5.0
@@ -106,6 +108,213 @@ float FoamEvaluateIntrinsicShapeMask(
     return saturate(material.presence * validFluid);
 }
 
+
+float FoamLoadFilmSource(int2 coordinate)
+{
+    int2 clamped = clamp(
+        coordinate,
+        int2(0, 0),
+        max(int2(0, 0), _FoamFilmDimensions - int2(1, 1)));
+    return saturate(_FoamFilmSourceRead.Load(int3(clamped, 0)));
+}
+
+
+void FoamResolveFilmBilinearCoordinates(
+    float2 uv,
+    out int2 baseCoordinate,
+    out int2 nextCoordinate,
+    out float2 blend)
+{
+    int2 safeDimensions = max(_FoamFilmDimensions, int2(1, 1));
+    float2 coordinate = saturate(uv) * (float2)safeDimensions - 0.5;
+    coordinate = clamp(
+        coordinate,
+        float2(0.0, 0.0),
+        max(float2(0.0, 0.0), (float2)safeDimensions - 1.0));
+
+    baseCoordinate = int2(floor(coordinate));
+    nextCoordinate = min(
+        baseCoordinate + int2(1, 1),
+        safeDimensions - int2(1, 1));
+    blend = frac(coordinate);
+}
+
+
+float FoamSampleFilmSourceBilinear(float2 uv)
+{
+    int2 baseCoordinate;
+    int2 nextCoordinate;
+    float2 blend;
+    FoamResolveFilmBilinearCoordinates(
+        uv,
+        baseCoordinate,
+        nextCoordinate,
+        blend);
+
+    float a = _FoamFilmSourceRead.Load(int3(baseCoordinate, 0));
+    float b = _FoamFilmSourceRead.Load(
+        int3(nextCoordinate.x, baseCoordinate.y, 0));
+    float c = _FoamFilmSourceRead.Load(
+        int3(baseCoordinate.x, nextCoordinate.y, 0));
+    float d = _FoamFilmSourceRead.Load(int3(nextCoordinate, 0));
+    return saturate(lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y));
+}
+
+
+float FoamSampleFilmSupportBilinear(float2 uv)
+{
+    int2 baseCoordinate;
+    int2 nextCoordinate;
+    float2 blend;
+    FoamResolveFilmBilinearCoordinates(
+        uv,
+        baseCoordinate,
+        nextCoordinate,
+        blend);
+
+    float a = _FoamFilmSupportRead.Load(int3(baseCoordinate, 0));
+    float b = _FoamFilmSupportRead.Load(
+        int3(nextCoordinate.x, baseCoordinate.y, 0));
+    float c = _FoamFilmSupportRead.Load(
+        int3(baseCoordinate.x, nextCoordinate.y, 0));
+    float d = _FoamFilmSupportRead.Load(int3(nextCoordinate, 0));
+    return saturate(lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y));
+}
+
+
+float FoamResolveMaterialPhaseOffsetUV()
+{
+    return _FoamFieldLength > 0.0001
+        ? _FoamPhaseTransportMetres / _FoamFieldLength
+        : 0.0;
+}
+
+
+float2 FoamResolveMaterialUVForDomainUV(float2 domainUV)
+{
+    // Layer C stores persistent material in residual-phase material space.
+    // Layer D products are written in stable river/domain space, so any
+    // material contribution must be sampled from the phase-corrected source
+    // coordinate before being mixed with domain-anchored support fields.
+    return float2(
+        saturate(domainUV.x - FoamResolveMaterialPhaseOffsetUV()),
+        saturate(domainUV.y));
+}
+
+
+FoamMaterialState FoamSampleMaterialStateForDomainUV(
+    float2 domainUV,
+    float validFluid)
+{
+    float2 materialUV = FoamResolveMaterialUVForDomainUV(domainUV);
+    float2 materialPixel = FoamUVToTexelCoordinate(
+        materialUV,
+        _FoamDimensions);
+    float4 packed = FoamClipPackedToValidFluid(
+        SampleStateBilinear(materialPixel),
+        validFluid);
+    return FoamDecodeMaterialState(packed);
+}
+
+
+float FoamResolveVisualFilmSourceAtDomainUV(float2 domainUV)
+{
+    if (!IsFoamUInsideDomain(domainUV.x))
+    {
+        return 0.0;
+    }
+
+    float2 domainPixel = FoamUVToTexelCoordinate(domainUV, _FoamDimensions);
+    float boundaryCoverage = SampleBoundaryCoverageBilinear(domainPixel);
+    float obstacleFootprint = SampleObstacleExclusionBilinear(domainPixel);
+    float validFluid = saturate(boundaryCoverage * (1.0 - obstacleFootprint));
+    FoamMaterialState material = FoamSampleMaterialStateForDomainUV(
+        domainUV,
+        validFluid);
+
+    float2 topologyPixel = FoamUVToTexelCoordinate(
+        domainUV,
+        _FoamTopologyDimensions);
+    float4 topologyState = SampleTopologyBilinear(topologyPixel);
+    float4 anchoredSources = SampleTopologySourcesBilinear(topologyPixel);
+
+    float materialBody = smoothstep(0.035, 0.36, material.presence) *
+        smoothstep(0.015, 0.070, material.remainingLife);
+    float anchoredSupport = max(
+        max(anchoredSources.r * 0.70, anchoredSources.g * 0.58),
+        anchoredSources.b * 0.82);
+    float structuralSupport = max(
+        topologyState.r * 0.36,
+        topologyState.g * 0.42);
+    float supportSource = max(anchoredSupport, structuralSupport);
+    float negativeSuppression = 1.0 -
+        smoothstep(0.22, 0.85, saturate(topologyState.b)) * 0.62;
+
+    // Layer D source is a domain-space visual-film permission field, not
+    // durable material. Persistent material is phase-corrected into domain
+    // space before mixing with Layer B support/contact fields so Film Source
+    // and Film Support do not scroll/snap with the material-cell residual.
+    float source = max(materialBody, supportSource * 0.78);
+    return saturate(source * validFluid * negativeSuppression);
+}
+
+
+[numthreads(8, 8, 1)]
+void BuildFoamFilmSource(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamFilmDimensions.x ||
+        dispatchId.y >= (uint)_FoamFilmDimensions.y)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(dispatchId.xy);
+    float2 uv = FoamTexelCentreUV(dispatchId.xy, _FoamFilmDimensions);
+    _FoamFilmSourceWrite[coordinate] = FoamResolveVisualFilmSourceAtDomainUV(uv);
+}
+
+
+[numthreads(8, 8, 1)]
+void BuildFoamFilmSupport(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamFilmDimensions.x ||
+        dispatchId.y >= (uint)_FoamFilmDimensions.y)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(dispatchId.xy);
+    int flowStep = _FoamFlowDirection >= 0.0 ? 1 : -1;
+    float centre = FoamLoadFilmSource(coordinate);
+
+    float along = centre * 0.28;
+    along += FoamLoadFilmSource(coordinate + int2(-flowStep, 0)) * 0.13;
+    along += FoamLoadFilmSource(coordinate + int2(flowStep, 0)) * 0.17;
+    along += FoamLoadFilmSource(coordinate + int2(-flowStep * 2, 0)) * 0.09;
+    along += FoamLoadFilmSource(coordinate + int2(flowStep * 2, 0)) * 0.12;
+    along += FoamLoadFilmSource(coordinate + int2(-flowStep * 3, 0)) * 0.05;
+    along += FoamLoadFilmSource(coordinate + int2(flowStep * 3, 0)) * 0.07;
+
+    float across = centre * 0.44;
+    across += FoamLoadFilmSource(coordinate + int2(0, -1)) * 0.19;
+    across += FoamLoadFilmSource(coordinate + int2(0, 1)) * 0.19;
+    across += FoamLoadFilmSource(coordinate + int2(0, -2)) * 0.07;
+    across += FoamLoadFilmSource(coordinate + int2(0, 2)) * 0.07;
+
+    float diagonal = 0.0;
+    diagonal += FoamLoadFilmSource(coordinate + int2(-flowStep, -1));
+    diagonal += FoamLoadFilmSource(coordinate + int2(-flowStep, 1));
+    diagonal += FoamLoadFilmSource(coordinate + int2(flowStep, -1));
+    diagonal += FoamLoadFilmSource(coordinate + int2(flowStep, 1));
+    diagonal *= 0.065;
+
+    float sheet = max(max(centre, along), max(across * 0.76, diagonal));
+    float bridge = smoothstep(0.18, 0.52, along) *
+        smoothstep(0.10, 0.42, across);
+    _FoamFilmSupportWrite[coordinate] = saturate(max(sheet, bridge * 0.72));
+}
+
+
 [numthreads(8, 8, 1)]
 void EvaluateFoamShape(uint3 dispatchId : SV_DispatchThreadID)
 {
@@ -130,18 +339,26 @@ void EvaluateFoamShape(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    // 4.11C.5.11B: Layer D is intentionally reset to a truthful
-    // pass-through baseline. Validation proved the 5.9z coordinate-warp
-    // changed values without useful visible structure, and the 5.11 local
-    // breakup probe exposed cell/ribbon artifacts. Future Layer D work should
-    // add macro film-support/bridge/pinch structure on top of this clean
-    // baseline; fine breakup belongs in Layer E shader composition.
-    float4 packed = FoamClipPackedToValidFluid(
-        _FoamStateRead.Load(int3(coordinate, 0)),
+    float2 domainUV = FoamTexelCentreUV(
+        uint2((uint)coordinate.x, (uint)coordinate.y),
+        _FoamDimensions);
+    FoamMaterialState material = FoamSampleMaterialStateForDomainUV(
+        domainUV,
         validFluid);
-    FoamMaterialState material = FoamDecodeMaterialState(packed);
-    _FoamShapeMaskWrite[coordinate] =
-        FoamEvaluateIntrinsicShapeMask(material, validFluid);
+    float baseShape = FoamEvaluateIntrinsicShapeMask(material, validFluid);
+
+    float filmSource = FoamSampleFilmSourceBilinear(domainUV);
+    float filmSupport = FoamSampleFilmSupportBilinear(domainUV);
+
+    float supportShape = smoothstep(0.18, 0.62, filmSupport);
+    float sourceShape = smoothstep(0.08, 0.42, filmSource);
+    float visualFilm = max(sourceShape * 0.72, supportShape * 0.88);
+
+    // Layer D now owns broad visual film structure only. It may widen/bridge a
+    // visible sheet through film-source/support fields, but it never writes back
+    // to FoamState. Fine sub-cell fragmentation remains Layer E shader work.
+    _FoamShapeMaskWrite[coordinate] = saturate(max(baseShape, visualFilm) *
+        validFluid);
 }
 
 [numthreads(8, 8, 1)]

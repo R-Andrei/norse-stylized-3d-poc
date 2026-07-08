@@ -34,6 +34,8 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.FindKernel("MeasureTopologyMetrics");
             phaseCommitKernel = computeShader.FindKernel("CommitPhaseTransport");
             simulateKernel = computeShader.FindKernel("SimulateFoam");
+            buildFilmSourceKernel = computeShader.FindKernel("BuildFoamFilmSource");
+            buildFilmSupportKernel = computeShader.FindKernel("BuildFoamFilmSupport");
             evaluateShapeKernel = computeShader.FindKernel("EvaluateFoamShape");
             applyBoundaryKernel = computeShader.FindKernel("ApplyBoundary");
         }
@@ -41,6 +43,10 @@ namespace ProgrammaticStylized3D.Rivers
         private void ConfigureSharedComputeParameters(float deltaTime)
         {
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetInts(
+                "_FoamFilmDimensions",
+                filmFieldWidth,
+                filmFieldHeight);
             computeShader.SetInts(
                 "_FoamTopologyDimensions",
                 structuralWidth,
@@ -239,22 +245,89 @@ namespace ProgrammaticStylized3D.Rivers
         private void DispatchEvaluateShape()
         {
             if (computeShader == null || currentState == null ||
-                shapeMaskTexture == null || boundaryTexture == null ||
-                obstacleExclusionTexture == null || evaluateShapeKernel < 0 ||
-                fieldWidth <= 0 || fieldHeight <= 0)
+                shapeMaskTexture == null || filmSourceTexture == null ||
+                filmSupportTexture == null || boundaryTexture == null ||
+                obstacleExclusionTexture == null || topologyTexture == null ||
+                topologySourcesTexture == null || metricBuffer == null ||
+                buildFilmSourceKernel < 0 || buildFilmSupportKernel < 0 ||
+                evaluateShapeKernel < 0 || fieldWidth <= 0 ||
+                fieldHeight <= 0 || filmFieldWidth <= 0 ||
+                filmFieldHeight <= 0)
             {
                 return;
             }
 
-            using var profilerScope = EvaluateShapeProfilerMarker.Auto();
-
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetInts(
+                "_FoamFilmDimensions",
+                filmFieldWidth,
+                filmFieldHeight);
+            computeShader.SetInts(
+                "_FoamTopologyDimensions",
+                structuralWidth,
+                structuralHeight);
             computeShader.SetFloat("_FoamValidLength", validFieldLength);
             computeShader.SetFloat(
                 "_FoamSimulationLength",
                 simulationFieldLength);
+            computeShader.SetFloat("_FoamFieldLength", fieldLength);
+            computeShader.SetFloat(
+                "_FoamPhaseTransportMetres",
+                foamPhaseTransportMetres);
+            computeShader.SetFloat("_FoamFlowDirection", river.FlowDirection);
             computeShader.SetInt("_FoamRangeStart", 0);
             computeShader.SetInt("_FoamRangeCount", fieldWidth);
+
+            using (BuildFilmSourceProfilerMarker.Auto())
+            {
+                computeShader.SetBuffer(
+                    buildFilmSourceKernel,
+                    "_FoamMetricRows",
+                    metricBuffer);
+                computeShader.SetTexture(
+                    buildFilmSourceKernel,
+                    "_FoamBoundary",
+                    boundaryTexture);
+                computeShader.SetTexture(
+                    buildFilmSourceKernel,
+                    "_FoamObstacleExclusionRead",
+                    obstacleExclusionTexture);
+                computeShader.SetTexture(
+                    buildFilmSourceKernel,
+                    "_FoamStateRead",
+                    currentState);
+                computeShader.SetTexture(
+                    buildFilmSourceKernel,
+                    "_FoamTopologyRead",
+                    topologyTexture);
+                computeShader.SetTexture(
+                    buildFilmSourceKernel,
+                    "_FoamTopologySourcesRead",
+                    topologySourcesTexture);
+                computeShader.SetTexture(
+                    buildFilmSourceKernel,
+                    "_FoamFilmSourceWrite",
+                    filmSourceTexture);
+
+                Dispatch(buildFilmSourceKernel, filmFieldWidth, filmFieldHeight);
+            }
+
+            using (BuildFilmSupportProfilerMarker.Auto())
+            {
+                computeShader.SetTexture(
+                    buildFilmSupportKernel,
+                    "_FoamFilmSourceRead",
+                    filmSourceTexture);
+                computeShader.SetTexture(
+                    buildFilmSupportKernel,
+                    "_FoamFilmSupportWrite",
+                    filmSupportTexture);
+
+                Dispatch(buildFilmSupportKernel, filmFieldWidth, filmFieldHeight);
+            }
+
+            using var profilerScope = EvaluateShapeProfilerMarker.Auto();
+
             computeShader.SetTexture(
                 evaluateShapeKernel,
                 "_FoamBoundary",
@@ -267,6 +340,14 @@ namespace ProgrammaticStylized3D.Rivers
                 evaluateShapeKernel,
                 "_FoamStateRead",
                 currentState);
+            computeShader.SetTexture(
+                evaluateShapeKernel,
+                "_FoamFilmSourceRead",
+                filmSourceTexture);
+            computeShader.SetTexture(
+                evaluateShapeKernel,
+                "_FoamFilmSupportRead",
+                filmSupportTexture);
             computeShader.SetTexture(
                 evaluateShapeKernel,
                 "_FoamShapeMaskWrite",

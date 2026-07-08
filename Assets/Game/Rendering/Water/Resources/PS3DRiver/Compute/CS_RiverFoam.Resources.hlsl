@@ -9,6 +9,10 @@
 RWTexture2D<float4> _FoamStateWrite;
 Texture2D<float4> _FoamStateRead;
 RWTexture2D<float> _FoamShapeMaskWrite;
+RWTexture2D<float> _FoamFilmSourceWrite;
+Texture2D<float> _FoamFilmSourceRead;
+RWTexture2D<float> _FoamFilmSupportWrite;
+Texture2D<float> _FoamFilmSupportRead;
 RWTexture2D<float4> _FoamBirthDebugWrite;
 RWStructuredBuffer<uint> _FoamBirthDebugCounters;
 Texture2D<float4> _FoamBoundary;
@@ -89,6 +93,7 @@ static const uint FoamMetricCount = 24u;
 RWByteAddressBuffer _FoamTopologyMetrics;
 
 int2 _FoamDimensions;
+int2 _FoamFilmDimensions;
 int2 _FoamTopologyDimensions;
 int2 _FoamTopologyTransitionDimensions;
 int2 _FoamMajorMaskDimensions;

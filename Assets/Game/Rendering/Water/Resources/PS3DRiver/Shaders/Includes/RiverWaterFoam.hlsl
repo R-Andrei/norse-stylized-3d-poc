@@ -166,7 +166,7 @@ float RiverWaterFoamEvaluateShaderLocalDetailProbe(
     float presence,
     float remainingLife,
     float materialPattern,
-    float2 materialUV,
+    float2 detailUV,
     float globalDistance,
     float lateralMetres,
     float renderTravelMetres,
@@ -183,13 +183,15 @@ float RiverWaterFoamEvaluateShaderLocalDetailProbe(
     float life = saturate(remainingLife);
     float damage = 1.0 - life;
     float seed = materialPattern * 61.37 +
-        RiverWaterFoamHash21(materialUV * float2(193.0, 257.0)) * 19.0 +
+        RiverWaterFoamHash21(detailUV * float2(193.0, 257.0)) * 19.0 +
         7.13;
 
-    // Use river metres, not foam-grid cells. This keeps the probe at the
-    // rendered-pixel/detail layer and avoids the long cell/ribbon artifacts
-    // that caused the 5.11 Layer D breakup probe to be retired.
-    float2 p = float2(globalDistance - renderTravelMetres, lateralMetres);
+    // Use stable river metres, not foam-grid cells or residual material UVs.
+    // This keeps the probe at the rendered-pixel/detail layer and prevents
+    // Layer E diagnostics from inheriting material-cell phase snap. Future
+    // final streak/detail motion should use its own smooth shader motion, not
+    // Layer C's residual transport coordinate.
+    float2 p = float2(globalDistance, lateralMetres);
     float slowTime = _Time.y * 0.055;
 
     float broad = RiverWaterFoamValueNoise(

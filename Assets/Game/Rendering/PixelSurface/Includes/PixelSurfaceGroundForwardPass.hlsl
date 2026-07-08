@@ -1,6 +1,114 @@
 #ifndef PS3D_PIXELSURFACEGROUNDFORWARDPASS_HLSL
 #define PS3D_PIXELSURFACEGROUNDFORWARDPASS_HLSL
 
+            bool PS3D_IsGroundFeatureMode(float expectedMode)
+            {
+                return abs(_GroundFeatureMode - expectedMode) < 0.25 &&
+                    _GroundFeatureStrength > 0.0001;
+            }
+
+            float ResolveGroundDirectionalStreakFeature(
+                Varyings input,
+                float exposureMask,
+                float dampDepositMask,
+                float rockyDryMask,
+                float contractMask)
+            {
+                if (!PS3D_IsGroundFeatureMode(1.0))
+                {
+                    return 0.0;
+                }
+
+                float2 direction = _GroundFeatureDirection.xy;
+
+                if (dot(direction, direction) < 0.0001)
+                {
+                    direction = float2(1.0, 0.0);
+                }
+
+                direction = normalize(direction);
+                float2 crossDirection = float2(-direction.y, direction.x);
+                float2 positionXZ = input.positionWS.xz;
+                float along = dot(positionXZ, direction);
+                float across = dot(positionXZ, crossDirection);
+                float scale = max(0.1, _GroundFeatureScale);
+                float seed = _PixelSeed * 0.017 + _GroundFeatureSeed * 0.071;
+
+                float lane = PS3D_ValueNoise31(
+                    float3(
+                        across / scale + seed,
+                        along / (scale * 7.5) - seed * 0.37,
+                        seed + 19.13));
+                float scrape = PS3D_ValueNoise31(
+                    float3(
+                        across / (scale * 0.38) - seed * 0.23,
+                        along / (scale * 14.0) + seed,
+                        seed + 41.71));
+                float combined = saturate(
+                    lane * 0.78 +
+                    scrape * 0.22);
+                float contrast = lerp(1.15, 3.8, saturate(_GroundFeatureContrast));
+                float signedFeature =
+                    (combined - 0.5) * contrast * saturate(_GroundFeatureStrength);
+                float semanticGate = saturate(
+                    exposureMask * 0.68 +
+                    rockyDryMask * 0.20 +
+                    dampDepositMask * 0.12);
+                float maskGate = lerp(
+                    1.0,
+                    semanticGate,
+                    saturate(_GroundFeatureMaskInfluence));
+
+                return clamp(
+                    signedFeature * maskGate * contractMask,
+                    -1.0,
+                    1.0);
+            }
+
+            float ResolveGroundPooledWetnessFeature(
+                Varyings input,
+                float dampDepositMask,
+                float shoreMask,
+                float rockyDryMask,
+                float contractMask)
+            {
+                if (!PS3D_IsGroundFeatureMode(2.0))
+                {
+                    return 0.0;
+                }
+
+                float scale = max(0.1, _GroundFeatureScale);
+                float seed = _PixelSeed * 0.019 + _GroundFeatureSeed * 0.083;
+                float2 positionXZ = input.positionWS.xz;
+                float broad = PS3D_ValueNoise31(
+                    float3(
+                        positionXZ.x / scale + seed,
+                        positionXZ.y / scale - seed * 0.41,
+                        seed + 61.37));
+                float detail = PS3D_ValueNoise31(
+                    float3(
+                        positionXZ.x / (scale * 0.42) - seed * 0.17,
+                        positionXZ.y / (scale * 0.42) + seed * 0.29,
+                        seed + 83.11));
+                float combined = saturate(broad * 0.74 + detail * 0.26);
+                float contrast = lerp(0.65, 2.40, saturate(_GroundFeatureContrast));
+                float poolShape = saturate((combined - 0.48) * contrast + 0.5);
+                float semanticGate = saturate(
+                    dampDepositMask * 0.70 +
+                    shoreMask * 0.45 +
+                    (1.0 - rockyDryMask) * 0.18);
+                float maskGate = lerp(
+                    1.0,
+                    semanticGate,
+                    saturate(_GroundFeatureMaskInfluence));
+
+                return saturate(
+                    poolShape *
+                    maskGate *
+                    saturate(_GroundFeatureStrength) *
+                    contractMask);
+            }
+
             half3 ResolvePixelGroundSurfaceColor(Varyings input)
             {
                 half4 baseSample =
@@ -81,6 +189,18 @@
                     groundRockyDry * max(0.0, _GroundRockyDryResponse));
                 float groundVegetationVisual = saturate(
                     groundVegetation * max(0.0, _GroundVegetationResponse));
+                float directionalFeature = ResolveGroundDirectionalStreakFeature(
+                    input,
+                    exposureMask,
+                    groundDampDeposit,
+                    groundRockyDry,
+                    contractMask);
+                float pooledWetnessFeature = ResolveGroundPooledWetnessFeature(
+                    input,
+                    groundDampDeposit,
+                    groundShore,
+                    groundRockyDry,
+                    contractMask);
                 float profileContrast =
                     max(0.0, _ProfileContrast) *
                     lerp(1.0, max(0.0, _FrostContrast), saturate(_FrostStrength));
@@ -99,7 +219,8 @@
                      dampPatch * (0.14 + _GroundDampDarkenStrength * 0.26) -
                      groundRockyDryVisual * 0.045 +
                      groundVegetationVisual * 0.030 +
-                     tonalSigned * 0.040 * _GroundPatchBlendStrength) *
+                     tonalSigned * 0.040 * _GroundPatchBlendStrength +
+                     directionalFeature * 0.10) *
                     profileContrast;
 
                 half3 albedo =
@@ -157,9 +278,33 @@
                     vegetationTarget,
                     (half)(groundVegetationVisual * 0.14 * patchBlend));
 
+                half3 featureTarget = PS3D_ApplyValuePreservingTint(
+                    albedo * (half)max(0.0, 1.0 + directionalFeature * 0.16),
+                    (half3)_FrostColor.rgb,
+                    saturate(_GroundFeatureStrength) * 0.34);
+                albedo = lerp(
+                    albedo,
+                    featureTarget,
+                    (half)(abs(directionalFeature) * 0.35));
+
+                half3 pooledWetnessTarget =
+                    albedo *
+                    (half)max(
+                        0.0,
+                        1.0 - pooledWetnessFeature *
+                        (0.08 + saturate(_GroundFeatureStrength) * 0.12));
+                pooledWetnessTarget = PS3D_ApplyValuePreservingTint(
+                    pooledWetnessTarget,
+                    (half3)_GroundDampTint.rgb,
+                    saturate(_GroundDampTintStrength + pooledWetnessFeature * 0.16));
+                albedo = lerp(
+                    albedo,
+                    pooledWetnessTarget,
+                    (half)(pooledWetnessFeature * 0.40));
+
                 float wetness = saturate(_Wetness);
                 float wetGlobalDarken =
-                    wetness * saturate(_WetDarkenStrength) * 0.36;
+                    wetness * saturate(_WetDarkenStrength) * 0.18;
                 albedo *= (half)max(0.0, 1.0 - wetGlobalDarken);
 
                 float exposureVisual =
@@ -215,11 +360,26 @@
                 return albedo * valueScale;
             }
 
-            half ResolveGroundProfileSmoothness()
+            half ResolveGroundProfileSmoothness(Varyings input)
             {
+                float contractMask =
+                    1.0 -
+                    step(
+                        0.995,
+                        min(
+                            min((float)input.color.r, (float)input.color.g),
+                            (float)input.color.b));
+                float pooledWetnessFeature = ResolveGroundPooledWetnessFeature(
+                    input,
+                    ResolveGroundDampDepositMask(input),
+                    ResolveGroundShoreMask(input),
+                    ResolveGroundRockyDryMask(input),
+                    contractMask);
+
                 return saturate(
                     (half)_Smoothness +
-                    (half)_Wetness * (half)_WetSmoothnessBoost +
+                    (half)_Wetness * (half)_WetSmoothnessBoost * 0.22h +
+                    (half)pooledWetnessFeature * 0.025h +
                     (half)_MonolithicFlatten *
                     (half)_MonolithicSmoothnessBoost -
                     (half)_FrostStrength * 0.06h);
@@ -244,22 +404,40 @@
                 return inputData;
             }
 
-            SurfaceData BuildSurfaceData(half3 albedo)
+            SurfaceData BuildSurfaceData(half3 albedo, Varyings input)
             {
+                float contractMask =
+                    1.0 -
+                    step(
+                        0.995,
+                        min(
+                            min((float)input.color.r, (float)input.color.g),
+                            (float)input.color.b));
+                float pooledWetnessFeature = ResolveGroundPooledWetnessFeature(
+                    input,
+                    ResolveGroundDampDepositMask(input),
+                    ResolveGroundShoreMask(input),
+                    ResolveGroundRockyDryMask(input),
+                    contractMask);
+
                 SurfaceData surfaceData = (SurfaceData)0;
                 surfaceData.albedo = albedo;
                 surfaceData.specular =
                     (half3)_SpecularStrength *
                     lerp(
                         1.0h,
-                        1.25h,
+                        1.025h,
                         saturate((half)_Wetness)) *
+                    lerp(
+                        1.0h,
+                        1.035h,
+                        saturate((half)pooledWetnessFeature)) *
                     lerp(
                         1.0h,
                         1.10h,
                         saturate((half)_MonolithicFlatten));
                 surfaceData.metallic = 0.0h;
-                surfaceData.smoothness = ResolveGroundProfileSmoothness();
+                surfaceData.smoothness = ResolveGroundProfileSmoothness(input);
                 surfaceData.normalTS = half3(0.0h, 0.0h, 1.0h);
                 surfaceData.emission = half3(0.0h, 0.0h, 0.0h);
                 surfaceData.occlusion = 1.0h;
@@ -308,7 +486,7 @@
                     normalWS);
 
                 InputData inputData = BuildInputData(input, normalWS);
-                SurfaceData surfaceData = BuildSurfaceData(albedo);
+                SurfaceData surfaceData = BuildSurfaceData(albedo, input);
                 half4 pbrColor = UniversalFragmentPBR(inputData, surfaceData);
 
                 half3 safeAlbedo = max(albedo, half3(0.001h, 0.001h, 0.001h));

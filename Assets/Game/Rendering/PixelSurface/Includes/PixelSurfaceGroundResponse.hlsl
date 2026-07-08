@@ -40,4 +40,9 @@
             {
                 return saturate(input.materialMasks.z);
             }
+
+            float ResolveGroundStandingWaterPotentialMask(Varyings input)
+            {
+                return saturate(input.materialMasks.w);
+            }
 #endif // PS3D_PIXELSURFACEGROUNDRESPONSE_HLSL

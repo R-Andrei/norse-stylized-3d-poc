@@ -137,7 +137,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public float RockyDry { get; }
 
         /// <summary>
-        /// UV2 W. Reserved for authored masks or secondary profile blending.
+        /// UV2 W. Authored standing-water or puddle-potential mask. Kept
+        /// under the historical ReservedSurfaceMask property name for
+        /// snapshot/API compatibility.
         /// </summary>
         public float ReservedSurfaceMask { get; }
 

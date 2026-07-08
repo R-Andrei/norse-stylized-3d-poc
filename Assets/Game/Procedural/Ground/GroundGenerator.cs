@@ -521,6 +521,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 GroundModifierSnapshot modifier =
                     modifiers[modifierIndex];
 
+                if (modifier.Mode == GroundModifierMode.None)
+                {
+                    continue;
+                }
+
                 for (int z = 0; z < resolution; z++)
                 {
                     float localZ =
@@ -575,6 +580,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                                 heights[index] -=
                                     modifier.HeightAmount *
                                     influence;
+                                break;
+
+                            case GroundModifierMode.None:
                                 break;
 
                             default:
@@ -913,6 +921,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             point,
                             modifiers);
 
+                    float dampDepositModifier =
+                        EvaluateDampDepositModifierInfluence(
+                            point,
+                            modifiers);
+
+                    float standingWaterPotential =
+                        EvaluateStandingWaterPotentialInfluence(
+                            point,
+                            modifiers);
+
                     float shore =
                         EvaluateShoreInfluence(
                             point,
@@ -970,6 +988,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
                     exposureRaw *= Mathf.Lerp(1f, 0.96f, shore * rainAbsorption);
                     exposureRaw *= Mathf.Lerp(1f, 0.92f, compaction);
+                    exposureRaw *= Mathf.Lerp(1f, 0.88f, dampDepositModifier);
+                    exposureRaw *= Mathf.Lerp(1f, 0.82f, standingWaterPotential);
                     exposureMasks[index] = Mathf.Clamp01(exposureRaw);
 
                     float dampDeposit =
@@ -980,9 +1000,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             depositPocket * 0.11f +
                             shore * 0.07f +
                             compaction * 0.08f +
+                            dampDepositModifier * 0.26f +
+                            standingWaterPotential * 0.20f +
                             dampBias * 0.13f);
 
                     dampDeposit *= Mathf.Lerp(0.78f, 1.14f, rainAbsorption);
+                    dampDeposit = Mathf.Clamp01(
+                        dampDeposit +
+                        dampDepositModifier * (1f - dampDeposit) * 0.42f +
+                        standingWaterPotential * (1f - dampDeposit) * 0.34f);
                     dampDepositMasks[index] = Mathf.Clamp01(dampDeposit);
 
                     float midMoisture =
@@ -996,6 +1022,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             broadPatch * vegetationBias * 0.14f);
 
                     vegetation *= Mathf.Lerp(1f, 0.65f, compaction);
+                    vegetation *= Mathf.Lerp(1f, 0.78f, dampDepositModifier);
+                    vegetation *= Mathf.Lerp(1f, 0.52f, standingWaterPotential);
                     vegetation *= Mathf.Lerp(1f, 0.84f, shore);
                     vegetation *= Mathf.Lerp(1f, 0.58f, rockyDry);
                     vegetationSuitabilityMasks[index] = Mathf.Clamp01(vegetation);
@@ -1008,13 +1036,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     // X = compaction/path/flatten influence
                     // Y = river/shore influence
                     // Z = rocky/dry secondary patch
-                    // W = reserved authored mask or secondary profile blend
+                    // W = authored standing-water/puddle potential
                     secondarySurfaceMasks[index] =
                         new Vector4(
                             Mathf.Clamp01(compaction),
                             Mathf.Clamp01(shore),
                             Mathf.Clamp01(rockyDry),
-                            0f);
+                            Mathf.Clamp01(standingWaterPotential));
                 }
             }
 
@@ -1195,6 +1223,37 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Vector2 point,
             IReadOnlyList<GroundModifierSnapshot> modifiers)
         {
+            return EvaluateModifierSurfaceInfluence(
+                point,
+                modifiers,
+                ModifierSurfaceChannel.Compaction);
+        }
+
+        private static float EvaluateDampDepositModifierInfluence(
+            Vector2 point,
+            IReadOnlyList<GroundModifierSnapshot> modifiers)
+        {
+            return EvaluateModifierSurfaceInfluence(
+                point,
+                modifiers,
+                ModifierSurfaceChannel.DampDeposit);
+        }
+
+        private static float EvaluateStandingWaterPotentialInfluence(
+            Vector2 point,
+            IReadOnlyList<GroundModifierSnapshot> modifiers)
+        {
+            return EvaluateModifierSurfaceInfluence(
+                point,
+                modifiers,
+                ModifierSurfaceChannel.StandingWater);
+        }
+
+        private static float EvaluateModifierSurfaceInfluence(
+            Vector2 point,
+            IReadOnlyList<GroundModifierSnapshot> modifiers,
+            ModifierSurfaceChannel channel)
+        {
             if (modifiers == null || modifiers.Count == 0)
             {
                 return 0f;
@@ -1206,7 +1265,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             {
                 GroundModifierSnapshot modifier = modifiers[index];
 
-                if (modifier.Mode != GroundModifierMode.Flatten)
+                float weight = modifier.EvaluateWeight(point);
+
+                if (weight <= 0f)
+                {
+                    continue;
+                }
+
+                float strength =
+                    ResolveModifierSurfaceStrength(
+                        modifier,
+                        channel);
+
+                if (strength <= 0f)
                 {
                     continue;
                 }
@@ -1214,10 +1285,45 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 influence =
                     Mathf.Max(
                         influence,
-                        modifier.EvaluateWeight(point) * modifier.Strength);
+                        weight * strength);
             }
 
             return Mathf.Clamp01(influence);
+        }
+
+        private static float ResolveModifierSurfaceStrength(
+            GroundModifierSnapshot modifier,
+            ModifierSurfaceChannel channel)
+        {
+            switch (modifier.SurfaceEffectMode)
+            {
+                case GroundModifierSurfaceEffectMode.AutoFromHeight:
+                    return channel == ModifierSurfaceChannel.Compaction &&
+                           modifier.Mode == GroundModifierMode.Flatten
+                        ? modifier.Strength
+                        : 0f;
+
+                case GroundModifierSurfaceEffectMode.Custom:
+                    return channel switch
+                    {
+                        ModifierSurfaceChannel.Compaction =>
+                            modifier.SurfaceCompactionStrength,
+
+                        ModifierSurfaceChannel.DampDeposit =>
+                            modifier.SurfaceDampDepositStrength,
+
+                        ModifierSurfaceChannel.StandingWater =>
+                            modifier.SurfaceStandingWaterStrength,
+
+                        _ => 0f
+                    };
+
+                case GroundModifierSurfaceEffectMode.None:
+                    return 0f;
+
+                default:
+                    return 0f;
+            }
         }
 
         private static float EvaluateShoreInfluence(
@@ -1348,7 +1454,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 FormatMaskStats("Vegetation", vegetationSuitabilityMasks) + "\n" +
                 FormatMaskStats("Compaction", secondarySurfaceMasks, 0) + "\n" +
                 FormatMaskStats("Shore", secondarySurfaceMasks, 1) + "\n" +
-                FormatMaskStats("RockyDry", secondarySurfaceMasks, 2);
+                FormatMaskStats("RockyDry", secondarySurfaceMasks, 2) + "\n" +
+                FormatMaskStats("StandingWater", secondarySurfaceMasks, 3);
         }
 
         private static string FormatMaskStats(
@@ -1456,6 +1563,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 sortedValues[lower],
                 sortedValues[upper],
                 t);
+        }
+
+        private enum ModifierSurfaceChannel
+        {
+            Compaction,
+            DampDeposit,
+            StandingWater
         }
 
         private readonly struct MaskStats

@@ -8,9 +8,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
     public sealed class GeneratedGroundEditor : UnityEditor.Editor
     {
         private SerializedProperty recipe;
+        private SerializedProperty surfaceStyleProfile;
+        private SerializedProperty surfaceVariantId;
+        private SerializedProperty overrideSurfaceProfile;
         private SerializedProperty surfaceProfile;
-        private SerializedProperty groundSurfaceType;
-        private SerializedProperty snowfieldVariant;
+        private SerializedProperty overrideMaterialControls;
         private SerializedProperty groundMaterialControls;
         private SerializedProperty regenerateOnValidate;
 
@@ -68,6 +70,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty specularStrength;
 
         private bool showMaterialControls;
+        private bool showStyleAssetDetails;
         private bool showAdvanced;
 
 
@@ -76,14 +79,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             recipe =
                 serializedObject.FindProperty("recipe");
 
+            surfaceStyleProfile =
+                serializedObject.FindProperty("surfaceStyleProfile");
+
+            surfaceVariantId =
+                serializedObject.FindProperty("surfaceVariantId");
+
+            overrideSurfaceProfile =
+                serializedObject.FindProperty("overrideSurfaceProfile");
+
             surfaceProfile =
                 serializedObject.FindProperty("surfaceProfile");
 
-            groundSurfaceType =
-                serializedObject.FindProperty("groundSurfaceType");
-
-            snowfieldVariant =
-                serializedObject.FindProperty("snowfieldVariant");
+            overrideMaterialControls =
+                serializedObject.FindProperty("overrideMaterialControls");
 
             groundMaterialControls =
                 serializedObject.FindProperty("groundMaterialControls");
@@ -253,6 +262,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         {
             serializedObject.Update();
 
+            DrawGroundSurfaceAuthoringSection();
             DrawGenerationSection();
             DrawPatchSection();
             DrawTransitionSection();
@@ -265,6 +275,236 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             EditorGUILayout.Space(10f);
             DrawActionButtons();
+        }
+
+        private void DrawGroundSurfaceAuthoringSection()
+        {
+            EditorGUILayout.LabelField(
+                "Ground Surface",
+                EditorStyles.boldLabel);
+
+            DrawSurfaceFamilyPopup();
+
+            GroundSurfaceStyleProfile style =
+                surfaceStyleProfile.objectReferenceValue as
+                    GroundSurfaceStyleProfile;
+
+            DrawSurfaceVariantPopup(style);
+            DrawStyleWarnings(style);
+            DrawSurfaceProfileOverride(style);
+            DrawResolvedFeatureSummary();
+            DrawStyleAssetDetails(style);
+        }
+
+        private void DrawSurfaceFamilyPopup()
+        {
+            GroundSurfaceStyleProfile[] styles =
+                LoadAvailableStyleProfiles();
+
+            if (styles.Length == 0)
+            {
+                EditorGUILayout.HelpBox(
+                    "No GroundSurfaceStyleProfile assets were found. Create or assign a style profile before choosing a family.",
+                    MessageType.Warning);
+
+                DrawManualSurfaceStyleField();
+                return;
+            }
+
+            GroundSurfaceStyleProfile current =
+                surfaceStyleProfile.objectReferenceValue as
+                    GroundSurfaceStyleProfile;
+
+            int selectedIndex = 0;
+            bool foundCurrent = false;
+
+            for (int index = 0; index < styles.Length; index++)
+            {
+                if (styles[index] == current)
+                {
+                    selectedIndex = index;
+                    foundCurrent = true;
+                    break;
+                }
+            }
+
+            if (current != null && !foundCurrent)
+            {
+                styles = AppendStyle(styles, current);
+                selectedIndex = styles.Length - 1;
+                foundCurrent = true;
+            }
+
+            GUIContent[] labels = new GUIContent[styles.Length];
+
+            for (int index = 0; index < styles.Length; index++)
+            {
+                GroundSurfaceStyleProfile style = styles[index];
+                labels[index] = new GUIContent(
+                    style != null ? style.DisplayName : "Missing Style");
+            }
+
+            EditorGUI.showMixedValue =
+                surfaceStyleProfile.hasMultipleDifferentValues;
+            EditorGUI.BeginChangeCheck();
+
+            int newSelectedIndex = EditorGUILayout.Popup(
+                new GUIContent(
+                    "Surface Family",
+                    "Top-level visual ground family. This assigns a GroundSurfaceStyleProfile asset without manual dragging."),
+                Mathf.Clamp(selectedIndex, 0, labels.Length - 1),
+                labels);
+
+            EditorGUI.showMixedValue = false;
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                GroundSurfaceStyleProfile selectedStyle =
+                    styles[Mathf.Clamp(
+                        newSelectedIndex,
+                        0,
+                        styles.Length - 1)];
+
+                serializedObject.ApplyModifiedProperties();
+                ApplyToTargets(
+                    "Select Ground Surface Family",
+                    ground => ground.SetSurfaceStyleProfile(selectedStyle));
+            }
+
+            if (current == null && !surfaceStyleProfile.hasMultipleDifferentValues)
+            {
+                EditorGUILayout.HelpBox(
+                    "No style is currently assigned. GeneratedGround will use the first valid discovered family after validation.",
+                    MessageType.Info);
+            }
+        }
+
+        private void DrawManualSurfaceStyleField()
+        {
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                surfaceStyleProfile,
+                new GUIContent(
+                    "Surface Style Profile",
+                    "Manual style asset fallback. Normal authoring should use the Surface Family dropdown when profiles are discoverable."));
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+                ApplyToTargets(
+                    "Change Ground Surface Style",
+                    ground => ground.RefreshSurfaceStyleState());
+            }
+        }
+
+        private void DrawStyleAssetDetails(
+            GroundSurfaceStyleProfile style)
+        {
+            showStyleAssetDetails = EditorGUILayout.Foldout(
+                showStyleAssetDetails,
+                "Advanced Style Asset",
+                true);
+
+            if (!showStyleAssetDetails)
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                surfaceStyleProfile,
+                new GUIContent(
+                    "Style Asset",
+                    "Direct asset reference for custom or externally stored style profiles."));
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+                ApplyToTargets(
+                    "Change Ground Surface Style",
+                    ground => ground.RefreshSurfaceStyleState());
+            }
+
+            if (style != null)
+            {
+                using (new EditorGUI.DisabledScope(true))
+                {
+                    EditorGUILayout.ObjectField(
+                        new GUIContent(
+                            "Resolved Style Asset",
+                            "The asset currently driving family and variant options."),
+                        style,
+                        typeof(GroundSurfaceStyleProfile),
+                        false);
+                }
+            }
+
+            EditorGUI.indentLevel--;
+        }
+
+        private void DrawStyleWarnings(
+            GroundSurfaceStyleProfile style)
+        {
+            if (style == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "Missing surface family. Assign or create a GroundSurfaceStyleProfile asset.",
+                    MessageType.Warning);
+                return;
+            }
+
+            if (style.DefaultSurfaceProfile == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "The selected surface family has no default GroundSurfaceProfile. Generation will fall back to the local override/profile if available.",
+                    MessageType.Warning);
+            }
+
+            if (style.Variants == null || style.Variants.Count == 0)
+            {
+                EditorGUILayout.HelpBox(
+                    "The selected surface family has no variants.",
+                    MessageType.Warning);
+                return;
+            }
+
+            bool selectedVariantFound = false;
+            string currentId = surfaceVariantId.stringValue;
+
+            for (int index = 0; index < style.Variants.Count; index++)
+            {
+                GroundSurfaceVariantRecipe variant = style.Variants[index];
+
+                if (variant == null || !variant.HasValidId)
+                {
+                    continue;
+                }
+
+                if (variant.Id == currentId)
+                {
+                    selectedVariantFound = true;
+                    break;
+                }
+            }
+
+            if (!selectedVariantFound &&
+                !surfaceVariantId.hasMultipleDifferentValues)
+            {
+                EditorGUILayout.HelpBox(
+                    "The stored variant id is not present in the selected family. The first valid variant will be used after validation.",
+                    MessageType.Warning);
+            }
+
+            string duplicateId = FindDuplicateVariantId(style);
+
+            if (!string.IsNullOrWhiteSpace(duplicateId))
+            {
+                EditorGUILayout.HelpBox(
+                    $"The selected family contains duplicate variant id '{duplicateId}'. Variant ids must be stable and unique.",
+                    MessageType.Warning);
+            }
         }
 
         private void DrawGenerationSection()
@@ -397,16 +637,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 "Surface",
                 EditorStyles.boldLabel);
 
-            EditorGUILayout.PropertyField(
-                surfaceProfile,
-                new GUIContent(
-                    "Surface Profile",
-                    "Optional terrain/material identity. Empty uses built-in mask defaults."));
-
             EditorGUILayout.HelpBox(
-                "Shape controls still define playable height. The surface profile " +
-                "biases generated material masks: R tonal variation, G exposure, " +
-                "B damp/deposit, A vegetation suitability.",
+                "Shape controls still define playable height. The selected surface family and variant resolve visual recipes at the top of the Inspector. This section controls the generated material masks: R tonal variation, G exposure, B damp/deposit, A vegetation suitability.",
                 MessageType.None);
 
             EditorGUILayout.Slider(
@@ -425,8 +657,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     "Material Variation",
                     "Overall strength of generated tonal variation written to vertex colour red."));
 
-            DrawGroundVisualControls();
-
             if (targets.Length == 1)
             {
                 GeneratedGround ground =
@@ -440,59 +670,173 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         MessageType.None);
                 }
             }
+
+            DrawMaterialOverrideControls();
         }
 
-        private void DrawGroundVisualControls()
+        private void DrawSurfaceVariantPopup(
+            GroundSurfaceStyleProfile style)
         {
-            EditorGUILayout.Space(6f);
-
-            EditorGUILayout.PropertyField(
-                groundSurfaceType,
-                new GUIContent(
-                    "Surface Type",
-                    "High-level ground visual family. Only Snowfield is implemented right now; future types can add their own variants."));
-
-            GroundSurfaceType selectedType =
-                (GroundSurfaceType)groundSurfaceType.enumValueIndex;
-
-            if (selectedType == GroundSurfaceType.Snowfield)
-            {
-                EditorGUI.showMixedValue =
-                    snowfieldVariant.hasMultipleDifferentValues;
-
-                GroundSnowfieldVariant currentVariant =
-                    (GroundSnowfieldVariant)snowfieldVariant.enumValueIndex;
-
-                EditorGUI.BeginChangeCheck();
-
-                GroundSnowfieldVariant selectedVariant =
-                    (GroundSnowfieldVariant)EditorGUILayout.EnumPopup(
-                        new GUIContent(
-                            "Snowfield Variant",
-                            "Applies a complete snowfield visual recipe to this generated ground."),
-                        currentVariant);
-
-                EditorGUI.showMixedValue = false;
-
-                if (EditorGUI.EndChangeCheck())
-                {
-                    ApplyToTargets(
-                        "Apply Snowfield Variant",
-                        ground => ground.ApplySnowfieldVariant(
-                            selectedVariant));
-                }
-            }
-            else
+            if (style == null)
             {
                 EditorGUILayout.HelpBox(
-                    "This surface type has no implemented variant set yet.",
+                    "Assign a Surface Style Profile to choose visual variants. " +
+                    "GeneratedGround will attempt to assign the Snowfield style automatically if it exists in the project.",
                     MessageType.Info);
+                return;
             }
 
+            if (style.Variants == null || style.Variants.Count == 0)
+            {
+                EditorGUILayout.HelpBox(
+                    "The selected Surface Style Profile has no valid variants.",
+                    MessageType.Warning);
+                return;
+            }
+
+            string currentId = surfaceVariantId.stringValue;
+            int validCount = 0;
+
+            for (int index = 0; index < style.Variants.Count; index++)
+            {
+                GroundSurfaceVariantRecipe variant = style.Variants[index];
+
+                if (variant != null && variant.HasValidId)
+                {
+                    validCount++;
+                }
+            }
+
+            if (validCount == 0)
+            {
+                EditorGUILayout.HelpBox(
+                    "The selected Surface Style Profile contains only empty or invalid variant ids.",
+                    MessageType.Warning);
+                return;
+            }
+
+            string[] ids = new string[validCount];
+            GUIContent[] labels = new GUIContent[validCount];
+            int writeIndex = 0;
+            int selectedIndex = 0;
+            for (int index = 0; index < style.Variants.Count; index++)
+            {
+                GroundSurfaceVariantRecipe variant = style.Variants[index];
+
+                if (variant == null || !variant.HasValidId)
+                {
+                    continue;
+                }
+
+                ids[writeIndex] = variant.Id;
+                labels[writeIndex] = new GUIContent(variant.DisplayName);
+
+                if (variant.Id == currentId)
+                {
+                    selectedIndex = writeIndex;
+                }
+
+                writeIndex++;
+            }
+
+            EditorGUI.showMixedValue =
+                surfaceVariantId.hasMultipleDifferentValues;
+            EditorGUI.BeginChangeCheck();
+
+            int newSelectedIndex = EditorGUILayout.Popup(
+                new GUIContent(
+                    "Surface Variant",
+                    "Variant recipe inside the selected surface style asset."),
+                selectedIndex,
+                labels);
+
+            EditorGUI.showMixedValue = false;
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                string selectedId = ids[Mathf.Clamp(
+                    newSelectedIndex,
+                    0,
+                    ids.Length - 1)];
+
+                serializedObject.ApplyModifiedProperties();
+                ApplyToTargets(
+                    "Select Ground Surface Variant",
+                    ground => ground.SetSurfaceVariant(selectedId));
+            }
+        }
+
+        private void DrawResolvedFeatureSummary()
+        {
+            if (targets.Length != 1)
+            {
+                return;
+            }
+
+            GeneratedGround ground = target as GeneratedGround;
+
+            if (ground == null)
+            {
+                return;
+            }
+
+            EditorGUILayout.HelpBox(
+                ground.ResolvedSurfaceFeatureSummary,
+                MessageType.None);
+        }
+
+        private void DrawSurfaceProfileOverride(
+            GroundSurfaceStyleProfile style)
+        {
+            EditorGUILayout.Space(3f);
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                overrideSurfaceProfile,
+                new GUIContent(
+                    "Override Surface Profile",
+                    "Use a local semantic/mask-generation profile instead of the style profile default."));
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+                ApplyToTargets(
+                    "Toggle Ground Surface Profile Override",
+                    ground => ground.RefreshSurfaceStyleState());
+            }
+
+            if (overrideSurfaceProfile.hasMultipleDifferentValues ||
+                overrideSurfaceProfile.boolValue)
+            {
+                EditorGUILayout.PropertyField(
+                    surfaceProfile,
+                    new GUIContent(
+                        "Surface Profile Override",
+                        "Local semantic/mask-generation profile used by this generated ground."));
+                return;
+            }
+
+            using (new EditorGUI.DisabledScope(true))
+            {
+                Object defaultProfile =
+                    style != null ? style.DefaultSurfaceProfile : null;
+
+                EditorGUILayout.ObjectField(
+                    new GUIContent(
+                        "Resolved Surface Profile",
+                        "Semantic/mask-generation profile inherited from the selected style."),
+                    defaultProfile,
+                    typeof(GroundSurfaceProfile),
+                    false);
+            }
+        }
+
+        private void DrawMaterialOverrideControls()
+        {
             showMaterialControls =
                 EditorGUILayout.Foldout(
                     showMaterialControls,
-                    "Advanced Material Controls",
+                    "Advanced Material Overrides",
                     true);
 
             if (!showMaterialControls)
@@ -501,6 +845,52 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             }
 
             EditorGUI.indentLevel++;
+
+            if (overrideMaterialControls.hasMultipleDifferentValues)
+            {
+                EditorGUILayout.PropertyField(
+                    overrideMaterialControls,
+                    new GUIContent("Override Material Controls"));
+            }
+            else
+            {
+                EditorGUI.BeginChangeCheck();
+
+                bool enabled = EditorGUILayout.Toggle(
+                    new GUIContent(
+                        "Override Material Controls",
+                        "Use a local material-control recipe instead of the selected style variant."),
+                    overrideMaterialControls.boolValue);
+
+                if (EditorGUI.EndChangeCheck())
+                {
+                    serializedObject.ApplyModifiedProperties();
+
+                    if (enabled)
+                    {
+                        ApplyToTargets(
+                            "Enable Ground Material Override",
+                            ground => ground.EnableMaterialControlOverrideFromResolved());
+                    }
+                    else
+                    {
+                        ApplyToTargets(
+                            "Disable Ground Material Override",
+                            ground => ground.DisableMaterialControlOverride());
+                    }
+                }
+            }
+
+            if (!overrideMaterialControls.hasMultipleDifferentValues &&
+                !overrideMaterialControls.boolValue)
+            {
+                EditorGUILayout.HelpBox(
+                    "Using the selected style variant recipe. Enable Override Material Controls to create a local custom copy.",
+                    MessageType.None);
+                EditorGUI.indentLevel--;
+                return;
+            }
+
             EditorGUI.BeginChangeCheck();
 
             DrawMaterialSubsection(
@@ -683,6 +1073,96 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             }
         }
 
+        private static GroundSurfaceStyleProfile[] LoadAvailableStyleProfiles()
+        {
+            string[] searchFolders = { "Assets/Game/Demo/Profiles/Ground/Styles" };
+            string[] guids = AssetDatabase.FindAssets(
+                "t:GroundSurfaceStyleProfile",
+                searchFolders);
+
+            if (guids == null || guids.Length == 0)
+            {
+                guids = AssetDatabase.FindAssets(
+                    "t:GroundSurfaceStyleProfile");
+            }
+
+            if (guids == null || guids.Length == 0)
+            {
+                return new GroundSurfaceStyleProfile[0];
+            }
+
+            System.Collections.Generic.List<GroundSurfaceStyleProfile> styles =
+                new System.Collections.Generic.List<GroundSurfaceStyleProfile>();
+
+            for (int index = 0; index < guids.Length; index++)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guids[index]);
+                GroundSurfaceStyleProfile style =
+                    AssetDatabase.LoadAssetAtPath<GroundSurfaceStyleProfile>(
+                        path);
+
+                if (style == null || styles.Contains(style))
+                {
+                    continue;
+                }
+
+                styles.Add(style);
+            }
+
+            styles.Sort((left, right) =>
+                string.Compare(
+                    left != null ? left.DisplayName : string.Empty,
+                    right != null ? right.DisplayName : string.Empty,
+                    System.StringComparison.OrdinalIgnoreCase));
+
+            return styles.ToArray();
+        }
+
+        private static GroundSurfaceStyleProfile[] AppendStyle(
+            GroundSurfaceStyleProfile[] styles,
+            GroundSurfaceStyleProfile style)
+        {
+            GroundSurfaceStyleProfile[] expanded =
+                new GroundSurfaceStyleProfile[styles.Length + 1];
+
+            for (int index = 0; index < styles.Length; index++)
+            {
+                expanded[index] = styles[index];
+            }
+
+            expanded[styles.Length] = style;
+            return expanded;
+        }
+
+        private static string FindDuplicateVariantId(
+            GroundSurfaceStyleProfile style)
+        {
+            if (style == null || style.Variants == null)
+            {
+                return null;
+            }
+
+            System.Collections.Generic.HashSet<string> seen =
+                new System.Collections.Generic.HashSet<string>();
+
+            for (int index = 0; index < style.Variants.Count; index++)
+            {
+                GroundSurfaceVariantRecipe variant = style.Variants[index];
+
+                if (variant == null || !variant.HasValidId)
+                {
+                    continue;
+                }
+
+                if (!seen.Add(variant.Id))
+                {
+                    return variant.Id;
+                }
+            }
+
+            return null;
+        }
+
         private void ApplyToTargets(
             string undoName,
             GroundAction action)
@@ -715,171 +1195,4 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             GeneratedGround ground);
     }
 
-    [CustomEditor(typeof(GroundModifier))]
-    [CanEditMultipleObjects]
-    internal sealed class GroundModifierEditor :
-        UnityEditor.Editor
-    {
-        private SerializedProperty mode;
-        private SerializedProperty shape;
-        private SerializedProperty priority;
-        private SerializedProperty strength;
-        private SerializedProperty blendDistance;
-        private SerializedProperty circleRadius;
-        private SerializedProperty boxSize;
-        private SerializedProperty heightAmount;
-        private SerializedProperty preserveDetail;
-        private SerializedProperty autoRegenerateParent;
-
-        private void OnEnable()
-        {
-            mode =
-                serializedObject.FindProperty("mode");
-
-            shape =
-                serializedObject.FindProperty("shape");
-
-            priority =
-                serializedObject.FindProperty("priority");
-
-            strength =
-                serializedObject.FindProperty("strength");
-
-            blendDistance =
-                serializedObject.FindProperty(
-                    "blendDistance");
-
-            circleRadius =
-                serializedObject.FindProperty(
-                    "circleRadius");
-
-            boxSize =
-                serializedObject.FindProperty("boxSize");
-
-            heightAmount =
-                serializedObject.FindProperty(
-                    "heightAmount");
-
-            preserveDetail =
-                serializedObject.FindProperty(
-                    "preserveDetail");
-
-            autoRegenerateParent =
-                serializedObject.FindProperty(
-                    "autoRegenerateParent");
-        }
-
-        public override void OnInspectorGUI()
-        {
-            serializedObject.Update();
-
-            EditorGUILayout.LabelField(
-                "Influence",
-                EditorStyles.boldLabel);
-
-            EditorGUILayout.PropertyField(mode);
-            EditorGUILayout.PropertyField(shape);
-            EditorGUILayout.PropertyField(priority);
-
-            EditorGUILayout.Slider(
-                strength,
-                0f,
-                1f,
-                new GUIContent("Strength"));
-
-            EditorGUILayout.Slider(
-                blendDistance,
-                0f,
-                20f,
-                new GUIContent("Blend Distance"));
-
-            EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField(
-                "Shape",
-                EditorStyles.boldLabel);
-
-            GroundModifierShape selectedShape =
-                (GroundModifierShape)shape.enumValueIndex;
-
-            if (selectedShape ==
-                GroundModifierShape.Circle)
-            {
-                EditorGUILayout.Slider(
-                    circleRadius,
-                    0.25f,
-                    40f,
-                    new GUIContent("Radius"));
-            }
-            else
-            {
-                EditorGUILayout.PropertyField(
-                    boxSize,
-                    new GUIContent("Box Size"));
-            }
-
-            GroundModifierMode selectedMode =
-                (GroundModifierMode)mode.enumValueIndex;
-
-            EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField(
-                "Mode Settings",
-                EditorStyles.boldLabel);
-
-            if (selectedMode ==
-                GroundModifierMode.Flatten)
-            {
-                EditorGUILayout.Slider(
-                    preserveDetail,
-                    0f,
-                    1f,
-                    new GUIContent(
-                        "Preserve Detail"));
-
-                EditorGUILayout.HelpBox(
-                    "The modifier Transform Y position is the " +
-                    "flatten target height.",
-                    MessageType.Info);
-            }
-            else
-            {
-                EditorGUILayout.Slider(
-                    heightAmount,
-                    0f,
-                    12f,
-                    new GUIContent(
-                        selectedMode ==
-                        GroundModifierMode.Raise
-                            ? "Raise Amount"
-                            : "Lower Amount"));
-            }
-
-            EditorGUILayout.Space(8f);
-            EditorGUILayout.PropertyField(
-                autoRegenerateParent,
-                new GUIContent(
-                    "Live Parent Regeneration"));
-
-            serializedObject.ApplyModifiedProperties();
-
-            if (GUILayout.Button(
-                    "Regenerate Parent Ground"))
-            {
-                for (int i = 0; i < targets.Length; i++)
-                {
-                    GroundModifier modifier =
-                        targets[i] as GroundModifier;
-
-                    if (modifier == null)
-                    {
-                        continue;
-                    }
-
-                    modifier.RegenerateParentGround();
-                    EditorUtility.SetDirty(modifier);
-                }
-
-                SceneView.RepaintAll();
-            }
-        }
-    }
 }

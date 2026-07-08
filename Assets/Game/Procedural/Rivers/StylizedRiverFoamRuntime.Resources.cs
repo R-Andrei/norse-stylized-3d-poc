@@ -74,6 +74,10 @@ namespace ProgrammaticStylized3D.Rivers
                 currentState != null &&
                 shapeMaskTexture != null &&
                 shapeMaskTexture.IsCreated() &&
+                filmSourceTexture != null &&
+                filmSourceTexture.IsCreated() &&
+                filmSupportTexture != null &&
+                filmSupportTexture.IsCreated() &&
                 topologyTexture != null &&
                 topologySourcesTexture != null &&
                 topologyGeneratedTexture != null &&
@@ -181,6 +185,10 @@ namespace ProgrammaticStylized3D.Rivers
                         stateB = CreateFieldTexture("PS3D_RiverFoam_B");
                         shapeMaskTexture = CreateShapeMaskTexture(
                             "PS3D_RiverFoam_ShapeMask");
+                        filmSourceTexture = CreateFilmTexture(
+                            "PS3D_RiverFoam_FilmSource");
+                        filmSupportTexture = CreateFilmTexture(
+                            "PS3D_RiverFoam_FilmSupport");
                     }
 
                     initializationPhase =
@@ -432,6 +440,8 @@ namespace ProgrammaticStylized3D.Rivers
                         DispatchClear(stateA, 0, fieldWidth);
                         DispatchClear(stateB, 0, fieldWidth);
                         ClearRenderTexture(shapeMaskTexture);
+                        ClearRenderTexture(filmSourceTexture);
+                        ClearRenderTexture(filmSupportTexture);
                     }
 
                     initializationPhase =
@@ -479,6 +489,8 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             fieldHeight = desiredStructuralResolution;
+            filmFieldWidth = Mathf.Max(1, Mathf.CeilToInt(fieldWidth * 0.5f));
+            filmFieldHeight = Mathf.Max(1, Mathf.CeilToInt(fieldHeight * 0.5f));
 
             // Topology uses the same structural grid as persistent material so
             // narrow structures are not authored on a coarser
@@ -737,6 +749,27 @@ namespace ProgrammaticStylized3D.Rivers
             return texture;
         }
 
+        private RenderTexture CreateFilmTexture(string textureName)
+        {
+            RenderTexture texture = new RenderTexture(
+                filmFieldWidth,
+                filmFieldHeight,
+                0,
+                RenderTextureFormat.RHalf,
+                RenderTextureReadWrite.Linear)
+            {
+                name = textureName,
+                enableRandomWrite = true,
+                useMipMap = false,
+                autoGenerateMips = false,
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+            texture.Create();
+            return texture;
+        }
+
 
         private RenderTexture CreateStructuralTexture(string textureName)
         {
@@ -916,6 +949,8 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseTexture(ref stateA);
             ReleaseTexture(ref stateB);
             ReleaseTexture(ref shapeMaskTexture);
+            ReleaseTexture(ref filmSourceTexture);
+            ReleaseTexture(ref filmSupportTexture);
             ReleaseProgressiveBirthDiagnosticResources();
             ReleaseTexture(ref topologyTexture);
             ReleaseTexture(ref topologySourcesTexture);
@@ -1056,10 +1091,14 @@ namespace ProgrammaticStylized3D.Rivers
             measureTopologyMetricsKernel = -1;
             phaseCommitKernel = -1;
             simulateKernel = -1;
+            buildFilmSourceKernel = -1;
+            buildFilmSupportKernel = -1;
             evaluateShapeKernel = -1;
             applyBoundaryKernel = -1;
             fieldWidth = 0;
             fieldHeight = 0;
+            filmFieldWidth = 0;
+            filmFieldHeight = 0;
             structuralWidth = 0;
             structuralHeight = 0;
             chunkCount = 0;

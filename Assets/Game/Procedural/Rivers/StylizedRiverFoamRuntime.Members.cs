@@ -21,6 +21,8 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture currentState;
         private RenderTexture writeState;
         private RenderTexture shapeMaskTexture;
+        private RenderTexture filmSourceTexture;
+        private RenderTexture filmSupportTexture;
         private RenderTexture topologyTexture;
         private RenderTexture topologySourcesTexture;
         private RenderTexture topologyGeneratedTexture;
@@ -345,6 +347,8 @@ namespace ProgrammaticStylized3D.Rivers
         private int domainVersion = -1;
         private int fieldWidth;
         private int fieldHeight;
+        private int filmFieldWidth;
+        private int filmFieldHeight;
         private int chunkCount;
         private int resolutionPerChunk;
         private int structuralWidth;
@@ -397,6 +401,8 @@ namespace ProgrammaticStylized3D.Rivers
         private int measureTopologyMetricsKernel = -1;
         private int phaseCommitKernel = -1;
         private int simulateKernel = -1;
+        private int buildFilmSourceKernel = -1;
+        private int buildFilmSupportKernel = -1;
         private int evaluateShapeKernel = -1;
         private int applyBoundaryKernel = -1;
         private int obstacleGeometryVersion = -1;

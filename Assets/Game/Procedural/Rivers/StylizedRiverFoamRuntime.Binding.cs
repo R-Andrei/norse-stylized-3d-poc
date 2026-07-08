@@ -37,6 +37,8 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(FoamPreviousId, snapshot.PreviousState);
             propertyBlock.SetTexture(FoamCurrentId, snapshot.CurrentState);
             propertyBlock.SetTexture(FoamShapeMaskId, snapshot.CurrentState);
+            propertyBlock.SetTexture(FoamFilmSourceId, Texture2D.blackTexture);
+            propertyBlock.SetTexture(FoamFilmSupportId, Texture2D.blackTexture);
             propertyBlock.SetTexture(
                 FoamBirthDebugId,
                 ResolveBoundTexture(progressiveBirthDebugTexture));
@@ -90,6 +92,12 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamShapeMaskId,
                 ResolveBoundTexture(shapeMaskTexture));
             propertyBlock.SetTexture(
+                FoamFilmSourceId,
+                ResolveBoundTexture(filmSourceTexture));
+            propertyBlock.SetTexture(
+                FoamFilmSupportId,
+                ResolveBoundTexture(filmSupportTexture));
+            propertyBlock.SetTexture(
                 FoamBirthDebugId,
                 ResolveBoundTexture(progressiveBirthDebugTexture));
             propertyBlock.SetTexture(
@@ -140,6 +148,8 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(FoamPreviousId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamCurrentId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamShapeMaskId, Texture2D.blackTexture);
+            propertyBlock.SetTexture(FoamFilmSourceId, Texture2D.blackTexture);
+            propertyBlock.SetTexture(FoamFilmSupportId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamBirthDebugId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamTopologyId, Texture2D.blackTexture);
             propertyBlock.SetTexture(

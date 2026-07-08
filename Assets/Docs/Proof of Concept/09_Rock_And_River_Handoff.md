@@ -1416,3 +1416,24 @@ Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.
 
 Next decision after validation: accept, tune once, or reject Layer E local detail. Regardless of that result, broad inspiration-river sheet/contact/bridge behavior still requires the future low-res Layer D Film Source / Film Support system.
 
+
+
+## Addendum — River Foam 4.11C.5.13 Low-Resolution Layer D Film Source / Film Support
+
+After the Layer E shader-detail proof, `4.11C.5.13` adds the first real structural Layer D helper fields. `_FoamFilmSource` is a half-resolution visual-film source/permission field built from persistent material and external support/contact fields. `_FoamFilmSupport` is a half-resolution directional spread field intended to create broad sheet/contact/bridge support without pocket IDs, connected components, or wide full-resolution neighbourhood classifiers.
+
+`EvaluateFoamShape` now combines Persistent Presence with Film Source/Support into `_FoamShapeMask`. This remains a visual product only. Final Foam is still disconnected, and no durable material state is modified by Layer D.
+
+When continuing work, validate the four relevant debug views first: `Material Presence`, `Foam Film Source`, `Foam Film Support`, and `Foam Evaluated Shape`. Use `Foam Shape Difference` to confirm where Layer D adds or removes coverage compared with raw Material Presence.
+
+## Addendum — River Foam 4.11C.5.13B Layer D Domain-Space Sampling Fix
+
+If continuing river foam work from this point, keep this coordinate rule in mind:
+
+```text
+FoamState = material-space persistent truth.
+Film Source / Film Support / _FoamShapeMask = domain-space visual products.
+Layer D reads FoamState through domainUV - phaseTransport / fieldLength, but writes/samples its own products in domainUV / fieldUV.
+```
+
+This was introduced because the first 5.13 validation showed Film Source, Film Support, Evaluated Shape, and Shape Difference stuttering with the same rhythm as the material cell grid. The material cell grid may still move/snap in its own debug view; that is expected. Layer D visual products should not inherit that movement.

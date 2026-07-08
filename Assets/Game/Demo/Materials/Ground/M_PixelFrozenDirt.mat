@@ -25,7 +25,8 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
-  m_InvalidKeywords: []
+  m_InvalidKeywords:
+  - _RECEIVESHADOWS_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -145,34 +146,43 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _GroundDampResponse: 1
-    - _GroundRockyDryResponse: 0.5
-    - _GroundShoreDampStrength: 1
-    - _GroundPatchBlendStrength: 0.52
-    - _GroundMacroPatchScale: 4.5
-    - _GroundSnowTintStrength: 0.74
-    - _GroundSnowBrightness: 0.14
     - _GroundDampDarkenStrength: 0.34
+    - _GroundDampResponse: 1
+    - _GroundDampTintStrength: 0.2
+    - _GroundFeatureContrast: 0.5
+    - _GroundFeatureMaskInfluence: 0.5
+    - _GroundFeatureMode: 0
+    - _GroundFeatureScale: 5
+    - _GroundFeatureSeed: 0
+    - _GroundFeatureStrength: 0
+    - _GroundMacroPatchScale: 3.65
+    - _GroundPatchBlendStrength: 0.781
+    - _GroundRockyDryResponse: 0.5
+    - _GroundRockyDryTintStrength: 0.18
+    - _GroundShoreDampStrength: 1
+    - _GroundSnowBrightness: 0.14
     - _GroundSnowResponse: 1
+    - _GroundSnowTintStrength: 0.728
     - _GroundVegetationResponse: 0.25
-    - _LightingTintInfluence: 0.35
+    - _GroundVegetationTintStrength: 0.1
     - _HighlightCompressStart: 0.72
     - _HighlightCompressStrength: 0.08
+    - _LightingTintInfluence: 0.35
     - _MaskDebugMode: 0
     - _Metallic: 0
     - _MonolithicFlatten: 0
     - _MonolithicSmoothnessBoost: 0.18
     - _OcclusionStrength: 1
     - _Parallax: 0.005
-    - _PixelBroadVariation: 0.032
+    - _PixelBroadVariation: 0.0557
     - _PixelCellSize: 0.055
     - _PixelClusterStrength: 0.576
     - _PixelEffectStrength: 1
     - _PixelSeed: 3276
     - _PixelToneCount: 4.67
-    - _PixelVariation: 0.024
+    - _PixelVariation: 0.0299
     - _PixelVertexVariation: 0.2
-    - _PixelWarpStrength: 0.08
+    - _PixelWarpStrength: 0.198
     - _Pixel_Seed: 4979
     - _Pixel_Variation: 0.047
     - _ProfileContrast: 1
@@ -203,11 +213,15 @@ Material:
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.80740476, g: 0.8704377, b: 0.9056604, a: 1}
+    - _BaseColor: {r: 0.8479441, g: 0.9240835, b: 0.9716981, a: 1}
     - _Base_Color: {r: 0.34901956, g: 0.38823527, b: 0.41960776, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _FrostColor: {r: 0.82, g: 0.93, b: 1, a: 1}
+    - _FrostColor: {r: 0.7328231, g: 0.81484896, b: 0.8679245, a: 1}
+    - _GroundDampTint: {r: 0.4699999, g: 0.41999996, b: 0.33999997, a: 1}
+    - _GroundFeatureDirection: {r: 1, g: 0, b: 0, a: 0}
+    - _GroundRockyDryTint: {r: 0.68, g: 0.7, b: 0.68, a: 1}
+    - _GroundVegetationTint: {r: 0.5, g: 0.58, b: 0.41999996, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _StoneCreaseTint: {r: 0.089999996, g: 0.08499997, b: 0.07499998, a: 1}
     - _StoneDirtTint: {r: 0.41999996, g: 0.35999998, b: 0.25999996, a: 1}

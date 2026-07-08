@@ -39,6 +39,10 @@
                 {
                     mask = ResolveGroundRockyDryMask(input);
                 }
+                else if (mode == 27)
+                {
+                    mask = ResolveGroundStandingWaterPotentialMask(input);
+                }
                 else if (mode == 14)
                 {
                     float exposure = ResolveGroundExposureMask(input);

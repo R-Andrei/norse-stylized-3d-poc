@@ -764,7 +764,7 @@ Known non-urgent caveats:
 ```text
 The transition-hold fallback may still bind persistent state where the shape mask is expected; evaluated-shape debug during topology transition should be treated cautiously until a dedicated transition ShapeMask snapshot exists.
 Shader-side Final Foam still owns legacy macro shaping until the accepted Layer D film/shape product replaces it.
-No low-res Layer D Film Source or Film Support helpers exist yet.
+Low-res Layer D Film Source and Film Support helpers now exist after `4.11C.5.13`, pending Unity validation and tuning.
 ```
 
 ## 5.3.2 4.11C.5.10B validation response and reset
@@ -1817,5 +1817,99 @@ Move foam-derived sheet support into Layer D.
 Treat 5.9z coherent coordinate warp as a failed/superseded prototype, not as the main path.
 ```
 
-Compliance/debug visibility is complete through `4.11C.5.10`, and failed Layer D visual probes were retired in `4.11C.5.10B` and `4.11C.5.11B`. `4.11C.5.12` now implements the Layer E shader-side local detail probe as debug-only. After it is validated or rejected, the next structural work is low-resolution Layer D Film Source / Film Support.
+Compliance/debug visibility is complete through `4.11C.5.10`, and failed Layer D visual probes were retired in `4.11C.5.10B` and `4.11C.5.11B`. `4.11C.5.12` implements the Layer E shader-side local detail probe as debug-only. `4.11C.5.13` adds the first low-resolution Layer D Film Source / Film Support structural helper pipeline; the next work is Unity validation, tuning, and containment before any Final Foam switch.
 
+
+
+---
+
+# Addendum — 4.11C.5.13 Low-Resolution Layer D Film Source / Film Support
+
+`4.11C.5.13` implements the first real structural Layer D helper system. This is not a foam entity database and not a pocket tracker. It is a fixed-size field pipeline:
+
+```text
+Layer C FoamState + Layer B external support/contact fields
+    -> half-resolution Film Source
+    -> half-resolution Film Support directional spread
+    -> full-resolution _FoamShapeMask
+    -> Layer E debug/render sampling
+```
+
+Ownership remains acyclic:
+
+```text
+Layer B does not read FoamState, Film Source, Film Support, or _FoamShapeMask.
+Layer C does not read Film Source, Film Support, or _FoamShapeMask.
+Layer D reads Layer B and Layer C and writes only visual products.
+Layer E reads visual products and writes screen pixels only.
+```
+
+New Layer D products:
+
+```text
+_FoamFilmSource  — half-resolution RHalf visual-film permission/source field.
+_FoamFilmSupport — half-resolution RHalf broad sheet/contact/bridge support field.
+```
+
+`BuildFoamFilmSource` combines persistent material with external support/contact context. Material Presence is the strongest source, but topology support and anchored pressure/lee/shore support may seed visual film even where durable material is weak. The result is clipped by valid fluid and obstacle exclusion and suppressed by negative-aging pressure.
+
+`BuildFoamFilmSupport` performs a cheap fixed-tap directional spread over the half-resolution Film Source. It favours along-flow continuity, applies weaker across-flow widening, and includes small diagonal support for bridge/cohesion. This is the intended low-cost alternative to wide full-resolution neighbourhood classifiers.
+
+`EvaluateFoamShape` now combines clipped persistent material with the film source/support product. This is allowed because `_FoamShapeMask` is visual interpretation, not durable material truth. Fine sub-cell detail still belongs in Layer E shader composition.
+
+New debug views:
+
+```text
+Foam Film Source  — samples _FoamFilmSource.
+Foam Film Support — samples _FoamFilmSupport.
+```
+
+Final Foam remains disconnected from `_FoamShapeMask` until the Layer D output is validated.
+
+# Addendum — 4.11C.5.13B Layer D Domain-Space Film Sampling Fix
+
+`4.11C.5.13B` corrects the coordinate ownership of the Layer D film pipeline.
+
+The fixed contract is:
+
+```text
+Layer C FoamState:
+  material-space persistent storage.
+  Rendering may use residual material travel to display it smoothly.
+
+Layer B external support/contact fields:
+  domain-space river support fields.
+  These do not follow material residual phase.
+
+Layer D Film Source / Film Support / _FoamShapeMask:
+  domain-space current visual products.
+  They may read phase-corrected material, but the products themselves are anchored to the river domain.
+
+Layer E shader debug/render sampling:
+  Layer C material views use materialUV.
+  Layer D visual products use fieldUV.
+```
+
+The bug fixed by `5.13B` was that `_FoamFilmSource`, `_FoamFilmSupport`, and `_FoamShapeMask` were sampled through `foam.materialUV`. Because `foam.materialUV` includes residual phase travel and snaps back after integer material commits, domain-anchored film/support products appeared to slide and then snap with the cell grid. The fix is not a tuning change; it is a coordinate-space ownership correction.
+
+Implementation details:
+
+```text
+CS_RiverFoam.compute:
+  - added FoamResolveMaterialPhaseOffsetUV;
+  - added FoamResolveMaterialUVForDomainUV;
+  - added FoamSampleMaterialStateForDomainUV;
+  - BuildFoamFilmSource samples support/contact fields at domainUV and material state at phase-corrected materialUV;
+  - EvaluateFoamShape samples material at phase-corrected materialUV but writes domain-space _FoamShapeMask.
+
+StylizedRiverFoamRuntime.Compute.cs:
+  - DispatchEvaluateShape explicitly binds _FoamPhaseTransportMetres before all Layer D kernels.
+
+SH_CleanStylizedRiver.shader:
+  - Layer D debug views sample _FoamShapeMask, _FoamFilmSource, and _FoamFilmSupport with foam.fieldUV.
+
+RiverWaterFoam.hlsl:
+  - Layer E shader-detail probe uses stable river-space diagnostic coordinates instead of inheriting the residual material phase.
+```
+
+Do not reverse this split. If a future effect needs durable material motion, it belongs in Layer C. If a future effect needs broad visual film support, it belongs in Layer D and writes domain-space visual products. If a future effect needs pixel-scale local polish, it belongs in Layer E and must not feed back into compute state.

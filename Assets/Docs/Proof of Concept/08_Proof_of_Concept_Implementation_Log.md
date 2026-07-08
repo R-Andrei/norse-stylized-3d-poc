@@ -1270,3 +1270,16 @@ Final Foam remains unchanged.
 
 This probe is not intended to solve broad sheets, bank-hugging film, contact support, bridge/rejoin, or macro split/merge. Those remain the job of future low-resolution Layer D Film Source / Film Support.
 
+
+
+## 2026-07-08 — River Foam 4.11C.5.13 Low-Resolution Layer D Film Source / Film Support
+
+Implemented the first structural Layer D helper-field prototype. The runtime now allocates half-resolution RHalf textures for `_FoamFilmSource` and `_FoamFilmSupport`, builds Film Source from persistent material plus external support/contact fields, spreads Film Support directionally with fixed low-cost taps, and uses the result in `EvaluateFoamShape` to write `_FoamShapeMask`. Added `Foam Film Source` and `Foam Film Support` debug views.
+
+The dependency contract remains intact: Layer D reads Layer C and Layer B but writes only visual products. No persistent `FoamState`, Remaining Life, Material Pattern, Layer B fields, or Final Foam output is mutated by this patch.
+
+### 2026-07-08 — River Foam 4.11C.5.13B Layer D domain-space sampling fix
+
+After validating the first Film Source / Film Support prototype, the Layer D debug views were found to pulse in sync with the material cell grid. The root cause was coordinate ownership: Layer D domain-support products were sampled through materialUV, which includes residual phase travel and snaps after integer material commits.
+
+`4.11C.5.13B` fixes this by treating `_FoamFilmSource`, `_FoamFilmSupport`, and `_FoamShapeMask` as domain-space visual products. Build/evaluate kernels sample persistent FoamState from phase-corrected material coordinates but sample Layer B support/contact fields in domain coordinates. Shader debug views now sample Layer D products using `foam.fieldUV`. Final Foam remains unchanged.

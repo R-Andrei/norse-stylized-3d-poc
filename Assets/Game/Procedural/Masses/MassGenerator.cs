@@ -623,12 +623,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     bounds.size.x,
                     Mathf.Max(bounds.size.y, bounds.size.z)));
 
-            // EW-4B keeps the EW-4A.1 control contract: Width owns the
-            // physical chamfer depth, Amount owns generated material strength,
-            // and Softness is reserved for material/normal response. The bevel
-            // construction below is local edge-strip geometry, not global
-            // polyhedron clipping, so accepted bevels cannot slice unrelated
-            // faces elsewhere on the mass.
+            // EW-4D0.3 keeps the EW-4A.1 control contract: Width owns
+            // physical bevel depth, Amount owns generated material strength,
+            // and Softness is reserved for material/normal response. The active
+            // construction path is being moved to a topology-first graph: this
+            // step preflights graph mapping, per-face selected-edge clipping,
+            // shared rail extraction, and sampled profile-grid preparation
+            // before the older half-space fallback runs.
             float width01 = Mathf.InverseLerp(0.25f, 2f, settings.EdgeWearWidth);
             float bevelDepth = maximumDimension * Mathf.Lerp(0.0035f, 0.0115f, width01);
             bevelDepth = Mathf.Clamp(
@@ -673,7 +674,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 candidates.Count,
                 selectedCount);
 
-            if (!TryApplyLocalEdgeWearBevels(
+            if (!TryPreflightTopologyBevelGraph(
+                    faces,
+                    candidates,
+                    selectedCount,
+                    bevelDepth,
+                    minimumStableFaceArea,
+                    minimumStableEdgeLength,
+                    ref stats))
+            {
+                // EW-4D0.4 fail-closed: if selected edge candidates cannot be
+                // mapped into a real topology graph, if affected faces cannot
+                // produce shared clipped rails, if selected edges cannot
+                // produce stable sampled profile grids, or if temporary
+                // clipped base-face replacements cannot be built, later bevel
+                // ribbons would be operating on untrusted data.
+                WarnEdgeWearBevelFailure(stats);
+                return;
+            }
+
+            if (!TryApplyHalfSpaceEdgeWearBevels(
                     faces,
                     candidates,
                     selectedCount,
@@ -836,6 +856,1614 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return candidates;
         }
 
+        private static bool TryPreflightTopologyBevelGraph(
+            List<PolygonFace> faces,
+            List<EdgeWearBevelCandidate> candidates,
+            int selectedCount,
+            float bevelDepth,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength,
+            ref EdgeWearBevelBuildStats stats)
+        {
+            if (!TryBuildEdgeWearTopologyGraph(
+                    faces,
+                    out EdgeWearTopologyGraph graph,
+                    out EdgeWearGraphBuildStats graphStats))
+            {
+                stats.ApplyGraphStats(graphStats);
+                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationGlobal);
+                return false;
+            }
+
+            if (!TryMapSelectedCandidatesToGraph(
+                    graph,
+                    candidates,
+                    selectedCount,
+                    out List<EdgeWearSelectedGraphEdge> selectedEdges,
+                    ref graphStats))
+            {
+                stats.ApplyGraphStats(graphStats);
+                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationGlobal);
+                return false;
+            }
+
+            if (!TryPreflightSelectedFaceClips(
+                    faces,
+                    graph,
+                    selectedEdges,
+                    bevelDepth,
+                    minimumStableFaceArea,
+                    minimumStableEdgeLength,
+                    ref graphStats))
+            {
+                stats.ApplyGraphStats(graphStats);
+                if (graphStats.FaceClipFailedFaceCount > 0)
+                {
+                    stats.RegisterReject(EdgeWearBevelRejectReason.FaceClip);
+                }
+                else if (graphStats.BaseFaceValidationFailureCount > 0)
+                {
+                    stats.RegisterReject(EdgeWearBevelRejectReason.ValidationBaseFace);
+                }
+                else if (graphStats.FragmentedRailCount > 0)
+                {
+                    stats.RegisterReject(EdgeWearBevelRejectReason.RailFragmented);
+                }
+                else
+                {
+                    stats.RegisterReject(EdgeWearBevelRejectReason.RailExtraction);
+                }
+
+                return false;
+            }
+
+            stats.ApplyGraphStats(graphStats);
+            return selectedEdges.Count == selectedCount;
+        }
+
+        private static bool TryBuildEdgeWearTopologyGraph(
+            List<PolygonFace> faces,
+            out EdgeWearTopologyGraph graph,
+            out EdgeWearGraphBuildStats stats)
+        {
+            graph = new EdgeWearTopologyGraph();
+            stats = new EdgeWearGraphBuildStats();
+
+            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
+            {
+                PolygonFace face = faces[faceIndex];
+                if (face.Feature != PolygonFaceFeature.Base)
+                {
+                    continue;
+                }
+
+                List<int> vertexIndices = new List<int>(face.Vertices.Count);
+                for (int vertexIndex = 0; vertexIndex < face.Vertices.Count; vertexIndex++)
+                {
+                    int graphVertexIndex = GetOrAddEdgeWearGraphVertex(
+                        graph,
+                        face.Vertices[vertexIndex]);
+                    vertexIndices.Add(graphVertexIndex);
+                }
+
+                if (GetUniqueGraphVertexCount(vertexIndices) < 3)
+                {
+                    stats.InvalidFaceCount++;
+                    continue;
+                }
+
+                List<int> edgeIndices = new List<int>(face.Vertices.Count);
+                for (int vertexIndex = 0; vertexIndex < face.Vertices.Count; vertexIndex++)
+                {
+                    int startVertex = vertexIndices[vertexIndex];
+                    int endVertex = vertexIndices[(vertexIndex + 1) % vertexIndices.Count];
+                    if (startVertex == endVertex)
+                    {
+                        stats.InvalidEdgeCount++;
+                        continue;
+                    }
+
+                    int edgeIndex = GetOrAddEdgeWearGraphEdge(
+                        graph,
+                        startVertex,
+                        endVertex,
+                        face.Vertices[vertexIndex],
+                        face.Vertices[(vertexIndex + 1) % face.Vertices.Count]);
+                    EdgeWearGraphEdge edge = graph.Edges[edgeIndex];
+                    edge.TryAddFace(faceIndex);
+
+                    edgeIndices.Add(edgeIndex);
+                    graph.Vertices[startVertex].AddFace(faceIndex);
+                    graph.Vertices[endVertex].AddFace(faceIndex);
+                }
+
+                graph.Faces.Add(
+                    new EdgeWearGraphFace(
+                        faceIndex,
+                        face,
+                        vertexIndices,
+                        edgeIndices));
+            }
+
+            for (int edgeIndex = 0; edgeIndex < graph.Edges.Count; edgeIndex++)
+            {
+                EdgeWearGraphEdge edge = graph.Edges[edgeIndex];
+                if (edge.FaceA < 0 || edge.FaceB < 0)
+                {
+                    stats.GraphBoundaryEdgeCount++;
+                }
+
+                if (edge.ExtraFaceCount > 0)
+                {
+                    stats.GraphNonManifoldEdgeCount = CountGraphNonManifoldEdges(graph);
+                }
+            }
+
+            stats.GraphVertexCount = graph.Vertices.Count;
+            stats.GraphEdgeCount = graph.Edges.Count;
+            stats.GraphFaceCount = graph.Faces.Count;
+
+            return stats.GraphFaceCount > 0 &&
+                stats.GraphNonManifoldEdgeCount == 0 &&
+                stats.InvalidFaceCount == 0 &&
+                stats.InvalidEdgeCount == 0;
+        }
+
+        private static bool TryMapSelectedCandidatesToGraph(
+            EdgeWearTopologyGraph graph,
+            List<EdgeWearBevelCandidate> candidates,
+            int selectedCount,
+            out List<EdgeWearSelectedGraphEdge> selectedEdges,
+            ref EdgeWearGraphBuildStats stats)
+        {
+            selectedEdges = new List<EdgeWearSelectedGraphEdge>(selectedCount);
+            int limit = Mathf.Clamp(selectedCount, 0, candidates.Count);
+            for (int i = 0; i < limit; i++)
+            {
+                EdgeWearBevelCandidate candidate = candidates[i];
+                EdgeKey key = new EdgeKey(candidate.Start, candidate.End);
+                if (!graph.EdgeByKey.TryGetValue(key, out int graphEdgeIndex))
+                {
+                    stats.MissingSelectedGraphEdgeCount++;
+                    continue;
+                }
+
+                EdgeWearGraphEdge edge = graph.Edges[graphEdgeIndex];
+                if (!GraphEdgeMatchesCandidateFaces(edge, candidate))
+                {
+                    stats.MismatchedSelectedGraphFaceCount++;
+                    continue;
+                }
+
+                if (edge.Selected)
+                {
+                    stats.DuplicateSelectedGraphEdgeCount++;
+                    continue;
+                }
+
+                edge.Selected = true;
+                edge.CandidateIndex = candidate.CandidateIndex;
+                selectedEdges.Add(
+                    new EdgeWearSelectedGraphEdge(
+                        graphEdgeIndex,
+                        candidate.CandidateIndex,
+                        candidate));
+                stats.SelectedGraphEdgeCount++;
+            }
+
+            return stats.SelectedGraphEdgeCount == limit &&
+                stats.MissingSelectedGraphEdgeCount == 0 &&
+                stats.MismatchedSelectedGraphFaceCount == 0 &&
+                stats.DuplicateSelectedGraphEdgeCount == 0;
+        }
+
+        private static bool TryPreflightSelectedFaceClips(
+            List<PolygonFace> sourceFaces,
+            EdgeWearTopologyGraph graph,
+            List<EdgeWearSelectedGraphEdge> selectedEdges,
+            float bevelDepth,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength,
+            ref EdgeWearGraphBuildStats stats)
+        {
+            if (selectedEdges.Count == 0)
+            {
+                return false;
+            }
+
+            Dictionary<int, List<FaceInsetCut>> cutsByFace =
+                new Dictionary<int, List<FaceInsetCut>>();
+            Dictionary<long, FaceInsetCut> cutsByCandidateFace =
+                new Dictionary<long, FaceInsetCut>(selectedEdges.Count * 2);
+
+            for (int i = 0; i < selectedEdges.Count; i++)
+            {
+                EdgeWearBevelCandidate candidate = selectedEdges[i].Candidate;
+                float candidateDepth = bevelDepth * candidate.DepthMultiplier;
+
+                if (!TryBuildFaceInsetCut(
+                        candidate,
+                        candidate.FaceA,
+                        sourceFaces[candidate.FaceA],
+                        candidateDepth,
+                        out FaceInsetCut cutA))
+                {
+                    stats.FaceClipFailedFaceCount++;
+                    continue;
+                }
+
+                if (!TryBuildFaceInsetCut(
+                        candidate,
+                        candidate.FaceB,
+                        sourceFaces[candidate.FaceB],
+                        candidateDepth,
+                        out FaceInsetCut cutB))
+                {
+                    stats.FaceClipFailedFaceCount++;
+                    continue;
+                }
+
+                AddFaceInsetCut(cutsByFace, cutA);
+                AddFaceInsetCut(cutsByFace, cutB);
+                cutsByCandidateFace[MakeCandidateFaceKey(candidate.CandidateIndex, candidate.FaceA)] = cutA;
+                cutsByCandidateFace[MakeCandidateFaceKey(candidate.CandidateIndex, candidate.FaceB)] = cutB;
+                stats.SelectedFaceEdgeCount += 2;
+            }
+
+            Dictionary<int, List<Vector3>> clippedPolygonsByFace =
+                new Dictionary<int, List<Vector3>>(cutsByFace.Count);
+            float localBaseMinEdgeLength = Mathf.Max(
+                PlaneEpsilon * 8f,
+                minimumStableEdgeLength * 0.35f);
+            float localBaseFaceMinArea = Mathf.Max(
+                TinyFaceAreaEpsilon * 4f,
+                minimumStableFaceArea * 0.2f);
+
+            for (int faceIndex = 0; faceIndex < graph.Faces.Count; faceIndex++)
+            {
+                EdgeWearGraphFace graphFace = graph.Faces[faceIndex];
+                int sourceFaceIndex = graphFace.SourceFaceIndex;
+                if (!cutsByFace.TryGetValue(sourceFaceIndex, out List<FaceInsetCut> faceCuts))
+                {
+                    continue;
+                }
+
+                stats.FaceClipAffectedFaceCount++;
+                PolygonFace sourceFace = graphFace.SourceFace;
+                List<Vector3> polygon = new List<Vector3>(sourceFace.Vertices);
+                bool failed = false;
+
+                for (int cutIndex = 0; cutIndex < faceCuts.Count; cutIndex++)
+                {
+                    polygon = ClipPolygon(
+                        polygon,
+                        faceCuts[cutIndex].Plane,
+                        new List<Vector3>());
+                    polygon = SanitizePolygon(polygon, sourceFace.Normal);
+
+                    if (!ValidateLocalEdgeWearFace(
+                            polygon,
+                            localBaseFaceMinArea,
+                            localBaseMinEdgeLength))
+                    {
+                        failed = true;
+                        break;
+                    }
+                }
+
+                if (failed)
+                {
+                    stats.FaceClipFailedFaceCount++;
+                    continue;
+                }
+
+                stats.FaceClipSucceededFaceCount++;
+                clippedPolygonsByFace[sourceFaceIndex] = polygon;
+            }
+
+            stats.ExpectedRailCount = selectedEdges.Count * 2;
+            float railTolerance = Mathf.Max(
+                PlaneEpsilon * 18f,
+                minimumStableEdgeLength * 0.8f);
+            Dictionary<long, BevelRail> railsByCandidateFace =
+                new Dictionary<long, BevelRail>(stats.ExpectedRailCount);
+
+            for (int i = 0; i < selectedEdges.Count; i++)
+            {
+                EdgeWearBevelCandidate candidate = selectedEdges[i].Candidate;
+                TryPreflightRailForCandidateFace(
+                    clippedPolygonsByFace,
+                    cutsByCandidateFace,
+                    railsByCandidateFace,
+                    candidate,
+                    candidate.FaceA,
+                    railTolerance,
+                    minimumStableEdgeLength,
+                    ref stats);
+
+                TryPreflightRailForCandidateFace(
+                    clippedPolygonsByFace,
+                    cutsByCandidateFace,
+                    railsByCandidateFace,
+                    candidate,
+                    candidate.FaceB,
+                    railTolerance,
+                    minimumStableEdgeLength,
+                    ref stats);
+            }
+
+            if (stats.FaceClipFailedFaceCount != 0 ||
+                stats.MissingRailCount != 0 ||
+                stats.FragmentedRailCount != 0 ||
+                stats.ShortRailCount != 0 ||
+                stats.ExtractedRailCount != stats.ExpectedRailCount)
+            {
+                return false;
+            }
+
+            if (!TryBuildSampledProfileGrids(
+                    selectedEdges,
+                    railsByCandidateFace,
+                    bevelDepth,
+                    minimumStableEdgeLength,
+                    out Dictionary<int, EdgeWearProfileGrid> profileGridsByCandidate,
+                    ref stats))
+            {
+                return false;
+            }
+
+            return TryBuildClippedBaseFaceWorkspace(
+                sourceFaces,
+                graph,
+                clippedPolygonsByFace,
+                profileGridsByCandidate,
+                localBaseFaceMinArea,
+                localBaseMinEdgeLength,
+                minimumStableEdgeLength,
+                ref stats);
+        }
+
+        private static bool TryPreflightRailForCandidateFace(
+            Dictionary<int, List<Vector3>> clippedPolygonsByFace,
+            Dictionary<long, FaceInsetCut> cutsByCandidateFace,
+            Dictionary<long, BevelRail> railsByCandidateFace,
+            EdgeWearBevelCandidate candidate,
+            int faceIndex,
+            float railTolerance,
+            float minimumStableEdgeLength,
+            ref EdgeWearGraphBuildStats stats)
+        {
+            long key = MakeCandidateFaceKey(candidate.CandidateIndex, faceIndex);
+            if (!clippedPolygonsByFace.TryGetValue(faceIndex, out List<Vector3> polygon) ||
+                !cutsByCandidateFace.TryGetValue(
+                    key,
+                    out FaceInsetCut cut))
+            {
+                stats.MissingRailCount++;
+                return false;
+            }
+
+            if (!TryExtractCutRail(
+                    polygon,
+                    cut,
+                    railTolerance,
+                    minimumStableEdgeLength,
+                    out BevelRail rail,
+                    out bool fragmented))
+            {
+                if (fragmented)
+                {
+                    stats.FragmentedRailCount++;
+                }
+                else
+                {
+                    stats.MissingRailCount++;
+                }
+
+                return false;
+            }
+
+            float minimumLength = Mathf.Max(
+                minimumStableEdgeLength,
+                railTolerance * 0.45f);
+            if ((rail.End - rail.Start).magnitude <= minimumLength)
+            {
+                stats.ShortRailCount++;
+                return false;
+            }
+
+            railsByCandidateFace[key] = rail;
+            stats.ExtractedRailCount++;
+            return true;
+        }
+
+        private static bool TryBuildSampledProfileGrids(
+            List<EdgeWearSelectedGraphEdge> selectedEdges,
+            Dictionary<long, BevelRail> railsByCandidateFace,
+            float bevelDepth,
+            float minimumStableEdgeLength,
+            out Dictionary<int, EdgeWearProfileGrid> profileGridsByCandidate,
+            ref EdgeWearGraphBuildStats stats)
+        {
+            profileGridsByCandidate = new Dictionary<int, EdgeWearProfileGrid>(
+                selectedEdges.Count);
+
+            if (selectedEdges.Count == 0)
+            {
+                return false;
+            }
+
+            const int profileSegments = 3;
+            stats.ProfileSegmentCount = profileSegments;
+            stats.ProfileMinSampleCount = int.MaxValue;
+
+            for (int edgeIndex = 0; edgeIndex < selectedEdges.Count; edgeIndex++)
+            {
+                EdgeWearBevelCandidate candidate = selectedEdges[edgeIndex].Candidate;
+                if (!railsByCandidateFace.TryGetValue(
+                        MakeCandidateFaceKey(candidate.CandidateIndex, candidate.FaceA),
+                        out BevelRail railA) ||
+                    !railsByCandidateFace.TryGetValue(
+                        MakeCandidateFaceKey(candidate.CandidateIndex, candidate.FaceB),
+                        out BevelRail railB))
+                {
+                    stats.ProfileEdgesFailedCount++;
+                    continue;
+                }
+
+                float edgeLength = (candidate.End - candidate.Start).magnitude;
+                float railALength = (railA.End - railA.Start).magnitude;
+                float railBLength = (railB.End - railB.Start).magnitude;
+                float minimumProfileWidth = Mathf.Max(
+                    minimumStableEdgeLength * 0.18f,
+                    bevelDepth * 0.08f);
+
+                if (edgeLength <= minimumStableEdgeLength ||
+                    railALength <= minimumStableEdgeLength ||
+                    railBLength <= minimumStableEdgeLength)
+                {
+                    stats.ProfileEdgesFailedCount++;
+                    continue;
+                }
+
+                int sampleCount = CalculateEdgeWearProfileSampleCount(
+                    edgeLength,
+                    bevelDepth,
+                    minimumStableEdgeLength);
+                Vector3[,] points = new Vector3[sampleCount, profileSegments + 1];
+                int edgeGridPointCount = 0;
+                bool failed = false;
+
+                for (int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++)
+                {
+                    float t = sampleCount <= 1
+                        ? 0f
+                        : sampleIndex / (float)(sampleCount - 1);
+                    Vector3 edgePoint = Vector3.Lerp(candidate.Start, candidate.End, t);
+                    Vector3 railPointA = Vector3.Lerp(railA.Start, railA.End, t);
+                    Vector3 railPointB = Vector3.Lerp(railB.Start, railB.End, t);
+                    float profileWidth = (railPointB - railPointA).magnitude;
+                    if (profileWidth <= minimumProfileWidth)
+                    {
+                        stats.ProfileZeroWidthCount++;
+                        failed = true;
+                        continue;
+                    }
+
+                    for (int segmentIndex = 0; segmentIndex <= profileSegments; segmentIndex++)
+                    {
+                        float u = segmentIndex / (float)profileSegments;
+                        Vector3 point = EvaluateEdgeWearProfilePoint(
+                            railPointA,
+                            edgePoint,
+                            railPointB,
+                            u);
+                        if (!IsFinite(point))
+                        {
+                            stats.ProfileInvalidPointCount++;
+                            failed = true;
+                            continue;
+                        }
+
+                        points[sampleIndex, segmentIndex] = point;
+                        edgeGridPointCount++;
+                    }
+                }
+
+                if (failed)
+                {
+                    stats.ProfileEdgesFailedCount++;
+                    continue;
+                }
+
+                profileGridsByCandidate[candidate.CandidateIndex] =
+                    new EdgeWearProfileGrid(
+                        candidate,
+                        railA,
+                        railB,
+                        sampleCount,
+                        profileSegments,
+                        points);
+
+                stats.ProfileEdgesPreparedCount++;
+                stats.ProfileSampleCount += sampleCount;
+                stats.ProfileGridPointCount += edgeGridPointCount;
+                stats.ProfileMinSampleCount = Mathf.Min(
+                    stats.ProfileMinSampleCount,
+                    sampleCount);
+                stats.ProfileMaxSampleCount = Mathf.Max(
+                    stats.ProfileMaxSampleCount,
+                    sampleCount);
+            }
+
+            if (stats.ProfileMinSampleCount == int.MaxValue)
+            {
+                stats.ProfileMinSampleCount = 0;
+            }
+
+            return profileGridsByCandidate.Count == selectedEdges.Count &&
+                stats.ProfileEdgesPreparedCount == selectedEdges.Count &&
+                stats.ProfileEdgesFailedCount == 0 &&
+                stats.ProfileInvalidPointCount == 0 &&
+                stats.ProfileZeroWidthCount == 0 &&
+                stats.ProfileGridPointCount > 0;
+        }
+
+        private static bool TryBuildClippedBaseFaceWorkspace(
+            List<PolygonFace> sourceFaces,
+            EdgeWearTopologyGraph graph,
+            Dictionary<int, List<Vector3>> clippedPolygonsByFace,
+            Dictionary<int, EdgeWearProfileGrid> profileGridsByCandidate,
+            float localBaseFaceMinArea,
+            float localBaseMinEdgeLength,
+            float minimumStableEdgeLength,
+            ref EdgeWearGraphBuildStats stats)
+        {
+            EdgeWearTopologyRebuildWorkspace workspace =
+                new EdgeWearTopologyRebuildWorkspace();
+            Dictionary<int, List<EdgeWearFaceRailSamples>> railSamplesByFace =
+                BuildEdgeWearFaceRailSamples(profileGridsByCandidate);
+            float railSampleTolerance = Mathf.Max(
+                PlaneEpsilon * 20f,
+                minimumStableEdgeLength * 0.9f);
+            float railSampleMinEdgeLength = Mathf.Max(
+                PlaneEpsilon * 6f,
+                minimumStableEdgeLength * 0.05f);
+
+            for (int faceIndex = 0; faceIndex < sourceFaces.Count; faceIndex++)
+            {
+                PolygonFace sourceFace = sourceFaces[faceIndex];
+                if (sourceFace.Feature != PolygonFaceFeature.Base)
+                {
+                    workspace.RebuiltFaces.Add(
+                        new PolygonFace(
+                            new List<Vector3>(sourceFace.Vertices),
+                            sourceFace.Normal,
+                            sourceFace.Feature,
+                            sourceFace.FeatureStrength));
+                    continue;
+                }
+
+                if (clippedPolygonsByFace.TryGetValue(
+                        faceIndex,
+                        out List<Vector3> clippedPolygon))
+                {
+                    stats.AffectedBaseFaceCount++;
+                    List<Vector3> clean = SanitizePolygon(
+                        new List<Vector3>(clippedPolygon),
+                        sourceFace.Normal);
+
+                    if (!ValidateLocalEdgeWearFace(
+                            clean,
+                            localBaseFaceMinArea,
+                            localBaseMinEdgeLength))
+                    {
+                        stats.BaseFaceValidationFailureCount++;
+                        continue;
+                    }
+
+                    if (!railSamplesByFace.TryGetValue(
+                            faceIndex,
+                            out List<EdgeWearFaceRailSamples> faceRailSamples) ||
+                        faceRailSamples.Count == 0)
+                    {
+                        stats.RailSampleInsertionFailureCount++;
+                        continue;
+                    }
+
+                    if (!TryInsertRailSamplesIntoBaseFace(
+                            clean,
+                            faceRailSamples,
+                            railSampleTolerance,
+                            out List<Vector3> sampledBaseFace,
+                            ref stats))
+                    {
+                        stats.BaseFaceValidationFailureCount++;
+                        continue;
+                    }
+
+                    if (!ValidateRailSampledBaseFace(
+                            sampledBaseFace,
+                            localBaseFaceMinArea,
+                            railSampleMinEdgeLength))
+                    {
+                        stats.BaseFaceValidationFailureCount++;
+                        continue;
+                    }
+
+                    PolygonFace clippedFace = new PolygonFace(
+                        sampledBaseFace,
+                        sourceFace.Normal,
+                        PolygonFaceFeature.Base,
+                        sourceFace.FeatureStrength);
+                    workspace.AffectedSourceFaces.Add(faceIndex);
+                    workspace.ClippedBaseFaceBySourceFace[faceIndex] = clippedFace;
+                    workspace.RebuiltFaces.Add(clippedFace);
+                    stats.ReplacedBaseFaceCount++;
+                    stats.RailSampledBaseFaceCount++;
+                    continue;
+                }
+
+                workspace.RebuiltFaces.Add(
+                    new PolygonFace(
+                        new List<Vector3>(sourceFace.Vertices),
+                        sourceFace.Normal,
+                        sourceFace.Feature,
+                        sourceFace.FeatureStrength));
+                stats.PreservedBaseFaceCount++;
+            }
+
+            stats.WorkspaceFaceCount = workspace.RebuiltFaces.Count;
+            stats.WorkspaceBaseFaceCount = CountBaseFaces(workspace.RebuiltFaces);
+
+            EdgeWearTopologyStats workspaceTopology = AuditEdgeWearTopology(
+                workspace.RebuiltFaces,
+                minimumStableEdgeLength);
+            stats.WorkspaceTemporaryOpenEdgeCount = workspaceTopology.OpenEdgeCount;
+
+            bool baseWorkspaceValid = stats.BaseFaceValidationFailureCount == 0 &&
+                stats.RailSampleInsertionFailureCount == 0 &&
+                stats.AffectedBaseFaceCount == stats.FaceClipAffectedFaceCount &&
+                stats.ReplacedBaseFaceCount == stats.FaceClipSucceededFaceCount &&
+                stats.WorkspaceBaseFaceCount >= graph.Faces.Count;
+            if (!baseWorkspaceValid)
+            {
+                return false;
+            }
+
+            if (!TryAppendEdgeWearRibbonFaces(
+                    workspace,
+                    profileGridsByCandidate,
+                    localBaseFaceMinArea,
+                    railSampleMinEdgeLength,
+                    minimumStableEdgeLength,
+                    ref stats))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static Dictionary<int, List<EdgeWearFaceRailSamples>> BuildEdgeWearFaceRailSamples(
+            Dictionary<int, EdgeWearProfileGrid> profileGridsByCandidate)
+        {
+            Dictionary<int, List<EdgeWearFaceRailSamples>> samplesByFace =
+                new Dictionary<int, List<EdgeWearFaceRailSamples>>();
+
+            foreach (EdgeWearProfileGrid grid in profileGridsByCandidate.Values)
+            {
+                AddEdgeWearFaceRailSamples(
+                    samplesByFace,
+                    grid.Candidate.FaceA,
+                    grid.Candidate.CandidateIndex,
+                    grid.RailA,
+                    grid.GetBoundarySamples(0));
+                AddEdgeWearFaceRailSamples(
+                    samplesByFace,
+                    grid.Candidate.FaceB,
+                    grid.Candidate.CandidateIndex,
+                    grid.RailB,
+                    grid.GetBoundarySamples(grid.ProfileSegments));
+            }
+
+            return samplesByFace;
+        }
+
+        private static void AddEdgeWearFaceRailSamples(
+            Dictionary<int, List<EdgeWearFaceRailSamples>> samplesByFace,
+            int faceIndex,
+            int candidateIndex,
+            BevelRail rail,
+            Vector3[] samples)
+        {
+            if (!samplesByFace.TryGetValue(
+                    faceIndex,
+                    out List<EdgeWearFaceRailSamples> faceSamples))
+            {
+                faceSamples = new List<EdgeWearFaceRailSamples>();
+                samplesByFace.Add(faceIndex, faceSamples);
+            }
+
+            faceSamples.Add(
+                new EdgeWearFaceRailSamples(
+                    faceIndex,
+                    candidateIndex,
+                    rail,
+                    samples));
+        }
+
+        private static bool TryInsertRailSamplesIntoBaseFace(
+            List<Vector3> polygon,
+            List<EdgeWearFaceRailSamples> faceRailSamples,
+            float tolerance,
+            out List<Vector3> sampledPolygon,
+            ref EdgeWearGraphBuildStats stats)
+        {
+            sampledPolygon = new List<Vector3>();
+            if (polygon.Count < 3 || faceRailSamples.Count == 0)
+            {
+                stats.RailSampleInsertionFailureCount++;
+                return false;
+            }
+
+            bool[] matchedRails = new bool[faceRailSamples.Count];
+            for (int vertexIndex = 0; vertexIndex < polygon.Count; vertexIndex++)
+            {
+                Vector3 start = polygon[vertexIndex];
+                Vector3 end = polygon[(vertexIndex + 1) % polygon.Count];
+                AddPointIfDifferent(sampledPolygon, start);
+
+                int railIndex = FindMatchingRailSampleSegment(
+                    faceRailSamples,
+                    matchedRails,
+                    start,
+                    end,
+                    tolerance,
+                    out bool reversed);
+                if (railIndex < 0)
+                {
+                    continue;
+                }
+
+                EdgeWearFaceRailSamples railSamples = faceRailSamples[railIndex];
+                matchedRails[railIndex] = true;
+                stats.RailSampledBoundarySegmentCount++;
+                stats.RailSamplesPreservedCount += railSamples.Samples.Length;
+
+                if (!reversed)
+                {
+                    for (int sampleIndex = 1; sampleIndex < railSamples.Samples.Length - 1; sampleIndex++)
+                    {
+                        AddPointIfDifferent(sampledPolygon, railSamples.Samples[sampleIndex]);
+                        stats.RailSamplesInsertedCount++;
+                    }
+                }
+                else
+                {
+                    for (int sampleIndex = railSamples.Samples.Length - 2; sampleIndex >= 1; sampleIndex--)
+                    {
+                        AddPointIfDifferent(sampledPolygon, railSamples.Samples[sampleIndex]);
+                        stats.RailSamplesInsertedCount++;
+                    }
+                }
+            }
+
+            RemoveClosingDuplicate(sampledPolygon);
+
+            int matchedCount = 0;
+            for (int i = 0; i < matchedRails.Length; i++)
+            {
+                if (matchedRails[i])
+                {
+                    matchedCount++;
+                }
+            }
+
+            if (matchedCount != faceRailSamples.Count)
+            {
+                stats.RailSampleInsertionFailureCount += faceRailSamples.Count - matchedCount;
+                return false;
+            }
+
+            return sampledPolygon.Count >= polygon.Count;
+        }
+
+        private static int FindMatchingRailSampleSegment(
+            List<EdgeWearFaceRailSamples> faceRailSamples,
+            bool[] matchedRails,
+            Vector3 segmentStart,
+            Vector3 segmentEnd,
+            float tolerance,
+            out bool reversed)
+        {
+            reversed = false;
+            for (int i = 0; i < faceRailSamples.Count; i++)
+            {
+                if (matchedRails[i])
+                {
+                    continue;
+                }
+
+                EdgeWearFaceRailSamples samples = faceRailSamples[i];
+                if (AreWithinDistance(segmentStart, samples.Start, tolerance) &&
+                    AreWithinDistance(segmentEnd, samples.End, tolerance))
+                {
+                    reversed = false;
+                    return i;
+                }
+
+                if (AreWithinDistance(segmentStart, samples.End, tolerance) &&
+                    AreWithinDistance(segmentEnd, samples.Start, tolerance))
+                {
+                    reversed = true;
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static bool TryAppendEdgeWearRibbonFaces(
+            EdgeWearTopologyRebuildWorkspace workspace,
+            Dictionary<int, EdgeWearProfileGrid> profileGridsByCandidate,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength,
+            float topologyMinimumStableEdgeLength,
+            ref EdgeWearGraphBuildStats stats)
+        {
+            foreach (EdgeWearProfileGrid grid in profileGridsByCandidate.Values)
+            {
+                int expectedForEdge = Mathf.Max(0, grid.SampleCount - 1) * grid.ProfileSegments;
+                stats.RibbonFacesExpectedCount += expectedForEdge;
+
+                if (grid.SampleCount < 2 || grid.ProfileSegments < 1)
+                {
+                    stats.RibbonEdgesFailedCount++;
+                    continue;
+                }
+
+                int builtForEdge = 0;
+                bool failed = false;
+                for (int sampleIndex = 0; sampleIndex < grid.SampleCount - 1; sampleIndex++)
+                {
+                    for (int profileIndex = 0; profileIndex < grid.ProfileSegments; profileIndex++)
+                    {
+                        Vector3 p00 = grid.Points[sampleIndex, profileIndex];
+                        Vector3 p10 = grid.Points[sampleIndex + 1, profileIndex];
+                        Vector3 p11 = grid.Points[sampleIndex + 1, profileIndex + 1];
+                        Vector3 p01 = grid.Points[sampleIndex, profileIndex + 1];
+
+                        if (HasDegenerateQuad(p00, p10, p11, p01, minimumStableEdgeLength))
+                        {
+                            stats.RibbonDegenerateFaceCount++;
+                            failed = true;
+                            continue;
+                        }
+
+                        Vector3 normal = Vector3.Cross(p10 - p00, p01 - p00);
+                        if (normal.sqrMagnitude <= MinimumEdgeLengthSqr)
+                        {
+                            normal = grid.Candidate.BevelNormal;
+                        }
+                        else
+                        {
+                            normal.Normalize();
+                            if (Vector3.Dot(normal, grid.Candidate.BevelNormal) < 0f)
+                            {
+                                normal = -normal;
+                            }
+                        }
+
+                        PolygonFace ribbonFace = CreateOrientedFace(
+                            normal,
+                            PolygonFaceFeature.ConvexEdgeWear,
+                            grid.Candidate.Strength,
+                            p00,
+                            p10,
+                            p11,
+                            p01);
+
+                        if (!ValidateLocalEdgeWearFace(
+                                ribbonFace.Vertices,
+                                minimumStableFaceArea * 0.08f,
+                                minimumStableEdgeLength))
+                        {
+                            stats.RibbonInvalidFaceCount++;
+                            failed = true;
+                            continue;
+                        }
+
+                        workspace.RebuiltFaces.Add(ribbonFace);
+                        stats.RibbonFacesBuiltCount++;
+                        builtForEdge++;
+                    }
+                }
+
+                if (failed || builtForEdge != expectedForEdge)
+                {
+                    stats.RibbonEdgesFailedCount++;
+                }
+                else
+                {
+                    stats.RibbonEdgesPreparedCount++;
+                }
+            }
+
+            stats.WorkspaceConvexEdgeWearFaceCount = CountFeatureFaces(
+                workspace.RebuiltFaces,
+                PolygonFaceFeature.ConvexEdgeWear);
+            stats.WorkspaceFacesAfterRibbonsCount = workspace.RebuiltFaces.Count;
+
+            EdgeWearTopologyStats ribbonTopology = AuditEdgeWearTopology(
+                workspace.RebuiltFaces,
+                topologyMinimumStableEdgeLength);
+            stats.WorkspaceOpenEdgesAfterRibbonsCount = ribbonTopology.OpenEdgeCount;
+
+            return stats.RibbonEdgesPreparedCount == profileGridsByCandidate.Count &&
+                stats.RibbonEdgesFailedCount == 0 &&
+                stats.RibbonFacesBuiltCount == stats.RibbonFacesExpectedCount &&
+                stats.RibbonDegenerateFaceCount == 0 &&
+                stats.RibbonInvalidFaceCount == 0 &&
+                stats.WorkspaceConvexEdgeWearFaceCount > 0;
+        }
+
+        private static bool ValidateRailSampledBaseFace(
+            List<Vector3> vertices,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength)
+        {
+            if (vertices.Count < 3 ||
+                CalculatePolygonArea(vertices) <= minimumStableFaceArea)
+            {
+                return false;
+            }
+
+            float minimumEdgeLengthSqr = minimumStableEdgeLength * minimumStableEdgeLength;
+            for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
+            {
+                Vector3 start = vertices[vertexIndex];
+                Vector3 end = vertices[(vertexIndex + 1) % vertices.Count];
+                if (!IsFinite(start) ||
+                    !IsFinite(end) ||
+                    (end - start).sqrMagnitude <= minimumEdgeLengthSqr)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool HasDegenerateQuad(
+            Vector3 p00,
+            Vector3 p10,
+            Vector3 p11,
+            Vector3 p01,
+            float minimumStableEdgeLength)
+        {
+            float minimumEdgeLengthSqr = minimumStableEdgeLength * minimumStableEdgeLength;
+            return
+                !IsFinite(p00) ||
+                !IsFinite(p10) ||
+                !IsFinite(p11) ||
+                !IsFinite(p01) ||
+                (p10 - p00).sqrMagnitude <= minimumEdgeLengthSqr ||
+                (p11 - p10).sqrMagnitude <= minimumEdgeLengthSqr ||
+                (p01 - p11).sqrMagnitude <= minimumEdgeLengthSqr ||
+                (p00 - p01).sqrMagnitude <= minimumEdgeLengthSqr;
+        }
+
+        private static bool AreWithinDistance(
+            Vector3 left,
+            Vector3 right,
+            float distance)
+        {
+            return (left - right).sqrMagnitude <= distance * distance;
+        }
+
+        private static int CountBaseFaces(List<PolygonFace> faces)
+        {
+            int count = 0;
+            for (int i = 0; i < faces.Count; i++)
+            {
+                if (faces[i].Feature == PolygonFaceFeature.Base)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static int CalculateEdgeWearProfileSampleCount(
+            float edgeLength,
+            float bevelDepth,
+            float minimumStableEdgeLength)
+        {
+            float spacing = Mathf.Max(
+                minimumStableEdgeLength * 5.0f,
+                Mathf.Max(bevelDepth * 1.35f, PlaneEpsilon * 12f));
+            int sampleCount = Mathf.CeilToInt(edgeLength / Mathf.Max(PlaneEpsilon, spacing)) + 1;
+            return Mathf.Clamp(sampleCount, 2, 8);
+        }
+
+        private static Vector3 EvaluateEdgeWearProfilePoint(
+            Vector3 railPointA,
+            Vector3 edgePoint,
+            Vector3 railPointB,
+            float u)
+        {
+            u = Mathf.Clamp01(u);
+            float inverse = 1f - u;
+            return
+                inverse * inverse * railPointA +
+                2f * inverse * u * edgePoint +
+                u * u * railPointB;
+        }
+
+        private static int GetOrAddEdgeWearGraphVertex(
+            EdgeWearTopologyGraph graph,
+            Vector3 position)
+        {
+            VertexKey key = new VertexKey(position);
+            if (graph.VertexByKey.TryGetValue(key, out int index))
+            {
+                return index;
+            }
+
+            index = graph.Vertices.Count;
+            graph.VertexByKey.Add(key, index);
+            graph.Vertices.Add(new EdgeWearGraphVertex(position, key));
+            return index;
+        }
+
+        private static int GetOrAddEdgeWearGraphEdge(
+            EdgeWearTopologyGraph graph,
+            int vertexA,
+            int vertexB,
+            Vector3 start,
+            Vector3 end)
+        {
+            EdgeKey key = new EdgeKey(start, end);
+            if (graph.EdgeByKey.TryGetValue(key, out int index))
+            {
+                return index;
+            }
+
+            index = graph.Edges.Count;
+            graph.EdgeByKey.Add(key, index);
+            graph.Edges.Add(new EdgeWearGraphEdge(vertexA, vertexB));
+            graph.Vertices[vertexA].AddEdge(index);
+            graph.Vertices[vertexB].AddEdge(index);
+            return index;
+        }
+
+        private static int GetUniqueGraphVertexCount(List<int> vertexIndices)
+        {
+            HashSet<int> unique = new HashSet<int>();
+            for (int i = 0; i < vertexIndices.Count; i++)
+            {
+                unique.Add(vertexIndices[i]);
+            }
+
+            return unique.Count;
+        }
+
+        private static bool GraphEdgeMatchesCandidateFaces(
+            EdgeWearGraphEdge edge,
+            EdgeWearBevelCandidate candidate)
+        {
+            return
+                (edge.FaceA == candidate.FaceA && edge.FaceB == candidate.FaceB) ||
+                (edge.FaceA == candidate.FaceB && edge.FaceB == candidate.FaceA);
+        }
+
+        private static int CountGraphNonManifoldEdges(EdgeWearTopologyGraph graph)
+        {
+            int count = 0;
+            for (int i = 0; i < graph.Edges.Count; i++)
+            {
+                if (graph.Edges[i].ExtraFaceCount > 0)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+
+        private static bool TryApplyHalfSpaceEdgeWearBevels(
+            List<PolygonFace> faces,
+            List<EdgeWearBevelCandidate> candidates,
+            int selectedCount,
+            float bevelDepth,
+            Bounds bounds,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength,
+            ref EdgeWearBevelBuildStats stats)
+        {
+            if (selectedCount <= 0)
+            {
+                return false;
+            }
+
+            List<EdgeWearBevelCandidate> selected =
+                new List<EdgeWearBevelCandidate>(selectedCount);
+            for (int i = 0; i < selectedCount; i++)
+            {
+                selected.Add(candidates[i]);
+            }
+
+            EdgeWearTopologyStats sourceTopologyStats = AuditEdgeWearTopology(
+                faces,
+                minimumStableEdgeLength);
+
+            // EW-4C.0: candidates are no longer individually sacrificed to
+            // repair topology. All authored selected candidates become bevel
+            // support planes; if the requested width cannot fit, the whole
+            // profile narrows and solves again from the same candidate set.
+            float[] depthScales =
+            {
+                1.0f,
+                0.85f,
+                0.70f,
+                0.55f,
+                0.40f,
+                0.30f,
+                0.22f
+            };
+
+            for (int scaleIndex = 0; scaleIndex < depthScales.Length; scaleIndex++)
+            {
+                float depthScale = depthScales[scaleIndex];
+                if (!TryBuildHalfSpaceEdgeWearSupportPlanes(
+                        faces,
+                        selected,
+                        bevelDepth * depthScale,
+                        out List<EdgeWearSupportPlane> supportPlanes,
+                        out int bevelPlaneCount,
+                        out EdgeWearBevelRejectReason supportRejectReason))
+                {
+                    stats.RegisterReject(supportRejectReason);
+                    return false;
+                }
+
+                if (!TryRebuildConvexPolyhedronFromSupportPlanes(
+                        supportPlanes,
+                        minimumStableFaceArea,
+                        minimumStableEdgeLength,
+                        out List<PolygonFace> rebuiltFaces,
+                        out int producedBevelFaceCount))
+                {
+                    stats.RegisterReject(EdgeWearBevelRejectReason.ValidationGlobal);
+                    continue;
+                }
+
+                if (producedBevelFaceCount < selected.Count)
+                {
+                    stats.RegisterReject(EdgeWearBevelRejectReason.ValidationBevelFace);
+                    continue;
+                }
+
+                EdgeWearTopologyStats topologyStats = AuditEdgeWearTopology(
+                    rebuiltFaces,
+                    minimumStableEdgeLength);
+
+                if (topologyStats.OpenEdgeCount > sourceTopologyStats.OpenEdgeCount)
+                {
+                    stats.RegisterReject(EdgeWearBevelRejectReason.ValidationOpenEdge);
+                    continue;
+                }
+
+                if (topologyStats.NonManifoldEdgeCount >
+                    sourceTopologyStats.NonManifoldEdgeCount)
+                {
+                    stats.RegisterReject(EdgeWearBevelRejectReason.ValidationNonManifoldEdge);
+                    continue;
+                }
+
+                if (topologyStats.TJunctionCount > sourceTopologyStats.TJunctionCount)
+                {
+                    stats.RegisterReject(EdgeWearBevelRejectReason.ValidationTJunction);
+                    continue;
+                }
+
+                faces.Clear();
+                faces.AddRange(rebuiltFaces);
+
+                stats.AcceptedCount = selected.Count;
+                stats.ConstructedBevelPlaneCount = bevelPlaneCount;
+                stats.ProducedBevelFaceCount = producedBevelFaceCount;
+                stats.BevelDepthScalePercent = Mathf.RoundToInt(depthScale * 100f);
+                stats.TopologyOpenEdges = topologyStats.OpenEdgeCount;
+                stats.TopologyNonManifoldEdges = topologyStats.NonManifoldEdgeCount;
+                stats.TopologyTJunctions = topologyStats.TJunctionCount;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryBuildHalfSpaceEdgeWearSupportPlanes(
+            List<PolygonFace> sourceFaces,
+            List<EdgeWearBevelCandidate> selected,
+            float bevelDepth,
+            out List<EdgeWearSupportPlane> supportPlanes,
+            out int bevelPlaneCount,
+            out EdgeWearBevelRejectReason rejectReason)
+        {
+            supportPlanes = new List<EdgeWearSupportPlane>(
+                sourceFaces.Count + selected.Count);
+            bevelPlaneCount = 0;
+            rejectReason = EdgeWearBevelRejectReason.None;
+
+            Vector3 interiorPoint = CalculatePolyhedronInteriorPoint(sourceFaces);
+
+            for (int faceIndex = 0; faceIndex < sourceFaces.Count; faceIndex++)
+            {
+                PolygonFace face = sourceFaces[faceIndex];
+                if (face.Vertices.Count < 3)
+                {
+                    rejectReason = EdgeWearBevelRejectReason.ValidationBaseFace;
+                    return false;
+                }
+
+                float distance = AveragePlaneDistance(
+                    face.Normal,
+                    face.Vertices);
+                supportPlanes.Add(
+                    new EdgeWearSupportPlane(
+                        face.Normal,
+                        distance,
+                        face.Feature,
+                        face.FeatureStrength,
+                        -1));
+            }
+
+            for (int i = 0; i < selected.Count; i++)
+            {
+                EdgeWearBevelCandidate candidate = selected[i];
+                if (!TryBuildHalfSpaceBevelPlane(
+                        candidate,
+                        sourceFaces,
+                        bevelDepth * candidate.DepthMultiplier,
+                        interiorPoint,
+                        out EdgeWearSupportPlane bevelPlane))
+                {
+                    rejectReason = EdgeWearBevelRejectReason.InsetCut;
+                    return false;
+                }
+
+                supportPlanes.Add(bevelPlane);
+                bevelPlaneCount++;
+            }
+
+            return true;
+        }
+
+        private static bool TryBuildHalfSpaceBevelPlane(
+            EdgeWearBevelCandidate candidate,
+            List<PolygonFace> sourceFaces,
+            float candidateDepth,
+            Vector3 interiorPoint,
+            out EdgeWearSupportPlane bevelPlane)
+        {
+            bevelPlane = default;
+
+            if (!TryBuildFaceInsetCut(
+                    candidate,
+                    candidate.FaceA,
+                    sourceFaces[candidate.FaceA],
+                    candidateDepth,
+                    out FaceInsetCut cutA) ||
+                !TryBuildFaceInsetCut(
+                    candidate,
+                    candidate.FaceB,
+                    sourceFaces[candidate.FaceB],
+                    candidateDepth,
+                    out FaceInsetCut cutB))
+            {
+                return false;
+            }
+
+            Vector3 edge = candidate.End - candidate.Start;
+            float edgeLength = edge.magnitude;
+            if (edgeLength <= PlaneEpsilon)
+            {
+                return false;
+            }
+
+            Vector3 edgeDirection = edge / edgeLength;
+            float insetAStart = Mathf.Abs(cutA.Plane.SignedDistance(candidate.Start));
+            float insetAEnd = Mathf.Abs(cutA.Plane.SignedDistance(candidate.End));
+            float insetBStart = Mathf.Abs(cutB.Plane.SignedDistance(candidate.Start));
+            float insetBEnd = Mathf.Abs(cutB.Plane.SignedDistance(candidate.End));
+
+            Vector3 railAStart = candidate.Start + cutA.Inward * insetAStart;
+            Vector3 railAEnd = candidate.End + cutA.Inward * insetAEnd;
+            Vector3 railBStart = candidate.Start + cutB.Inward * insetBStart;
+            Vector3 railBEnd = candidate.End + cutB.Inward * insetBEnd;
+
+            Vector3 across = ((railBStart - railAStart) +
+                (railBEnd - railAEnd)) * 0.5f;
+            if (across.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                return false;
+            }
+
+            Vector3 normal = Vector3.Cross(edgeDirection, across);
+            if (normal.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                normal = Vector3.Cross(edgeDirection, railBEnd - railAStart);
+            }
+
+            if (normal.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                return false;
+            }
+
+            normal.Normalize();
+            if (Vector3.Dot(normal, candidate.BevelNormal) < 0f)
+            {
+                normal = -normal;
+            }
+
+            float distance =
+                (Vector3.Dot(normal, railAStart) +
+                 Vector3.Dot(normal, railAEnd) +
+                 Vector3.Dot(normal, railBStart) +
+                 Vector3.Dot(normal, railBEnd)) * 0.25f;
+
+            float edgeDistance = Vector3.Dot(normal, candidate.Midpoint);
+            if (edgeDistance <= distance + PlaneEpsilon)
+            {
+                distance = edgeDistance - Mathf.Max(
+                    PlaneEpsilon * 12f,
+                    candidateDepth * 0.15f);
+            }
+
+            if (Vector3.Dot(normal, interiorPoint) > distance - PlaneEpsilon)
+            {
+                return false;
+            }
+
+            bevelPlane = new EdgeWearSupportPlane(
+                normal,
+                distance,
+                PolygonFaceFeature.ConvexEdgeWear,
+                candidate.Strength,
+                candidate.CandidateIndex);
+            return true;
+        }
+
+        private static bool TryRebuildConvexPolyhedronFromSupportPlanes(
+            List<EdgeWearSupportPlane> supportPlanes,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength,
+            out List<PolygonFace> rebuiltFaces,
+            out int producedBevelFaceCount)
+        {
+            rebuiltFaces = null;
+            producedBevelFaceCount = 0;
+
+            if (supportPlanes.Count < 4)
+            {
+                return false;
+            }
+
+            float insideTolerance = Mathf.Max(
+                PlaneEpsilon * 12f,
+                minimumStableEdgeLength * 0.45f);
+            Dictionary<VertexKey, Vector3> uniqueVertices =
+                new Dictionary<VertexKey, Vector3>();
+
+            for (int i = 0; i < supportPlanes.Count - 2; i++)
+            {
+                for (int j = i + 1; j < supportPlanes.Count - 1; j++)
+                {
+                    for (int k = j + 1; k < supportPlanes.Count; k++)
+                    {
+                        if (!TryIntersectSupportPlanes(
+                                supportPlanes[i],
+                                supportPlanes[j],
+                                supportPlanes[k],
+                                out Vector3 point))
+                        {
+                            continue;
+                        }
+
+                        if (!IsInsideSupportPlanes(
+                                point,
+                                supportPlanes,
+                                insideTolerance))
+                        {
+                            continue;
+                        }
+
+                        VertexKey key = new VertexKey(point);
+                        if (!uniqueVertices.ContainsKey(key))
+                        {
+                            uniqueVertices.Add(key, point);
+                        }
+                    }
+                }
+            }
+
+            if (uniqueVertices.Count < 4)
+            {
+                return false;
+            }
+
+            List<Vector3> vertices = new List<Vector3>(uniqueVertices.Values);
+            List<PolygonFace> faces =
+                new List<PolygonFace>(supportPlanes.Count);
+            float faceTolerance = Mathf.Max(
+                PlaneEpsilon * 16f,
+                minimumStableEdgeLength * 0.55f);
+
+            for (int planeIndex = 0;
+                 planeIndex < supportPlanes.Count;
+                 planeIndex++)
+            {
+                EdgeWearSupportPlane plane = supportPlanes[planeIndex];
+                List<Vector3> faceVertices = new List<Vector3>();
+                for (int vertexIndex = 0;
+                     vertexIndex < vertices.Count;
+                     vertexIndex++)
+                {
+                    float distance = Mathf.Abs(
+                        Vector3.Dot(plane.Normal, vertices[vertexIndex]) -
+                        plane.Distance);
+                    if (distance <= faceTolerance)
+                    {
+                        faceVertices.Add(vertices[vertexIndex]);
+                    }
+                }
+
+                faceVertices = GetUniquePoints(faceVertices);
+                if (faceVertices.Count < 3)
+                {
+                    continue;
+                }
+
+                PolygonFace oriented = CreateOrientedFace(
+                    plane.Normal,
+                    plane.Feature,
+                    plane.FeatureStrength,
+                    faceVertices.ToArray());
+                List<Vector3> clean = SanitizePolygon(
+                    oriented.Vertices,
+                    oriented.Normal);
+                if (!ValidateLocalEdgeWearFace(
+                        clean,
+                        minimumStableFaceArea,
+                        minimumStableEdgeLength * 0.25f))
+                {
+                    continue;
+                }
+
+                faces.Add(
+                    new PolygonFace(
+                        clean,
+                        plane.Normal,
+                        plane.Feature,
+                        plane.FeatureStrength));
+                if (plane.Feature == PolygonFaceFeature.ConvexEdgeWear)
+                {
+                    producedBevelFaceCount++;
+                }
+            }
+
+            if (faces.Count < 4 || producedBevelFaceCount <= 0)
+            {
+                return false;
+            }
+
+            WeldSharedVertices(faces);
+            SanitizeAllFaces(faces);
+            producedBevelFaceCount = CountFeatureFaces(
+                faces,
+                PolygonFaceFeature.ConvexEdgeWear);
+            if (!ValidatePolyhedronFaces(
+                    faces,
+                    minimumStableFaceArea,
+                    minimumStableEdgeLength * 0.20f))
+            {
+                return false;
+            }
+
+            rebuiltFaces = faces;
+            return true;
+        }
+
+        private static bool TryIntersectSupportPlanes(
+            EdgeWearSupportPlane first,
+            EdgeWearSupportPlane second,
+            EdgeWearSupportPlane third,
+            out Vector3 point)
+        {
+            Vector3 n1 = first.Normal;
+            Vector3 n2 = second.Normal;
+            Vector3 n3 = third.Normal;
+            Vector3 n2CrossN3 = Vector3.Cross(n2, n3);
+            float denominator = Vector3.Dot(n1, n2CrossN3);
+
+            if (Mathf.Abs(denominator) <= PlaneEpsilon * 0.05f)
+            {
+                point = Vector3.zero;
+                return false;
+            }
+
+            point =
+                (first.Distance * n2CrossN3 +
+                 second.Distance * Vector3.Cross(n3, n1) +
+                 third.Distance * Vector3.Cross(n1, n2)) /
+                denominator;
+            return IsFinite(point);
+        }
+
+        private static bool IsInsideSupportPlanes(
+            Vector3 point,
+            List<EdgeWearSupportPlane> supportPlanes,
+            float tolerance)
+        {
+            for (int i = 0; i < supportPlanes.Count; i++)
+            {
+                if (Vector3.Dot(supportPlanes[i].Normal, point) -
+                    supportPlanes[i].Distance > tolerance)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static Vector3 CalculatePolyhedronInteriorPoint(
+            List<PolygonFace> faces)
+        {
+            List<Vector3> points = new List<Vector3>();
+            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
+            {
+                PolygonFace face = faces[faceIndex];
+                for (int vertexIndex = 0;
+                     vertexIndex < face.Vertices.Count;
+                     vertexIndex++)
+                {
+                    points.Add(face.Vertices[vertexIndex]);
+                }
+            }
+
+            return points.Count > 0
+                ? CalculateAverage(points)
+                : Vector3.zero;
+        }
+
+        private static float AveragePlaneDistance(
+            Vector3 normal,
+            List<Vector3> vertices)
+        {
+            float total = 0f;
+            for (int i = 0; i < vertices.Count; i++)
+            {
+                total += Vector3.Dot(normal, vertices[i]);
+            }
+
+            return total / Mathf.Max(1, vertices.Count);
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return !(float.IsNaN(value.x) ||
+                float.IsNaN(value.y) ||
+                float.IsNaN(value.z) ||
+                float.IsInfinity(value.x) ||
+                float.IsInfinity(value.y) ||
+                float.IsInfinity(value.z));
+        }
+
         private static bool TryApplyLocalEdgeWearBevels(
             List<PolygonFace> faces,
             List<EdgeWearBevelCandidate> candidates,
@@ -868,12 +2496,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         minimumStableEdgeLength,
                         out List<PolygonFace> rebuiltFaces,
                         out EdgeWearCornerClosureStats cornerClosureStats,
+                        out EdgeWearTopologyStats topologyStats,
                         out EdgeWearBevelRejectReason rejectReason))
                 {
                     bestFaces = rebuiltFaces;
                     stats.AcceptedCount = accepted.Count;
                     stats.CornerClosureCount = cornerClosureStats.CreatedCount;
                     stats.SkippedCornerClosureCount = cornerClosureStats.SkippedCount;
+                    stats.TopologyOpenEdges = topologyStats.OpenEdgeCount;
+                    stats.TopologyNonManifoldEdges = topologyStats.NonManifoldEdgeCount;
+                    stats.TopologyTJunctions = topologyStats.TJunctionCount;
                 }
                 else
                 {
@@ -895,6 +2527,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 WarnEdgeWearCornerClosureGaps(stats);
             }
 
+            if (stats.HasTopologyRejects)
+            {
+                WarnEdgeWearTopologyRejects(stats);
+            }
+
             return true;
         }
 
@@ -902,7 +2539,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
 #if UNITY_EDITOR
             Debug.LogWarning(
-                "GeneratedMass edge wear generated no local bevel faces. " +
+                "GeneratedMass edge wear generated no valid topology-graph bevel result. " +
                 stats.ToSummaryString());
 #endif
         }
@@ -916,6 +2553,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 #endif
         }
 
+        private static void WarnEdgeWearTopologyRejects(EdgeWearBevelBuildStats stats)
+        {
+#if UNITY_EDITOR
+            Debug.LogWarning(
+                "GeneratedMass edge wear rejected one or more topology-unsafe bevel candidates. " +
+                stats.ToSummaryString());
+#endif
+        }
+
         private static bool TryBuildLocalEdgeWearBevelFaces(
             List<PolygonFace> sourceFaces,
             List<EdgeWearBevelCandidate> selected,
@@ -925,10 +2571,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float minimumStableEdgeLength,
             out List<PolygonFace> rebuiltFaces,
             out EdgeWearCornerClosureStats cornerClosureStats,
+            out EdgeWearTopologyStats topologyStats,
             out EdgeWearBevelRejectReason rejectReason)
         {
             rebuiltFaces = null;
             cornerClosureStats = new EdgeWearCornerClosureStats();
+            topologyStats = EdgeWearTopologyStats.Empty;
             rejectReason = EdgeWearBevelRejectReason.None;
 
             Dictionary<int, List<FaceInsetCut>> cutsByFace =
@@ -969,6 +2617,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 rejectReason = EdgeWearBevelRejectReason.ValidationGlobal;
                 return false;
             }
+
+            EdgeWearTopologyStats sourceTopologyStats = AuditEdgeWearTopology(
+                sourceFaces,
+                minimumStableEdgeLength);
 
             float localBaseFaceMinArea = Mathf.Max(
                 TinyFaceAreaEpsilon * 4f,
@@ -1184,6 +2836,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     PolygonFaceFeature.ConvexEdgeWear) < selected.Count)
             {
                 rejectReason = EdgeWearBevelRejectReason.ValidationBevelFace;
+                return false;
+            }
+
+            topologyStats = AuditEdgeWearTopology(
+                localRebuiltFaces,
+                minimumStableEdgeLength);
+            if (topologyStats.OpenEdgeCount > sourceTopologyStats.OpenEdgeCount)
+            {
+                rejectReason = EdgeWearBevelRejectReason.ValidationOpenEdge;
+                return false;
+            }
+
+            if (topologyStats.NonManifoldEdgeCount >
+                sourceTopologyStats.NonManifoldEdgeCount)
+            {
+                rejectReason = EdgeWearBevelRejectReason.ValidationNonManifoldEdge;
+                return false;
+            }
+
+            if (topologyStats.TJunctionCount > sourceTopologyStats.TJunctionCount)
+            {
+                rejectReason = EdgeWearBevelRejectReason.ValidationTJunction;
                 return false;
             }
 
@@ -1691,6 +3365,166 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             cap.AddRailPair(firstRailPoint, secondRailPoint, strength);
+        }
+
+        private static EdgeWearTopologyStats AuditEdgeWearTopology(
+            List<PolygonFace> faces,
+            float minimumStableEdgeLength)
+        {
+            if (faces == null || faces.Count == 0)
+            {
+                return EdgeWearTopologyStats.Empty;
+            }
+
+            Dictionary<TopologyEdgeKey, int> edgeUseCounts =
+                new Dictionary<TopologyEdgeKey, int>();
+            List<TopologyEdgeSegment> edgeSegments =
+                new List<TopologyEdgeSegment>();
+            Dictionary<VertexKey, Vector3> uniqueVertices =
+                new Dictionary<VertexKey, Vector3>();
+
+            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
+            {
+                List<Vector3> vertices = faces[faceIndex].Vertices;
+                if (vertices == null || vertices.Count < 3)
+                {
+                    continue;
+                }
+
+                for (int vertexIndex = 0;
+                     vertexIndex < vertices.Count;
+                     vertexIndex++)
+                {
+                    Vector3 start = vertices[vertexIndex];
+                    Vector3 end = vertices[(vertexIndex + 1) % vertices.Count];
+
+                    if (AreSamePoint(start, end))
+                    {
+                        continue;
+                    }
+
+                    VertexKey startKey = new VertexKey(start);
+                    VertexKey endKey = new VertexKey(end);
+                    if (!uniqueVertices.ContainsKey(startKey))
+                    {
+                        uniqueVertices.Add(startKey, start);
+                    }
+
+                    if (!uniqueVertices.ContainsKey(endKey))
+                    {
+                        uniqueVertices.Add(endKey, end);
+                    }
+
+                    TopologyEdgeKey edgeKey = new TopologyEdgeKey(
+                        startKey,
+                        endKey);
+                    edgeUseCounts.TryGetValue(edgeKey, out int useCount);
+                    edgeUseCounts[edgeKey] = useCount + 1;
+                    edgeSegments.Add(
+                        new TopologyEdgeSegment(
+                            start,
+                            end,
+                            startKey,
+                            endKey));
+                }
+            }
+
+            int openEdges = 0;
+            int nonManifoldEdges = 0;
+            foreach (int useCount in edgeUseCounts.Values)
+            {
+                if (useCount == 1)
+                {
+                    openEdges++;
+                }
+                else if (useCount > 2)
+                {
+                    nonManifoldEdges++;
+                }
+            }
+
+            int tJunctions = CountTopologyTJunctions(
+                uniqueVertices,
+                edgeSegments,
+                minimumStableEdgeLength);
+
+            return new EdgeWearTopologyStats(
+                openEdges,
+                nonManifoldEdges,
+                tJunctions);
+        }
+
+        private static int CountTopologyTJunctions(
+            Dictionary<VertexKey, Vector3> uniqueVertices,
+            List<TopologyEdgeSegment> edgeSegments,
+            float minimumStableEdgeLength)
+        {
+            if (uniqueVertices.Count == 0 || edgeSegments.Count == 0)
+            {
+                return 0;
+            }
+
+            float tolerance = Mathf.Max(
+                PointMergeDistance * 4f,
+                minimumStableEdgeLength * 0.04f);
+            float toleranceSqr = tolerance * tolerance;
+            int count = 0;
+
+            foreach (KeyValuePair<VertexKey, Vector3> vertex in uniqueVertices)
+            {
+                for (int edgeIndex = 0;
+                     edgeIndex < edgeSegments.Count;
+                     edgeIndex++)
+                {
+                    TopologyEdgeSegment edge = edgeSegments[edgeIndex];
+                    if (vertex.Key.Equals(edge.StartKey) ||
+                        vertex.Key.Equals(edge.EndKey))
+                    {
+                        continue;
+                    }
+
+                    if (IsPointOnSegmentInterior(
+                            vertex.Value,
+                            edge.Start,
+                            edge.End,
+                            toleranceSqr))
+                    {
+                        count++;
+                        break;
+                    }
+                }
+            }
+
+            return count;
+        }
+
+        private static bool IsPointOnSegmentInterior(
+            Vector3 point,
+            Vector3 start,
+            Vector3 end,
+            float toleranceSqr)
+        {
+            Vector3 segment = end - start;
+            float segmentLengthSqr = segment.sqrMagnitude;
+            if (segmentLengthSqr <= MinimumEdgeLengthSqr)
+            {
+                return false;
+            }
+
+            if ((point - start).sqrMagnitude <= toleranceSqr ||
+                (point - end).sqrMagnitude <= toleranceSqr)
+            {
+                return false;
+            }
+
+            float t = Vector3.Dot(point - start, segment) / segmentLengthSqr;
+            if (t <= 0f || t >= 1f)
+            {
+                return false;
+            }
+
+            Vector3 closest = start + segment * t;
+            return (point - closest).sqrMagnitude <= toleranceSqr;
         }
 
         private static bool AreSamePoint(Vector3 left, Vector3 right)
@@ -4084,7 +5918,363 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ValidationBaseFace,
             ValidationBevelFace,
             ValidationCapFace,
+            ValidationOpenEdge,
+            ValidationNonManifoldEdge,
+            ValidationTJunction,
             ValidationGlobal
+        }
+
+        private readonly struct EdgeWearSupportPlane
+        {
+            public readonly Vector3 Normal;
+            public readonly float Distance;
+            public readonly PolygonFaceFeature Feature;
+            public readonly float FeatureStrength;
+            public readonly int CandidateIndex;
+
+            public EdgeWearSupportPlane(
+                Vector3 normal,
+                float distance,
+                PolygonFaceFeature feature,
+                float featureStrength,
+                int candidateIndex)
+            {
+                Normal = normal.normalized;
+                Distance = distance;
+                Feature = feature;
+                FeatureStrength = Mathf.Clamp01(featureStrength);
+                CandidateIndex = candidateIndex;
+            }
+        }
+
+        private readonly struct EdgeWearTopologyStats
+        {
+            public static readonly EdgeWearTopologyStats Empty =
+                new EdgeWearTopologyStats(0, 0, 0);
+
+            public readonly int OpenEdgeCount;
+            public readonly int NonManifoldEdgeCount;
+            public readonly int TJunctionCount;
+
+            public EdgeWearTopologyStats(
+                int openEdgeCount,
+                int nonManifoldEdgeCount,
+                int tJunctionCount)
+            {
+                OpenEdgeCount = openEdgeCount;
+                NonManifoldEdgeCount = nonManifoldEdgeCount;
+                TJunctionCount = tJunctionCount;
+            }
+        }
+
+        private readonly struct TopologyEdgeKey : IEquatable<TopologyEdgeKey>
+        {
+            private readonly VertexKey first;
+            private readonly VertexKey second;
+
+            public TopologyEdgeKey(VertexKey start, VertexKey end)
+            {
+                if (start.CompareTo(end) <= 0)
+                {
+                    first = start;
+                    second = end;
+                }
+                else
+                {
+                    first = end;
+                    second = start;
+                }
+            }
+
+            public bool Equals(TopologyEdgeKey other)
+            {
+                return first.Equals(other.first) &&
+                    second.Equals(other.second);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is TopologyEdgeKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return (first.GetHashCode() * 397) ^
+                        second.GetHashCode();
+                }
+            }
+        }
+
+        private readonly struct TopologyEdgeSegment
+        {
+            public readonly Vector3 Start;
+            public readonly Vector3 End;
+            public readonly VertexKey StartKey;
+            public readonly VertexKey EndKey;
+
+            public TopologyEdgeSegment(
+                Vector3 start,
+                Vector3 end,
+                VertexKey startKey,
+                VertexKey endKey)
+            {
+                Start = start;
+                End = end;
+                StartKey = startKey;
+                EndKey = endKey;
+            }
+        }
+
+        private sealed class EdgeWearTopologyGraph
+        {
+            public readonly List<EdgeWearGraphVertex> Vertices =
+                new List<EdgeWearGraphVertex>();
+            public readonly List<EdgeWearGraphEdge> Edges =
+                new List<EdgeWearGraphEdge>();
+            public readonly List<EdgeWearGraphFace> Faces =
+                new List<EdgeWearGraphFace>();
+            public readonly Dictionary<VertexKey, int> VertexByKey =
+                new Dictionary<VertexKey, int>();
+            public readonly Dictionary<EdgeKey, int> EdgeByKey =
+                new Dictionary<EdgeKey, int>();
+        }
+
+        private sealed class EdgeWearTopologyRebuildWorkspace
+        {
+            public readonly List<PolygonFace> RebuiltFaces =
+                new List<PolygonFace>();
+
+            public readonly Dictionary<int, PolygonFace> ClippedBaseFaceBySourceFace =
+                new Dictionary<int, PolygonFace>();
+
+            public readonly HashSet<int> AffectedSourceFaces =
+                new HashSet<int>();
+        }
+
+        private sealed class EdgeWearGraphVertex
+        {
+            public readonly Vector3 Position;
+            public readonly VertexKey Key;
+            public readonly List<int> EdgeIndices = new List<int>();
+            public readonly List<int> FaceIndices = new List<int>();
+
+            public EdgeWearGraphVertex(Vector3 position, VertexKey key)
+            {
+                Position = position;
+                Key = key;
+            }
+
+            public void AddEdge(int edgeIndex)
+            {
+                if (!EdgeIndices.Contains(edgeIndex))
+                {
+                    EdgeIndices.Add(edgeIndex);
+                }
+            }
+
+            public void AddFace(int faceIndex)
+            {
+                if (!FaceIndices.Contains(faceIndex))
+                {
+                    FaceIndices.Add(faceIndex);
+                }
+            }
+        }
+
+        private sealed class EdgeWearGraphEdge
+        {
+            public readonly int VertexA;
+            public readonly int VertexB;
+            public int FaceA = -1;
+            public int FaceB = -1;
+            public int ExtraFaceCount;
+            public int CandidateIndex = -1;
+            public bool Selected;
+
+            public EdgeWearGraphEdge(int vertexA, int vertexB)
+            {
+                VertexA = vertexA;
+                VertexB = vertexB;
+            }
+
+            public bool TryAddFace(int faceIndex)
+            {
+                if (FaceA == faceIndex || FaceB == faceIndex)
+                {
+                    return true;
+                }
+
+                if (FaceA < 0)
+                {
+                    FaceA = faceIndex;
+                    return true;
+                }
+
+                if (FaceB < 0)
+                {
+                    FaceB = faceIndex;
+                    return true;
+                }
+
+                ExtraFaceCount++;
+                return false;
+            }
+        }
+
+        private sealed class EdgeWearGraphFace
+        {
+            public readonly int SourceFaceIndex;
+            public readonly PolygonFace SourceFace;
+            public readonly List<int> VertexIndices;
+            public readonly List<int> EdgeIndices;
+
+            public EdgeWearGraphFace(
+                int sourceFaceIndex,
+                PolygonFace sourceFace,
+                List<int> vertexIndices,
+                List<int> edgeIndices)
+            {
+                SourceFaceIndex = sourceFaceIndex;
+                SourceFace = sourceFace;
+                VertexIndices = vertexIndices;
+                EdgeIndices = edgeIndices;
+            }
+        }
+
+        private readonly struct EdgeWearSelectedGraphEdge
+        {
+            public readonly int GraphEdgeIndex;
+            public readonly int CandidateIndex;
+            public readonly EdgeWearBevelCandidate Candidate;
+
+            public EdgeWearSelectedGraphEdge(
+                int graphEdgeIndex,
+                int candidateIndex,
+                EdgeWearBevelCandidate candidate)
+            {
+                GraphEdgeIndex = graphEdgeIndex;
+                CandidateIndex = candidateIndex;
+                Candidate = candidate;
+            }
+        }
+
+        private sealed class EdgeWearProfileGrid
+        {
+            public readonly EdgeWearBevelCandidate Candidate;
+            public readonly BevelRail RailA;
+            public readonly BevelRail RailB;
+            public readonly int SampleCount;
+            public readonly int ProfileSegments;
+            public readonly Vector3[,] Points;
+
+            public EdgeWearProfileGrid(
+                EdgeWearBevelCandidate candidate,
+                BevelRail railA,
+                BevelRail railB,
+                int sampleCount,
+                int profileSegments,
+                Vector3[,] points)
+            {
+                Candidate = candidate;
+                RailA = railA;
+                RailB = railB;
+                SampleCount = sampleCount;
+                ProfileSegments = profileSegments;
+                Points = points;
+            }
+
+            public Vector3[] GetBoundarySamples(int profileIndex)
+            {
+                Vector3[] samples = new Vector3[SampleCount];
+                int clampedProfileIndex = Mathf.Clamp(
+                    profileIndex,
+                    0,
+                    ProfileSegments);
+                for (int sampleIndex = 0; sampleIndex < SampleCount; sampleIndex++)
+                {
+                    samples[sampleIndex] = Points[sampleIndex, clampedProfileIndex];
+                }
+
+                return samples;
+            }
+        }
+
+        private readonly struct EdgeWearFaceRailSamples
+        {
+            public readonly int FaceIndex;
+            public readonly int CandidateIndex;
+            public readonly Vector3 Start;
+            public readonly Vector3 End;
+            public readonly Vector3[] Samples;
+
+            public EdgeWearFaceRailSamples(
+                int faceIndex,
+                int candidateIndex,
+                BevelRail rail,
+                Vector3[] samples)
+            {
+                FaceIndex = faceIndex;
+                CandidateIndex = candidateIndex;
+                Start = rail.Start;
+                End = rail.End;
+                Samples = samples;
+            }
+        }
+
+        private struct EdgeWearGraphBuildStats
+        {
+            public int GraphVertexCount;
+            public int GraphEdgeCount;
+            public int GraphFaceCount;
+            public int GraphBoundaryEdgeCount;
+            public int GraphNonManifoldEdgeCount;
+            public int SelectedGraphEdgeCount;
+            public int MissingSelectedGraphEdgeCount;
+            public int MismatchedSelectedGraphFaceCount;
+            public int DuplicateSelectedGraphEdgeCount;
+            public int InvalidFaceCount;
+            public int InvalidEdgeCount;
+            public int FaceClipAffectedFaceCount;
+            public int FaceClipSucceededFaceCount;
+            public int FaceClipFailedFaceCount;
+            public int SelectedFaceEdgeCount;
+            public int ExpectedRailCount;
+            public int ExtractedRailCount;
+            public int MissingRailCount;
+            public int ShortRailCount;
+            public int FragmentedRailCount;
+            public int ProfileEdgesPreparedCount;
+            public int ProfileEdgesFailedCount;
+            public int ProfileSampleCount;
+            public int ProfileSegmentCount;
+            public int ProfileGridPointCount;
+            public int ProfileMinSampleCount;
+            public int ProfileMaxSampleCount;
+            public int ProfileInvalidPointCount;
+            public int ProfileZeroWidthCount;
+            public int PreservedBaseFaceCount;
+            public int AffectedBaseFaceCount;
+            public int ReplacedBaseFaceCount;
+            public int BaseFaceValidationFailureCount;
+            public int WorkspaceFaceCount;
+            public int WorkspaceBaseFaceCount;
+            public int WorkspaceTemporaryOpenEdgeCount;
+            public int RailSampledBaseFaceCount;
+            public int RailSampledBoundarySegmentCount;
+            public int RailSamplesInsertedCount;
+            public int RailSamplesPreservedCount;
+            public int RailSampleInsertionFailureCount;
+            public int RibbonEdgesPreparedCount;
+            public int RibbonEdgesFailedCount;
+            public int RibbonFacesExpectedCount;
+            public int RibbonFacesBuiltCount;
+            public int RibbonDegenerateFaceCount;
+            public int RibbonInvalidFaceCount;
+            public int WorkspaceConvexEdgeWearFaceCount;
+            public int WorkspaceFacesAfterRibbonsCount;
+            public int WorkspaceOpenEdgesAfterRibbonsCount;
         }
 
         private struct EdgeWearCornerClosureStats
@@ -4116,9 +6306,68 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int RejectedValidationBaseFace;
             public int RejectedValidationBevelFace;
             public int RejectedValidationCapFace;
+            public int RejectedValidationOpenEdge;
+            public int RejectedValidationNonManifoldEdge;
+            public int RejectedValidationTJunction;
             public int RejectedValidationGlobal;
             public int CornerClosureCount;
             public int SkippedCornerClosureCount;
+            public int ConstructedBevelPlaneCount;
+            public int ProducedBevelFaceCount;
+            public int BevelDepthScalePercent;
+            public int GraphVertexCount;
+            public int GraphEdgeCount;
+            public int GraphFaceCount;
+            public int GraphBoundaryEdgeCount;
+            public int GraphNonManifoldEdgeCount;
+            public int SelectedGraphEdgeCount;
+            public int MissingSelectedGraphEdgeCount;
+            public int MismatchedSelectedGraphFaceCount;
+            public int DuplicateSelectedGraphEdgeCount;
+            public int InvalidGraphFaceCount;
+            public int InvalidGraphEdgeCount;
+            public int FaceClipAffectedFaceCount;
+            public int FaceClipSucceededFaceCount;
+            public int FaceClipFailedFaceCount;
+            public int SelectedFaceEdgeCount;
+            public int ExpectedRailCount;
+            public int ExtractedRailCount;
+            public int MissingRailCount;
+            public int ShortRailCount;
+            public int FragmentedRailCount;
+            public int ProfileEdgesPreparedCount;
+            public int ProfileEdgesFailedCount;
+            public int ProfileSampleCount;
+            public int ProfileSegmentCount;
+            public int ProfileGridPointCount;
+            public int ProfileMinSampleCount;
+            public int ProfileMaxSampleCount;
+            public int ProfileInvalidPointCount;
+            public int ProfileZeroWidthCount;
+            public int PreservedBaseFaceCount;
+            public int AffectedBaseFaceCount;
+            public int ReplacedBaseFaceCount;
+            public int BaseFaceValidationFailureCount;
+            public int WorkspaceFaceCount;
+            public int WorkspaceBaseFaceCount;
+            public int WorkspaceTemporaryOpenEdgeCount;
+            public int RailSampledBaseFaceCount;
+            public int RailSampledBoundarySegmentCount;
+            public int RailSamplesInsertedCount;
+            public int RailSamplesPreservedCount;
+            public int RailSampleInsertionFailureCount;
+            public int RibbonEdgesPreparedCount;
+            public int RibbonEdgesFailedCount;
+            public int RibbonFacesExpectedCount;
+            public int RibbonFacesBuiltCount;
+            public int RibbonDegenerateFaceCount;
+            public int RibbonInvalidFaceCount;
+            public int WorkspaceConvexEdgeWearFaceCount;
+            public int WorkspaceFacesAfterRibbonsCount;
+            public int WorkspaceOpenEdgesAfterRibbonsCount;
+            public int TopologyOpenEdges;
+            public int TopologyNonManifoldEdges;
+            public int TopologyTJunctions;
             public int RejectedUnknown;
 
             public EdgeWearBevelBuildStats(int candidateCount, int selectedCount)
@@ -4134,10 +6383,123 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 RejectedValidationBaseFace = 0;
                 RejectedValidationBevelFace = 0;
                 RejectedValidationCapFace = 0;
+                RejectedValidationOpenEdge = 0;
+                RejectedValidationNonManifoldEdge = 0;
+                RejectedValidationTJunction = 0;
                 RejectedValidationGlobal = 0;
                 CornerClosureCount = 0;
                 SkippedCornerClosureCount = 0;
+                ConstructedBevelPlaneCount = 0;
+                ProducedBevelFaceCount = 0;
+                BevelDepthScalePercent = 0;
+                GraphVertexCount = 0;
+                GraphEdgeCount = 0;
+                GraphFaceCount = 0;
+                GraphBoundaryEdgeCount = 0;
+                GraphNonManifoldEdgeCount = 0;
+                SelectedGraphEdgeCount = 0;
+                MissingSelectedGraphEdgeCount = 0;
+                MismatchedSelectedGraphFaceCount = 0;
+                DuplicateSelectedGraphEdgeCount = 0;
+                InvalidGraphFaceCount = 0;
+                InvalidGraphEdgeCount = 0;
+                FaceClipAffectedFaceCount = 0;
+                FaceClipSucceededFaceCount = 0;
+                FaceClipFailedFaceCount = 0;
+                SelectedFaceEdgeCount = 0;
+                ExpectedRailCount = 0;
+                ExtractedRailCount = 0;
+                MissingRailCount = 0;
+                ShortRailCount = 0;
+                FragmentedRailCount = 0;
+                ProfileEdgesPreparedCount = 0;
+                ProfileEdgesFailedCount = 0;
+                ProfileSampleCount = 0;
+                ProfileSegmentCount = 0;
+                ProfileGridPointCount = 0;
+                ProfileMinSampleCount = 0;
+                ProfileMaxSampleCount = 0;
+                ProfileInvalidPointCount = 0;
+                ProfileZeroWidthCount = 0;
+                PreservedBaseFaceCount = 0;
+                AffectedBaseFaceCount = 0;
+                ReplacedBaseFaceCount = 0;
+                BaseFaceValidationFailureCount = 0;
+                WorkspaceFaceCount = 0;
+                WorkspaceBaseFaceCount = 0;
+                WorkspaceTemporaryOpenEdgeCount = 0;
+                RailSampledBaseFaceCount = 0;
+                RailSampledBoundarySegmentCount = 0;
+                RailSamplesInsertedCount = 0;
+                RailSamplesPreservedCount = 0;
+                RailSampleInsertionFailureCount = 0;
+                RibbonEdgesPreparedCount = 0;
+                RibbonEdgesFailedCount = 0;
+                RibbonFacesExpectedCount = 0;
+                RibbonFacesBuiltCount = 0;
+                RibbonDegenerateFaceCount = 0;
+                RibbonInvalidFaceCount = 0;
+                WorkspaceConvexEdgeWearFaceCount = 0;
+                WorkspaceFacesAfterRibbonsCount = 0;
+                WorkspaceOpenEdgesAfterRibbonsCount = 0;
+                TopologyOpenEdges = 0;
+                TopologyNonManifoldEdges = 0;
+                TopologyTJunctions = 0;
                 RejectedUnknown = 0;
+            }
+
+            public void ApplyGraphStats(EdgeWearGraphBuildStats graphStats)
+            {
+                GraphVertexCount = graphStats.GraphVertexCount;
+                GraphEdgeCount = graphStats.GraphEdgeCount;
+                GraphFaceCount = graphStats.GraphFaceCount;
+                GraphBoundaryEdgeCount = graphStats.GraphBoundaryEdgeCount;
+                GraphNonManifoldEdgeCount = graphStats.GraphNonManifoldEdgeCount;
+                SelectedGraphEdgeCount = graphStats.SelectedGraphEdgeCount;
+                MissingSelectedGraphEdgeCount = graphStats.MissingSelectedGraphEdgeCount;
+                MismatchedSelectedGraphFaceCount = graphStats.MismatchedSelectedGraphFaceCount;
+                DuplicateSelectedGraphEdgeCount = graphStats.DuplicateSelectedGraphEdgeCount;
+                InvalidGraphFaceCount = graphStats.InvalidFaceCount;
+                InvalidGraphEdgeCount = graphStats.InvalidEdgeCount;
+                FaceClipAffectedFaceCount = graphStats.FaceClipAffectedFaceCount;
+                FaceClipSucceededFaceCount = graphStats.FaceClipSucceededFaceCount;
+                FaceClipFailedFaceCount = graphStats.FaceClipFailedFaceCount;
+                SelectedFaceEdgeCount = graphStats.SelectedFaceEdgeCount;
+                ExpectedRailCount = graphStats.ExpectedRailCount;
+                ExtractedRailCount = graphStats.ExtractedRailCount;
+                MissingRailCount = graphStats.MissingRailCount;
+                ShortRailCount = graphStats.ShortRailCount;
+                FragmentedRailCount = graphStats.FragmentedRailCount;
+                ProfileEdgesPreparedCount = graphStats.ProfileEdgesPreparedCount;
+                ProfileEdgesFailedCount = graphStats.ProfileEdgesFailedCount;
+                ProfileSampleCount = graphStats.ProfileSampleCount;
+                ProfileSegmentCount = graphStats.ProfileSegmentCount;
+                ProfileGridPointCount = graphStats.ProfileGridPointCount;
+                ProfileMinSampleCount = graphStats.ProfileMinSampleCount;
+                ProfileMaxSampleCount = graphStats.ProfileMaxSampleCount;
+                ProfileInvalidPointCount = graphStats.ProfileInvalidPointCount;
+                ProfileZeroWidthCount = graphStats.ProfileZeroWidthCount;
+                PreservedBaseFaceCount = graphStats.PreservedBaseFaceCount;
+                AffectedBaseFaceCount = graphStats.AffectedBaseFaceCount;
+                ReplacedBaseFaceCount = graphStats.ReplacedBaseFaceCount;
+                BaseFaceValidationFailureCount = graphStats.BaseFaceValidationFailureCount;
+                WorkspaceFaceCount = graphStats.WorkspaceFaceCount;
+                WorkspaceBaseFaceCount = graphStats.WorkspaceBaseFaceCount;
+                WorkspaceTemporaryOpenEdgeCount = graphStats.WorkspaceTemporaryOpenEdgeCount;
+                RailSampledBaseFaceCount = graphStats.RailSampledBaseFaceCount;
+                RailSampledBoundarySegmentCount = graphStats.RailSampledBoundarySegmentCount;
+                RailSamplesInsertedCount = graphStats.RailSamplesInsertedCount;
+                RailSamplesPreservedCount = graphStats.RailSamplesPreservedCount;
+                RailSampleInsertionFailureCount = graphStats.RailSampleInsertionFailureCount;
+                RibbonEdgesPreparedCount = graphStats.RibbonEdgesPreparedCount;
+                RibbonEdgesFailedCount = graphStats.RibbonEdgesFailedCount;
+                RibbonFacesExpectedCount = graphStats.RibbonFacesExpectedCount;
+                RibbonFacesBuiltCount = graphStats.RibbonFacesBuiltCount;
+                RibbonDegenerateFaceCount = graphStats.RibbonDegenerateFaceCount;
+                RibbonInvalidFaceCount = graphStats.RibbonInvalidFaceCount;
+                WorkspaceConvexEdgeWearFaceCount = graphStats.WorkspaceConvexEdgeWearFaceCount;
+                WorkspaceFacesAfterRibbonsCount = graphStats.WorkspaceFacesAfterRibbonsCount;
+                WorkspaceOpenEdgesAfterRibbonsCount = graphStats.WorkspaceOpenEdgesAfterRibbonsCount;
             }
 
             public void RegisterReject(EdgeWearBevelRejectReason reason)
@@ -4168,6 +6530,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     case EdgeWearBevelRejectReason.ValidationCapFace:
                         RejectedValidationCapFace++;
                         break;
+                    case EdgeWearBevelRejectReason.ValidationOpenEdge:
+                        RejectedValidationOpenEdge++;
+                        break;
+                    case EdgeWearBevelRejectReason.ValidationNonManifoldEdge:
+                        RejectedValidationNonManifoldEdge++;
+                        break;
+                    case EdgeWearBevelRejectReason.ValidationTJunction:
+                        RejectedValidationTJunction++;
+                        break;
                     case EdgeWearBevelRejectReason.ValidationGlobal:
                         RejectedValidationGlobal++;
                         break;
@@ -4176,6 +6547,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         break;
                 }
             }
+
+            public bool HasTopologyRejects =>
+                RejectedValidationOpenEdge > 0 ||
+                RejectedValidationNonManifoldEdge > 0 ||
+                RejectedValidationTJunction > 0;
 
             public string ToSummaryString()
             {
@@ -4188,9 +6564,68 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     $"rejectedValidationBaseFace={RejectedValidationBaseFace}, " +
                     $"rejectedValidationBevelFace={RejectedValidationBevelFace}, " +
                     $"rejectedValidationCapFace={RejectedValidationCapFace}, " +
+                    $"rejectedValidationOpenEdge={RejectedValidationOpenEdge}, " +
+                    $"rejectedValidationNonManifoldEdge={RejectedValidationNonManifoldEdge}, " +
+                    $"rejectedValidationTJunction={RejectedValidationTJunction}, " +
                     $"rejectedValidationGlobal={RejectedValidationGlobal}, " +
                     $"cornerClosures={CornerClosureCount}, " +
                     $"skippedCornerClosures={SkippedCornerClosureCount}, " +
+                    $"constructedBevelPlanes={ConstructedBevelPlaneCount}, " +
+                    $"producedBevelFaces={ProducedBevelFaceCount}, " +
+                    $"bevelDepthScalePercent={BevelDepthScalePercent}, " +
+                    $"graphVertices={GraphVertexCount}, " +
+                    $"graphEdges={GraphEdgeCount}, " +
+                    $"graphFaces={GraphFaceCount}, " +
+                    $"graphBoundaryEdges={GraphBoundaryEdgeCount}, " +
+                    $"graphNonManifoldEdges={GraphNonManifoldEdgeCount}, " +
+                    $"selectedGraphEdges={SelectedGraphEdgeCount}, " +
+                    $"missingSelectedGraphEdges={MissingSelectedGraphEdgeCount}, " +
+                    $"mismatchedSelectedGraphFaces={MismatchedSelectedGraphFaceCount}, " +
+                    $"duplicateSelectedGraphEdges={DuplicateSelectedGraphEdgeCount}, " +
+                    $"invalidGraphFaces={InvalidGraphFaceCount}, " +
+                    $"invalidGraphEdges={InvalidGraphEdgeCount}, " +
+                    $"faceClipAffectedFaces={FaceClipAffectedFaceCount}, " +
+                    $"faceClipSucceededFaces={FaceClipSucceededFaceCount}, " +
+                    $"faceClipFailedFaces={FaceClipFailedFaceCount}, " +
+                    $"selectedFaceEdges={SelectedFaceEdgeCount}, " +
+                    $"expectedRails={ExpectedRailCount}, " +
+                    $"extractedRails={ExtractedRailCount}, " +
+                    $"missingRails={MissingRailCount}, " +
+                    $"shortRails={ShortRailCount}, " +
+                    $"fragmentedRails={FragmentedRailCount}, " +
+                    $"profileEdgesPrepared={ProfileEdgesPreparedCount}, " +
+                    $"profileEdgesFailed={ProfileEdgesFailedCount}, " +
+                    $"profileSamples={ProfileSampleCount}, " +
+                    $"profileSegments={ProfileSegmentCount}, " +
+                    $"profileGridPoints={ProfileGridPointCount}, " +
+                    $"profileMinSamples={ProfileMinSampleCount}, " +
+                    $"profileMaxSamples={ProfileMaxSampleCount}, " +
+                    $"profileInvalidPoints={ProfileInvalidPointCount}, " +
+                    $"profileZeroWidth={ProfileZeroWidthCount}, " +
+                    $"preservedBaseFaces={PreservedBaseFaceCount}, " +
+                    $"affectedBaseFaces={AffectedBaseFaceCount}, " +
+                    $"replacedBaseFaces={ReplacedBaseFaceCount}, " +
+                    $"baseFaceValidationFailures={BaseFaceValidationFailureCount}, " +
+                    $"workspaceFaces={WorkspaceFaceCount}, " +
+                    $"workspaceBaseFaces={WorkspaceBaseFaceCount}, " +
+                    $"workspaceTemporaryOpenEdges={WorkspaceTemporaryOpenEdgeCount}, " +
+                    $"railSampledBaseFaces={RailSampledBaseFaceCount}, " +
+                    $"railSampledBoundarySegments={RailSampledBoundarySegmentCount}, " +
+                    $"railSamplesInserted={RailSamplesInsertedCount}, " +
+                    $"railSamplesPreserved={RailSamplesPreservedCount}, " +
+                    $"railSampleInsertionFailures={RailSampleInsertionFailureCount}, " +
+                    $"ribbonEdgesPrepared={RibbonEdgesPreparedCount}, " +
+                    $"ribbonEdgesFailed={RibbonEdgesFailedCount}, " +
+                    $"ribbonFacesExpected={RibbonFacesExpectedCount}, " +
+                    $"ribbonFacesBuilt={RibbonFacesBuiltCount}, " +
+                    $"ribbonDegenerateFaces={RibbonDegenerateFaceCount}, " +
+                    $"ribbonInvalidFaces={RibbonInvalidFaceCount}, " +
+                    $"workspaceConvexEdgeWearFaces={WorkspaceConvexEdgeWearFaceCount}, " +
+                    $"workspaceFacesAfterRibbons={WorkspaceFacesAfterRibbonsCount}, " +
+                    $"workspaceOpenEdgesAfterRibbons={WorkspaceOpenEdgesAfterRibbonsCount}, " +
+                    $"topologyOpenEdges={TopologyOpenEdges}, " +
+                    $"topologyNonManifoldEdges={TopologyNonManifoldEdges}, " +
+                    $"topologyTJunctions={TopologyTJunctions}, " +
                     $"rejectedUnknown={RejectedUnknown}.";
             }
         }
