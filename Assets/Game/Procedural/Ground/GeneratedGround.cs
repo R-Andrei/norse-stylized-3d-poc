@@ -402,6 +402,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     localSample.Exposure,
                     localSample.DampDeposit,
                     localSample.VegetationSuitability,
+                    new Vector4(
+                        localSample.Compaction,
+                        localSample.ShoreInfluence,
+                        localSample.RockyDry,
+                        localSample.ReservedSurfaceMask),
                     localSample.MaterialClassification);
 
             return true;
@@ -575,7 +580,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         private void ApplySurfaceProfileMaterialProperties()
         {
-            if (meshRenderer == null)
+            ApplySurfaceProfileMaterialProperties(meshRenderer);
+        }
+
+        public void ApplySurfaceProfileMaterialProperties(Renderer targetRenderer)
+        {
+            if (targetRenderer == null)
             {
                 return;
             }
@@ -602,12 +612,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 GroundSurfaceProfile.ResolveRainAbsorption(surfaceProfile);
 
             materialProperties ??= new MaterialPropertyBlock();
-            meshRenderer.GetPropertyBlock(materialProperties);
+            targetRenderer.GetPropertyBlock(materialProperties);
 
             // Surface Contract: 0 = generated mass/rock, 1 = generated ground.
-            // The material may be shared with stones, so ground-specific response
-            // is selected per-renderer through a property block rather than by
-            // mutating or duplicating the material asset.
+            // The material may be shared with stones and corridor geometry, so
+            // ground-specific response is selected per-renderer through a
+            // property block rather than by mutating or duplicating the material
+            // asset.
             materialProperties.SetFloat(SurfaceContractId, 1f);
             materialProperties.SetFloat(
                 ProfileContrastId,
@@ -633,7 +644,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 GroundShoreDampStrengthId,
                 Mathf.Lerp(0.75f, 1.35f, rainAbsorption));
 
-            meshRenderer.SetPropertyBlock(materialProperties);
+            targetRenderer.SetPropertyBlock(materialProperties);
         }
 
         private void EnsureGeneratedMesh()

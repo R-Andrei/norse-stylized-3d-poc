@@ -1,8 +1,8 @@
 # Generated Mass Edge Wear Recovery Architecture
 
 Status: active recovery plan  
-Current patch: EW-4B.4 — Candidate-Local Bevel Validation  
-Next production patch: visual/topology tuning after accepted bevel faces are confirmed
+Current patch: EW-4B.5 — Shared Corner Closure  
+Next production patch: visual/topology tuning after joint closure validation
 
 ---
 
@@ -317,3 +317,18 @@ EW-4B.4 changes the acceptance rule. A candidate is now rejected by validation o
 Endpoint cap faces are treated as optional. If a cap degenerates or falls below the relaxed cap threshold, it is skipped rather than killing the bevel strip. The final whole-polyhedron validator remains available for older global clipping code paths, but it is no longer the local edge-strip candidate killer.
 
 Validation after this patch must use `Surface Mask Debug = ConvexEdgeWear`. A successful first result is not “beautiful bevels”; it is `accepted > 0` in the console and visible UV2.z geometry-mask faces. Visual width/coverage/tint tuning comes after that proof.
+
+
+## EW-4B.5 update — shared corner closure replaces per-edge joint caps
+
+EW-4B.4 validation restored physical bevel strips and made the edge-wear controls visibly affect generated geometry. The next observed failure was topology at bevel joints: triangle-like artifacts and mesh gaps appeared where several bevel strips met at an original source vertex. Code inspection matched that result: each bevel strip still added independent triangular endpoint caps, and failed caps were skipped without being represented in the build summary.
+
+EW-4B.5 changes the local-strip closure policy:
+
+- bevel strips still generate per selected edge;
+- rail endpoints are accumulated by original source vertex;
+- a shared corner closure face is generated once per source vertex when multiple bevels meet;
+- isolated bevel endpoints keep the old triangular fallback cap;
+- created/skipped corner closures are added to the editor summary so remaining holes are diagnosable instead of silent.
+
+This is still plane-cut GeneratedMass-only. It does not modify the shader, FeatureAtlas0/1, MeshData, MeshBuilder, GeneratedGround, or the ground generator. `ConvexEdgeWear` remains the correct debug view for generated bevel geometry. `Convex Boundary Proximity` remains atlas/debug data and can reveal malformed geometry only because it renders over the same mesh.

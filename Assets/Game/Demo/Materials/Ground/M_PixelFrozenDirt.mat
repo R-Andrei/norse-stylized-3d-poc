@@ -21,7 +21,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: M_PixelFrozenDirt
-  m_Shader: {fileID: -6465566751694194690, guid: e88dcc2f542a49e429a211631d1271ef, type: 3}
+  m_Shader: {fileID: 4800000, guid: b6f12e4b78e04d2fa9943c7a91f8436d, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -150,6 +150,7 @@ Material:
     - _GroundShoreDampStrength: 1
     - _GroundSnowResponse: 1
     - _GroundVegetationResponse: 0.25
+    - _LightingTintInfluence: 0.35
     - _HighlightCompressStart: 0.72
     - _HighlightCompressStrength: 0.08
     - _MaskDebugMode: 0
@@ -186,7 +187,7 @@ Material:
     - _StoneEdgeWearResponse: 0.5
     - _StoneFeatureClip: 0.035
     - _Surface: 0
-    - _SurfaceContract: 0
+    - _SurfaceContract: 1
     - _Tone_Count: 4.96
     - _Vertex_Variation: 0.08
     - _WetDarkenStrength: 0.22

@@ -1,8 +1,8 @@
 # Generated Mass Feature Implementation Checklist
 
 Status: active implementation checklist  
-Current patch: EW-4B.4 — Candidate-Local Bevel Validation  
-Next patch: visual/topology tuning after accepted bevel faces are confirmed
+Current patch: EW-4B.5 — Shared Corner Closure  
+Next patch: visual/topology tuning after joint closure validation
 
 ---
 
@@ -346,3 +346,24 @@ Validation focus after EW-4B.4:
 2. Confirm the warning is gone or `accepted > 0` appears in the console summary.
 3. If still failing, use the split validation bucket to identify whether the remaining blocker is base-face, bevel-face, cap-face, or global validation.
 4. Only tune visual controls after physical bevel faces exist.
+
+
+## EW-4B.5 checklist status
+
+Completed in EW-4B.5:
+
+- Replaced automatic per-edge endpoint-cap creation with a shared corner-closure accumulation pass.
+- Collected bevel rail endpoints by original source vertex.
+- Generated one shared `ConvexEdgeWear` corner patch when multiple bevel strips meet at the same source vertex.
+- Preserved triangular endpoint caps only as an isolated-end fallback.
+- Added `cornerClosures` and `skippedCornerClosures` to the editor summary string.
+- Added an editor warning when accepted bevels exist but one or more corner closures are skipped.
+- Did not modify shader, FeatureAtlas0/1, MeshData, MeshBuilder, GeneratedGround, or ground generation.
+
+Validation focus after EW-4B.5:
+
+1. Use the same settings that showed joint triangles/gaps after EW-4B.4.
+2. Confirm physical bevels still exist and controls still affect Amount, Width, and Coverage.
+3. Inspect bevel joints in normal render and `Surface Mask Debug = ConvexEdgeWear`.
+4. If gaps remain, check the console for `skippedCornerClosures`.
+5. Continue visual tuning only after joint holes are gone or isolated to a specific skipped-corner count.

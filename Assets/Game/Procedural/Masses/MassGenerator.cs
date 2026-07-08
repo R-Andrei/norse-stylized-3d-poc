@@ -867,10 +867,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         minimumStableFaceArea,
                         minimumStableEdgeLength,
                         out List<PolygonFace> rebuiltFaces,
+                        out EdgeWearCornerClosureStats cornerClosureStats,
                         out EdgeWearBevelRejectReason rejectReason))
                 {
                     bestFaces = rebuiltFaces;
                     stats.AcceptedCount = accepted.Count;
+                    stats.CornerClosureCount = cornerClosureStats.CreatedCount;
+                    stats.SkippedCornerClosureCount = cornerClosureStats.SkippedCount;
                 }
                 else
                 {
@@ -886,6 +889,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             faces.Clear();
             faces.AddRange(bestFaces);
+
+            if (stats.SkippedCornerClosureCount > 0)
+            {
+                WarnEdgeWearCornerClosureGaps(stats);
+            }
+
             return true;
         }
 
@@ -898,6 +907,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 #endif
         }
 
+        private static void WarnEdgeWearCornerClosureGaps(EdgeWearBevelBuildStats stats)
+        {
+#if UNITY_EDITOR
+            Debug.LogWarning(
+                "GeneratedMass edge wear skipped one or more corner closures. " +
+                stats.ToSummaryString());
+#endif
+        }
+
         private static bool TryBuildLocalEdgeWearBevelFaces(
             List<PolygonFace> sourceFaces,
             List<EdgeWearBevelCandidate> selected,
@@ -906,9 +924,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float minimumStableFaceArea,
             float minimumStableEdgeLength,
             out List<PolygonFace> rebuiltFaces,
+            out EdgeWearCornerClosureStats cornerClosureStats,
             out EdgeWearBevelRejectReason rejectReason)
         {
             rebuiltFaces = null;
+            cornerClosureStats = new EdgeWearCornerClosureStats();
             rejectReason = EdgeWearBevelRejectReason.None;
 
             Dictionary<int, List<FaceInsetCut>> cutsByFace =
@@ -1064,6 +1084,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 railsByCandidateFace[MakeCandidateFaceKey(candidate.CandidateIndex, candidate.FaceB)] = railB;
             }
 
+            Dictionary<VertexKey, EndpointCapAccumulator> cornerClosures =
+                new Dictionary<VertexKey, EndpointCapAccumulator>(selected.Count * 2);
+
             for (int i = 0; i < selected.Count; i++)
             {
                 EdgeWearBevelCandidate candidate = selected[i];
@@ -1109,25 +1132,27 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         bevelFace.Feature,
                         bevelFace.FeatureStrength));
 
-                AddEndpointCapFace(
-                    localRebuiltFaces,
-                    bounds,
+                AddCornerClosurePoints(
+                    cornerClosures,
                     candidate.Start,
                     candidate.Strength,
                     railA.Start,
-                    railB.Start,
-                    localCapFaceMinArea,
-                    localCapMinEdgeLength);
-                AddEndpointCapFace(
-                    localRebuiltFaces,
-                    bounds,
+                    railB.Start);
+                AddCornerClosurePoints(
+                    cornerClosures,
                     candidate.End,
                     candidate.Strength,
                     railA.End,
-                    railB.End,
-                    localCapFaceMinArea,
-                    localCapMinEdgeLength);
+                    railB.End);
             }
+
+            AddCornerClosureFaces(
+                localRebuiltFaces,
+                cornerClosures,
+                bounds,
+                localCapFaceMinArea,
+                localCapMinEdgeLength,
+                ref cornerClosureStats);
 
             WeldSharedVertices(localRebuiltFaces);
             SanitizeAllFaces(localRebuiltFaces);
@@ -1203,6 +1228,153 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             return false;
+        }
+
+        private static void AddCornerClosureFaces(
+            List<PolygonFace> rebuiltFaces,
+            Dictionary<VertexKey, EndpointCapAccumulator> cornerClosures,
+            Bounds bounds,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength,
+            ref EdgeWearCornerClosureStats stats)
+        {
+            foreach (EndpointCapAccumulator closure in cornerClosures.Values)
+            {
+                if (TryAddCornerClosureFace(
+                        rebuiltFaces,
+                        bounds,
+                        closure,
+                        minimumStableFaceArea,
+                        minimumStableEdgeLength))
+                {
+                    stats.RegisterCreated();
+                }
+                else
+                {
+                    stats.RegisterSkipped();
+                }
+            }
+        }
+
+        private static bool TryAddCornerClosureFace(
+            List<PolygonFace> rebuiltFaces,
+            Bounds bounds,
+            EndpointCapAccumulator closure,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength)
+        {
+            List<Vector3> uniqueRailPoints = GetUniquePoints(closure.Points);
+            if (uniqueRailPoints.Count < 2)
+            {
+                return false;
+            }
+
+            if (closure.RailPairCount <= 1 || uniqueRailPoints.Count < 3)
+            {
+                return AddEndpointCapFace(
+                    rebuiltFaces,
+                    bounds,
+                    closure.Origin,
+                    closure.AverageStrength,
+                    uniqueRailPoints[0],
+                    uniqueRailPoints[1],
+                    minimumStableFaceArea,
+                    minimumStableEdgeLength);
+            }
+
+            Vector3 outward = closure.Origin - bounds.center;
+            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                outward = CalculatePolygonNormal(uniqueRailPoints);
+            }
+
+            PolygonFace cornerFace = CreateOrientedFace(
+                outward,
+                PolygonFaceFeature.ConvexEdgeWear,
+                closure.AverageStrength,
+                uniqueRailPoints.ToArray());
+            List<Vector3> cleanCorner = SanitizePolygon(
+                cornerFace.Vertices,
+                cornerFace.Normal);
+
+            if (ValidateLocalEdgeWearFace(
+                    cleanCorner,
+                    minimumStableFaceArea,
+                    minimumStableEdgeLength))
+            {
+                rebuiltFaces.Add(
+                    new PolygonFace(
+                        cleanCorner,
+                        cornerFace.Normal,
+                        cornerFace.Feature,
+                        cornerFace.FeatureStrength));
+                return true;
+            }
+
+            return TryAddCornerClosureFan(
+                rebuiltFaces,
+                cornerFace.Normal,
+                closure.AverageStrength,
+                cleanCorner,
+                minimumStableFaceArea,
+                minimumStableEdgeLength);
+        }
+
+        private static bool TryAddCornerClosureFan(
+            List<PolygonFace> rebuiltFaces,
+            Vector3 outwardNormal,
+            float strength,
+            List<Vector3> orderedRailPoints,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength)
+        {
+            if (orderedRailPoints.Count < 3)
+            {
+                return false;
+            }
+
+            Vector3 centre = CalculateAverage(orderedRailPoints);
+            int addedCount = 0;
+            for (int i = 0; i < orderedRailPoints.Count; i++)
+            {
+                Vector3 start = orderedRailPoints[i];
+                Vector3 end = orderedRailPoints[(i + 1) % orderedRailPoints.Count];
+                if (AreSamePoint(start, end) ||
+                    AreSamePoint(start, centre) ||
+                    AreSamePoint(end, centre))
+                {
+                    continue;
+                }
+
+                PolygonFace fanFace = CreateOrientedFace(
+                    outwardNormal,
+                    PolygonFaceFeature.ConvexEdgeWear,
+                    strength,
+                    start,
+                    end,
+                    centre);
+                List<Vector3> cleanFan = SanitizePolygon(
+                    fanFace.Vertices,
+                    fanFace.Normal);
+
+                if (!ValidateLocalEdgeWearFace(
+                        cleanFan,
+                        minimumStableFaceArea,
+                        minimumStableEdgeLength))
+                {
+                    continue;
+                }
+
+                rebuiltFaces.Add(
+                    new PolygonFace(
+                        cleanFan,
+                        fanFace.Normal,
+                        fanFace.Feature,
+                        fanFace.FeatureStrength));
+                addedCount++;
+            }
+
+            return addedCount > 0;
         }
 
         private static void AddFaceInsetCut(
@@ -1466,23 +1638,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return true;
         }
 
-        private static void AddEndpointCapPoints(
-            Dictionary<VertexKey, EndpointCapAccumulator> endpointCaps,
+        private static void AddCornerClosurePoints(
+            Dictionary<VertexKey, EndpointCapAccumulator> cornerClosures,
             Vector3 origin,
             float strength,
             Vector3 firstRailPoint,
             Vector3 secondRailPoint)
         {
             VertexKey key = new VertexKey(origin);
-            if (!endpointCaps.TryGetValue(key, out EndpointCapAccumulator cap))
+            if (!cornerClosures.TryGetValue(key, out EndpointCapAccumulator cap))
             {
                 cap = new EndpointCapAccumulator(origin);
-                endpointCaps.Add(key, cap);
+                cornerClosures.Add(key, cap);
             }
 
-            cap.Add(origin, strength);
-            cap.Add(firstRailPoint, strength);
-            cap.Add(secondRailPoint, strength);
+            cap.AddRailPair(firstRailPoint, secondRailPoint, strength);
         }
 
         private static bool AreSamePoint(Vector3 left, Vector3 right)
@@ -3878,6 +4048,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ValidationGlobal
         }
 
+        private struct EdgeWearCornerClosureStats
+        {
+            public int CreatedCount;
+            public int SkippedCount;
+
+            public void RegisterCreated()
+            {
+                CreatedCount++;
+            }
+
+            public void RegisterSkipped()
+            {
+                SkippedCount++;
+            }
+        }
+
         private struct EdgeWearBevelBuildStats
         {
             public readonly int CandidateCount;
@@ -3891,6 +4077,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int RejectedValidationBevelFace;
             public int RejectedValidationCapFace;
             public int RejectedValidationGlobal;
+            public int CornerClosureCount;
+            public int SkippedCornerClosureCount;
             public int RejectedUnknown;
 
             public EdgeWearBevelBuildStats(int candidateCount, int selectedCount)
@@ -3906,6 +4094,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 RejectedValidationBevelFace = 0;
                 RejectedValidationCapFace = 0;
                 RejectedValidationGlobal = 0;
+                CornerClosureCount = 0;
+                SkippedCornerClosureCount = 0;
                 RejectedUnknown = 0;
             }
 
@@ -3953,6 +4143,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     $"rejectedValidationBevelFace={RejectedValidationBevelFace}, " +
                     $"rejectedValidationCapFace={RejectedValidationCapFace}, " +
                     $"rejectedValidationGlobal={RejectedValidationGlobal}, " +
+                    $"cornerClosures={CornerClosureCount}, " +
+                    $"skippedCornerClosures={SkippedCornerClosureCount}, " +
                     $"rejectedUnknown={RejectedUnknown}.";
             }
         }
@@ -4054,15 +4246,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Origin = origin;
             }
 
+            public int RailPairCount { get; private set; }
+
             public float AverageStrength => strengthCount > 0
                 ? Mathf.Clamp01(strengthSum / strengthCount)
                 : 0f;
 
-            public void Add(Vector3 point, float strength)
+            public void AddRailPair(
+                Vector3 firstRailPoint,
+                Vector3 secondRailPoint,
+                float strength)
             {
-                Points.Add(point);
+                AddPointIfDifferent(Points, firstRailPoint);
+                AddPointIfDifferent(Points, secondRailPoint);
                 strengthSum += Mathf.Clamp01(strength);
                 strengthCount++;
+                RailPairCount++;
             }
         }
 

@@ -1,7 +1,7 @@
 # Generated Mass Framework
 
 Status: active framework definition  
-Current implementation patch: EW-4B.4 — Candidate-Local Bevel Validation  
+Current implementation patch: EW-4B.5 — Shared Corner Closure  
 Supersedes: older Patch 14C/14D and EW-3A.1 through EW-3A.6 atlas-first/runtime edge-wear plans.
 
 ---
@@ -469,3 +469,12 @@ EW-4B.4 removes that whole-polyhedron validation as the per-candidate acceptance
 Endpoint caps remain optional closure helpers. Degenerate or too-small caps are skipped instead of rejecting an otherwise valid bevel strip. After welding/sanitizing, the pass only requires that the rebuilt candidate set still contains at least one generated `ConvexEdgeWear` face per selected accepted candidate.
 
 The rejection statistics are also split so future console warnings identify whether a candidate failed base-face, bevel-face, cap-face, or global validation instead of reporting one broad `Validation` bucket. EW-4B.4 does not modify the shader, FeatureAtlas0/1, MeshData, MeshBuilder, GeneratedGround, or the ground generator.
+
+
+## EW-4B.5 shared corner closure update
+
+EW-4B.4 proved that local edge-strip bevel faces can now reach the final mesh, but validation screenshots showed triangular artifacts and actual holes around bevel joints. The relevant code path was the endpoint closure policy: every beveled edge independently attempted two triangular endpoint caps, and cap failure did not stop or report the accepted bevel strip.
+
+EW-4B.5 keeps the local edge-strip foundation but changes closure ownership from per-edge endpoint caps to per-source-vertex corner closures. Each accepted bevel contributes its two rail endpoints to the original vertex at each end. When multiple bevels meet at the same original vertex, the generator builds one shared `ConvexEdgeWear` corner patch from the unique rail points. When only one bevel terminates at a vertex, the previous triangular endpoint cap remains as a fallback.
+
+The build summary now carries `cornerClosures` and `skippedCornerClosures`. A skipped-corner warning means physical bevel strips were accepted, but at least one closure patch could not be generated cleanly and the remaining visible artifact should be investigated as corner topology rather than shader or atlas behavior.

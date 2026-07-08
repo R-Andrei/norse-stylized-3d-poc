@@ -498,17 +498,17 @@ namespace ProgrammaticStylized3D.Rivers
                     Color colour =
                         new Color(
                             groundSample.SurfaceVariation,
-                            0.5f,
-                            0.5f,
-                            1f);
+                            groundSample.Exposure,
+                            groundSample.DampDeposit,
+                            groundSample.VegetationSuitability);
 
                     renderData.AddVertex(localPosition, uv, colour);
                     renderData.UV2.Add(
                         new Vector4(
-                            terrainIntegrationWeight,
-                            groundSample.MaterialClassification,
-                            0f,
-                            0f));
+                            groundSample.Compaction,
+                            groundSample.ShoreInfluence,
+                            groundSample.RockyDry,
+                            groundSample.ReservedSurfaceMask));
                     terrainIntegrationWeights.Add(
                         terrainIntegrationWeight);
                     sampledGroundNormals.Add(localGroundNormal);

@@ -184,6 +184,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     exposureMasks,
                     dampDepositMasks,
                     vegetationSuitabilityMasks,
+                    secondarySurfaceMasks,
                     materialClassifications,
                     resolution,
                     spacing,

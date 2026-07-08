@@ -3253,10 +3253,13 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 corridorObject.layer = ground.gameObject.layer;
                 corridorMeshRenderer.sharedMaterial = ground.SharedMaterial;
+                ground.ApplySurfaceProfileMaterialProperties(
+                    corridorMeshRenderer);
             }
             else
             {
                 corridorObject.layer = 0;
+                corridorMeshRenderer.SetPropertyBlock(null);
             }
 
             corridorMeshRenderer.shadowCastingMode =
@@ -3577,6 +3580,12 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     corridorMeshRenderer.sharedMaterial =
                         ground.SharedMaterial;
+                    ground.ApplySurfaceProfileMaterialProperties(
+                        corridorMeshRenderer);
+                }
+                else
+                {
+                    corridorMeshRenderer.SetPropertyBlock(null);
                 }
             }
 

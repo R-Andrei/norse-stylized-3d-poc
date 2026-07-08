@@ -21,6 +21,29 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float dampDeposit,
             float vegetationSuitability,
             float materialClassification)
+            : this(
+                height,
+                normal,
+                renderNormal,
+                surfaceVariation,
+                exposure,
+                dampDeposit,
+                vegetationSuitability,
+                Vector4.zero,
+                materialClassification)
+        {
+        }
+
+        public GroundSurfaceSample(
+            float height,
+            Vector3 normal,
+            Vector3 renderNormal,
+            float surfaceVariation,
+            float exposure,
+            float dampDeposit,
+            float vegetationSuitability,
+            Vector4 secondarySurfaceMask,
+            float materialClassification)
         {
             Height = height;
             Normal = ResolveNormal(normal);
@@ -29,6 +52,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Exposure = Mathf.Clamp01(exposure);
             DampDeposit = Mathf.Clamp01(dampDeposit);
             VegetationSuitability = Mathf.Clamp01(vegetationSuitability);
+            Compaction = Mathf.Clamp01(secondarySurfaceMask.x);
+            ShoreInfluence = Mathf.Clamp01(secondarySurfaceMask.y);
+            RockyDry = Mathf.Clamp01(secondarySurfaceMask.z);
+            ReservedSurfaceMask = Mathf.Clamp01(secondarySurfaceMask.w);
             MaterialClassification = materialClassification;
         }
 
@@ -93,6 +120,27 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         /// </summary>
         public float VegetationSuitability { get; }
 
+        /// <summary>
+        /// UV2 X. Static compaction/path/flatten influence used by ground
+        /// surface shaders and future runtime surface-state systems.
+        /// </summary>
+        public float Compaction { get; }
+
+        /// <summary>
+        /// UV2 Y. River/shore influence shared with the visible ground mesh.
+        /// </summary>
+        public float ShoreInfluence { get; }
+
+        /// <summary>
+        /// UV2 Z. Rocky/dry secondary surface patch.
+        /// </summary>
+        public float RockyDry { get; }
+
+        /// <summary>
+        /// UV2 W. Reserved for authored masks or secondary profile blending.
+        /// </summary>
+        public float ReservedSurfaceMask { get; }
+
         public float MaterialClassification { get; }
 
         private static Vector3 ResolveNormal(Vector3 value)
@@ -118,6 +166,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private readonly float[] exposureMasks;
         private readonly float[] dampDepositMasks;
         private readonly float[] vegetationSuitabilityMasks;
+        private readonly Vector4[] secondarySurfaceMasks;
         private readonly float[] materialClassifications;
         private readonly int triangulationSeed;
 
@@ -139,6 +188,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 CreateFilled(baseHeights, 0.5f),
                 CreateFilled(baseHeights, 0.5f),
                 CreateFilled(baseHeights, 1f),
+                CreateFilledVector4(baseHeights, Vector4.zero),
                 materialClassifications,
                 resolution,
                 spacing,
@@ -160,6 +210,37 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float spacing,
             float halfSize,
             int triangulationSeed)
+            : this(
+                baseHeights,
+                baseNormals,
+                renderNormals,
+                surfaceVariations,
+                exposureMasks,
+                dampDepositMasks,
+                vegetationSuitabilityMasks,
+                CreateFilledVector4(baseHeights, Vector4.zero),
+                materialClassifications,
+                resolution,
+                spacing,
+                halfSize,
+                triangulationSeed)
+        {
+        }
+
+        public GroundHeightFieldSnapshot(
+            float[] baseHeights,
+            Vector3[] baseNormals,
+            Vector3[] renderNormals,
+            float[] surfaceVariations,
+            float[] exposureMasks,
+            float[] dampDepositMasks,
+            float[] vegetationSuitabilityMasks,
+            Vector4[] secondarySurfaceMasks,
+            float[] materialClassifications,
+            int resolution,
+            float spacing,
+            float halfSize,
+            int triangulationSeed)
         {
             this.baseHeights = CloneOrEmpty(baseHeights);
             this.baseNormals = CloneOrEmpty(baseNormals);
@@ -169,6 +250,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             this.dampDepositMasks = CloneOrEmpty(dampDepositMasks);
             this.vegetationSuitabilityMasks =
                 CloneOrEmpty(vegetationSuitabilityMasks);
+            this.secondarySurfaceMasks =
+                CloneOrEmpty(secondarySurfaceMasks);
             this.materialClassifications = CloneOrEmpty(materialClassifications);
 
             Resolution = Mathf.Max(0, resolution);
@@ -186,6 +269,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 Array.Empty<float>(),
                 Array.Empty<float>(),
                 Array.Empty<float>(),
+                Array.Empty<Vector4>(),
                 Array.Empty<float>(),
                 0,
                 1f,
@@ -209,6 +293,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                        exposureMasks.Length == expected &&
                        dampDepositMasks.Length == expected &&
                        vegetationSuitabilityMasks.Length == expected &&
+                       secondarySurfaceMasks.Length == expected &&
                        materialClassifications.Length == expected;
             }
         }
@@ -246,6 +331,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 SampleTriangulated(exposureMasks, gridX, gridZ),
                 SampleTriangulated(dampDepositMasks, gridX, gridZ),
                 SampleTriangulated(vegetationSuitabilityMasks, gridX, gridZ),
+                SampleTriangulated(secondarySurfaceMasks, gridX, gridZ),
                 SampleTriangulated(materialClassifications, gridX, gridZ));
 
             return true;
@@ -314,6 +400,25 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 ? value.normalized
                 : Vector3.up;
         }
+
+        private Vector4 SampleTriangulated(
+            Vector4[] values,
+            float gridX,
+            float gridZ)
+        {
+            ResolveTriangle(
+                gridX,
+                gridZ,
+                out int i0,
+                out int i1,
+                out int i2,
+                out Vector3 weights);
+
+            return values[i0] * weights.x +
+                   values[i1] * weights.y +
+                   values[i2] * weights.z;
+        }
+
 
         private void ResolveTriangle(
             float gridX,
@@ -390,10 +495,32 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 : Array.Empty<Vector3>();
         }
 
+        private static Vector4[] CloneOrEmpty(Vector4[] source)
+        {
+            return source != null
+                ? (Vector4[])source.Clone()
+                : Array.Empty<Vector4>();
+        }
+
         private static float[] CreateFilled(float[] source, float value)
         {
             int length = source != null ? source.Length : 0;
             float[] result = new float[length];
+
+            for (int index = 0; index < result.Length; index++)
+            {
+                result[index] = value;
+            }
+
+            return result;
+        }
+
+        private static Vector4[] CreateFilledVector4(
+            float[] source,
+            Vector4 value)
+        {
+            int length = source != null ? source.Length : 0;
+            Vector4[] result = new Vector4[length];
 
             for (int index = 0; index < result.Length; index++)
             {

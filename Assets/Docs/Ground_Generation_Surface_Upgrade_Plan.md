@@ -983,7 +983,7 @@ Acceptance:
 
 ### Patch 3 - Static Surface Mask Contract
 
-Status: mostly implemented on 2026-07-05; Unity compile/scene validation still required.
+Status: mostly implemented on 2026-07-05; river corridor metadata continuity corrected on 2026-07-08; Unity compile/scene validation still required.
 
 Goal:
 
@@ -1000,6 +1000,8 @@ Checklist:
 - [x] Write semantic masks to vertex color G/B/A.
 - [x] Reserve/write UV2 for path, shore, rocky, and authored masks.
 - [x] Update `GroundHeightFieldSnapshot` to retain the important vertex-color mask values.
+- [x] Update `GroundHeightFieldSnapshot` to retain secondary UV2 surface masks for dependent generated geometry.
+- [x] Update river corridor geometry to copy sampled ground R/G/B/A and UV2 mask contracts instead of old neutral placeholder values.
 - [x] Update comments documenting the vertex color/UV2 contract.
 
 Acceptance:
@@ -1011,7 +1013,7 @@ Acceptance:
 
 ### Patch 4 - Modifier and River Surface Influence
 
-Status: partially implemented on 2026-07-05.
+Status: partially implemented on 2026-07-05; river corridor UV2 continuity corrected on 2026-07-08.
 
 Goal:
 
@@ -1027,6 +1029,7 @@ Checklist:
 - [x] Reserve/write UV2 Y for river/shore influence.
 - [x] Make profile settings begin to bias shore and compaction mask response.
 - [x] Ensure river concealment still does not affect visible render normals incorrectly.
+- [x] Preserve corridor terrain-normal blending while freeing UV2 from the old terrain-integration meaning.
 
 Acceptance:
 
@@ -1036,7 +1039,7 @@ Acceptance:
 
 ### Patch 5 - Ground Material Property Block
 
-Status: partially implemented on 2026-07-05.
+Status: partially implemented on 2026-07-05; river corridor renderer/property-block continuity corrected on 2026-07-08.
 
 Goal:
 
@@ -1045,12 +1048,14 @@ Goal:
 Checklist:
 
 - [x] Add `MaterialPropertyBlock` support to `GeneratedGround`.
+- [x] Expose the same profile material binding for dependent renderers such as generated river corridors.
 - [ ] Bind base/profile colors.
 - [~] Bind patch scale/contrast values. Contrast is bound; patch scale remains generated-data-only for now.
 - [~] Bind wetness/snow/grass defaults. Static snow/damp/vegetation/rocky response is bound; runtime wetness is still deferred.
 - [ ] Bind seed or patch coordinate values.
 - [x] Refresh property block on enable, validate, regenerate, and profile change.
 - [x] Keep shared material assignment intact.
+- [x] Reapply the ground surface contract to the river corridor after corridor material assignment/rebuild.
 - [ ] Add debug mode binding if available. Debug remains a material/shader setting for now.
 
 Acceptance:
@@ -1058,6 +1063,19 @@ Acceptance:
 - two ground patches can use the same shared material but different profiles/colors;
 - changing the profile updates only that ground patch;
 - regeneration does not reset the selected profile.
+
+
+### Patch B - Dedicated Ground Surface Shader Migration
+
+Status: implemented in the dedicated ground shader split patch.
+
+- [x] Created `SH_PixelGroundSurfaceLit.shader` as `PS3D/Pixel Ground Surface Lit`.
+- [x] Added ground-only forward/material/debug include files.
+- [x] Reused shared pixel-cell, ground-mask, and color utility includes.
+- [x] Kept generated masses on `PS3D/Pixel Surface Lit`.
+- [x] Migrated `M_PixelFrozenDirt` to the dedicated ground shader.
+- [x] Removed generated-mass feature atlas and generated-mass local mask dependencies from the ground shader path.
+- [ ] Validate in Unity that generated ground and river corridor still visually match.
 
 ### Patch 6 - First Ground Shader Response
 
@@ -1428,9 +1446,9 @@ The first milestone is complete when:
 
 - [ ] Patch 1 - Document, baseline, and safety values.
 - [~] Patch 2 - Separate shape from surface profile. Core code implemented; demo asset still pending Unity asset creation.
-- [~] Patch 3 - Static surface mask contract. Core code implemented; Unity validation still required.
-- [~] Patch 4 - Modifier and river surface influence. Flatten and shore mask influence implemented; surface-only modifier mode still pending.
-- [~] Patch 5 - Ground material property block. First profile-to-material binding implemented; color/seed/debug binding still deferred.
+- [~] Patch 3 - Static surface mask contract. Core code implemented; corridor metadata continuity corrected; Unity validation still required.
+- [~] Patch 4 - Modifier and river surface influence. Flatten, shore mask influence, and corridor UV2 continuity implemented; surface-only modifier mode still pending.
+- [~] Patch 5 - Ground material property block. First profile-to-material binding implemented and shared with generated river corridors; color/seed/debug binding still deferred.
 - [~] Patch 6 - First ground shader response. Shared shader ground mode, final response, and debug modes implemented; material asset tuning still pending.
 - [ ] Patch 7 - Terrain profile asset set.
 - [ ] Patch 8 - Runtime state design stub.
