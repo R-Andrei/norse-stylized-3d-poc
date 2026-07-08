@@ -1075,7 +1075,62 @@ Status: implemented in the dedicated ground shader split patch.
 - [x] Kept generated masses on `PS3D/Pixel Surface Lit`.
 - [x] Migrated `M_PixelFrozenDirt` to the dedicated ground shader.
 - [x] Removed generated-mass feature atlas and generated-mass local mask dependencies from the ground shader path.
-- [ ] Validate in Unity that generated ground and river corridor still visually match.
+- [x] Validated in Unity that generated ground and river corridor still visually match.
+
+
+### Patch C - Ground Surface Mask Quality Pass
+
+Status: implemented and Unity-validated.
+
+Goal:
+
+- improve the generated static masks before doing final snowfield/dampness art tuning.
+
+Checklist:
+
+- [x] Remove per-vertex random tonal sampling from the active surface mask path.
+- [x] Add smoother multi-octave surface patch sampling for tonal, exposure, damp/deposit, and rocky/dry masks.
+- [x] Rebalance exposure so snow-hold/debug data has more useful large-scale variation.
+- [x] Rebalance damp/deposit so it is less dominated by broad height bands and shore alone.
+- [x] Change shore influence from a full-width binary river band to a waterline/bank-weighted mask with softer bed and outer-bank falloff.
+- [x] Preserve the existing vertex color and UV2 channel contract.
+- [x] Validate `GroundTonal`, `GroundExposure`, `GroundDampDeposit`, `GroundShore`, and `GroundCombined` in Unity.
+
+Acceptance:
+
+- `GroundTonal` no longer shows obvious triangle/random-vertex artifacts;
+- `GroundExposure` has useful but not noisy snow-hold variation;
+- `GroundDampDeposit` loses rectangular/column-like dominance;
+- `GroundShore` remains aligned to the river but is less brutally dominant;
+- river corridor and generated ground remain visually continuous.
+
+### Patch D - Ground Mask Contrast and Shore Restraint Pass
+
+Status: implemented in code; Unity debug-view validation pending.
+
+Goal:
+
+- make the generated masks more useful before final snowfield/dampness material tuning by increasing exposure readability and preventing shore influence from dominating the combined ground surface data.
+
+Checklist:
+
+- [x] Increase profile-driven tonal patch contrast slightly without reintroducing per-vertex random artifacts.
+- [x] Rebalance exposure so the dedicated exposure patch contributes more than broad height/up-facing terms alone.
+- [x] Apply a centered contrast curve to exposure masks so `GroundExposure` reads more clearly from the gameplay camera.
+- [x] Reduce shore contribution inside damp/deposit so river-adjacent areas do not overpower the entire damp mask.
+- [x] Narrow and soften the shore influence band by reducing bank width, bed strength, outer-bank strength, and waterline-band amplitude.
+- [x] Preserve the vertex color and UV2 channel contracts used by generated ground and river corridor meshes.
+- [ ] Validate `GroundTonal`, `GroundExposure`, `GroundDampDeposit`, `GroundShore`, and `GroundCombined` in Unity.
+
+Acceptance:
+
+- `GroundExposure` is visibly more informative but not noisy;
+- `GroundShore` remains aligned to the river/corridor handoff but no longer dominates the whole combined mask;
+- `GroundDampDeposit` remains broad and soft while becoming less shore-led;
+- `GroundCombined` shows balanced mask data rather than a river-band diagnostic;
+- final mode remains at least as good as the prior patch;
+- generated ground and river corridor remain visually continuous.
+
 
 ### Patch 6 - First Ground Shader Response
 
@@ -1087,7 +1142,7 @@ Goal:
 
 Checklist:
 
-- [x] Decide whether to add `SH_GroundSurfaceLit.shader` or a ground mode in `SH_PixelSurfaceLit.shader`. Current implementation uses a ground mode in the shared pixel-surface shader.
+- [x] Decide whether to add `SH_GroundSurfaceLit.shader` or a ground mode in `SH_PixelSurfaceLit.shader`. Current implementation uses a dedicated `PS3D/Pixel Ground Surface Lit` shader built from shared pixel-surface includes.
 - [x] Reuse `PixelCellVariation.hlsl` or split shared pixel helpers cleanly.
 - [x] Read vertex color R/G/B/A.
 - [x] Read UV2 X/Y if written. UV2 Z is also read for rocky/dry response.
@@ -1097,7 +1152,7 @@ Checklist:
 - [x] Add shore influence response.
 - [x] Keep small pixel cell variation restrained.
 - [x] Add mask debug modes.
-- [ ] Create or update a ground material for the new shader path. The current patch uses per-renderer property blocks instead of duplicating material assets.
+- [x] Create or update a ground material for the new shader path. `M_PixelFrozenDirt` now uses `PS3D/Pixel Ground Surface Lit`.
 
 Acceptance:
 
@@ -1449,7 +1504,9 @@ The first milestone is complete when:
 - [~] Patch 3 - Static surface mask contract. Core code implemented; corridor metadata continuity corrected; Unity validation still required.
 - [~] Patch 4 - Modifier and river surface influence. Flatten, shore mask influence, and corridor UV2 continuity implemented; surface-only modifier mode still pending.
 - [~] Patch 5 - Ground material property block. First profile-to-material binding implemented and shared with generated river corridors; color/seed/debug binding still deferred.
-- [~] Patch 6 - First ground shader response. Shared shader ground mode, final response, and debug modes implemented; material asset tuning still pending.
+- [~] Patch 6 - First ground shader response. Dedicated ground shader, final response, and debug modes implemented; material asset tuning still pending.
+- [x] Patch C - Ground surface mask quality pass. Implemented and Unity debug-view validated.
+- [~] Patch D - Ground mask contrast and shore restraint pass. Code implemented; Unity debug-view validation pending.
 - [ ] Patch 7 - Terrain profile asset set.
 - [ ] Patch 8 - Runtime state design stub.
 - [ ] Patch 9 - Footprint prototype.
