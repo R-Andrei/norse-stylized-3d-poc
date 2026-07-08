@@ -3112,11 +3112,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.FoamFilmSource:
                     return
-                        "Layer D half-resolution Film Source diagnostic. It is built from persistent material plus external support/contact fields and means visual-film permission, not durable FoamState.";
+                        "Layer D half-resolution Film Source diagnostic. After 4.11C.5.13C this is material-derived: persistent material creates source coverage, while external support/contact fields only bias or suppress it. It is visual-film source, not durable FoamState and not raw topology support.";
 
                 case StylizedRiverFoamDebugView.FoamFilmSupport:
                     return
-                        "Layer D half-resolution Film Support diagnostic after directional spread. This is the first structural broad-sheet/bridge support product; it does not mutate persistent material.";
+                        "Layer D half-resolution Film Support diagnostic after directional spread. It spreads material-derived Film Source; external support/contact fields may bias or suppress spread but cannot seed visual film from zero. It does not mutate persistent material.";
 
                 default:
                     return

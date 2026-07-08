@@ -2,7 +2,7 @@
 
 Status: active implementation checklist  
 Current target: EW-4D0 — Variable-Profile Topology Bevel Graph  
-Current step: EW-4D0.5 — Rail-Sampled Base Boundaries + Bevel Ribbon Emission
+Current step: EW-4D0.6 — Corner Vertex Patches
 
 ---
 
@@ -106,6 +106,19 @@ profileGridPoints > 0
 affectedBaseFaces == faceClipAffectedFaces
 replacedBaseFaces == faceClipSucceededFaces
 baseFaceValidationFailures == 0
+railSampleInsertionFailures == 0
+ribbonEdgesPrepared == selectedGraphEdges
+ribbonEdgesFailed == 0
+ribbonFacesBuilt == ribbonFacesExpected
+ribbonDegenerateFaces == 0
+ribbonInvalidFaces == 0
+cornerPatchVertices > 0
+cornerPatchesBuilt > 0
+cornerPatchFacesBuilt > 0
+cornerPatchFailed == 0
+cornerPatchDegenerateFaces == 0
+workspaceOpenEdgesAfterCorners <= workspaceOpenEdgesAfterRibbons
+baseFaceValidationFailures == 0
 workspaceBaseFaces == graphFaces
 profileSegments == 3
 ```
@@ -133,7 +146,7 @@ baseFaceValidationFailures == 0
 workspaceBaseFaces == graphFaces
 ```
 
-### EW-4D0.5 — Rail-sampled base boundaries + sampled variable-profile bevel ribbon emission — current
+### EW-4D0.5 — Rail-sampled base boundaries + sampled variable-profile bevel ribbon emission — completed
 
 Implementation requirements:
 
@@ -160,22 +173,28 @@ workspaceConvexEdgeWearFaces > 0
 Convex Edge Wear debug is no longer black after final commit step
 ```
 
-### EW-4D0.6 — Corner vertex patches
+### EW-4D0.6 — Corner vertex patches — current
 
 Implementation requirements:
 
 ```text
 - At each touched source graph vertex, gather endpoint profile arcs from incident selected edges.
 - Build one shared corner patch, not per-edge endpoint caps.
+- Use the same sampled profile-grid endpoint points used by bevel ribbons.
 - Mark corner patch faces as ConvexEdgeWear.
 - Prefer stable fan/radial patches first; improve aesthetics later if necessary.
+- Keep this workspace-only; final visible commit waits for EW-4D0.7.
 ```
 
 Validation success:
 
 ```text
-cornerPatchesCreated > 0 when selected edges meet at vertices
-cornerPatchesFailed == 0
+cornerPatchVertices > 0
+cornerPatchesBuilt > 0
+cornerPatchFacesBuilt > 0
+cornerPatchFailed == 0
+cornerPatchDegenerateFaces == 0
+workspaceOpenEdgesAfterCorners <= workspaceOpenEdgesAfterRibbons
 ```
 
 ### EW-4D0.7 — Final topology validation and active-path switch
@@ -238,7 +257,7 @@ Implementation requirements:
 
 ## 4. Validation checklist for the current patch
 
-After importing EW-4D0.5:
+After importing EW-4D0.6:
 
 ```text
 1. Regenerate the same plane-cut rock.
@@ -247,6 +266,7 @@ After importing EW-4D0.5:
 4. Confirm the existing Step 1, Step 2, and Step 3 fields remain clean.
 5. Confirm clipped-base workspace fields remain clean.
 6. Confirm rail-sampled base boundary and ribbon fields are present and clean.
+7. Confirm corner patch workspace fields are present and clean.
 ```
 
 Good current result:
@@ -273,13 +293,19 @@ ribbonFacesBuilt == ribbonFacesExpected
 ribbonDegenerateFaces == 0
 ribbonInvalidFaces == 0
 workspaceConvexEdgeWearFaces > 0
+cornerPatchVertices > 0
+cornerPatchesBuilt > 0
+cornerPatchFacesBuilt > 0
+cornerPatchFailed == 0
+cornerPatchDegenerateFaces == 0
+workspaceOpenEdgesAfterCorners <= workspaceOpenEdgesAfterRibbons
 ```
 
 Expected visual result:
 
 ```text
 Convex Edge Wear may still be black.
-EW-4D0.5 emits ribbon faces only inside the temporary rebuild workspace. Final visible commit waits for corner patches and final topology validation.
+EW-4D0.5 emits ribbon faces only inside the temporary rebuild workspace. EW-4D0.6 adds corner patches in that same workspace. Final visible commit still waits for final topology validation and active-path switch.
 ```
 
 ---

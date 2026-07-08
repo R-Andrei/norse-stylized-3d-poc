@@ -320,6 +320,14 @@ namespace ProgrammaticStylized3D.Rivers
                     filmSourceTexture);
                 computeShader.SetTexture(
                     buildFilmSupportKernel,
+                    "_FoamTopologyRead",
+                    topologyTexture);
+                computeShader.SetTexture(
+                    buildFilmSupportKernel,
+                    "_FoamTopologySourcesRead",
+                    topologySourcesTexture);
+                computeShader.SetTexture(
+                    buildFilmSupportKernel,
                     "_FoamFilmSupportWrite",
                     filmSupportTexture);
 

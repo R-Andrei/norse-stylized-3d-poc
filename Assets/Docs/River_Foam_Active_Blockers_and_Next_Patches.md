@@ -276,117 +276,331 @@ Either preserve a transition snapshot ShapeMask or bind a clear fallback and doc
 
 ---
 
+
 # Immediate patch order
+
+This section is the active source of truth for the next foam work. Work items must come from this sequence:
+
+```text
+Canonical Layer A-F architecture
+    -> current implemented code state
+    -> Unity validation result
+    -> documented next-patch plan
+    -> implementation patch
+```
+
+Do not implement a new visual/compute behavior patch directly from conversation speculation. If validation reveals a new issue, document the issue here first, then implement against the documented target.
+
+## Current validated state after 4.11C.5.13C
+
+Validated by Unity screenshots after applying `4.11C.5.13C`:
+
+```text
+Coordinate-space stutter: fixed by 5.13B.
+Support-topology contamination: fixed by 5.13C.
+Final Foam: unchanged and still legacy shader-side final foam.
+Foam Film Source: now follows material-derived foam instead of generic support topology.
+Foam Film Support: now spreads material-derived source instead of raw topology support.
+Foam Shape Difference: now reports material-derived Layer D visual spread/removal.
+Foam And Aging Topology: remains the explicit support/topology debug view.
+```
+
+Important interpretation:
+
+```text
+The latest green in Foam Shape Difference is no longer support topology masquerading as foam.
+It now means Layer D added visual coverage over material-derived source.
+This does not mean durable material was created.
+```
+
+Current screenshots showed the corrected result is semantically clean but visually primitive: Film Support behaves like a broad low-resolution dilation around the material ribbon. That is now the real next problem.
 
 ## Patch A — Documentation lock
 
-Status: complete in docs update.
+Status: complete.
 
 Purpose:
 
 ```text
-Replace stale Stage 1.5 / coherent-warp / three-stage oversimplification with the corrected Layer A-F acyclic architecture.
+Replace stale Stage 1.5 / coherent-warp / three-stage ambiguity with the corrected Layer A-F acyclic architecture.
 ```
 
 ## Patch B — Compliance and debug truth audit
 
-Status: complete in 4.11C.5.10.
+Status: complete in `4.11C.5.10`.
 
 Implemented behavior:
 
 ```text
-new debug enum: FoamShapeDifference
-shader debug branch compares _FoamShapeMask to raw persistent Presence
-editor label/description added
-stale material-motion descriptions corrected
-unused disturbance transport constants removed
-Layer D shape evaluation dispatch gated to Layer D debug use
-no final rendering change
-no low-res helper textures yet
+Added Foam Shape Difference.
+Corrected stale debug/editor text.
+Removed unused material-motion constants.
+Gated Layer D shape evaluation dispatch to Layer D/debug use.
+Documented the audit findings.
 ```
 
 ## Patch C — Layer E shader-side local detail probe
 
-Status: implemented in `4.11C.5.12`, pending Unity validation.
+Status: implemented and validated as a technical proof in `4.11C.5.12`.
 
-Implemented scope:
+Validation result:
 
 ```text
-Added Foam Shader Detail Probe and Foam Shader Detail Difference debug views.
-Retests the cheap local-only visual-breakup idea at rendered-pixel scale rather than _FoamShapeMask cell scale.
-Samples the clean Layer D mask and applies local procedural edge breakup, granular cuts, and tiny scratch/cut removals in the shader debug path only.
-No new entity system.
-No wide neighbourhood sampling.
-No persistent material mutation.
-No _FoamShapeMask mutation.
-No Final Foam change.
+The shader-side probe can create sub-cell/pixel-scale detail.
+The Foam Shader Detail Difference view shows granular removals instead of simulation-cell bars.
+It is not a standalone visual solution and should not be promoted to Final Foam yet.
+It remains a useful future Layer E polish/detail tool after Layer D macro structure becomes credible.
 ```
 
-Validation acceptance:
+Canonical conclusion:
 
 ```text
-Fine breakup should read as sub-cell/per-pixel foam detail rather than simulation-grid holes.
-It may improve edge chipping, fray, thin cuts, and streaks.
-It is not expected to solve broad bridge/sheet/contact structure.
-If it still reads as noise or dirt, reject it quickly and do not keep tuning it endlessly.
+Layer E can own micro breakup, chipping, fray, thin cuts, and scratch/highlight detail.
+Layer E cannot solve broad sheet/contact/bridge structure by itself.
 ```
 
 ## Patch D — Low-res Layer D Film Source / Film Support prototype
 
-Status: implemented in `4.11C.5.13`, pending Unity validation.
+Status: implemented across `4.11C.5.13`, corrected by `5.13B` and `5.13C`, and semantically validated after `5.13C`.
 
-Implemented scope:
-
-```text
-Added half-resolution Layer D Film Source and Film Support textures.
-Film Source is built from persistent material Presence plus Layer B external support/contact fields: topology support, anchored pressure/lee/shore support, valid fluid, and obstacle exclusion.
-Film Support is a half-resolution directional spread field using cheap fixed taps along flow, across flow, and diagonals.
-Added Foam Film Source and Foam Film Support debug views.
-EvaluateFoamShape now combines raw Persistent Presence with Film Source / Film Support into _FoamShapeMask.
-No Layer B or Layer C feedback was added.
-No FoamState, Remaining Life, or Material Pattern mutation was added.
-Final Foam still does not consume _FoamShapeMask.
-```
-
-Validation acceptance:
+Implemented products:
 
 ```text
-Foam Film Source should show where visual film is allowed/seeded by material and support.
-Foam Film Support should show broader sheet/contact/bridge support than raw Material Presence.
-Foam Evaluated Shape should visibly differ from Material Presence in broad structural ways.
-Foam Shape Difference should now show mostly green additions where Layer D adds visual film coverage.
-No durable material corruption.
-No circular dependencies.
-No Final Foam change.
+_FoamFilmSource  — half-resolution, material-derived Layer D source field.
+_FoamFilmSupport — half-resolution, directional spread/support field fed by Film Source.
+_FoamShapeMask   — full-resolution domain-space visual mask.
 ```
 
-## Patch E — Layer D structural tuning / containment
-
-Scope:
+Corrected contract after `5.13B` and `5.13C`:
 
 ```text
-Tune Film Source and Film Support thresholds, spread taps, support weighting, and negative suppression after Unity validation.
-Keep Film Source/Support fixed-grid and low-resolution.
-Keep fine pixel-scale breakup in Layer E.
-Do not switch Final Foam to _FoamShapeMask until the evaluated shape is visually accepted.
+FoamState is material-space persistent truth.
+Layer B support/contact/topology is domain-space external influence.
+Film Source / Film Support / _FoamShapeMask are domain-space visual products.
+Layer D samples FoamState through phase-corrected material coordinates but writes/samples its own products in domain coordinates.
+Layer C material creates Film Source.
+Layer B support can bias or suppress material-derived source/spread.
+Layer B support cannot create Film Source from zero.
 ```
 
-Acceptance:
+Validation result:
 
 ```text
-Broad film sheets and contact/bridge behavior become directionally similar to the inspiration river without revealing the simulation grid or flooding the whole river.
+Film Source no longer reproduces generic support topology.
+Film Support is broader than Film Source and is fed by material-derived source.
+Shape Difference now reports material-derived visual spread.
+The result is stable and no longer pulses with the cell grid.
 ```
 
-## Patch F — Final Foam consumes _FoamShapeMask
+Remaining visual issue:
 
-Only after Patch E is accepted.
+```text
+Film Support currently behaves like blunt low-resolution dilation around the material ribbon.
+It creates thick capsule-like widening rather than nuanced inspiration-river sheets.
+This is a spread/threshold/tuning problem now that the semantics are clean.
+```
+
+## Patch E — 4.11C.5.13D Layer D Film Spread Shape Tune
+
+Status: next documented implementation target.
+
+This patch must tune the current Film Source / Film Support / Evaluated Shape formulas. It is not a new architecture and not a Final Foam integration.
+
+### Purpose
+
+```text
+Make the material-derived Layer D spread less blunt, less uniformly inflated, and more suitable as a macro surface-film foundation.
+```
+
+### Current problem to fix
+
+After `5.13C`, the support-topology pollution is gone. The remaining issue is that the half-resolution spread is too generic:
+
+```text
+Foam Film Source is now semantically correct but still broad/soft because it is half-resolution and thresholded.
+Foam Film Support expands the source too uniformly across the river.
+Foam Evaluated Shape inherits that broad support and can look like a fat capsule around the spawned material ribbon.
+Foam Shape Difference shows valid material-derived additions, but the additions are too blunt and too continuous.
+```
+
+### Files to inspect before editing
+
+Required code files:
+
+```text
+Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs
+Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs
+Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs
+Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl
+```
+
+Likely only `CS_RiverFoam.compute` needs behavior edits. Runtime binding should be touched only if inspection proves a parameter/input is missing.
+
+Required docs after implementation:
+
+```text
+Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Docs/River_Foam_Stage6_Architecture.md
+Docs/River_Rendering_Roadmap.md
+Docs/Proof of Concept/08_Proof_of_Concept_Implementation_Log.md
+Docs/Proof of Concept/09_Rock_And_River_Handoff.md
+```
+
+### Exact code areas to inspect
+
+In `CS_RiverFoam.compute`:
+
+```text
+FoamResolveVisualFilmInfluenceAtDomainUV(...)
+FoamResolveVisualFilmSourceAtDomainUV(...)
+BuildFoamFilmSource
+FoamLoadFilmSource(...)
+BuildFoamFilmSupport
+EvaluateFoamShape
+```
+
+The current formulas to review/tune are conceptually:
+
+```hlsl
+// Film Source
+materialBody = smoothstep(presence low/high) * smoothstep(life low/high);
+source = materialBody * influence.supportBias * influence.negativeSuppression;
+
+// Film Support
+along = weighted x-neighbour source samples;
+across = weighted y-neighbour source samples;
+diagonal = weighted diagonal source samples;
+bridge = threshold(along) * threshold(across);
+spread = max(sheet, bridge contribution) * supportBias * negativeSuppression;
+
+// Evaluated Shape
+baseShape = phase-corrected material presence;
+sourceShape = threshold(filmSource);
+supportShape = threshold(filmSupport);
+visualFilm = max(source contribution, support contribution);
+shapeMask = max(baseShape, visualFilm) * validFluid;
+```
+
+### Required tuning direction
+
+Tune toward this behavior:
+
+```text
+Film Source should remain close to material truth, not become a thick source by itself.
+Film Support should be broader than Film Source, but not a uniform capsule.
+Along-flow continuity should be stronger than cross-flow widening.
+Cross-flow widening should be conditional on nearby source/support evidence.
+Bridge/fill behavior should require stronger evidence than the current prototype.
+Final support contribution to _FoamShapeMask should be more conservative.
+```
+
+Concrete tuning levers:
+
+```text
+Raise or narrow Film Source presence/life smoothstep thresholds if source is too fat.
+Reduce supportBias multiplier range if support exaggerates source too much.
+Reduce cross-flow tap weights and/or cross-flow multiplier.
+Gate across-flow spread by centre/along evidence instead of letting it widen everywhere.
+Raise bridge thresholds and reduce bridge contribution.
+Raise supportShape thresholds in EvaluateFoamShape.
+Lower supportShape contribution so Film Support assists rather than dominates.
+Keep negative suppression active and verify it still suppresses film correctly.
+```
+
+### Forbidden changes in 5.13D
+
+```text
+Do not switch Final Foam to _FoamShapeMask.
+Do not reintroduce support-only Film Source.
+Do not add environmental contact film yet.
+Do not tune Layer E shader detail yet.
+Do not add entity/pocket/connected-component tracking.
+Do not mutate FoamState, Remaining Life, or Material Pattern from Layer D.
+Do not add wide full-resolution neighbourhood classifiers.
+Do not make shader-side wide-neighbour structural searches.
+Do not add Inspector controls yet; formulas are still probe/tuning code.
+```
+
+### Acceptance criteria
+
+`Foam Film Source`:
+
+```text
+Still follows actual material-derived foam.
+No raw support topology appears where no material-derived foam exists.
+Less over-thick source if current thresholding is excessive.
+```
+
+`Foam Film Support`:
+
+```text
+Still broader/smoother than Film Source.
+Less uniformly inflated across the river.
+More along-flow than cross-flow.
+Fewer fat capsule edges around simple ribbon material.
+No support-only source reappears.
+```
+
+`Foam Evaluated Shape`:
+
+```text
+Adds macro visual film coverage over material, but more selectively.
+Does not look like a blunt dilation of the ribbon.
+Still remains stable in domain space.
+```
+
+`Foam Shape Difference`:
+
+```text
+Green additions remain material-derived.
+Green additions shrink/become more selective compared with 5.13C.
+No broad support-topology shapes return.
+```
+
+`Final Foam`:
+
+```text
+Unchanged.
+```
+
+## Patch F — Future explicit environmental contact film
+
+Status: intentionally postponed.
+
+Reason:
+
+```text
+The inspiration river likely needs bank/rock/contact film that can exist without obvious spawned material. However, 5.13C proved that allowing generic topology support to create Film Source implicitly pollutes every Layer D-derived view. Any environmental film must therefore be added later as a separate named product with its own debug view, thresholds, and ownership rules.
+```
+
+Possible future product:
+
+```text
+_FoamEnvironmentalFilm or _FoamContactFilm
+```
+
+Rules if added:
+
+```text
+It must not be called Film Source.
+It must not write FoamState.
+It must be visibly separable in debug.
+It must be limited to strict bank/rock/contact conditions.
+It must have conservative width/intensity and must not flood the river.
+```
+
+## Patch G — Final Foam consumes _FoamShapeMask
+
+Only after Layer D macro shape is visually accepted.
 
 Scope:
 
 ```text
 Shader broad foam structure samples _FoamShapeMask.
 Legacy shader-side macro shape logic is demoted/removed.
-Shader keeps local polish/thin streaks.
+Shader keeps Layer E local polish/thin streaks.
 ```
 
 ---
@@ -402,44 +616,10 @@ a proposed Layer D helper feeds Layer C;
 a shader effect requires wide neighbourhood sampling over screen pixels;
 a debug view uses final foam.mask while claiming to show raw material;
 a new feature creates a second authority over material movement;
-a new patch cannot state which layer owns each written texture.
+a new patch cannot state which layer owns each written texture;
+Layer B support/topology creates Film Source from zero;
+Layer D products are sampled with materialUV instead of fieldUV;
+Final Foam is changed before Layer D is accepted;
+Inspector controls are exposed for formulas still under architectural validation.
 ```
 
-
-## Patch D.1 — Layer D domain-space film sampling fix
-
-Status: implemented in `4.11C.5.13B`, pending Unity validation.
-
-Reason:
-
-```text
-After 4.11C.5.13, Foam Film Source, Foam Film Support, Foam Evaluated Shape, and Foam Shape Difference visibly pulsed/stuttered with the same rhythm as the material cell-grid residual phase. The root cause was a coordinate ownership mistake: Layer D visual products were being sampled through material-following UVs even though Film Source / Film Support include domain-anchored Layer B support/contact data.
-```
-
-Canonical correction:
-
-```text
-Layer C FoamState remains material-space and may be sampled through phase-corrected material UVs.
-Layer B support/contact fields remain domain-space.
-Layer D Film Source, Film Support, and _FoamShapeMask are domain-space visual products.
-Layer E debug/render sampling of Layer D products must use fieldUV/domain UV, not materialUV.
-```
-
-Implemented scope:
-
-```text
-BuildFoamFilmSource now writes a domain-space Film Source. It samples Layer B support/contact fields at domainUV, but samples persistent FoamState at domainUV - phaseTransport / fieldLength.
-EvaluateFoamShape now writes a domain-space _FoamShapeMask. It samples persistent FoamState with the same phase correction, and samples Film Source / Film Support at domainUV.
-DispatchEvaluateShape explicitly binds _FoamPhaseTransportMetres before building Film Source / Film Support / Shape.
-Shader debug views for Foam Evaluated Shape, Foam Shape Difference, Foam Shader Detail Probe, Foam Shader Detail Difference, Foam Film Source, and Foam Film Support now sample Layer D products through foam.fieldUV.
-The shader-side detail probe now uses stable river-space detail coordinates for its diagnostic layer, so it does not inherit material-cell phase snap.
-```
-
-Expected validation:
-
-```text
-Foam Motion Field + Cell Grid may still show material-cell residual movement/snap; that is expected for that debug view.
-Material Presence should still represent material-space truth with residual render travel.
-Foam Film Source, Foam Film Support, Foam Evaluated Shape, and Foam Shape Difference should no longer pulse or snap with the material cell grid.
-Final Foam remains unchanged.
-```

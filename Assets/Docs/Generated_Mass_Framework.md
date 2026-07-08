@@ -2,7 +2,7 @@
 
 Status: active framework definition  
 Current implementation target: EW-4D0 — Variable-Profile Topology Bevel Graph  
-Current implementation step: EW-4D0.5 — Rail-Sampled Base Boundaries + Bevel Ribbon Emission  
+Current implementation step: EW-4D0.6 — Corner Vertex Patches  
 Supersedes: atlas-first/runtime edge-wear plans, EW-4A global cuts, EW-4B local strips, and EW-4C.0 half-space bevel planes as production convex edge-wear construction paths.
 
 ---
@@ -57,7 +57,8 @@ MassGenerator.cs
 - EW-4D0.3 preflights sampled profile grids from paired rails.
 - EW-4D0.4 builds temporary clipped base-face replacement workspaces.
 - EW-4D0.5 inserts protected rail samples into those base-face boundaries and appends sampled ConvexEdgeWear ribbon faces to the temporary workspace.
-- Later EW-4D0 steps will emit sampled variable-profile bevel ribbons, add corner patches, and commit only after topology audit.
+- EW-4D0.6 adds shared corner vertex patches from endpoint profile arcs in the temporary workspace.
+- Later EW-4D0 steps will final-audit the complete workspace and commit only after topology audit.
 
 SH_PixelSurfaceLit.shader
 - FeatureAtlas0/1 sampling remains available for boundary debug modes.
@@ -85,7 +86,7 @@ source PolygonFace list
 → UV2.z / vertex color ConvexEdgeWear markers
 ```
 
-The current implementation is still in rebuild-workspace stages. EW-4D0.5 inserts protected rail samples into clipped base-face boundaries and appends sampled `ConvexEdgeWear` bevel ribbon faces to the temporary workspace. It still does not final-commit visible bevel geometry because corner vertex patches and final topology validation are reserved for later steps. Until final commit is implemented, `Surface Mask Debug = Convex Edge Wear` may remain black even when ribbon preflight succeeds.
+The current implementation is still in rebuild-workspace stages. EW-4D0.6 appends shared `ConvexEdgeWear` corner vertex patches to the temporary workspace after rail-sampled base faces and sampled bevel ribbon faces are built. It still does not final-commit visible bevel geometry because final topology validation and the active-path switch are reserved for EW-4D0.7. Until final commit is implemented, `Surface Mask Debug = Convex Edge Wear` may remain black even when ribbon and corner-patch workspace construction succeeds.
 
 ---
 
@@ -96,8 +97,8 @@ EW-4D0.1 — topology graph foundation — completed
 EW-4D0.2 — per-face selected-edge clipping / shared rail preflight — completed
 EW-4D0.3 — rail/profile storage and sampled profile-grid preflight — completed
 EW-4D0.4 — clipped base-face replacement workspace — completed
-EW-4D0.5 — rail-sampled base boundaries + sampled variable-profile bevel ribbon emission — current
-EW-4D0.6 — corner vertex patches
+EW-4D0.5 — rail-sampled base boundaries + sampled variable-profile bevel ribbon emission — completed
+EW-4D0.6 — corner vertex patches — current
 EW-4D0.7 — final topology validation and active-path switch
 EW-4D0.8 — variation tuning
 EW-4D1   — corner quality refinement and crack/groove planning
@@ -230,7 +231,7 @@ The existing shader response should read the generated marker. Shader changes ar
 
 A step is not complete because code exists. It is complete only when console stats prove the step succeeded.
 
-Current EW-4D0.4 success target:
+Current EW-4D0.6 success target:
 
 ```text
 selectedGraphEdges == selected
@@ -245,6 +246,18 @@ affectedBaseFaces == faceClipAffectedFaces
 replacedBaseFaces == faceClipSucceededFaces
 baseFaceValidationFailures == 0
 workspaceBaseFaces == graphFaces
+railSampleInsertionFailures == 0
+ribbonEdgesPrepared == selectedGraphEdges
+ribbonEdgesFailed == 0
+ribbonFacesBuilt == ribbonFacesExpected
+ribbonDegenerateFaces == 0
+ribbonInvalidFaces == 0
+cornerPatchVertices > 0
+cornerPatchesBuilt > 0
+cornerPatchFacesBuilt > 0
+cornerPatchFailed == 0
+cornerPatchDegenerateFaces == 0
+workspaceOpenEdgesAfterCorners <= workspaceOpenEdgesAfterRibbons
 ```
 
-Visible bevels are not expected until the later ribbon emission and final commit steps. Temporary workspace open edges are allowed at EW-4D0.4 because bevel ribbons and corner patches have not been appended yet.
+Visible bevels are not expected until the final commit step. Temporary workspace open edges are still reported at EW-4D0.6 for diagnosis; they become hard pass/fail criteria in EW-4D0.7 final topology validation.

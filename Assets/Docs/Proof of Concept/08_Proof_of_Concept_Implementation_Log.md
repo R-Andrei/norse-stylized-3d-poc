@@ -1283,3 +1283,31 @@ The dependency contract remains intact: Layer D reads Layer C and Layer B but wr
 After validating the first Film Source / Film Support prototype, the Layer D debug views were found to pulse in sync with the material cell grid. The root cause was coordinate ownership: Layer D domain-support products were sampled through materialUV, which includes residual phase travel and snaps after integer material commits.
 
 `4.11C.5.13B` fixes this by treating `_FoamFilmSource`, `_FoamFilmSupport`, and `_FoamShapeMask` as domain-space visual products. Build/evaluate kernels sample persistent FoamState from phase-corrected material coordinates but sample Layer B support/contact fields in domain coordinates. Shader debug views now sample Layer D products using `foam.fieldUV`. Final Foam remains unchanged.
+
+
+### 2026-07-08 — River Foam 4.11C.5.13C Material-Gated Film Source
+
+Implemented `4.11C.5.13C` as a semantic correction to the Layer D film pipeline. Validation after `5.13B` showed the coordinate-space stutter was fixed, but many Layer D-derived debug views still reproduced support topology shapes. Source audit found the root cause in `BuildFoamFilmSource`: support topology could become Film Source directly.
+
+The patch changes Film Source to be material-derived only. Layer B support/contact/topology now biases or suppresses material-derived source/spread but cannot create visual film from zero. `BuildFoamFilmSupport` now binds topology and topology-source textures for bias/suppression during spread. Final Foam remains unchanged.
+
+
+### 2026-07-08 — River Foam 4.11C.5.13C Unity validation and 5.13D documentation plan
+
+Validated `4.11C.5.13C` in Unity. The material-gated Film Source correction worked: support topology no longer appears as material-derived Film Source, and Layer D-derived views no longer reproduce the support-topology shapes that previously contaminated Film Source, Film Support, Evaluated Shape, Shape Difference, and shader-detail probes.
+
+Current correct interpretation:
+
+```text
+Foam Film Source = half-resolution material-derived visual source.
+Foam Film Support = half-resolution spread/support field fed by Film Source.
+Foam Evaluated Shape = full-resolution domain-space visual interpretation.
+Foam Shape Difference = signed difference against material presence.
+Final Foam = unchanged legacy final shader path.
+```
+
+Remaining issue after validation: Film Support is semantically clean but visually primitive. It behaves like a broad low-resolution dilation/capsule around the material ribbon. This is now the next active problem.
+
+Documented next target: `4.11C.5.13D — Layer D Film Spread Shape Tune`.
+
+`5.13D` must tune source thresholds, cross-flow spread, along-flow continuity, bridge thresholds, and final support contribution. It must not change Final Foam, reintroduce support-only Film Source, add environmental contact film, mutate persistent material, add entity tracking, or tune shader-side detail.

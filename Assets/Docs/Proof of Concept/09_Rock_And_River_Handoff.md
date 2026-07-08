@@ -1437,3 +1437,122 @@ Layer D reads FoamState through domainUV - phaseTransport / fieldLength, but wri
 ```
 
 This was introduced because the first 5.13 validation showed Film Source, Film Support, Evaluated Shape, and Shape Difference stuttering with the same rhythm as the material cell grid. The material cell grid may still move/snap in its own debug view; that is expected. Layer D visual products should not inherit that movement.
+
+
+### River Foam 4.11C.5.13C note
+
+`4.11C.5.13C` corrects Layer D Film Source semantics. Generic Layer B support/contact/topology must not become visual film by itself. Film Source is now material-derived, with support used only as bias/suppression. If future river art direction needs environmental contact film that appears without spawned material, implement it as a separate named product with its own debug view and rules rather than reusing generic topology support as Film Source.
+
+
+## Addendum — River Foam 4.11C.5.13C validation and next-chat continuation target
+
+Use this section as the current continuation point if opening a new chat after `4.11C.5.13C`.
+
+### Validated current state
+
+```text
+4.11C.5.13B fixed Layer D coordinate-space stutter.
+4.11C.5.13C fixed support-topology contamination.
+Foam Film Source now follows material-derived foam, not generic support topology.
+Foam Film Support now spreads material-derived source.
+Foam Shape Difference now reports material-derived visual additions/removals.
+Final Foam remains unchanged and still does not consume _FoamShapeMask.
+```
+
+### Current debug-view meanings
+
+```text
+Material Presence:
+  Layer C material truth.
+
+Foam Film Source:
+  Half-resolution material-derived visual source.
+  It should not show support topology without material.
+
+Foam Film Support:
+  Half-resolution broadened support/spread field fed by Film Source.
+  It can be broader than source but cannot come from support alone.
+
+Foam Evaluated Shape:
+  Full-resolution domain-space _FoamShapeMask.
+  Visual interpretation only; not persistent material.
+
+Foam Shape Difference:
+  Signed difference between _FoamShapeMask and raw material presence.
+  Green = material-derived visual addition after 5.13C.
+  Magenta = visual removal.
+
+Foam And Aging Topology:
+  The explicit support/topology view. If support topology is visible here, that is intentional.
+```
+
+### Active problem
+
+The system is now semantically correct enough to tune, but the Film Support shape is too blunt. Validation showed a thick/capsule-like spread around the material ribbon. This is expected from the first spread formula and is not yet inspiration-river quality.
+
+### Next patch target
+
+```text
+4.11C.5.13D — Layer D Film Spread Shape Tune
+```
+
+Do not implement this patch before inspecting the current code. The primary file is:
+
+```text
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+```
+
+Inspect these functions first:
+
+```text
+FoamResolveVisualFilmInfluenceAtDomainUV(...)
+FoamResolveVisualFilmSourceAtDomainUV(...)
+BuildFoamFilmSource
+FoamLoadFilmSource(...)
+BuildFoamFilmSupport
+EvaluateFoamShape
+```
+
+Expected tuning direction:
+
+```text
+Keep Film Source close to material truth.
+Make cross-flow spread weaker and conditional.
+Keep along-flow continuity stronger than cross-flow widening.
+Make bridge/fill thresholds stricter.
+Make final support contribution to _FoamShapeMask less dominant.
+Keep negative suppression and support bias active.
+```
+
+Do not touch:
+
+```text
+Final Foam integration.
+Layer E shader-detail tuning.
+Environmental contact film.
+Entity/pocket/connected-component systems.
+Persistent FoamState writes.
+Layer B support-source seeding.
+Inspector controls for this still-unstable formula.
+```
+
+Validation after 5.13D should compare:
+
+```text
+Foam Film Source
+Foam Film Support
+Foam Evaluated Shape
+Foam Shape Difference
+Final Foam
+```
+
+Expected validation:
+
+```text
+Film Source remains material-derived.
+Film Support is still broader than source but less uniformly inflated.
+Shape Difference green additions are smaller/more selective.
+No topology-support contamination returns.
+No phase/cell-grid stutter returns.
+Final Foam remains unchanged.
+```

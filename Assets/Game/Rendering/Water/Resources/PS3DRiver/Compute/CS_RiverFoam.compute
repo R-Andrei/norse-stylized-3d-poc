@@ -217,6 +217,38 @@ FoamMaterialState FoamSampleMaterialStateForDomainUV(
 }
 
 
+struct FoamVisualFilmInfluence
+{
+    float supportBias;
+    float negativeSuppression;
+};
+
+
+FoamVisualFilmInfluence FoamResolveVisualFilmInfluenceAtDomainUV(
+    float2 domainUV)
+{
+    float2 topologyPixel = FoamUVToTexelCoordinate(
+        domainUV,
+        _FoamTopologyDimensions);
+    float4 topologyState = SampleTopologyBilinear(topologyPixel);
+    float4 anchoredSources = SampleTopologySourcesBilinear(topologyPixel);
+
+    float anchoredSupport = max(
+        max(anchoredSources.r * 0.70, anchoredSources.g * 0.58),
+        anchoredSources.b * 0.82);
+    float structuralSupport = max(
+        topologyState.r * 0.36,
+        topologyState.g * 0.42);
+    float combinedSupport = saturate(max(anchoredSupport, structuralSupport));
+
+    FoamVisualFilmInfluence influence;
+    influence.supportBias = lerp(0.90, 1.18, combinedSupport);
+    influence.negativeSuppression = 1.0 -
+        smoothstep(0.22, 0.85, saturate(topologyState.b)) * 0.62;
+    return influence;
+}
+
+
 float FoamResolveVisualFilmSourceAtDomainUV(float2 domainUV)
 {
     if (!IsFoamUInsideDomain(domainUV.x))
@@ -231,31 +263,18 @@ float FoamResolveVisualFilmSourceAtDomainUV(float2 domainUV)
     FoamMaterialState material = FoamSampleMaterialStateForDomainUV(
         domainUV,
         validFluid);
-
-    float2 topologyPixel = FoamUVToTexelCoordinate(
-        domainUV,
-        _FoamTopologyDimensions);
-    float4 topologyState = SampleTopologyBilinear(topologyPixel);
-    float4 anchoredSources = SampleTopologySourcesBilinear(topologyPixel);
+    FoamVisualFilmInfluence influence =
+        FoamResolveVisualFilmInfluenceAtDomainUV(domainUV);
 
     float materialBody = smoothstep(0.035, 0.36, material.presence) *
         smoothstep(0.015, 0.070, material.remainingLife);
-    float anchoredSupport = max(
-        max(anchoredSources.r * 0.70, anchoredSources.g * 0.58),
-        anchoredSources.b * 0.82);
-    float structuralSupport = max(
-        topologyState.r * 0.36,
-        topologyState.g * 0.42);
-    float supportSource = max(anchoredSupport, structuralSupport);
-    float negativeSuppression = 1.0 -
-        smoothstep(0.22, 0.85, saturate(topologyState.b)) * 0.62;
 
-    // Layer D source is a domain-space visual-film permission field, not
-    // durable material. Persistent material is phase-corrected into domain
-    // space before mixing with Layer B support/contact fields so Film Source
-    // and Film Support do not scroll/snap with the material-cell residual.
-    float source = max(materialBody, supportSource * 0.78);
-    return saturate(source * validFluid * negativeSuppression);
+    // Layer D Film Source is material-derived. Layer B support/contact fields
+    // may bias or suppress visible film around existing material, but they must
+    // not create source coverage from zero. This keeps support topology visible
+    // only in explicit topology debug views unless actual material feeds it.
+    float source = materialBody * influence.supportBias;
+    return saturate(source * validFluid * influence.negativeSuppression);
 }
 
 
@@ -311,7 +330,16 @@ void BuildFoamFilmSupport(uint3 dispatchId : SV_DispatchThreadID)
     float sheet = max(max(centre, along), max(across * 0.76, diagonal));
     float bridge = smoothstep(0.18, 0.52, along) *
         smoothstep(0.10, 0.42, across);
-    _FoamFilmSupportWrite[coordinate] = saturate(max(sheet, bridge * 0.72));
+    float2 domainUV = FoamTexelCentreUV(dispatchId.xy, _FoamFilmDimensions);
+    FoamVisualFilmInfluence influence =
+        FoamResolveVisualFilmInfluenceAtDomainUV(domainUV);
+    float spread = max(sheet, bridge * 0.72);
+
+    // Film Support spreads only material-derived Film Source. Layer B support
+    // biases that spread and negative topology suppresses it; neither path
+    // seeds visible film without material-derived source coverage.
+    _FoamFilmSupportWrite[coordinate] = saturate(
+        spread * influence.supportBias * influence.negativeSuppression);
 }
 
 

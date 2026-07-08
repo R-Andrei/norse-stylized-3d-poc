@@ -50,9 +50,9 @@ MonoBehaviour:
       wetDarkenStrength: 0.18
       wetPixelSoftening: 0.22
       wetSmoothnessBoost: 0.04
-      frostStrength: 0.0
+      frostStrength: 0
       frostContrast: 0.82
-      monolithicFlatten: 0.0
+      monolithicFlatten: 0
       monolithicSmoothnessBoost: 0.18
       smoothness: 0.12
       specularStrength: 0.045
@@ -83,7 +83,7 @@ MonoBehaviour:
       pixelVariation: 0.034
       broadVariation: 0.09
       vertexVariation: 0.2
-      pixelEffectStrength: 1.0
+      pixelEffectStrength: 1
       cellWarpStrength: 0.28
       groundMacroPatchScale: 4.6
       profileContrastScale: 1.08
@@ -95,15 +95,15 @@ MonoBehaviour:
       groundShoreDampStrengthScale: 2.1
       groundPatchBlendStrength: 0.86
       groundSnowTintStrength: 0.04
-      groundSnowBrightness: 0.0
+      groundSnowBrightness: 0
       groundDampDarkenStrength: 0.56
       wetness: 0.12
       wetDarkenStrength: 0.24
       wetPixelSoftening: 0.28
       wetSmoothnessBoost: 0.05
-      frostStrength: 0.0
+      frostStrength: 0
       frostContrast: 0.72
-      monolithicFlatten: 0.0
+      monolithicFlatten: 0
       monolithicSmoothnessBoost: 0.2
       smoothness: 0.14
       specularStrength: 0.055
@@ -113,7 +113,7 @@ MonoBehaviour:
       costClass: 0
       strength: 0.08
       scale: 6.2
-      contrast: 0.30
+      contrast: 0.3
       maskInfluence: 0.84
       direction: {x: 1, y: 0}
       seedOffset: 131
@@ -146,15 +146,15 @@ MonoBehaviour:
       groundShoreDampStrengthScale: 1.85
       groundPatchBlendStrength: 0.92
       groundSnowTintStrength: 0.05
-      groundSnowBrightness: 0.0
+      groundSnowBrightness: 0
       groundDampDarkenStrength: 0.75
       wetness: 0.07
       wetDarkenStrength: 0.18
       wetPixelSoftening: 0.18
       wetSmoothnessBoost: 0.035
-      frostStrength: 0.0
+      frostStrength: 0
       frostContrast: 0.78
-      monolithicFlatten: 0.0
+      monolithicFlatten: 0
       monolithicSmoothnessBoost: 0.18
       smoothness: 0.105
       specularStrength: 0.04
@@ -171,9 +171,9 @@ MonoBehaviour:
   - id: mudflat.frozen_thaw
     displayName: Frozen Thaw
     materialControls:
-      baseColor: {r: 0.49, g: 0.50, b: 0.465, a: 1}
+      baseColor: {r: 0.49, g: 0.5, b: 0.465, a: 1}
       frostColor: {r: 0.68, g: 0.78, b: 0.82, a: 1}
-      dampTint: {r: 0.34, g: 0.30, b: 0.235, a: 1}
+      dampTint: {r: 0.34, g: 0.3, b: 0.235, a: 1}
       dampTintStrength: 0.32
       rockyDryTint: {r: 0.55, g: 0.53, b: 0.48, a: 1}
       rockyDryTintStrength: 0.22

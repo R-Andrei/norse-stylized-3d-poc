@@ -2,7 +2,7 @@
 
 Status: active recovery plan  
 Current recovery target: EW-4D0 — Variable-Profile Topology Bevel Graph  
-Current implementation step: EW-4D0.5 — Rail-Sampled Base Boundaries + Bevel Ribbon Emission
+Current implementation step: EW-4D0.6 — Corner Vertex Patches
 
 ---
 
@@ -220,7 +220,7 @@ baseFaceValidationFailures == 0
 workspaceBaseFaces == graphFaces
 ```
 
-### EW-4D0.5 — Rail-sampled base boundaries + sampled variable-profile bevel ribbons — current step
+### EW-4D0.5 — Rail-sampled base boundaries + sampled variable-profile bevel ribbons — completed
 
 Insert protected rail samples into clipped base-face boundaries, then turn each profile grid into `ConvexEdgeWear` ribbon faces inside the temporary rebuild workspace.
 
@@ -248,16 +248,18 @@ ribbonInvalidFaces == 0
 workspaceConvexEdgeWearFaces > 0
 ```
 
-### EW-4D0.6 — Corner vertex patches
+### EW-4D0.6 — Corner vertex patches — current step
 
-At every original graph vertex touched by selected bevel edges, collect endpoint profile arcs and build a shared patch.
+At every original graph vertex touched by selected bevel edges, collect endpoint profile arcs and build a shared patch inside the temporary rebuild workspace. This closes the endpoint/corner holes left after EW-4D0.5 ribbon emission.
 
 Initial patch policy:
 
 ```text
 - build stable ordered fan/radial patches first
+- use endpoint profile-grid points from incident selected edges
 - mark corner patch faces as ConvexEdgeWear
 - prefer watertightness over perfect corner aesthetics
+- do not final-commit the workspace yet
 ```
 
 Future refinement can replace fan patches with an Adj-like corner pattern if corners look pinched.
@@ -265,9 +267,12 @@ Future refinement can replace fan patches with an Adj-like corner pattern if cor
 Expected stats:
 
 ```text
-cornerPatchVertices
-cornerPatchesCreated
-cornerPatchesFailed == 0
+cornerPatchVertices > 0
+cornerPatchesBuilt > 0
+cornerPatchFacesBuilt > 0
+cornerPatchFailed == 0
+cornerPatchDegenerateFaces == 0
+workspaceOpenEdgesAfterCorners <= workspaceOpenEdgesAfterRibbons
 ```
 
 ### EW-4D0.7 — Final topology validation and active-path switch

@@ -18,18 +18,18 @@ MonoBehaviour:
   - id: snowfield.clean
     displayName: Clean
     materialControls:
-      baseColor: {r: 0.807, g: 0.870, b: 0.906, a: 1}
-      frostColor: {r: 0.82, g: 0.93, b: 1.00, a: 1}
+      baseColor: {r: 0.807, g: 0.87, b: 0.906, a: 1}
+      frostColor: {r: 0.82, g: 0.93, b: 1, a: 1}
       dampTint: {r: 0.47, g: 0.42, b: 0.34, a: 1}
       dampTintStrength: 0.16
-      rockyDryTint: {r: 0.68, g: 0.70, b: 0.68, a: 1}
-      rockyDryTintStrength: 0.10
-      vegetationTint: {r: 0.50, g: 0.58, b: 0.42, a: 1}
+      rockyDryTint: {r: 0.68, g: 0.7, b: 0.68, a: 1}
+      rockyDryTintStrength: 0.1
+      vegetationTint: {r: 0.5, g: 0.58, b: 0.42, a: 1}
       vegetationTintStrength: 0.04
       pixelCellSize: 0.055
       pixelToneCount: 4.67
       pixelClusterStrength: 0.576
-      pixelVariation: 0.020
+      pixelVariation: 0.02
       broadVariation: 0.032
       vertexVariation: 0.18
       pixelEffectStrength: 0.92
@@ -37,7 +37,7 @@ MonoBehaviour:
       groundMacroPatchScale: 4.8
       profileContrastScale: 0.95
       profilePixelContrastScale: 0.92
-      groundSnowResponseScale: 1.10
+      groundSnowResponseScale: 1.1
       groundDampResponseScale: 0.72
       groundVegetationResponseScale: 0.45
       groundRockyDryResponseScale: 0.55
@@ -50,29 +50,29 @@ MonoBehaviour:
       wetDarkenStrength: 0.18
       wetPixelSoftening: 0.55
       wetSmoothnessBoost: 0.26
-      frostStrength: 0.10
+      frostStrength: 0.1
       frostContrast: 1.05
       monolithicFlatten: 0.06
       monolithicSmoothnessBoost: 0.18
-      smoothness: 0.20
+      smoothness: 0.2
       specularStrength: 0.14
     features:
     - kind: 10
       enabled: 1
       costClass: 0
       strength: 0.06
-      scale: 9.0
-      contrast: 0.20
+      scale: 9
+      contrast: 0.2
       maskInfluence: 0.85
       direction: {x: 0.82, y: 0.36}
       seedOffset: 11
   - id: snowfield.patchy
     displayName: Patchy
     materialControls:
-      baseColor: {r: 0.760, g: 0.825, b: 0.845, a: 1}
-      frostColor: {r: 0.80, g: 0.91, b: 0.98, a: 1}
+      baseColor: {r: 0.76, g: 0.825, b: 0.845, a: 1}
+      frostColor: {r: 0.8, g: 0.91, b: 0.98, a: 1}
       dampTint: {r: 0.42, g: 0.39, b: 0.34, a: 1}
-      dampTintStrength: 0.30
+      dampTintStrength: 0.3
       rockyDryTint: {r: 0.56, g: 0.57, b: 0.55, a: 1}
       rockyDryTintStrength: 0.34
       vegetationTint: {r: 0.48, g: 0.56, b: 0.39, a: 1}
@@ -88,21 +88,21 @@ MonoBehaviour:
       groundMacroPatchScale: 3.25
       profileContrastScale: 1.35
       profilePixelContrastScale: 1.16
-      groundSnowResponseScale: 1.00
-      groundDampResponseScale: 1.10
-      groundVegetationResponseScale: 0.70
+      groundSnowResponseScale: 1
+      groundDampResponseScale: 1.1
+      groundVegetationResponseScale: 0.7
       groundRockyDryResponseScale: 1.45
       groundShoreDampStrengthScale: 1.15
       groundPatchBlendStrength: 0.88
-      groundSnowTintStrength: 0.70
+      groundSnowTintStrength: 0.7
       groundSnowBrightness: 0.12
       groundDampDarkenStrength: 0.42
       wetness: 0.04
       wetDarkenStrength: 0.26
       wetPixelSoftening: 0.45
-      wetSmoothnessBoost: 0.30
+      wetSmoothnessBoost: 0.3
       frostStrength: 0.06
-      frostContrast: 1.20
+      frostContrast: 1.2
       monolithicFlatten: 0
       monolithicSmoothnessBoost: 0.18
       smoothness: 0.18
@@ -120,15 +120,15 @@ MonoBehaviour:
   - id: snowfield.dirty_thawing
     displayName: Dirty Thawing
     materialControls:
-      baseColor: {r: 0.675, g: 0.700, b: 0.665, a: 1}
-      frostColor: {r: 0.74, g: 0.80, b: 0.82, a: 1}
-      dampTint: {r: 0.38, g: 0.30, b: 0.22, a: 1}
+      baseColor: {r: 0.675, g: 0.7, b: 0.665, a: 1}
+      frostColor: {r: 0.74, g: 0.8, b: 0.82, a: 1}
+      dampTint: {r: 0.38, g: 0.3, b: 0.22, a: 1}
       dampTintStrength: 0.72
-      rockyDryTint: {r: 0.50, g: 0.47, b: 0.42, a: 1}
+      rockyDryTint: {r: 0.5, g: 0.47, b: 0.42, a: 1}
       rockyDryTintStrength: 0.38
-      vegetationTint: {r: 0.42, g: 0.50, b: 0.34, a: 1}
+      vegetationTint: {r: 0.42, g: 0.5, b: 0.34, a: 1}
       vegetationTintStrength: 0.14
-      pixelCellSize: 0.060
+      pixelCellSize: 0.06
       pixelToneCount: 3.8
       pixelClusterStrength: 0.72
       pixelVariation: 0.036
@@ -137,14 +137,14 @@ MonoBehaviour:
       pixelEffectStrength: 1.08
       cellWarpStrength: 0.24
       groundMacroPatchScale: 3.1
-      profileContrastScale: 1.20
+      profileContrastScale: 1.2
       profilePixelContrastScale: 1.02
       groundSnowResponseScale: 0.62
       groundDampResponseScale: 1.95
       groundVegetationResponseScale: 1.05
       groundRockyDryResponseScale: 1.05
-      groundShoreDampStrengthScale: 1.80
-      groundPatchBlendStrength: 0.90
+      groundShoreDampStrengthScale: 1.8
+      groundPatchBlendStrength: 0.9
       groundSnowTintStrength: 0.36
       groundSnowBrightness: 0.05
       groundDampDarkenStrength: 0.72
@@ -152,38 +152,38 @@ MonoBehaviour:
       wetDarkenStrength: 0.42
       wetPixelSoftening: 0.58
       wetSmoothnessBoost: 0.48
-      frostStrength: 0.00
-      frostContrast: 0.90
+      frostStrength: 0
+      frostContrast: 0.9
       monolithicFlatten: 0
       monolithicSmoothnessBoost: 0.18
       smoothness: 0.23
-      specularStrength: 0.20
+      specularStrength: 0.2
     features: []
   - id: snowfield.wind_scoured
     displayName: Wind-Scoured
     materialControls:
-      baseColor: {r: 0.840, g: 0.900, b: 0.930, a: 1}
-      frostColor: {r: 0.86, g: 0.96, b: 1.00, a: 1}
+      baseColor: {r: 0.84, g: 0.9, b: 0.93, a: 1}
+      frostColor: {r: 0.86, g: 0.96, b: 1, a: 1}
       dampTint: {r: 0.52, g: 0.51, b: 0.48, a: 1}
       dampTintStrength: 0.08
-      rockyDryTint: {r: 0.70, g: 0.73, b: 0.74, a: 1}
+      rockyDryTint: {r: 0.7, g: 0.73, b: 0.74, a: 1}
       rockyDryTintStrength: 0.12
       vegetationTint: {r: 0.54, g: 0.62, b: 0.45, a: 1}
       vegetationTintStrength: 0.02
       pixelCellSize: 0.052
       pixelToneCount: 5.5
       pixelClusterStrength: 0.44
-      pixelVariation: 0.010
+      pixelVariation: 0.01
       broadVariation: 0.018
-      vertexVariation: 0.10
+      vertexVariation: 0.1
       pixelEffectStrength: 0.72
       cellWarpStrength: 0.035
       groundMacroPatchScale: 8.6
-      profileContrastScale: 0.70
-      profilePixelContrastScale: 0.70
+      profileContrastScale: 0.7
+      profilePixelContrastScale: 0.7
       groundSnowResponseScale: 1.38
       groundDampResponseScale: 0.34
-      groundVegetationResponseScale: 0.20
+      groundVegetationResponseScale: 0.2
       groundRockyDryResponseScale: 0.35
       groundShoreDampStrengthScale: 0.45
       groundPatchBlendStrength: 0.34
@@ -192,7 +192,7 @@ MonoBehaviour:
       groundDampDarkenStrength: 0.12
       wetness: 0
       wetDarkenStrength: 0.12
-      wetPixelSoftening: 0.70
+      wetPixelSoftening: 0.7
       wetSmoothnessBoost: 0.22
       frostStrength: 0.18
       frostContrast: 1.12

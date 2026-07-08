@@ -2792,12 +2792,80 @@ MonoBehaviour:
     edgeBlend: 1
     surfaceVariation: 0.42
     useModifiers: 1
+  surfaceStyleProfile: {fileID: 11400000, guid: 9ba42932860747dfa76b99b97bb289df, type: 2}
+  surfaceVariantId: snowfield.patchy
+  overrideSurfaceProfile: 0
   surfaceProfile: {fileID: 11400000, guid: 92d482aa5a37c7f41b644f1390ff89c6, type: 2}
+  overrideMaterialControls: 0
+  groundMaterialControls:
+    baseColor: {r: 0.76, g: 0.825, b: 0.845, a: 1}
+    frostColor: {r: 0.8, g: 0.91, b: 0.98, a: 1}
+    dampTint: {r: 0.42, g: 0.39, b: 0.34, a: 1}
+    dampTintStrength: 0.3
+    rockyDryTint: {r: 0.56, g: 0.57, b: 0.55, a: 1}
+    rockyDryTintStrength: 0.34
+    vegetationTint: {r: 0.48, g: 0.56, b: 0.39, a: 1}
+    vegetationTintStrength: 0.08
+    pixelCellSize: 0.055
+    pixelToneCount: 4.2
+    pixelClusterStrength: 0.68
+    pixelVariation: 0.024
+    broadVariation: 0.095
+    vertexVariation: 0.25
+    pixelEffectStrength: 1.18
+    cellWarpStrength: 0.18
+    groundMacroPatchScale: 3.25
+    profileContrastScale: 1.35
+    profilePixelContrastScale: 1.16
+    groundSnowResponseScale: 1
+    groundDampResponseScale: 1.1
+    groundVegetationResponseScale: 0.7
+    groundRockyDryResponseScale: 1.45
+    groundShoreDampStrengthScale: 1.15
+    groundPatchBlendStrength: 0.88
+    groundSnowTintStrength: 0.7
+    groundSnowBrightness: 0.12
+    groundDampDarkenStrength: 0.42
+    wetness: 0.04
+    wetDarkenStrength: 0.26
+    wetPixelSoftening: 0.45
+    wetSmoothnessBoost: 0.3
+    frostStrength: 0.06
+    frostContrast: 1.2
+    monolithicFlatten: 0
+    monolithicSmoothnessBoost: 0.18
+    smoothness: 0.18
+    specularStrength: 0.15
+  groundSurfaceType: 0
+  snowfieldVariant: 2
+  surfaceStyleMigrationVersion: 1
   regenerateOnValidate: 1
   modifiers:
   - {fileID: 1356653796}
   rivers:
   - {fileID: 1626776158}
+  lastSurfaceMaskDiagnostics: 'Surface masks (min/max/avg/p05/p95)
+
+    Tonal: 0.357/0.599/0.478/0.402/0.549
+
+    Exposure:
+    0.285/0.879/0.587/0.285/0.879
+
+    DampDeposit: 0.214/0.502/0.369/0.290/0.449
+
+    Vegetation:
+    0.108/0.176/0.161/0.122/0.171
+
+    Compaction: 0.000/1.000/0.054/0.000/0.786
+
+    Shore:
+    0.000/0.279/0.009/0.000/0.032
+
+    RockyDry: 0.091/0.140/0.114/0.099/0.133
+
+    StandingWater:
+    0.000/0.000/0.000/0.000/0.000'
+  lastValidatedGenerationSignature: 246450052
 --- !u!64 &593135562
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -6805,6 +6873,10 @@ MonoBehaviour:
   mode: 0
   shape: 1
   priority: 1
+  surfaceEffectMode: 0
+  surfaceCompactionStrength: 1
+  surfaceDampDepositStrength: 0
+  surfaceStandingWaterStrength: 0
   strength: 1
   blendDistance: 1.5
   circleRadius: 4
@@ -8266,7 +8338,7 @@ MonoBehaviour:
   featureRecipe: 0
   stoneSurfaceProfile: 1
   baseColor: {r: 0.39061943, g: 0.39342293, b: 0.3962264, a: 1}
-  surfaceMaskDebug: 15
+  surfaceMaskDebug: 4
   surfaceMaskBaseLift: 0.0517
   creviceReach: 1.024
   creviceSmoothness: 0.995

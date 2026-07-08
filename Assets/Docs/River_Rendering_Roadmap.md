@@ -456,3 +456,14 @@ The first structural Layer D film-support pass now exists. Runtime Foam can buil
 ## Stage 6 Foam update — 4.11C.5.13B
 
 Layer D Film Source, Film Support, and _FoamShapeMask are now explicitly domain-space visual products. Persistent FoamState remains material-space and is phase-corrected when Layer D reads it. Shader debug views for Layer D products now sample with fieldUV rather than materialUV, preventing Film Source / Film Support / Evaluated Shape from pulsing with the material cell-grid residual phase. Final Foam remains unchanged.
+
+## Stage 6 Foam update — 4.11C.5.13C
+
+Layer D Film Source is now material-gated. The previous 5.13/5.13B formula allowed Layer B support/topology to seed visual Film Source directly, which made Foam Film Source, Film Support, Evaluated Shape, Shape Difference, and shader-detail probes reproduce support topology shapes. The corrected rule is: persistent material creates Film Source; external support/contact/topology may bias or suppress material-derived source and spread, but cannot create visual film from zero. Final Foam remains unchanged.
+
+
+## Stage 6 Foam update — 4.11C.5.13C validation and 5.13D planning
+
+`4.11C.5.13C` has now been Unity-validated. The support-topology contamination is fixed: Film Source no longer displays generic support topology, and Film Support / Evaluated Shape now derive from material-fed source rather than topology-only source. The remaining issue is visual quality, not architecture: the current Film Support spread is too blunt and capsule-like around the material ribbon.
+
+The next planned patch is `4.11C.5.13D — Layer D Film Spread Shape Tune`. It must tune Film Source thresholds, Film Support directional spread, bridge thresholds, and final support contribution. It must not switch Final Foam to `_FoamShapeMask`, add environmental contact film, mutate persistent material, add entity tracking, or reintroduce support-only Film Source. This is still Stage 6 debug/product work; final water rendering remains unchanged until Layer D is visually accepted.
