@@ -33,8 +33,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         {
             new GUIContent("None"),
             new GUIContent("Convex Edge Wear"),
-            new GUIContent("Boundary Field Diagnostic"),
-            new GUIContent("Boundary Modulation Diagnostic"),
+            new GUIContent("Atlas Boundary Field Diagnostic", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry."),
+            new GUIContent("Atlas Boundary Modulation Diagnostic", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry."),
             new GUIContent("Exposure"),
             new GUIContent("Crevice / Base"),
             new GUIContent("Dirt / Deposit")
@@ -58,16 +58,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private static readonly GUIContent[] AdvancedDebugLabels =
         {
             new GUIContent("None"),
-            new GUIContent("Convex Boundary Proximity"),
-            new GUIContent("Concave Boundary Proximity"),
-            new GUIContent("Convex Boundary + Salience"),
-            new GUIContent("Boundary Salience"),
-            new GUIContent("Boundary Identity"),
-            new GUIContent("Concave Boundary + Salience"),
-            new GUIContent("Boundary Along Coordinate"),
-            new GUIContent("Boundary Cross Coordinate"),
-            new GUIContent("Boundary Coarse Modulation"),
-            new GUIContent("Boundary Fine Modulation")
+            new GUIContent("Atlas Convex Boundary Proximity", "Legacy generated-mass atlas diagnostic. Use Convex Edge Wear to validate physical bevel geometry."),
+            new GUIContent("Atlas Concave Boundary Proximity", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry."),
+            new GUIContent("Atlas Convex Boundary + Salience", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry."),
+            new GUIContent("Atlas Boundary Salience", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry."),
+            new GUIContent("Atlas Boundary Identity", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry."),
+            new GUIContent("Atlas Concave Boundary + Salience", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry."),
+            new GUIContent("Atlas Boundary Along Coordinate", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry."),
+            new GUIContent("Atlas Boundary Cross Coordinate", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry."),
+            new GUIContent("Atlas Boundary Coarse Modulation", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry."),
+            new GUIContent("Atlas Boundary Fine Modulation", "Legacy generated-mass atlas diagnostic. Not physical bevel geometry.")
         };
 
         private SerializedProperty coldGreyStoneMaterial;

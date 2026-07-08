@@ -1,8 +1,8 @@
 # Generated Mass Feature Implementation Checklist
 
 Status: active implementation checklist  
-Current patch: EW-4B.5 — Shared Corner Closure  
-Next patch: visual/topology tuning after joint closure validation
+Current patch: EW-4B.6 — Topology Hardening and Atlas Debug Label Clarification  
+Next patch: validate fail-closed topology before any visual tuning
 
 ---
 
@@ -367,3 +367,22 @@ Validation focus after EW-4B.5:
 3. Inspect bevel joints in normal render and `Surface Mask Debug = ConvexEdgeWear`.
 4. If gaps remain, check the console for `skippedCornerClosures`.
 5. Continue visual tuning only after joint holes are gone or isolated to a specific skipped-corner count.
+
+## EW-4B.6 checklist status
+
+Completed in EW-4B.6:
+
+- Changed skipped corner closures from a post-commit warning into a hard candidate-set rejection through `ValidationCapFace`.
+- Preserved cumulative candidate acceptance so a closure failure removes the newest candidate instead of disabling all edge wear.
+- Added conservative rail-fragment detection to reject ambiguous multi-segment cut rails.
+- Added `rejectedRailFragmented` to the editor summary so long slit investigations have a concrete rejection bucket.
+- Renamed generated-mass atlas boundary debug labels in the editor to make their atlas/legacy nature explicit.
+- Did not modify shaders, FeatureAtlas baker, MeshData, MeshBuilder, GeneratedGround, ground generation, or river/foam systems.
+
+Validation focus after EW-4B.6:
+
+1. Re-test the same mass/settings that produced `skippedCornerClosures=1` after EW-4B.5.
+2. Confirm no accepted mesh is committed with `skippedCornerClosures > 0`.
+3. If edge wear becomes sparser, inspect `rejectedValidationCapFace` and `rejectedRailFragmented` counts before changing visual controls.
+4. Use `Surface Mask Debug = Convex Edge Wear` for physical bevel validation.
+5. Treat `Atlas ... Boundary ...` modes as legacy atlas diagnostics only.

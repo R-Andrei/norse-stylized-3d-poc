@@ -1689,24 +1689,32 @@ Verification that all new Layer D helpers write only Layer D products and do not
 
 ## Phase 3 — Layer E shader-side local detail probe
 
-Retest the cheapest “magical” layer at the correct scale: shader pixels rather than Layer D cells.
-
-Scope:
-
-```text
-shader-side local procedural chipping/fray/cuts based on position, river UV, time, life/material pattern where available
-sub-cell granular edge breakup
-thin bright scratches/streaks
-no neighbourhood search
-no persistent mutation
-no _FoamShapeMask mutation
-no broad bridge support
-```
+Status: implemented as `4.11C.5.12`, pending Unity validation.
 
 Purpose:
 
 ```text
 determine how much reference-like fine chaos can be achieved with local shader math before/alongside the structural Layer D film-support system
+```
+
+Implemented diagnostic scope:
+
+```text
+Foam Shader Detail Probe debug view
+Foam Shader Detail Difference debug view
+shader-side local procedural chipping/fray/cuts based on river metres, material UV, material pattern, time, Remaining Life, and surface energy
+sub-cell granular edge breakup at rendered-pixel scale
+no neighbourhood search
+no persistent mutation
+no _FoamShapeMask mutation
+no broad bridge support
+no Final Foam change
+```
+
+Validation rule:
+
+```text
+Accept this as Layer E detail only if the result reads as pixel/sub-cell edge detail and not as cell/ribbon holes, dirty static noise, or broad structural breakup.
 ```
 
 ## Phase 4 — Low-res Visual Film Source and Sheet Support
@@ -1809,5 +1817,5 @@ Move foam-derived sheet support into Layer D.
 Treat 5.9z coherent coordinate warp as a failed/superseded prototype, not as the main path.
 ```
 
-The next implementation work should start from compliance and debug visibility, not another visual patch.
+Compliance/debug visibility is complete through `4.11C.5.10`, and failed Layer D visual probes were retired in `4.11C.5.10B` and `4.11C.5.11B`. `4.11C.5.12` now implements the Layer E shader-side local detail probe as debug-only. After it is validated or rejected, the next structural work is low-resolution Layer D Film Source / Film Support.
 

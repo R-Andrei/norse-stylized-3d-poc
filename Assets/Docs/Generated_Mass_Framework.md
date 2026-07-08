@@ -1,7 +1,7 @@
 # Generated Mass Framework
 
 Status: active framework definition  
-Current implementation patch: EW-4B.5 — Shared Corner Closure  
+Current implementation patch: EW-4B.6 — Topology Hardening and Atlas Debug Label Clarification  
 Supersedes: older Patch 14C/14D and EW-3A.1 through EW-3A.6 atlas-first/runtime edge-wear plans.
 
 ---
@@ -478,3 +478,11 @@ EW-4B.4 proved that local edge-strip bevel faces can now reach the final mesh, b
 EW-4B.5 keeps the local edge-strip foundation but changes closure ownership from per-edge endpoint caps to per-source-vertex corner closures. Each accepted bevel contributes its two rail endpoints to the original vertex at each end. When multiple bevels meet at the same original vertex, the generator builds one shared `ConvexEdgeWear` corner patch from the unique rail points. When only one bevel terminates at a vertex, the previous triangular endpoint cap remains as a fallback.
 
 The build summary now carries `cornerClosures` and `skippedCornerClosures`. A skipped-corner warning means physical bevel strips were accepted, but at least one closure patch could not be generated cleanly and the remaining visible artifact should be investigated as corner topology rather than shader or atlas behavior.
+
+## EW-4B.6 topology hardening and atlas debug label clarification
+
+EW-4B.5 validation restored physical bevel strips and proved that controls affect the generated mesh, but the editor warning `skippedCornerClosures > 0` showed that the generator could still commit a mesh after at least one required corner closure failed. EW-4B.6 changes the local-strip bevel policy from "warn after committing" to "fail closed": if a candidate set produces any skipped corner closure, that attempted set is rejected with `ValidationCapFace` and cumulative candidate acceptance continues with that newest candidate removed.
+
+EW-4B.6 also adds conservative rail-fragment detection. `TryExtractCutRail` previously selected the single best aligned rail segment from a clipped face. When the same cut exposes more than one valid aligned rail segment, or when the fallback near-plane extraction yields more than two unique rail points, the candidate is now rejected as `RailFragmented` instead of silently using one partial rail. This favors fewer accepted bevels over long slit-like topology artifacts.
+
+The GeneratedMass editor labels for atlas boundary views are now explicitly prefixed with `Atlas`. `Convex Edge Wear` remains the geometry/UV2.z validation view for physical bevel faces. Atlas boundary modes remain useful diagnostics, but they are legacy generated-mass atlas views and must not be used as proof of bevel geometry.

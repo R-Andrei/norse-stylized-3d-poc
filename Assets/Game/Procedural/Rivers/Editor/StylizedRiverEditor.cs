@@ -1753,7 +1753,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam Motion Field",
                 "Foam Motion Field + Cell Grid",
                 "Foam Evaluated Shape",
-                "Foam Shape Difference"
+                "Foam Shape Difference",
+                "Foam Shader Detail Probe",
+                "Foam Shader Detail Difference"
             };
             int[] foamDebugValues =
             {
@@ -1765,7 +1767,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.FoamMotionField,
                 (int)StylizedRiverFoamDebugView.FoamMotionFieldCellGrid,
                 (int)StylizedRiverFoamDebugView.FoamEvaluatedShape,
-                (int)StylizedRiverFoamDebugView.FoamShapeDifference
+                (int)StylizedRiverFoamDebugView.FoamShapeDifference,
+                (int)StylizedRiverFoamDebugView.FoamShaderDetailProbe,
+                (int)StylizedRiverFoamDebugView.FoamShaderDetailDifference
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -1779,7 +1783,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             int selectedDebugIndex = EditorGUILayout.Popup(
                 new GUIContent(
                     "Debug View",
-                    "Final Foam is the normal render. Foam Motion Field views show external routing/deformation intent and raw stored Foam Presence overlay; Foam Evaluated Shape and Shape Difference show the Layer D visual product, not persistent material truth."),
+                    "Final Foam is the normal render. Foam Motion Field views show external routing/deformation intent and raw stored Foam Presence overlay; Foam Evaluated Shape and Shape Difference show the Layer D visual product; Shader Detail probes show Layer E pixel-scale detail over that product."),
                 currentDebugIndex,
                 foamDebugLabels);
             if (EditorGUI.EndChangeCheck())
@@ -2004,7 +2008,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam Motion Field",
                 "Foam Motion Field + Cell Grid",
                 "Foam Evaluated Shape",
-                "Foam Shape Difference"
+                "Foam Shape Difference",
+                "Foam Shader Detail Probe",
+                "Foam Shader Detail Difference"
             };
             int[] foamDebugValues =
             {
@@ -2016,7 +2022,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.FoamMotionField,
                 (int)StylizedRiverFoamDebugView.FoamMotionFieldCellGrid,
                 (int)StylizedRiverFoamDebugView.FoamEvaluatedShape,
-                (int)StylizedRiverFoamDebugView.FoamShapeDifference
+                (int)StylizedRiverFoamDebugView.FoamShapeDifference,
+                (int)StylizedRiverFoamDebugView.FoamShaderDetailProbe,
+                (int)StylizedRiverFoamDebugView.FoamShaderDetailDifference
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -2030,7 +2038,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             int selectedDebugIndex = EditorGUILayout.Popup(
                 new GUIContent(
                     "Debug View",
-                    "Raw material views show the persistent foam texture directly, not the beauty mask or topology overlay."),
+                    "Raw material views show the persistent foam texture directly. Evaluated/Shader views compare Layer D and Layer E visual products against that material truth."),
                 currentDebugIndex,
                 foamDebugLabels);
             if (EditorGUI.EndChangeCheck())
@@ -3084,7 +3092,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.FoamShapeDifference:
                     return
-                        "Layer D difference diagnostic. Black means _FoamShapeMask matches raw persistent Material Presence, green means evaluated shape adds visual coverage, and magenta/red means evaluated shape removes visual coverage. This exists so Stage D changes are visible without guessing between two similar masks.";
+                        "Layer D difference diagnostic. Black means _FoamShapeMask matches raw persistent Material Presence, green means evaluated shape adds visual coverage, and magenta/red means evaluated shape removes visual coverage. This exists so Layer D changes are visible without guessing between two similar masks.";
+
+                case StylizedRiverFoamDebugView.FoamShaderDetailProbe:
+                    return
+                        "Layer E shader-side local detail probe. Samples the clean _FoamShapeMask and applies render-pixel procedural chipping/fray/cuts for diagnosis only. It does not write FoamState, does not write _FoamShapeMask, and is not Final Foam.";
+
+                case StylizedRiverFoamDebugView.FoamShaderDetailDifference:
+                    return
+                        "Layer E shader-side local detail difference diagnostic. Black means the shader detail probe matches _FoamShapeMask, green means local shader detail adds coverage, and magenta/red means local shader detail removes coverage. This proves whether sub-cell detail is happening at rendered-pixel scale rather than foam-cell scale.";
 
                 default:
                     return

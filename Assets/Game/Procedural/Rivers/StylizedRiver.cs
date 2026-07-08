@@ -98,7 +98,9 @@ namespace ProgrammaticStylized3D.Rivers
         FoamMotionField = 5,
         FoamMotionFieldCellGrid = 6,
         FoamEvaluatedShape = 7,
-        FoamShapeDifference = 8
+        FoamShapeDifference = 8,
+        FoamShaderDetailProbe = 9,
+        FoamShaderDetailDifference = 10
     }
 
 
@@ -1708,6 +1710,10 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.FoamEvaluatedShape;
                 case (int)StylizedRiverFoamDebugView.FoamShapeDifference:
                     return StylizedRiverFoamDebugView.FoamShapeDifference;
+                case (int)StylizedRiverFoamDebugView.FoamShaderDetailProbe:
+                    return StylizedRiverFoamDebugView.FoamShaderDetailProbe;
+                case (int)StylizedRiverFoamDebugView.FoamShaderDetailDifference:
+                    return StylizedRiverFoamDebugView.FoamShaderDetailDifference;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }
@@ -3265,6 +3271,50 @@ namespace ProgrammaticStylized3D.Rivers
             corridorMeshRenderer.shadowCastingMode =
                 ShadowCastingMode.On;
             corridorMeshRenderer.receiveShadows = true;
+        }
+
+        public void RefreshCorridorMaterialProperties()
+        {
+            if (corridorObject == null)
+            {
+                Transform existing = transform.Find(CorridorObjectName);
+
+                if (existing != null)
+                {
+                    corridorObject = existing.gameObject;
+                }
+            }
+
+            if (corridorObject == null)
+            {
+                return;
+            }
+
+            if (corridorMeshRenderer == null)
+            {
+                corridorMeshRenderer =
+                    corridorObject.GetComponent<MeshRenderer>();
+            }
+
+            if (corridorMeshRenderer == null)
+            {
+                return;
+            }
+
+            GeneratedGround ground =
+                GetComponentInParent<GeneratedGround>();
+
+            if (ground != null)
+            {
+                corridorObject.layer = ground.gameObject.layer;
+                corridorMeshRenderer.sharedMaterial = ground.SharedMaterial;
+                ground.ApplySurfaceProfileMaterialProperties(
+                    corridorMeshRenderer);
+            }
+            else
+            {
+                corridorMeshRenderer.SetPropertyBlock(null);
+            }
         }
 
         private static bool HasRequiredCorridorComponents(GameObject target)

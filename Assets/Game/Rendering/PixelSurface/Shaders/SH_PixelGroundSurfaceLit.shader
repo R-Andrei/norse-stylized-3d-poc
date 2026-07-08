@@ -25,6 +25,17 @@ Shader "PS3D/Pixel Ground Surface Lit"
         _GroundVegetationResponse("Ground Vegetation Response", Range(0, 2)) = 0.25
         _GroundRockyDryResponse("Ground Rocky/Dry Response", Range(0, 2)) = 0.5
         _GroundShoreDampStrength("Ground Shore Damp Strength", Range(0, 2)) = 1
+        _GroundPatchBlendStrength("Ground Patch Blend Strength", Range(0, 1)) = 0.55
+        _GroundMacroPatchScale("Ground Macro Patch Scale", Range(0.5, 12)) = 4.5
+        _GroundSnowTintStrength("Ground Snow Tint Strength", Range(0, 1)) = 0.58
+        _GroundSnowBrightness("Ground Snow Brightness", Range(0, 0.5)) = 0.16
+        _GroundDampDarkenStrength("Ground Damp Darken Strength", Range(0, 0.75)) = 0.34
+        _GroundDampTint("Ground Damp Tint", Color) = (0.47, 0.42, 0.34, 1)
+        _GroundDampTintStrength("Ground Damp Tint Strength", Range(0, 1)) = 0.2
+        _GroundRockyDryTint("Ground Rocky/Dry Tint", Color) = (0.68, 0.70, 0.68, 1)
+        _GroundRockyDryTintStrength("Ground Rocky/Dry Tint Strength", Range(0, 1)) = 0.18
+        _GroundVegetationTint("Ground Vegetation Tint", Color) = (0.50, 0.58, 0.42, 1)
+        _GroundVegetationTintStrength("Ground Vegetation Tint Strength", Range(0, 1)) = 0.1
 
         [Header(Stylized Value Shaping)]
         _HighlightCompressStrength("Highlight Compress Strength", Range(0, 0.5)) = 0.08

@@ -9,6 +9,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
     {
         private SerializedProperty recipe;
         private SerializedProperty surfaceProfile;
+        private SerializedProperty groundSurfaceType;
+        private SerializedProperty snowfieldVariant;
+        private SerializedProperty groundMaterialControls;
         private SerializedProperty regenerateOnValidate;
 
         private SerializedProperty shapeSeed;
@@ -25,6 +28,46 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty surfaceVariation;
         private SerializedProperty useModifiers;
 
+        private SerializedProperty baseColor;
+        private SerializedProperty frostColor;
+        private SerializedProperty dampTint;
+        private SerializedProperty dampTintStrength;
+        private SerializedProperty rockyDryTint;
+        private SerializedProperty rockyDryTintStrength;
+        private SerializedProperty vegetationTint;
+        private SerializedProperty vegetationTintStrength;
+        private SerializedProperty pixelCellSize;
+        private SerializedProperty pixelToneCount;
+        private SerializedProperty pixelClusterStrength;
+        private SerializedProperty pixelVariation;
+        private SerializedProperty broadVariation;
+        private SerializedProperty vertexVariation;
+        private SerializedProperty pixelEffectStrength;
+        private SerializedProperty cellWarpStrength;
+        private SerializedProperty groundMacroPatchScale;
+        private SerializedProperty profileContrastScale;
+        private SerializedProperty profilePixelContrastScale;
+        private SerializedProperty groundSnowResponseScale;
+        private SerializedProperty groundDampResponseScale;
+        private SerializedProperty groundVegetationResponseScale;
+        private SerializedProperty groundRockyDryResponseScale;
+        private SerializedProperty groundShoreDampStrengthScale;
+        private SerializedProperty groundPatchBlendStrength;
+        private SerializedProperty groundSnowTintStrength;
+        private SerializedProperty groundSnowBrightness;
+        private SerializedProperty groundDampDarkenStrength;
+        private SerializedProperty wetness;
+        private SerializedProperty wetDarkenStrength;
+        private SerializedProperty wetPixelSoftening;
+        private SerializedProperty wetSmoothnessBoost;
+        private SerializedProperty frostStrength;
+        private SerializedProperty frostContrast;
+        private SerializedProperty monolithicFlatten;
+        private SerializedProperty monolithicSmoothnessBoost;
+        private SerializedProperty smoothness;
+        private SerializedProperty specularStrength;
+
+        private bool showMaterialControls;
         private bool showAdvanced;
 
 
@@ -35,6 +78,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             surfaceProfile =
                 serializedObject.FindProperty("surfaceProfile");
+
+            groundSurfaceType =
+                serializedObject.FindProperty("groundSurfaceType");
+
+            snowfieldVariant =
+                serializedObject.FindProperty("snowfieldVariant");
+
+            groundMaterialControls =
+                serializedObject.FindProperty("groundMaterialControls");
 
             regenerateOnValidate =
                 serializedObject.FindProperty(
@@ -81,6 +133,120 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             useModifiers =
                 recipe.FindPropertyRelative("useModifiers");
+
+            baseColor =
+                groundMaterialControls.FindPropertyRelative("baseColor");
+
+            frostColor =
+                groundMaterialControls.FindPropertyRelative("frostColor");
+
+            dampTint =
+                groundMaterialControls.FindPropertyRelative("dampTint");
+
+            dampTintStrength =
+                groundMaterialControls.FindPropertyRelative("dampTintStrength");
+
+            rockyDryTint =
+                groundMaterialControls.FindPropertyRelative("rockyDryTint");
+
+            rockyDryTintStrength =
+                groundMaterialControls.FindPropertyRelative("rockyDryTintStrength");
+
+            vegetationTint =
+                groundMaterialControls.FindPropertyRelative("vegetationTint");
+
+            vegetationTintStrength =
+                groundMaterialControls.FindPropertyRelative("vegetationTintStrength");
+
+            pixelCellSize =
+                groundMaterialControls.FindPropertyRelative("pixelCellSize");
+
+            pixelToneCount =
+                groundMaterialControls.FindPropertyRelative("pixelToneCount");
+
+            pixelClusterStrength =
+                groundMaterialControls.FindPropertyRelative("pixelClusterStrength");
+
+            pixelVariation =
+                groundMaterialControls.FindPropertyRelative("pixelVariation");
+
+            broadVariation =
+                groundMaterialControls.FindPropertyRelative("broadVariation");
+
+            vertexVariation =
+                groundMaterialControls.FindPropertyRelative("vertexVariation");
+
+            pixelEffectStrength =
+                groundMaterialControls.FindPropertyRelative("pixelEffectStrength");
+
+            cellWarpStrength =
+                groundMaterialControls.FindPropertyRelative("cellWarpStrength");
+
+            groundMacroPatchScale =
+                groundMaterialControls.FindPropertyRelative("groundMacroPatchScale");
+
+            profileContrastScale =
+                groundMaterialControls.FindPropertyRelative("profileContrastScale");
+
+            profilePixelContrastScale =
+                groundMaterialControls.FindPropertyRelative("profilePixelContrastScale");
+
+            groundSnowResponseScale =
+                groundMaterialControls.FindPropertyRelative("groundSnowResponseScale");
+
+            groundDampResponseScale =
+                groundMaterialControls.FindPropertyRelative("groundDampResponseScale");
+
+            groundVegetationResponseScale =
+                groundMaterialControls.FindPropertyRelative("groundVegetationResponseScale");
+
+            groundRockyDryResponseScale =
+                groundMaterialControls.FindPropertyRelative("groundRockyDryResponseScale");
+
+            groundShoreDampStrengthScale =
+                groundMaterialControls.FindPropertyRelative("groundShoreDampStrengthScale");
+
+            groundPatchBlendStrength =
+                groundMaterialControls.FindPropertyRelative("groundPatchBlendStrength");
+
+            groundSnowTintStrength =
+                groundMaterialControls.FindPropertyRelative("groundSnowTintStrength");
+
+            groundSnowBrightness =
+                groundMaterialControls.FindPropertyRelative("groundSnowBrightness");
+
+            groundDampDarkenStrength =
+                groundMaterialControls.FindPropertyRelative("groundDampDarkenStrength");
+
+            wetness =
+                groundMaterialControls.FindPropertyRelative("wetness");
+
+            wetDarkenStrength =
+                groundMaterialControls.FindPropertyRelative("wetDarkenStrength");
+
+            wetPixelSoftening =
+                groundMaterialControls.FindPropertyRelative("wetPixelSoftening");
+
+            wetSmoothnessBoost =
+                groundMaterialControls.FindPropertyRelative("wetSmoothnessBoost");
+
+            frostStrength =
+                groundMaterialControls.FindPropertyRelative("frostStrength");
+
+            frostContrast =
+                groundMaterialControls.FindPropertyRelative("frostContrast");
+
+            monolithicFlatten =
+                groundMaterialControls.FindPropertyRelative("monolithicFlatten");
+
+            monolithicSmoothnessBoost =
+                groundMaterialControls.FindPropertyRelative("monolithicSmoothnessBoost");
+
+            smoothness =
+                groundMaterialControls.FindPropertyRelative("smoothness");
+
+            specularStrength =
+                groundMaterialControls.FindPropertyRelative("specularStrength");
         }
 
         public override void OnInspectorGUI()
@@ -259,6 +425,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     "Material Variation",
                     "Overall strength of generated tonal variation written to vertex colour red."));
 
+            DrawGroundVisualControls();
+
             if (targets.Length == 1)
             {
                 GeneratedGround ground =
@@ -272,6 +440,155 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         MessageType.None);
                 }
             }
+        }
+
+        private void DrawGroundVisualControls()
+        {
+            EditorGUILayout.Space(6f);
+
+            EditorGUILayout.PropertyField(
+                groundSurfaceType,
+                new GUIContent(
+                    "Surface Type",
+                    "High-level ground visual family. Only Snowfield is implemented right now; future types can add their own variants."));
+
+            GroundSurfaceType selectedType =
+                (GroundSurfaceType)groundSurfaceType.enumValueIndex;
+
+            if (selectedType == GroundSurfaceType.Snowfield)
+            {
+                EditorGUI.showMixedValue =
+                    snowfieldVariant.hasMultipleDifferentValues;
+
+                GroundSnowfieldVariant currentVariant =
+                    (GroundSnowfieldVariant)snowfieldVariant.enumValueIndex;
+
+                EditorGUI.BeginChangeCheck();
+
+                GroundSnowfieldVariant selectedVariant =
+                    (GroundSnowfieldVariant)EditorGUILayout.EnumPopup(
+                        new GUIContent(
+                            "Snowfield Variant",
+                            "Applies a complete snowfield visual recipe to this generated ground."),
+                        currentVariant);
+
+                EditorGUI.showMixedValue = false;
+
+                if (EditorGUI.EndChangeCheck())
+                {
+                    ApplyToTargets(
+                        "Apply Snowfield Variant",
+                        ground => ground.ApplySnowfieldVariant(
+                            selectedVariant));
+                }
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    "This surface type has no implemented variant set yet.",
+                    MessageType.Info);
+            }
+
+            showMaterialControls =
+                EditorGUILayout.Foldout(
+                    showMaterialControls,
+                    "Advanced Material Controls",
+                    true);
+
+            if (!showMaterialControls)
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+            EditorGUI.BeginChangeCheck();
+
+            DrawMaterialSubsection(
+                "Palette",
+                baseColor,
+                frostColor,
+                dampTint,
+                dampTintStrength,
+                rockyDryTint,
+                rockyDryTintStrength,
+                vegetationTint,
+                vegetationTintStrength);
+
+            DrawMaterialSubsection(
+                "Pixel and Macro Variation",
+                pixelCellSize,
+                pixelToneCount,
+                pixelClusterStrength,
+                pixelVariation,
+                broadVariation,
+                vertexVariation,
+                pixelEffectStrength,
+                cellWarpStrength,
+                groundMacroPatchScale);
+
+            DrawMaterialSubsection(
+                "Semantic Response",
+                profileContrastScale,
+                profilePixelContrastScale,
+                groundSnowResponseScale,
+                groundDampResponseScale,
+                groundVegetationResponseScale,
+                groundRockyDryResponseScale,
+                groundShoreDampStrengthScale,
+                groundPatchBlendStrength,
+                groundSnowTintStrength,
+                groundSnowBrightness,
+                groundDampDarkenStrength);
+
+            DrawMaterialSubsection(
+                "Weather and Finish",
+                wetness,
+                wetDarkenStrength,
+                wetPixelSoftening,
+                wetSmoothnessBoost,
+                frostStrength,
+                frostContrast,
+                monolithicFlatten,
+                monolithicSmoothnessBoost,
+                smoothness,
+                specularStrength);
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+
+                ApplyToTargets(
+                    "Customize Ground Material Controls",
+                    ground => ground.MarkGroundVisualControlsCustom());
+            }
+
+            EditorGUI.indentLevel--;
+        }
+
+        private static void DrawMaterialSubsection(
+            string label,
+            params SerializedProperty[] properties)
+        {
+            EditorGUILayout.Space(3f);
+            EditorGUILayout.LabelField(
+                label,
+                EditorStyles.miniBoldLabel);
+
+            EditorGUI.indentLevel++;
+
+            for (int i = 0; i < properties.Length; i++)
+            {
+                SerializedProperty property = properties[i];
+
+                if (property == null)
+                {
+                    continue;
+                }
+
+                EditorGUILayout.PropertyField(property);
+            }
+
+            EditorGUI.indentLevel--;
         }
 
         private void DrawModifierSection()

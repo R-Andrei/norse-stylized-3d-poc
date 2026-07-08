@@ -925,7 +925,8 @@ Shader "PS3D/Stylized River Water"
                     return half4(saturate(fieldColour), 1.0);
                 }
 
-                if (foamDebug == 7 || foamDebug == 8)
+                if (foamDebug == 7 || foamDebug == 8 ||
+                    foamDebug == 9 || foamDebug == 10)
                 {
                     float evaluatedShape = saturate(
                         SAMPLE_TEXTURE2D(
@@ -945,6 +946,39 @@ Shader "PS3D/Stylized River Water"
                             addedByShape,
                             removedByShape * 0.85);
                         return half4(saturate(differenceColour), 1.0);
+                    }
+
+                    if (foamDebug == 9 || foamDebug == 10)
+                    {
+                        float detailedShape =
+                            RiverWaterFoamEvaluateShaderLocalDetailProbe(
+                                evaluatedShape,
+                                foam.presence,
+                                foam.remainingLife,
+                                foam.materialPattern,
+                                foam.materialUV,
+                                input.domainData.x,
+                                input.domainData.y,
+                                _FoamRenderTravelMetres,
+                                _FoamSharpness,
+                                foam.surfaceEnergy);
+
+                        if (foamDebug == 10)
+                        {
+                            float addedByDetail = saturate(
+                                (detailedShape - evaluatedShape) * 5.0);
+                            float removedByDetail = saturate(
+                                (evaluatedShape - detailedShape) * 5.0);
+                            float3 detailDifferenceColour = float3(
+                                removedByDetail + addedByDetail * 0.10,
+                                addedByDetail,
+                                removedByDetail * 0.85);
+                            return half4(
+                                saturate(detailDifferenceColour),
+                                1.0);
+                        }
+
+                        return half4(detailedShape.xxx, 1.0);
                     }
 
                     return half4(evaluatedShape.xxx, 1.0);

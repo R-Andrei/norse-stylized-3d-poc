@@ -148,6 +148,11 @@ Material:
     - _GroundDampResponse: 1
     - _GroundRockyDryResponse: 0.5
     - _GroundShoreDampStrength: 1
+    - _GroundPatchBlendStrength: 0.52
+    - _GroundMacroPatchScale: 4.5
+    - _GroundSnowTintStrength: 0.74
+    - _GroundSnowBrightness: 0.14
+    - _GroundDampDarkenStrength: 0.34
     - _GroundSnowResponse: 1
     - _GroundVegetationResponse: 0.25
     - _LightingTintInfluence: 0.35
@@ -159,15 +164,15 @@ Material:
     - _MonolithicSmoothnessBoost: 0.18
     - _OcclusionStrength: 1
     - _Parallax: 0.005
-    - _PixelBroadVariation: 0.022
+    - _PixelBroadVariation: 0.032
     - _PixelCellSize: 0.055
     - _PixelClusterStrength: 0.576
     - _PixelEffectStrength: 1
     - _PixelSeed: 3276
     - _PixelToneCount: 4.67
-    - _PixelVariation: 0.047
-    - _PixelVertexVariation: 0.221
-    - _PixelWarpStrength: 0.18
+    - _PixelVariation: 0.024
+    - _PixelVertexVariation: 0.2
+    - _PixelWarpStrength: 0.08
     - _Pixel_Seed: 4979
     - _Pixel_Variation: 0.047
     - _ProfileContrast: 1
@@ -202,7 +207,7 @@ Material:
     - _Base_Color: {r: 0.34901956, g: 0.38823527, b: 0.41960776, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _FrostColor: {r: 0.72, g: 0.82, b: 0.88, a: 1}
+    - _FrostColor: {r: 0.82, g: 0.93, b: 1, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _StoneCreaseTint: {r: 0.089999996, g: 0.08499997, b: 0.07499998, a: 1}
     - _StoneDirtTint: {r: 0.41999996, g: 0.35999998, b: 0.25999996, a: 1}

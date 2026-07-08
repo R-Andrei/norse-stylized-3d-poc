@@ -361,8 +361,8 @@ The current approved order is:
 1. Documentation lock and acyclic architecture correction — complete in the canonical docs update.
 2. Compliance and debug truth audit — complete in 4.11C.5.10; Foam Shape Difference now compares _FoamShapeMask against raw Persistent Presence, stale movement labels were corrected, and current Layer D dispatch is gated to Layer D debug use while Final Foam remains disconnected.
 3. Failed 5.9z warp retirement — complete in 4.11C.5.10B; EvaluateFoamShape is back to pass-through clipped Persistent Presence so future work starts from a clean Layer D baseline.
-4. Layer E shader-side local detail probe — test cheap sub-cell chipping/fray/cuts/thin streaks at rendered-pixel scale, without mutating `_FoamShapeMask` or `FoamState`.
-5. Low-res Layer D Film Source / Film Support — add fixed-grid visual sheet/contact/bridge support without entities or feedback.
+4. Layer E shader-side local detail probe — implemented in `4.11C.5.12` as debug-only `Foam Shader Detail Probe` / `Foam Shader Detail Difference`; validate cheap sub-cell chipping/fray/cuts at rendered-pixel scale without mutating `_FoamShapeMask` or `FoamState`.
+5. Low-res Layer D Film Source / Film Support — next structural step after 5.12 validation; add fixed-grid visual sheet/contact/bridge support without entities or feedback.
 6. Full-res _FoamShapeMask integration — combine persistent material, visual support, valid fluid, and exclusion into macro structure.
 7. Final Foam consumes _FoamShapeMask — only after Layer D visibly outperforms current final foam.
 8. Thin bright streak layer — shader-side local detail, separate from broad film structure; this may merge with item 4 if the probe is accepted.
@@ -385,6 +385,8 @@ Primary debug views should include or gain:
 - Foam Motion Field + Cell Grid;
 - Foam Evaluated Shape;
 - Foam Shape Difference;
+- Foam Shader Detail Probe;
+- Foam Shader Detail Difference;
 - Foam Film Source;
 - Foam Film Support.
 

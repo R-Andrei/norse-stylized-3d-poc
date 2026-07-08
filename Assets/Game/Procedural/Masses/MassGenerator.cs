@@ -1062,21 +1062,37 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         MakeCandidateFaceKey(candidate.CandidateIndex, candidate.FaceB),
                         out FaceInsetCut cutB) ||
                     !rebuiltBasePolygons.TryGetValue(candidate.FaceA, out List<Vector3> polygonA) ||
-                    !rebuiltBasePolygons.TryGetValue(candidate.FaceB, out List<Vector3> polygonB) ||
-                    !TryExtractCutRail(
+                    !rebuiltBasePolygons.TryGetValue(candidate.FaceB, out List<Vector3> polygonB))
+                {
+                    rejectReason = EdgeWearBevelRejectReason.RailExtraction;
+                    return false;
+                }
+
+                if (!TryExtractCutRail(
                         polygonA,
                         cutA,
                         railTolerance,
                         minimumStableEdgeLength,
-                        out BevelRail railA) ||
-                    !TryExtractCutRail(
+                        out BevelRail railA,
+                        out bool railAFragmented))
+                {
+                    rejectReason = railAFragmented
+                        ? EdgeWearBevelRejectReason.RailFragmented
+                        : EdgeWearBevelRejectReason.RailExtraction;
+                    return false;
+                }
+
+                if (!TryExtractCutRail(
                         polygonB,
                         cutB,
                         railTolerance,
                         minimumStableEdgeLength,
-                        out BevelRail railB))
+                        out BevelRail railB,
+                        out bool railBFragmented))
                 {
-                    rejectReason = EdgeWearBevelRejectReason.RailExtraction;
+                    rejectReason = railBFragmented
+                        ? EdgeWearBevelRejectReason.RailFragmented
+                        : EdgeWearBevelRejectReason.RailExtraction;
                     return false;
                 }
 
@@ -1153,6 +1169,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 localCapFaceMinArea,
                 localCapMinEdgeLength,
                 ref cornerClosureStats);
+
+            if (cornerClosureStats.SkippedCount > 0)
+            {
+                rejectReason = EdgeWearBevelRejectReason.ValidationCapFace;
+                return false;
+            }
 
             WeldSharedVertices(localRebuiltFaces);
             SanitizeAllFaces(localRebuiltFaces);
@@ -1502,9 +1524,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             FaceInsetCut cut,
             float tolerance,
             float minimumStableEdgeLength,
-            out BevelRail rail)
+            out BevelRail rail,
+            out bool fragmented)
         {
             rail = default;
+            fragmented = false;
 
             // Prefer the actual clipped polygon edge created by this inset cut.
             // EW-4B's original version gathered every vertex near the cut plane
@@ -1513,6 +1537,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Vector3 bestStart = Vector3.zero;
             Vector3 bestEnd = Vector3.zero;
             float bestScore = 0f;
+            int alignedSegmentCount = 0;
             float minimumLength = Mathf.Max(
                 minimumStableEdgeLength,
                 tolerance * 0.45f);
@@ -1555,6 +1580,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     continue;
                 }
 
+                alignedSegmentCount++;
                 float score = length * alignment;
                 if (score > bestScore)
                 {
@@ -1562,6 +1588,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     bestStart = startAlong <= endAlong ? start : end;
                     bestEnd = startAlong <= endAlong ? end : start;
                 }
+            }
+
+            if (alignedSegmentCount > 1)
+            {
+                fragmented = true;
+                return false;
             }
 
             if (bestScore > 0f)
@@ -1605,6 +1637,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             railPoints = GetUniquePoints(railPoints);
             if (railPoints.Count < 2)
             {
+                return false;
+            }
+
+            if (railPoints.Count > 2)
+            {
+                fragmented = true;
                 return false;
             }
 
@@ -4041,6 +4079,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             InsetCut,
             FaceClip,
             RailExtraction,
+            RailFragmented,
             BevelFace,
             ValidationBaseFace,
             ValidationBevelFace,
@@ -4072,6 +4111,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int RejectedInsetCut;
             public int RejectedFaceClip;
             public int RejectedRailExtraction;
+            public int RejectedRailFragmented;
             public int RejectedBevelFace;
             public int RejectedValidationBaseFace;
             public int RejectedValidationBevelFace;
@@ -4089,6 +4129,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 RejectedInsetCut = 0;
                 RejectedFaceClip = 0;
                 RejectedRailExtraction = 0;
+                RejectedRailFragmented = 0;
                 RejectedBevelFace = 0;
                 RejectedValidationBaseFace = 0;
                 RejectedValidationBevelFace = 0;
@@ -4111,6 +4152,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         break;
                     case EdgeWearBevelRejectReason.RailExtraction:
                         RejectedRailExtraction++;
+                        break;
+                    case EdgeWearBevelRejectReason.RailFragmented:
+                        RejectedRailFragmented++;
                         break;
                     case EdgeWearBevelRejectReason.BevelFace:
                         RejectedBevelFace++;
@@ -4138,7 +4182,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return
                     $"candidates={CandidateCount}, selected={SelectedCount}, accepted={AcceptedCount}, " +
                     $"rejectedInsetCut={RejectedInsetCut}, rejectedFaceClip={RejectedFaceClip}, " +
-                    $"rejectedRailExtraction={RejectedRailExtraction}, rejectedBevelFace={RejectedBevelFace}, " +
+                    $"rejectedRailExtraction={RejectedRailExtraction}, " +
+                    $"rejectedRailFragmented={RejectedRailFragmented}, " +
+                    $"rejectedBevelFace={RejectedBevelFace}, " +
                     $"rejectedValidationBaseFace={RejectedValidationBaseFace}, " +
                     $"rejectedValidationBevelFace={RejectedValidationBevelFace}, " +
                     $"rejectedValidationCapFace={RejectedValidationCapFace}, " +

@@ -161,6 +161,97 @@ float RiverWaterFoamPatternedMask(
     return saturate(max(hardVisible, fringe));
 }
 
+float RiverWaterFoamEvaluateShaderLocalDetailProbe(
+    float baseShape,
+    float presence,
+    float remainingLife,
+    float materialPattern,
+    float2 materialUV,
+    float globalDistance,
+    float lateralMetres,
+    float renderTravelMetres,
+    float sharpness,
+    float surfaceEnergy)
+{
+    baseShape = saturate(baseShape);
+    if (baseShape <= 0.0001)
+    {
+        return 0.0;
+    }
+
+    float s = saturate(sharpness);
+    float life = saturate(remainingLife);
+    float damage = 1.0 - life;
+    float seed = materialPattern * 61.37 +
+        RiverWaterFoamHash21(materialUV * float2(193.0, 257.0)) * 19.0 +
+        7.13;
+
+    // Use river metres, not foam-grid cells. This keeps the probe at the
+    // rendered-pixel/detail layer and avoids the long cell/ribbon artifacts
+    // that caused the 5.11 Layer D breakup probe to be retired.
+    float2 p = float2(globalDistance - renderTravelMetres, lateralMetres);
+    float slowTime = _Time.y * 0.055;
+
+    float broad = RiverWaterFoamValueNoise(
+        float2(
+            p.x * 2.20 + p.y * 0.85,
+            p.y * 4.40 - p.x * 0.31) + seed + slowTime);
+    float mid = RiverWaterFoamValueNoise(
+        float2(
+            p.x * 5.90 - p.y * 1.35,
+            p.y * 8.70 + p.x * 0.74) + seed * 1.71 - slowTime * 1.37);
+    float fine = RiverWaterFoamValueNoise(
+        float2(
+            p.x * 13.20 + p.y * 3.10,
+            p.y * 16.60 - p.x * 1.80) + seed * 2.47 + slowTime * 2.10);
+    float grain = RiverWaterFoamValueNoise(
+        float2(
+            p.x * 24.00 - p.y * 5.80,
+            p.y * 28.00 + p.x * 3.60) + seed * 3.63 - slowTime * 2.80);
+
+    float localField = saturate(
+        broad * 0.16 +
+        mid * 0.29 +
+        fine * 0.33 +
+        grain * 0.22);
+
+    // Limit the diagnostic to edges and weak/old fringe material. Broad, high
+    // coverage interiors should remain readable so this probe tests micro detail
+    // instead of macro shape ownership.
+    float edgeBand = smoothstep(0.035, 0.42, baseShape) *
+        (1.0 - smoothstep(0.62, 0.94, baseShape));
+    float weakCoverage = 1.0 - smoothstep(0.52, 0.88, baseShape);
+    float detailInfluence = saturate(
+        edgeBand * (0.88 + surfaceEnergy * 0.22) +
+        weakCoverage * damage * 0.20);
+
+    float threshold = lerp(0.24, 0.38, s) +
+        damage * 0.12 -
+        surfaceEnergy * 0.035;
+    float keep = smoothstep(
+        threshold - 0.12,
+        threshold + 0.18,
+        localField + broad * 0.10);
+
+    // A narrow scratch signal removes tiny local slivers in the debug probe. It
+    // is deliberately bounded by detailInfluence so it cannot become a broad
+    // structural split/merge system.
+    float scratchPhase = frac(
+        p.y * 7.30 +
+        p.x * 0.46 +
+        mid * 1.70 +
+        seed * 0.11);
+    float scratch = 1.0 - smoothstep(0.010, 0.085, abs(scratchPhase - 0.5));
+    float scratchKeep = lerp(
+        1.0,
+        0.54 + keep * 0.46,
+        scratch * edgeBand * (0.28 + damage * 0.18));
+
+    float detailed = baseShape * lerp(1.0, keep, detailInfluence);
+    detailed *= scratchKeep;
+    return saturate(detailed);
+}
+
 
 struct RiverWaterFoamSurfaceInfluence
 {
@@ -345,6 +436,7 @@ struct RiverWaterFoamResult
 {
     float presence;
     float remainingLife;
+    float materialPattern;
     float mask;
     float surfaceEnergy;
     float2 fieldUV;
@@ -369,6 +461,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     RiverWaterFoamResult result;
     result.presence = 0.0;
     result.remainingLife = 0.0;
+    result.materialPattern = 0.0;
     result.mask = 0.0;
     result.surfaceEnergy = 0.0;
     result.fieldUV = 0.0;
@@ -415,6 +508,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     // bend the final mask without changing lifecycle or material ownership.
     result.presence = storedPresence;
     result.remainingLife = storedRemainingLife;
+    result.materialPattern = storedMaterialPattern;
     result.fieldUV = fieldUV;
     result.materialUV = foamUV;
 

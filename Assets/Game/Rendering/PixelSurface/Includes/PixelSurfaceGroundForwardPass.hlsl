@@ -6,7 +6,11 @@
                 half4 baseSample =
                     SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
 
-                float broadCellSize = max(_PixelCellSize * 8.0, 0.0001);
+                // Ground macro variation must live at terrain scale, not pixel-cell
+                // scale. The previous _PixelCellSize * 8 path produced ~0.44 m
+                // patches with the snowfield material, which read as repeated
+                // granular mottling from the isometric camera.
+                float broadCellSize = max(_GroundMacroPatchScale, 0.0001);
                 float3 broadCoordinate =
                     input.positionWS / broadCellSize + _PixelSeed * 0.013;
                 float3 warp =
@@ -53,6 +57,12 @@
                 half tonalScale =
                     (half)max(0.0, 1.0 + tonalOffset * _PixelEffectStrength);
 
+                float groundTonal = ResolveGroundTonalMask(input);
+                float tonalSigned = (groundTonal - 0.5) * 2.0 * contractMask;
+                float semanticPatch = saturate(
+                    0.5 + tonalSigned * 0.44 + broadValue * 0.22);
+                float inversePatch = 1.0 - semanticPatch;
+
                 float exposureMask =
                     ResolveGroundExposureMask(input) * contractMask;
                 float groundDampDeposit = ResolveGroundDampDepositMask(input);
@@ -60,12 +70,13 @@
                 float groundRockyDry = ResolveGroundRockyDryMask(input);
                 float groundVegetation = ResolveGroundVegetationMask(input);
                 float groundDampVisual = saturate(
-                    (groundDampDeposit * 0.78 +
-                     groundShore * 0.52 * max(0.0, _GroundShoreDampStrength)) *
+                    (groundDampDeposit * 0.84 +
+                     groundShore * 0.34 * max(0.0, _GroundShoreDampStrength)) *
                     max(0.0, _GroundDampResponse));
                 float groundSnowVisual = saturate(
-                    exposureMask * max(0.0, _GroundSnowResponse) *
-                    (1.0 - groundDampVisual * 0.42));
+                    pow(saturate(exposureMask), 0.82) *
+                    max(0.0, _GroundSnowResponse) *
+                    (1.0 - groundDampVisual * 0.36));
                 float groundRockyDryVisual = saturate(
                     groundRockyDry * max(0.0, _GroundRockyDryResponse));
                 float groundVegetationVisual = saturate(
@@ -73,13 +84,22 @@
                 float profileContrast =
                     max(0.0, _ProfileContrast) *
                     lerp(1.0, max(0.0, _FrostContrast), saturate(_FrostStrength));
+                float patchBlend =
+                    saturate(_GroundPatchBlendStrength) * profileContrast;
+                float snowPatch = saturate(
+                    groundSnowVisual *
+                    lerp(0.78, 1.18, semanticPatch) *
+                    (1.0 - groundRockyDryVisual * 0.16));
+                float dampPatch = saturate(
+                    groundDampVisual * lerp(0.86, 1.18, inversePatch));
 
                 float groundSemanticScale =
                     1.0 +
-                    (groundSnowVisual * 0.11 -
-                     groundDampVisual * 0.18 -
-                     groundRockyDryVisual * 0.035 +
-                     groundVegetationVisual * 0.025) *
+                    (snowPatch * (0.10 + _GroundSnowBrightness * 0.45) -
+                     dampPatch * (0.14 + _GroundDampDarkenStrength * 0.26) -
+                     groundRockyDryVisual * 0.045 +
+                     groundVegetationVisual * 0.030 +
+                     tonalSigned * 0.040 * _GroundPatchBlendStrength) *
                     profileContrast;
 
                 half3 albedo =
@@ -88,20 +108,54 @@
                     tonalScale *
                     (half)max(0.0, groundSemanticScale);
 
+                // Separate snow value lift from snow hue. Ground Snow Brightness
+                // now controls luminance, while Ground Snow Tint Strength controls
+                // how much the lifted snow target adopts the frost/cold hue. This
+                // makes the tint control perceptible even when the base snow color
+                // is already pale.
+                half3 snowValueTarget =
+                    albedo *
+                    (half)max(
+                        0.0,
+                        1.0 + saturate(_GroundSnowBrightness) * 0.78);
+                half3 snowTintTarget = PS3D_ApplyValuePreservingTint(
+                    snowValueTarget,
+                    (half3)_FrostColor.rgb,
+                    _GroundSnowTintStrength);
                 albedo = lerp(
                     albedo,
-                    _FrostColor.rgb,
-                    (half)(groundSnowVisual * 0.34));
-                albedo *=
-                    (half)max(0.0, 1.0 - groundDampVisual * 0.24);
+                    snowTintTarget,
+                    (half)(snowPatch * patchBlend * 0.76));
+
+                half3 dampTarget = albedo * half3(0.78h, 0.76h, 0.69h);
+                dampTarget = PS3D_ApplyValuePreservingTint(
+                    dampTarget,
+                    (half3)_GroundDampTint.rgb,
+                    _GroundDampTintStrength);
                 albedo = lerp(
                     albedo,
-                    albedo * half3(0.88h, 0.90h, 0.93h),
-                    (half)(groundRockyDryVisual * 0.22));
+                    dampTarget,
+                    (half)(dampPatch * saturate(_GroundDampDarkenStrength) * 0.92));
+
+                half3 rockyDryTarget = albedo * half3(0.88h, 0.90h, 0.93h);
+                rockyDryTarget = PS3D_ApplyValuePreservingTint(
+                    rockyDryTarget,
+                    (half3)_GroundRockyDryTint.rgb,
+                    _GroundRockyDryTintStrength);
                 albedo = lerp(
                     albedo,
-                    albedo * half3(0.94h, 1.00h, 0.90h),
-                    (half)(groundVegetationVisual * 0.18));
+                    rockyDryTarget,
+                    (half)(groundRockyDryVisual * 0.18 * patchBlend));
+
+                half3 vegetationTarget = albedo * half3(0.94h, 1.00h, 0.90h);
+                vegetationTarget = PS3D_ApplyValuePreservingTint(
+                    vegetationTarget,
+                    (half3)_GroundVegetationTint.rgb,
+                    _GroundVegetationTintStrength);
+                albedo = lerp(
+                    albedo,
+                    vegetationTarget,
+                    (half)(groundVegetationVisual * 0.14 * patchBlend));
 
                 float wetness = saturate(_Wetness);
                 float wetGlobalDarken =

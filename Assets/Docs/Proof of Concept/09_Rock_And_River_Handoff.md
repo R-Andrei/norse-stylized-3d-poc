@@ -1383,3 +1383,36 @@ Validation showed the probe was active, but unsuitable: `Foam Shape Difference` 
 `4.11C.5.11B` retires the probe as active code. `EvaluateFoamShape` is reset to pass-through clipped Persistent Presence, the local helper functions are removed from `CS_RiverFoam.compute`, and `DispatchEvaluateShape()` no longer binds the physical-position/time/seed data required only by that rejected probe.
 
 Current rule: Layer D owns macro film structure, broad sheet/contact/bridge/pinch behavior, and a clean `_FoamShapeMask` foundation. Fine fragmentation, tiny cuts, edge granularity, and thin streaks belong in Layer E shader composition.
+
+## Addendum — River Foam 4.11C.5.12 Layer E Shader-Side Local Detail Probe
+
+After `4.11C.5.11B` restored a clean Layer D pass-through baseline, `4.11C.5.12` adds a debug-only Layer E shader-side local-detail probe. The purpose is to test fine chipping/fray/cuts at rendered-pixel scale, because the previous Layer D local-breakup probe proved `_FoamShapeMask` cells are too coarse for atomic detail.
+
+Changed responsibility remains strict:
+
+```text
+Layer C Persistent Foam Material remains material truth.
+Layer D _FoamShapeMask remains a clean macro-shape product and is not mutated by this probe.
+Layer E Shader Composition applies only debug-local pixel detail and writes only screen pixels.
+Final Foam remains unchanged.
+```
+
+New debug views:
+
+```text
+Foam Shader Detail Probe
+Foam Shader Detail Difference
+```
+
+Important files:
+
+```text
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl
+```
+
+Next decision after validation: accept, tune once, or reject Layer E local detail. Regardless of that result, broad inspiration-river sheet/contact/bridge behavior still requires the future low-res Layer D Film Source / Film Support system.
+

@@ -20,6 +20,17 @@
                 float _GroundVegetationResponse;
                 float _GroundRockyDryResponse;
                 float _GroundShoreDampStrength;
+                float _GroundPatchBlendStrength;
+                float _GroundMacroPatchScale;
+                float _GroundSnowTintStrength;
+                float _GroundSnowBrightness;
+                float _GroundDampDarkenStrength;
+                half4 _GroundDampTint;
+                float _GroundDampTintStrength;
+                half4 _GroundRockyDryTint;
+                float _GroundRockyDryTintStrength;
+                half4 _GroundVegetationTint;
+                float _GroundVegetationTintStrength;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;

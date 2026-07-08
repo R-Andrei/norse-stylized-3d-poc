@@ -1127,14 +1127,14 @@ namespace ProgrammaticStylized3D.Rivers
 
             float waterlineWidth =
                 Mathf.Max(
-                    0.08f,
-                    (safeSurfaceHalfWidth - safeVisibleHalfWidth) * 0.45f);
+                    0.05f,
+                    (safeSurfaceHalfWidth - safeVisibleHalfWidth) * 0.28f);
 
             float distanceFromWaterline =
                 Mathf.Abs(acrossDistance - safeVisibleHalfWidth);
 
             float waterlineBand =
-                0.78f *
+                0.52f *
                 (1f - SmoothStep(
                     0f,
                     waterlineWidth,
@@ -1150,9 +1150,9 @@ namespace ProgrammaticStylized3D.Rivers
 
                 bedInfluence =
                     Mathf.Lerp(
-                        0.025f,
-                        0.14f,
-                        SmoothStep(0.62f, 1f, bed01));
+                        0.015f,
+                        0.075f,
+                        SmoothStep(0.70f, 1f, bed01));
             }
 
             float hiddenCoverInfluence = 0f;
@@ -1161,8 +1161,8 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 hiddenCoverInfluence =
                     Mathf.Lerp(
-                        0.46f,
-                        0.22f,
+                        0.24f,
+                        0.08f,
                         Mathf.Clamp01(point.T));
             }
 
@@ -1171,7 +1171,7 @@ namespace ProgrammaticStylized3D.Rivers
             if (point.Region == CrossRegion.OuterBlend)
             {
                 outerBlendInfluence =
-                    0.20f *
+                    0.10f *
                     (1f - SmoothStep(
                         0f,
                         1f,
@@ -1186,7 +1186,7 @@ namespace ProgrammaticStylized3D.Rivers
                         acrossDistance);
 
                 outerBlendInfluence =
-                    0.16f *
+                    0.08f *
                     (1f - SmoothStep(0f, 1f, outer01));
             }
 
@@ -1202,7 +1202,7 @@ namespace ProgrammaticStylized3D.Rivers
             return Mathf.Clamp01(
                 Mathf.Pow(
                     Mathf.Clamp01(influence),
-                    1.08f));
+                    1.32f));
         }
 
         private static float ResolveTerrainIntegrationWeight(

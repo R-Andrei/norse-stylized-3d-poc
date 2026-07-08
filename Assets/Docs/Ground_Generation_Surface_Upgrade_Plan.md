@@ -1508,7 +1508,11 @@ The first milestone is complete when:
 - [x] Patch C - Ground surface mask quality pass. Implemented and Unity debug-view validated.
 - [x] Patch D - Ground mask contrast and shore restraint pass. Implemented and Unity debug-view validated; shore/exposure needed one more focused correction.
 - [x] Patch E - Shore semantic correction and exposure/combined debug balance. Implemented and Unity debug-view validated; audit showed shore still used the wrong owner/model.
-- [~] Patch F - Ground shore model and mask diagnostics. Implemented: ground-side shore now uses visible-bank distance as a low-amplitude coarse hint; corridor-side shore is computed from corridor cross-section; generated ground exposes numeric mask diagnostics. Unity validation pending.
+- [x] Patch F - Ground shore model and mask diagnostics. Implemented and Unity-validated: generated-ground shore statistics are now low and broad; diagnostics exposed exposure saturation as the next blocker.
+- [x] Patch G - Exposure distribution normalization and corridor-shore restraint. Implemented and Unity-validated: exposure now has a healthy p05/p95 distribution and corridor-side shore is restrained enough for material-response work.
+- [~] Patch H - Ground snowfield visual response pass. Implemented: the dedicated ground shader now uses the validated tonal/exposure/damp/shore masks for stronger snow tint, broad patch identity, and damp/deposit darkening. Unity validation pending.
+- [x] Patch J - Ground visual presets and component-owned material controls. Implemented: generated-ground material response controls now live on `GeneratedGround`, apply through material property blocks, and refresh river corridors without requiring geometry rebuild.
+- [~] Patch K - Surface Type / Surface Variant architecture and stronger snowfield recipes. Implemented in code/docs; Unity visual tuning pending.
 - [ ] Patch 7 - Terrain profile asset set.
 - [ ] Patch 8 - Runtime state design stub.
 - [ ] Patch 9 - Footprint prototype.
@@ -1516,3 +1520,71 @@ The first milestone is complete when:
 - [ ] Patch 11 - Grass integration contract.
 - [ ] Patch 12 - Mixed terrain and authored masks.
 
+### 2026-07-08 — Patch I: Ground Visual Scale Cleanup
+
+Implemented after the first snowfield visual-response pass made the final ground read as too granular from the isometric camera. The ground masks were kept unchanged; the fix is limited to the dedicated ground shader/material response.
+
+- Added `_GroundMacroPatchScale` to `PS3D/Pixel Ground Surface Lit` so macro snowfield variation is measured in terrain metres instead of deriving from `_PixelCellSize * 8`.
+- Reduced `M_PixelFrozenDirt` fine pixel variation/warp to avoid repeated mottling across the ground plane.
+- Reworked snow response so `_GroundSnowBrightness` handles value lift and `_GroundSnowTintStrength` controls value-preserving hue shift toward `_FrostColor`.
+- No generated-ground mask generation, river corridor, water, foam, or generated-mass shader code changed.
+
+### 2026-07-08 — Patch J: Ground Visual Presets and Component-Owned Material Controls
+
+Implemented after the snowfield baseline became visually acceptable but too difficult to author through the shared material asset. The ground material asset remains a shared shader backend; per-ground visual response is now owned by `GeneratedGround` and pushed through renderer `MaterialPropertyBlock`s.
+
+- Added the first `GroundVisualPreset` implementation with `Clean Snowfield`, `Patchy Snowfield`, `Dirty / Thawing Snowfield`, and `Wind-Scoured Snowfield` options.
+- Added serialized `GroundMaterialControls` on `GeneratedGround` for pixel variation, broad variation, vertex variation, cell warp, patch blend, macro patch scale, snow tint, snow brightness, damp darkening, and frost colour.
+- Extended `GeneratedGround.ApplySurfaceProfileMaterialProperties(Renderer)` so these visual controls are applied per renderer through property IDs for `_PixelVariation`, `_PixelBroadVariation`, `_PixelVertexVariation`, `_PixelWarpStrength`, `_GroundPatchBlendStrength`, `_GroundMacroPatchScale`, `_GroundSnowTintStrength`, `_GroundSnowBrightness`, `_GroundDampDarkenStrength`, and `_FrostColor`.
+- Added a `GeneratedGroundEditor` preset dropdown and compact `Advanced Material Controls` foldout under the existing Surface section. Changing presets writes the bundled values into the serialized controls; manually editing a control marks the preset as `Custom`.
+- Added a generation-signature guard in `GeneratedGround.OnValidate()` so material-only control edits refresh material property blocks instead of forcing a ground/corridor geometry regeneration.
+- Added `StylizedRiver.RefreshCorridorMaterialProperties()` so ground visual changes can resync the existing river corridor renderer without rebuilding corridor meshes.
+- No material duplication, mask generation changes, generated-mass shader changes, or river geometry changes were introduced.
+
+### 2026-07-08 — Patch K: Surface Type / Surface Variant Architecture
+
+Implemented after visual validation showed that the Patch J presets were too similar and that `Dirty / Thawing Snowfield` appeared as a nested Unity menu item because `/` was interpreted as a submenu separator. Patch K starts the long-term surface-style architecture while keeping the current implementation cheap and reversible.
+
+Current authoring model:
+
+```text
+GeneratedGround
+  Surface Profile        -> semantic/mask-generation asset
+  Surface Type           -> visual family, currently Snowfield
+  Snowfield Variant      -> Clean / Patchy / Dirty Thawing / Wind-Scoured / Custom
+  Advanced Material Controls -> per-object visual recipe overrides
+```
+
+Important architecture decisions:
+
+- `Surface Type` is intentionally not called biome. A biome is a world/ecology concept; this control is a renderer/terrain-surface family.
+- `GroundSurfaceProfile` remains the source for generated mask tendencies such as exposure, damp/deposit, vegetation suitability, rocky/dry suitability, snow eligibility, and rain absorption.
+- `GroundSurfaceType` and the per-type variant select a final visual recipe that interprets those masks.
+- Variant edits are visual-only and must continue to refresh material property blocks without rebuilding ground or river-corridor geometry.
+- The current enum-backed implementation is a stepping stone. The expected final form is asset-backed `GroundSurfaceStyleProfile` / variant assets once more than one surface type exists and once the required feature vocabulary is known.
+
+Patch K changes:
+
+- Replaced the flat `Ground Visual Preset` authoring concept with `Surface Type` plus `Snowfield Variant`.
+- Renamed `Dirty / Thawing Snowfield` to `Dirty Thawing`, removing the slash that caused Unity to display a nested dropdown submenu.
+- Expanded `GroundMaterialControls` so variants now drive a full visual recipe instead of only ten mild material values.
+- Added per-ground control over base colour, frost colour, damp/rocky/vegetation tint colours and tint strengths, pixel cell size, tone count, cluster strength, pixel effect strength, profile contrast scales, semantic response scales, wetness/finish controls, frost response, monolithic flattening, smoothness, and specular strength.
+- Added ground shader properties for `_GroundDampTint`, `_GroundDampTintStrength`, `_GroundRockyDryTint`, `_GroundRockyDryTintStrength`, `_GroundVegetationTint`, and `_GroundVegetationTintStrength`.
+- Updated `PixelSurfaceGroundForwardPass.hlsl` so damp, rocky/dry, and vegetation responses can shift hue through value-preserving tint targets instead of being fixed hard-coded colour multipliers.
+- Strengthened the four snowfield recipes so they are intentionally more distinct at game-camera distance: clean is quiet/cold, patchy increases rocky/dry and macro contrast, dirty thawing increases warm damp/shore/wet response and lowers snow purity, and wind-scoured suppresses dirt/detail while flattening into larger cold plates.
+
+Near-term limitation:
+
+- Wind-scoured ground still lacks true directional streak geometry/noise. The current recipe can make it cleaner, colder, flatter, and broader, but a convincing scoured/swept snowfield will need a directional surface-feature module later.
+
+Future architectural target:
+
+```text
+GeneratedGround
+  GroundSurfaceProfile         // mask generation / terrain semantic tendencies
+  GroundSurfaceStyleProfile    // visual surface family, e.g. Snowfield, Mudflat, Rocky Ground
+  Style Variant                // Clean, Patchy, Dirty Thawing, Wind-Scoured, etc.
+  Advanced Overrides           // local per-object deviation from the selected variant
+```
+
+Do not add dozens of hardcoded surface types indefinitely. When the second or third surface type is introduced, move from enum recipes to style-profile assets so new ground families can be authored without expanding `GeneratedGround.cs` into a preset registry.

@@ -1,8 +1,8 @@
 # Generated Mass Edge Wear Recovery Architecture
 
 Status: active recovery plan  
-Current patch: EW-4B.5 — Shared Corner Closure  
-Next production patch: visual/topology tuning after joint closure validation
+Current patch: EW-4B.6 — Topology Hardening and Atlas Debug Label Clarification  
+Next production patch: validate fail-closed topology before any visual tuning
 
 ---
 
@@ -332,3 +332,11 @@ EW-4B.5 changes the local-strip closure policy:
 - created/skipped corner closures are added to the editor summary so remaining holes are diagnosable instead of silent.
 
 This is still plane-cut GeneratedMass-only. It does not modify the shader, FeatureAtlas0/1, MeshData, MeshBuilder, GeneratedGround, or the ground generator. `ConvexEdgeWear` remains the correct debug view for generated bevel geometry. `Convex Boundary Proximity` remains atlas/debug data and can reveal malformed geometry only because it renders over the same mesh.
+
+## EW-4B.6 update — fail closed on unsafe closures and fragmented rails
+
+EW-4B.5 validation produced accepted bevel strips but also reported `skippedCornerClosures=1` in the editor summary. Code inspection showed that the generator committed `bestFaces` and only then warned about skipped closures. EW-4B.6 fixes that specific unsafe commit path: any skipped corner closure rejects the current candidate set with `ValidationCapFace`, allowing the cumulative accept loop to remove the newest candidate and keep the last watertight accepted set.
+
+EW-4B.6 also treats fragmented rail extraction as a conservative rejection. The previous rail extractor could find several aligned cut-boundary segments and keep only the highest-scoring one. That made coverage look better but risked partial bevel strips and side cracks. The new `RailFragmented` bucket records those cases separately from ordinary `RailExtraction` failures so future validation can distinguish "no rail" from "ambiguous/multi-segment rail".
+
+Rendering remains unchanged. The updated split shader stack already separates generated mass and generated ground paths; this patch intentionally does not modify the mass shader, ground shader, FeatureAtlas baker, MeshData, MeshBuilder, GeneratedGround, or ground generation. Debug labeling is clarified in the GeneratedMass editor by prefixing legacy atlas boundary modes with `Atlas`, while `Convex Edge Wear` remains the physical bevel/UV2.z validation mode.

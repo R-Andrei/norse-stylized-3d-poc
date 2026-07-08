@@ -864,7 +864,11 @@ namespace ProgrammaticStylized3D.Rivers
                 return river.FoamDebugView ==
                         StylizedRiverFoamDebugView.FoamEvaluatedShape ||
                     river.FoamDebugView ==
-                        StylizedRiverFoamDebugView.FoamShapeDifference;
+                        StylizedRiverFoamDebugView.FoamShapeDifference ||
+                    river.FoamDebugView ==
+                        StylizedRiverFoamDebugView.FoamShaderDetailProbe ||
+                    river.FoamDebugView ==
+                        StylizedRiverFoamDebugView.FoamShaderDetailDifference;
             }
         }
 

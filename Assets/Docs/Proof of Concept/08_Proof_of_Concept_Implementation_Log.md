@@ -1236,3 +1236,37 @@ Current active implementation direction after this cleanup:
 3. Integrate accepted macro support into _FoamShapeMask.
 4. Switch Final Foam to _FoamShapeMask only after Layer D visibly outperforms current final foam.
 ```
+
+## 2026-07-08 — River Foam 4.11C.5.12 Layer E Shader-Side Local Detail Probe
+
+`4.11C.5.12` implements the first shader-side Layer E local-detail probe after `4.11C.5.11B` restored the clean pass-through Layer D baseline. This patch deliberately does not mutate `FoamState`, does not mutate `_FoamShapeMask`, and does not affect Final Foam. It only adds debug views that sample the clean Layer D mask and apply local rendered-pixel procedural detail in the water shader.
+
+Added debug modes:
+
+```text
+Foam Shader Detail Probe
+Foam Shader Detail Difference
+```
+
+Code-level ownership notes:
+
+```text
+StylizedRiverFoamDebugView now includes FoamShaderDetailProbe = 9 and FoamShaderDetailDifference = 10.
+IsShapeProductDebugActive includes those modes so the pass-through _FoamShapeMask is current while the shader detail probe samples it.
+RiverWaterFoamResult now exposes materialPattern to shader debug/detail code.
+RiverWaterFoamEvaluateShaderLocalDetailProbe(...) lives in RiverWaterFoam.hlsl and applies local, no-neighbour detail using river metres, material UV, material pattern, Remaining Life, time, sharpness, and surface energy.
+SH_CleanStylizedRiver.shader handles debug modes 9 and 10 by comparing the shader-detailed result against the base _FoamShapeMask.
+```
+
+Validation expectation:
+
+```text
+Material Presence and Foam Evaluated Shape remain the clean Layer C/Layer D baseline.
+Foam Shape Difference remains black unless Layer D changes.
+Foam Shader Detail Probe shows only Layer E pixel-scale detail over _FoamShapeMask.
+Foam Shader Detail Difference shows granular local removal/addition relative to _FoamShapeMask.
+Final Foam remains unchanged.
+```
+
+This probe is not intended to solve broad sheets, bank-hugging film, contact support, bridge/rejoin, or macro split/merge. Those remain the job of future low-resolution Layer D Film Source / Film Support.
+

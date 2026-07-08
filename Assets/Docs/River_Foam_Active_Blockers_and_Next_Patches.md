@@ -231,7 +231,7 @@ Local-only math cannot reliably know whether an empty cell is between two nearby
 Required future system:
 
 ```text
-Low-res Layer D visual film source/support fields.
+Low-res Layer D visual film source/support fields. This remains the next structural work after the 5.12 Layer E local-detail probe is validated or rejected.
 ```
 
 This should target:
@@ -307,18 +307,22 @@ no low-res helper textures yet
 
 ## Patch C — Layer E shader-side local detail probe
 
-Scope:
+Status: implemented in `4.11C.5.12`, pending Unity validation.
+
+Implemented scope:
 
 ```text
-Retest the cheap local-only visual-breakup idea at the correct resolution: shader pixels, not _FoamShapeMask cells.
-Sample the clean Layer D mask and apply local procedural edge breakup, granular cuts, thin scratches, and highlight/streak detail in a debug/final-shader path.
+Added Foam Shader Detail Probe and Foam Shader Detail Difference debug views.
+Retests the cheap local-only visual-breakup idea at rendered-pixel scale rather than _FoamShapeMask cell scale.
+Samples the clean Layer D mask and applies local procedural edge breakup, granular cuts, and tiny scratch/cut removals in the shader debug path only.
 No new entity system.
 No wide neighbourhood sampling.
 No persistent material mutation.
 No _FoamShapeMask mutation.
+No Final Foam change.
 ```
 
-Acceptance:
+Validation acceptance:
 
 ```text
 Fine breakup should read as sub-cell/per-pixel foam detail rather than simulation-grid holes.

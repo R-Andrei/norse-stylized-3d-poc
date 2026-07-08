@@ -956,29 +956,21 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             recipe.ShapeSeed,
                             0x7F2D);
 
+                    // Store a raw exposure candidate first. A later pass
+                    // normalizes the distribution across the whole generated
+                    // patch. This avoids flat combat-safe terrain driving the
+                    // mask into a mostly-clipped snow-everywhere value.
                     float exposureRaw =
                         Mathf.Clamp01(
-                            upFacing * 0.24f +
-                            heightValue * 0.08f +
-                            exposurePatch * 0.46f +
-                            broadPatch * 0.08f +
-                            exposureBias * 0.14f);
+                            upFacing * 0.10f +
+                            heightValue * 0.05f +
+                            exposurePatch * 0.58f +
+                            broadPatch * 0.16f +
+                            exposureBias * 0.11f);
 
-                    float exposure =
-                        SmoothStep(
-                            0.16f,
-                            0.84f,
-                            exposureRaw);
-
-                    exposure =
-                        ApplyCenteredMaskContrast(
-                            exposure,
-                            Mathf.Lerp(1.18f, 1.58f, snowEligibility));
-
-                    exposure *= Mathf.Lerp(0.72f, 1.18f, snowEligibility);
-                    exposure *= Mathf.Lerp(1f, 0.96f, shore * rainAbsorption);
-                    exposure *= Mathf.Lerp(1f, 0.94f, compaction);
-                    exposureMasks[index] = Mathf.Clamp01(exposure);
+                    exposureRaw *= Mathf.Lerp(1f, 0.96f, shore * rainAbsorption);
+                    exposureRaw *= Mathf.Lerp(1f, 0.92f, compaction);
+                    exposureMasks[index] = Mathf.Clamp01(exposureRaw);
 
                     float dampDeposit =
                         Mathf.Clamp01(
@@ -1025,6 +1017,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             0f);
                 }
             }
+
+            NormalizeExposureMasks(
+                exposureMasks,
+                snowEligibility);
         }
 
         private static float EvaluateBroadSurfacePatch(
@@ -1131,6 +1127,58 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     tertiary * 0.12f);
 
             return value * value * (3f - 2f * value);
+        }
+
+        private static void NormalizeExposureMasks(
+            float[] exposureMasks,
+            float snowEligibility)
+        {
+            MaskStats stats = CalculateMaskStats(exposureMasks);
+
+            if (!stats.IsValid)
+            {
+                return;
+            }
+
+            float lower = stats.Percentile05;
+            float upper = stats.Percentile95;
+
+            if (upper - lower < 0.05f)
+            {
+                lower = stats.Minimum;
+                upper = stats.Maximum;
+            }
+
+            if (upper - lower < 0.05f)
+            {
+                lower = Mathf.Max(0f, stats.Average - 0.08f);
+                upper = Mathf.Min(1f, stats.Average + 0.08f);
+            }
+
+            float targetLow = Mathf.Lerp(0.20f, 0.30f, snowEligibility);
+            float targetHigh = Mathf.Lerp(0.76f, 0.90f, snowEligibility);
+            float contrast = Mathf.Lerp(0.96f, 1.14f, snowEligibility);
+
+            for (int index = 0; index < exposureMasks.Length; index++)
+            {
+                float normalized =
+                    SmoothStep(
+                        lower,
+                        upper,
+                        exposureMasks[index]);
+
+                normalized =
+                    ApplyCenteredMaskContrast(
+                        normalized,
+                        contrast);
+
+                exposureMasks[index] =
+                    Mathf.Clamp01(
+                        Mathf.Lerp(
+                            targetLow,
+                            targetHigh,
+                            normalized));
+            }
         }
 
         private static float ApplyCenteredMaskContrast(
