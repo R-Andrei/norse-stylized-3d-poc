@@ -406,11 +406,21 @@ Its height can combine:
 - river depression;
 - local landmark adjustments.
 
+The ground's visual direction is restrained stylized terrain, as defined in `Assets/Docs/Ground_Visual_Design_and_Architecture.md`:
+
+```text
+BOTW/TOTK-like base-material restraint
++ Hades-1-like painted ground accents
++ procedural masks and reusable style layers.
+```
+
+For the proof-of-concept clearing, this means calm matte base ground, broad readable patch composition, semantic masks, sparse painted accent lines, contact/edge accents, and later sparse motifs. Runtime footprints, rain, puddles, snow compression, and grass trampling should wait until this static language works.
+
 Do not solve erosion or production terrain streaming.
 
 ### Exit condition
 
-The clearing has readable large-scale form, stable navigation, and enough surface variation to support lighting without becoming noisy.
+The clearing has readable large-scale form, stable navigation, calm base ground, broad patches that do not become noisy, and at least a first proof of authored-looking accent language or a clear queued plan for it. The ground should look deliberately simple rather than unfinished.
 
 ## Stage 6 — Spline River and Crossing
 
@@ -679,6 +689,7 @@ Do not store all prototype state in one scene director or monolithic ScriptableO
 - Actor simplicity feels designed rather than unfinished.
 - VFX reinforce form, timing, and meaning.
 - Several seeds look like variations of one art direction.
+- Generated ground follows the restrained stylized terrain doctrine: calm base, broad patches, sparse accents, and no procedural noise soup.
 - A silent short recording looks like a game scene, not merely a procedural-generation demonstration.
 
 ## Workflow Acceptance Criteria
@@ -701,6 +712,7 @@ Pause and revise if:
 - all objects share one generic low-poly appearance without identity;
 - actor actions only read after particles and camera shake are added;
 - procedural detail overwhelms focal points;
+- generated ground becomes a noisy feature pile before calm base, macro patches, accent lines, and contact accents work;
 - runtime architecture is being built before editor authoring is pleasant;
 - voxel work expands without a clear semantic purpose;
 - the prototype becomes a disguised attempt to build the whole game.

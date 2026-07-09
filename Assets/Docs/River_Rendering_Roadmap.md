@@ -362,9 +362,10 @@ The current approved order is:
 2. Compliance and debug truth audit — complete in 4.11C.5.10; Foam Shape Difference now compares _FoamShapeMask against raw Persistent Presence, stale movement labels were corrected, and current Layer D dispatch is gated to Layer D debug use while Final Foam remains disconnected.
 3. Failed 5.9z warp retirement — complete in 4.11C.5.10B; EvaluateFoamShape is back to pass-through clipped Persistent Presence so future work starts from a clean Layer D baseline.
 4. Layer E shader-side local detail probe — implemented in `4.11C.5.12` as debug-only `Foam Shader Detail Probe` / `Foam Shader Detail Difference`; validate cheap sub-cell chipping/fray/cuts at rendered-pixel scale without mutating `_FoamShapeMask` or `FoamState`.
-5. Low-res Layer D Film Source / Film Support — next structural step after 5.12 validation; add fixed-grid visual sheet/contact/bridge support without entities or feedback.
-6. Full-res _FoamShapeMask integration — combine persistent material, visual support, valid fluid, and exclusion into macro structure.
-7. Final Foam consumes _FoamShapeMask — only after Layer D visibly outperforms current final foam.
+5. Low-res Layer D Film Source / Film Support — implemented through `4.11C.5.13`; `5.13B` fixed domain-space sampling, `5.13C` fixed support-topology contamination, and `5.13D` tunes spread shape.
+6. Validate 5.13D Film Support shape quality — compare Film Source, Film Support, Evaluated Shape, Shape Difference, and unchanged Final Foam.
+7. Full-res _FoamShapeMask integration — combine persistent material, visual support, valid fluid, and exclusion into macro structure only after Layer D is visually accepted.
+8. Final Foam consumes _FoamShapeMask — only after Layer D visibly outperforms current final foam.
 8. Thin bright streak layer — shader-side local detail, separate from broad film structure; this may merge with item 4 if the probe is accepted.
 9. Optional visual-only history — only if flicker becomes a real issue.
 10. Performance tiers and chunk scheduling — formalize update rates, resolution tiers, active chunk caps, and profiling counters.
@@ -466,4 +467,13 @@ Layer D Film Source is now material-gated. The previous 5.13/5.13B formula allow
 
 `4.11C.5.13C` has now been Unity-validated. The support-topology contamination is fixed: Film Source no longer displays generic support topology, and Film Support / Evaluated Shape now derive from material-fed source rather than topology-only source. The remaining issue is visual quality, not architecture: the current Film Support spread is too blunt and capsule-like around the material ribbon.
 
-The next planned patch is `4.11C.5.13D — Layer D Film Spread Shape Tune`. It must tune Film Source thresholds, Film Support directional spread, bridge thresholds, and final support contribution. It must not switch Final Foam to `_FoamShapeMask`, add environmental contact film, mutate persistent material, add entity tracking, or reintroduce support-only Film Source. This is still Stage 6 debug/product work; final water rendering remains unchanged until Layer D is visually accepted.
+`4.11C.5.13D — Layer D Film Spread Shape Tune` has now been implemented as compute-only Layer D tuning. It narrows support bias, weakens and gates cross-flow spread, tightens bridge/fill behavior, and lowers final Film Support dominance in `_FoamShapeMask`. It still must not be treated as Final Foam integration: Final Foam remains unchanged until Layer D is visually accepted.
+
+
+## Stage 6 Foam update — 4.11C.5.13D
+
+`4.11C.5.13D` tunes the existing Layer D Film Source / Film Support / Evaluated Shape formulas without changing the architecture. Support/contact/topology still cannot create Film Source from zero material. Final Foam still does not consume `_FoamShapeMask`.
+
+The compute pass now uses a narrower support-bias range, weaker and source-gated cross-flow spread, stricter bridge thresholds, lower bridge contribution, and a more conservative `supportShape` contribution in `EvaluateFoamShape`. The intended result is a Film Support field that remains broader than Film Source but is less uniformly inflated and less capsule-like.
+
+Validation should compare `Foam Film Source`, `Foam Film Support`, `Foam Evaluated Shape`, `Foam Shape Difference`, and `Final Foam`.

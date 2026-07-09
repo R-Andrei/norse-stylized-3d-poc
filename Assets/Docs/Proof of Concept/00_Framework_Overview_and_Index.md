@@ -85,6 +85,7 @@ More detailed routing:
 | Question or task | Read |
 |---|---|
 | Camera, composition, palette, lighting, shaders, snow, fog, or voxel aesthetics | `01_Visual_Language_and_Rendering.md` |
+| Generated-ground visual doctrine, style pillars, family/variant ground interpretation, shared ground style layers, static ground mask contracts, or ground roadmap priority | `../Ground_Visual_Design_and_Architecture.md` |
 | Procedural meshes, rocks, vegetation, buildings, ruins, bridges, rivers, paths, carvings, recipes, or baking | `02_Procedural_Geometry_and_Asset_Grammars.md` |
 | Nontraditional characters, rigid-part rigs, pose systems, action phases, trails, telegraphs, impacts, or dialogue staging | `03_Procedural_Actors_Motion_and_Combat.md` |
 | Terrain representations, chunks, sockets, graphs, semantic placement, deterministic generation, hubs, or changing wilderness | `04_World_Construction_and_Generative_Assembly.md` |
@@ -114,6 +115,9 @@ Applying a generic technique to the current game
 
 Continuing the prototype
     → Parts 00 + 06, then consult 01–04 only as needed
+
+Ground visual design or generated-ground style work
+    → Ground_Visual_Design_and_Architecture.md + Ground_Generation_Surface_Upgrade_Plan.md
 ```
 
 ## Core Terms
@@ -201,6 +205,7 @@ Each topic has one authoritative home:
 - Part 03 owns expressive actor presentation; Part 05 records which actor approaches the current project intends to use.
 - Part 04 owns generic hub-and-expedition patterns; Part 05 records whether the current game uses one.
 - Part 06 records experimental implementation and findings; it should not silently redefine the durable framework or project canon.
+- `Ground_Visual_Design_and_Architecture.md` owns generated-ground visual doctrine; `Ground_Generation_Surface_Upgrade_Plan.md` owns generated-ground implementation history and patch sequencing.
 
 ## Status Vocabulary
 
@@ -233,6 +238,8 @@ Project and prototype documents should distinguish:
 04_World_Construction_and_Generative_Assembly.md
 05_Project_Application_Norse_Game.md
 06_Proof_of_Concept.md
+../Ground_Visual_Design_and_Architecture.md
+../Ground_Generation_Surface_Upgrade_Plan.md
 ```
 
 ## Closing Position

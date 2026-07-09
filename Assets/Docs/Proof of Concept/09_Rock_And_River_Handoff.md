@@ -1486,42 +1486,34 @@ Foam And Aging Topology:
   The explicit support/topology view. If support topology is visible here, that is intentional.
 ```
 
-### Active problem
+### Current 5.13D patch status
 
-The system is now semantically correct enough to tune, but the Film Support shape is too blunt. Validation showed a thick/capsule-like spread around the material ribbon. This is expected from the first spread formula and is not yet inspiration-river quality.
+`4.11C.5.13D — Layer D Film Spread Shape Tune` has now been implemented as a narrow compute-only tuning pass and is pending Unity validation. The patch keeps the material-gated Film Source contract from 5.13C, does not switch Final Foam to `_FoamShapeMask`, and does not add environmental contact film or Inspector controls.
 
-### Next patch target
-
-```text
-4.11C.5.13D — Layer D Film Spread Shape Tune
-```
-
-Do not implement this patch before inspecting the current code. The primary file is:
+The primary code file changed is:
 
 ```text
 Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
 ```
 
-Inspect these functions first:
+Changed functions:
 
 ```text
 FoamResolveVisualFilmInfluenceAtDomainUV(...)
-FoamResolveVisualFilmSourceAtDomainUV(...)
-BuildFoamFilmSource
-FoamLoadFilmSource(...)
 BuildFoamFilmSupport
 EvaluateFoamShape
 ```
 
-Expected tuning direction:
+Implemented tuning:
 
 ```text
-Keep Film Source close to material truth.
-Make cross-flow spread weaker and conditional.
-Keep along-flow continuity stronger than cross-flow widening.
-Make bridge/fill thresholds stricter.
-Make final support contribution to _FoamShapeMask less dominant.
-Keep negative suppression and support bias active.
+Support bias range reduced to 0.94-1.08.
+Cross-flow Film Support spread reduced and gated by source/evidence.
+Along-flow continuity remains dominant.
+Diagonal spread reduced.
+Bridge thresholds tightened and bridge contribution lowered.
+Final support contribution to _FoamShapeMask made more conservative.
+Negative suppression remains active.
 ```
 
 Do not touch:
@@ -1536,7 +1528,7 @@ Layer B support-source seeding.
 Inspector controls for this still-unstable formula.
 ```
 
-Validation after 5.13D should compare:
+Validation for 5.13D should compare:
 
 ```text
 Foam Film Source
@@ -1556,3 +1548,10 @@ No topology-support contamination returns.
 No phase/cell-grid stutter returns.
 Final Foam remains unchanged.
 ```
+
+### Next continuation target after 5.13D validation
+
+If 5.13D validates well, the next decision is whether Layer D macro shape is good enough to continue toward Final Foam integration or whether one more Layer D tuning pass is needed. Do not switch Final Foam until the user accepts the Layer D macro result in debug views.
+
+If 5.13D is still too blunt, tune the same compute formulas again before adding new architecture. If it becomes too thin or loses useful broad sheets, relax `supportShape`, cross-flow gates, or bridge contribution slightly, but do not reintroduce support-only Film Source.
+

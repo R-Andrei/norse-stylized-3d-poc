@@ -19,7 +19,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private GroundMaterialControls materialControls =
             new GroundMaterialControls();
 
-        [Tooltip("Optional surface-feature recipes owned by this variant. Patch M applies Directional Streaks and Patch N applies Pooled Wetness as the first shader-only features; other kinds are reserved for later modules.")]
+        [Tooltip("Optional surface-feature recipes owned by this variant. Patch M applies Directional Streaks, Patch N applies Pooled Wetness, and Patch U applies Trampled Wear as shader-only proof features; other kinds are reserved for later modules.")]
         [SerializeField]
         private List<GroundSurfaceFeatureRecipe> features =
             new List<GroundSurfaceFeatureRecipe>();
@@ -95,7 +95,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             GroundSurfaceFeatureKind kind)
         {
             return kind == GroundSurfaceFeatureKind.DirectionalStreaks ||
-                kind == GroundSurfaceFeatureKind.PooledWetness;
+                kind == GroundSurfaceFeatureKind.PooledWetness ||
+                kind == GroundSurfaceFeatureKind.TrampledWear;
         }
 
         public string BuildFeatureSummary()

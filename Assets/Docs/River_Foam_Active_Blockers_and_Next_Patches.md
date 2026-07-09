@@ -402,7 +402,7 @@ This is a spread/threshold/tuning problem now that the semantics are clean.
 
 ## Patch E — 4.11C.5.13D Layer D Film Spread Shape Tune
 
-Status: next documented implementation target.
+Status: implemented in this patch; pending Unity validation.
 
 This patch must tune the current Film Source / Film Support / Evaluated Shape formulas. It is not a new architecture and not a Final Foam integration.
 
@@ -563,6 +563,47 @@ No broad support-topology shapes return.
 
 ```text
 Unchanged.
+```
+
+### 5.13D implementation notes
+
+Implemented as a narrow compute-only tuning pass in:
+
+```text
+Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+```
+
+Code changes:
+
+```text
+FoamResolveVisualFilmInfluenceAtDomainUV:
+  reduced supportBias from 0.90-1.18 to 0.94-1.08 so Layer B support remains a subtle bias/suppression path rather than an inflation path.
+
+BuildFoamFilmSupport:
+  kept along-flow continuity stronger than lateral widening;
+  reduced cross-flow tap weights;
+  added source/evidence gating for cross-flow spread;
+  reduced diagonal contribution;
+  raised bridge thresholds;
+  lowered bridge contribution from 0.72 to 0.42.
+
+EvaluateFoamShape:
+  raised supportShape threshold from 0.18-0.62 to 0.28-0.74;
+  raised sourceShape threshold slightly from 0.08-0.42 to 0.10-0.46;
+  lowered sourceShape contribution from 0.72 to 0.68;
+  lowered supportShape contribution from 0.88 to 0.60.
+```
+
+No runtime binding, shader sampling, debug enum, Final Foam integration, Inspector controls, environmental contact film, or persistent material transport changes were made.
+
+Expected validation delta from `5.13C`:
+
+```text
+Foam Film Source remains material-derived and may be slightly less inflated by support.
+Foam Film Support remains broader than source but should lose the thick uniform capsule look.
+Foam Evaluated Shape should show more selective additions.
+Foam Shape Difference should show smaller/more selective green material-derived additions.
+Final Foam remains unchanged.
 ```
 
 ## Patch F — Future explicit environmental contact film

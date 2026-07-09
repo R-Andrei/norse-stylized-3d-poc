@@ -109,6 +109,58 @@
                     contractMask);
             }
 
+            float ResolveGroundTrampledWearFeature(
+                Varyings input,
+                float compactionMask,
+                float dampDepositMask,
+                float rockyDryMask,
+                float contractMask)
+            {
+                if (!PS3D_IsGroundFeatureMode(3.0))
+                {
+                    return 0.0;
+                }
+
+                float scale = max(0.1, _GroundFeatureScale);
+                float seed = _PixelSeed * 0.023 + _GroundFeatureSeed * 0.097;
+                float2 positionXZ = input.positionWS.xz;
+                float broad = PS3D_ValueNoise31(
+                    float3(
+                        positionXZ.x / scale + seed,
+                        positionXZ.y / (scale * 0.72) - seed * 0.37,
+                        seed + 107.17));
+                float scrape = PS3D_ValueNoise31(
+                    float3(
+                        positionXZ.x / (scale * 0.34) - seed * 0.21,
+                        positionXZ.y / (scale * 1.85) + seed * 0.43,
+                        seed + 139.43));
+                float grit = PS3D_ValueNoise31(
+                    float3(
+                        positionXZ.x / (scale * 0.16) + seed * 0.61,
+                        positionXZ.y / (scale * 0.20) - seed * 0.19,
+                        seed + 173.89));
+                float combined = saturate(
+                    broad * 0.52 +
+                    scrape * 0.34 +
+                    grit * 0.14);
+                float contrast = lerp(0.85, 3.20, saturate(_GroundFeatureContrast));
+                float breakup = saturate((combined - 0.42) * contrast + 0.5);
+                float semanticGate = saturate(
+                    compactionMask * 0.90 +
+                    dampDepositMask * 0.18 +
+                    rockyDryMask * 0.12);
+                float maskGate = lerp(
+                    compactionMask,
+                    semanticGate,
+                    saturate(_GroundFeatureMaskInfluence));
+
+                return saturate(
+                    breakup *
+                    maskGate *
+                    saturate(_GroundFeatureStrength) *
+                    contractMask);
+            }
+
             half3 ResolvePixelGroundSurfaceColor(Varyings input)
             {
                 half4 baseSample =
@@ -177,6 +229,7 @@
                 float groundShore = ResolveGroundShoreMask(input);
                 float groundRockyDry = ResolveGroundRockyDryMask(input);
                 float groundVegetation = ResolveGroundVegetationMask(input);
+                float groundCompaction = ResolveGroundCompactionMask(input);
                 float groundDampVisual = saturate(
                     (groundDampDeposit * 0.84 +
                      groundShore * 0.34 * max(0.0, _GroundShoreDampStrength)) *
@@ -201,6 +254,12 @@
                     groundShore,
                     groundRockyDry,
                     contractMask);
+                float trampledWearFeature = ResolveGroundTrampledWearFeature(
+                    input,
+                    groundCompaction,
+                    groundDampDeposit,
+                    groundRockyDry,
+                    contractMask);
                 float profileContrast =
                     max(0.0, _ProfileContrast) *
                     lerp(1.0, max(0.0, _FrostContrast), saturate(_FrostStrength));
@@ -218,7 +277,8 @@
                     (snowPatch * (0.10 + _GroundSnowBrightness * 0.45) -
                      dampPatch * (0.14 + _GroundDampDarkenStrength * 0.26) -
                      groundRockyDryVisual * 0.045 +
-                     groundVegetationVisual * 0.030 +
+                     groundVegetationVisual * 0.030 -
+                     trampledWearFeature * 0.13 +
                      tonalSigned * 0.040 * _GroundPatchBlendStrength +
                      directionalFeature * 0.10) *
                     profileContrast;
@@ -302,6 +362,21 @@
                     pooledWetnessTarget,
                     (half)(pooledWetnessFeature * 0.40));
 
+                half3 trampledWearTarget =
+                    albedo *
+                    (half)max(
+                        0.0,
+                        1.0 - trampledWearFeature *
+                        (0.16 + saturate(_GroundFeatureContrast) * 0.12));
+                trampledWearTarget = PS3D_ApplyValuePreservingTint(
+                    trampledWearTarget,
+                    (half3)_GroundDampTint.rgb,
+                    saturate(_GroundDampTintStrength + trampledWearFeature * 0.20));
+                albedo = lerp(
+                    albedo,
+                    trampledWearTarget,
+                    (half)(trampledWearFeature * 0.55));
+
                 float wetness = saturate(_Wetness);
                 float wetGlobalDarken =
                     wetness * saturate(_WetDarkenStrength) * 0.18;
@@ -375,11 +450,18 @@
                     ResolveGroundShoreMask(input),
                     ResolveGroundRockyDryMask(input),
                     contractMask);
+                float trampledWearFeature = ResolveGroundTrampledWearFeature(
+                    input,
+                    ResolveGroundCompactionMask(input),
+                    ResolveGroundDampDepositMask(input),
+                    ResolveGroundRockyDryMask(input),
+                    contractMask);
 
                 return saturate(
                     (half)_Smoothness +
                     (half)_Wetness * (half)_WetSmoothnessBoost * 0.22h +
-                    (half)pooledWetnessFeature * 0.025h +
+                    (half)pooledWetnessFeature * 0.025h -
+                    (half)trampledWearFeature * 0.030h +
                     (half)_MonolithicFlatten *
                     (half)_MonolithicSmoothnessBoost -
                     (half)_FrostStrength * 0.06h);
@@ -419,6 +501,12 @@
                     ResolveGroundShoreMask(input),
                     ResolveGroundRockyDryMask(input),
                     contractMask);
+                float trampledWearFeature = ResolveGroundTrampledWearFeature(
+                    input,
+                    ResolveGroundCompactionMask(input),
+                    ResolveGroundDampDepositMask(input),
+                    ResolveGroundRockyDryMask(input),
+                    contractMask);
 
                 SurfaceData surfaceData = (SurfaceData)0;
                 surfaceData.albedo = albedo;
@@ -435,7 +523,11 @@
                     lerp(
                         1.0h,
                         1.10h,
-                        saturate((half)_MonolithicFlatten));
+                        saturate((half)_MonolithicFlatten)) *
+                    lerp(
+                        1.0h,
+                        0.82h,
+                        saturate((half)trampledWearFeature));
                 surfaceData.metallic = 0.0h;
                 surfaceData.smoothness = ResolveGroundProfileSmoothness(input);
                 surfaceData.normalTS = half3(0.0h, 0.0h, 1.0h);

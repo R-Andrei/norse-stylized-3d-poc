@@ -1819,7 +1819,7 @@ Move foam-derived sheet support into Layer D.
 Treat 5.9z coherent coordinate warp as a failed/superseded prototype, not as the main path.
 ```
 
-Compliance/debug visibility is complete through `4.11C.5.10`, and failed Layer D visual probes were retired in `4.11C.5.10B` and `4.11C.5.11B`. `4.11C.5.12` proved Layer E can create sub-cell shader-side detail, but it remains debug-only. `4.11C.5.13`, `5.13B`, and `5.13C` establish the first low-resolution Layer D Film Source / Film Support pipeline with corrected domain-space sampling and material-gated source semantics. The current next work is not validation of semantics; that passed. The next work is `4.11C.5.13D`: tune Film Source / Film Support spread shape so the now-clean material-derived macro film is less blunt and more suitable for inspiration-river sheets before any Final Foam switch.
+Compliance/debug visibility is complete through `4.11C.5.10`, and failed Layer D visual probes were retired in `4.11C.5.10B` and `4.11C.5.11B`. `4.11C.5.12` proved Layer E can create sub-cell shader-side detail, but it remains debug-only. `4.11C.5.13`, `5.13B`, and `5.13C` establish the first low-resolution Layer D Film Source / Film Support pipeline with corrected domain-space sampling and material-gated source semantics. `4.11C.5.13D` now tunes that clean spread shape: support bias is narrower, cross-flow spread is weaker/evidence-gated, bridge behavior is stricter, and final support contribution is more conservative. The next work is Unity validation of 5.13D before any Final Foam switch.
 
 
 
@@ -2036,7 +2036,7 @@ Foam Shape Difference
   It must no longer be interpreted as automatic foam generation.
 ```
 
-## Why 5.13D is needed
+## Why 5.13D was needed
 
 The latest screenshots showed Film Support behaving like a thick, uniform low-resolution dilation around the spawned material ribbon. This is expected from the current first-pass spread formula, but it is not the desired final film shape.
 
@@ -2047,11 +2047,13 @@ semantically correct source/support;
 visually primitive spread/threshold behavior.
 ```
 
-The next patch must tune spread shape, not add new architecture.
+The patch tunes spread shape without adding new architecture.
 
 ## 4.11C.5.13D — Layer D Film Spread Shape Tune
 
-Required target:
+Status: implemented as a compute-only tuning pass; pending Unity validation.
+
+Target:
 
 ```text
 Make Film Support less like a uniform capsule dilation and more like controlled surface-film support.
@@ -2076,6 +2078,36 @@ EvaluateFoamShape:
   make supportShape more conservative;
   reduce support dominance over base/material source;
   keep additions visible but selective.
+```
+
+
+Implementation completed in this patch:
+
+```text
+FoamResolveVisualFilmInfluenceAtDomainUV:
+  supportBias is now 0.94-1.08 instead of 0.90-1.18.
+
+BuildFoamFilmSupport:
+  along-flow taps remain the dominant continuity path;
+  cross-flow taps are reduced and gated by source/evidence;
+  diagonal spread is reduced and tied to the same cross-flow gate;
+  bridge thresholds are stricter;
+  bridge contribution is reduced to 0.42.
+
+EvaluateFoamShape:
+  supportShape threshold is stricter;
+  supportShape no longer dominates visualFilm;
+  sourceShape remains visible but slightly more conservative.
+```
+
+Files intentionally not changed:
+
+```text
+StylizedRiverFoamRuntime.*.cs
+SH_CleanStylizedRiver.shader
+RiverWaterFoam.hlsl
+StylizedRiver.cs
+StylizedRiverEditor.cs
 ```
 
 No-touch rules:

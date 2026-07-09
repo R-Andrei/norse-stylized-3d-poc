@@ -1311,3 +1311,39 @@ Remaining issue after validation: Film Support is semantically clean but visuall
 Documented next target: `4.11C.5.13D — Layer D Film Spread Shape Tune`.
 
 `5.13D` must tune source thresholds, cross-flow spread, along-flow continuity, bridge thresholds, and final support contribution. It must not change Final Foam, reintroduce support-only Film Source, add environmental contact film, mutate persistent material, add entity tracking, or tune shader-side detail.
+
+### 2026-07-09 — River Foam 4.11C.5.13D Layer D Film Spread Shape Tune
+
+Implemented `4.11C.5.13D` as a narrow Layer D compute tuning pass. The patch edits only `Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute` on the code side.
+
+The patch keeps the `5.13C` material-gated Film Source contract intact: persistent material creates Film Source, and Layer B support/contact/topology can only bias or suppress material-derived film. It does not switch Final Foam to `_FoamShapeMask`, does not add environmental contact film, does not add Inspector controls, and does not mutate `FoamState`.
+
+Changed behavior:
+
+```text
+FoamResolveVisualFilmInfluenceAtDomainUV:
+  supportBias reduced from 0.90-1.18 to 0.94-1.08.
+
+BuildFoamFilmSupport:
+  along-flow continuity remains dominant;
+  cross-flow spread is weaker and gated by local/axial source evidence;
+  diagonal spread is weaker;
+  bridge thresholds are stricter;
+  bridge contribution is lower.
+
+EvaluateFoamShape:
+  supportShape threshold is stricter;
+  supportShape contribution is lower;
+  sourceShape threshold/contribution are slightly more conservative.
+```
+
+Expected validation:
+
+```text
+Foam Film Source remains material-derived.
+Foam Film Support is still broader than source but less uniformly capsule-like.
+Foam Evaluated Shape adds macro visual coverage more selectively.
+Foam Shape Difference shows smaller and more selective green additions than 5.13C.
+Final Foam remains unchanged.
+```
+

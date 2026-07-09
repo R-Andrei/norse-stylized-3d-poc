@@ -27,43 +27,43 @@ MonoBehaviour:
       vegetationTint: {r: 0.36, g: 0.44, b: 0.27, a: 1}
       vegetationTintStrength: 0.12
       pixelCellSize: 0.06
-      pixelToneCount: 3.7
-      pixelClusterStrength: 0.7
-      pixelVariation: 0.04
-      broadVariation: 0.075
-      vertexVariation: 0.22
-      pixelEffectStrength: 1.08
-      cellWarpStrength: 0.22
-      groundMacroPatchScale: 3.4
-      profileContrastScale: 1.18
-      profilePixelContrastScale: 1.04
+      pixelToneCount: 4.2
+      pixelClusterStrength: 0.46
+      pixelVariation: 0.018
+      broadVariation: 0.052
+      vertexVariation: 0.14
+      pixelEffectStrength: 0.68
+      cellWarpStrength: 0.08
+      groundMacroPatchScale: 5.2
+      profileContrastScale: 0.90
+      profilePixelContrastScale: 0.76
       groundSnowResponseScale: 0.16
-      groundDampResponseScale: 1.9
-      groundVegetationResponseScale: 0.9
-      groundRockyDryResponseScale: 0.7
-      groundShoreDampStrengthScale: 1.8
-      groundPatchBlendStrength: 0.84
+      groundDampResponseScale: 1.45
+      groundVegetationResponseScale: 0.72
+      groundRockyDryResponseScale: 0.56
+      groundShoreDampStrengthScale: 1.35
+      groundPatchBlendStrength: 0.46
       groundSnowTintStrength: 0.1
       groundSnowBrightness: 0.02
-      groundDampDarkenStrength: 0.66
-      wetness: 0.08
-      wetDarkenStrength: 0.18
-      wetPixelSoftening: 0.22
-      wetSmoothnessBoost: 0.04
-      frostStrength: 0
+      groundDampDarkenStrength: 0.42
+      wetness: 0.04
+      wetDarkenStrength: 0.14
+      wetPixelSoftening: 0.40
+      wetSmoothnessBoost: 0.025
+      frostStrength: 0.0
       frostContrast: 0.82
-      monolithicFlatten: 0
+      monolithicFlatten: 0.0
       monolithicSmoothnessBoost: 0.18
-      smoothness: 0.12
-      specularStrength: 0.045
+      smoothness: 0.10
+      specularStrength: 0.035
     features:
     - kind: 12
       enabled: 1
       costClass: 0
-      strength: 0.05
+      strength: 0.025
       scale: 4.8
-      contrast: 0.26
-      maskInfluence: 0.72
+      contrast: 0.18
+      maskInfluence: 0.58
       direction: {x: 1, y: 0}
       seedOffset: 101
   - id: mudflat.waterlogged
@@ -78,43 +78,43 @@ MonoBehaviour:
       vegetationTint: {r: 0.3, g: 0.38, b: 0.23, a: 1}
       vegetationTintStrength: 0.08
       pixelCellSize: 0.065
-      pixelToneCount: 3.2
-      pixelClusterStrength: 0.76
-      pixelVariation: 0.034
-      broadVariation: 0.09
-      vertexVariation: 0.2
-      pixelEffectStrength: 1
-      cellWarpStrength: 0.28
-      groundMacroPatchScale: 4.6
-      profileContrastScale: 1.08
-      profilePixelContrastScale: 0.94
+      pixelToneCount: 4.0
+      pixelClusterStrength: 0.50
+      pixelVariation: 0.016
+      broadVariation: 0.060
+      vertexVariation: 0.14
+      pixelEffectStrength: 0.64
+      cellWarpStrength: 0.09
+      groundMacroPatchScale: 5.8
+      profileContrastScale: 0.88
+      profilePixelContrastScale: 0.72
       groundSnowResponseScale: 0.04
-      groundDampResponseScale: 2.25
-      groundVegetationResponseScale: 0.6
-      groundRockyDryResponseScale: 0.45
-      groundShoreDampStrengthScale: 2.1
-      groundPatchBlendStrength: 0.86
+      groundDampResponseScale: 1.75
+      groundVegetationResponseScale: 0.48
+      groundRockyDryResponseScale: 0.36
+      groundShoreDampStrengthScale: 1.65
+      groundPatchBlendStrength: 0.50
       groundSnowTintStrength: 0.04
-      groundSnowBrightness: 0
-      groundDampDarkenStrength: 0.56
-      wetness: 0.12
-      wetDarkenStrength: 0.24
-      wetPixelSoftening: 0.28
-      wetSmoothnessBoost: 0.05
-      frostStrength: 0
+      groundSnowBrightness: 0.0
+      groundDampDarkenStrength: 0.44
+      wetness: 0.08
+      wetDarkenStrength: 0.18
+      wetPixelSoftening: 0.44
+      wetSmoothnessBoost: 0.035
+      frostStrength: 0.0
       frostContrast: 0.72
-      monolithicFlatten: 0
+      monolithicFlatten: 0.0
       monolithicSmoothnessBoost: 0.2
-      smoothness: 0.14
-      specularStrength: 0.055
+      smoothness: 0.11
+      specularStrength: 0.040
     features:
     - kind: 12
       enabled: 1
       costClass: 0
-      strength: 0.08
+      strength: 0.040
       scale: 6.2
-      contrast: 0.3
-      maskInfluence: 0.84
+      contrast: 0.22
+      maskInfluence: 0.68
       direction: {x: 1, y: 0}
       seedOffset: 131
   - id: mudflat.trampled
@@ -129,93 +129,93 @@ MonoBehaviour:
       vegetationTint: {r: 0.32, g: 0.39, b: 0.22, a: 1}
       vegetationTintStrength: 0.1
       pixelCellSize: 0.055
-      pixelToneCount: 3.5
-      pixelClusterStrength: 0.82
-      pixelVariation: 0.052
-      broadVariation: 0.11
-      vertexVariation: 0.25
-      pixelEffectStrength: 1.18
-      cellWarpStrength: 0.36
-      groundMacroPatchScale: 2.6
-      profileContrastScale: 1.38
-      profilePixelContrastScale: 1.22
+      pixelToneCount: 4.0
+      pixelClusterStrength: 0.54
+      pixelVariation: 0.022
+      broadVariation: 0.064
+      vertexVariation: 0.15
+      pixelEffectStrength: 0.72
+      cellWarpStrength: 0.10
+      groundMacroPatchScale: 4.4
+      profileContrastScale: 0.98
+      profilePixelContrastScale: 0.78
       groundSnowResponseScale: 0.08
-      groundDampResponseScale: 2.05
-      groundVegetationResponseScale: 0.72
-      groundRockyDryResponseScale: 0.78
-      groundShoreDampStrengthScale: 1.85
-      groundPatchBlendStrength: 0.92
+      groundDampResponseScale: 1.55
+      groundVegetationResponseScale: 0.56
+      groundRockyDryResponseScale: 0.64
+      groundShoreDampStrengthScale: 1.42
+      groundPatchBlendStrength: 0.54
       groundSnowTintStrength: 0.05
-      groundSnowBrightness: 0
-      groundDampDarkenStrength: 0.75
-      wetness: 0.07
-      wetDarkenStrength: 0.18
-      wetPixelSoftening: 0.18
-      wetSmoothnessBoost: 0.035
-      frostStrength: 0
+      groundSnowBrightness: 0.0
+      groundDampDarkenStrength: 0.48
+      wetness: 0.04
+      wetDarkenStrength: 0.14
+      wetPixelSoftening: 0.38
+      wetSmoothnessBoost: 0.025
+      frostStrength: 0.0
       frostContrast: 0.78
-      monolithicFlatten: 0
+      monolithicFlatten: 0.0
       monolithicSmoothnessBoost: 0.18
-      smoothness: 0.105
-      specularStrength: 0.04
+      smoothness: 0.095
+      specularStrength: 0.035
     features:
-    - kind: 12
+    - kind: 32
       enabled: 1
       costClass: 0
-      strength: 0.04
-      scale: 3.1
-      contrast: 0.36
-      maskInfluence: 0.66
+      strength: 0.52
+      scale: 3.6
+      contrast: 0.50
+      maskInfluence: 0.84
       direction: {x: 1, y: 0}
       seedOffset: 167
   - id: mudflat.frozen_thaw
     displayName: Frozen Thaw
     materialControls:
-      baseColor: {r: 0.49, g: 0.5, b: 0.465, a: 1}
+      baseColor: {r: 0.49, g: 0.50, b: 0.465, a: 1}
       frostColor: {r: 0.68, g: 0.78, b: 0.82, a: 1}
-      dampTint: {r: 0.34, g: 0.3, b: 0.235, a: 1}
+      dampTint: {r: 0.34, g: 0.30, b: 0.235, a: 1}
       dampTintStrength: 0.32
       rockyDryTint: {r: 0.55, g: 0.53, b: 0.48, a: 1}
       rockyDryTintStrength: 0.22
       vegetationTint: {r: 0.34, g: 0.42, b: 0.28, a: 1}
       vegetationTintStrength: 0.06
       pixelCellSize: 0.06
-      pixelToneCount: 4.1
-      pixelClusterStrength: 0.6
-      pixelVariation: 0.026
-      broadVariation: 0.06
-      vertexVariation: 0.18
-      pixelEffectStrength: 0.88
-      cellWarpStrength: 0.12
-      groundMacroPatchScale: 5.2
-      profileContrastScale: 0.92
-      profilePixelContrastScale: 0.86
+      pixelToneCount: 4.4
+      pixelClusterStrength: 0.44
+      pixelVariation: 0.014
+      broadVariation: 0.044
+      vertexVariation: 0.12
+      pixelEffectStrength: 0.58
+      cellWarpStrength: 0.055
+      groundMacroPatchScale: 6.2
+      profileContrastScale: 0.78
+      profilePixelContrastScale: 0.66
       groundSnowResponseScale: 0.42
-      groundDampResponseScale: 1.55
-      groundVegetationResponseScale: 0.45
-      groundRockyDryResponseScale: 0.48
-      groundShoreDampStrengthScale: 1.4
-      groundPatchBlendStrength: 0.62
+      groundDampResponseScale: 1.20
+      groundVegetationResponseScale: 0.36
+      groundRockyDryResponseScale: 0.40
+      groundShoreDampStrengthScale: 1.10
+      groundPatchBlendStrength: 0.38
       groundSnowTintStrength: 0.36
       groundSnowBrightness: 0.08
-      groundDampDarkenStrength: 0.48
-      wetness: 0.04
-      wetDarkenStrength: 0.14
-      wetPixelSoftening: 0.16
-      wetSmoothnessBoost: 0.025
-      frostStrength: 0.28
+      groundDampDarkenStrength: 0.34
+      wetness: 0.02
+      wetDarkenStrength: 0.10
+      wetPixelSoftening: 0.42
+      wetSmoothnessBoost: 0.018
+      frostStrength: 0.22
       frostContrast: 1.05
-      monolithicFlatten: 0.16
-      monolithicSmoothnessBoost: 0.24
-      smoothness: 0.13
-      specularStrength: 0.035
+      monolithicFlatten: 0.12
+      monolithicSmoothnessBoost: 0.16
+      smoothness: 0.10
+      specularStrength: 0.030
     features:
     - kind: 12
       enabled: 1
       costClass: 0
-      strength: 0.03
+      strength: 0.018
       scale: 5.8
-      contrast: 0.24
-      maskInfluence: 0.76
+      contrast: 0.16
+      maskInfluence: 0.62
       direction: {x: 1, y: 0}
       seedOffset: 193

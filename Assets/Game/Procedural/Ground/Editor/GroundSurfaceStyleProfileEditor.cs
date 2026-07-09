@@ -851,7 +851,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             GroundSurfaceFeatureKind kind)
         {
             return kind == GroundSurfaceFeatureKind.DirectionalStreaks ||
-                kind == GroundSurfaceFeatureKind.PooledWetness;
+                kind == GroundSurfaceFeatureKind.PooledWetness ||
+                kind == GroundSurfaceFeatureKind.TrampledWear;
         }
     }
 }

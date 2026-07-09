@@ -182,6 +182,28 @@ Possible qualities include:
 
 The visual world can sit somewhere between miniature, sculpture, stage design, and animated illustration without requiring conventional illustration as the production method.
 
+
+## Ground Visual Baseline: Restrained Stylized Terrain
+
+Generated ground has a specific design baseline inside the broader visual language. The ground-specific source of truth is:
+
+```text
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+```
+
+The canonical target is:
+
+```text
+BOTW/TOTK-like base-material restraint
++ Hades-1-like painted ground accents
++ mostly 3D procedural geometry
++ reusable procedural masks and style layers.
+```
+
+This generic visual-language document records the high-level relationship only. The ground design document owns the full philosophy, pillars, family/variant interpretation, feature-layer stack, implementation contracts, roadmap, and drift-prevention rules.
+
+In short: the ground should be calm, matte, broad, readable, and low-noise at the base; then enriched by broad macro patches, semantic masks, short painted-looking accent lines, contact/edge response, sparse motifs, and later runtime state.
+
 ## Controlled Camera as an Art Multiplier
 
 A tightly controlled camera significantly reduces the visual burden.
@@ -487,7 +509,7 @@ World-space and triplanar projection can provide:
 - cracks;
 - fine snow.
 
-This does not need to imitate realistic textures. It can be subtle visual noise that prevents large surfaces from feeling sterile.
+This does not need to imitate realistic textures. It should be subordinate to the ground doctrine: use world-space detail to support calm base materials, macro patches, painted accent lines, contact accents, and sparse motifs. Do not let triplanar or procedural detail become constant texture noise everywhere.
 
 ## Stylized Lighting
 
@@ -593,7 +615,9 @@ Too much variation produces visual mush.
 
 Not every parameter should be randomized.
 
-Important silhouettes, landmarks, paths, and encounters should remain controlled.
+Important silhouettes, landmarks, paths, ground accents, and encounters should remain controlled.
+
+For generated ground specifically, procedural noise must not become the art direction. Base ground should stay calm; variation should appear as broad patches, sparse painted accent lines, contact accents, and meaningful motif clusters. If the surface reads as equal-density noise from the game camera, reduce frequency, contrast, or density.
 
 Randomness should operate within designed ranges.
 

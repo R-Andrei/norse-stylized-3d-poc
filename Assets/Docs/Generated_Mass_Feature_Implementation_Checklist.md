@@ -2,7 +2,7 @@
 
 Status: active implementation checklist  
 Current target: EW-4D0 — Variable-Profile Topology Bevel Graph  
-Current step: EW-4D0.6 — Corner Vertex Patches
+Current step: EW-4D0.6T3 — T-Junction-Safe Open-Cycle Polygon Closure
 
 ---
 
@@ -25,7 +25,7 @@ Final plane-cut GeneratedMass convex edge wear should be:
 
 ```text
 generated main-mesh variable-profile bevel ribbons
-+ corner vertex patches
++ actual open-cycle polygon caps without centre-fan radial edges
 + UV2.z / vertex color ConvexEdgeWear material markers
 + shader response on marked generated geometry
 ```
@@ -112,12 +112,14 @@ ribbonEdgesFailed == 0
 ribbonFacesBuilt == ribbonFacesExpected
 ribbonDegenerateFaces == 0
 ribbonInvalidFaces == 0
-cornerPatchVertices > 0
-cornerPatchesBuilt > 0
-cornerPatchFacesBuilt > 0
-cornerPatchFailed == 0
-cornerPatchDegenerateFaces == 0
-workspaceOpenEdgesAfterCorners <= workspaceOpenEdgesAfterRibbons
+openCycleClosureEdgesInput == workspaceOpenEdgesAfterRibbons
+openCycleClosureComponentsInput == workspaceOpenEdgeComponentsAfterRibbons
+openCycleClosureComponentsBuilt == openCycleClosureComponentsInput
+openCycleClosureFacesExpected == openCycleClosureComponentsInput
+openCycleClosureFacesBuilt == openCycleClosureFacesExpected
+workspaceOpenEdgesAfterComponentClosure == 0
+workspaceNonManifoldEdgesAfterComponentClosure == 0
+workspaceTJunctionsAfterComponentClosure == 0
 baseFaceValidationFailures == 0
 workspaceBaseFaces == graphFaces
 profileSegments == 3
@@ -173,16 +175,37 @@ workspaceConvexEdgeWearFaces > 0
 Convex Edge Wear debug is no longer black after final commit step
 ```
 
-### EW-4D0.6 — Corner vertex patches — current
+### EW-4D0.6 — Corner vertex patches — completed but unsafe
+
+Implementation result:
+
+```text
+- Endpoint profile arcs were gathered at touched graph vertices.
+- Shared corner fan/radial patch faces were generated and marked ConvexEdgeWear.
+- The stage proved corner faces can be built, but not that the workspace is safe.
+```
+
+Failure branch that blocks EW-4D0.7:
+
+```text
+- A failed patch could append partial faces before returning false.
+- Corner point dedupe used PointMergeDistance rather than the validation edge-length scale.
+- Corner normal fallback could silently become Vector3.up.
+- workspaceOpenEdgesAfterCorners <= workspaceOpenEdgesAfterRibbons is not a sufficient pass condition.
+```
+
+### EW-4D0.6R — Corner patch hardening / failure diagnostics — completed as containment
 
 Implementation requirements:
 
 ```text
-- At each touched source graph vertex, gather endpoint profile arcs from incident selected edges.
-- Build one shared corner patch, not per-edge endpoint caps.
-- Use the same sampled profile-grid endpoint points used by bevel ribbons.
-- Mark corner patch faces as ConvexEdgeWear.
-- Prefer stable fan/radial patches first; improve aesthetics later if necessary.
+- Build each corner patch into a local temporary face list first.
+- Append corner faces to the rebuild workspace only when the patch is accepted.
+- If a corner patch fails, append no partial faces.
+- Add granular failure diagnostics for arcs, boundary points, duplicates, normals, ordering, centre distance, small faces, skipped degenerates, hard failures, accepted faces, and rejected faces.
+- Use corner-local dedupe tolerance based on minimumStableEdgeLength.
+- Replace unsafe Vector3.up normal fallback with a corner normal calculation that can actually fail.
+- Count remaining open edges after corners near graph vertices and away from graph vertices.
 - Keep this workspace-only; final visible commit waits for EW-4D0.7.
 ```
 
@@ -190,11 +213,108 @@ Validation success:
 
 ```text
 cornerPatchVertices > 0
-cornerPatchesBuilt > 0
-cornerPatchFacesBuilt > 0
+cornerPatchAcceptedFaces > 0
 cornerPatchFailed == 0
-cornerPatchDegenerateFaces == 0
-workspaceOpenEdgesAfterCorners <= workspaceOpenEdgesAfterRibbons
+cornerPatchHardFailures == 0
+cornerPatchInvalidNormals == 0
+cornerPatchOrderingFailures == 0
+cornerPatchInsufficientBoundaryPoints == 0
+workspaceOpenEdgesAfterCorners is substantially lower than the EW-4D0.6 baseline
+remaining open edges are attributed by workspaceOpenEdgesNearGraphVerticesAfterCorners and workspaceOpenEdgesAwayFromGraphVerticesAfterCorners
+```
+
+
+### EW-4D0.6R2 — Workspace open-edge loop diagnostics — completed as proof
+
+EW-4D0.6R validation proved that corner degenerates were eliminated, but remaining open edges were split between graph-vertex-local and away-from-vertex regions:
+
+```text
+cornerPatchFailed=2
+cornerPatchDegenerateFaces=0
+workspaceOpenEdgesAfterCorners=64
+workspaceOpenEdgesNearGraphVerticesAfterCorners=30
+workspaceOpenEdgesAwayFromGraphVerticesAfterCorners=34
+```
+
+EW-4D0.6R2 then proved the post-ribbon state is the cleaner closure target:
+
+```text
+workspaceOpenEdgesAfterRibbons=226
+workspaceOpenEdgeComponentsAfterRibbons=22
+workspaceOpenEdgeEndpointLeavesAfterRibbons=0
+workspaceOpenEdgeEndpointBranchesAfterRibbons=0
+workspaceOpenEdgesAfterCorners=64
+workspaceOpenEdgeEndpointBranchesAfterCorners=14
+```
+
+### EW-4D0.6T — Actual open-cycle closure after ribbons — completed as topology-trace proof
+
+Validation result:
+
+```text
+openCycleClosureEdgesInput=226
+openCycleClosureComponentsInput=22
+openCycleClosureNonCycleEndpoints=0
+openCycleClosureTraceFailures=0
+openCycleClosureTooSmallCycles=0
+openCycleClosureInvalidNormals=1
+openCycleClosureFacesBuilt=0
+```
+
+Verdict: topology tracing is valid; aggregate whole-cycle normal calculation is too strict and must be replaced by per-triangle normals.
+
+### EW-4D0.6T2 — Per-triangle open-cycle closure normals — completed as open-edge proof
+
+Validation result:
+
+```text
+openCycleClosureEdgesInput=226
+openCycleClosureComponentsInput=22
+openCycleClosureComponentsBuilt=22
+openCycleClosureComponentsFailed=0
+openCycleClosureFacesExpected=226
+openCycleClosureFacesBuilt=226
+workspaceOpenEdgesAfterComponentClosure=0
+workspaceNonManifoldEdgesAfterComponentClosure=0
+workspaceTJunctionsAfterComponentClosure=19
+```
+
+Verdict: per-triangle fan closure proved the open-cycle topology can close open edges and avoid non-manifold edges, but the radial centre-fan diagonals create T-junctions.
+
+### EW-4D0.6T3 — T-junction-safe open-cycle polygon closure — current
+
+Implementation requirements:
+
+```text
+- Keep actual post-ribbon open edges as the closure source.
+- Require endpoint valence 2 for every open-edge endpoint.
+- Trace each connected component into an ordered cycle.
+- Compute centre = average(cycle vertices) for each cycle.
+- Build one ConvexEdgeWear polygon cap per traced open-edge component.
+- Preserve the traced cycle vertex order so cap boundary edges exactly match the real open edges.
+- Compute a robust orientation normal from aligned per-edge triangle normals, but do not create radial centre-fan topology edges.
+- Build the full closure face list transactionally and append only on success.
+- Audit post-closure open edges, non-manifold edges, and T-junctions.
+- Keep the step workspace-only; final visible commit remains EW-4D0.7.
+```
+
+Validation success:
+
+```text
+openCycleClosureEdgesInput == workspaceOpenEdgesAfterRibbons
+openCycleClosureComponentsInput == workspaceOpenEdgeComponentsAfterRibbons
+openCycleClosureComponentsBuilt == openCycleClosureComponentsInput
+openCycleClosureFacesExpected == openCycleClosureComponentsInput
+openCycleClosureFacesBuilt == openCycleClosureFacesExpected
+openCycleClosureNonCycleEndpoints == 0
+openCycleClosureTraceFailures == 0
+openCycleClosureTooSmallCycles == 0
+openCycleClosureInvalidNormals == 0
+openCycleClosureDegenerateTriangles == 0
+openCycleClosureInvalidFaces == 0
+workspaceOpenEdgesAfterComponentClosure == 0
+workspaceNonManifoldEdgesAfterComponentClosure == 0
+workspaceTJunctionsAfterComponentClosure == 0
 ```
 
 ### EW-4D0.7 — Final topology validation and active-path switch
@@ -202,7 +322,7 @@ workspaceOpenEdgesAfterCorners <= workspaceOpenEdgesAfterRibbons
 Implementation requirements:
 
 ```text
-- Combine unaffected faces, clipped replacement base faces, bevel ribbon faces, and corner patches.
+- Combine unaffected faces, clipped replacement base faces, bevel ribbon faces, and open-cycle closure faces.
 - Weld/sanitize consistently.
 - Audit open edges, non-manifold edges, and T-junctions.
 - Commit only if topology is safe.
@@ -257,7 +377,7 @@ Implementation requirements:
 
 ## 4. Validation checklist for the current patch
 
-After importing EW-4D0.6:
+After importing EW-4D0.6R:
 
 ```text
 1. Regenerate the same plane-cut rock.
@@ -266,7 +386,7 @@ After importing EW-4D0.6:
 4. Confirm the existing Step 1, Step 2, and Step 3 fields remain clean.
 5. Confirm clipped-base workspace fields remain clean.
 6. Confirm rail-sampled base boundary and ribbon fields are present and clean.
-7. Confirm corner patch workspace fields are present and clean.
+7. Confirm open-cycle closure diagnostics are present and explain any remaining failure.
 ```
 
 Good current result:
@@ -293,19 +413,21 @@ ribbonFacesBuilt == ribbonFacesExpected
 ribbonDegenerateFaces == 0
 ribbonInvalidFaces == 0
 workspaceConvexEdgeWearFaces > 0
-cornerPatchVertices > 0
-cornerPatchesBuilt > 0
-cornerPatchFacesBuilt > 0
-cornerPatchFailed == 0
-cornerPatchDegenerateFaces == 0
-workspaceOpenEdgesAfterCorners <= workspaceOpenEdgesAfterRibbons
+openCycleClosureEdgesInput == workspaceOpenEdgesAfterRibbons
+openCycleClosureComponentsInput == workspaceOpenEdgeComponentsAfterRibbons
+openCycleClosureComponentsBuilt == openCycleClosureComponentsInput
+openCycleClosureFacesExpected == openCycleClosureComponentsInput
+openCycleClosureFacesBuilt == openCycleClosureFacesExpected
+workspaceOpenEdgesAfterComponentClosure == 0
+workspaceNonManifoldEdgesAfterComponentClosure == 0
+workspaceTJunctionsAfterComponentClosure == 0
 ```
 
 Expected visual result:
 
 ```text
 Convex Edge Wear may still be black.
-EW-4D0.5 emits ribbon faces only inside the temporary rebuild workspace. EW-4D0.6 adds corner patches in that same workspace. Final visible commit still waits for final topology validation and active-path switch.
+EW-4D0.5 emits ribbon faces only inside the temporary rebuild workspace. EW-4D0.6T3 closes actual post-ribbon open cycles in that same workspace using one ordered polygon cap per traced open-edge component. Final visible commit still waits for EW-4D0.7 final topology validation and active-path switch.
 ```
 
 ---

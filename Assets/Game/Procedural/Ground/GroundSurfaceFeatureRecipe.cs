@@ -6,7 +6,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
     [Serializable]
     public sealed class GroundSurfaceFeatureRecipe
     {
-        [Tooltip("Feature module represented by this recipe entry. Patch M applies Directional Streaks and Patch N applies Pooled Wetness as the first shader-only proof features; the other kinds reserve the asset contract for later modules.")]
+        [Tooltip("Feature module represented by this recipe entry. Patch M applies Directional Streaks, Patch N applies Pooled Wetness, and Patch U applies Trampled Wear as shader-only proof features; the other kinds reserve the asset contract for later modules.")]
         [SerializeField]
         private GroundSurfaceFeatureKind kind =
             GroundSurfaceFeatureKind.None;

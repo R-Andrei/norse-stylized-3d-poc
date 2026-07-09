@@ -1326,6 +1326,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     mode = 2f;
                     return true;
 
+                case GroundSurfaceFeatureKind.TrampledWear:
+                    mode = 3f;
+                    return true;
+
                 default:
                     mode = 0f;
                     return false;

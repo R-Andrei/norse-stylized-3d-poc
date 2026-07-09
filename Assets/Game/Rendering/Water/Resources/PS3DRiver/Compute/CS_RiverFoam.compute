@@ -242,7 +242,10 @@ FoamVisualFilmInfluence FoamResolveVisualFilmInfluenceAtDomainUV(
     float combinedSupport = saturate(max(anchoredSupport, structuralSupport));
 
     FoamVisualFilmInfluence influence;
-    influence.supportBias = lerp(0.90, 1.18, combinedSupport);
+    // 5.13D keeps support as a conservative bias only. The earlier range
+    // over-amplified already-material-derived film and made the half-res spread
+    // read as generic support dilation instead of source-shaped visual film.
+    influence.supportBias = lerp(0.94, 1.08, combinedSupport);
     influence.negativeSuppression = 1.0 -
         smoothstep(0.22, 0.85, saturate(topologyState.b)) * 0.62;
     return influence;
@@ -306,34 +309,43 @@ void BuildFoamFilmSupport(uint3 dispatchId : SV_DispatchThreadID)
     int flowStep = _FoamFlowDirection >= 0.0 ? 1 : -1;
     float centre = FoamLoadFilmSource(coordinate);
 
-    float along = centre * 0.28;
-    along += FoamLoadFilmSource(coordinate + int2(-flowStep, 0)) * 0.13;
-    along += FoamLoadFilmSource(coordinate + int2(flowStep, 0)) * 0.17;
-    along += FoamLoadFilmSource(coordinate + int2(-flowStep * 2, 0)) * 0.09;
-    along += FoamLoadFilmSource(coordinate + int2(flowStep * 2, 0)) * 0.12;
-    along += FoamLoadFilmSource(coordinate + int2(-flowStep * 3, 0)) * 0.05;
-    along += FoamLoadFilmSource(coordinate + int2(flowStep * 3, 0)) * 0.07;
+    float along = centre * 0.32;
+    along += FoamLoadFilmSource(coordinate + int2(-flowStep, 0)) * 0.12;
+    along += FoamLoadFilmSource(coordinate + int2(flowStep, 0)) * 0.18;
+    along += FoamLoadFilmSource(coordinate + int2(-flowStep * 2, 0)) * 0.075;
+    along += FoamLoadFilmSource(coordinate + int2(flowStep * 2, 0)) * 0.115;
+    along += FoamLoadFilmSource(coordinate + int2(-flowStep * 3, 0)) * 0.030;
+    along += FoamLoadFilmSource(coordinate + int2(flowStep * 3, 0)) * 0.055;
 
-    float across = centre * 0.44;
-    across += FoamLoadFilmSource(coordinate + int2(0, -1)) * 0.19;
-    across += FoamLoadFilmSource(coordinate + int2(0, 1)) * 0.19;
-    across += FoamLoadFilmSource(coordinate + int2(0, -2)) * 0.07;
-    across += FoamLoadFilmSource(coordinate + int2(0, 2)) * 0.07;
+    float acrossRaw = centre * 0.28;
+    acrossRaw += FoamLoadFilmSource(coordinate + int2(0, -1)) * 0.115;
+    acrossRaw += FoamLoadFilmSource(coordinate + int2(0, 1)) * 0.115;
+    acrossRaw += FoamLoadFilmSource(coordinate + int2(0, -2)) * 0.035;
+    acrossRaw += FoamLoadFilmSource(coordinate + int2(0, 2)) * 0.035;
+
+    // Cross-flow spread should be present, but it must be source-supported and
+    // weaker than along-flow continuity. This prevents the low-res helper from
+    // turning every material ribbon into a uniform capsule.
+    float axialEvidence = max(centre, along);
+    float localEvidence = max(axialEvidence, acrossRaw);
+    float acrossGate = smoothstep(0.045, 0.24, localEvidence) *
+        lerp(0.42, 1.0, smoothstep(0.16, 0.54, axialEvidence));
+    float across = acrossRaw * acrossGate;
 
     float diagonal = 0.0;
     diagonal += FoamLoadFilmSource(coordinate + int2(-flowStep, -1));
     diagonal += FoamLoadFilmSource(coordinate + int2(-flowStep, 1));
     diagonal += FoamLoadFilmSource(coordinate + int2(flowStep, -1));
     diagonal += FoamLoadFilmSource(coordinate + int2(flowStep, 1));
-    diagonal *= 0.065;
+    diagonal *= 0.042 * acrossGate;
 
-    float sheet = max(max(centre, along), max(across * 0.76, diagonal));
-    float bridge = smoothstep(0.18, 0.52, along) *
-        smoothstep(0.10, 0.42, across);
+    float sheet = max(max(centre, along), max(across * 0.54, diagonal));
+    float bridge = smoothstep(0.28, 0.68, along) *
+        smoothstep(0.20, 0.56, across);
     float2 domainUV = FoamTexelCentreUV(dispatchId.xy, _FoamFilmDimensions);
     FoamVisualFilmInfluence influence =
         FoamResolveVisualFilmInfluenceAtDomainUV(domainUV);
-    float spread = max(sheet, bridge * 0.72);
+    float spread = max(sheet, bridge * 0.42);
 
     // Film Support spreads only material-derived Film Source. Layer B support
     // biases that spread and negative topology suppresses it; neither path
@@ -378,9 +390,9 @@ void EvaluateFoamShape(uint3 dispatchId : SV_DispatchThreadID)
     float filmSource = FoamSampleFilmSourceBilinear(domainUV);
     float filmSupport = FoamSampleFilmSupportBilinear(domainUV);
 
-    float supportShape = smoothstep(0.18, 0.62, filmSupport);
-    float sourceShape = smoothstep(0.08, 0.42, filmSource);
-    float visualFilm = max(sourceShape * 0.72, supportShape * 0.88);
+    float supportShape = smoothstep(0.28, 0.74, filmSupport);
+    float sourceShape = smoothstep(0.10, 0.46, filmSource);
+    float visualFilm = max(sourceShape * 0.68, supportShape * 0.60);
 
     // Layer D now owns broad visual film structure only. It may widen/bridge a
     // visible sheet through film-source/support fields, but it never writes back

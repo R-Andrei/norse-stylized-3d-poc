@@ -2,39 +2,62 @@
 
 ## Purpose
 
-Improve the generated ground so it reads as intentional, stylized terrain while preserving stable isometric gameplay.
+Define the implementation plan, patch history, and active technical roadmap for generated-ground surface work. The ground visual/design baseline is owned by `Ground_Visual_Design_and_Architecture.md`; this document implements that baseline and records how the code/assets are brought into alignment.
 
-The current ground should remain mostly flat and combat-friendly. This plan does not try to make the terrain visually interesting by adding lots of physical height noise. Instead, it separates:
+The current visual north star, defined in `Ground_Visual_Design_and_Architecture.md`, is:
+
+```text
+Restrained stylized terrain:
+BOTW/TOTK-like base-material restraint
++ Hades-1-like painted ground accents
++ mostly 3D procedural geometry
++ reusable procedural masks and style layers instead of fully hand-painted floor art.
+```
+
+This does not mean copying any reference literally. It means borrowing the useful production grammar:
+
+- from BOTW/TOTK: calm matte base ground, restrained noise, broad readable material regions, and scene complexity carried by geometry, lighting, props, vegetation, rocks, rivers, and atmosphere;
+- from Hades 1: sparse authored-looking surface accents, short dark mound/crease lines, contact emphasis, decorative rhythm, and deliberate value grouping;
+- from the existing PS3D framework: procedural masks, component-owned style authoring, shared material/property-block contracts, debugable semantic channels, and deterministic generated geometry.
+
+The ground should remain mostly flat and combat-friendly. It should not become interesting through constant height noise, texture soup, or feature-by-feature simulation before the art language is proven. Instead, it separates and layers:
 
 - playable shape;
-- authored surface identity;
-- static generated masks;
-- runtime surface state;
-- future grass, snow, rain, mud, footprints, and material blending.
+- calm family/variant base material;
+- broad macro patch composition;
+- static semantic masks;
+- reusable painted accent layers;
+- contact and edge accent layers;
+- sparse motif/stamp layers;
+- runtime surface state later;
+- future grass, snow, rain, mud, footprints, puddles, and material blending.
 
-The desired result is a broad plane that is easy to walk and fight on, but whose surface looks like uneven land made of meaningful patches: snow cover, exposed dirt, damp low areas, compacted paths, moss, rocky patches, grass suitability, and later footprints or weather response.
+The desired result is a broad, readable stage floor whose surface feels designed: simple at rest, but enriched by meaningful patches, subtle hand-painted-looking accents, shore/contact response, compacted paths, damp low areas, snow or mud identity, and later runtime footprints or weather response.
 
 ## Current State
 
-### Current Implementation Status After Patch T
+### Current Implementation Status After Patch U and Style Doctrine Pivot
 
-The ground upgrade has moved beyond the original single snow-material improvement pass. The current system now has a real surface-style framework:
+The ground upgrade has moved beyond the original single snow-material improvement pass. The current system now has a real surface-style framework, and the design direction has pivoted from feature accumulation to a shared visual doctrine.
 
 | Area | Status | Notes |
 | --- | --- | --- |
+| Ground visual doctrine | Canonical in `Ground_Visual_Design_and_Architecture.md` | The ground target is restrained stylized terrain: calm BOTW/TOTK-like base surfaces plus Hades-1-like painted accents, implemented through reusable procedural style layers. |
 | Dedicated ground shader | Implemented | `SH_PixelGroundSurfaceLit.shader` owns ground rendering separately from generated masses. |
 | Static semantic masks | Implemented baseline | Vertex color and UV2 carry tonal, exposure, damp/deposit, vegetation, compaction, shore, rocky/dry, and authored standing-water/puddle-potential data. |
-| Ground/corridor material contract | Implemented | `GeneratedGround` resolves visual state and applies it by `MaterialPropertyBlock`; river corridors remain dependent renderers. |
+| Ground/corridor material contract | Implemented | `GeneratedGround` resolves visual state and applies it by `MaterialPropertyBlock`; river corridors remain dependent renderers and must remain style-agnostic. |
 | Component-owned surface authoring | Implemented | `GeneratedGround` exposes top-level Surface Family and Surface Variant controls. |
-| Asset-backed visual families | Implemented baseline | `GroundSurfaceStyleProfile` assets own visual families such as Snowfield and Wet Mudflat. |
-| Asset-backed variants | Implemented baseline | `GroundSurfaceVariantRecipe` stores stable ids, display names, material controls, and feature recipes. |
-| Feature-module recipe layer | Implemented baseline | `GroundSurfaceFeatureRecipe` supports explicit cost classes and the first shader-only features. |
-| Snowfield family | Implemented baseline | `GSSP_Snowfield` and `GSP_Snowfield` exist. Variants are temporary art baselines. |
-| Wet Mudflat family | Implemented baseline | `GSSP_WetMudflat` and `GSP_WetMudflat` exist. Patch Q intentionally reset the family to matte earth until explicit puddle/rut/debris features exist. |
-| Style profile editor | Implemented in Patch R | Style assets now have a readable custom editor with variant cards, feature summaries, duplicate support, and validation warnings. |
-| Ground modifier surface/height contract | Implemented in Patch T | `GroundModifier` can now affect height, authored surface masks, or both; legacy Flatten compaction behavior is preserved. |
-| Runtime surface state | Not started | Wetness, snow depth, compression, footprints, and trample maps remain future work. |
-| Explicit path/rut/track features | Contract ready | Patch T provides authored compaction, damp/deposit boost, and standing-water potential; visual feature modules still need to consume those masks. |
+| Asset-backed visual families | Implemented baseline | `GroundSurfaceStyleProfile` assets own visual families such as Snowfield and Wet Mudflat. Families define surface identity; they do not define the global art language alone. |
+| Asset-backed variants | Implemented baseline | `GroundSurfaceVariantRecipe` stores stable ids, display names, material controls, and feature recipes. Variants tune the shared style stack. |
+| Feature-module recipe layer | Implemented baseline | `GroundSurfaceFeatureRecipe` supports explicit cost classes and shader-only proof features. The current resolver is still too narrow because it effectively selects one supported shader feature; future work should aggregate known style layers. |
+| Snowfield family | Implemented baseline | `GSSP_Snowfield` and `GSP_Snowfield` exist. Variants are temporary art baselines and must be retuned under the new doctrine. |
+| Wet Mudflat family | Implemented baseline | `GSSP_WetMudflat` and `GSP_WetMudflat` exist. Patch Q reset the family to matte earth until explicit puddle/rut/debris features exist. |
+| Style profile editor | Implemented in Patch R | Style assets have a readable custom editor with variant cards, feature summaries, duplicate support, and validation warnings. |
+| Style asset live refresh | Implemented in Patch S | Editing a style asset can refresh open `GeneratedGround` users without manual scene rebuilds for material/property-block changes. |
+| Ground modifier surface/height contract | Implemented in Patch T | `GroundModifier` can affect height, authored surface masks, or both; legacy Flatten compaction behavior is preserved. |
+| TrampledWear proof feature | Implemented/prototyped in Patch U | `TrampledWear` reads `UV2.x` compaction/path. It is now considered an experiment/proof of the mask-to-feature route, not the active art-direction priority. |
+| Runtime surface state | Deferred | Wetness, snow depth, compression, footprints, and trample maps remain future work. Runtime work must wait until the static visual language is validated. |
+| Style calibration pass | Active next direction | The next priority is a general visual calibration pass: base simplicity, macro patches, painted accent lines, contact accents, sparse motifs, and multi-layer feature resolving. |
 
 Current conceptual split:
 
@@ -84,6 +107,7 @@ Primary implementation files:
 
 Related art and system documents:
 
+- `Assets/Docs/Ground_Visual_Design_and_Architecture.md`
 - `Assets/Docs/Rock_Generated_Mass_Upgrade_Plan.md`
 - `Assets/Docs/Proof of Concept/01_Visual_Language_and_Rendering.md`
 - `Assets/Docs/Proof of Concept/05_Project_Application_Norse_Game.md`
@@ -107,8 +131,8 @@ Original limitations that motivated this upgrade. Items marked as implemented ar
 - [x] The ground originally had no object-owned material property block equivalent to `GeneratedMass`; `GeneratedGround` now applies resolved material controls through `MaterialPropertyBlock`.
 - [x] The ground originally had no authored surface profile asset; `GSP_Snowfield` and `GSP_WetMudflat` now exist.
 - [x] The ground originally had no static mask contract for snow potential, wetness potential, dirt/deposit, vegetation suitability, or terrain type blending; the baseline semantic contract now exists.
-- [ ] The ground still has no runtime surface state texture for rain, footprints, snow compression, grass trampling, or mud/water accumulation.
-- [~] Early material output read as pale, low-contrast procedural fuzz. Baseline Snowfield and Wet Mudflat now exist, but final detail still needs explicit feature modules and runtime state.
+- [ ] The ground still has no runtime surface state texture for rain, footprints, snow compression, grass trampling, or mud/water accumulation; this is now deliberately deferred until the static visual language is proven.
+- [~] Early material output read as pale, low-contrast procedural fuzz. Baseline Snowfield and Wet Mudflat now exist, but final detail should come from the shared visual stack: calm base, macro patches, painted accent lines, contact accents, and sparse motifs before niche runtime features.
 
 ## Design Constraints
 
@@ -126,7 +150,11 @@ The upgrade must:
 - reserve runtime maps for changing state such as wetness, snow depth, footprints, and grass compression;
 - keep shader contracts explicit and documented;
 - avoid a large biome/world streaming system in the first pass;
-- make the first visible improvement possible without authored texture assets.
+- make the first visible improvement possible without authored texture assets;
+- preserve the new ground doctrine: calm base surfaces plus selective painted accents;
+- use family/variant assets to tune the shared style stack rather than creating unrelated one-off feature silos;
+- avoid high-frequency procedural noise as the primary source of visual interest;
+- keep runtime surface state deferred until the static style pillars are proven.
 
 The upgrade should not:
 
@@ -137,1270 +165,232 @@ The upgrade should not:
 - require final weather simulation before rain/snow channels are reserved;
 - bake footprints into the generated mesh;
 - treat every terrain type as a separate duplicated material;
-- turn the generic pixel surface shader into an unreadable all-purpose monolith without contracts.
+- turn the generic pixel surface shader into an unreadable all-purpose monolith without contracts;
+- chase Hades 2-level hand-painted floor production;
+- rely on Tunic-like block/voxel simplicity as the main style target;
+- make every ground family visually unrelated;
+- build footprints, puddles, rain, grass trampling, or runtime wetness before the static ground language works.
 
-## Core Direction
+## Ground Visual Doctrine - Restrained Stylized Terrain
 
-The ground system should be split into four layers.
-
-### 1. Playable Shape
-
-Owned by:
-
-- `GroundRecipe`
-- `GroundProfile`
-- `GroundModifier`
-- river concealment
-
-Purpose:
-
-- define walkable height;
-- preserve combat and camera stability;
-- create broad readable slopes only where useful;
-- allow authored flattening around combat, structures, paths, and crossings;
-- conceal broad ground beneath river corridor geometry.
-
-Rule:
-
-- playable height should remain simple enough that an isometric far camera can ignore small terrain variation.
-
-### 2. Static Surface Identity
-
-Owned by:
-
-- generated surface masks;
-- selected `GroundSurfaceProfile`;
-- optional patch coordinate;
-- optional authored masks later.
-
-Purpose:
-
-- determine what the ground is made of;
-- create broad stylized patches;
-- decide where snow, dirt, wetness, moss, grass, rock, or sand should appear;
-- provide deterministic masks to the shader, grass system, and weather system.
-
-Rule:
-
-- this layer should create most of the visible unevenness.
-
-### 3. Runtime Surface State
-
-Owned by:
-
-- one or more world-space patch state textures;
-- weather systems;
-- player/enemy footprints;
-- combat impacts;
-- grass interaction;
-- snow/rain/mud update logic.
-
-Purpose:
-
-- store changing states such as wetness, snow depth, compression, footprints, trampling, mud, and disturbance age.
-
-Rule:
-
-- this layer should not require mesh regeneration.
-
-### 4. Rendering and Presentation
-
-Owned by:
-
-- ground surface shader;
-- material property blocks;
-- profile assets;
-- state texture bindings;
-- debug views.
-
-Purpose:
-
-- combine profile colors, generated masks, runtime maps, lighting, and pixel surface style into the final look.
-
-Rule:
-
-- visual richness should come from a small number of meaningful masks, not arbitrary noise.
-
-## Proposed Architecture
-
-### `GroundSurfaceProfile`
-
-Create a new ScriptableObject profile type:
-
-- `Assets/Game/Procedural/Ground/GroundSurfaceProfile.cs`
-
-Suggested asset path:
-
-- `Assets/Game/Demo/Profiles/Ground/`
-
-Suggested asset names:
-
-- `GSP_Snowfield.asset`
-- `GSP_WetSoil.asset`
-- `GSP_FertileSoil.asset`
-- `GSP_DrySoil.asset`
-- `GSP_MossyGround.asset`
-- `GSP_RockyScrub.asset`
-- `GSP_FrozenMud.asset`
-- `GSP_DesertSand.asset`
-
-`GeneratedGround` should expose one selected profile in the Inspector. In the first pass, a single selected profile is enough. Later, mixed terrain can blend multiple profiles using generated or authored masks.
-
-Purpose:
-
-- select terrain type from the Inspector;
-- provide defaults for shader properties;
-- control generated mask bias;
-- tell future systems how grass, snow, rain, footprints, and mud should behave.
-
-Suggested serialized fields:
-
-- display name or profile id;
-- base color;
-- secondary patch color;
-- exposed highlight color;
-- wet color;
-- snow color;
-- moss/vegetation color;
-- rocky/dry color;
-- patch scale;
-- patch contrast;
-- patch edge softness;
-- pixel variation strength;
-- broad variation strength;
-- cell warp strength;
-- exposure brightening strength;
-- deposit/damp darkening strength;
-- snow eligibility;
-- default snow amount;
-- rain absorption;
-- wetness darkening;
-- wetness smoothness boost;
-- mud formation;
-- footprint visibility;
-- footprint persistence;
-- grass suitability;
-- grass recovery speed;
-- grass bend multiplier;
-- rocky scatter suitability;
-- dry dust response;
-- gameplay friction modifier placeholder;
-- surface audio/material tag placeholder.
-
-The first implementation does not need to consume every field. The profile should reserve the concepts now so future systems have a stable home.
-
-### `GroundSurfaceMasks`
-
-Add a small data container generated alongside the heightfield.
-
-Possible implementation:
-
-- arrays inside `GroundGenerator.Generate`;
-- copied into `GroundHeightFieldSnapshot`;
-- written to vertex color and/or UV2.
-
-Suggested channels:
+The canonical generated-ground design baseline now lives in:
 
 ```text
-Vertex Color R = tonal patch variation
-Vertex Color G = exposure / snow-hold / frost accumulation potential
-Vertex Color B = damp/deposit/low-area potential
-Vertex Color A = vegetation suitability or primary profile blend
-
-UV2 X = compacted/path/flatten modifier influence
-UV2 Y = river/shore wetness influence
-UV2 Z = rocky/dry patch influence
-UV2 W = reserved for authored mask or secondary terrain blend
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
 ```
 
-If UV2 usage feels too broad for the first pass, start with vertex colors only and document UV2 as the next expansion. `MeshData` and `MeshBuilder` already support optional UV2, so no core mesh infrastructure should be needed.
+That document is authoritative for:
 
-### `GroundSurfaceRuntimeState`
+- the BOTW/TOTK-like base + Hades-1-like accent direction;
+- ground style pillars;
+- reference interpretation;
+- non-goals;
+- the shared ground composition stack;
+- family/variant interpretation;
+- reusable style-layer architecture;
+- static surface-mask contracts;
+- the paused runtime-state policy;
+- acceptance criteria and drift-prevention rules.
 
-Add later as a separate runtime component.
+This implementation plan should not duplicate the full doctrine. It should reference the ground design document and focus on concrete implementation state, patch sequencing, known limitations, and validation.
 
-Suggested component:
-
-- `GroundSurfaceStateRuntime`
-
-Purpose:
-
-- allocate and own per-ground-patch runtime state textures;
-- expose world-to-state texture mapping;
-- receive writes from weather, footprints, combat impacts, and grass/player interaction;
-- bind textures to renderer material property blocks;
-- optionally decay or diffuse wetness/footprints over time.
-
-Suggested texture channel contract:
+Implementation shorthand retained here:
 
 ```text
-Runtime State Texture 0
-R = wetness amount
-G = snow depth / snow cover amount
-B = compression / footprint / trample amount
-A = mud / standing water / disturbance age selector
+Restrained stylized terrain
+= calm base surfaces
++ broad macro patch composition
++ semantic mask response
++ Hades-1-like painted accent lines
++ contact / edge accents
++ sparse motifs
++ runtime state later.
 ```
 
-Optional second texture later:
+Patch work that changes the visual doctrine, static mask contract, family/variant meaning, feature-layer taxonomy, or runtime-state priority must update both documents together.
 
-```text
-Runtime State Texture 1
-R = recent directional disturbance X packed or encoded
-G = recent directional disturbance Z packed or encoded
-B = grass bend impulse amount
-A = reserved
-```
+## Active Roadmap After Style Doctrine Pivot
 
-Do not add this runtime component in the first visual patch unless needed. The plan should prepare static contracts so the runtime layer can be added without changing the conceptual model.
+The old Patch V-Z runtime roadmap is paused. It was coherent technically, but it is now the wrong priority because the ground art direction must be proven before more niche simulation/features are added.
 
-### Ground-Specific Shader Path
+Patch T and Patch U remain useful:
 
-The current `SH_PixelSurfaceLit.shader` is generic but has many generated-mass-specific assumptions. Ground should either get:
+- Patch T established the authored surface-mask contract.
+- Patch U proved that a feature can consume `UV2.x` compaction/path in the shader.
 
-- a dedicated `SH_GroundSurfaceLit.shader`; or
-- a clearly separated ground mode inside `SH_PixelSurfaceLit.shader`.
-
-Preferred long-term direction:
-
-- create `Assets/Game/Rendering/PixelSurface/Shaders/SH_GroundSurfaceLit.shader` or `Assets/Game/Rendering/Ground/Shaders/SH_GroundSurfaceLit.shader`;
-- share generic pixel/noise helper includes with stone;
-- keep generated-mass local-height logic out of the ground path;
-- bind ground profile values through material and property block.
-
-The first patch can still reuse the existing pixel surface shader if it is faster, but the contract should not remain ambiguous.
-
-## Terrain Type Model
-
-Terrain types should be profile assets rather than hardcoded enum-only values.
-
-Reason:
-
-- designers can tune values without recompiling;
-- new terrain families do not require enum migration;
-- profile assets can reference material settings, grass settings, wetness behavior, snow behavior, and footstep behavior;
-- mixed terrain can later blend profile assets.
-
-An enum can exist as a convenience preset selector, but the source of truth should be profile assets.
-
-### Suggested Initial Profiles
-
-#### Snowfield
-
-Visual language:
-
-- pale blue-white base;
-- broad soft snow islands;
-- subtle exposed dirt or ice patches;
-- restrained pixel variation;
-- damp/shore areas slightly darker and smoother.
-
-System behavior:
-
-- high snow eligibility;
-- footprints visible;
-- compression persists moderately;
-- grass mostly suppressed or buried;
-- rain may darken, slush, or melt depending on future temperature state.
-
-#### Wet Soil
-
-Visual language:
-
-- dark cold brown/grey;
-- damp low patches;
-- glossy riverbank response;
-- compacted paths visible;
-- snow only in exposed cold pockets.
-
-System behavior:
-
-- high rain absorption;
-- wetness persists;
-- footprints visible and dark;
-- grass can grow but bends/tramples visibly;
-- mud can form in low or compacted areas.
-
-#### Fertile Soil
-
-Visual language:
-
-- richer dark earth;
-- green moss/grass suitability patches;
-- less pale frost unless weather demands it;
-- strong grass density support.
-
-System behavior:
-
-- high vegetation suitability;
-- moderate rain absorption;
-- footprints visible through grass compression more than color alone;
-- mud possible under heavy rain.
-
-#### Dry Soil
-
-Visual language:
-
-- grey/tan cold dirt;
-- dusty exposed patches;
-- low wetness by default;
-- sharper patch edges than snow.
-
-System behavior:
-
-- lower grass density;
-- rain darkens quickly at first but may dry faster;
-- footprints dusty or light rather than dark;
-- mud requires sustained rain.
-
-#### Mossy Ground
-
-Visual language:
-
-- muted green-brown;
-- soft patch borders;
-- dark damp recesses;
-- low reflective wet sheen.
-
-System behavior:
-
-- high dampness retention;
-- grass and moss overlays likely;
-- footprints compress vegetation and darken slightly;
-- snow can sit on top but breaks around traffic.
-
-#### Rocky Scrub
-
-Visual language:
-
-- grey stone flecks;
-- sparse soil pockets;
-- low vegetation bands;
-- stronger contrast around rock/dirt boundaries.
-
-System behavior:
-
-- low footprint visibility except in soil pockets;
-- low grass density overall;
-- rain pools in cracks;
-- snow catches on exposed flat patches.
-
-#### Frozen Mud
-
-Visual language:
-
-- blue-grey mud;
-- wet dark low patches;
-- pale frost on exposed ridges;
-- occasional slick/ice-like highlights.
-
-System behavior:
-
-- footprints may crack/compress snow/frost;
-- rain can create slick surfaces;
-- grass mostly suppressed;
-- good near rivers and cold banks.
-
-#### Desert Sand
-
-Visual language:
-
-- warmer pale sand or ash;
-- wind-shaped patch bands;
-- low wetness by default;
-- footprints bright/dark depending on slope and light.
-
-System behavior:
-
-- very high footprint visibility;
-- low grass density;
-- rain absorption can create temporary dark patches;
-- wind can soften footprints later.
-
-This list is exploratory. Implement only enough profiles to prove the profile system first.
-
-## Playable Shape Policy
-
-The ground mesh should support visual variety without destabilizing the camera, controller, or combat.
-
-Recommended shape rules:
-
-- default combat patches should stay within a very low local height amplitude;
-- broad slopes are allowed only when authored or clearly intentional;
-- `SurfaceDetail` should not be used as the main visual interest knob;
-- high-frequency physical detail should remain subtle;
-- paths, hut/camp areas, bridge approaches, and combat arenas should be flattened by modifiers;
-- river banks can have visible shape because they are local focal areas;
-- the shader can fake smaller bumps through color, stylized lighting, or normals later.
-
-Suggested new controls:
-
-- `Playable Flatness` or `Height Safety`
-- `Visual Surface Patchiness`
-- `Surface Detail Height`
-- `Patch Contrast`
-- `Patch Scale`
-
-`Surface Detail Height` should remain low. `Patch Contrast` and `Patch Scale` should carry most visual richness.
-
-## Static Mask Generation
-
-Static masks should be generated from meaningful inputs.
-
-Inputs:
-
-- local ground position;
-- world or patch coordinate;
-- base height;
-- relative height within patch;
-- surface normal;
-- slope;
-- distance to river handoff;
-- river side/bank influence;
-- modifier influence;
-- flatten/path influence;
-- deterministic broad noise;
-- deterministic cellular or value-noise patches;
-- selected `GroundSurfaceProfile`.
-
-Recommended generated masks:
-
-### Tonal Patch Mask
-
-Purpose:
-
-- broad color islands and stylized uneven land patches.
-
-Implementation:
-
-- use low-frequency value noise or cellular noise;
-- warp coordinates with another lower-frequency field;
-- quantize or posterize to a small number of levels;
-- keep edges soft enough to avoid noisy checkerboard patterns;
-- scale and contrast from `GroundSurfaceProfile`.
-
-### Exposure/Snow-Hold Mask
-
-Purpose:
-
-- determine where snow, frost, light dusting, or exposed highlights can sit.
-
-Implementation:
-
-- favor upward-facing normals;
-- favor higher or exposed areas;
-- reduce near wet shorelines if profile says snow melts there;
-- break up with broad patch noise;
-- keep stable across regeneration for a seed.
-
-### Damp/Deposit Mask
-
-Purpose:
-
-- determine where dirt darkening, dampness, mud, or soil deposits should sit.
-
-Implementation:
-
-- favor lower relative heights;
-- favor flatter basins;
-- favor river/shore proximity;
-- favor compacted/path areas depending on profile;
-- oppose exposure where appropriate;
-- use broad masks, not per-vertex random flecks.
-
-### Vegetation Suitability Mask
-
-Purpose:
-
-- future grass and moss placement.
-
-Implementation:
-
-- profile bias controls base density;
-- reduce in riverbed/concealment areas;
-- reduce on rocky/dry patches;
-- reduce in heavy snow unless grass is allowed to poke through;
-- increase on fertile or mossy profiles;
-- preserve route/combat readability by allowing modifier suppression.
-
-### Shore Influence Mask
-
-Purpose:
-
-- river-aware ground material response.
-
-Implementation:
-
-- during `ApplyRivers` or a new mask pass, compute distance to river handoff;
-- write a soft band around shore/corridor;
-- let profile decide whether shore means wet, muddy, icy, mossy, eroded, or snowy.
-
-### Compaction/Path Mask
-
-Purpose:
-
-- support authored paths, flattened combat areas, structure pads, and later foot traffic.
-
-Implementation:
-
-- extend `GroundModifierSnapshot` or add a surface-only modifier mode;
-- track flatten modifier weight in a separate mask;
-- let paths reduce grass, reduce snow, darken damp soil, or brighten dry dust depending on profile.
-
-## Runtime Surface State
-
-Runtime state is for changes after generation.
-
-Future writers:
-
-- player footsteps;
-- enemy footsteps;
-- rolling/dashing bodies;
-- combat impacts;
-- rain splashes;
-- snow accumulation;
-- snow melt;
-- grass/trample interaction;
-- river splash or overflow;
-- magic/corruption effects.
-
-Future readers:
-
-- ground shader;
-- grass renderer/simulation;
-- footprint/decal system;
-- audio/footstep system;
-- gameplay surface queries;
-- VFX spawn logic.
-
-Recommended rules:
-
-- runtime state should be world-space and patch-local;
-- texture mapping should be stable for a ground patch;
-- systems should write through one API rather than each binding textures manually;
-- state decay should be profile-driven;
-- generation should not erase runtime state unless explicitly regenerated;
-- editor regeneration can reset runtime state unless play-mode persistence is later required.
-
-### Footprints
-
-Footprints should probably not be regular mesh deformation.
-
-Preferred model:
-
-- a footprint writer stamps compression into runtime state;
-- compression darkens or lightens the shader depending on profile;
-- compression bends/flattens grass;
-- snow profiles show compacted snow and exposed dirt;
-- mud profiles show darker wet impressions;
-- sand/dry soil profiles show bright/dark rimmed impressions;
-- rocky profiles show weak footprints except in soil pockets.
-
-Important:
-
-- footprints need direction and shape eventually, not only a circular stamp.
-- first pass can use circular/ellipse stamps.
-- avoid solving detailed boot-shape decals until the runtime state path works.
-
-### Rain and Wetness
-
-Rain should write wetness, but terrain profiles decide what wetness means.
-
-Examples:
-
-- snowfield: wetness creates slush/darker snow or melts to exposed dirt;
-- wet soil: wetness darkens and increases smoothness quickly;
-- fertile soil: wetness darkens soil and boosts moss/grass richness;
-- dry soil: wetness creates temporary dark patches with faster drying;
-- moss: wetness stays longer and increases saturation/gloss subtly;
-- rocky scrub: wetness gathers in cracks and soil pockets;
-- desert sand: wetness creates strong temporary dark patches, then dries.
-
-### Snow Accumulation
-
-Snow should write snow depth/coverage, not replace the base terrain type.
-
-Rules:
-
-- profile controls whether snow can accumulate;
-- exposure mask controls where it accumulates first;
-- compaction mask can reduce snow or change its shade;
-- wetness can melt or darken snow;
-- grass can be hidden, partially buried, or poke through depending on depth.
-
-### Grass and Wind Interaction
-
-Grass should be downstream of the ground profile and masks.
-
-Ground should provide:
-
-- vegetation suitability;
-- snow cover;
-- wetness;
-- compression/trample;
-- profile grass defaults.
-
-Grass system should provide:
-
-- wind bending;
-- player/enemy bending;
-- density and placement;
-- optional color response to ground profile.
-
-Shared runtime state should let one player movement event:
-
-- bend grass;
-- stamp compression;
-- reveal a footprint;
-- alter snow/mud/dust presentation.
-
-## Inspector and Authoring UX
-
-`GeneratedGround` should remain easy to use from the Inspector.
-
-Recommended Inspector sections:
-
-### Generation
-
-- shape seed;
-- live regeneration;
-- new shape button;
-- regenerate button.
-
-### Playable Shape
-
-- patch size;
-- resolution;
-- profile: flat, rolling, basin, ridge, uneven;
-- broad form;
-- roughness;
-- surface detail height;
-- transition direction and height;
-- edge blend.
-
-### Surface Profile
-
-- selected `GroundSurfaceProfile`;
-- surface seed if split from shape seed;
-- patch scale;
-- patch contrast;
-- material variation;
-- snow amount override;
-- wetness override;
-- grass density override;
-- mask debug mode.
-
-### Modifiers
-
-- use modifiers;
-- found modifiers;
-- found river channels;
-- future: surface-only modifiers count.
-
-### Runtime State
-
-Later, optional section:
-
-- allocate runtime maps;
-- clear wetness;
-- clear footprints;
-- clear snow compression;
-- debug state texture.
-
-### Debug Views
-
-Ground debug should include:
-
-- tonal patch mask;
-- exposure/snow-hold mask;
-- damp/deposit mask;
-- vegetation suitability mask;
-- shore influence mask;
-- compaction/path mask;
-- runtime wetness;
-- runtime snow;
-- runtime compression/footprints;
-- final composite.
-
-Debug views are important because a surface system with many masks can become impossible to tune by eye if every channel is hidden.
-
-## Shader and Material Direction
-
-The visible upgrade should move from "random pixel noise" to "stylized patch composition."
-
-Shader goals:
-
-- keep pixel-like quantized tonal variation;
-- add broad hand-authored-looking patches;
-- use generated masks as semantic inputs;
-- use profile colors rather than arbitrary per-material duplication;
-- support snow/wetness/dampness/compression in reserved channels;
-- keep debug modes.
-
-First visible shader features:
-
-- broad patch color blend;
-- exposure tint or snow overlay;
-- damp/deposit darkening;
-- shore wetness darkening;
-- restrained pixel cell variation on top;
-- optional profile contrast controls.
-
-Future shader features:
-
-- runtime wetness map;
-- runtime snow map;
-- runtime footprint/compression map;
-- profile blending;
-- grass/ground color harmonization;
-- puddle or standing-water mask;
-- stylized normals or fake small relief;
-- profile-specific edge/noise behavior.
-
-Material policy:
-
-- prefer shared material plus property blocks and profile data;
-- do not create one duplicated material per terrain instance;
-- terrain type assets should control the look;
-- material instances are acceptable only for distinct shader families or demo comparison.
-
-## Interaction With River Work
-
-The river corridor owns visible river water, bed, foam, and shoreline geometry. The broad ground should not try to become the riverbed, but it should react visually to the river.
-
-Ground should receive or derive:
-
-- distance to river/corridor;
-- shore influence band;
-- wet bank mask;
-- snow suppression or slush near water;
-- moss/dampness boost for suitable profiles;
-- grass suppression inside the corridor;
-- grass/vegetation change near the bank if desired.
-
-Do not couple ground surface masks to foam internals. Foam is a water material system. Ground only needs the river domain/shore relationship.
-
-## Interaction With Rock/Mass Work
-
-The rock upgrade plan already defines a semantic material direction:
-
-- deterministic surface variation;
-- exposure/upward mask;
-- crevice/base/deposit masks;
-- broad low-frequency blotches;
-- warped cell lookup;
-- material profile controls.
-
-Ground should borrow this philosophy but not copy rock implementation literally.
-
-Differences:
-
-- rocks have object-space height and side/base crevice masks;
-- ground is mostly horizontal and patch-based;
-- rocks can rely on local mesh bounds;
-- ground needs world/patch-space masks, river proximity, modifier influence, and runtime state.
-
-Shared principle:
-
-- generated geometry should send semantic signals to the shader instead of expecting noise alone to carry style.
-
-## Data Contracts
-
-### Generated Mesh Contract - First Target
-
-```text
-UV0
-X = normalized local patch X
-Y = normalized local patch Z
-
-Vertex Color
-R = tonal patch variation
-G = exposure / snow-hold potential
-B = damp/deposit potential
-A = vegetation suitability
-
-UV2
-X = compaction/path/flatten influence
-Y = river/shore influence
-Z = rocky/dry secondary patch
-W = reserved secondary profile blend or authored mask
-```
-
-### Snapshot Contract
-
-`GroundHeightFieldSnapshot` should eventually expose:
-
-- base height;
-- base normal;
-- render normal;
-- tonal patch variation;
-- material classification or primary profile blend;
-- exposure/snow-hold;
-- damp/deposit;
-- vegetation suitability;
-- shore influence;
-- compaction/path influence.
-
-This helps future placement systems ask useful questions:
-
-- can grass grow here?
-- will snow accumulate here?
-- is this point damp?
-- is this point in a path/combat pad?
-- is this near the river?
-- what terrain material is dominant?
-
-### Runtime State Texture Contract
-
-```text
-R = wetness
-G = snow depth / snow amount
-B = compression / footprint / trample
-A = mud / standing water / disturbance age
-```
-
-### Material Property Contract
-
-Suggested ground material properties:
-
-- `_GroundBaseColor`
-- `_GroundSecondaryColor`
-- `_GroundExposureColor`
-- `_GroundDampColor`
-- `_GroundSnowColor`
-- `_GroundMossColor`
-- `_GroundPatchScale`
-- `_GroundPatchContrast`
-- `_GroundPatchEdgeSoftness`
-- `_GroundSnowAmount`
-- `_GroundWetness`
-- `_GroundGrassSuitability`
-- `_GroundFootprintStrength`
-- `_GroundProfileBlend`
-- `_GroundRuntimeStateTex`
-- `_GroundRuntimeStateTex_TexelSize`
-- `_GroundWorldToStateScaleOffset`
-- `_GroundMaskDebugMode`
-
-If the first implementation reuses `_BaseColor` and existing pixel properties, document the migration path to ground-specific names.
-
-## Current Roadmap After Patch T
-
-The original patch list below is retained for historical context, but the active roadmap is now organized around the asset-backed surface-style architecture introduced by Patches J through T.
-
-Patch T implemented the modifier contract needed before path, rut, puddle, and trampled-wear features can become credible. `GroundModifier` can now affect height, authored surface masks, or both.
+However, `TrampledWear` is now classified as a proof/experiment, not the next visual cornerstone. The active roadmap is now style calibration and shared doctrine layers.
 
 | Priority | Patch | Concrete goal |
 | --- | --- | --- |
-| 1 | Patch U — Trampled Wear Feature | Add a feature recipe that interprets compaction/path masks for trampled mud, worn earth, and future compacted snow/grass paths. |
-| 2 | Patch V — Ground Surface Runtime State Stub | Add the no-cost API and binding contract for wetness, snow depth, compression, footprints, and disturbance state. |
-| 3 | Patch W — Footprint / Compression Prototype | Stamp compression into runtime state and let Snowfield/Wet Mudflat interpret it differently. |
-| 4 | Patch X — Rain / Wetness Prototype | Add wetness accumulation and drying through runtime state, not full-surface permanent material gloss. |
-| 5 | Patch Y — Style/Feature Authoring Polish | Improve style/profile editing further only after more real content exposes actual authoring pain. |
-| 6 | Patch Z — Grass Integration Contract | Connect vegetation suitability, runtime compression, and future grass rendering/trampling. |
-| 7 | Future | Mixed Terrain / Profile Blending | Add explicit support for blended surface families such as snow over mud, rocky scrub over soil, or worn path through snow. |
+| 1 | Patch V0 — Ground Visual Doctrine Documentation | Completed. `Ground_Visual_Design_and_Architecture.md` now owns the sacred ground design baseline; this implementation plan records technical alignment. |
+| 2 | Patch V1 — Style Calibration Setup | Completed as a temporary `Style Calibration` surface family with four comparison variants: Calm Base, Hades Accent Proxy, Hybrid Target Proxy, and Pixel-Faceted. |
+| 3 | Patch V2 — Base Ground Simplification | Implemented as an asset/docs retune. Snowfield and Wet Mudflat now use calmer matte bases with lower pixel variation, lower patch contrast, and reduced broad noise so future accents can sit on top. |
+| 4 | Patch V3 — Painted Accent Lines | Implement the first foundational shared style layer: short, broken, slightly curved, dark/value-shifted crease/mound strokes. Shader-only first pass. |
+| 5 | Patch V4 — Contact / Edge Accent Layer | Add localized accent response near shores, rocks, modifier boundaries, paths, banks, and object contact zones. Use existing masks first; add new generated/contact masks only when justified. |
+| 6 | Patch V5 — Sparse Motif Layer | Add reusable sparse marks such as chips, cracks, scuffs, stains, snow scratches, stones, or debris hints. Avoid stamp spam. |
+| 7 | Patch V6 — Feature Stack Resolver | Replace the effective first-supported-feature model with aggregation of known shared doctrine layers. A variant should tune multiple style layers, not choose exactly one feature mode. |
+| 8 | Later | Ground Surface Runtime State Stub | Revisit runtime wetness, snow depth, compression, footprints, and disturbance after the static visual stack is accepted. |
+| 9 | Later | Footprints / Rain / Puddles / Grass Integration | Build on the runtime state contract only after the visual doctrine is stable. |
+| 10 | Future | Mixed Terrain / Profile Blending | Add explicit support for blended surface families such as snow over mud, rocky scrub over soil, or worn path through snow. |
 
-Surface modifier note:
+### Paused runtime roadmap
+
+The following patches are no longer the immediate queue:
+
+```text
+Old Patch V — Ground Surface Runtime State Stub
+Old Patch W — Footprint / Compression Prototype
+Old Patch X — Rain / Wetness Prototype
+Old Patch Y — Style/Feature Authoring Polish
+Old Patch Z — Grass Integration Contract
+```
+
+They are not rejected. They are deferred because building them before the static style works invites drift and overengineering.
+
+### Surface modifier note
 
 - Surface-only masks are preferred when the same visual effect can be achieved without changing playable height.
-- Small denivelations are acceptable for roads, wagon tracks, camp pads, and other authored terrain features when they remain combat-safe and camera-stable.
+- Small denivelations are acceptable for roads, wagon tracks, camp pads, puddle basins, and other authored terrain features when they remain combat-safe and camera-stable.
 - Snow paths and grass paths should eventually come from snow/grass accumulation and runtime interaction systems, not be hard-baked into the base ground as final content.
 - Patch T inspected the current `GroundModifier` and ground mask code before implementing the path.
 
-## Implementation Plan
+## Superseded Implementation Plan Notes
 
-### Patch 1 - Document, Baseline, and Safety Values
+The original Patch 1-12 implementation plan has been superseded by the completed Patch J-V0 work and the active doctrine roadmap above. It is no longer the active queue and should not be used to decide next work.
 
-Status: not started.
+Historical mapping:
 
-Goal:
+| Old concern | Current status |
+| --- | --- |
+| Separate physical shape from surface identity | Implemented through `GroundSurfaceProfile`, `GroundSurfaceStyleProfile`, variants, and `GroundModifier` surface/height split. |
+| Static surface mask contract | Implemented baseline through vertex color and UV2 channels. |
+| Ground material property block | Implemented through `GeneratedGround` material/property-block resolver. |
+| Dedicated ground shader | Implemented as `SH_PixelGroundSurfaceLit.shader`. |
+| Terrain profile asset set | Implemented baseline with Snowfield and Wet Mudflat. |
+| Runtime state design | Deferred after doctrine pivot. Contract remains documented, but implementation is no longer the immediate milestone. |
+| Footprints / rain / grass | Deferred until the static visual doctrine stack works. |
+| Mixed terrain/profile blending | Future work. |
 
-- capture the current ground behavior;
-- avoid tuning blindly;
-- establish safe gameplay height defaults.
+Active implementation work must follow `Active Roadmap After Style Doctrine Pivot`, not the old Patch 1-12 list.
 
-Checklist:
+## Patch V1 - Style Calibration Setup
 
-- [ ] Add this plan document.
-- [ ] Record current `Ground_Blockout` scene recipe values.
-- [ ] Record current `M_PixelFrozenDirt` material values.
-- [ ] Decide first-pass combat-safe recommended values for `BroadForm`, `Roughness`, and `SurfaceDetail`.
-- [ ] Add a short note to the plan after the first visual comparison.
-- [ ] Verify no existing ground scenes fail to regenerate.
+Patch V1 creates a temporary development surface family for screenshot-based style comparison.
 
-Acceptance:
+Changed assets:
 
-- the team has an agreed baseline and does not confuse mesh relief with surface richness.
+```text
+Assets/Game/Demo/Profiles/Ground/GSP_StyleCalibration.asset
+Assets/Game/Demo/Profiles/Ground/Styles/GSSP_StyleCalibration.asset
+```
 
-### Patch 2 - Separate Shape From Surface Profile
+`GSP_StyleCalibration` is a neutral semantic/mask-generation profile. It provides a common mask baseline for all calibration variants so the comparison is mostly about visible material/style tuning.
 
-Status: partially implemented on 2026-07-05.
+`GSSP_StyleCalibration` is a `GroundSurfaceStyleProfile` discovered by the existing `GeneratedGround` style-family dropdown because the editor searches:
 
-Goal:
+```text
+Assets/Game/Demo/Profiles/Ground/Styles
+```
 
-- add `GroundSurfaceProfile` without changing visible behavior yet.
+The family contains four variants:
 
-Checklist:
+| Variant id | Display name | Intent |
+| --- | --- | --- |
+| `calibration.calm_base` | Calm Base | Restrained BOTW/TOTK-like base-material lane. Low noise, matte finish, broad soft patches, no feature recipe. |
+| `calibration.hades_accent_proxy` | Hades Accent Proxy | Stronger Hades-1-like surface rhythm using the existing `DirectionalStreaks` shader-only feature as a temporary proxy. |
+| `calibration.hybrid_target_proxy` | Hybrid Target Proxy | Likely doctrine target: calm base plus restrained accent rhythm. Uses a weaker `DirectionalStreaks` proxy. |
+| `calibration.pixel_faceted` | Pixel-Faceted | Pushes existing PS3D pixel/faceted material identity harder for comparison. No new feature recipe. |
 
-- [x] Create `GroundSurfaceProfile.cs`.
-- [x] Add a `GroundSurfaceProfile` serialized field to `GeneratedGround`.
-- [x] Add a default/fallback profile behavior when no asset is assigned.
-- [x] Update `GeneratedGroundEditor` with a `Surface Profile` section.
-- [ ] Create a folder for demo ground profiles.
-- [ ] Create `GSP_Snowfield.asset` as the first profile through Unity asset creation.
-- [x] Keep all existing `GroundRecipe` serialized fields valid.
-- [x] Do not require profile assets for old scenes to load.
+Implementation boundaries:
 
-Acceptance:
+- No new code.
+- No shader changes.
+- No scene changes.
+- No runtime state.
+- No new materials.
+- No river code changes.
+- No final painted accent line implementation yet.
 
-- `GeneratedGround` exposes a surface profile selector;
-- existing ground regenerates with fallback behavior;
-- assigning `GSP_Snowfield` changes no gameplay geometry.
+Patch V1 is intentionally a calibration patch. It gives the project a controlled way to choose the next visual lane before Patch V2 base simplification and Patch V3 painted accent lines.
 
-### Patch 3 - Static Surface Mask Contract
 
-Status: mostly implemented on 2026-07-05; river corridor metadata continuity corrected on 2026-07-08; Unity compile/scene validation still required.
+## Patch V2 - Base Ground Simplification and Calibration Cleanup
 
-Goal:
+Patch V2 applies the first screenshot-driven doctrine correction after the V1 calibration pass.
 
-- upgrade generated surface metadata from one random variation channel to semantic masks.
+Calibration findings recorded by this patch:
 
-Checklist:
+- `Calm Base` is the strongest foundation: readable, restrained, and appropriate as the stage floor.
+- `Hades Accent Proxy` and `Hybrid Target Proxy` support the direction philosophically, but the existing `DirectionalStreaks` proxy does not create convincing Hades-1-like painted crease lines. Real accent lines remain Patch V3.
+- `Pixel-Faceted` is useful as an anti-reference for the default ground style. Global pixel/faceted noise becomes too busy and should not be the primary ground read.
 
-- [x] Add an internal mask-generation path inside `GroundGenerator`.
-- [x] Compute tonal patch variation from broad warped patch noise when a profile is assigned.
-- [x] Compute exposure/snow-hold potential.
-- [x] Compute damp/deposit potential.
-- [x] Compute vegetation suitability.
-- [x] Keep the old `SurfaceVariation` meaning approximately compatible through vertex color R.
-- [x] Write semantic masks to vertex color G/B/A.
-- [x] Reserve/write UV2 for path, shore, rocky, and authored masks.
-- [x] Update `GroundHeightFieldSnapshot` to retain the important vertex-color mask values.
-- [x] Update `GroundHeightFieldSnapshot` to retain secondary UV2 surface masks for dependent generated geometry.
-- [x] Update river corridor geometry to copy sampled ground R/G/B/A and UV2 mask contracts instead of old neutral placeholder values.
-- [x] Update comments documenting the vertex color/UV2 contract.
+Patch V2 therefore retunes the real production families toward the accepted base doctrine:
 
-Acceptance:
+```text
+calm matte base
++ restrained broad patches
++ lower pixel/faceted noise
++ subtle feature response
++ no final painted accents yet
+```
 
-- mask debug values can be inspected;
-- existing material still renders;
-- generated masks are stable for a seed and patch coordinate;
-- visual improvement is possible without raising mesh height.
+Changed assets:
 
-### Patch 4 - Modifier and River Surface Influence
+```text
+Assets/Game/Demo/Profiles/Ground/Styles/GSSP_StyleCalibration.asset
+Assets/Game/Demo/Profiles/Ground/Styles/GSSP_Snowfield.asset
+Assets/Game/Demo/Profiles/Ground/Styles/GSSP_WetMudflat.asset
+```
 
-Status: partially implemented on 2026-07-05; river corridor UV2 continuity corrected on 2026-07-08.
+Concrete asset changes:
 
-Goal:
+- Renamed the calibration display label from `Pixel / Faceted` to `Pixel-Faceted` so Unity does not treat the slash as a submenu path.
+- Kept the stable variant id `calibration.pixel_faceted` unchanged.
+- Reduced Snowfield pixel variation, pixel effect strength, cell warp, patch blend, and overly strong directional streaks.
+- Reduced Wet Mudflat pixel variation, pixel effect strength, cell warp, damp darkening, patch blend, and pooled/trampled feature intensity.
+- Kept Wet Mudflat matte; no glossy puddle or water material behavior was added.
+- Kept all feature work static and shader/material-control driven; no runtime state was introduced.
 
-- let authored flatten/path regions and river proximity affect surface masks.
+Patch V2 does not implement:
 
-Checklist:
-
-- [x] Track flatten modifier influence during surface metadata generation.
-- [x] Keep physical height modification separate from surface compaction/path influence.
-- [ ] Add optional surface-only modifier mode or defer with a documented placeholder.
-- [x] Compute river/shore influence separately from concealed trench height.
-- [x] Reserve/write UV2 X for compaction/path influence.
-- [x] Reserve/write UV2 Y for river/shore influence.
-- [x] Make profile settings begin to bias shore and compaction mask response.
-- [x] Ensure river concealment still does not affect visible render normals incorrectly.
-- [x] Preserve corridor terrain-normal blending while freeing UV2 from the old terrain-integration meaning.
-
-Acceptance:
-
-- paths/combat pads can become visually compacted without needing more height changes;
-- river banks can become damp/slushy/mossy by profile;
-- river geometry ownership remains unchanged.
-
-### Patch 5 - Ground Material Property Block
-
-Status: partially implemented on 2026-07-05; river corridor renderer/property-block continuity corrected on 2026-07-08.
-
-Goal:
-
-- let each generated ground patch supply profile-driven material settings without duplicating material assets.
-
-Checklist:
-
-- [x] Add `MaterialPropertyBlock` support to `GeneratedGround`.
-- [x] Expose the same profile material binding for dependent renderers such as generated river corridors.
-- [ ] Bind base/profile colors.
-- [~] Bind patch scale/contrast values. Contrast is bound; patch scale remains generated-data-only for now.
-- [~] Bind wetness/snow/grass defaults. Static snow/damp/vegetation/rocky response is bound; runtime wetness is still deferred.
-- [ ] Bind seed or patch coordinate values.
-- [x] Refresh property block on enable, validate, regenerate, and profile change.
-- [x] Keep shared material assignment intact.
-- [x] Reapply the ground surface contract to the river corridor after corridor material assignment/rebuild.
-- [ ] Add debug mode binding if available. Debug remains a material/shader setting for now.
-
-Acceptance:
-
-- two ground patches can use the same shared material but different profiles/colors;
-- changing the profile updates only that ground patch;
-- regeneration does not reset the selected profile.
-
-
-### Patch B - Dedicated Ground Surface Shader Migration
-
-Status: implemented in the dedicated ground shader split patch.
-
-- [x] Created `SH_PixelGroundSurfaceLit.shader` as `PS3D/Pixel Ground Surface Lit`.
-- [x] Added ground-only forward/material/debug include files.
-- [x] Reused shared pixel-cell, ground-mask, and color utility includes.
-- [x] Kept generated masses on `PS3D/Pixel Surface Lit`.
-- [x] Migrated `M_PixelFrozenDirt` to the dedicated ground shader.
-- [x] Removed generated-mass feature atlas and generated-mass local mask dependencies from the ground shader path.
-- [x] Validated in Unity that generated ground and river corridor still visually match.
-
-
-### Patch C - Ground Surface Mask Quality Pass
-
-Status: implemented and Unity-validated.
-
-Goal:
-
-- improve the generated static masks before doing final snowfield/dampness art tuning.
-
-Checklist:
-
-- [x] Remove per-vertex random tonal sampling from the active surface mask path.
-- [x] Add smoother multi-octave surface patch sampling for tonal, exposure, damp/deposit, and rocky/dry masks.
-- [x] Rebalance exposure so snow-hold/debug data has more useful large-scale variation.
-- [x] Rebalance damp/deposit so it is less dominated by broad height bands and shore alone.
-- [x] Change shore influence from a full-width binary river band to a waterline/bank-weighted mask with softer bed and outer-bank falloff.
-- [x] Preserve the existing vertex color and UV2 channel contract.
-- [x] Validate `GroundTonal`, `GroundExposure`, `GroundDampDeposit`, `GroundShore`, and `GroundCombined` in Unity.
-
-Acceptance:
-
-- `GroundTonal` no longer shows obvious triangle/random-vertex artifacts;
-- `GroundExposure` has useful but not noisy snow-hold variation;
-- `GroundDampDeposit` loses rectangular/column-like dominance;
-- `GroundShore` remains aligned to the river but is less brutally dominant;
-- river corridor and generated ground remain visually continuous.
-
-### Patch D - Ground Mask Contrast and Shore Restraint Pass
-
-Status: implemented in code; Unity debug-view validation pending.
-
-Goal:
-
-- make the generated masks more useful before final snowfield/dampness material tuning by increasing exposure readability and preventing shore influence from dominating the combined ground surface data.
-
-Checklist:
-
-- [x] Increase profile-driven tonal patch contrast slightly without reintroducing per-vertex random artifacts.
-- [x] Rebalance exposure so the dedicated exposure patch contributes more than broad height/up-facing terms alone.
-- [x] Apply a centered contrast curve to exposure masks so `GroundExposure` reads more clearly from the gameplay camera.
-- [x] Reduce shore contribution inside damp/deposit so river-adjacent areas do not overpower the entire damp mask.
-- [x] Narrow and soften the shore influence band by reducing bank width, bed strength, outer-bank strength, and waterline-band amplitude.
-- [x] Preserve the vertex color and UV2 channel contracts used by generated ground and river corridor meshes.
-- [ ] Validate `GroundTonal`, `GroundExposure`, `GroundDampDeposit`, `GroundShore`, and `GroundCombined` in Unity.
-
-Acceptance:
-
-- `GroundExposure` is visibly more informative but not noisy;
-- `GroundShore` remains aligned to the river/corridor handoff but no longer dominates the whole combined mask;
-- `GroundDampDeposit` remains broad and soft while becoming less shore-led;
-- `GroundCombined` shows balanced mask data rather than a river-band diagnostic;
-- final mode remains at least as good as the prior patch;
-- generated ground and river corridor remain visually continuous.
-
-
-### Patch 6 - First Ground Shader Response
-
-Status: partially implemented on 2026-07-05.
-
-Goal:
-
-- make the generated masks visibly useful.
-
-Checklist:
-
-- [x] Decide whether to add `SH_GroundSurfaceLit.shader` or a ground mode in `SH_PixelSurfaceLit.shader`. Current implementation uses a dedicated `PS3D/Pixel Ground Surface Lit` shader built from shared pixel-surface includes.
-- [x] Reuse `PixelCellVariation.hlsl` or split shared pixel helpers cleanly.
-- [x] Read vertex color R/G/B/A.
-- [x] Read UV2 X/Y if written. UV2 Z is also read for rocky/dry response.
-- [x] Add broad profile patch color blending.
-- [x] Add exposure/snow-hold tint.
-- [x] Add damp/deposit darkening.
-- [x] Add shore influence response.
-- [x] Keep small pixel cell variation restrained.
-- [x] Add mask debug modes.
-- [x] Create or update a ground material for the new shader path. `M_PixelFrozenDirt` now uses `PS3D/Pixel Ground Surface Lit`.
-
-Acceptance:
-
-- snowy field no longer reads as uniform pixel fuzz;
-- broad land patches are visible from the isometric camera;
-- texture richness does not depend on high physical terrain relief;
-- debug modes clearly show each mask.
-
-### Patch 7 - Terrain Profile Asset Set
-
-Status: partially superseded by Patches L through R.
-
-Goal:
-
-- prove that multiple terrain families can be selected from the Inspector without duplicating materials or adding hardcoded `GeneratedGround` terrain-family branches.
-
-Current result:
-
-- `GroundSurfaceProfile` now owns semantic/mask-generation tendencies.
-- `GroundSurfaceStyleProfile` now owns visual surface families.
-- `GroundSurfaceVariantRecipe` now owns variants inside a family.
-- `GeneratedGround` now exposes top-level Surface Family and Surface Variant controls.
-
-Checklist:
-
-- [x] Create `GSP_Snowfield`.
-- [x] Create `GSSP_Snowfield`.
-- [x] Create `GSP_WetMudflat`.
-- [x] Create `GSSP_WetMudflat`.
-- [x] Make style families selectable from `GeneratedGround` without manual asset dragging for common profiles.
-- [x] Keep river corridor material response dependent on the parent ground, not on its own style state.
-- [ ] Create future style/profile pairs such as Rocky Ground, Mossy Ground, Dry Dust, or Fertile Soil only after the current authoring and feature contracts remain stable.
-- [ ] Add a demo comparison area or duplicate ground patch for visual checks.
-
-Acceptance:
-
-- selecting a different surface family changes terrain identity without changing the ground material asset;
-- at least two terrain families are proven through the same style/profile architecture;
-- shared shader/material-property-block architecture remains intact;
-- future families can be added as assets before requiring new code.
-
-### Patch 8 - Runtime State Design Stub
-
-Status: not started.
-
-Goal:
-
-- add the minimal API shape for future weather/footprint/grass interaction without implementing full simulation.
-
-Checklist:
-
-- [ ] Create a `GroundSurfaceStateRuntime` component stub or design note.
-- [ ] Define world-to-state mapping.
-- [ ] Define runtime texture dimensions based on patch size and desired texels per metre.
-- [ ] Define channel contract in code comments.
-- [ ] Add methods such as `AddWetness`, `AddSnow`, `StampCompression`, and `ClearState` as stubs or no-op placeholders if appropriate.
-- [ ] Do not add expensive updates until a writer exists.
-- [ ] Decide whether runtime maps are allocated only in play mode or also in edit/debug mode.
-
-Acceptance:
-
-- future systems have a clear component/API target;
-- the shader contract can reserve runtime texture bindings;
-- no active performance cost is introduced if runtime state is disabled.
-
-### Patch 9 - Footprint Prototype
-
-Status: not started.
-
-Goal:
-
-- prove that player movement can alter ground surface visually without mesh regeneration.
-
-Checklist:
-
-- [ ] Implement runtime state texture allocation.
-- [ ] Implement world-space stamp writing for compression.
-- [ ] Bind runtime state texture to the ground material.
-- [ ] Add simple circular or elliptical footprint stamps.
-- [ ] Make `Snowfield` show compacted footprints.
-- [ ] Make `WetSoil` show darker wet impressions.
-- [ ] Make `DrySoil` show lighter/dusty impressions if profile supports it.
-- [ ] Add decay/persistence controlled by profile.
-- [ ] Add debug view for compression channel.
-
-Acceptance:
-
-- walking over ground leaves visible profile-appropriate marks;
-- marks do not require mesh changes;
-- marks align with world position and patch mapping.
-
-### Patch 10 - Rain/Wetness Prototype
-
-Status: not started.
-
-Goal:
-
-- prove that weather can write into the same runtime state model.
-
-Checklist:
-
-- [ ] Add wetness writes to runtime state.
-- [ ] Add drying/decay controlled by profile.
-- [ ] Make wetness darken and/or smooth ground based on profile.
-- [ ] Let wetness interact with snow amount in a simple way.
-- [ ] Add debug view for wetness channel.
-- [ ] Add an editor/play-mode test button to apply rain to the whole patch.
-- [ ] Add localized rain/splash writer if needed.
-
-Acceptance:
-
-- wetness response differs between snow, soil, moss, rock, and dry profiles;
-- wetness is visible but does not obliterate the terrain profile;
-- runtime texture decay is stable.
-
-### Patch 11 - Grass Integration Contract
-
-Status: not started.
-
-Goal:
-
-- make ground profiles and masks useful to the future grass system.
-
-Checklist:
-
-- [ ] Expose vegetation suitability sampling from `GeneratedGround`.
-- [ ] Expose snow/wetness/compression state sampling if runtime maps exist.
-- [ ] Define how grass placement uses `GroundSurfaceProfile`.
-- [ ] Define how grass color uses ground profile colors.
-- [ ] Define how grass bending writes or reads runtime compression.
-- [ ] Reserve combat/path suppression behavior.
-- [ ] Document grass density expectations per initial profile.
-
-Acceptance:
-
-- grass placement can be derived from ground data instead of a separate unrelated noise field;
-- player interaction can affect both grass and ground state through shared concepts.
-
-### Patch 12 - Mixed Terrain and Authored Masks
-
-Status: not started.
-
-Goal:
-
-- support patches that are not a single uniform terrain type.
-
-Checklist:
-
-- [ ] Add optional secondary `GroundSurfaceProfile`.
-- [ ] Use a generated blend mask or authored mask to mix primary and secondary profiles.
-- [ ] Support profile blend in shader.
-- [ ] Add profile blend to snapshot data.
-- [ ] Allow modifiers to bias terrain blend for paths, camp pads, banks, or rocky zones.
-- [ ] Keep single-profile workflow simple.
-
-Acceptance:
-
-- one ground patch can blend snowfield with exposed dirt or mossy bank without separate meshes;
-- the Inspector remains usable.
+- real `PaintedAccentLines`;
+- contact/edge accents;
+- sparse motifs;
+- feature-stack aggregation;
+- runtime wetness, snow compression, footprints, rain, puddles, grass suppression, roads, or wagon tracks;
+- new shader properties, components, scene changes, or river logic.
+
+The success condition is not that the ground already looks like Hades. The success condition is that Snowfield and Wet Mudflat become calm, readable stage floors that can accept future painted accents without fighting base noise.
 
 ## Validation Plan
 
-### Visual Validation
+Validation must happen from the actual isometric/gameplay camera first. Close editor inspection is secondary. The ground is successful only if it reads as a coherent stage for characters, rivers, rocks, props, combat telegraphs, and atmosphere.
+
+### Style Calibration Validation
 
 Checklist:
 
-- [ ] Test from the actual game camera.
-- [ ] Test close editor inspection only after camera validation.
-- [ ] Compare old snowfield material against new profile material.
-- [ ] Confirm broad patching is visible but not noisy.
-- [ ] Confirm pixel variation is secondary, not the main read.
-- [ ] Confirm paths/banks/flat areas have believable material response.
-- [ ] Confirm rocks, river, and ground still belong to the same palette.
+- [ ] Select `GeneratedGround` -> `Surface Family = Style Calibration`.
+- [ ] Test `Calm Base`, `Hades Accent Proxy`, `Hybrid Target Proxy`, and `Pixel-Faceted` from the same camera.
+- [ ] Confirm the calm base surface is readable without looking empty.
+- [ ] Confirm broad macro patches are visible but not noisy.
+- [ ] Confirm the Hades and Hybrid proxy accents suggest useful authored ground rhythm without becoming procedural hatching.
+- [ ] Do not expect final painted accent lines, contact accents, or sparse motifs in V1; those remain queued for V3-V5.
+- [ ] Confirm pixel/faceted variation is clearly visible only in the Pixel-Faceted lane.
+- [ ] Confirm ground detail does not compete with characters, VFX, hazards, dialogue presentation, or river foam.
+
+
+### Base Simplification Validation
+
+Checklist:
+
+- [ ] Confirm the calibration variant appears as `Pixel-Faceted`, not as a nested dropdown.
+- [ ] Test `Snowfield` variants from the gameplay camera and confirm they are calmer and less noisy than before.
+- [ ] Test `Wet Mudflat` variants from the gameplay camera and confirm they remain matte, broad, and low-noise.
+- [ ] Confirm `Wet Mudflat -> Trampled` still responds to compaction/path masks, but does not make trampled wear the main visual foundation.
+- [ ] Confirm `Wind-Scoured` remains directional but no longer dominates as a fake final accent-line solution.
+- [ ] Confirm the base ground may look plain; that is acceptable until Patch V3 adds real painted accent lines.
+- [ ] Confirm river corridor material sync still follows the selected ground style.
 
 ### Gameplay Validation
 
@@ -1411,19 +401,21 @@ Checklist:
 - [ ] Verify hit/telegraph readability over the ground.
 - [ ] Verify bridge and river crossing remain clear.
 - [ ] Verify camera does not need to chase tiny height changes.
-- [ ] Verify flatten modifiers still preserve playable spaces.
+- [ ] Verify flatten/lower/raise modifiers still preserve playable spaces.
+- [ ] Verify surface-only modifiers can change masks without changing height.
 
 ### Technical Validation
 
 Checklist:
 
 - [ ] Regenerate ground in edit mode.
-- [ ] Change surface profile and verify material updates.
-- [ ] Change shape seed and verify selected profile persists.
+- [ ] Change surface family and variant and verify material updates.
+- [ ] Edit a style profile asset and verify open generated grounds refresh as expected.
+- [ ] Change shape seed and verify selected style state persists.
 - [ ] Verify `MeshData.Validate` passes.
 - [ ] Verify UV2 count matches vertex count when used.
-- [ ] Verify material property block does not instantiate materials.
-- [ ] Verify no river corridor rebuild regressions.
+- [ ] Verify material property blocks do not instantiate materials.
+- [ ] Verify no river corridor material-sync regressions.
 - [ ] Verify shader compiles in URP.
 
 ### Debug Validation
@@ -1436,56 +428,89 @@ Checklist:
 - [ ] Inspect vegetation suitability mask.
 - [ ] Inspect shore influence mask.
 - [ ] Inspect compaction/path influence mask.
-- [ ] Inspect runtime wetness if implemented.
-- [ ] Inspect runtime snow if implemented.
-- [ ] Inspect runtime compression if implemented.
+- [ ] Inspect standing-water/puddle-potential mask.
+- [ ] Add doctrine-layer debug views later when painted accent lines/contact accents become real shader layers.
+- [ ] Inspect runtime wetness/snow/compression only after runtime state exists.
 
 ## Suggested Initial Tuning
 
-For the current snowy prototype clearing:
+The first style-calibration goal is not final snow, mud, grass, or path quality. The goal is to find the correct balance between calm base ground and selective authored-looking accents.
 
-- keep `GroundProfile.Uneven` if desired, but lower physical amplitude;
-- keep `BroadForm` modest for combat spaces;
-- keep `SurfaceDetail` low enough that it does not read as bumpy navigation;
+For the current prototype clearing:
+
+- lower physical height detail before increasing shader detail;
+- make base material response matte and restrained;
+- keep smoothness/specular conservative, especially for mud;
 - make material patch scale larger than individual mesh cells;
-- reduce reliance on tiny pixel noise;
-- introduce broad cold/warm or pale/damp land patches;
-- darken near river/shore where appropriate;
-- use profile snow amount rather than baking snow into the base color alone.
+- reduce reliance on tiny pixel/noise variation;
+- use broad cold/warm or pale/damp land patches for composition;
+- keep accent marks sparse enough that some ground remains quiet;
+- add stronger detail near shore/contact/path boundaries before distributing detail everywhere;
+- test from game camera before judging close-up editor screenshots.
 
-Possible starting values:
+Possible starting values for a calm base pass:
 
 ```text
 Ground shape
-BroadForm: 0.35 to 1.25 for combat-safe uneven fields
-Roughness: 0.25 to 0.55
-SurfaceDetail: 0.05 to 0.22
+BroadForm: 0.25 to 0.95 for combat-safe uneven fields
+Roughness: 0.15 to 0.40
+SurfaceDetail: 0.02 to 0.12
 
-Snowfield surface profile
-PatchScale: 6 m to 14 m
-PatchContrast: 0.18 to 0.35
-PatchEdgeSoftness: 0.35 to 0.65
-PixelVariation: 0.02 to 0.06
-BroadVariation: 0.04 to 0.10
-SnowAmount: 0.65 to 0.95
-Wetness: 0.0 to 0.15 baseline
+Base surface response
+PatchScale: 7 m to 18 m
+PatchContrast: 0.10 to 0.28
+PatchEdgeSoftness: 0.40 to 0.75
+PixelVariation: 0.00 to 0.04 unless testing Pixel/Faceted lane
+BroadVariation: 0.03 to 0.10
+Smoothness: low unless the feature is explicit water/ice/wet stone
+SpecularStrength: low for mud/soil/snow baselines
+
+Painted accent line first target
+Density: low
+Contrast: low-to-medium
+Length: short
+Distribution: clustered
+Curvature: subtle
+Masking: biased by macro patches, shore/contact, and family tuning
 ```
 
-These are only starting points. The real test is readability from the isometric camera.
+These are only starting ranges. The real test is whether the ground looks deliberately simple rather than unfinished, and accented rather than noisy.
 
 ## Open Questions
 
-- Should ground have a dedicated shader now, or should the first patch extend `SH_PixelSurfaceLit.shader`?
-- Should `GroundSurfaceProfile` live under `Procedural/Ground` or under a broader rendering/material-profile namespace?
-- Should surface-only modifiers be part of `GroundModifier`, or should they be a separate `GroundSurfaceModifier` component?
-- Should vegetation suitability be vertex color A in the first mask patch, or should A remain reserved for terrain blending?
-- Should shore influence be generated by ground from river snapshots, or should the river provide a richer surface-response snapshot?
-- How much runtime state resolution is needed for footprints from the game camera?
-- Should footprints be stored in the runtime state texture only, or combined with decal meshes for close-up/debug views?
-- Should terrain profile assets also define footstep audio and gameplay friction, or should they expose separate tags for other systems?
-- Should snow/rain simulation be local per patch or driven by a global weather manager that writes to registered patches?
+Resolved by current architecture:
+
+- Ground now has a dedicated shader path.
+- Surface family/variant authoring now lives on `GeneratedGround` with style assets.
+- Surface-only modifier authoring now belongs in `GroundModifier` through `GroundModifierSurfaceEffectMode`.
+- The first semantic mesh channel contract is established.
+
+Still open after the doctrine pivot:
+
+- Should style calibration use a temporary `GSSP_Calibration` family, or should Snowfield/Wet Mudflat receive explicit calibration variants?
+- What is the minimum shader/control change needed for `PaintedAccentLines` to feel hand-authored rather than procedural?
+- Should painted accent lines be generated entirely in shader from world-space noise, from a baked/generated mask, or from a cheap hybrid?
+- Which existing masks should bias accent-line density first: tonal patch, damp/deposit, shore, compaction, or modifier priority?
+- How should contact/edge accents be sourced for generated masses and props: existing placement data, ground modifiers, object stamps, or a later contact-mask bake?
+- When should the feature resolver move from first-supported-feature selection to multi-layer aggregation?
+- How many doctrine-layer controls should be exposed in `GroundSurfaceStyleProfileEditor` before the UI becomes cluttered?
+- What debug views are needed for painted accent lines, contact accents, and sparse motifs?
+- How much pixel/faceted breakup should remain in the final style, if any?
+- What runtime state resolution is needed later for footprints from the game camera, after the static style is validated?
 
 ## Risks
+
+### Doctrine Drift
+
+Risk:
+
+- new work slides back into niche features, runtime systems, or one-off material tricks before the visual language is proven.
+
+Mitigation:
+
+- keep this document as the canonical baseline;
+- require new ground features to state which doctrine pillar they serve;
+- pause work that does not improve calm base, macro patches, painted accent lines, contact accents, sparse motifs, or the feature-stack resolver.
 
 ### Too Much Height Detail
 
@@ -1499,40 +524,89 @@ Mitigation:
 - put most variety in static masks and shader response;
 - validate from gameplay camera first.
 
+### Procedural Noise Masquerading As Style
+
+Risk:
+
+- the ground looks busy but not authored.
+
+Mitigation:
+
+- lower noise frequency and contrast;
+- prefer broad patches and sparse accents;
+- cluster marks instead of distributing them uniformly;
+- add debug views for doctrine layers.
+
+### Hades Reference Overreach
+
+Risk:
+
+- the project tries to match Supergiant-level hand-painted terrain production.
+
+Mitigation:
+
+- copy Hades 1 ground grammar, not its full authored finish;
+- implement reusable procedural accent layers;
+- keep base ground simple and let geometry, lighting, props, rivers, rocks, and atmosphere carry the scene.
+
+### Tunic Reference Misuse
+
+Risk:
+
+- the ground becomes too primitive because simple Tunic-like surfaces are treated as the target without the rest of Tunic's block/toy-world simplification.
+
+Mitigation:
+
+- use Tunic only for readability lessons;
+- keep the main target as restrained stylized 3D terrain with higher organic/geometric complexity.
+
 ### Shader Becomes Too Broad
 
 Risk:
 
-- the generic pixel surface shader accumulates unrelated rock, ground, weather, and vegetation assumptions.
+- the ground shader accumulates unrelated rock, ground, weather, vegetation, and feature assumptions.
 
 Mitigation:
 
-- create a dedicated ground shader path or cleanly separated include functions;
+- keep a dedicated ground shader path;
 - document property contracts;
-- keep debug modes.
+- organize shader code into doctrine-layer functions;
+- expose debug modes.
+
+### Feature Silo Accumulation
+
+Risk:
+
+- `DirectionalStreaks`, `PooledWetness`, `TrampledWear`, and future features become mutually exclusive one-off modes.
+
+Mitigation:
+
+- evolve toward a feature-stack resolver that aggregates known shared layers;
+- require each feature recipe to map to a doctrine layer;
+- do not keep adding feature modes that cannot coexist.
 
 ### Profiles Become Premature Biome System
 
 Risk:
 
-- too many terrain types are added before one looks good.
+- too many terrain families are added before one looks good.
 
 Mitigation:
 
-- implement `Snowfield` first;
-- add only enough additional profiles to prove the architecture;
+- calibrate the doctrine on existing Snowfield and Wet Mudflat first;
+- add new families only to test a specific style-layer need;
 - defer production biome/world assembly.
 
 ### Runtime State Overbuild
 
 Risk:
 
-- footprint/weather infrastructure is built before any visible use case needs it.
+- footprint/weather infrastructure is built before the static visual stack is proven.
 
 Mitigation:
 
-- reserve the contract early;
-- implement texture allocation only when adding footprints or rain prototype.
+- keep runtime state contract documented;
+- implement texture allocation only after calm base, accent lines, contact accents, and feature-stack resolving are validated.
 
 ### Mask Ambiguity
 
@@ -1548,58 +622,83 @@ Mitigation:
 
 ## Deferred Work
 
-Defer until the basic profile/mask/shader path is proven:
+Defer until the static doctrine stack is proven:
 
+- ground runtime state component;
+- detailed boot-shape footprints;
+- rain/wetness accumulation and drying;
+- snow compression runtime;
+- puddle fluid simulation or puddle rendering;
+- grass rendering implementation and trampling;
+- roads/wagon-track spline system;
+- mixed terrain/profile blending;
 - production terrain streaming;
 - destructible terrain;
 - full biome graph;
 - authored texture painting UI;
-- detailed boot-shape footprints;
-- puddle fluid simulation;
 - erosion simulation;
-- vegetation rendering implementation;
 - persistent save/load of runtime footprint and weather state;
 - large-scale weather manager;
 - snow depth geometry displacement;
 - triplanar authored texture sets;
 - terrain LOD system.
 
-## Definition of Done for First Milestone
+Do not treat deferral as rejection. These systems remain useful later, but they should inherit a proven ground language rather than define it prematurely.
 
-The first milestone is complete when:
+## Definition of Done for First Doctrine Milestone
 
-- `GeneratedGround` has a surface profile selector;
-- the snowfield profile drives material settings;
-- generated ground writes semantic masks beyond random red-channel variation;
-- the shader visibly uses those masks;
-- the current clearing ground reads as broad stylized land patches from the game camera;
-- physical terrain remains comfortable for isometric movement and combat;
-- river shore influence is at least reserved, ideally visible;
-- future runtime state channels for wetness, snow, footprints, and grass are documented in code or this plan;
-- at least one debug view can show the new masks.
+The first doctrine milestone is complete when:
+
+- the docs define restrained stylized terrain as the canonical target;
+- `GeneratedGround` still exposes family/variant authoring;
+- existing Snowfield and Wet Mudflat variants are retuned or calibrated under the doctrine;
+- the same clearing can demonstrate at least two style-calibration lanes, including the preferred hybrid target;
+- the calm base reads as intentional from the game camera;
+- broad macro patches are visible but not noisy;
+- a first painted accent-line prototype creates sparse Hades-1-like crease/mound marks;
+- contact/edge accents are either prototyped or explicitly queued as the next doctrine layer;
+- ground remains combat-safe and camera-stable;
+- river corridor material sync still works;
+- semantic debug views still show the mesh channel contract;
+- no runtime surface state has been added merely to compensate for an undecided static style.
 
 ## Working Checklist Summary
 
-- [ ] Patch 1 - Document, baseline, and safety values.
-- [~] Patch 2 - Separate shape from surface profile. Core code implemented; demo asset still pending Unity asset creation.
-- [~] Patch 3 - Static surface mask contract. Core code implemented; corridor metadata continuity corrected; Unity validation still required.
-- [~] Patch 4 - Modifier and river surface influence. Flatten, shore mask influence, and corridor UV2 continuity implemented; surface-only modifier mode still pending.
-- [~] Patch 5 - Ground material property block. First profile-to-material binding implemented and shared with generated river corridors; color/seed/debug binding still deferred.
-- [~] Patch 6 - First ground shader response. Dedicated ground shader, final response, and debug modes implemented; material asset tuning still pending.
-- [x] Patch C - Ground surface mask quality pass. Implemented and Unity debug-view validated.
-- [x] Patch D - Ground mask contrast and shore restraint pass. Implemented and Unity debug-view validated; shore/exposure needed one more focused correction.
-- [x] Patch E - Shore semantic correction and exposure/combined debug balance. Implemented and Unity debug-view validated; audit showed shore still used the wrong owner/model.
-- [x] Patch F - Ground shore model and mask diagnostics. Implemented and Unity-validated: generated-ground shore statistics are now low and broad; diagnostics exposed exposure saturation as the next blocker.
-- [x] Patch G - Exposure distribution normalization and corridor-shore restraint. Implemented and Unity-validated: exposure now has a healthy p05/p95 distribution and corridor-side shore is restrained enough for material-response work.
-- [~] Patch H - Ground snowfield visual response pass. Implemented: the dedicated ground shader now uses the validated tonal/exposure/damp/shore masks for stronger snow tint, broad patch identity, and damp/deposit darkening. Unity validation pending.
-- [x] Patch J - Ground visual presets and component-owned material controls. Implemented: generated-ground material response controls now live on `GeneratedGround`, apply through material property blocks, and refresh river corridors without requiring geometry rebuild.
-- [~] Patch K - Surface Type / Surface Variant architecture and stronger snowfield recipes. Implemented in code/docs; Unity visual tuning pending.
-- [ ] Patch 7 - Terrain profile asset set.
-- [ ] Patch 8 - Runtime state design stub.
-- [ ] Patch 9 - Footprint prototype.
-- [ ] Patch 10 - Rain/wetness prototype.
-- [ ] Patch 11 - Grass integration contract.
-- [ ] Patch 12 - Mixed terrain and authored masks.
+Active checklist after the doctrine pivot:
+
+- [x] Patch T - establish surface/height modifier contract.
+- [x] Patch U - prove compaction/path mask can feed a shader feature.
+- [x] Patch V0 - document and lock the new ground visual doctrine.
+- [x] Patch V1 - create style calibration setup.
+- [x] Patch V2 - simplify and retune calm base ground.
+- [ ] Patch V3 - prototype painted accent lines.
+- [ ] Patch V4 - prototype contact/edge accents.
+- [ ] Patch V5 - prototype sparse motif/stamp layer.
+- [ ] Patch V6 - aggregate feature recipes into a shared style-layer stack.
+- [ ] Later - resume runtime state design only after static doctrine validation.
+
+Historical patch notes remain below for context.
+
+### 2026-07-09 — Patch V2: Base Ground Simplification and Calibration Cleanup
+
+Implemented as an asset/docs retune after the first Style Calibration screenshots.
+
+- Renamed `Pixel / Faceted` to `Pixel-Faceted` while preserving stable id `calibration.pixel_faceted`.
+- Recorded the calibration outcome: Calm Base is the best foundation; Hybrid remains the target philosophy; Pixel-Faceted should not be the default ground style; the Hades proxy is not a substitute for real painted accent lines.
+- Retuned `GSSP_Snowfield.asset` toward calmer, matte, lower-noise snow variants.
+- Retuned `GSSP_WetMudflat.asset` toward matte, broad, lower-noise mud variants.
+- Reduced excessive pixel variation, pixel effect strength, cell warp, patch blend, damp darkening, and overly strong feature response where it fought the doctrine.
+- Added no code, shader changes, runtime state, scene edits, materials, or river changes.
+
+### 2026-07-09 — Patch V1: Style Calibration Setup
+
+Implemented as an asset-only calibration patch after the ground doctrine was accepted.
+
+- Added `GSP_StyleCalibration.asset` as a neutral semantic profile for visual-lane comparisons.
+- Added `GSSP_StyleCalibration.asset` as a temporary style family with `Calm Base`, `Hades Accent Proxy`, `Hybrid Target Proxy`, and `Pixel-Faceted` variants.
+- Used existing `GroundSurfaceStyleProfile`, `GroundSurfaceVariantRecipe`, `GroundMaterialControls`, and `GroundSurfaceFeatureRecipe` architecture.
+- Used `DirectionalStreaks` only as a temporary proxy for Hades-like accent rhythm in the Hades and Hybrid variants.
+- Added no code, shader changes, runtime state, scene edits, materials, or river changes.
 
 ### 2026-07-08 — Patch I: Ground Visual Scale Cleanup
 
@@ -2151,7 +1250,7 @@ Rules after Patch Q:
 
 Patch R reconciles the ground roadmap with the architecture that now exists after Patches J through Q and adds a custom editor for `GroundSurfaceStyleProfile` assets.
 
-The documentation update records the current split between semantic surface profiles, visual style profiles, variant recipes, material controls, feature recipes, and the `GeneratedGround` resolver. It also replaces the old active roadmap with the current next-step roadmap: surface path/compaction authoring, trampled wear, runtime state, footprints, rain/wetness, grass integration, and mixed terrain blending.
+The documentation update records the split between semantic surface profiles, visual style profiles, variant recipes, material controls, feature recipes, and the `GeneratedGround` resolver. Its roadmap was later superseded by Patch V0, which pauses the immediate runtime-state queue and makes style calibration, painted accent lines, contact accents, sparse motifs, and feature-stack aggregation the active direction.
 
 The `GroundSurfaceStyleProfile` editor makes style assets practical to edit before more surface families are added. It adds:
 
@@ -2241,4 +1340,51 @@ Authoring rules after Patch T:
 - Keep denivelations small and combat-safe unless a later gameplay/navigation pass explicitly approves stronger terrain deformation.
 
 Patch T does not add final trampled rendering, puddle rendering, splines, footprints, runtime wetness, atlases, textures, or new mesh channels. It only establishes the static authored modifier contract that future features can read.
+
+
+### Patch U — Trampled Wear Feature / Compaction Feature Proof
+
+Patch U is the first feature that consumes the Patch T authored surface-mask contract directly in the ground shader.
+
+Concrete flow:
+
+```text
+GroundModifier surface mask
+→ GroundGenerator metadata pass
+→ UV2.x compaction/path/flatten influence
+→ GroundSurfaceFeatureKind.TrampledWear
+→ shader-only feature response
+```
+
+Patch U proves the data path but does not define the final ground direction. After the doctrine pivot, `TrampledWear` is classified as a useful proof and future compaction-response layer, not the current foundation. Do not keep polishing trampled mud while the overall static style remains undecided.
+
+Patch U intentionally does not solve final footprints, snow compression, grass suppression, puddles, runtime wetness, roads, wagon tracks, or painted accent-line language.
+
+### Patch V0 — Ground Visual Doctrine Documentation
+
+Patch V0 locks the new ground baseline in `Assets/Docs/Ground_Visual_Design_and_Architecture.md`:
+
+```text
+Restrained stylized terrain
+= BOTW/TOTK-like base-material restraint
++ Hades-1-like painted ground accents
++ procedural masks and reusable style layers
++ family/variant tuning.
+```
+
+This patch also changes this implementation plan so it no longer acts as the sole home for ground design doctrine. It pauses the old immediate runtime-state roadmap and makes style calibration the next milestone.
+
+Rules after Patch V0:
+
+- family/variant architecture stays;
+- families define material identity;
+- variants tune the shared visual stack;
+- `GroundSurfaceFeatureRecipe` entries should evolve toward reusable doctrine layers;
+- painted accent lines are the first new foundational visual feature;
+- contact/edge accents are the next major grounding layer;
+- sparse motifs come after accent lines/contact response;
+- runtime state resumes only after the static visual language is validated;
+- no new niche terrain features should be prioritized until the doctrine stack is working.
+
+Patch V0 changes documentation only.
 
