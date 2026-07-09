@@ -2048,7 +2048,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.4115802, y: -1.1981777e-15, z: 5.4110217e-16, w: 0.91137356}
-  m_LocalPosition: {x: 0.631, y: 22.25, z: -26.466}
+  m_LocalPosition: {x: -1.05, y: 22.25, z: -32.93}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2779,7 +2779,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Ground.GeneratedGround
   recipe:
-    shapeSeed: 7122
+    shapeSeed: 8304
     patchSize: 1
     resolution: 1
     patchCoordinate: {x: 0, y: 0}
@@ -2792,8 +2792,8 @@ MonoBehaviour:
     edgeBlend: 1
     surfaceVariation: 0.42
     useModifiers: 1
-  surfaceStyleProfile: {fileID: 11400000, guid: 9ba42932860747dfa76b99b97bb289df, type: 2}
-  surfaceVariantId: snowfield.patchy
+  surfaceStyleProfile: {fileID: 11400000, guid: 1f5a9dc3b8df4e2b9c9124c8a7f44367, type: 2}
+  surfaceVariantId: grassland.clean_meadow
   overrideSurfaceProfile: 0
   surfaceProfile: {fileID: 11400000, guid: 92d482aa5a37c7f41b644f1390ff89c6, type: 2}
   overrideMaterialControls: 0
@@ -2840,32 +2840,33 @@ MonoBehaviour:
   snowfieldVariant: 2
   surfaceStyleMigrationVersion: 1
   regenerateOnValidate: 1
+  debugView: 28
   modifiers:
   - {fileID: 1356653796}
   rivers:
   - {fileID: 1626776158}
   lastSurfaceMaskDiagnostics: 'Surface masks (min/max/avg/p05/p95)
 
-    Tonal: 0.357/0.599/0.477/0.402/0.549
+    Tonal: 0.372/0.611/0.478/0.406/0.549
 
     Exposure:
-    0.285/0.879/0.604/0.285/0.879
+    0.215/0.764/0.488/0.215/0.764
 
-    DampDeposit: 0.225/0.520/0.370/0.293/0.459
+    DampDeposit: 0.227/0.526/0.385/0.289/0.475
 
     Vegetation:
-    0.106/0.176/0.161/0.125/0.171
+    0.409/0.687/0.614/0.506/0.660
 
-    Compaction: 0.000/1.000/0.053/0.000/0.809
+    Compaction: 0.000/1.000/0.053/0.000/0.741
 
     Shore:
     0.000/0.279/0.009/0.000/0.032
 
-    RockyDry: 0.091/0.140/0.114/0.099/0.133
+    RockyDry: 0.138/0.216/0.178/0.151/0.204
 
     StandingWater:
     0.000/0.000/0.000/0.000/0.000'
-  lastValidatedGenerationSignature: 246450052
+  lastValidatedGenerationSignature: 1667266530
 --- !u!64 &593135562
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -6852,7 +6853,7 @@ Transform:
   m_GameObject: {fileID: 1356653794}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -4.87, y: 0, z: -14.42}
+  m_LocalPosition: {x: -7.3, y: 0, z: -14.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -7911,7 +7912,7 @@ Transform:
   m_GameObject: {fileID: 1533091818}
   serializedVersion: 2
   m_LocalRotation: {x: 0.4115802, y: -1.748707e-15, z: 1.7601546e-15, w: 0.91137356}
-  m_LocalPosition: {x: 0.631, y: 22.25, z: -26.466}
+  m_LocalPosition: {x: -1.05, y: 22.25, z: -32.93}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -8528,7 +8529,7 @@ Transform:
   m_GameObject: {fileID: 1611485499}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.631, y: 1, z: -6.466}
+  m_LocalPosition: {x: -1.05, y: 1, z: -12.93}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -9294,6 +9295,42 @@ MonoBehaviour:
   foamEdgeCavityAmount: 0.423
   foamConnectorWeakSpanAmount: 0.443
   foamFreeWaterEventAmount: 0.409
+  foamAutomaticBirthEnabled: 1
+  foamSourcePopulationPreset: 1
+  foamAutomaticShoreBirthEnabled: 1
+  foamShoreFoamCoverage: 0.821
+  foamShoreFoamActivity: 0.91
+  foamShoreFoamPatchSize: 0.679
+  foamShoreFoamFormationSpeedMetresPerSecond: 0.507
+  foamShoreFoamPattern: 0
+  foamShoreRibbonPatternWeight: 0.689
+  foamInwardWashPatternWeight: 0.311
+  foamShoreRibbonFormationSpeedMultiplier: 1
+  foamShoreRibbonLengthMinMetres: 4
+  foamShoreRibbonLengthMaxMetres: 12
+  foamShoreRibbonWidthMinMetres: 0.045
+  foamShoreRibbonWidthMaxMetres: 0.155
+  foamShoreRibbonOffsetMinMetres: 0.03
+  foamShoreRibbonOffsetMaxMetres: 0.16
+  foamShoreRibbonInitialLifeMin: 0.918
+  foamShoreRibbonInitialLifeMax: 1
+  foamShoreRibbonBreakupStrengthMin: 0.12
+  foamShoreRibbonBreakupStrengthMax: 0.38
+  foamInwardWashFormationSpeedMultiplier: 1
+  foamInwardWashLengthMinMetres: 0.8
+  foamInwardWashLengthMaxMetres: 3
+  foamInwardWashWidthMinMetres: 0.03
+  foamInwardWashWidthMaxMetres: 0.085
+  foamInwardWashReachMinMetres: 0.18
+  foamInwardWashReachMaxMetres: 0.75
+  foamInwardWashOffsetMinMetres: 0.006
+  foamInwardWashOffsetMaxMetres: 0.04
+  foamInwardWashInitialLifeMin: 0.787
+  foamInwardWashInitialLifeMax: 1
+  foamInwardWashBreakupStrengthMin: 0.04
+  foamInwardWashBreakupStrengthMax: 0.14
+  foamShoreFoamStrength: 0.35
+  foamShoreFoamPersistence: 0.3
   foamNeutralLifetime: 8
   foamSupportedAgingRate: 0.12
   foamNegativeAgingRate: 7
@@ -9306,7 +9343,7 @@ MonoBehaviour:
   foamMotionFieldLaneScale: 1
   foamMaterialLifecycleTuningVersion: 1
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}
-  foamDebugView: 3
+  foamDebugView: 4
   foamSpawnDistanceNormalized: 0.634
   foamSpawnAcrossNormalized: -0.27
   foamSpawnScale: 0.538

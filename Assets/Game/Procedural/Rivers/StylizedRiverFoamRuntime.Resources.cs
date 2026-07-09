@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -98,6 +99,7 @@ namespace ProgrammaticStylized3D.Rivers
                 neutralDisturbanceTexture.IsCreated() &&
                 boundaryTexture != null &&
                 metricBuffer != null &&
+                automaticFoamSourceEventBuffer != null &&
                 topologyMetricsBuffer != null &&
                 domainVersion == river.Domain.Version &&
                 allocatedQuality == river.Quality;
@@ -273,6 +275,10 @@ namespace ProgrammaticStylized3D.Rivers
                             TopologyMetricCount,
                             sizeof(uint),
                             ComputeBufferType.Raw);
+                        automaticFoamSourceEventBuffer = new ComputeBuffer(
+                            AutomaticFoamSourceEventCapacity,
+                            Marshal.SizeOf<FoamSourceEventGpuData>(),
+                            ComputeBufferType.Structured);
                     }
 
                     initializationPhase =
@@ -993,6 +999,8 @@ namespace ProgrammaticStylized3D.Rivers
 
             metricBuffer?.Release();
             metricBuffer = null;
+            automaticFoamSourceEventBuffer?.Release();
+            automaticFoamSourceEventBuffer = null;
             ReleaseObstacleExclusionBuffers();
             obstacleExclusionMeshFilters.Clear();
             topologyCacheFingerprintMeshFilters.Clear();
@@ -1080,6 +1088,7 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader = null;
             clearKernel = -1;
             injectKernel = -1;
+            rasterizeFoamSourceEventKernel = -1;
             writeIsolatedLifeProbeKernel = -1;
             buildCurrentShoreEdgesKernel = -1;
             composeTopologyKernel = -1;

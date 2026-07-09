@@ -102,7 +102,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         GroundStandingWaterPotential = 27,
 
         [InspectorName("Ground Painted Accent Lines")]
-        GroundPaintedAccentLines = 28
+        GroundPaintedAccentLines = 28,
+
+        [InspectorName("Ground Painted Accent Relief")]
+        GroundPaintedAccentRelief = 29,
+
+        [InspectorName("Ground Painted Accent Signed Relief")]
+        GroundPaintedAccentSignedRelief = 30
     }
 
     public enum GroundSurfaceType
@@ -290,6 +296,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField, HideInInspector]
         private int lastValidatedGenerationSignature;
         private MaterialPropertyBlock materialProperties;
+        private Texture2D paintedAccentFoldFieldTexture;
+        private bool paintedAccentFoldFieldEnabled;
+        private Vector4 paintedAccentFoldFieldOriginSize =
+            new Vector4(0f, 0f, 1f, 1f);
+        private Vector4 paintedAccentFoldFieldTexelSize =
+            new Vector4(1f, 1f, 1f, 1f);
+        private int paintedAccentFoldFieldSignature;
 
         private static readonly int BaseColorId =
             Shader.PropertyToID("_BaseColor");
@@ -371,6 +384,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_SpecularStrength");
         private static readonly int MaskDebugModeId =
             Shader.PropertyToID("_MaskDebugMode");
+        private static readonly int GroundPaintedAccentFoldFieldId =
+            Shader.PropertyToID("_GroundPaintedAccentFoldField");
+        private static readonly int GroundPaintedAccentFoldFieldEnabledId =
+            Shader.PropertyToID("_GroundPaintedAccentFoldFieldEnabled");
+        private static readonly int GroundPaintedAccentFoldFieldOriginSizeId =
+            Shader.PropertyToID("_GroundPaintedAccentFoldFieldOriginSize");
+        private static readonly int GroundPaintedAccentFoldFieldTexelSizeId =
+            Shader.PropertyToID("_GroundPaintedAccentFoldFieldTexelSize");
         private static readonly int GroundFeatureModeId =
             Shader.PropertyToID("_GroundFeatureMode");
         private static readonly int GroundFeatureStrengthId =
@@ -547,6 +568,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             lastValidatedGenerationSignature =
                 CalculateGenerationSignature();
 
+            paintedAccentFoldFieldSignature = 0;
+            EnsurePaintedAccentFoldFieldCurrent();
+
             ApplySurfaceProfileMaterialProperties();
             NotifyRiverCorridorsChanged();
         }
@@ -702,6 +726,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public void RefreshSurfaceMaterialProperties()
         {
             CacheComponents();
+            EnsurePaintedAccentFoldFieldCurrent();
             ApplySurfaceProfileMaterialProperties();
             RefreshRiverCorridorMaterialProperties();
         }
@@ -1358,6 +1383,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 (float)debugView);
 
             ApplyResolvedFeatureMaterialProperties(materialProperties);
+            ApplyPaintedAccentFoldFieldProperties(materialProperties);
 
             targetRenderer.SetPropertyBlock(materialProperties);
         }
@@ -1394,6 +1420,187 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 properties,
                 ResolveShaderFeature(GroundSurfaceFeatureKind.PaintedAccentLines),
                 GroundPaintedAccentLineFeatureIds);
+        }
+
+        private void ApplyPaintedAccentFoldFieldProperties(
+            MaterialPropertyBlock properties)
+        {
+            properties.SetTexture(
+                GroundPaintedAccentFoldFieldId,
+                ResolvePaintedAccentFoldFieldTexture());
+
+            properties.SetFloat(
+                GroundPaintedAccentFoldFieldEnabledId,
+                paintedAccentFoldFieldEnabled ? 1f : 0f);
+
+            properties.SetVector(
+                GroundPaintedAccentFoldFieldOriginSizeId,
+                paintedAccentFoldFieldOriginSize);
+
+            properties.SetVector(
+                GroundPaintedAccentFoldFieldTexelSizeId,
+                paintedAccentFoldFieldTexelSize);
+        }
+
+        private Texture2D ResolvePaintedAccentFoldFieldTexture()
+        {
+            if (paintedAccentFoldFieldTexture == null)
+            {
+                paintedAccentFoldFieldTexture =
+                    CreateNeutralPaintedAccentFoldFieldTexture();
+            }
+
+            return paintedAccentFoldFieldTexture;
+        }
+
+        private static Texture2D CreateNeutralPaintedAccentFoldFieldTexture()
+        {
+            Texture2D texture =
+                new Texture2D(
+                    1,
+                    1,
+                    TextureFormat.RGBA32,
+                    false,
+                    true)
+                {
+                    name = "GeneratedGround_NeutralPaintedAccentFoldField",
+                    hideFlags = HideFlags.DontSave,
+                    wrapMode = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Bilinear
+                };
+
+            texture.SetPixel(0, 0, new Color32(0, 0, 128, 0));
+            texture.Apply(false, true);
+            return texture;
+        }
+
+        private void EnsurePaintedAccentFoldFieldCurrent()
+        {
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(GroundSurfaceFeatureKind.PaintedAccentLines);
+            int signature =
+                CalculatePaintedAccentFoldFieldSignature(feature);
+
+            if (paintedAccentFoldFieldTexture != null &&
+                paintedAccentFoldFieldSignature == signature)
+            {
+                return;
+            }
+
+            paintedAccentFoldFieldSignature = signature;
+
+            if (!CanGeneratePaintedAccentFoldField(feature))
+            {
+                ApplyNeutralPaintedAccentFoldField();
+                return;
+            }
+
+            Texture2D generatedTexture =
+                GroundPaintedAccentFoldFieldGenerator.Generate(
+                    generatedMesh.bounds,
+                    baseSurface,
+                    feature,
+                    recipe != null ? recipe.ShapeSeed : 0,
+                    out Vector4 originSize,
+                    out Vector4 texelSize);
+
+            ReplacePaintedAccentFoldFieldTexture(generatedTexture);
+            paintedAccentFoldFieldEnabled = true;
+            paintedAccentFoldFieldOriginSize = originSize;
+            paintedAccentFoldFieldTexelSize = texelSize;
+        }
+
+        private bool CanGeneratePaintedAccentFoldField(
+            GroundSurfaceFeatureRecipe feature)
+        {
+            return feature != null &&
+                   feature.CanApplyAsShaderOnly &&
+                   feature.Strength > 0.0001f &&
+                   generatedMesh != null &&
+                   baseSurface != null &&
+                   baseSurface.IsValid;
+        }
+
+        private void ApplyNeutralPaintedAccentFoldField()
+        {
+            paintedAccentFoldFieldEnabled = false;
+            ReplacePaintedAccentFoldFieldTexture(
+                CreateNeutralPaintedAccentFoldFieldTexture());
+
+            Bounds localBounds =
+                generatedMesh != null
+                    ? generatedMesh.bounds
+                    : new Bounds(Vector3.zero, Vector3.one);
+
+            paintedAccentFoldFieldOriginSize =
+                new Vector4(
+                    localBounds.min.x,
+                    localBounds.min.z,
+                    Mathf.Max(0.0001f, localBounds.size.x),
+                    Mathf.Max(0.0001f, localBounds.size.z));
+
+            paintedAccentFoldFieldTexelSize =
+                new Vector4(1f, 1f, 1f, 1f);
+        }
+
+        private void ReplacePaintedAccentFoldFieldTexture(
+            Texture2D texture)
+        {
+            if (paintedAccentFoldFieldTexture != null &&
+                paintedAccentFoldFieldTexture != texture)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(paintedAccentFoldFieldTexture);
+                }
+                else
+                {
+                    DestroyImmediate(paintedAccentFoldFieldTexture);
+                }
+            }
+
+            paintedAccentFoldFieldTexture = texture;
+        }
+
+        private int CalculatePaintedAccentFoldFieldSignature(
+            GroundSurfaceFeatureRecipe feature)
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + CalculateGenerationSignature();
+                hash = hash * 31 +
+                    (feature != null && feature.CanApplyAsShaderOnly ? 1 : 0);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.Strength : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.Scale : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.Contrast : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.MaskInfluence : 0f);
+
+                Vector2 direction =
+                    feature != null
+                        ? feature.Direction
+                        : Vector2.right;
+
+                hash = hash * 31 + Quantize(direction.x);
+                hash = hash * 31 + Quantize(direction.y);
+                hash = hash * 31 +
+                    (feature != null ? feature.SeedOffset : 0);
+
+                if (generatedMesh != null)
+                {
+                    Bounds localBounds = generatedMesh.bounds;
+                    hash = hash * 31 + Quantize(localBounds.min.x);
+                    hash = hash * 31 + Quantize(localBounds.min.z);
+                    hash = hash * 31 + Quantize(localBounds.size.x);
+                    hash = hash * 31 + Quantize(localBounds.size.z);
+                }
+
+                return hash;
+            }
         }
 
         private static void ApplyFeatureRecipe(
@@ -1455,6 +1662,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             baseSurface = GroundHeightFieldSnapshot.Empty;
             lastSurfaceMaskDiagnostics =
                 "Surface masks have not been generated yet.";
+            paintedAccentFoldFieldSignature = 0;
+            ApplyNeutralPaintedAccentFoldField();
 
             if (meshFilter != null &&
                 meshFilter.sharedMesh == generatedMesh)
@@ -1472,6 +1681,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private void OnDestroy()
         {
             ClearGeneratedAssignments();
+
+            if (paintedAccentFoldFieldTexture != null)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(paintedAccentFoldFieldTexture);
+                }
+                else
+                {
+                    DestroyImmediate(paintedAccentFoldFieldTexture);
+                }
+
+                paintedAccentFoldFieldTexture = null;
+            }
 
             if (generatedMesh == null)
             {

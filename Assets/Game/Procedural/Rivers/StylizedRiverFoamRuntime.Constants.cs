@@ -21,6 +21,10 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MaximumManualReservationSeconds = 300f;
         private const float TopologyMetricsUpdateRate = 8f;
         private const int FoamCompositionEventCapacity = 8;
+        // Patch 4.11C.5.14E separates final automatic source
+        // rasterization from the manual/debug injection primitive path. Keep
+        // this bounded: source events are authored vocabulary, not particles.
+        private const int AutomaticFoamSourceEventCapacity = 16;
         private const int LowFoamCompositionBirthBudgetPerStep = 2;
         private const int MediumFoamCompositionBirthBudgetPerStep = 4;
         private const int HighFoamCompositionBirthBudgetPerStep = 6;
@@ -167,13 +171,16 @@ namespace ProgrammaticStylized3D.Rivers
         private const float AutomaticShoreSourceMinimumSlotSpacingMetres = 3.5f;
         private const float AutomaticShoreSourceMaximumSlotSpacingMetres = 12.0f;
         private const float AutomaticShoreSourceMinimumEventsPerSecond = 0.25f;
-        private const float AutomaticShoreSourceMaximumEventsPerSecond = 3.0f;
-        private const int AutomaticShoreSourceMaximumStartsPerUpdate = 2;
+        private const float AutomaticShoreSourceMaximumEventsPerSecond = 5.0f;
+        private const int AutomaticShoreSourceMaximumStartsPerUpdate = 3;
         private const int AutomaticShoreSourceMaximumScansPerUpdate = 32;
-        private const float AutomaticShoreRibbonMinimumDuration = 0.45f;
-        private const float AutomaticShoreRibbonMaximumDuration = 0.90f;
-        private const float AutomaticShoreWashMinimumDuration = 0.55f;
-        private const float AutomaticShoreWashMaximumDuration = 1.10f;
+        private const float AutomaticShoreSourceMinimumDuration = 0.85f;
+        private const float AutomaticShoreSourceMaximumDuration = 14.0f;
+        private const float AutomaticShoreSourceMinimumHeadTrailMetres = 0.12f;
+        private const float AutomaticShoreSourceMaximumHeadTrailMetres = 0.65f;
+        private const float AutomaticShoreWashMinimumHeadTrailMetres = 0.045f;
+        private const float AutomaticShoreWashMaximumHeadTrailMetres = 0.22f;
+        private const float AutomaticShoreWashMaximumHeadTrailFraction = 0.11f;
         private const float AutomaticShoreBirthPatternSeedSalt = 307.733f;
         private const float AutomaticShoreBirthSourceFillSeedSalt = 419.371f;
         private const float AutomaticShoreBirthShapeSeedSalt = 521.909f;
@@ -403,6 +410,8 @@ namespace ProgrammaticStylized3D.Rivers
             new ProfilerMarker("RiverFoam.Shape.BuildFilmSource");
         private static readonly ProfilerMarker BuildFilmSupportProfilerMarker =
             new ProfilerMarker("RiverFoam.Shape.BuildFilmSupport");
+        private static readonly ProfilerMarker RasterizeAutomaticSourceProfilerMarker =
+            new ProfilerMarker("RiverFoam.Source.RasterizeAutomatic");
 
         private static readonly int FoamEnabledId =
             Shader.PropertyToID("_FoamEnabled");

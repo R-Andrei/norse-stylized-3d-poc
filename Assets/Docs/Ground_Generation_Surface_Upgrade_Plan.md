@@ -58,7 +58,7 @@ The ground upgrade has moved beyond the original single snow-material improvemen
 | Ground modifier surface/height contract | Implemented in Patch T | `GroundModifier` can affect height, authored surface masks, or both; legacy Flatten compaction behavior is preserved. |
 | TrampledWear proof feature | Implemented/prototyped in Patch U | `TrampledWear` reads `UV2.x` compaction/path. It is now considered an experiment/proof of the mask-to-feature route, not the active art-direction priority. |
 | Runtime surface state | Deferred | Wetness, snow depth, compression, footprints, and trample maps remain future work. Runtime work must wait until the static visual language is validated. |
-| Painted accent lines | Implemented foundation in Patch V3; curved relief model in Patch V3E | `PaintedAccentLines` is the first stackable doctrine layer. Patch V3D decouples line spacing from stroke size and caps strokes in world units. Patch V3E replaces straight/bar-like micro-strokes with curved terrain-fold strokes and adds subtle painted relief shading so the feature reads as visual mound/crease detail rather than flat line stamps. |
+| Painted accent lines | Implemented foundation in Patch V3; relief debug/strengthening in Patch V3F | `PaintedAccentLines` is the first stackable doctrine layer. Patch V3D decouples line spacing from stroke size and caps strokes in world units. Patch V3E replaces straight/bar-like micro-strokes with curved terrain-fold strokes. Patch V3F exposes line, relief-body, and signed-relief debug channels, thins the contour, and strengthens side-dependent painted relief shading. |
 | GeneratedGround debug views | Implemented in Patch V3B; dropdown cleanup in Patch V3C | Generated-ground debug selection is now exposed on the `GeneratedGround` component and written through renderer-local material property blocks. Material asset debug controls are fallback/internal only. |
 
 Current conceptual split:
@@ -870,12 +870,149 @@ Active checklist after the doctrine pivot:
 - [x] Patch V3C - fix object-level debug dropdown labels and Unity 6.5 obsolete editor refresh warning.
 - [x] Patch V3D - refine Painted Accent Lines raw mask from large strips into smaller clustered micro-strokes.
 - [x] Patch V3E - replace straight line stamps with curved visual-relief terrain-fold strokes.
+- [x] Patch V3F - expose painted-accent relief channels and strengthen visual relief.
+- [x] Patch V3F.1 - make relief continuity and signed-side debug readable; validation still rejects the curve-distance source model.
+- [x] Patch V3G - retire the curve-distance stroke model and document the generated fold-field direction.
+- [x] Patch V3H - add generated fold-field data skeleton and shader sampling fallback plumbing.
+- [x] Patch V3I - prototype local-space 256x256 fold-field generation at ground regeneration/dirty time.
+- [ ] Patch V3J - extract one-sided accent lines from fold-field gradients/contours.
+- [ ] Patch V3K - use generated line/body/signed channels for final visual fold response.
+- [ ] Patch V3L - tune Painted Accent Lines per production family after fold-field validation.
 - [ ] Patch V4 - prototype contact/edge accents.
 - [ ] Patch V5 - prototype sparse motif/stamp layer.
 - [ ] Patch V6 - feature-stack authoring polish, warnings, and per-kind drawers.
 - [ ] Later - resume runtime state design only after static doctrine validation.
 
 Historical patch notes remain below for context.
+
+### 2026-07-09 — Patch V3I: Local-Space 256x256 Fold Field Generator Prototype
+
+Patch V3I is the first active implementation of the generated visual fold-field direction. It replaces the active Painted Accent Lines data source, when the feature is enabled, with a generated local-space texture owned by `GeneratedGround`.
+
+Implemented data policy:
+
+```text
+visible authored chunk with PaintedAccentLines active:
+  generate one 256x256 RGBA32 fold-field texture
+
+hidden/offscreen/background chunks:
+  disable PaintedAccentLines entirely
+  no low-resolution fallback texture
+```
+
+Budget:
+
+```text
+256x256 RGBA32 = 256 KiB per active chunk
+10 chunks  = 2.5 MiB
+50 chunks  = 12.5 MiB
+100 chunks = 25 MiB
+200 chunks = 50 MiB
+```
+
+Runtime/chunk-library policy:
+
+```text
+Chunks are authored/generated in editor or at load/camp rebuild time.
+The runtime map builder places, rotates, and connects reusable authored chunks.
+Fold-field sampling is local/object-space so the field rotates with the chunk.
+The feature is not a per-frame CPU simulation.
+```
+
+Implementation details:
+
+- Added `GroundPaintedAccentFoldFieldGenerator`.
+- The generator builds deterministic soft fold candidates in local chunk space.
+- Candidates are rasterized into a scalar body field instead of deriving a body from procedural curve-distance tubes.
+- The body field is semantically supported by existing ground masks.
+- The body field is lightly smoothed.
+- The signed channel is derived from the body-field gradient.
+- The line channel is a rough temporary edge/gradient candidate and is not final line-art polish.
+- The generated texture is uploaded with no mipmaps and the CPU texture copy is discarded.
+- The retired V3D-V3F.1 curve-distance path remains as fallback when no active `PaintedAccentLines` feature exists.
+
+V3I validation should judge `Ground Painted Accent Relief` first. Success means the relief/body debug view reads as terrain-field-like soft folds rather than fat tubes, scratches, or side rails. V3J will refine line extraction after the body field is accepted.
+
+### 2026-07-09 — Patch V3H: Generated Fold Field Data Skeleton
+
+Patch V3H adds the inactive data path for the accepted fold-field model without changing visible output. `GeneratedGround` now owns a neutral generated fold-field texture placeholder and pushes it through the same material-property-block path used by the ground renderer and river corridor renderer. The ground shader declares the fold-field texture and parameters, adds a non-retired fold-field resolver, and routes Painted Accent debug/final sampling through a new feature router.
+
+V3H data contract:
+
+```text
+R = selected accent line mask
+G = relief/body/fold-height channel
+B = signed side encoded 0..1, where 0.5 is neutral
+A = reserved / validity / future support
+```
+
+V3H intentionally keeps `_GroundPaintedAccentFoldFieldEnabled = 0`, so the retired curve-distance shader path remains the runtime fallback until V3I generates real fold-field data. This patch adds no noise generation, no edge extraction, no family tuning, no fake normals, no mesh channels, no material assets, and no runtime state.
+
+### 2026-07-09 — Patch V3G: Painted Accent Direction Reset / Fold-Field Plan
+
+Patch V3G is a redirection patch. It does not delete or disable the V3D-V3F.1 shader path, but it clearly retires that curve-distance stroke model as the final solution. The old model is kept only as fallback/comparison code until the generated fold-field replacement exists. It must not be tuned further as the chosen direction.
+
+Rejected source model:
+
+```text
+procedural curve stroke
+  -> distance-to-curve contour
+  -> inflated tube-like relief body
+  -> side rails derived from curve side
+```
+
+Chosen source model:
+
+```text
+generated visual fold field F(x,z)
+  -> fold-height/body channel
+  -> selected contour/ridge/edge line channel
+  -> gradient/polarity signed-side channel
+```
+
+Retained architecture:
+
+```text
+PaintedAccentLines feature kind
+GroundSurfaceVariantRecipe feature stack
+GeneratedGround material-property-block ownership
+object-level Ground Debug dropdown
+Ground Painted Accent Lines / Relief / Signed Relief debug modes
+three-channel line/body/signed-side validation contract
+```
+
+Planned implementation sequence after V3G:
+
+```text
+Patch V3H - Generated Fold Field Data Skeleton
+Patch V3I - Fold Field Generator Prototype
+Patch V3J - Edge/Contour Extraction
+Patch V3K - Final Render Fold Response
+Patch V3L - Production Family Tuning
+```
+
+This remains visual-only. No physical terrain mesh deformation, collision changes, runtime footprints/wetness, decals, contact accents, sparse motifs, or family tuning are part of V3G.
+
+### 2026-07-09 — Patch V3F.1: Per-Stroke Relief Correction
+
+Patch V3F.1 made the current three-channel debug contract more useful by keeping the relief body continuous instead of fragmenting it with the line breakup mask, and by making the signed-side debug view display visible polarity colors. Validation after V3F.1 showed the debug channels were useful but the underlying source model was still wrong: the line remained a procedural stroke, the relief body read as a fat distance tube, and the signed side read as parallel rails. This validation directly motivates Patch V3G's fold-field direction reset.
+
+### 2026-07-09 — Patch V3F: Painted Accent Relief Debug + Visual Relief Strengthening
+
+Validation after V3E showed the curved marks were directionally better but still too wide and still read as 2D painted stamps. Patch V3F keeps the feature shader-only and visual-only, but exposes the internal three-channel model directly in object-level debug:
+
+```text
+Ground Painted Accent Lines
+  thin line contour / crease mask
+
+Ground Painted Accent Relief
+  broader soft relief body around the contour
+
+Ground Painted Accent Signed Relief
+  signed side field remapped from [-1, 1] to [0, 1] for debug
+```
+
+The shader now thins the contour independently from the wider relief body and uses the signed relief side more deliberately in normal rendering: one side receives painted shadow, the opposite side receives painted highlight, and the narrow contour remains the dark/tinted crease. No mesh displacement, collision, decals, textures, generated atlases, runtime state, new mesh channels, new components, contact accents, sparse motifs, or family asset retuning are included in this patch.
 
 ### 2026-07-09 — Patch V3E: Painted Accent Lines Curved Relief Model
 

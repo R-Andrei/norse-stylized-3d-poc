@@ -1,5 +1,6 @@
 #pragma kernel ClearRange
 #pragma kernel InjectFoam
+#pragma kernel RasterizeFoamSourceEvent
 #pragma kernel WriteIsolatedLifeProbe
 #pragma kernel ClearProgressiveBirthDebugAll
 #pragma kernel ClearProgressiveBirthDebugTransient
@@ -547,6 +548,326 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
         _FoamStateWrite[coordinate],
         sourcePacked);
 
+}
+
+
+static const float FoamSourceEventTypeShoreRibbon = 1.0;
+static const float FoamSourceEventTypeInwardWash = 2.0;
+
+float FoamSourceEventBreakup(
+    float2 sourceLocal,
+    float sourceFillSeed,
+    float scaleMetres,
+    float strength,
+    float2 physicalCellSpacing)
+{
+    float maximumCellSpacing = max(
+        max(0.01, physicalCellSpacing.x),
+        max(0.01, physicalCellSpacing.y));
+    float featureSize = max(max(0.08, scaleMetres), maximumCellSpacing * 2.0);
+    float value = EvaluateFoamSourceFillField(
+        sourceLocal,
+        sourceFillSeed,
+        featureSize);
+    float keep = smoothstep(0.18, 0.82, value);
+    return lerp(1.0, keep, saturate(strength));
+}
+
+float FoamSourceEventSoftRange(
+    float value,
+    float lower,
+    float upper,
+    float feather)
+{
+    return smoothstep(lower, lower + feather, value) *
+        (1.0 - smoothstep(upper - feather, upper, value));
+}
+
+float FoamEvaluateShoreRibbonSource(
+    FoamSourceEventData sourceEvent,
+    float globalDistance,
+    float lateralMetres,
+    float shoreMetres,
+    float2 physicalCellSpacing,
+    out float amountMultiplier)
+{
+    float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
+    float alongLength = max(
+        0.001,
+        abs(sourceEvent.distance.y - sourceEvent.distance.x));
+    float alongFromStart = flowDirection *
+        (globalDistance - sourceEvent.distance.x);
+    float progress = saturate(sourceEvent.header.z);
+    float revealedLength = max(
+        max(physicalCellSpacing.x, sourceEvent.shore.w),
+        alongLength * progress);
+    float revealFeather = max(
+        max(physicalCellSpacing.x, sourceEvent.shore.w),
+        alongLength * 0.045);
+    float revealMask = 1.0 - smoothstep(
+        revealedLength,
+        revealedLength + revealFeather,
+        alongFromStart);
+    float endMask = FoamSourceEventSoftRange(
+        alongFromStart,
+        0.0,
+        alongLength,
+        max(sourceEvent.shore.w, alongLength * 0.055));
+
+    float inwardMetres = sourceEvent.header.y < 0.0
+        ? lateralMetres - shoreMetres
+        : shoreMetres - lateralMetres;
+    float centre = sourceEvent.shore.x;
+    float halfWidth = max(0.01, sourceEvent.shore.y * 0.5);
+    float feather = max(
+        max(0.01, sourceEvent.shore.w),
+        max(physicalCellSpacing.x, physicalCellSpacing.y) * 0.85);
+    float bandDistance = abs(inwardMetres - centre);
+    float core = 1.0 - smoothstep(
+        halfWidth * 0.62,
+        halfWidth + feather * 0.18,
+        bandDistance);
+    float softBand = 1.0 - smoothstep(
+        halfWidth,
+        halfWidth + feather,
+        bandDistance);
+
+    float strandPhase = FoamHash11(sourceEvent.header.w + 17.0) * 6.2831853;
+    float strand = 0.72 + 0.28 * sin(
+        alongFromStart / max(0.12, sourceEvent.variation.y) * 2.9 +
+        strandPhase);
+    float breakup = FoamSourceEventBreakup(
+        float2(alongFromStart, inwardMetres),
+        sourceEvent.variation.x,
+        sourceEvent.variation.y,
+        sourceEvent.variation.z,
+        physicalCellSpacing);
+    float irregularEdge = lerp(1.0, saturate(breakup * strand), 0.82);
+    float shape = saturate(max(core, softBand * irregularEdge) *
+        endMask * revealMask);
+
+    amountMultiplier = 1.0;
+    return shape;
+}
+
+float FoamEvaluateInwardWashSource(
+    FoamSourceEventData sourceEvent,
+    float globalDistance,
+    float lateralMetres,
+    float shoreMetres,
+    float2 physicalCellSpacing,
+    out float amountMultiplier)
+{
+    float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
+    float alongLength = max(
+        0.001,
+        abs(sourceEvent.distance.y - sourceEvent.distance.x));
+    float halfLength = alongLength * 0.5;
+    float signedAlong = (globalDistance - sourceEvent.distance.z) *
+        flowDirection;
+    float inwardMetres = sourceEvent.header.y < 0.0
+        ? lateralMetres - shoreMetres
+        : shoreMetres - lateralMetres;
+    float progress = saturate(sourceEvent.header.z);
+    float cellSize = max(physicalCellSpacing.x, physicalCellSpacing.y);
+    float feather = max(
+        max(0.006, sourceEvent.shore.w * 0.70),
+        cellSize * 0.55);
+    float baseInset = max(0.0, sourceEvent.shore.x);
+    float inwardReach = max(feather, sourceEvent.shore.z);
+    float strokeWidth = max(
+        sourceEvent.shore.y * 0.38,
+        cellSize * 0.28);
+    float localInward = inwardMetres - baseInset;
+
+    float pathLength = max(
+        0.001,
+        max(sourceEvent.kinematics.z, sqrt(alongLength * alongLength +
+            inwardReach * inwardReach)));
+    float trailFraction = clamp(
+        sourceEvent.kinematics.y / pathLength,
+        0.012,
+        0.11);
+    float headS = progress;
+    float tailS = max(0.0, headS - trailFraction);
+    float sampleSpan = max(0.001, headS - tailS);
+    float minDistance = 100000.0;
+    float nearestS = 0.0;
+
+    [unroll]
+    for (int sampleIndex = 0; sampleIndex < 6; sampleIndex++)
+    {
+        float sampleT = (float)sampleIndex / 5.0;
+        float s = tailS + sampleSpan * sampleT;
+        float turnStart = 0.22 +
+            0.12 * FoamHash11(sourceEvent.header.w + 41.0);
+        float peelT = saturate((s - turnStart) /
+            max(0.001, 1.0 - turnStart));
+        float peel = peelT * peelT * (3.0 - 2.0 * peelT);
+        float pathAlong = lerp(-halfLength, halfLength, s) +
+            sourceEvent.variation.w * max(0.08, inwardReach) *
+            peel * (1.0 - peel) * 0.65;
+        float pathInward = baseInset + inwardReach * peel;
+        float distanceToCurve = distance(
+            float2(signedAlong, inwardMetres),
+            float2(pathAlong, pathInward));
+        if (distanceToCurve < minDistance)
+        {
+            minDistance = distanceToCurve;
+            nearestS = s;
+        }
+    }
+
+    float stroke = 1.0 - smoothstep(
+        strokeWidth,
+        strokeWidth + feather,
+        minDistance);
+    float validInwardMask = smoothstep(
+        -feather * 0.50,
+        feather * 0.50,
+        localInward) *
+        (1.0 - smoothstep(
+            inwardReach + feather * 0.50,
+            inwardReach + feather * 1.35,
+            localInward));
+    float startCap = smoothstep(0.0, 0.030, headS + trailFraction);
+    float endTaper = 1.0 - smoothstep(0.84, 1.04, nearestS);
+    float breakup = FoamSourceEventBreakup(
+        float2(signedAlong, localInward),
+        sourceEvent.variation.x,
+        sourceEvent.variation.y,
+        sourceEvent.variation.z,
+        physicalCellSpacing);
+    float shape = saturate(stroke * validInwardMask * startCap *
+        lerp(1.0, breakup, 0.32) * lerp(1.0, 0.78, nearestS) *
+        max(0.72, endTaper));
+
+    amountMultiplier = lerp(1.0, 0.92, nearestS);
+    return shape;
+}
+
+[numthreads(8, 8, 1)]
+void RasterizeFoamSourceEvent(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamRangeCount ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int x = _FoamRangeStart + (int)dispatchId.x;
+    int y = (int)dispatchId.y;
+    if (x < 0 || x >= _FoamDimensions.x)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(x, y);
+    if (!IsFoamColumnInsideDomain(x))
+    {
+        _FoamStateWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
+    float coverage = LoadBoundaryCoverage(coordinate);
+    float obstacleFootprint = saturate(
+        _FoamObstacleExclusionRead.Load(int3(coordinate, 0)));
+    float validFluid = coverage * (1.0 - obstacleFootprint);
+    if (validFluid <= 0.001)
+    {
+        _FoamStateWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
+    FoamSourceEventData sourceEvent =
+        _FoamSourceEvents[max(0, _FoamSourceEventIndex)];
+    float sourceType = sourceEvent.header.x;
+    if (sourceType < 0.5)
+    {
+        return;
+    }
+
+    FoamMetricRow metric = _FoamMetricRows[x];
+    float across01 = FoamAcross01AtTexel(y);
+    float lateralMetres = FoamAcross01ToMetres(
+        across01,
+        metric.widthsAndSpacing.x,
+        metric.widthsAndSpacing.y);
+    float globalDistance = _FoamGlobalStart + FoamLocalDistanceAtTexel(x);
+    float2 physicalPosition = float2(globalDistance, lateralMetres);
+    float2 physicalCellSpacing = float2(
+        max(0.01, metric.widthsAndSpacing.z),
+        max(0.01, metric.widthsAndSpacing.w));
+    float2 shoreEdges = _FoamCurrentShoreEdgesRead.Load(int3(x, 0, 0));
+    float shoreMetres = sourceEvent.header.y < 0.0
+        ? shoreEdges.x
+        : shoreEdges.y;
+    float inwardMetres = sourceEvent.header.y < 0.0
+        ? lateralMetres - shoreMetres
+        : shoreMetres - lateralMetres;
+    if (inwardMetres < -max(sourceEvent.shore.w, physicalCellSpacing.y))
+    {
+        return;
+    }
+
+    float amountMultiplier = 1.0;
+    float shape = 0.0;
+    if (sourceType < 1.5)
+    {
+        shape = FoamEvaluateShoreRibbonSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            shoreMetres,
+            physicalCellSpacing,
+            amountMultiplier);
+    }
+    else
+    {
+        shape = FoamEvaluateInwardWashSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            shoreMetres,
+            physicalCellSpacing,
+            amountMultiplier);
+    }
+
+    if (shape <= FoamMaterialStateEpsilon)
+    {
+        return;
+    }
+
+    float sourceFillBlend = sourceType < 1.5 ? 0.35 : 0.08;
+    float sourceFill = lerp(
+        1.0,
+        EvaluateFoamSourceFillCoverage(
+            physicalPosition,
+            sourceEvent.material.x,
+            sourceEvent.variation.x,
+            sourceEvent.material.w,
+            physicalCellSpacing),
+        sourceFillBlend);
+    float injectedPresence = saturate(
+        shape * sourceFill * sourceEvent.material.x * amountMultiplier *
+        validFluid);
+    if (injectedPresence <= FoamMaterialStateEpsilon)
+    {
+        return;
+    }
+
+    FoamMaterialState sourceState;
+    sourceState.presence = injectedPresence;
+    sourceState.remainingLife = saturate(sourceEvent.material.y);
+    sourceState.materialPattern = EvaluateFoamMaterialPattern(
+        physicalPosition,
+        sourceEvent.material.z,
+        sourceEvent.material.w,
+        physicalCellSpacing);
+    float4 sourcePacked = FoamEncodeMaterialState(sourceState);
+    _FoamStateWrite[coordinate] = FoamMergeBornPresence(
+        _FoamStateWrite[coordinate],
+        sourcePacked);
 }
 
 

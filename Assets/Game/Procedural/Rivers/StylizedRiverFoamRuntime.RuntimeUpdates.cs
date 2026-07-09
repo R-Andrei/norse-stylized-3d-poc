@@ -65,6 +65,7 @@ namespace ProgrammaticStylized3D.Rivers
             birthCommandsThisFrame = 0;
             automaticShoreBirthSubmittedLastUpdate = 0;
             automaticShoreBirthRejectedLastUpdate = 0;
+            automaticSourceEventsRasterizedLastUpdate = 0;
             lastPhaseCommitCellsThisFrame = 0;
         }
 

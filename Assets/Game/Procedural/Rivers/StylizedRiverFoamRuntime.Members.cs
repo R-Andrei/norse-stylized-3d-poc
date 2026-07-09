@@ -59,6 +59,7 @@ namespace ProgrammaticStylized3D.Rivers
         private ComputeBuffer obstacleExclusionSampleBuffer;
         private ComputeBuffer topologyMetricsBuffer;
         private ComputeBuffer progressiveBirthDebugCounterBuffer;
+        private ComputeBuffer automaticFoamSourceEventBuffer;
         private ComputeBuffer majorEvolutionBuffer;
         private ComputeBuffer hostedNegativeEvolutionBuffer;
         private ComputeBuffer freeWaterEvolutionBuffer;
@@ -97,6 +98,8 @@ namespace ProgrammaticStylized3D.Rivers
         private int automaticShoreBirthSubmittedLastUpdate;
         private int automaticShoreBirthRejectedLastUpdate;
         private int automaticShoreBirthSubmittedTotal;
+        private int activeAutomaticFoamSourceEventCount;
+        private int automaticSourceEventsRasterizedLastUpdate;
         private string automaticShoreBirthStatus =
             "Automatic source population disabled";
         private StylizedRiverFoamMajorTopology majorTopology;
@@ -202,6 +205,10 @@ namespace ProgrammaticStylized3D.Rivers
         private readonly List<PendingInjection> pendingMaterialBirths = new();
         private readonly FoamCompositionEvent[] foamCompositionEvents =
             new FoamCompositionEvent[FoamCompositionEventCapacity];
+        private readonly AutomaticFoamSourceEvent[] automaticFoamSourceEvents =
+            new AutomaticFoamSourceEvent[AutomaticFoamSourceEventCapacity];
+        private readonly FoamSourceEventGpuData[] automaticFoamSourceEventGpuData =
+            new FoamSourceEventGpuData[AutomaticFoamSourceEventCapacity];
         private readonly uint[] progressiveBirthDebugCounterReadback =
             new uint[ProgressiveBirthDebugCounterCount];
         private readonly List<MeshFilter> obstacleExclusionMeshFilters = new();
@@ -394,6 +401,7 @@ namespace ProgrammaticStylized3D.Rivers
         private double idleSince;
         private int clearKernel = -1;
         private int injectKernel = -1;
+        private int rasterizeFoamSourceEventKernel = -1;
         private int writeIsolatedLifeProbeKernel = -1;
         private int clearProgressiveBirthDebugAllKernel = -1;
         private int clearProgressiveBirthDebugTransientKernel = -1;

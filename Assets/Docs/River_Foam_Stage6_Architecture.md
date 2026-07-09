@@ -628,7 +628,7 @@ Layer B environmental support/contact/wake context
 
 This replaces the earlier temptation to add a separate visual-only environmental film authority. Such a visual-only product is postponed and should not be introduced until source population has been tested and found insufficient.
 
-Patch `4.11C.5.14A` added the first automatic source class: conservative shore/contact birth. Validation proved the plumbing but showed the first control design was too crude. Patch `4.11C.5.14B` correctly moved toward source-class-specific spawning, but exposed too many low-level controls. Patch `4.11C.5.14C` simplified the UI, but its hidden one-shot shore stroke recipe was too sparse and same-shaped. Patch `4.11C.5.14D` replaces that recipe with deterministic full-strength shore source events controlled by Coverage, Activity, Patch Size, and Pattern. Shore Contact Birth remains the only implemented automatic source class; river-body, obstacle-contact, and lee/wake presets are documented placeholders until shore birth validates.
+Patch `4.11C.5.14A` added the first automatic source class: conservative shore/contact birth. Validation proved the plumbing but showed the first control design was too crude. Patch `4.11C.5.14B` correctly moved toward source-class-specific spawning, but exposed too many low-level controls. Patch `4.11C.5.14C` simplified the UI, but its hidden one-shot shore stroke recipe was too sparse and same-shaped. Patch `4.11C.5.14D` attempted deterministic full-strength shore source events, but validation showed it still emitted generic segment/capsule stamps and therefore produced rectangular, same-looking shore bars. Patch `4.11C.5.14E` replaces automatic shore output with a dedicated typed source-event rasterizer that reads live shore edges and writes real Layer C material through analytic shore-local masks. Shore Contact Birth remains the only implemented automatic source class; river-body, obstacle-contact, and lee/wake presets are documented placeholders until shore birth validates.
 
 ## 4.8 Current status
 
@@ -636,7 +636,7 @@ Active/trusted:
 
 ```text
 manual/source birth
-conservative automatic shore/contact source population when explicitly enabled, now controlled by a simplified shore-specific spawn recipe
+automatic shore/contact source population when explicitly enabled, now using a dedicated shore-local source-event rasterizer
 source-to-persistent merge
 downstream phase transport
 lifecycle aging
@@ -2216,3 +2216,67 @@ Pattern: Mixed / Shore Ribbons / Inward Wash
 ```
 
 Two recipes are implemented: `Shore Ribbon`, a bank-parallel opaque ribbon source event, and `Inward Wash`, a shore-attached event that drifts inward/downstream from the bank contact band. Both are scheduled through deterministic slots distributed along both banks, bounded by a maximum number of starts and scans per update.
+
+
+### 2026-07-09 — River Foam 4.11C.5.14E Automatic Source Event Rasterizer
+
+Runtime validation of `4.11C.5.14D` showed that deterministic source-event scheduling alone was not enough. Both `Shore Ribbons` and `Inward Wash` still flowed through the generic progressive composition / `PendingInjection` / `InjectFoam` segment path, so the GPU only received capsule-like stamps. The result was predictable near-shore rectangles/bars, insufficient coverage at max settings, and no strong visual difference between patterns.
+
+`4.11C.5.14E` keeps the Layer C material-birth contract but separates final automatic source generation from the manual/debug injection primitive path. Automatic shore slots now create typed source events and a dedicated `RasterizeFoamSourceEvent` compute kernel evaluates shore-local analytic masks against `_FoamCurrentShoreEdgesRead`. The kernel writes real persistent material through `FoamMergeBornPresence`; support/lifetime capture, Layer D Film Source/Support, and Final Foam integration remain unchanged.
+
+Implemented event types:
+
+```text
+ShoreRibbon
+  live-shore-following ribbon band with deterministic breakup and tapered ends.
+
+InwardWash
+  shore-attached inward/downstream tongue with progressive area reveal and curvature.
+```
+
+The current UI remains Coverage, Activity, Patch Size, and Pattern. The old generic `PendingInjection` path remains available for manual/debug/simple births only.
+
+### 4.11C.5.14F source formation rule
+
+Automatic Layer C source events now separate three concepts that were previously coupled:
+
+1. **Coverage** — which eligible shoreline slots can participate over time.
+2. **Activity** — how often new source events start.
+3. **Formation Speed** — how quickly a single source event forms along its path, in metres per second.
+
+This keeps source density/frequency independent from source kinematics. The user-facing problem was that source events appeared as if a mask popped on in about one second. The fix is distance-based formation: a longer source path takes longer to form at the same formation speed.
+
+Inward Wash also changes from a filled reveal mask to a moving stroke-head. The source rasterizer now writes a short curved head/trailing segment per update, while persistent FoamState preserves the trail. This preserves the Layer C rule: the rasterizer writes real material, not visual-only film, and Layer D only interprets that material afterward.
+
+### 4.11C.5.14G shore wash refinement rule
+
+`4.11C.5.14G` keeps the 5.14E/5.14F automatic source-event rasterizer architecture but tightens the `Inward Wash` source class. The scope is still shore-related Layer C spawning only.
+
+The refined rule is:
+
+- `Shore Ribbon` remains the primary validated shore source.
+- `Inward Wash` is not a large filled tongue and not a broad moving body. It is a small detaching stroke that starts by following the shore and then peels inward.
+- Wash events use separate, shorter head-trail limits from ribbons.
+- Wash fill noise is low so shape is controlled by stroke geometry rather than chunky source-fill cells.
+- `Mixed` is protected from bad wash dominance by greatly reducing Inward Wash weighting.
+
+This patch still writes real persistent FoamState material through the Layer C rasterizer. It does not alter Layer D visual-film evaluation or Final Foam.
+
+
+### 4.11C.5.14H foam birth authoring framework
+
+`4.11C.5.14H` does not alter the Layer C source-event rasterizer contract. It changes authoring: shore source recipes are no longer hardcoded experimental constants. They are controlled by a source-category inspector framework.
+
+Current source categories:
+
+```text
+Shore Foam      implemented source category
+Object Foam     staged placeholder for later static-object/contact spawning
+Free Water Foam staged placeholder for later open-water source spawning
+```
+
+The implemented Shore Foam category keeps Coverage and Activity as category-level density/rate controls. Pattern composition is controlled by normalized pattern shares whose sum is always one. This means changing `Shore Ribbons` versus `Inward Wash` changes which source type is selected in Mixed mode, not the total source rate.
+
+Each implemented shore pattern now owns its own source-authoring controls: Formation Speed multiplier, dimensions, Initial Life, and Breakup Strength. `Initial Life` is the normalized Remaining Life written into newly born persistent material; it is not event duration. Event duration still derives from source path distance divided by formation speed.
+
+Dimension selection now uses a correlated event scale plus small per-axis jitter and aspect guards. This preserves deterministic variety without allowing short/fat or reach/width-incoherent shore wash events.

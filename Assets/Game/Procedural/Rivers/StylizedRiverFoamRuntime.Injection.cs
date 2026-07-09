@@ -97,6 +97,7 @@ namespace ProgrammaticStylized3D.Rivers
 
             previousState = currentState;
             DispatchSimulation(0, fieldWidth);
+            DispatchAutomaticFoamSourceEvents(writeState, deltaTime);
             DispatchQueuedMaterialBirths(writeState);
             (currentState, writeState) = (writeState, currentState);
             RecordMaterialSimulationStep(deltaTime);
@@ -116,6 +117,195 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             pendingMaterialBirths.Clear();
+        }
+
+
+        private void DispatchAutomaticFoamSourceEvents(
+            RenderTexture target,
+            float deltaTime)
+        {
+            if (activeAutomaticFoamSourceEventCount <= 0 || target == null ||
+                computeShader == null || automaticFoamSourceEventBuffer == null ||
+                rasterizeFoamSourceEventKernel < 0 || metricBuffer == null ||
+                boundaryTexture == null || obstacleExclusionTexture == null ||
+                currentShoreEdgesTexture == null || fieldWidth <= 0 ||
+                fieldHeight <= 0)
+            {
+                return;
+            }
+
+            int activeCount = 0;
+            for (int index = 0; index < automaticFoamSourceEvents.Length; index++)
+            {
+                AutomaticFoamSourceEvent sourceEvent =
+                    automaticFoamSourceEvents[index];
+                if (!sourceEvent.Active)
+                {
+                    automaticFoamSourceEventGpuData[index] = default;
+                    continue;
+                }
+
+                sourceEvent.Elapsed = Mathf.Min(
+                    sourceEvent.Duration,
+                    sourceEvent.Elapsed + Mathf.Max(0f, deltaTime));
+                automaticFoamSourceEvents[index] = sourceEvent;
+                automaticFoamSourceEventGpuData[index] =
+                    BuildAutomaticFoamSourceGpuData(sourceEvent);
+                activeCount++;
+            }
+
+            if (activeCount <= 0)
+            {
+                activeAutomaticFoamSourceEventCount = 0;
+                return;
+            }
+
+            automaticFoamSourceEventBuffer.SetData(automaticFoamSourceEventGpuData);
+
+            using (RasterizeAutomaticSourceProfilerMarker.Auto())
+            {
+                for (int index = 0; index < automaticFoamSourceEvents.Length; index++)
+                {
+                    AutomaticFoamSourceEvent sourceEvent =
+                        automaticFoamSourceEvents[index];
+                    if (!sourceEvent.Active)
+                    {
+                        continue;
+                    }
+
+                    DispatchAutomaticFoamSourceEvent(index, sourceEvent, target);
+                    automaticSourceEventsRasterizedLastUpdate++;
+                    injectedLastUpdate++;
+
+                    if (sourceEvent.Elapsed >= sourceEvent.Duration - 0.00001f)
+                    {
+                        automaticFoamSourceEvents[index] = default;
+                        automaticFoamSourceEventGpuData[index] = default;
+                        activeAutomaticFoamSourceEventCount = Mathf.Max(
+                            0,
+                            activeAutomaticFoamSourceEventCount - 1);
+                        foamCompositionCompletedCount++;
+                    }
+                }
+            }
+        }
+
+        private FoamSourceEventGpuData BuildAutomaticFoamSourceGpuData(
+            AutomaticFoamSourceEvent sourceEvent)
+        {
+            float startStorageGlobal =
+                WorldGlobalDistanceToFoamStorageGlobalDistance(
+                    sourceEvent.StartGlobalDistance);
+            float endStorageGlobal =
+                WorldGlobalDistanceToFoamStorageGlobalDistance(
+                    sourceEvent.EndGlobalDistance);
+            float centreStorageGlobal = (startStorageGlobal + endStorageGlobal) * 0.5f;
+            float progress = Mathf.Clamp01(
+                sourceEvent.Elapsed / Mathf.Max(0.0001f, sourceEvent.Duration));
+
+            return new FoamSourceEventGpuData
+            {
+                Header = new Vector4(
+                    (float)sourceEvent.Type,
+                    sourceEvent.SideSign,
+                    progress,
+                    sourceEvent.ShapeSeed),
+                Distance = new Vector4(
+                    startStorageGlobal,
+                    endStorageGlobal,
+                    centreStorageGlobal,
+                    river != null && river.FlowDirection >= 0f ? 1f : -1f),
+                Shore = new Vector4(
+                    sourceEvent.ShoreInsetMetres,
+                    sourceEvent.WidthMetres,
+                    sourceEvent.InwardReachMetres,
+                    sourceEvent.FeatherMetres),
+                Material = new Vector4(
+                    sourceEvent.SourceAmount,
+                    sourceEvent.RemainingLife,
+                    sourceEvent.PatternSeed,
+                    sourceEvent.SourceFillFeatureSize),
+                Variation = new Vector4(
+                    sourceEvent.SourceFillSeed,
+                    sourceEvent.BreakupScaleMetres,
+                    sourceEvent.BreakupStrength,
+                    sourceEvent.Curvature),
+                Kinematics = new Vector4(
+                    sourceEvent.FormationSpeedMetresPerSecond,
+                    sourceEvent.HeadTrailMetres,
+                    Mathf.Sqrt(
+                        Mathf.Abs(endStorageGlobal - startStorageGlobal) *
+                        Mathf.Abs(endStorageGlobal - startStorageGlobal) +
+                        sourceEvent.InwardReachMetres *
+                        sourceEvent.InwardReachMetres),
+                    0f)
+            };
+        }
+
+        private void DispatchAutomaticFoamSourceEvent(
+            int eventIndex,
+            AutomaticFoamSourceEvent sourceEvent,
+            RenderTexture target)
+        {
+            float startStorageGlobal =
+                WorldGlobalDistanceToFoamStorageGlobalDistance(
+                    sourceEvent.StartGlobalDistance);
+            float endStorageGlobal =
+                WorldGlobalDistanceToFoamStorageGlobalDistance(
+                    sourceEvent.EndGlobalDistance);
+            float padding = Mathf.Max(
+                sourceEvent.FeatherMetres * 2f,
+                Mathf.Max(sourceEvent.WidthMetres, sourceEvent.InwardReachMetres) * 1.25f);
+            int startX = Mathf.Clamp(
+                GlobalDistanceToX(Mathf.Min(startStorageGlobal, endStorageGlobal) - padding) - 2,
+                0,
+                fieldWidth - 1);
+            int endX = Mathf.Clamp(
+                GlobalDistanceToX(Mathf.Max(startStorageGlobal, endStorageGlobal) + padding) + 2,
+                0,
+                fieldWidth - 1);
+            int countX = endX - startX + 1;
+            if (countX <= 0)
+            {
+                return;
+            }
+
+            computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetFloat("_FoamValidLength", validFieldLength);
+            computeShader.SetFloat(
+                "_FoamSimulationLength",
+                simulationFieldLength);
+            computeShader.SetFloat("_FoamGlobalStart", river.Domain.GlobalDistanceMinimum);
+            computeShader.SetFloat("_FoamFieldLength", fieldLength);
+            computeShader.SetInt("_FoamRangeStart", startX);
+            computeShader.SetInt("_FoamRangeCount", countX);
+            computeShader.SetInt("_FoamSourceEventIndex", eventIndex);
+            computeShader.SetBuffer(
+                rasterizeFoamSourceEventKernel,
+                "_FoamMetricRows",
+                metricBuffer);
+            computeShader.SetBuffer(
+                rasterizeFoamSourceEventKernel,
+                "_FoamSourceEvents",
+                automaticFoamSourceEventBuffer);
+            computeShader.SetTexture(
+                rasterizeFoamSourceEventKernel,
+                "_FoamBoundary",
+                boundaryTexture);
+            computeShader.SetTexture(
+                rasterizeFoamSourceEventKernel,
+                "_FoamObstacleExclusionRead",
+                obstacleExclusionTexture);
+            computeShader.SetTexture(
+                rasterizeFoamSourceEventKernel,
+                "_FoamCurrentShoreEdgesRead",
+                currentShoreEdgesTexture);
+            computeShader.SetTexture(
+                rasterizeFoamSourceEventKernel,
+                "_FoamStateWrite",
+                target);
+
+            Dispatch(rasterizeFoamSourceEventKernel, countX, fieldHeight);
         }
 
 

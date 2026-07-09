@@ -63,6 +63,9 @@
                 float _GroundPaintedAccentLineMaskInfluence;
                 float4 _GroundPaintedAccentLineDirection;
                 float _GroundPaintedAccentLineSeed;
+                float _GroundPaintedAccentFoldFieldEnabled;
+                float4 _GroundPaintedAccentFoldFieldOriginSize;
+                float4 _GroundPaintedAccentFoldFieldTexelSize;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;

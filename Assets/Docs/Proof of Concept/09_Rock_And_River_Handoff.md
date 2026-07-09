@@ -1747,7 +1747,7 @@ First validate the simplified Shore Contact Test preset. If it still overfills, 
 
 ## Addendum — River Foam 4.11C.5.14D Deterministic Shore Source Events
 
-Use this as the current continuation point after `4.11C.5.14D`.
+Superseded: `4.11C.5.14D` visually failed and was replaced by `4.11C.5.14E`.
 
 ### Why 5.14D exists
 
@@ -1833,3 +1833,124 @@ Final Foam should remain unchanged.
 ### Next likely work
 
 If 5.14D validates, tune only the four high-level shore controls or hidden recipe constants. Do not add river-body, obstacle-contact, or lee/wake source classes until shore source events are acceptable. If 5.14D still looks wrong, diagnose whether the issue is slot eligibility, recipe geometry, progressive reveal envelope, or support/lifetime capture before adding new systems.
+
+
+## Addendum — River Foam 4.11C.5.14E Automatic Source Event Rasterizer
+
+Use this as the current continuation point after `4.11C.5.14E`.
+
+### Why 5.14E exists
+
+`4.11C.5.14D` kept the right architecture but failed the visual target. Even at max Coverage/Activity, it produced predictable near-shore rectangles/bars; `Shore Ribbons` and `Inward Wash` were not visually distinct. The root cause was that both recipes still emitted generic progressive composition segments and therefore reached the GPU as `PendingInjection` / `InjectFoam` segment capsules.
+
+### Implemented contract
+
+`4.11C.5.14E` keeps automatic shore birth as Layer C material, but changes the automatic output path:
+
+```text
+Layer B/domain shore context
+  -> deterministic shore source slots
+  -> typed automatic FoamSourceEvent records
+  -> RasterizeFoamSourceEvent compute kernel
+  -> real persistent FoamState material through FoamMergeBornPresence
+  -> support/lifetime capture
+  -> Layer D material-derived spread
+  -> Final Foam unchanged
+```
+
+Manual/debug injections still use the old `PendingInjection` / `InjectFoam` path. Automatic shore foam no longer relies on generic segment capsules.
+
+### Current source types
+
+```text
+ShoreRibbon
+  Analytic bank-following ribbon using live current-shore edges, tapered ends, and deterministic edge breakup.
+
+InwardWash
+  Analytic shore-attached tongue revealed inward from the live shore edge with downstream curvature and taper.
+```
+
+The current UI remains only Coverage, Activity, Patch Size, and Pattern. Do not add low-level source controls unless validation proves a genuinely necessary authoring parameter.
+
+### Validation instructions
+
+Validate in this order:
+
+```text
+1. Material Presence
+2. Material Remaining Life
+3. Foam Film Source
+4. Foam Film Support
+5. Final Foam
+```
+
+Expected behavior:
+
+```text
+Coverage = 1 / Activity = 1 / Patch Size = 1 / Pattern Shore Ribbons should show obvious thin bank-following ribbons, not rectangular bars.
+Coverage = 1 / Activity = 1 / Patch Size = 1 / Pattern Inward Wash should show shore-attached inward/downstream tongues, visibly distinct from ribbons.
+Pattern Mixed should deterministically show both source classes across both banks.
+Material should be normal-strength; do not expect faint deposits to accumulate into visibility.
+Foam Film Source and Foam Film Support should follow the new material.
+Final Foam should remain unchanged.
+```
+
+### Next likely work
+
+If 5.14E validates, the next source vocabulary needed by the inspiration river is open-water streamlines/sheet borders, followed by rock/contact arcs. Keep using the typed source-event rasterizer for those classes. Do not switch Final Foam to `_FoamShapeMask` until source material and Layer D macro spread are accepted.
+
+## River Foam handoff note — after 4.11C.5.14F
+
+Current automatic shore-source direction:
+
+- The dedicated Layer C automatic source-event rasterizer is still the right foundation.
+- 5.14E fixed the primitive problem by replacing generic capsule-like automatic shore births.
+- 5.14F fixes the next observed problem: source events formed too quickly and Inward Wash accumulated into broad blobs.
+
+Important current implementation details:
+
+- Shore Foam now has `Formation Speed` in metres per second. This controls how fast a single event forms along its path and is independent from `Activity`.
+- Source duration is derived from source path distance / formation speed.
+- Inward Wash is a moving curved stroke-head. It writes only a short head/trail segment per update; persistent FoamState preserves the already drawn path.
+- Final Foam remains disconnected from the Layer D products until source material and macro spread are accepted.
+
+Next validation should compare `Shore Ribbons`, `Inward Wash`, and `Mixed` in `Material Remaining Life`, then inspect `Foam Film Source` and `Foam Film Support`.
+
+## River Foam handoff note — after 4.11C.5.14G
+
+Current shore-spawning status:
+
+- The automatic source-event rasterizer remains the correct Layer C foundation.
+- Formation Speed is good enough to park for now.
+- Shore Ribbons are improved enough to keep as the primary shore source.
+- 5.14G specifically refines Inward Wash, which was still producing chunky slabs/cards after 5.14F.
+
+5.14G changes:
+
+- Inward Wash uses smaller dimensions and lower persistence.
+- Inward Wash uses shorter wash-specific head trails.
+- The wash curve follows shore first, then peels inward.
+- Wash source-fill and feather/stroke inflation are reduced.
+- `Mixed` is mostly Shore Ribbon and only occasionally Inward Wash.
+
+Next validation should stay strictly on shore spawning in `Material Remaining Life`: compare `Shore Ribbons`, `Inward Wash`, and `Mixed`. Do not move to object foam, free-water foam, Layer D tuning, or Final Foam until shore spawning is acceptable.
+
+
+## River Foam handoff note — after 4.11C.5.14H
+
+Current shore-spawning status:
+
+- The Layer C automatic source-event rasterizer remains the foundation.
+- Formation Speed remains accepted enough to park.
+- Shore Ribbons are the primary accepted shore source.
+- Inward Wash remains crude, but now has direct authoring controls rather than another hardcoded tuning pass.
+
+5.14H changes:
+
+- Inspector source population is now organized as `Foam Birth Sources`.
+- `Shore Foam` is implemented; `Object Foam` and `Free Water Foam` are present as disabled framework sections for future source classes.
+- Shore Foam `Mixed` composition uses normalized Shore Ribbon / Inward Wash weights. Changing one recalculates the other so total source rate is not affected.
+- Each shore pattern exposes Formation Speed, dimension ranges, Initial Life, and Breakup Strength.
+- Runtime event sampling uses correlated scale and aspect guards to avoid incoherent length/width/reach combinations.
+
+Next recommended validation: stay in `Material Remaining Life`. Validate the control framework, especially normalized weights, per-pattern Formation Speed, and Initial Life. If shore spawning is authorable enough, the next source class should be Object Foam spawning. Do not move to free-water foam, Layer D tuning, or Final Foam before shore/object birth are acceptable.

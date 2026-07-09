@@ -220,6 +220,9 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamMaterialFlowSpeedMultiplier = 0f;
         private const float MaximumFoamMaterialFlowSpeedMultiplier = 6f;
         private const float DefaultFoamMaterialFlowSpeedMultiplier = 1f;
+        private const float MinimumShoreFoamFormationSpeedMetresPerSecond = 0.15f;
+        private const float MaximumShoreFoamFormationSpeedMetresPerSecond = 2.5f;
+        private const float DefaultShoreFoamFormationSpeedMetresPerSecond = 0.75f;
         private const float MinimumFoamMotionFieldStrength = 0f;
         private const float MaximumFoamMotionFieldStrength = 4f;
         private const float DefaultFoamMotionFieldStrength = 1f;
@@ -828,9 +831,121 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreFoamPatchSize = 0.35f;
 
-        [Tooltip("Chooses the deterministic shore source recipe. Mixed alternates shore-parallel ribbons and inward wash tongues from stable source slots.")]
+        [Tooltip("How fast automatic shore foam forms along its source path, in metres per second. This is independent of spawn frequency and can be manually aligned with the visible river flow.")]
+        [Range(
+            MinimumShoreFoamFormationSpeedMetresPerSecond,
+            MaximumShoreFoamFormationSpeedMetresPerSecond)]
+        [SerializeField]
+        private float foamShoreFoamFormationSpeedMetresPerSecond =
+            DefaultShoreFoamFormationSpeedMetresPerSecond;
+
+        [Tooltip("Chooses the deterministic shore source recipe. Mixed uses the normalized Shore Ribbon / Inward Wash pattern weights below; the pure modes force one pattern for debugging.")]
         [SerializeField] private StylizedRiverFoamShorePattern foamShoreFoamPattern =
             StylizedRiverFoamShorePattern.Mixed;
+
+        [Tooltip("Normalized Shore Foam mix share for bank-parallel ribbon sources when Pattern is Mixed. The editor keeps this and Inward Wash Weight summing to one.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamShoreRibbonPatternWeight = 0.88f;
+
+        [Tooltip("Normalized Shore Foam mix share for inward wash sources when Pattern is Mixed. The editor keeps this and Shore Ribbon Weight summing to one.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamInwardWashPatternWeight = 0.12f;
+
+        [Tooltip("Per-pattern multiplier for how fast Shore Ribbon sources reveal along their path. One uses the global Formation Speed.")]
+        [Range(0.10f, 3.00f)]
+        [SerializeField] private float foamShoreRibbonFormationSpeedMultiplier = 1.00f;
+
+        [Tooltip("Minimum authored Shore Ribbon length in metres before global Patch Size and deterministic variation are applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamShoreRibbonLengthMinMetres = 2.20f;
+
+        [Tooltip("Maximum authored Shore Ribbon length in metres before global Patch Size and deterministic variation are applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamShoreRibbonLengthMaxMetres = 7.00f;
+
+        [Tooltip("Minimum authored Shore Ribbon width in metres before global Patch Size and deterministic variation are applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamShoreRibbonWidthMinMetres = 0.045f;
+
+        [Tooltip("Maximum authored Shore Ribbon width in metres before global Patch Size and deterministic variation are applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamShoreRibbonWidthMaxMetres = 0.125f;
+
+        [Tooltip("Minimum inward offset from the live shore edge for Shore Ribbon sources.")]
+        [Min(0f)]
+        [SerializeField] private float foamShoreRibbonOffsetMinMetres = 0.030f;
+
+        [Tooltip("Maximum inward offset from the live shore edge for Shore Ribbon sources.")]
+        [Min(0f)]
+        [SerializeField] private float foamShoreRibbonOffsetMaxMetres = 0.160f;
+
+        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Shore Ribbon material. One means full authored Foam lifetime.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamShoreRibbonInitialLifeMin = 0.80f;
+
+        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Shore Ribbon material. One means full authored Foam lifetime.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamShoreRibbonInitialLifeMax = 1.00f;
+
+        [Tooltip("Minimum deterministic edge breakup strength for Shore Ribbon sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamShoreRibbonBreakupStrengthMin = 0.12f;
+
+        [Tooltip("Maximum deterministic edge breakup strength for Shore Ribbon sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamShoreRibbonBreakupStrengthMax = 0.38f;
+
+        [Tooltip("Per-pattern multiplier for how fast Inward Wash sources reveal along their path. One uses the global Formation Speed.")]
+        [Range(0.10f, 3.00f)]
+        [SerializeField] private float foamInwardWashFormationSpeedMultiplier = 1.00f;
+
+        [Tooltip("Minimum authored Inward Wash length in metres before global Patch Size and deterministic variation are applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamInwardWashLengthMinMetres = 0.70f;
+
+        [Tooltip("Maximum authored Inward Wash length in metres before global Patch Size and deterministic variation are applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamInwardWashLengthMaxMetres = 1.90f;
+
+        [Tooltip("Minimum authored Inward Wash stroke width in metres before global Patch Size and deterministic variation are applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamInwardWashWidthMinMetres = 0.030f;
+
+        [Tooltip("Maximum authored Inward Wash stroke width in metres before global Patch Size and deterministic variation are applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamInwardWashWidthMaxMetres = 0.085f;
+
+        [Tooltip("Minimum authored inward reach in metres for Inward Wash sources before global Patch Size and deterministic variation are applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamInwardWashReachMinMetres = 0.18f;
+
+        [Tooltip("Maximum authored inward reach in metres for Inward Wash sources before global Patch Size and deterministic variation are applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamInwardWashReachMaxMetres = 0.75f;
+
+        [Tooltip("Minimum starting offset from the live shore edge for Inward Wash sources.")]
+        [Min(0f)]
+        [SerializeField] private float foamInwardWashOffsetMinMetres = 0.006f;
+
+        [Tooltip("Maximum starting offset from the live shore edge for Inward Wash sources.")]
+        [Min(0f)]
+        [SerializeField] private float foamInwardWashOffsetMaxMetres = 0.040f;
+
+        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Inward Wash material. One means full authored Foam lifetime.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamInwardWashInitialLifeMin = 0.60f;
+
+        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Inward Wash material. One means full authored Foam lifetime.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamInwardWashInitialLifeMax = 1.00f;
+
+        [Tooltip("Minimum deterministic breakup strength for Inward Wash sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamInwardWashBreakupStrengthMin = 0.04f;
+
+        [Tooltip("Maximum deterministic breakup strength for Inward Wash sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamInwardWashBreakupStrengthMax = 0.14f;
 
         [SerializeField, HideInInspector] private float foamShoreFoamStrength = 0.35f;
         [SerializeField, HideInInspector] private float foamShoreFoamPersistence = 0.30f;
@@ -1446,10 +1561,97 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamShoreFoamActivity);
         public float FoamShoreFoamPatchSize =>
             Mathf.Clamp01(foamShoreFoamPatchSize);
+        public float FoamShoreFoamFormationSpeedMetresPerSecond =>
+            Mathf.Clamp(
+                foamShoreFoamFormationSpeedMetresPerSecond,
+                MinimumShoreFoamFormationSpeedMetresPerSecond,
+                MaximumShoreFoamFormationSpeedMetresPerSecond);
         public StylizedRiverFoamShorePattern FoamShoreFoamPattern =>
             foamShoreFoamPattern;
         public float FoamShoreFoamSize =>
             FoamShoreFoamPatchSize;
+        public float FoamShoreRibbonPatternWeight =>
+            Mathf.Clamp01(foamShoreRibbonPatternWeight);
+        public float FoamInwardWashPatternWeight =>
+            Mathf.Clamp01(foamInwardWashPatternWeight);
+        public float FoamShoreRibbonFormationSpeedMultiplier =>
+            Mathf.Clamp(foamShoreRibbonFormationSpeedMultiplier, 0.10f, 3.00f);
+        public float FoamShoreRibbonLengthMinMetres =>
+            Mathf.Max(0.05f, Mathf.Min(
+                foamShoreRibbonLengthMinMetres,
+                foamShoreRibbonLengthMaxMetres));
+        public float FoamShoreRibbonLengthMaxMetres =>
+            Mathf.Max(FoamShoreRibbonLengthMinMetres, foamShoreRibbonLengthMaxMetres);
+        public float FoamShoreRibbonWidthMinMetres =>
+            Mathf.Max(0.005f, Mathf.Min(
+                foamShoreRibbonWidthMinMetres,
+                foamShoreRibbonWidthMaxMetres));
+        public float FoamShoreRibbonWidthMaxMetres =>
+            Mathf.Max(FoamShoreRibbonWidthMinMetres, foamShoreRibbonWidthMaxMetres);
+        public float FoamShoreRibbonOffsetMinMetres =>
+            Mathf.Max(0f, Mathf.Min(
+                foamShoreRibbonOffsetMinMetres,
+                foamShoreRibbonOffsetMaxMetres));
+        public float FoamShoreRibbonOffsetMaxMetres =>
+            Mathf.Max(FoamShoreRibbonOffsetMinMetres, foamShoreRibbonOffsetMaxMetres);
+        public float FoamShoreRibbonInitialLifeMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamShoreRibbonInitialLifeMin,
+                foamShoreRibbonInitialLifeMax));
+        public float FoamShoreRibbonInitialLifeMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamShoreRibbonInitialLifeMin,
+                foamShoreRibbonInitialLifeMax));
+        public float FoamShoreRibbonBreakupStrengthMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamShoreRibbonBreakupStrengthMin,
+                foamShoreRibbonBreakupStrengthMax));
+        public float FoamShoreRibbonBreakupStrengthMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamShoreRibbonBreakupStrengthMin,
+                foamShoreRibbonBreakupStrengthMax));
+        public float FoamInwardWashFormationSpeedMultiplier =>
+            Mathf.Clamp(foamInwardWashFormationSpeedMultiplier, 0.10f, 3.00f);
+        public float FoamInwardWashLengthMinMetres =>
+            Mathf.Max(0.05f, Mathf.Min(
+                foamInwardWashLengthMinMetres,
+                foamInwardWashLengthMaxMetres));
+        public float FoamInwardWashLengthMaxMetres =>
+            Mathf.Max(FoamInwardWashLengthMinMetres, foamInwardWashLengthMaxMetres);
+        public float FoamInwardWashWidthMinMetres =>
+            Mathf.Max(0.005f, Mathf.Min(
+                foamInwardWashWidthMinMetres,
+                foamInwardWashWidthMaxMetres));
+        public float FoamInwardWashWidthMaxMetres =>
+            Mathf.Max(FoamInwardWashWidthMinMetres, foamInwardWashWidthMaxMetres);
+        public float FoamInwardWashReachMinMetres =>
+            Mathf.Max(0.005f, Mathf.Min(
+                foamInwardWashReachMinMetres,
+                foamInwardWashReachMaxMetres));
+        public float FoamInwardWashReachMaxMetres =>
+            Mathf.Max(FoamInwardWashReachMinMetres, foamInwardWashReachMaxMetres);
+        public float FoamInwardWashOffsetMinMetres =>
+            Mathf.Max(0f, Mathf.Min(
+                foamInwardWashOffsetMinMetres,
+                foamInwardWashOffsetMaxMetres));
+        public float FoamInwardWashOffsetMaxMetres =>
+            Mathf.Max(FoamInwardWashOffsetMinMetres, foamInwardWashOffsetMaxMetres);
+        public float FoamInwardWashInitialLifeMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamInwardWashInitialLifeMin,
+                foamInwardWashInitialLifeMax));
+        public float FoamInwardWashInitialLifeMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamInwardWashInitialLifeMin,
+                foamInwardWashInitialLifeMax));
+        public float FoamInwardWashBreakupStrengthMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamInwardWashBreakupStrengthMin,
+                foamInwardWashBreakupStrengthMax));
+        public float FoamInwardWashBreakupStrengthMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamInwardWashBreakupStrengthMin,
+                foamInwardWashBreakupStrengthMax));
         public float FoamShoreFoamStrength =>
             Mathf.Clamp01(foamShoreFoamStrength);
         public float FoamShoreFoamPersistence =>
@@ -1610,6 +1812,107 @@ namespace ProgrammaticStylized3D.Rivers
         public int VisualSeed => visualSeed;
         public float FlowDirection => reverseFlow ? -1f : 1f;
         public MeshRenderer SurfaceRenderer => meshRenderer != null ? meshRenderer : GetComponent<MeshRenderer>();
+
+        private void NormalizeShorePatternWeights()
+        {
+            foamShoreRibbonPatternWeight = Mathf.Clamp01(
+                foamShoreRibbonPatternWeight);
+            foamInwardWashPatternWeight = Mathf.Clamp01(
+                foamInwardWashPatternWeight);
+            float total = foamShoreRibbonPatternWeight +
+                foamInwardWashPatternWeight;
+            if (total <= 0.0001f)
+            {
+                foamShoreRibbonPatternWeight = 0.88f;
+                foamInwardWashPatternWeight = 0.12f;
+                return;
+            }
+
+            foamShoreRibbonPatternWeight /= total;
+            foamInwardWashPatternWeight /= total;
+        }
+
+        private void SanitizeShoreFoamPatternControls()
+        {
+            foamShoreRibbonFormationSpeedMultiplier = Mathf.Clamp(
+                foamShoreRibbonFormationSpeedMultiplier,
+                0.10f,
+                3.00f);
+            SanitizePositiveRange(
+                ref foamShoreRibbonLengthMinMetres,
+                ref foamShoreRibbonLengthMaxMetres,
+                0.05f);
+            SanitizePositiveRange(
+                ref foamShoreRibbonWidthMinMetres,
+                ref foamShoreRibbonWidthMaxMetres,
+                0.005f);
+            SanitizePositiveRange(
+                ref foamShoreRibbonOffsetMinMetres,
+                ref foamShoreRibbonOffsetMaxMetres,
+                0f);
+            SanitizeUnitRange(
+                ref foamShoreRibbonInitialLifeMin,
+                ref foamShoreRibbonInitialLifeMax);
+            SanitizeUnitRange(
+                ref foamShoreRibbonBreakupStrengthMin,
+                ref foamShoreRibbonBreakupStrengthMax);
+
+            foamInwardWashFormationSpeedMultiplier = Mathf.Clamp(
+                foamInwardWashFormationSpeedMultiplier,
+                0.10f,
+                3.00f);
+            SanitizePositiveRange(
+                ref foamInwardWashLengthMinMetres,
+                ref foamInwardWashLengthMaxMetres,
+                0.05f);
+            SanitizePositiveRange(
+                ref foamInwardWashWidthMinMetres,
+                ref foamInwardWashWidthMaxMetres,
+                0.005f);
+            SanitizePositiveRange(
+                ref foamInwardWashReachMinMetres,
+                ref foamInwardWashReachMaxMetres,
+                0.005f);
+            SanitizePositiveRange(
+                ref foamInwardWashOffsetMinMetres,
+                ref foamInwardWashOffsetMaxMetres,
+                0f);
+            SanitizeUnitRange(
+                ref foamInwardWashInitialLifeMin,
+                ref foamInwardWashInitialLifeMax);
+            SanitizeUnitRange(
+                ref foamInwardWashBreakupStrengthMin,
+                ref foamInwardWashBreakupStrengthMax);
+        }
+
+        private static void SanitizePositiveRange(
+            ref float minimum,
+            ref float maximum,
+            float floor)
+        {
+            minimum = Mathf.Max(floor, minimum);
+            maximum = Mathf.Max(floor, maximum);
+            if (maximum < minimum)
+            {
+                float previousMinimum = minimum;
+                minimum = maximum;
+                maximum = previousMinimum;
+            }
+        }
+
+        private static void SanitizeUnitRange(
+            ref float minimum,
+            ref float maximum)
+        {
+            minimum = Mathf.Clamp01(minimum);
+            maximum = Mathf.Clamp01(maximum);
+            if (maximum < minimum)
+            {
+                float previousMinimum = minimum;
+                minimum = maximum;
+                maximum = previousMinimum;
+            }
+        }
 
         internal float EvaluateMotionMacroHeight(
             float globalDistance,
@@ -3101,6 +3404,12 @@ namespace ProgrammaticStylized3D.Rivers
                 foamShoreFoamActivity);
             foamShoreFoamPatchSize = Mathf.Clamp01(
                 foamShoreFoamPatchSize);
+            foamShoreFoamFormationSpeedMetresPerSecond = Mathf.Clamp(
+                foamShoreFoamFormationSpeedMetresPerSecond,
+                MinimumShoreFoamFormationSpeedMetresPerSecond,
+                MaximumShoreFoamFormationSpeedMetresPerSecond);
+            NormalizeShorePatternWeights();
+            SanitizeShoreFoamPatternControls();
             foamShoreFoamStrength = Mathf.Clamp01(
                 foamShoreFoamStrength);
             foamShoreFoamPersistence = Mathf.Clamp01(

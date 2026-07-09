@@ -43,7 +43,7 @@
                 {
                     mask = ResolveGroundStandingWaterPotentialMask(input);
                 }
-                else if (mode == 28)
+                else if (mode == 28 || mode == 29 || mode == 30)
                 {
                     float contractMask =
                         1.0 -
@@ -52,7 +52,7 @@
                             min(
                                 min((float)input.color.r, (float)input.color.g),
                                 (float)input.color.b));
-                    mask = ResolveGroundPaintedAccentLinesFeature(
+                    float3 paintedAccent = ResolveGroundPaintedAccentFeature(
                         input,
                         ResolveGroundExposureMask(input) * contractMask,
                         ResolveGroundDampDepositMask(input),
@@ -61,6 +61,30 @@
                         ResolveGroundShoreMask(input),
                         ResolveGroundRockyDryMask(input),
                         contractMask);
+
+                    if (mode == 28)
+                    {
+                        mask = paintedAccent.x;
+                    }
+                    else if (mode == 29)
+                    {
+                        mask = paintedAccent.y;
+                    }
+                    else
+                    {
+                        float signedMagnitude = saturate(abs(paintedAccent.z) * 3.2);
+                        float3 negativeColor = float3(0.16, 0.28, 0.95);
+                        float3 positiveColor = float3(1.0, 0.86, 0.24);
+                        float3 neutralColor = float3(0.025, 0.025, 0.035);
+                        float3 signedColor = lerp(
+                            negativeColor,
+                            positiveColor,
+                            step(0.0, paintedAccent.z));
+                        return (half3)lerp(
+                            neutralColor,
+                            signedColor,
+                            signedMagnitude);
+                    }
                 }
                 else if (mode == 14)
                 {

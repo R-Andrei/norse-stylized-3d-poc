@@ -291,6 +291,7 @@ namespace ProgrammaticStylized3D.Rivers
                     materialLifetimeAuthorityActive ||
                     foamCompositionDeposited || automaticBirthDeposited ||
                     activeFoamCompositionEventCount > 0 ||
+                    activeAutomaticFoamSourceEventCount > 0 ||
                     pendingMaterialBirths.Count > 0 ||
                     IsAutomaticSourcePopulationActive;
 

@@ -95,6 +95,62 @@ namespace ProgrammaticStylized3D.Rivers
             public float SegmentEndSourceAmount { get; }
         }
 
+        private enum AutomaticFoamSourceEventType
+        {
+            None = 0,
+            ShoreRibbon = 1,
+            InwardWash = 2
+        }
+
+        private struct AutomaticFoamSourceEvent
+        {
+            public bool Active;
+            public int EventId;
+            public AutomaticFoamSourceEventType Type;
+            public float SideSign;
+            public float StartGlobalDistance;
+            public float EndGlobalDistance;
+            public float Duration;
+            public float Elapsed;
+            public float FormationSpeedMetresPerSecond;
+            public float HeadTrailMetres;
+            public float ShoreInsetMetres;
+            public float WidthMetres;
+            public float InwardReachMetres;
+            public float FeatherMetres;
+            public float SourceAmount;
+            public float RemainingLife;
+            public float PatternSeed;
+            public float SourceFillSeed;
+            public float SourceFillFeatureSize;
+            public float ShapeSeed;
+            public float BreakupScaleMetres;
+            public float BreakupStrength;
+            public float Curvature;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct FoamSourceEventGpuData
+        {
+            // x = source type, y = side sign, z = reveal progress,
+            // w = shape seed.
+            public Vector4 Header;
+            // x = start storage global, y = end storage global,
+            // z = centre storage global, w = flow direction.
+            public Vector4 Distance;
+            // x = shore inset, y = width, z = inward reach, w = feather.
+            public Vector4 Shore;
+            // x = amount, y = remaining life, z = pattern seed,
+            // w = source fill feature size.
+            public Vector4 Material;
+            // x = source fill seed, y = breakup scale,
+            // z = breakup strength, w = curvature.
+            public Vector4 Variation;
+            // x = formation speed metres/second, y = moving-head trail metres,
+            // z = source path length metres, w reserved.
+            public Vector4 Kinematics;
+        }
+
         private struct FoamCompositionEvent
         {
             public bool Active;

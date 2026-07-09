@@ -220,6 +220,141 @@ They are short, broken, Hades-1-like dark/value-shifted surface strokes. They sh
 
 They are visual only. They do not require terrain deformation.
 
+#### Chosen Implementation Direction - Generated Visual Fold Field
+
+Patch V3G redirected Painted Accent Lines away from the earlier curve-distance stroke source model and toward generated visual fold-field data.
+
+The rejected V3D-V3F.1 source model was:
+
+```text
+procedural curve stroke
+  -> distance-to-curve line mask
+  -> inflated tube-like relief body
+  -> side rails derived from curve side
+```
+
+Validation showed this was the wrong representation. The debug views became useful, but they revealed the failure clearly: the line channel read as scratches, the relief channel read as fat tubes/capsules around those scratches, and the signed channel read as parallel rails. That path is kept only as fallback/comparison code while the generated fold-field replacement comes online. It must not be tuned further as the final solution.
+
+The accepted source model is:
+
+```text
+generated visual fold field F(local x, local z)
+  -> relief/body channel from F
+  -> rough/selected line channel from the edge/gradient structure of F
+  -> signed side channel from the gradient/polarity of F
+```
+
+This reverses the old dependency. The old model tried to make a line create the terrain fold. The new model creates an invisible visual terrain fold first, then derives the line from that fold. That matches the intended look: a thin painted/value-shifted crease on one useful side of a small raised, compressed, or wrinkled ground form.
+
+The feature remains visual-only:
+
+```text
+no terrain mesh displacement
+no collision change
+no runtime footprint/wetness simulation
+no decals
+no generated mesh channels
+```
+
+#### Fold-Field Texture Contract
+
+Patch V3H added the inactive data skeleton. Patch V3I makes it active for chunks that have an enabled `PaintedAccentLines` feature.
+
+The generated texture contract is:
+
+```text
+R = accent line / rough selected contour candidate
+G = relief body / visual fold-height field
+B = signed side encoded 0..1, with 0.5 as neutral
+A = semantic support / reserved future validity channel
+```
+
+The shader decodes the channels as:
+
+```text
+line   = R
+relief = G
+signed = B * 2 - 1
+```
+
+The debug views keep their existing names but now mean:
+
+```text
+Ground Painted Accent Lines
+  shows R: rough/selected contour candidates derived from the fold body
+
+Ground Painted Accent Relief
+  shows G: the underlying visual fold-height/body field
+
+Ground Painted Accent Signed Relief
+  shows B decoded as polarity: the gradient side used for painted shadow/highlight
+```
+
+For V3I, the relief/body channel is the main validation target. The line channel is intentionally a rough first derivation; final line extraction is a later patch.
+
+#### Chunk-Library and Runtime Policy
+
+The intended game workflow is a library of reusable authored chunks:
+
+```text
+editor:
+  generate/author chunks
+  validate the fold-field result
+  save the chunk as reusable runtime content
+
+runtime map builder:
+  choose authored chunks from the library
+  rotate/place/connect them in new arrangements
+  generate run-specific minutiae such as unit placement and doodads
+```
+
+The outside world may be rebuilt while the player is in camp, but the fold-field feature is not a per-frame simulation. It is generated at edit time or load/camp rebuild time before gameplay resumes.
+
+Because chunks can be rotated and reused, fold-field sampling must be chunk-local rather than world-locked. The shader samples with object-space X/Z (`positionOS.xz`) so the painted fold field rotates with the chunk when the runtime map builder rotates that chunk.
+
+#### Resolution and Performance Policy
+
+There is no low/background/hero/special resolution tier for this feature.
+
+The policy is:
+
+```text
+visible authored gameplay chunk with PaintedAccentLines active:
+  generate one 256x256 RGBA32 fold-field texture
+
+hidden/offscreen/background chunk:
+  disable PaintedAccentLines entirely
+  do not generate a lower-resolution fold-field texture
+```
+
+Memory budget:
+
+```text
+256x256 RGBA32 = 262,144 bytes = 256 KiB per active chunk
+
+1 chunk    = 256 KiB
+10 chunks  = 2.5 MiB
+50 chunks  = 12.5 MiB
+100 chunks = 25 MiB
+200 chunks = 50 MiB
+```
+
+This is acceptable for the projected game scale. A visual style demo validates one chunk. A vertical slice may use roughly ten chunks. A beta-like version may use around fifty. A full game might use around one hundred active selected chunks, with two hundred treated as a remote upper bound. If chunks are meant to be fully hidden by walls, relief, fog, or camera framing, they should disable the feature rather than use a reduced texture.
+
+Patch V3I generation is bounded:
+
+```text
+fixed 256x256 texture
+RGBA32
+no mipmaps
+CPU texture copy discarded after upload
+candidate rasterization instead of broad per-pixel cell searching
+hard candidate cap
+```
+
+The production cleanup target is to sample the fold field once per visible ground fragment and reuse that result through albedo/smoothness/surface response. Prototype patches may temporarily sample more than once while the data model is being validated.
+
+
 They should be:
 
 - short;
@@ -857,7 +992,7 @@ Patch V2B does not add painted accent lines, contact accents, sparse motifs, sha
 
 ### Patch V3 Implementation
 
-Patch V3 implements `Shader Feature Stack + Painted Accent Lines`. Patch V3A fixes shader include isolation after the first V3 compile issue. Patch V3B moves ground debug selection onto the `GeneratedGround` component so validation no longer requires opening shared material assets. Patch V3C cleans up that object-level debug UX by removing slash characters from debug labels and removing the obsolete Unity 6.5 editor-refresh overload. Patch V3D refines the raw Painted Accent Lines mask after validation showed the first line generator produced large isolated strips rather than small broken ground creases. Patch V3E then replaces the remaining straight/bar-like primitive with curved visual-relief terrain-fold strokes.
+Patch V3 implements `Shader Feature Stack + Painted Accent Lines`. Patch V3A fixes shader include isolation after the first V3 compile issue. Patch V3B moves ground debug selection onto the `GeneratedGround` component so validation no longer requires opening shared material assets. Patch V3C cleans up that object-level debug UX by removing slash characters from debug labels and removing the obsolete Unity 6.5 editor-refresh overload. Patch V3D refines the raw Painted Accent Lines mask after validation showed the first line generator produced large isolated strips rather than small broken ground creases. Patch V3E then replaces the remaining straight/bar-like primitive with curved visual-relief terrain-fold strokes. Patch V3F exposes the three painted-accent channels separately and strengthens the final side-dependent value relief. Patch V3F.1 makes the relief body more continuous and the signed-side channel readable, but validation shows the model still reads as curve tubes and side rails. Patch V3G retires the curve-distance stroke model as the chosen direction and redirects the feature toward generated visual fold-field data.
 
 Technical contract:
 
@@ -875,7 +1010,33 @@ Shader
 
 The old generic `_GroundFeatureMode` slot is now a deprecated compatibility property. It must not receive new modes.
 
-`PaintedAccentLines` is the first Hades-1-like doctrine layer. It uses world-space procedural curved strokes, loose cluster gating, semantic-mask gating, value/tint response, and subtle signed painted relief to create sparse visual crease/mound strokes. Patch V3D locks an important rule: accent-line recipe scale controls spacing/grouping, not raw stroke length. Patch V3E changes the primitive from straight line stamps into irregular curved terrain-fold strokes with a soft visual relief body. Stroke length and thickness are capped in world units so variants cannot create huge strips. The layer does not use textures, decals, generated atlases, runtime state, mesh channels, collision, or terrain height edits.
+`PaintedAccentLines` is the first Hades-1-like doctrine layer, but its V3D-V3F.1 curve-distance implementation is retired as the final visual model. That implementation remains in code temporarily as a fallback/comparison path only. It must not be tuned, extended, or used as the basis for family polish.
+
+Retired V3D-V3F.1 model:
+
+```text
+world-space procedural curve strokes
+  -> distance-to-curve line mask
+  -> inflated distance-to-curve relief body
+  -> side bands derived from curve side
+```
+
+Reason for retirement:
+
+```text
+It produces scratches, fat tubes, and rail-like signed-side bands. The target requires an underlying visual fold/height field whose selected edges produce accent lines.
+```
+
+Accepted V3G direction:
+
+```text
+generated visual fold field F(x,z)
+  -> relief/body channel from F
+  -> line contour from selected edge/ridge/gradient rules
+  -> signed side from fold-field gradient/polarity
+```
+
+The useful parts of V3 are retained: `PaintedAccentLines` feature kind, feature-stack authoring, material-property plumbing, object-level `GeneratedGround` debug selection, and the three-channel debug contract. The implementation source changes from direct shader curve strokes to generated fold-field data. The layer remains visual-only: no mesh displacement, no collision change, no terrain height edit, no runtime footprints/wetness state, and no decal system. Generated/cached texture data is allowed for the fold field if it is produced at ground regeneration/dirty time and sampled cheaply at runtime.
 
 Canonical validation set after V3:
 
@@ -887,18 +1048,54 @@ Grassland
 
 Each shared feature must be judged across all three before it is accepted as part of the baseline ground language.
 
-Patch V3E validation rule for Painted Accent Lines:
+Patch V3G fold-field validation rule for Painted Accent Lines:
 
 ```text
-Raw debug mask first, final color second.
+Generated field debug first, extracted line second, final color last.
 ```
 
-`Ground Painted Accent Lines` debug should show short, broken, organically curved marks in loose clusters. It should not show straight bars, giant crescent strips, continuous worms, full-screen hatching, dense hair-like noise, or crack networks. Normal rendering should read as subtle visual mound/crease relief through painted shadow/highlight, not through physical terrain height. Final family tuning must wait until the raw debug mask and the relief read are both directionally correct.
+`Ground Painted Accent Lines` debug should show the selected contour/ridge/edge strokes extracted from the fold field. `Ground Painted Accent Relief` should show the underlying visual fold-height/body field, not a widened line tube. `Ground Painted Accent Signed Relief` should show gradient/polarity information that can drive shadow/highlight side selection, not decorative parallel rails. The line contour should not show straight bars, giant crescent strips, continuous worms, full-screen hatching, dense hair-like noise, crack networks, or full closed outlines around every bump. Normal rendering should read as subtle visual mound/crease relief through painted shadow/highlight or, if later accepted, a tiny shader-only normal cue. Final family tuning must wait until the fold field, extracted line, and signed side read are all directionally correct.
 
+
+### 2026-07-09 — Patch V3G: Painted Accent Direction Reset / Fold-Field Plan
+
+Patch V3G retires the V3D-V3F.1 curve-distance stroke model as the final Painted Accent Lines direction. The previous path proved the feature stack, object-level debug workflow, shader property plumbing, and the three-channel diagnostic contract, but validation showed that the source representation is wrong: it starts from a curve, inflates the curve into a tube-like body, and derives rail-like side bands.
+
+The chosen direction is now a generated visual fold field. The ground generator will eventually create persistent/cached visual fold data at regeneration or dirty time. The shader will sample that generated data and use it to render accent lines and visual relief. The expected channel meaning is:
+
+```text
+line contour
+  selected contour/ridge/edge strokes extracted from the fold field
+
+relief body
+  underlying visual fold-height/body influence
+
+signed relief side
+  gradient/polarity field for painted shadow/highlight side selection
+```
+
+The old shader curve-stroke code remains temporarily as a runtime fallback/comparison path until the fold-field replacement is implemented. It is explicitly retired and must not be tuned as the final solution.
 
 ### 2026-07-09 — Patch V3E: Painted Accent Lines Curved Relief Model
 
 V3E redefines the active Painted Accent Lines primitive as visual terrain-fold strokes, not 2D line stamps. The shader now builds each stroke from several local control points to produce irregular curved marks, then derives both the line mask and a soft signed relief body from that same curve. The relief is used only for subtle painted value shaping: it is not mesh displacement, collision, terrain height, decals, textures, runtime state, or generated atlas data.
+
+### 2026-07-09 — Patch V3F: Painted Accent Relief Debug + Visual Relief Strengthening
+
+V3F separates the Painted Accent Lines visual model into three debuggable channels:
+
+```text
+line contour
+  thin dark/painted crease
+
+relief body
+  broader soft fold area around the contour
+
+signed relief side
+  side-dependent field used for painted shadow/highlight
+```
+
+The object-level ground debug dropdown now exposes `Ground Painted Accent Relief` and `Ground Painted Accent Signed Relief` in addition to `Ground Painted Accent Lines`. Normal rendering uses the narrow contour for crease/tint response and the signed side field for stronger value-side shadow/highlight. This remains visual-only: no mesh deformation, collision change, decals, textures, generated atlases, runtime state, new mesh channels, or new components are introduced.
 
 ## Acceptance Criteria
 

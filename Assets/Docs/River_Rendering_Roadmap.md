@@ -520,3 +520,43 @@ Inward Wash    shore-attached inward/downstream source event
 ```
 
 Both recipes create real persistent `FoamState` material through the existing progressive composition / injection path. Support topology still only affects survival/capture after material exists. Layer D and Final Foam integration are unchanged.
+
+
+## Stage 6 Foam update — 4.11C.5.14E
+
+`4.11C.5.14D` failed visually because automatic shore events still emitted generic progressive segment injections. `4.11C.5.14E` replaces that output path with a dedicated typed automatic source-event rasterizer. The new kernel reads live current shore edges, evaluates shore-local analytic masks, and writes real Layer C material with `FoamMergeBornPresence`.
+
+The user-facing source controls stay unchanged: Coverage, Activity, Patch Size, and Pattern. The internal shape vocabulary now has real `ShoreRibbon` and `InwardWash` event types instead of two recipes that merely changed numeric parameters on the same capsule stamp. Layer D formulas and Final Foam integration are unchanged.
+
+## River Foam 4.11C.5.14F update
+
+The automatic source-event rasterizer remains the selected foundation. 5.14F adds formation kinematics and stroke-style Inward Wash behavior:
+
+- Added Shore Foam Formation Speed as a high-level authoring control.
+- Replaced fixed source durations with distance / speed timing.
+- Reworked Inward Wash from a filled tongue into a moving curved stroke-head to prevent blob accumulation.
+- Left Final Foam and Layer D composition untouched until Layer C source material is visually accepted.
+
+Next after validation: if shore ribbons and inward strokes are accepted, expand the same source-event vocabulary to open-water streamlines and sheet borders, because the inspiration river contains interior white threads in addition to bank-attached foam.
+
+## River Foam 4.11C.5.14G update
+
+The next shore-spawning refinement after 5.14F is `4.11C.5.14G — Shore Wash Stroke Refinement`.
+
+Resulting direction:
+
+- Keep Formation Speed; it solved the event-pop speed issue well enough for now.
+- Keep Shore Ribbons mostly stable.
+- Reduce `Inward Wash` from a broad source body into a smaller shore-detachment stroke.
+- Protect `Mixed` by making Inward Wash occasional until pure Inward Wash is acceptable.
+
+This remains a spawning-only patch. Static-object spawning, free-water spawning, foam evolution, Layer D tuning, and Final Foam integration are later steps.
+
+
+## River Foam 4.11C.5.14H update
+
+After 5.14G, the next step stayed on shore spawning and converted the hardcoded shore-source recipe into an authoring framework. `Foam Birth Sources` now exposes live `Shore Foam` controls and staged `Object Foam` / `Free Water Foam` placeholders.
+
+For Shore Foam, `Mixed` now uses normalized pattern shares instead of a hardcoded ribbon/wash split. Shore Ribbon and Inward Wash each expose per-pattern Formation Speed, dimensions, Initial Life, and Breakup Strength. Runtime sampling is correlated and aspect-guarded so Length / Width / Reach do not randomize into incoherent combinations.
+
+This is still spawning-only work. Object-contact spawning, free-water spawning, foam evolution, Layer D tuning, and Final Foam integration remain later steps.

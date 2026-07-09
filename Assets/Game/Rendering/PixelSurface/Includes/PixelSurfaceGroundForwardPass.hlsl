@@ -254,7 +254,7 @@
                     groundDampDeposit,
                     groundRockyDry,
                     contractMask);
-                float3 paintedAccentLineRelief = ResolveGroundPaintedAccentLineReliefFeature(
+                float3 paintedAccentLineRelief = ResolveGroundPaintedAccentFeature(
                     input,
                     exposureMask,
                     groundDampDeposit,
@@ -391,29 +391,66 @@
                     paintedAccentTint,
                     (half3)_FrostColor.rgb,
                     (half)saturate(snowPatch * 0.62));
+                float paintedAccentContrast =
+                    saturate(_GroundPaintedAccentLineContrast);
+                float paintedAccentStrength =
+                    saturate(_GroundPaintedAccentLineStrength);
+                float paintedAccentResponse =
+                    saturate(0.55 + paintedAccentStrength * 0.65);
                 half3 paintedAccentTarget =
                     albedo *
                     (half)max(
                         0.0,
                         1.0 - paintedAccentLinesFeature *
-                        (0.10 + saturate(_GroundPaintedAccentLineContrast) * 0.10));
+                        paintedAccentResponse *
+                        (0.20 + paintedAccentContrast * 0.22));
                 paintedAccentTarget = PS3D_ApplyValuePreservingTint(
                     paintedAccentTarget,
                     paintedAccentTint,
-                    saturate(0.18 + paintedAccentLinesFeature * 0.28));
+                    saturate(0.16 + paintedAccentLinesFeature * 0.34));
                 albedo = lerp(
                     albedo,
                     paintedAccentTarget,
-                    (half)(paintedAccentLinesFeature * 0.64));
+                    (half)saturate(
+                        paintedAccentLinesFeature *
+                        (0.72 + paintedAccentResponse * 0.22)));
 
-                float paintedReliefScale =
+                // Painted relief is deliberately value-side shading, not normal
+                // perturbation or mesh displacement. The signed channel now
+                // represents continuous side lobes beside the crease, while the
+                // broader body supplies a small shared fold lift.
+                float paintedReliefShadow =
+                    saturate(-paintedAccentSignedRelief) *
+                    paintedAccentResponse *
+                    (0.30 + paintedAccentContrast * 0.20);
+                float paintedReliefHighlight =
+                    saturate(paintedAccentSignedRelief) *
+                    paintedAccentResponse *
+                    (0.20 + paintedAccentContrast * 0.17);
+                float paintedReliefBodyLift =
                     paintedAccentReliefFeature *
-                    (0.035 + saturate(_GroundPaintedAccentLineContrast) * 0.050);
-                float paintedReliefValue = clamp(
-                    paintedAccentSignedRelief * paintedReliefScale,
-                    -0.070,
-                    0.052);
-                albedo *= (half)max(0.0, 1.0 + paintedReliefValue);
+                    paintedAccentResponse *
+                    (0.025 + paintedAccentContrast * 0.035);
+                albedo *= (half)max(0.0, 1.0 - paintedReliefShadow);
+                half3 paintedReliefHighlightTint = lerp(
+                    _BaseColor.rgb,
+                    _FrostColor.rgb,
+                    (half)saturate(snowPatch * 0.45));
+                half3 paintedReliefHighlightTarget =
+                    albedo *
+                    (half)max(
+                        0.0,
+                        1.0 + paintedReliefHighlight + paintedReliefBodyLift);
+                paintedReliefHighlightTarget = PS3D_ApplyValuePreservingTint(
+                    paintedReliefHighlightTarget,
+                    paintedReliefHighlightTint,
+                    saturate(paintedReliefHighlight * 1.75));
+                albedo = lerp(
+                    albedo,
+                    paintedReliefHighlightTarget,
+                    (half)saturate(
+                        paintedReliefHighlight * 2.35 +
+                        paintedReliefBodyLift * 0.90));
 
                 float wetness = saturate(_Wetness);
                 float wetGlobalDarken =

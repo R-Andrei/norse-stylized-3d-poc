@@ -1,3 +1,24 @@
+
+struct FoamSourceEventData
+{
+    // x = source type, y = side sign, z = reveal progress, w = shape seed.
+    float4 header;
+    // x = start storage global, y = end storage global,
+    // z = centre storage global, w = flow direction.
+    float4 distance;
+    // x = shore inset, y = width, z = inward reach, w = feather.
+    float4 shore;
+    // x = source amount, y = remaining life, z = material pattern seed,
+    // w = source fill feature size.
+    float4 material;
+    // x = source fill seed, y = breakup scale,
+    // z = breakup strength, w = curvature.
+    float4 variation;
+    // x = formation speed metres/second, y = moving-head trail metres,
+    // z = source path length metres, w reserved.
+    float4 kinematics;
+};
+
 struct FoamMetricRow
 {
     // x = left surface half-width, y = right surface half-width,

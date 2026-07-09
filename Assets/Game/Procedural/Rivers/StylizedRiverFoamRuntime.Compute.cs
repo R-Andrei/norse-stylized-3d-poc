@@ -8,6 +8,8 @@ namespace ProgrammaticStylized3D.Rivers
         {
             clearKernel = computeShader.FindKernel("ClearRange");
             injectKernel = computeShader.FindKernel("InjectFoam");
+            rasterizeFoamSourceEventKernel =
+                computeShader.FindKernel("RasterizeFoamSourceEvent");
             writeIsolatedLifeProbeKernel =
                 computeShader.FindKernel("WriteIsolatedLifeProbe");
             clearProgressiveBirthDebugAllKernel =

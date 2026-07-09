@@ -1,12 +1,10 @@
 # Generated Mass Feature Implementation Checklist
 
 Status: active implementation checklist  
-Current target: EW-4D0 — Variable-Profile Topology Bevel Graph  
-Current step: EW-4D0.7 — Final Topology Validation and Active-Path Switch
+Current implementation target: **EW-B — Deterministic Selected-Edge Bevel Kernel**  
+Current implementation step: **EW-B1S — Legacy Bevel Construction Purge**
 
-## EW-4D0.7 final topology validation and active-path switch note
-
-EW-4D0.6T7 proved the rebuild workspace can reach zero open edges, zero non-manifold edges, and zero T-junctions after pre-closure T-junction repair, branch-aware open-boundary cycle decomposition, and topology-scale closure-cap validation. EW-4D0.7 is the first active commit step: successful EW-4D construction now explicitly commits the rebuilt workspace to the generated polygon face list and bypasses the obsolete EW-4C half-space fallback. This is a correctness/visibility patch, not density tuning; committed ConvexEdgeWear faces also report estimated triangulated triangles and rendered vertices so EW-4D0.8 can reduce sample density by quality tier.
+---
 
 ## 1. Hard rules
 
@@ -15,6 +13,7 @@ EW-4D0.6T7 proved the rebuild workspace can reach zero open edges, zero non-mani
 - Do not use overlay meshes as the final production solution.
 - Do not weaken topology validation to make geometry visible.
 - Do not drop individual selected candidates to hide construction errors.
+- Do not tune material response before physical bevel geometry is valid.
 - Dirty-time generation may be heavier; runtime memory and runtime per-frame cost should stay reasonable.
 - Keep docs updated in the same patch as each implementation step.
 ```
@@ -26,505 +25,204 @@ EW-4D0.6T7 proved the rebuild workspace can reach zero open edges, zero non-mani
 Final plane-cut GeneratedMass convex edge wear should be:
 
 ```text
-generated main-mesh variable-profile bevel ribbons
-+ actual open-cycle polygon caps without centre-fan radial edges
+main-mesh deterministic selected-edge bevel geometry
++ explicit source-face replacement faces
++ explicit selected-edge bevel/chamfer faces
++ explicit affected-vertex caps/transitions
 + UV2.z / vertex color ConvexEdgeWear material markers
-+ shader response on marked generated geometry
++ shader response on marked generated geometry after geometry is stable
 ```
 
 FeatureAtlas0/1 are temporary debug/broad-mask tools only. They are not the normal-render convex edge-wear representation.
 
 ---
 
-## 3. Staged EW-4D0 checklist
+## 3. Superseded active checklist branch
 
-### EW-4D0.1 — Topology graph foundation — done
+EW-4D/R3 is no longer the active checklist branch.
+
+Superseded active representation:
+
+```text
+generated main-mesh variable-profile bevel ribbons
++ actual open-cycle closure caps triangulated before final topology audit
++ UV2.z / vertex color ConvexEdgeWear material markers
+```
+
+Reason for superseding:
+
+```text
+- R3 builds candidate/graph/ribbon intermediate data but fails inside closure-cap triangulation.
+- Latest validation had accepted=0, producedBevelFaces=0, committedConvexEdgeWearFaces=0.
+- The failure happens after ribbonFacesBuilt=750 and workspaceTJunctionsAfterPreClosureTJunctionRepair=0.
+- The post-ribbon closure model is therefore too fragile to remain the active foundation.
+```
+
+Do not retain EW-4D construction code as inactive source-level fallback. Historical notes may remain in docs, but the active source must not carry retired bevel-construction systems forward.
+
+---
+
+## 4. EW-B staged checklist
+
+### EW-B0 — Edge Wear Bevel Kernel Reconciliation — complete
 
 Implementation requirements:
 
 ```text
-- Build graph from PolygonFace list.
-- Preserve graph vertices, edges, faces, and adjacency.
-- Map selected candidates to exact graph edges.
-- Report graph stats.
-- Emit no new bevel geometry.
+- Route active edge-wear construction through TryBuildDeterministicSelectedEdgeBevelKernelFaces(...).
+- Build/reuse the source topology graph.
+- Map selected candidates to graph edges.
+- Report graph/candidate stats.
+- Set deterministicKernelPending=1.
+- Fail closed before geometry emission.
+- Kept old EW-4D/R3 construction path inactive at B0; EW-B1S removes the retired construction path.
+- Rewrite docs so EW-B is the only active plan.
 ```
 
 Validation success:
 
 ```text
-selectedGraphEdges == selected
-missingSelectedGraphEdges == 0
-mismatchedSelectedGraphFaces == 0
-duplicateSelectedGraphEdges == 0
-invalidGraphFaces == 0
-invalidGraphEdges == 0
+Unity compiles.
+Generated_Mass_Framework.md names EW-B0 / EW-B as current.
+Generated_Mass_Edge_Wear_Recovery_Architecture.md names EW-B0 / EW-B as current.
+Generated_Mass_Feature_Implementation_Checklist.md names EW-B0 / EW-B as current.
+ApplyGeneratedEdgeWearBevels calls TryBuildDeterministicSelectedEdgeBevelKernelFaces, not TryBuildTopologyGraphEdgeWearBevelFaces.
+Regeneration with edge wear enabled leaves geometry unchanged and reports deterministicKernelPending=1.
 ```
 
-### EW-4D0.2 — Per-face selected-edge clipping / shared rail preflight — done
+### EW-B1S — Legacy bevel-construction purge — current
 
 Implementation requirements:
 
 ```text
-- For each selected edge, build the two adjacent face inset cuts.
-- For each affected face, clip once against all selected-edge cuts on that face.
-- Extract one rail from the clipped face boundary for each selected candidate/face pair.
-- Emit no new bevel geometry.
+- Remove retired local-bevel, half-space, sampled-ribbon/workspace, open-cycle-closure, corner-patch, and workspace-T-junction-repair construction code from MassGenerator.cs.
+- Remove legacy ribbon/open-cycle/workspace counters from the active warning summary.
+- Keep candidate selection, topology graph construction, selected graph-edge mapping, final topology audit, triangle preview, and ConvexEdgeWear material-marker plumbing.
+- Add/keep EW-B-specific selected-edge and affected-vertex records.
+- Fail closed with deterministicKernelGeometryPending=1 before geometry emission.
 ```
 
 Validation success:
 
 ```text
-faceClipFailedFaces == 0
-selectedFaceEdges == selectedGraphEdges * 2
-expectedRails == selectedGraphEdges * 2
-extractedRails == expectedRails
-missingRails == 0
-shortRails == 0
-fragmentedRails == 0
+Unity compiles.
+Search MassGenerator.cs: TryBuildLocalEdgeWearBevelFaces, TryBuildTopologyGraphEdgeWearBevelFaces, TryAppendEdgeWearOpenCycleClosureFaces, EdgeWearTopologyRebuildWorkspace, EdgeWearProfileGrid, EndpointCapAccumulator are absent.
+Regeneration with edge wear enabled emits a short EW-B log with deterministicKernelGeometryPending=1.
+No ribbon/open-cycle/workspace counters appear in the active summary.
+No bevel geometry is expected yet.
 ```
 
-### EW-4D0.3 — Rail/profile storage and sampled profile-grid preflight — done
+### EW-B1R — Clean isolated-edge bevel case
 
 Implementation requirements:
 
 ```text
-- Pair the two extracted rails for every selected graph edge.
-- Compute along-edge sample count.
-- Use three cross-profile segments for the first curved-profile preflight.
-- Generate finite profile-grid points P[t,k].
-- Use the original sharp edge as the rounded-profile control line.
-- Emit no new bevel geometry.
+- Use DeterministicBevelEdgeRecord and DeterministicBevelVertexRecord only.
+- Support selected edges whose endpoints are both isolated selected-edge endpoints.
+- Emit deterministic Base replacement faces, one ConvexEdgeWear bevel face, and explicit endpoint caps.
+- Defer two-edge and multi-edge vertex stars to EW-B2.
+- Commit only after topology and triangle-preview validation.
+```
+
+Strict exclusions:
+
+```text
+- no retired helper calls
+- no sampled variable-profile grids
+- no ribbon-density controls
+- no open-cycle closure
+- no edge-width variation
+- no shader/material tuning
+```
+
+### EW-B2 — Affected-vertex cap correctness
+
+Implementation requirements:
+
+```text
+- Support one selected incident edge at a vertex.
+- Support two selected incident edges at a vertex.
+- Support three or more selected incident edges at a vertex.
+- Support mixed selected/unselected incident edge stars.
+- Sort cap/transition geometry from source adjacency, not arbitrary open-hole tracing.
 ```
 
 Validation success:
 
 ```text
-profileEdgesPrepared == selectedGraphEdges
-profileEdgesFailed == 0
-profileInvalidPoints == 0
-profileZeroWidth == 0
-profileGridPoints > 0
-affectedBaseFaces == faceClipAffectedFaces
-replacedBaseFaces == faceClipSucceededFaces
-baseFaceValidationFailures == 0
-railSampleInsertionFailures == 0
-ribbonEdgesPrepared == selectedGraphEdges
-ribbonEdgesFailed == 0
-ribbonFacesBuilt == ribbonFacesExpected
-ribbonDegenerateFaces == 0
-ribbonInvalidFaces == 0
-openCycleClosureEdgesInput == workspaceOpenEdgesAfterRibbons
-openCycleClosureComponentsInput == workspaceOpenEdgeComponentsAfterRibbons
-openCycleClosureComponentsBuilt == openCycleClosureComponentsInput
-openCycleClosureFacesExpected == openCycleClosureComponentsInput
-openCycleClosureFacesBuilt == openCycleClosureFacesExpected
-workspaceOpenEdgesAfterComponentClosure == 0
-workspaceNonManifoldEdgesAfterComponentClosure == 0
-workspaceTJunctionRepairFailedFaces == 0
-workspaceOpenEdgesAfterTJunctionRepair == 0
-workspaceNonManifoldEdgesAfterTJunctionRepair == 0
-workspaceTJunctionsAfterTJunctionRepair == 0
-baseFaceValidationFailures == 0
-workspaceBaseFaces == graphFaces
-profileSegments == 3
+no missing caps at selected-edge endpoints
+no open edges around affected vertices
+no non-manifold vertex caps
+no T-junctions introduced by cap transitions
 ```
 
-### EW-4D0.4 — Clipped base-face replacement workspace — completed
+### EW-B3 — Real generated-rock validation
 
 Implementation requirements:
 
 ```text
-- Build a temporary rebuild workspace.
-- Preserve unaffected base faces.
-- Replace affected base faces with the clipped polygons proven in EW-4D0.2.
-- Keep replaced face feature as Base.
-- Validate replaced base faces before any bevel ribbons are accepted.
-- Do not commit the workspace as final geometry yet.
-- Allow temporary open edges because ribbons/corner patches are not appended yet.
+- Validate the constant-width kernel on normal generated mass seeds.
+- Keep coverage/amount/width controls wired.
+- Measure face/triangle/rendered-vertex cost.
+- Identify unsupported topology cases before adding variation.
 ```
 
 Validation success:
 
 ```text
-affectedBaseFaces == faceClipAffectedFaces
-replacedBaseFaces == faceClipSucceededFaces
-baseFaceValidationFailures == 0
-workspaceBaseFaces == graphFaces
+multiple generated rock seeds commit bevel geometry
+no seed fails because of post-ribbon closure/cap tracing
+diagnostics identify any unsupported source-vertex cases explicitly
 ```
 
-### EW-4D0.5 — Rail-sampled base boundaries + sampled variable-profile bevel ribbon emission — completed
+### EW-B4 — Multi-segment profile and irregularity
 
 Implementation requirements:
 
 ```text
-- Insert protected rail samples into clipped base-face boundaries before ribbon emission.
-- Convert profile grids into ConvexEdgeWear ribbon faces.
-- Generate one ribbon band face for each along-edge interval and profile segment.
-- Mark ribbon faces as ConvexEdgeWear.
-- Store material strength from candidate/edge style.
+- Add controlled bevel profiles after the single-segment kernel is stable.
+- Add width/strength variation only after topology stays stable.
+- Preserve budget limits by quality tier.
 ```
 
 Validation success:
 
 ```text
-railSampleInsertionFailures == 0
-railSampledBaseFaces == affectedBaseFaces
-railSamplesInserted > 0
-ribbonEdgesPrepared == selectedGraphEdges
-ribbonEdgesFailed == 0
-ribbonFacesBuilt == ribbonFacesExpected
-ribbonDegenerateFaces == 0
-ribbonInvalidFaces == 0
-workspaceConvexEdgeWearFaces > 0
-Convex Edge Wear debug is no longer black after final commit step
+profile changes alter bevel shape without changing topology validity
+variation does not introduce slivers or unclosed caps
+rendered vertex cost remains within accepted tier budgets or is explicitly reported
 ```
 
-### EW-4D0.6 — Corner vertex patches — completed but unsafe
-
-Implementation result:
-
-```text
-- Endpoint profile arcs were gathered at touched graph vertices.
-- Shared corner fan/radial patch faces were generated and marked ConvexEdgeWear.
-- The stage proved corner faces can be built, but not that the workspace is safe.
-```
-
-Failure branch that blocks EW-4D0.7:
-
-```text
-- A failed patch could append partial faces before returning false.
-- Corner point dedupe used PointMergeDistance rather than the validation edge-length scale.
-- Corner normal fallback could silently become Vector3.up.
-- workspaceOpenEdgesAfterCorners <= workspaceOpenEdgesAfterRibbons is not a sufficient pass condition.
-```
-
-### EW-4D0.6R — Corner patch hardening / failure diagnostics — completed as containment
+### EW-B5 — Mask/material response refinement
 
 Implementation requirements:
 
 ```text
-- Build each corner patch into a local temporary face list first.
-- Append corner faces to the rebuild workspace only when the patch is accepted.
-- If a corner patch fails, append no partial faces.
-- Add granular failure diagnostics for arcs, boundary points, duplicates, normals, ordering, centre distance, small faces, skipped degenerates, hard failures, accepted faces, and rejected faces.
-- Use corner-local dedupe tolerance based on minimumStableEdgeLength.
-- Replace unsafe Vector3.up normal fallback with a corner normal calculation that can actually fail.
-- Count remaining open edges after corners near graph vertices and away from graph vertices.
-- Keep this workspace-only; final visible commit waits for EW-4D0.7.
+- Use UV2.z / vertex alpha ConvexEdgeWear data from generated bevel/cap faces.
+- Tune brightness/tint/smoothness/falloff response.
+- Add edge-wear mask widening/softening only after geometry is stable.
 ```
 
 Validation success:
 
 ```text
-cornerPatchVertices > 0
-cornerPatchAcceptedFaces > 0
-cornerPatchFailed == 0
-cornerPatchHardFailures == 0
-cornerPatchInvalidNormals == 0
-cornerPatchOrderingFailures == 0
-cornerPatchInsufficientBoundaryPoints == 0
-workspaceOpenEdgesAfterCorners is substantially lower than the EW-4D0.6 baseline
-remaining open edges are attributed by workspaceOpenEdgesNearGraphVerticesAfterCorners and workspaceOpenEdgesAwayFromGraphVerticesAfterCorners
-```
-
-
-### EW-4D0.6R2 — Workspace open-edge loop diagnostics — completed as proof
-
-EW-4D0.6R validation proved that corner degenerates were eliminated, but remaining open edges were split between graph-vertex-local and away-from-vertex regions:
-
-```text
-cornerPatchFailed=2
-cornerPatchDegenerateFaces=0
-workspaceOpenEdgesAfterCorners=64
-workspaceOpenEdgesNearGraphVerticesAfterCorners=30
-workspaceOpenEdgesAwayFromGraphVerticesAfterCorners=34
-```
-
-EW-4D0.6R2 then proved the post-ribbon state is the cleaner closure target:
-
-```text
-workspaceOpenEdgesAfterRibbons=226
-workspaceOpenEdgeComponentsAfterRibbons=22
-workspaceOpenEdgeEndpointLeavesAfterRibbons=0
-workspaceOpenEdgeEndpointBranchesAfterRibbons=0
-workspaceOpenEdgesAfterCorners=64
-workspaceOpenEdgeEndpointBranchesAfterCorners=14
-```
-
-### EW-4D0.6T — Actual open-cycle closure after ribbons — completed as topology-trace proof
-
-Validation result:
-
-```text
-openCycleClosureEdgesInput=226
-openCycleClosureComponentsInput=22
-openCycleClosureNonCycleEndpoints=0
-openCycleClosureTraceFailures=0
-openCycleClosureTooSmallCycles=0
-openCycleClosureInvalidNormals=1
-openCycleClosureFacesBuilt=0
-```
-
-Verdict: topology tracing is valid; aggregate whole-cycle normal calculation is too strict and must be replaced by per-triangle normals.
-
-### EW-4D0.6T2 — Per-triangle open-cycle closure normals — completed as open-edge proof
-
-Validation result:
-
-```text
-openCycleClosureEdgesInput=226
-openCycleClosureComponentsInput=22
-openCycleClosureComponentsBuilt=22
-openCycleClosureComponentsFailed=0
-openCycleClosureFacesExpected=226
-openCycleClosureFacesBuilt=226
-workspaceOpenEdgesAfterComponentClosure=0
-workspaceNonManifoldEdgesAfterComponentClosure=0
-workspaceTJunctionsAfterComponentClosure=19
-```
-
-Verdict: per-triangle fan closure proved the open-cycle topology can close open edges and avoid non-manifold edges, but the radial centre-fan diagonals create T-junctions.
-
-### EW-4D0.6T3 — T-junction-safe open-cycle polygon closure — completed as cap-shape proof
-
-EW-4D0.6T3 replaced centre-fan closure triangles with one ordered ConvexEdgeWear polygon cap per traced open-edge cycle.
-
-Validation result to carry forward:
-
-```text
-openCycleClosureEdgesInput=226
-openCycleClosureComponentsInput=22
-openCycleClosureComponentsBuilt=22
-openCycleClosureComponentsFailed=0
-openCycleClosureFacesExpected=22
-openCycleClosureFacesBuilt=22
-workspaceOpenEdgesAfterComponentClosure=0
-workspaceNonManifoldEdgesAfterComponentClosure=0
-workspaceTJunctionsAfterComponentClosure=12
-workspaceTJunctionsOnClosureEdgesAfterComponentClosure=0
-workspaceTJunctionsOnBaseEdgesAfterComponentClosure=9
-workspaceTJunctionsOnConvexEdgeWearEdgesAfterComponentClosure=3
-```
-
-Verdict: polygon caps are the correct open-edge closure shape; the remaining failures are pre-existing Base/ConvexEdgeWear workspace edge T-junctions, not closure-cap edges.
-
-### EW-4D0.6T4 — Workspace T-junction edge split repair — completed as failed-face diagnostic
-
-EW-4D0.6T4 found the expected 12 repair candidates, but aborted before applying insertions because one repaired face failed validation. That proved the repair target was correct and the validation scale was too strict for topology edge splitting.
-
-### EW-4D0.6T4b — Robust T-junction edge split repair — completed as tolerance/closure-edge diagnostic
-
-Implementation requirements:
-
-```text
-- Keep EW-4D0.6T3 polygon open-cycle closure unchanged.
-- After component closure, collect audited T-junction vertices on non-closure Base and ConvexEdgeWear edges.
-- Split every affected workspace polygon edge by inserting the exact audited vertex between that edge's endpoints.
-- Validate repaired split faces at topology-repair edge length.
-- Track too-near-start/end, no-insertion, area, short-edge, non-finite, and applied-face counters.
-- Apply repair transactionally against a cloned workspace-face list.
-- Re-audit repaired workspace topology before accepting the step.
-- Keep the step workspace-only; final visible commit remains EW-4D0.7.
-```
-
-Validation success:
-
-```text
-openCycleClosureEdgesInput == workspaceOpenEdgesAfterRibbons
-openCycleClosureComponentsInput == workspaceOpenEdgeComponentsAfterRibbons
-openCycleClosureComponentsBuilt == openCycleClosureComponentsInput
-openCycleClosureFacesExpected == openCycleClosureComponentsInput
-openCycleClosureFacesBuilt == openCycleClosureFacesExpected
-workspaceOpenEdgesAfterComponentClosure == 0
-workspaceNonManifoldEdgesAfterComponentClosure == 0
-workspaceTJunctionRepairCandidates > 0
-workspaceTJunctionRepairFailedFaces == 0
-workspaceTJunctionRepairFailedArea == 0
-workspaceTJunctionRepairFailedShortEdge == 0
-workspaceTJunctionRepairFailedNonFinite == 0
-workspaceTJunctionRepairAppliedFaces > 0
-workspaceOpenEdgesAfterTJunctionRepair == 0
-workspaceNonManifoldEdgesAfterTJunctionRepair == 0
-workspaceTJunctionsAfterTJunctionRepair == 0
-```
-
-
-### EW-4D0.6T6 — Pre-closure T-junction repair and recomputed open-cycle closure — current
-
-Evidence that motivates this step: EW-4D0.6T4c eliminated the 12 post-closure T-junctions by splitting audited Base, ConvexEdgeWear, and closure-cap edges, but the post-closure split introduced 4 non-manifold edges. That proves the split repair target is real, but the ordering is wrong: closure caps must be generated from the already-split boundary, not repaired afterward.
-
-EW-4D0.6T6 keeps the T5 workspace sequence but changes closure tracing to branch-aware cycle decomposition: ribbons, audit/repair T-junctions in the post-ribbon workspace, recompute actual open-edge diagnostics, trace open cycles from the repaired boundary, then build polygon closure caps from that repaired cycle graph. The target remains strict: zero open edges, zero non-manifold edges, and zero T-junctions after component closure.
-
-### EW-4D0.6T7 — Topology-scale closure cap validation — completed
-
-Validation after EW-4D0.6T6 proved the branch-aware tracer is no longer the blocker: `openCycleClosureNonCycleEndpoints=0`, `openCycleClosureTraceFailures=0`, and `openCycleClosureTooSmallCycles=0`. It then failed on `openCycleClosureInvalidFaces=1` after one component built, so EW-4D0.6T7 keeps the topology path and changes only closure cap validation. Repaired split vertices must remain in cap boundaries; cap edge-length validation therefore uses the same topology/audit tolerance scale used by T-junction repair, not the broader ribbon-generation edge scale. New counters identify cap rejection by area, short edge, non-finite point, duplicate-point collapse, and min/max cap vertex count.
-
-### EW-4D0.7 — Final topology validation and active-path switch — current
-
-Implementation requirements:
-
-```text
-- Combine unaffected faces, clipped replacement base faces, bevel ribbon faces, and open-cycle closure faces.
-- Weld/sanitize consistently.
-- Audit open edges, non-manifold edges, and T-junctions.
-- Commit only if topology is safe.
-- Remove the old EW-4C.0 half-space fallback from the active post-preflight path.
-```
-
-Validation success:
-
-```text
-accepted == selectedGraphEdges
-builtBevelEdges == selectedGraphEdges
-rejectedValidationOpenEdge == 0
-rejectedValidationNonManifoldEdge == 0
-rejectedValidationTJunction == 0
-producedBevelFaces > 0
-Surface Mask Debug = Convex Edge Wear shows visible mask
-normal render shows real worn bevel geometry
-```
-
-### EW-4D0.8 — Variation tuning
-
-Implementation requirements:
-
-```text
-- Add deterministic per-edge style: width, profile curve, strength, chipped tendency.
-- Add deterministic along-edge variation: taper, width noise, material noise, chip mask.
-- Clamp rail wobble so variation cannot self-intersect or create topology breaks.
-- Keep selected candidates stable; scale global width/profile richness if needed.
-```
-
-Validation success:
-
-```text
-same seed produces same variation
-changed seed changes variation
-edges vary between each other
-wear varies within a single edge
-no new topology failures
-```
-
-### EW-4D1 — Quality refinement and crack/groove planning
-
-Implementation requirements:
-
-```text
-- Improve corner vertex patches if D0 fan patches are visibly pinched.
-- Decide whether corner patches need an Adj-like topology pattern.
-- Plan separate crack/groove features as concave/incised paths, not as convex bevels.
+Convex Edge Wear debug view matches generated bevel/cap geometry
+normal render shows inspiration-like exposed edge wear on physical bevels
+material response remains independent from topology validity
 ```
 
 ---
 
-## 4. Validation checklist for the current patch
+## 5. Do not resume until EW-B1/B2 pass
 
-After importing EW-4D0.6R:
-
-```text
-1. Regenerate the same plane-cut rock.
-2. Keep Edge Wear enabled with nonzero Amount / Width / Coverage.
-3. Read the console summary.
-4. Confirm the existing Step 1, Step 2, and Step 3 fields remain clean.
-5. Confirm clipped-base workspace fields remain clean.
-6. Confirm rail-sampled base boundary and ribbon fields are present and clean.
-7. Confirm open-cycle closure diagnostics are present and explain any remaining failure.
-```
-
-Good current result:
+Do not resume these items until the deterministic bevel kernel is structurally valid:
 
 ```text
-selectedGraphEdges == selected
-faceClipFailedFaces == 0
-extractedRails == expectedRails
-profileEdgesPrepared == selectedGraphEdges
-profileEdgesFailed == 0
-profileInvalidPoints == 0
-profileZeroWidth == 0
-profileGridPoints > 0
-affectedBaseFaces == faceClipAffectedFaces
-replacedBaseFaces == faceClipSucceededFaces
-baseFaceValidationFailures == 0
-workspaceBaseFaces == graphFaces
-railSampleInsertionFailures == 0
-railSampledBaseFaces == affectedBaseFaces
-railSamplesInserted > 0
-ribbonEdgesPrepared == selectedGraphEdges
-ribbonEdgesFailed == 0
-ribbonFacesBuilt == ribbonFacesExpected
-ribbonDegenerateFaces == 0
-ribbonInvalidFaces == 0
-workspaceConvexEdgeWearFaces > 0
-openCycleClosureEdgesInput == workspaceOpenEdgesAfterRibbons
-openCycleClosureComponentsInput == workspaceOpenEdgeComponentsAfterRibbons
-openCycleClosureComponentsBuilt == openCycleClosureComponentsInput
-openCycleClosureFacesExpected == openCycleClosureComponentsInput
-openCycleClosureFacesBuilt == openCycleClosureFacesExpected
-workspaceOpenEdgesAfterComponentClosure == 0
-workspaceNonManifoldEdgesAfterComponentClosure == 0
-workspaceTJunctionRepairFailedFaces == 0
-workspaceOpenEdgesAfterTJunctionRepair == 0
-workspaceNonManifoldEdgesAfterTJunctionRepair == 0
-workspaceTJunctionsAfterTJunctionRepair == 0
-```
-
-Expected visual result:
-
-```text
-Convex Edge Wear may still be black.
-```
-
-EW-4D0.6T4b proved the repair records still targeted the right 12 T-junction vertices, but no insertions were committed because closure cap edges were skipped and one repaired split face failed short-edge validation:
-
-```text
-workspaceTJunctionRepairCandidates=12
-workspaceTJunctionRepairSkippedClosureEdges=12
-workspaceTJunctionRepairTooNearStart=4
-workspaceTJunctionRepairTooNearEnd=1
-workspaceTJunctionRepairFailedShortEdge=1
-workspaceTJunctionRepairInsertedVertices=0
-workspaceTJunctionsAfterTJunctionRepair=12
-```
-
-### EW-4D0.6T4c — Closure-inclusive T-junction split repair — completed as ordering proof
-
-Checklist:
-
-```text
-include closure cap edges in T-junction repair records
-use the audit T-junction tolerance for repaired split-edge validation
-keep polygon open-cycle closure unchanged
-keep repair transactional
-require workspaceOpenEdgesAfterTJunctionRepair == 0
-require workspaceNonManifoldEdgesAfterTJunctionRepair == 0
-require workspaceTJunctionsAfterTJunctionRepair == 0
-```
-
-EW-4D0.5 emits ribbon faces only inside the temporary rebuild workspace. EW-4D0.6T3 proved one ordered polygon cap per traced open-edge component can close the workspace, and EW-4D0.6T4c proved the audited split targets are real but must not be repaired after caps are built. EW-4D0.6T6 moved T-junction splitting into the post-ribbon, pre-closure workspace, recomputed open-edge cycles, and proved branch-aware tracing works. EW-4D0.6T7 keeps that topology path and narrows the active blocker to closure cap validation scale. Final visible commit still waits for EW-4D0.7 final topology validation and active-path switch.
-
----
-
-## 5. Files allowed for EW-4D0 patches
-
-Allowed by default:
-
-```text
-Game/Procedural/Masses/MassGenerator.cs
-Docs/Generated_Mass_Framework.md
-Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md
-Docs/Generated_Mass_Feature_Implementation_Checklist.md
-```
-
-Do not touch without explicit approval:
-
-```text
-Shaders
-PixelSurface includes
-GeneratedMass.cs
-GeneratedMassEditor.cs
-FeatureAtlas baker
-GeneratedGround / ground generation
-MeshData / MeshBuilder
-River / foam systems
+EW-4D0.8 density/budget tuning
+closure-cap ear-clipping fixes
+sampled-ribbon closure repair
+shader response tuning
+mask expansion
+cracks/grooves
+rock fracture/plate features
 ```

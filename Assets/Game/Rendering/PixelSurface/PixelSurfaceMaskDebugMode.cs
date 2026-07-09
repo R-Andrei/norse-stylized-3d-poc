@@ -35,6 +35,11 @@ namespace ProgrammaticStylized3D.Rendering
         // diagnostic range.
         GroundPaintedAccentLines = 28,
 
+        // Painted accent visual-relief channels. These expose the wider soft
+        // fold body and signed side field separately from the thin contour.
+        GroundPaintedAccentRelief = 29,
+        GroundPaintedAccentSignedRelief = 30,
+
         // GeneratedMass generic boundary-atlas diagnostics. These are
         // intentionally placed after the ground debug modes so existing
         // serialized GeneratedMass debug values 0-6 remain stable.

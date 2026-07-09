@@ -47,6 +47,46 @@
             }
 
 #if defined(PS3D_PIXELSURFACEGROUND_MATERIAL_PROPERTIES)
+            float3 ResolveGroundPaintedAccentFoldFieldFeature(
+                Varyings input)
+            {
+                if (_GroundPaintedAccentFoldFieldEnabled <= 0.5)
+                {
+                    return float3(0.0, 0.0, 0.0);
+                }
+
+                float2 fieldSize =
+                    max(
+                        _GroundPaintedAccentFoldFieldOriginSize.zw,
+                        float2(0.0001, 0.0001));
+                float2 uv =
+                    (input.positionOS.xz -
+                     _GroundPaintedAccentFoldFieldOriginSize.xy) /
+                    fieldSize;
+
+                if (any(uv < 0.0) || any(uv > 1.0))
+                {
+                    return float3(0.0, 0.0, 0.0);
+                }
+
+                float4 sampleValue = SAMPLE_TEXTURE2D(
+                    _GroundPaintedAccentFoldField,
+                    sampler_GroundPaintedAccentFoldField,
+                    uv);
+
+                return float3(
+                    saturate(sampleValue.r),
+                    saturate(sampleValue.g),
+                    clamp(sampleValue.b * 2.0 - 1.0, -1.0, 1.0));
+            }
+
+            // RETIRED PATH - Patch V3G.
+            // The V3D-V3F.1 curve-distance PaintedAccentLines source model is
+            // kept only as a temporary fallback/comparison path until generated
+            // visual fold-field data replaces it. Do not tune or extend this
+            // path as the final solution. The accepted direction is:
+            // generated fold field -> selected contour line -> relief body ->
+            // gradient/polarity signed side.
             float3 ResolveGroundPaintedAccentSegmentSample(
                 float2 samplePoint,
                 float2 startPoint,
@@ -67,6 +107,10 @@
                 return float3(distanceToSegment, signedSide, globalT);
             }
 
+            // RETIRED PATH - Patch V3G.
+            // Direct curve stroke generation produces line/tube/rail artifacts.
+            // Keep this function only until the generated fold-field replacement
+            // is wired and validated.
             float3 ResolveGroundPaintedAccentCurvedStroke(
                 float2 positionXZ,
                 float microCellSize,
@@ -101,12 +145,12 @@
                 lengthHalf *= lerp(0.82, 1.10, saturate(contrast));
                 lengthHalf = min(lengthHalf, safeCellSize * 0.34);
 
-                float thickness = lerp(
-                    0.018,
-                    0.052,
+                float lineRadius = lerp(
+                    0.010,
+                    0.030,
                     PS3D_Hash31(hashBase + 97.43));
-                thickness *= lerp(0.88, 1.15, saturate(contrast));
-                thickness = min(thickness, safeCellSize * 0.065);
+                lineRadius *= lerp(0.82, 1.05, saturate(contrast));
+                lineRadius = min(lineRadius, safeCellSize * 0.040);
 
                 float randomAngle =
                     PS3D_Hash31(hashBase + 67.11) * 6.2831853;
@@ -119,7 +163,7 @@
 
                 // Keep the full curve inside its cell. Curved strokes need extra
                 // margin because their control points wander sideways.
-                float curveReach = lengthHalf + thickness * 5.0;
+                float curveReach = lengthHalf + lineRadius * 6.6;
                 float centerMargin = saturate(curveReach / safeCellSize + 0.12);
                 centerMargin = min(centerMargin, 0.40);
                 float2 center = float2(
@@ -200,13 +244,18 @@
 
                 float endMask = smoothstep(0.02, 0.16, bestSample.z) *
                     (1.0 - smoothstep(0.84, 0.98, bestSample.z));
-                float widthSoftness = lerp(
-                    1.35,
-                    0.62,
-                    saturate(contrast)) * thickness;
+                float lineCoreRadius = lineRadius * lerp(
+                    0.58,
+                    0.42,
+                    saturate(contrast));
+                float lineFalloffRadius = lineRadius +
+                    max(0.006, lineRadius * lerp(
+                        0.42,
+                        0.24,
+                        saturate(contrast)));
                 float lineMask = 1.0 - smoothstep(
-                    thickness,
-                    thickness + widthSoftness,
+                    lineCoreRadius,
+                    lineFalloffRadius,
                     bestSample.x);
 
                 float dashNoise = PS3D_ValueNoise31(float3(
@@ -215,7 +264,7 @@
                     cell.x * 0.37 + seed * 0.21,
                     cell.y * 0.41 + seed * 0.17));
                 float chipNoise = PS3D_ValueNoise31(float3(
-                    positionXZ / max(0.10, thickness * 6.2) + seed * 0.43,
+                    positionXZ / max(0.10, lineRadius * 6.8) + seed * 0.43,
                     seed + 151.31));
                 float dashKeep = smoothstep(
                     lerp(0.18, 0.40, saturate(contrast)),
@@ -232,20 +281,56 @@
                 float strokeMask = saturate(
                     lineMask * endMask * brokenMask);
 
-                // A wider soft body gives the line a tiny implied terrain fold.
-                // The signed side is later used for painted shadow/highlight; it
-                // is visual relief only, not mesh displacement.
+                // The line contour is intentionally narrow. The relief body is
+                // wider and softer so the final render can read as a painted fold
+                // instead of a thick 2D mark. This is visual relief only, not mesh
+                // displacement.
+                float reliefInnerRadius = max(
+                    lineRadius * 1.9,
+                    lengthHalf * 0.10);
+                float reliefOuterRadius = max(
+                    lineRadius * 6.2,
+                    lengthHalf * 0.28);
                 float reliefBody = 1.0 - smoothstep(
-                    thickness * 1.8,
-                    thickness * 5.4,
+                    reliefInnerRadius,
+                    reliefOuterRadius,
                     bestSample.x);
                 reliefBody *= endMask;
-                float side = bestSample.y / max(0.0001, abs(bestSample.y));
-                float signedRelief = side * reliefBody * brokenMask;
+                float signedSide = clamp(
+                    bestSample.y / max(0.0001, reliefOuterRadius),
+                    -1.0,
+                    1.0);
+                float signedPolarity = bestSample.y < 0.0 ? -1.0 : 1.0;
+                float sideDistance = abs(bestSample.y);
+                float sideBandCenter = lerp(
+                    reliefInnerRadius,
+                    reliefOuterRadius,
+                    0.46);
+                float sideBandHalfWidth = max(
+                    lineRadius * 2.4,
+                    reliefOuterRadius * 0.34);
+                float sideBand = 1.0 - smoothstep(
+                    sideBandHalfWidth * 0.34,
+                    sideBandHalfWidth,
+                    abs(sideDistance - sideBandCenter));
+                sideBand *= smoothstep(
+                    lineFalloffRadius,
+                    reliefInnerRadius,
+                    sideDistance);
+                float signedRelief =
+                    signedPolarity *
+                    sideBand *
+                    reliefBody *
+                    saturate(abs(signedSide) * 1.45);
 
-                return float3(strokeMask, reliefBody * brokenMask, signedRelief);
+                return float3(strokeMask, reliefBody, signedRelief);
             }
 
+            // RETIRED PATH - Patch V3G.
+            // Current implementation still derives line/body/signed data from
+            // procedural curve distance. Future patches must redirect this
+            // resolver to generated fold-field channels instead of continuing to
+            // tune curve-distance strokes.
             float3 ResolveGroundPaintedAccentLineReliefFeature(
                 Varyings input,
                 float exposureMask,
@@ -348,6 +433,34 @@
                     clamp(signedRelief * finalGate, -1.0, 1.0));
             }
 
+            float3 ResolveGroundPaintedAccentFeature(
+                Varyings input,
+                float exposureMask,
+                float dampDepositMask,
+                float vegetationMask,
+                float compactionMask,
+                float shoreMask,
+                float rockyDryMask,
+                float contractMask)
+            {
+                if (_GroundPaintedAccentFoldFieldEnabled > 0.5)
+                {
+                    return ResolveGroundPaintedAccentFoldFieldFeature(input);
+                }
+
+                // RETIRED FALLBACK - Patch V3G.
+                // Kept only until generated fold-field data is available.
+                return ResolveGroundPaintedAccentLineReliefFeature(
+                    input,
+                    exposureMask,
+                    dampDepositMask,
+                    vegetationMask,
+                    compactionMask,
+                    shoreMask,
+                    rockyDryMask,
+                    contractMask);
+            }
+
             float ResolveGroundPaintedAccentLinesFeature(
                 Varyings input,
                 float exposureMask,
@@ -358,7 +471,7 @@
                 float rockyDryMask,
                 float contractMask)
             {
-                return ResolveGroundPaintedAccentLineReliefFeature(
+                return ResolveGroundPaintedAccentFeature(
                     input,
                     exposureMask,
                     dampDepositMask,

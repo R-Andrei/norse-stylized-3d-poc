@@ -69,6 +69,10 @@ Shader "PS3D/Pixel Ground Surface Lit"
         [HideInInspector] _GroundPaintedAccentLineMaskInfluence("Ground Painted Accent Line Mask Influence", Range(0, 1)) = 0.5
         [HideInInspector] _GroundPaintedAccentLineDirection("Ground Painted Accent Line Direction", Vector) = (1, 0, 0, 0)
         [HideInInspector] _GroundPaintedAccentLineSeed("Ground Painted Accent Line Seed", Float) = 0
+        [HideInInspector] _GroundPaintedAccentFoldField("Ground Painted Accent Fold Field", 2D) = "black" {}
+        [HideInInspector] _GroundPaintedAccentFoldFieldEnabled("Ground Painted Accent Fold Field Enabled", Float) = 0
+        [HideInInspector] _GroundPaintedAccentFoldFieldOriginSize("Ground Painted Accent Fold Field Origin Size", Vector) = (0, 0, 1, 1)
+        [HideInInspector] _GroundPaintedAccentFoldFieldTexelSize("Ground Painted Accent Fold Field Texel Size", Vector) = (1, 1, 1, 1)
 
         [Header(Stylized Value Shaping)]
         _HighlightCompressStrength("Highlight Compress Strength", Range(0, 0.5)) = 0.08
@@ -146,6 +150,8 @@ Shader "PS3D/Pixel Ground Surface Lit"
 
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_GroundPaintedAccentFoldField);
+            SAMPLER(sampler_GroundPaintedAccentFoldField);
 
             #include "../Includes/PixelSurfaceGroundForwardTypes.hlsl"
             #include "../Includes/PixelSurfaceGroundResponse.hlsl"

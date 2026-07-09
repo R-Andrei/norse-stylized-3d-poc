@@ -20,6 +20,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private bool showFoamMaterialProbe;
         private bool showFoamManualBirthSource = true;
         private bool showFoamAutomaticSourcePopulation = true;
+        private bool showFoamBirthShoreFoam = true;
+        private bool showFoamBirthObjectFoam;
+        private bool showFoamBirthFreeWaterFoam;
+        private bool showFoamBirthShoreRibbonPattern;
+        private bool showFoamBirthInwardWashPattern;
         private bool showFoamManualSourceMotion;
         private bool showFoamShapeResidueDiagnostics;
         private bool showFoamRuntimeResourceDiagnostics;
@@ -2239,12 +2244,64 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUI.indentLevel--;
         }
 
+        private void DrawNormalizedPatternWeight(
+            SerializedProperty primary,
+            SerializedProperty secondary,
+            GUIContent label)
+        {
+            EditorGUI.BeginChangeCheck();
+            float value = EditorGUILayout.Slider(
+                label,
+                primary.floatValue,
+                0f,
+                1f);
+            if (EditorGUI.EndChangeCheck())
+            {
+                value = Mathf.Clamp01(value);
+                primary.floatValue = value;
+                secondary.floatValue = 1f - value;
+            }
+        }
+
+        private void DrawMinMaxMetreControls(
+            string label,
+            SerializedProperty minimum,
+            SerializedProperty maximum)
+        {
+            EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel);
+            EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(
+                minimum,
+                new GUIContent("Min", $"Minimum {label.ToLowerInvariant()} in metres."));
+            EditorGUILayout.PropertyField(
+                maximum,
+                new GUIContent("Max", $"Maximum {label.ToLowerInvariant()} in metres."));
+            EditorGUI.indentLevel--;
+        }
+
+        private void DrawMinMaxUnitControls(
+            string label,
+            SerializedProperty minimum,
+            SerializedProperty maximum,
+            string tooltip)
+        {
+            EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel);
+            EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(
+                minimum,
+                new GUIContent("Min", tooltip));
+            EditorGUILayout.PropertyField(
+                maximum,
+                new GUIContent("Max", tooltip));
+            EditorGUI.indentLevel--;
+        }
+
         private void DrawFoamAutomaticSourcePopulationSection(
             StylizedRiverFoamRuntime runtime)
         {
             showFoamAutomaticSourcePopulation = EditorGUILayout.Foldout(
                 showFoamAutomaticSourcePopulation,
-                "Source Population",
+                "Foam Birth Sources",
                 true);
             if (!showFoamAutomaticSourcePopulation)
             {
@@ -2253,7 +2310,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUI.indentLevel++;
             EditorGUILayout.HelpBox(
-                "Automatic birth creates real persistent FoamState material. The active shore test now starts deterministic full-strength shore source events; support topology then decides how long the material survives.",
+                "Automatic birth creates real persistent FoamState material. This section is the authoring framework for source categories; Shore Foam is implemented, while Object Foam and Free Water Foam are staged for later source classes.",
                 MessageType.None);
 
             EditorGUILayout.PropertyField(
@@ -2265,59 +2322,211 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("foamSourcePopulationPreset"),
                 new GUIContent(
                     "Spawn Preset",
-                    "Selects the active automatic source strategy. Shore Contact Test is implemented; the other presets are documented placeholders and do not spawn yet."));
+                    "Selects the active automatic source strategy. Shore Contact Test is implemented; object and free-water source classes are documented placeholders."));
 
             EditorGUILayout.Space(4f);
-            EditorGUILayout.LabelField("Shore Foam", EditorStyles.boldLabel);
-            EditorGUI.indentLevel++;
-            EditorGUILayout.PropertyField(
-                Find("foamShoreFoamCoverage"),
-                new GUIContent(
-                    "Coverage",
-                    "How much eligible shoreline can participate in deterministic source events over time. This does not change event opacity or patch size."));
-            EditorGUILayout.PropertyField(
-                Find("foamShoreFoamActivity"),
-                new GUIContent(
-                    "Activity",
-                    "How often new shore source events start. Higher values start more full-strength ribbons/tongues per second."));
-            EditorGUILayout.PropertyField(
-                Find("foamShoreFoamPatchSize"),
-                new GUIContent(
-                    "Patch Size",
-                    "How large each deterministic shore ribbon or inward-wash tongue is."));
-            EditorGUILayout.PropertyField(
-                Find("foamShoreFoamPattern"),
-                new GUIContent(
-                    "Pattern",
-                    "Chooses the shore event recipe: Mixed, Shore Ribbons, or Inward Wash."));
-            EditorGUI.indentLevel--;
-
-            EditorGUILayout.Space(4f);
-            EditorGUILayout.HelpBox(
-                "Hidden recipe: deterministic shore slots start short progressive source events. Events spawn normal-strength material and reveal shape spatially, rather than relying on faint deposits or one-shot random patches.",
-                MessageType.Info);
-
-            if (runtime != null)
+            showFoamBirthShoreFoam = EditorGUILayout.Foldout(
+                showFoamBirthShoreFoam,
+                "Shore Foam",
+                true);
+            if (showFoamBirthShoreFoam)
             {
                 EditorGUI.indentLevel++;
-                EditorGUILayout.LabelField(
-                    "Runtime Status",
-                    runtime.AutomaticShoreBirthStatus);
-                EditorGUILayout.LabelField(
-                    "Events Started",
-                    $"{runtime.AutomaticShoreBirthSubmittedLastUpdate} started / {runtime.AutomaticShoreBirthRejectedLastUpdate} skipped, max {runtime.AutomaticShoreBirthBudgetPerTick}/update");
-                EditorGUILayout.LabelField(
-                    "Events Total",
-                    runtime.AutomaticShoreBirthSubmittedTotal.ToString("N0"));
+                EditorGUILayout.PropertyField(
+                    Find("foamAutomaticShoreBirthEnabled"),
+                    new GUIContent(
+                        "Enabled",
+                        "Enables deterministic shore/contact Layer C material birth when the selected source preset allows shore sources."));
+                EditorGUILayout.PropertyField(
+                    Find("foamShoreFoamCoverage"),
+                    new GUIContent(
+                        "Coverage",
+                        "How much eligible shoreline can participate in deterministic source events over time. This does not change event opacity or patch size."));
+                EditorGUILayout.PropertyField(
+                    Find("foamShoreFoamActivity"),
+                    new GUIContent(
+                        "Activity",
+                        "How often new shore source events start. Higher values start more full-strength source events per second."));
+                EditorGUILayout.PropertyField(
+                    Find("foamShoreFoamPatchSize"),
+                    new GUIContent(
+                        "Global Size Multiplier",
+                        "Broad global scale selector for all shore-source pattern dimensions. Per-pattern length, width, reach, and offset controls below define the actual ranges."));
+                EditorGUILayout.PropertyField(
+                    Find("foamShoreFoamFormationSpeedMetresPerSecond"),
+                    new GUIContent(
+                        "Global Formation Speed",
+                        "Base source reveal speed in metres per second. Per-pattern Formation Speed multipliers below can make individual patterns reveal faster or slower."));
+                EditorGUILayout.PropertyField(
+                    Find("foamShoreFoamPattern"),
+                    new GUIContent(
+                        "Debug Pattern Mode",
+                        "Mixed uses the normalized pattern weights below. Shore Ribbons and Inward Wash force one pattern for validation."));
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField("Pattern Mix", EditorStyles.boldLabel);
+                SerializedProperty ribbonWeight = Find("foamShoreRibbonPatternWeight");
+                SerializedProperty washWeight = Find("foamInwardWashPatternWeight");
+                DrawNormalizedPatternWeight(
+                    ribbonWeight,
+                    washWeight,
+                    new GUIContent(
+                        "Shore Ribbons",
+                        "Normalized share of Mixed Shore Foam events assigned to Shore Ribbon sources. Editing this automatically updates Inward Wash to keep the mix sum at one."));
+                DrawNormalizedPatternWeight(
+                    washWeight,
+                    ribbonWeight,
+                    new GUIContent(
+                        "Inward Wash",
+                        "Normalized share of Mixed Shore Foam events assigned to Inward Wash sources. Editing this automatically updates Shore Ribbons to keep the mix sum at one."));
+
+                EditorGUILayout.Space(4f);
+                showFoamBirthShoreRibbonPattern = EditorGUILayout.Foldout(
+                    showFoamBirthShoreRibbonPattern,
+                    "Shore Ribbon Pattern",
+                    true);
+                if (showFoamBirthShoreRibbonPattern)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        Find("foamShoreRibbonFormationSpeedMultiplier"),
+                        new GUIContent(
+                            "Formation Speed",
+                            "Multiplier applied to Global Formation Speed for Shore Ribbon events only."));
+                    DrawMinMaxMetreControls(
+                        "Length",
+                        Find("foamShoreRibbonLengthMinMetres"),
+                        Find("foamShoreRibbonLengthMaxMetres"));
+                    DrawMinMaxMetreControls(
+                        "Width",
+                        Find("foamShoreRibbonWidthMinMetres"),
+                        Find("foamShoreRibbonWidthMaxMetres"));
+                    DrawMinMaxMetreControls(
+                        "Shore Offset",
+                        Find("foamShoreRibbonOffsetMinMetres"),
+                        Find("foamShoreRibbonOffsetMaxMetres"));
+                    DrawMinMaxUnitControls(
+                        "Initial Life",
+                        Find("foamShoreRibbonInitialLifeMin"),
+                        Find("foamShoreRibbonInitialLifeMax"),
+                        "Initial normalized Remaining Life assigned to spawned material. One means full authored foam lifetime; lower values die sooner under the normal aging rules.");
+                    DrawMinMaxUnitControls(
+                        "Breakup Strength",
+                        Find("foamShoreRibbonBreakupStrengthMin"),
+                        Find("foamShoreRibbonBreakupStrengthMax"),
+                        "Deterministic edge/source breakup strength for this pattern.");
+                    EditorGUI.indentLevel--;
+                }
+
+                showFoamBirthInwardWashPattern = EditorGUILayout.Foldout(
+                    showFoamBirthInwardWashPattern,
+                    "Inward Wash Pattern",
+                    true);
+                if (showFoamBirthInwardWashPattern)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        Find("foamInwardWashFormationSpeedMultiplier"),
+                        new GUIContent(
+                            "Formation Speed",
+                            "Multiplier applied to Global Formation Speed for Inward Wash events only."));
+                    DrawMinMaxMetreControls(
+                        "Length",
+                        Find("foamInwardWashLengthMinMetres"),
+                        Find("foamInwardWashLengthMaxMetres"));
+                    DrawMinMaxMetreControls(
+                        "Width",
+                        Find("foamInwardWashWidthMinMetres"),
+                        Find("foamInwardWashWidthMaxMetres"));
+                    DrawMinMaxMetreControls(
+                        "Inward Reach",
+                        Find("foamInwardWashReachMinMetres"),
+                        Find("foamInwardWashReachMaxMetres"));
+                    DrawMinMaxMetreControls(
+                        "Shore Start Offset",
+                        Find("foamInwardWashOffsetMinMetres"),
+                        Find("foamInwardWashOffsetMaxMetres"));
+                    DrawMinMaxUnitControls(
+                        "Initial Life",
+                        Find("foamInwardWashInitialLifeMin"),
+                        Find("foamInwardWashInitialLifeMax"),
+                        "Initial normalized Remaining Life assigned to spawned material. One means full authored foam lifetime; lower values die sooner under the normal aging rules.");
+                    DrawMinMaxUnitControls(
+                        "Breakup Strength",
+                        Find("foamInwardWashBreakupStrengthMin"),
+                        Find("foamInwardWashBreakupStrengthMax"),
+                        "Deterministic edge/source breakup strength for this pattern.");
+                    EditorGUI.indentLevel--;
+                }
+
+                if (runtime != null)
+                {
+                    EditorGUILayout.Space(4f);
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.LabelField(
+                        "Runtime Status",
+                        runtime.AutomaticShoreBirthStatus);
+                    EditorGUILayout.LabelField(
+                        "Events Started",
+                        $"{runtime.AutomaticShoreBirthSubmittedLastUpdate} started / {runtime.AutomaticShoreBirthRejectedLastUpdate} skipped, max {runtime.AutomaticShoreBirthBudgetPerTick}/update");
+                    EditorGUILayout.LabelField(
+                        "Events Total",
+                        runtime.AutomaticShoreBirthSubmittedTotal.ToString("N0"));
+                    EditorGUI.indentLevel--;
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("Runtime", "Unavailable");
+                }
+
                 EditorGUI.indentLevel--;
             }
-            else
+
+            EditorGUILayout.Space(4f);
+            showFoamBirthObjectFoam = EditorGUILayout.Foldout(
+                showFoamBirthObjectFoam,
+                "Object Foam",
+                true);
+            if (showFoamBirthObjectFoam)
             {
-                EditorGUILayout.LabelField("Runtime", "Unavailable");
+                EditorGUI.indentLevel++;
+                using (new EditorGUI.DisabledScope(true))
+                {
+                    EditorGUILayout.Toggle(
+                        new GUIContent(
+                            "Enabled",
+                            "Object-contact source spawning is the next source class after Shore Foam."),
+                        false);
+                }
+                EditorGUILayout.HelpBox(
+                    "Not implemented yet. This section reserves the same source-category authoring structure for future rock/object contact, lee, and wake birth patterns.",
+                    MessageType.Info);
+                EditorGUI.indentLevel--;
+            }
+
+            showFoamBirthFreeWaterFoam = EditorGUILayout.Foldout(
+                showFoamBirthFreeWaterFoam,
+                "Free Water Foam",
+                true);
+            if (showFoamBirthFreeWaterFoam)
+            {
+                EditorGUI.indentLevel++;
+                using (new EditorGUI.DisabledScope(true))
+                {
+                    EditorGUILayout.Toggle(
+                        new GUIContent(
+                            "Enabled",
+                            "Free-water source spawning is intentionally staged until shore and object birth are acceptable."),
+                        false);
+                }
+                EditorGUILayout.HelpBox(
+                    "Not implemented yet. This section reserves the same source-category authoring structure for future open-water threads and sheet-border source patterns.",
+                    MessageType.Info);
+                EditorGUI.indentLevel--;
             }
 
             EditorGUILayout.HelpBox(
-                "Validation target: Material Presence / Remaining Life should show shore-attached opaque ribbons or inward tongues distributed across the chunk over time. Final Foam remains unchanged until Layer D integration is accepted.",
+                "Validation target: Material Presence / Remaining Life should show shore-attached opaque material distributed across the chunk over time. Final Foam remains unchanged until Layer D integration is accepted.",
                 MessageType.Info);
 
             EditorGUI.indentLevel--;
