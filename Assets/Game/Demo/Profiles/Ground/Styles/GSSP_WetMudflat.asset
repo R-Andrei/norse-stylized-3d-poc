@@ -66,6 +66,15 @@ MonoBehaviour:
       maskInfluence: 0.58
       direction: {x: 1, y: 0}
       seedOffset: 101
+    - kind: 20
+      enabled: 1
+      costClass: 0
+      strength: 0.18
+      scale: 5.4
+      contrast: 0.36
+      maskInfluence: 0.64
+      direction: {x: 0.82, y: 0.36}
+      seedOffset: 401
   - id: mudflat.waterlogged
     displayName: Waterlogged
     materialControls:
@@ -117,6 +126,15 @@ MonoBehaviour:
       maskInfluence: 0.68
       direction: {x: 1, y: 0}
       seedOffset: 131
+    - kind: 20
+      enabled: 1
+      costClass: 0
+      strength: 0.14
+      scale: 5.8
+      contrast: 0.32
+      maskInfluence: 0.72
+      direction: {x: 0.82, y: 0.36}
+      seedOffset: 409
   - id: mudflat.trampled
     displayName: Trampled
     materialControls:
@@ -168,6 +186,15 @@ MonoBehaviour:
       maskInfluence: 0.84
       direction: {x: 1, y: 0}
       seedOffset: 167
+    - kind: 20
+      enabled: 1
+      costClass: 0
+      strength: 0.24
+      scale: 4.6
+      contrast: 0.48
+      maskInfluence: 0.78
+      direction: {x: 0.82, y: 0.36}
+      seedOffset: 419
   - id: mudflat.frozen_thaw
     displayName: Frozen Thaw
     materialControls:
@@ -219,3 +246,12 @@ MonoBehaviour:
       maskInfluence: 0.62
       direction: {x: 1, y: 0}
       seedOffset: 193
+    - kind: 20
+      enabled: 1
+      costClass: 0
+      strength: 0.14
+      scale: 5.8
+      contrast: 0.32
+      maskInfluence: 0.66
+      direction: {x: 0.82, y: 0.36}
+      seedOffset: 431

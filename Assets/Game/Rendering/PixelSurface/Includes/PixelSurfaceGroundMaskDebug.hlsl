@@ -43,6 +43,25 @@
                 {
                     mask = ResolveGroundStandingWaterPotentialMask(input);
                 }
+                else if (mode == 28)
+                {
+                    float contractMask =
+                        1.0 -
+                        step(
+                            0.995,
+                            min(
+                                min((float)input.color.r, (float)input.color.g),
+                                (float)input.color.b));
+                    mask = ResolveGroundPaintedAccentLinesFeature(
+                        input,
+                        ResolveGroundExposureMask(input) * contractMask,
+                        ResolveGroundDampDepositMask(input),
+                        ResolveGroundVegetationMask(input),
+                        ResolveGroundCompactionMask(input),
+                        ResolveGroundShoreMask(input),
+                        ResolveGroundRockyDryMask(input),
+                        contractMask);
+                }
                 else if (mode == 14)
                 {
                     float exposure = ResolveGroundExposureMask(input);

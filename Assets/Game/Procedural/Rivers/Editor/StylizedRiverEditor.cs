@@ -19,6 +19,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private bool showFoamLifetimeDiagnostics;
         private bool showFoamMaterialProbe;
         private bool showFoamManualBirthSource = true;
+        private bool showFoamAutomaticSourcePopulation = true;
         private bool showFoamManualSourceMotion;
         private bool showFoamShapeResidueDiagnostics;
         private bool showFoamRuntimeResourceDiagnostics;
@@ -52,6 +53,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 showFoamLifetimeDiagnostics ||
                 showFoamMaterialProbe ||
                 showFoamManualBirthSource ||
+                showFoamAutomaticSourcePopulation ||
                 showFoamShapeResidueDiagnostics ||
                 showFoamRuntimeResourceDiagnostics ||
                 showFoamAdvancedInternalDiagnostics;
@@ -1657,7 +1659,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam Debug",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Compact workflow: Overview for status, View for display mode, Material Motion for persistent downstream travel, Lifetime + Topology for aging/support, Material Probe for isolated lifetime checks, Manual Birth Source for all manual source controls, Material Shape for stored/visible footprint diagnostics, Runtime for resources, and Advanced Internals only for low-level failures.",
+                "Compact workflow: Overview for status, View for display mode, Material Motion for persistent downstream travel, Lifetime + Topology for aging/support, Material Probe for isolated lifetime checks, Manual Birth Source for explicit tests, Source Population for automatic Layer C birth, Material Shape for stored/visible footprint diagnostics, Runtime for resources, and Advanced Internals only for low-level failures.",
                 MessageType.None);
 
             DrawFoamValidationOverview(river, runtime);
@@ -1666,6 +1668,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             DrawFoamLifetimeSection(river, runtime);
             DrawFoamMaterialProbeSection(river, runtime);
             DrawFoamManualBirthSourceSection(river, runtime);
+            DrawFoamAutomaticSourcePopulationSection(runtime);
             DrawFoamShapeResidueSection(runtime);
             DrawFoamRuntimeResourceSection(runtime);
             DrawFoamAdvancedInternalSection(runtime);
@@ -2204,7 +2207,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             if (!Application.isPlaying)
             {
                 EditorGUILayout.HelpBox(
-                    "Enter Play Mode to start a manual source. Automatic spawning remains intentionally disabled.",
+                    "Enter Play Mode to start a manual source. Automatic source population is controlled separately in the Source Population foldout.",
                     MessageType.Info);
             }
 
@@ -2232,6 +2235,90 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 EditorGUILayout.LabelField("Runtime", "Unavailable");
             }
+
+            EditorGUI.indentLevel--;
+        }
+
+        private void DrawFoamAutomaticSourcePopulationSection(
+            StylizedRiverFoamRuntime runtime)
+        {
+            showFoamAutomaticSourcePopulation = EditorGUILayout.Foldout(
+                showFoamAutomaticSourcePopulation,
+                "Source Population",
+                true);
+            if (!showFoamAutomaticSourcePopulation)
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+            EditorGUILayout.HelpBox(
+                "Automatic birth creates real persistent FoamState material. The active shore test now starts deterministic full-strength shore source events; support topology then decides how long the material survives.",
+                MessageType.None);
+
+            EditorGUILayout.PropertyField(
+                Find("foamAutomaticBirthEnabled"),
+                new GUIContent(
+                    "Automatic Foam Birth",
+                    "Turns automatic Layer C material birth on or off. Support topology still only preserves or suppresses material after it exists."));
+            EditorGUILayout.PropertyField(
+                Find("foamSourcePopulationPreset"),
+                new GUIContent(
+                    "Spawn Preset",
+                    "Selects the active automatic source strategy. Shore Contact Test is implemented; the other presets are documented placeholders and do not spawn yet."));
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField("Shore Foam", EditorStyles.boldLabel);
+            EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(
+                Find("foamShoreFoamCoverage"),
+                new GUIContent(
+                    "Coverage",
+                    "How much eligible shoreline can participate in deterministic source events over time. This does not change event opacity or patch size."));
+            EditorGUILayout.PropertyField(
+                Find("foamShoreFoamActivity"),
+                new GUIContent(
+                    "Activity",
+                    "How often new shore source events start. Higher values start more full-strength ribbons/tongues per second."));
+            EditorGUILayout.PropertyField(
+                Find("foamShoreFoamPatchSize"),
+                new GUIContent(
+                    "Patch Size",
+                    "How large each deterministic shore ribbon or inward-wash tongue is."));
+            EditorGUILayout.PropertyField(
+                Find("foamShoreFoamPattern"),
+                new GUIContent(
+                    "Pattern",
+                    "Chooses the shore event recipe: Mixed, Shore Ribbons, or Inward Wash."));
+            EditorGUI.indentLevel--;
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.HelpBox(
+                "Hidden recipe: deterministic shore slots start short progressive source events. Events spawn normal-strength material and reveal shape spatially, rather than relying on faint deposits or one-shot random patches.",
+                MessageType.Info);
+
+            if (runtime != null)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField(
+                    "Runtime Status",
+                    runtime.AutomaticShoreBirthStatus);
+                EditorGUILayout.LabelField(
+                    "Events Started",
+                    $"{runtime.AutomaticShoreBirthSubmittedLastUpdate} started / {runtime.AutomaticShoreBirthRejectedLastUpdate} skipped, max {runtime.AutomaticShoreBirthBudgetPerTick}/update");
+                EditorGUILayout.LabelField(
+                    "Events Total",
+                    runtime.AutomaticShoreBirthSubmittedTotal.ToString("N0"));
+                EditorGUI.indentLevel--;
+            }
+            else
+            {
+                EditorGUILayout.LabelField("Runtime", "Unavailable");
+            }
+
+            EditorGUILayout.HelpBox(
+                "Validation target: Material Presence / Remaining Life should show shore-attached opaque ribbons or inward tongues distributed across the chunk over time. Final Foam remains unchanged until Layer D integration is accepted.",
+                MessageType.Info);
 
             EditorGUI.indentLevel--;
         }

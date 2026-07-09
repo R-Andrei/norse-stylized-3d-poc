@@ -108,6 +108,15 @@ MonoBehaviour:
       maskInfluence: 0.34
       direction: {x: 0.86, y: 0.28}
       seedOffset: 211
+    - kind: 20
+      enabled: 1
+      costClass: 0
+      strength: 0.36
+      scale: 4.8
+      contrast: 0.58
+      maskInfluence: 0.42
+      direction: {x: 0.86, y: 0.28}
+      seedOffset: 611
   - id: calibration.hybrid_target_proxy
     displayName: Hybrid Target Proxy
     materialControls:
@@ -159,6 +168,15 @@ MonoBehaviour:
       maskInfluence: 0.42
       direction: {x: 0.82, y: 0.36}
       seedOffset: 229
+    - kind: 20
+      enabled: 1
+      costClass: 0
+      strength: 0.2
+      scale: 5.8
+      contrast: 0.38
+      maskInfluence: 0.48
+      direction: {x: 0.82, y: 0.36}
+      seedOffset: 619
   - id: calibration.pixel_faceted
     displayName: Pixel-Faceted
     materialControls:

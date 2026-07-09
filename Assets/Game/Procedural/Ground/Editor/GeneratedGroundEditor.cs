@@ -15,6 +15,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty overrideMaterialControls;
         private SerializedProperty groundMaterialControls;
         private SerializedProperty regenerateOnValidate;
+        private SerializedProperty debugView;
 
         private SerializedProperty shapeSeed;
         private SerializedProperty patchSize;
@@ -100,6 +101,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             regenerateOnValidate =
                 serializedObject.FindProperty(
                     "regenerateOnValidate");
+
+            debugView =
+                serializedObject.FindProperty("debugView");
 
             shapeSeed =
                 recipe.FindPropertyRelative("shapeSeed");
@@ -263,6 +267,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             serializedObject.Update();
 
             DrawGroundSurfaceAuthoringSection();
+            DrawGroundDebugSection();
             DrawGenerationSection();
             DrawPatchSection();
             DrawTransitionSection();
@@ -504,6 +509,46 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 EditorGUILayout.HelpBox(
                     $"The selected family contains duplicate variant id '{duplicateId}'. Variant ids must be stable and unique.",
                     MessageType.Warning);
+            }
+        }
+
+        private void DrawGroundDebugSection()
+        {
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField(
+                "Ground Debug",
+                EditorStyles.boldLabel);
+
+            EditorGUILayout.HelpBox(
+                "Ground debug views are applied through this GeneratedGround object's MaterialPropertyBlock. They do not require editing shared material assets and do not regenerate terrain.",
+                MessageType.None);
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                debugView,
+                new GUIContent(
+                    "Debug View",
+                    "Renderer-local generated-ground debug view. Use None for normal rendering."));
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+                ApplyToTargets(
+                    "Change Generated Ground Debug View",
+                    ground => ground.RefreshSurfaceMaterialProperties());
+            }
+
+            using (new EditorGUI.DisabledScope(
+                       !debugView.hasMultipleDifferentValues &&
+                       debugView.enumValueIndex == 0))
+            {
+                if (GUILayout.Button("Clear Debug View"))
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    ApplyToTargets(
+                        "Clear Generated Ground Debug View",
+                        ground => ground.ClearDebugView());
+                }
             }
         }
 

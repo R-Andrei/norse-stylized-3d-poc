@@ -623,14 +623,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     bounds.size.x,
                     Mathf.Max(bounds.size.y, bounds.size.z)));
 
-            // EW-4D0.6T3 keeps the EW-4A.1 control contract: Width owns
+            // EW-4D0.7 keeps the EW-4A.1 control contract: Width owns
             // physical bevel depth, Amount owns generated material strength,
             // and Softness is reserved for material/normal response. The active
-            // construction path is topology-first and fail-closed: this step
-            // preflights graph mapping, per-face selected-edge clipping,
-            // shared rail extraction, sampled profile-grid preparation,
-            // rail-sampled base faces, ribbon emission, and T-junction-safe
-            // open-cycle polygon closure before any legacy half-space fallback is allowed.
+            // construction path is topology-first and fail-closed: graph mapping,
+            // per-face selected-edge clipping, shared rail extraction, sampled
+            // profile grids, rail-sampled base faces, ribbons, pre-closure
+            // T-junction repair, branch-aware open-cycle polygon closure, and
+            // final strict topology audit must succeed before rebuilt faces are
+            // committed. Successful EW-4D construction explicitly bypasses the
+            // obsolete EW-4C half-space fallback.
             float width01 = Mathf.InverseLerp(0.25f, 2f, settings.EdgeWearWidth);
             float bevelDepth = maximumDimension * Mathf.Lerp(0.0035f, 0.0115f, width01);
             bevelDepth = Mathf.Clamp(
@@ -675,43 +677,76 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 candidates.Count,
                 selectedCount);
 
-            if (!TryPreflightTopologyBevelGraph(
+            if (!TryBuildTopologyGraphEdgeWearBevelFaces(
                     faces,
                     candidates,
                     selectedCount,
                     bevelDepth,
                     minimumStableFaceArea,
                     minimumStableEdgeLength,
+                    out List<PolygonFace> rebuiltFaces,
                     ref stats))
             {
-                // EW-4D0.6T3 fail-closed: if selected edge candidates cannot be
+                // EW-4D0.7 fail-closed: if selected edge candidates cannot be
                 // mapped into a real topology graph, if affected faces cannot
-                // produce shared clipped rails, if selected edges cannot
-                // produce stable sampled profile grids, or if temporary
-                // clipped base-face replacements, sampled ribbons, or
-                // transactional open-cycle polygon closure cannot be built, the final
-                // topology-graph bevel result would be operating on untrusted
-                // data. In this failure case the legacy half-space fallback is
-                // intentionally not executed; zero half-space summary fields are
-                // diagnostic leftovers, not a second attempted bevel path.
+                // produce shared clipped rails, if selected edges cannot produce
+                // stable sampled profile grids, or if the rebuilt workspace
+                // cannot pass strict zero/zero/zero topology validation, the
+                // final topology-graph bevel result would be operating on
+                // untrusted data. In this failure case the legacy half-space
+                // fallback is intentionally not executed; zero half-space
+                // summary fields are diagnostic leftovers, not a second
+                // attempted bevel path.
                 WarnEdgeWearBevelFailure(stats);
                 return;
             }
 
-            if (!TryApplyHalfSpaceEdgeWearBevels(
-                    faces,
-                    candidates,
-                    selectedCount,
-                    bevelDepth,
-                    bounds,
-                    minimumStableFaceArea,
-                    minimumStableEdgeLength,
-                    ref stats))
+            EdgeWearTopologyStats finalTopology = AuditEdgeWearTopology(
+                rebuiltFaces,
+                minimumStableEdgeLength);
+            stats.TopologyOpenEdges = finalTopology.OpenEdgeCount;
+            stats.TopologyNonManifoldEdges = finalTopology.NonManifoldEdgeCount;
+            stats.TopologyTJunctions = finalTopology.TJunctionCount;
+
+            if (finalTopology.OpenEdgeCount != 0 ||
+                finalTopology.NonManifoldEdgeCount != 0 ||
+                finalTopology.TJunctionCount != 0)
             {
-                // Fail closed. Edge wear is optional; broken bevel topology is not.
+                if (finalTopology.OpenEdgeCount != 0)
+                {
+                    stats.RegisterReject(EdgeWearBevelRejectReason.ValidationOpenEdge);
+                }
+
+                if (finalTopology.NonManifoldEdgeCount != 0)
+                {
+                    stats.RegisterReject(EdgeWearBevelRejectReason.ValidationNonManifoldEdge);
+                }
+
+                if (finalTopology.TJunctionCount != 0)
+                {
+                    stats.RegisterReject(EdgeWearBevelRejectReason.ValidationTJunction);
+                }
+
                 WarnEdgeWearBevelFailure(stats);
                 return;
             }
+
+            faces.Clear();
+            faces.AddRange(ClonePolygonFaces(rebuiltFaces));
+
+            stats.AcceptedCount = selectedCount;
+            stats.ProducedBevelFaceCount = CountFeatureFaces(
+                faces,
+                PolygonFaceFeature.ConvexEdgeWear);
+            stats.CommittedConvexEdgeWearFaceCount = stats.ProducedBevelFaceCount;
+            stats.CommittedConvexEdgeWearTriangleEstimateCount =
+                EstimateTriangulatedTriangleCount(
+                    faces,
+                    PolygonFaceFeature.ConvexEdgeWear);
+            stats.CommittedConvexEdgeWearRenderedVertexEstimateCount =
+                stats.CommittedConvexEdgeWearTriangleEstimateCount * 3;
+
+            LogEdgeWearBevelCommit(stats);
         }
 
         private static List<EdgeWearBevelCandidate> BuildEdgeWearBevelCandidates(
@@ -861,15 +896,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return candidates;
         }
 
-        private static bool TryPreflightTopologyBevelGraph(
+        private static bool TryBuildTopologyGraphEdgeWearBevelFaces(
             List<PolygonFace> faces,
             List<EdgeWearBevelCandidate> candidates,
             int selectedCount,
             float bevelDepth,
             float minimumStableFaceArea,
             float minimumStableEdgeLength,
+            out List<PolygonFace> rebuiltFaces,
             ref EdgeWearBevelBuildStats stats)
         {
+            rebuiltFaces = null;
             if (!TryBuildEdgeWearTopologyGraph(
                     faces,
                     out EdgeWearTopologyGraph graph,
@@ -899,6 +936,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     bevelDepth,
                     minimumStableFaceArea,
                     minimumStableEdgeLength,
+                    out rebuiltFaces,
                     ref graphStats))
             {
                 stats.ApplyGraphStats(graphStats);
@@ -1085,8 +1123,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float bevelDepth,
             float minimumStableFaceArea,
             float minimumStableEdgeLength,
+            out List<PolygonFace> rebuiltFaces,
             ref EdgeWearGraphBuildStats stats)
         {
+            rebuiltFaces = null;
             if (selectedEdges.Count == 0)
             {
                 return false;
@@ -1242,6 +1282,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 localBaseFaceMinArea,
                 localBaseMinEdgeLength,
                 minimumStableEdgeLength,
+                out rebuiltFaces,
                 ref stats);
         }
 
@@ -1440,8 +1481,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float localBaseFaceMinArea,
             float localBaseMinEdgeLength,
             float minimumStableEdgeLength,
+            out List<PolygonFace> rebuiltFaces,
             ref EdgeWearGraphBuildStats stats)
         {
+            rebuiltFaces = null;
             EdgeWearTopologyRebuildWorkspace workspace =
                 new EdgeWearTopologyRebuildWorkspace();
             Dictionary<int, List<EdgeWearFaceRailSamples>> railSamplesByFace =
@@ -1581,6 +1624,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     openEdgeSelectedEdgeProximity),
                 ref stats);
 
+            if (!TryRepairWorkspaceTJunctionEdgesBeforeClosure(
+                    workspace,
+                    int.MaxValue,
+                    localBaseFaceMinArea * 0.08f,
+                    minimumStableEdgeLength,
+                    ref stats))
+            {
+                return false;
+            }
+
+            ApplyWorkspaceOpenEdgeDiagnosticsAfterPreClosureTJunctionRepair(
+                AnalyzeWorkspaceOpenEdges(
+                    workspace.RebuiltFaces,
+                    graph,
+                    selectedEdges,
+                    openEdgeVertexProximity,
+                    openEdgeSelectedEdgeProximity),
+                ref stats);
+
             if (!TryAppendEdgeWearOpenCycleClosureFaces(
                     workspace,
                     localBaseFaceMinArea * 0.08f,
@@ -1591,11 +1653,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return false;
             }
 
-            // EW-4D0.6T3 is still a workspace-only topology proof. Returning
-            // false prevents the successful preflight from falling through into
-            // the obsolete EW-4C half-space fallback before EW-4D0.7 owns the
-            // final topology audit and active-path switch.
-            return false;
+            EdgeWearTopologyStats finalWorkspaceTopology = AuditEdgeWearTopology(
+                workspace.RebuiltFaces,
+                minimumStableEdgeLength);
+            stats.WorkspaceOpenEdgesAfterTJunctionRepairCount =
+                finalWorkspaceTopology.OpenEdgeCount;
+            stats.WorkspaceNonManifoldEdgesAfterTJunctionRepairCount =
+                finalWorkspaceTopology.NonManifoldEdgeCount;
+            stats.WorkspaceTJunctionsAfterTJunctionRepairCount =
+                finalWorkspaceTopology.TJunctionCount;
+
+            if (finalWorkspaceTopology.OpenEdgeCount != 0 ||
+                finalWorkspaceTopology.NonManifoldEdgeCount != 0 ||
+                finalWorkspaceTopology.TJunctionCount != 0)
+            {
+                return false;
+            }
+
+            rebuiltFaces = ClonePolygonFaces(workspace.RebuiltFaces);
+            return true;
         }
 
         private static Dictionary<int, List<EdgeWearFaceRailSamples>> BuildEdgeWearFaceRailSamples(
@@ -1852,6 +1928,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 workspace.RebuiltFaces,
                 topologyMinimumStableEdgeLength);
             stats.WorkspaceOpenEdgesAfterRibbonsCount = ribbonTopology.OpenEdgeCount;
+            stats.WorkspaceNonManifoldEdgesAfterRibbonsCount =
+                ribbonTopology.NonManifoldEdgeCount;
+            stats.WorkspaceTJunctionsAfterRibbonsCount =
+                ribbonTopology.TJunctionCount;
 
             return stats.RibbonEdgesPreparedCount == profileGridsByCandidate.Count &&
                 stats.RibbonEdgesFailedCount == 0 &&
@@ -1904,7 +1984,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             if (!TryBuildOpenCycleClosureFaceList(
                     cycles,
                     minimumStableFaceArea,
-                    minimumStableEdgeLength,
+                    topologyMinimumStableEdgeLength,
                     out List<PolygonFace> closureFaces,
                     ref stats))
             {
@@ -1937,13 +2017,35 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             stats.WorkspaceTJunctionsOnConvexEdgeWearEdgesAfterComponentClosureCount =
                 closureTJunctionDiagnostics.OnConvexEdgeWearEdgeCount;
 
-            return stats.OpenCycleClosureComponentsBuiltCount ==
+            bool componentClosureValid =
+                stats.OpenCycleClosureComponentsBuiltCount ==
                     stats.OpenCycleClosureComponentsInputCount &&
                 stats.OpenCycleClosureFacesBuiltCount ==
                     stats.OpenCycleClosureFacesExpectedCount &&
                 closureTopology.OpenEdgeCount == 0 &&
-                closureTopology.NonManifoldEdgeCount == 0 &&
-                closureTopology.TJunctionCount == 0;
+                closureTopology.NonManifoldEdgeCount == 0;
+
+            if (!componentClosureValid)
+            {
+                return false;
+            }
+
+            // EW-4D0.6T7 repairs T-junctions before closure caps are
+            // generated, decomposes any even-valence repaired boundary graph, and validates cap boundaries at topology-repair scale. Post-closure repair can reintroduce non-manifold
+            // edges because the caps would have been built from stale
+            // unsplit boundaries, so any remaining T-junctions fail closed.
+            stats.WorkspaceFacesAfterTJunctionRepairCount =
+                stats.WorkspaceFacesAfterComponentClosureCount;
+            stats.WorkspaceConvexEdgeWearFacesAfterTJunctionRepairCount =
+                stats.WorkspaceConvexEdgeWearFacesAfterComponentClosureCount;
+            stats.WorkspaceOpenEdgesAfterTJunctionRepairCount =
+                stats.WorkspaceOpenEdgesAfterComponentClosureCount;
+            stats.WorkspaceNonManifoldEdgesAfterTJunctionRepairCount =
+                stats.WorkspaceNonManifoldEdgesAfterComponentClosureCount;
+            stats.WorkspaceTJunctionsAfterTJunctionRepairCount =
+                stats.WorkspaceTJunctionsAfterComponentClosureCount;
+
+            return closureTopology.TJunctionCount == 0;
         }
 
         private static Dictionary<VertexKey, List<int>> BuildOpenEdgeEndpointMap(
@@ -1982,9 +2084,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return true;
             }
 
+            // EW-4D0.6T7 keeps the EW-4D0.6T6 branch tracer: after pre-closure T-junction repair the open
+            // boundary can contain even-valence branch vertices where repaired
+            // loops touch at a split point. This is still closable; only odd
+            // valence endpoints are invalid. Degree-2 vertices trace normally,
+            // while degree-4 vertices are decomposed by choosing the smoothest
+            // unused continuation.
             foreach (KeyValuePair<VertexKey, List<int>> endpoint in openEdgesByEndpoint)
             {
-                if (endpoint.Value.Count != 2)
+                if (endpoint.Value.Count == 0 ||
+                    endpoint.Value.Count % 2 != 0)
                 {
                     stats.OpenCycleClosureNonCycleEndpointCount++;
                 }
@@ -2043,6 +2152,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             EdgeWearOpenEdgeRecord startEdge = openEdges[startEdgeIndex];
             VertexKey startKey = startEdge.StartKey;
             VertexKey currentKey = startEdge.EndKey;
+            Vector3 previousPosition = startEdge.Start;
+            Vector3 currentPosition = startEdge.End;
 
             cycle.Add(startEdge.Start);
             cycle.Add(startEdge.End);
@@ -2059,28 +2170,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     !openEdgesByEndpoint.TryGetValue(
                         currentKey,
                         out List<int> adjacent) ||
-                    adjacent.Count != 2)
+                    adjacent.Count == 0 ||
+                    adjacent.Count % 2 != 0)
                 {
                     stats.OpenCycleClosureTraceFailureCount++;
                     return false;
                 }
 
-                int nextEdgeIndex;
-                if (adjacent[0] == previousEdgeIndex)
-                {
-                    nextEdgeIndex = adjacent[1];
-                }
-                else if (adjacent[1] == previousEdgeIndex)
-                {
-                    nextEdgeIndex = adjacent[0];
-                }
-                else
-                {
-                    stats.OpenCycleClosureTraceFailureCount++;
-                    return false;
-                }
+                int nextEdgeIndex = ChooseNextOpenCycleEdge(
+                    openEdges,
+                    adjacent,
+                    currentKey,
+                    previousEdgeIndex,
+                    previousPosition,
+                    currentPosition,
+                    used);
 
-                if (used[nextEdgeIndex])
+                if (nextEdgeIndex < 0)
                 {
                     stats.OpenCycleClosureTraceFailureCount++;
                     return false;
@@ -2112,16 +2218,92 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
 
                 previousEdgeIndex = nextEdgeIndex;
+                previousPosition = currentPosition;
+                currentPosition = nextPosition;
                 currentKey = nextKey;
             }
 
             return true;
         }
 
+        private static int ChooseNextOpenCycleEdge(
+            List<EdgeWearOpenEdgeRecord> openEdges,
+            List<int> adjacentEdgeIndices,
+            VertexKey currentKey,
+            int previousEdgeIndex,
+            Vector3 previousPosition,
+            Vector3 currentPosition,
+            bool[] used)
+        {
+            int bestEdgeIndex = -1;
+            float bestScore = float.NegativeInfinity;
+            Vector3 incoming = currentPosition - previousPosition;
+            float incomingSqr = incoming.sqrMagnitude;
+
+            for (int i = 0; i < adjacentEdgeIndices.Count; i++)
+            {
+                int candidateEdgeIndex = adjacentEdgeIndices[i];
+                if (candidateEdgeIndex == previousEdgeIndex ||
+                    used[candidateEdgeIndex])
+                {
+                    continue;
+                }
+
+                if (!TryGetOpenEdgeOtherEndpoint(
+                        openEdges[candidateEdgeIndex],
+                        currentKey,
+                        out Vector3 candidatePosition))
+                {
+                    continue;
+                }
+
+                Vector3 outgoing = candidatePosition - currentPosition;
+                float outgoingSqr = outgoing.sqrMagnitude;
+                float score = -1f;
+                if (incomingSqr > MinimumEdgeLengthSqr &&
+                    outgoingSqr > MinimumEdgeLengthSqr)
+                {
+                    score = Vector3.Dot(
+                        incoming / Mathf.Sqrt(incomingSqr),
+                        outgoing / Mathf.Sqrt(outgoingSqr));
+                }
+
+                if (score > bestScore ||
+                    bestEdgeIndex < 0)
+                {
+                    bestScore = score;
+                    bestEdgeIndex = candidateEdgeIndex;
+                }
+            }
+
+            return bestEdgeIndex;
+        }
+
+        private static bool TryGetOpenEdgeOtherEndpoint(
+            EdgeWearOpenEdgeRecord openEdge,
+            VertexKey currentKey,
+            out Vector3 otherEndpoint)
+        {
+            if (openEdge.StartKey.Equals(currentKey))
+            {
+                otherEndpoint = openEdge.End;
+                return true;
+            }
+
+            if (openEdge.EndKey.Equals(currentKey))
+            {
+                otherEndpoint = openEdge.Start;
+                return true;
+            }
+
+            otherEndpoint = Vector3.zero;
+            return false;
+        }
+
         private static bool TryBuildOpenCycleClosureFaceList(
             List<List<Vector3>> cycles,
             float minimumStableFaceArea,
-            float minimumStableEdgeLength,
+            float topologyMinimumStableEdgeLength,
             out List<PolygonFace> closureFaces,
             ref EdgeWearGraphBuildStats stats)
         {
@@ -2134,7 +2316,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 if (!TryBuildOpenCycleClosurePolygonFace(
                         cycle,
                         minimumStableFaceArea,
-                        minimumStableEdgeLength,
+                        topologyMinimumStableEdgeLength,
                         out PolygonFace closureFace,
                         ref stats))
                 {
@@ -2152,7 +2334,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private static bool TryBuildOpenCycleClosurePolygonFace(
             List<Vector3> cycle,
             float minimumStableFaceArea,
-            float minimumStableEdgeLength,
+            float topologyMinimumStableEdgeLength,
             out PolygonFace closureFace,
             ref EdgeWearGraphBuildStats stats)
         {
@@ -2170,6 +2352,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 if (!IsFinite(point))
                 {
                     stats.OpenCycleClosureInvalidFaceCount++;
+                    stats.OpenCycleClosureInvalidFaceNonFiniteCount++;
                     return false;
                 }
 
@@ -2177,9 +2360,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             RemoveClosingDuplicate(ordered);
+            TrackOpenCycleClosureCapVertexCounts(ordered.Count, ref stats);
             if (ordered.Count < 3)
             {
                 stats.OpenCycleClosureTooSmallCycleCount++;
+                stats.OpenCycleClosureInvalidFaceCount++;
+                stats.OpenCycleClosureInvalidFaceDuplicatePointCount++;
                 return false;
             }
 
@@ -2197,14 +2383,80 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 PolygonFaceFeature.ConvexEdgeWear,
                 1f);
 
-            if (!ValidateLocalEdgeWearFace(
+            if (!ValidateOpenCycleClosureCapFace(
                     closureFace.Vertices,
                     minimumStableFaceArea,
-                    minimumStableEdgeLength))
+                    topologyMinimumStableEdgeLength,
+                    ref stats))
             {
                 stats.OpenCycleClosureInvalidFaceCount++;
                 closureFace = null;
                 return false;
+            }
+
+            return true;
+        }
+
+        private static void TrackOpenCycleClosureCapVertexCounts(
+            int vertexCount,
+            ref EdgeWearGraphBuildStats stats)
+        {
+            if (vertexCount <= 0)
+            {
+                return;
+            }
+
+            if (stats.OpenCycleClosureCapVerticesMinCount == 0 ||
+                vertexCount < stats.OpenCycleClosureCapVerticesMinCount)
+            {
+                stats.OpenCycleClosureCapVerticesMinCount = vertexCount;
+            }
+
+            if (vertexCount > stats.OpenCycleClosureCapVerticesMaxCount)
+            {
+                stats.OpenCycleClosureCapVerticesMaxCount = vertexCount;
+            }
+        }
+
+        private static bool ValidateOpenCycleClosureCapFace(
+            List<Vector3> vertices,
+            float minimumStableFaceArea,
+            float topologyMinimumStableEdgeLength,
+            ref EdgeWearGraphBuildStats stats)
+        {
+            if (vertices == null || vertices.Count < 3)
+            {
+                stats.OpenCycleClosureInvalidFaceDuplicatePointCount++;
+                return false;
+            }
+
+            for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
+            {
+                if (!IsFinite(vertices[vertexIndex]))
+                {
+                    stats.OpenCycleClosureInvalidFaceNonFiniteCount++;
+                    return false;
+                }
+            }
+
+            if (CalculatePolygonArea(vertices) <= minimumStableFaceArea)
+            {
+                stats.OpenCycleClosureInvalidFaceAreaCount++;
+                return false;
+            }
+
+            float edgeTolerance = CalculateTopologyTJunctionTolerance(
+                topologyMinimumStableEdgeLength);
+            float edgeToleranceSqr = edgeTolerance * edgeTolerance;
+            for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
+            {
+                Vector3 start = vertices[vertexIndex];
+                Vector3 end = vertices[(vertexIndex + 1) % vertices.Count];
+                if ((end - start).sqrMagnitude <= edgeToleranceSqr)
+                {
+                    stats.OpenCycleClosureInvalidFaceShortEdgeCount++;
+                    return false;
+                }
             }
 
             return true;
@@ -2769,6 +3021,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             stats.WorkspaceOpenEdgeEndpointVerticesAfterRibbonsCount = diagnostics.EndpointVertexCount;
             stats.WorkspaceOpenEdgeEndpointLeavesAfterRibbonsCount = diagnostics.EndpointLeafCount;
             stats.WorkspaceOpenEdgeEndpointBranchesAfterRibbonsCount = diagnostics.EndpointBranchCount;
+        }
+
+        private static void ApplyWorkspaceOpenEdgeDiagnosticsAfterPreClosureTJunctionRepair(
+            EdgeWearOpenEdgeDiagnostics diagnostics,
+            ref EdgeWearGraphBuildStats stats)
+        {
+            stats.WorkspaceOpenEdgesAfterPreClosureTJunctionRepairCount = diagnostics.OpenEdgeCount;
+            stats.WorkspaceOpenEdgeComponentsAfterPreClosureTJunctionRepairCount = diagnostics.ComponentCount;
+            stats.WorkspaceOpenEdgeIsolatedComponentsAfterPreClosureTJunctionRepairCount = diagnostics.IsolatedComponentCount;
+            stats.WorkspaceOpenEdgeLongestComponentEdgesAfterPreClosureTJunctionRepairCount = diagnostics.LongestComponentEdgeCount;
+            stats.WorkspaceOpenEdgeEndpointVerticesAfterPreClosureTJunctionRepairCount = diagnostics.EndpointVertexCount;
+            stats.WorkspaceOpenEdgeEndpointLeavesAfterPreClosureTJunctionRepairCount = diagnostics.EndpointLeafCount;
+            stats.WorkspaceOpenEdgeEndpointBranchesAfterPreClosureTJunctionRepairCount = diagnostics.EndpointBranchCount;
         }
 
         private static void ApplyWorkspaceOpenEdgeDiagnosticsAfterCorners(
@@ -3933,6 +4198,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 #endif
         }
 
+        private static void LogEdgeWearBevelCommit(EdgeWearBevelBuildStats stats)
+        {
+#if UNITY_EDITOR
+            Debug.Log(
+                "GeneratedMass edge wear topology-graph bevel committed. " +
+                stats.ToSummaryString());
+#endif
+        }
+
         private static void WarnEdgeWearCornerClosureGaps(EdgeWearBevelBuildStats stats)
         {
 #if UNITY_EDITOR
@@ -4853,9 +5127,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return 0;
             }
 
-            float tolerance = Mathf.Max(
-                PointMergeDistance * 4f,
-                minimumStableEdgeLength * 0.04f);
+            float tolerance = CalculateTopologyTJunctionTolerance(
+                minimumStableEdgeLength);
             float toleranceSqr = tolerance * tolerance;
             int count = 0;
 
@@ -4885,6 +5158,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             return count;
+        }
+
+        private static float CalculateTopologyTJunctionTolerance(
+            float minimumStableEdgeLength)
+        {
+            return Mathf.Max(
+                PointMergeDistance * 4f,
+                minimumStableEdgeLength * 0.04f);
         }
 
         private static EdgeWearTJunctionDiagnostics AnalyzeTopologyTJunctions(
@@ -4943,7 +5224,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                                 startKey,
                                 endKey),
                             face.Feature,
-                            faceIndex >= closureStartFaceIndex));
+                            faceIndex >= closureStartFaceIndex,
+                            faceIndex,
+                            vertexIndex));
                 }
             }
 
@@ -4952,9 +5235,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return diagnostics;
             }
 
-            float tolerance = Mathf.Max(
-                PointMergeDistance * 4f,
-                minimumStableEdgeLength * 0.04f);
+            float tolerance = CalculateTopologyTJunctionTolerance(
+                minimumStableEdgeLength);
             float toleranceSqr = tolerance * tolerance;
 
             foreach (KeyValuePair<VertexKey, Vector3> vertex in uniqueVertices)
@@ -4999,6 +5281,630 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             return diagnostics;
+        }
+
+        private static bool TryRepairWorkspaceTJunctionEdgesBeforeClosure(
+            EdgeWearTopologyRebuildWorkspace workspace,
+            int closureStartFaceIndex,
+            float minimumStableFaceArea,
+            float topologyMinimumStableEdgeLength,
+            ref EdgeWearGraphBuildStats stats)
+        {
+            if (workspace == null || workspace.RebuiltFaces.Count == 0)
+            {
+                return false;
+            }
+
+            List<PolygonFace> repairedFaces = ClonePolygonFaces(
+                workspace.RebuiltFaces);
+            const int maxRepairIterations = 8;
+
+            for (int iteration = 0; iteration < maxRepairIterations; iteration++)
+            {
+                EdgeWearTJunctionRepairDiagnostics repairDiagnostics;
+                List<EdgeWearTJunctionRepairRecord> repairRecords =
+                    CollectTopologyTJunctionRepairRecords(
+                        repairedFaces,
+                        closureStartFaceIndex,
+                        topologyMinimumStableEdgeLength,
+                        out repairDiagnostics);
+
+                if (repairDiagnostics.CandidateCount == 0)
+                {
+                    break;
+                }
+
+                stats.WorkspaceTJunctionRepairIterationCount++;
+                stats.WorkspaceTJunctionRepairCandidateCount +=
+                    repairDiagnostics.CandidateCount;
+                stats.WorkspaceTJunctionRepairBaseCandidateCount +=
+                    repairDiagnostics.BaseCandidateCount;
+                stats.WorkspaceTJunctionRepairConvexEdgeWearCandidateCount +=
+                    repairDiagnostics.ConvexEdgeWearCandidateCount;
+                stats.WorkspaceTJunctionRepairClosureCandidateCount +=
+                    repairDiagnostics.ClosureCandidateCount;
+                stats.WorkspaceTJunctionRepairSkippedClosureEdgeCount +=
+                    repairDiagnostics.SkippedClosureEdgeCount;
+
+                float repairSplitTolerance =
+                    CalculateTopologyTJunctionTolerance(
+                        topologyMinimumStableEdgeLength);
+                int insertedCount = ApplyTJunctionRepairRecords(
+                    repairedFaces,
+                    repairRecords,
+                    minimumStableFaceArea,
+                    repairSplitTolerance,
+                    ref stats);
+                stats.WorkspaceTJunctionRepairInsertedVertexCount += insertedCount;
+
+                if (insertedCount == 0)
+                {
+                    break;
+                }
+            }
+
+            EdgeWearTopologyStats repairedTopology = AuditEdgeWearTopology(
+                repairedFaces,
+                topologyMinimumStableEdgeLength);
+            stats.WorkspaceFacesAfterPreClosureTJunctionRepairCount = repairedFaces.Count;
+            stats.WorkspaceConvexEdgeWearFacesAfterPreClosureTJunctionRepairCount =
+                CountFeatureFaces(
+                    repairedFaces,
+                    PolygonFaceFeature.ConvexEdgeWear);
+            stats.WorkspaceOpenEdgesAfterPreClosureTJunctionRepairCount =
+                repairedTopology.OpenEdgeCount;
+            stats.WorkspaceNonManifoldEdgesAfterPreClosureTJunctionRepairCount =
+                repairedTopology.NonManifoldEdgeCount;
+            stats.WorkspaceTJunctionsAfterPreClosureTJunctionRepairCount =
+                repairedTopology.TJunctionCount;
+
+            bool repaired = repairedTopology.NonManifoldEdgeCount == 0 &&
+                repairedTopology.TJunctionCount == 0;
+            if (!repaired)
+            {
+                return false;
+            }
+
+            workspace.RebuiltFaces.Clear();
+            workspace.RebuiltFaces.AddRange(repairedFaces);
+            return true;
+        }
+
+        private static bool TryRepairWorkspaceTJunctionEdges(
+            EdgeWearTopologyRebuildWorkspace workspace,
+            int closureStartFaceIndex,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength,
+            float topologyMinimumStableEdgeLength,
+            ref EdgeWearGraphBuildStats stats)
+        {
+            if (workspace == null || workspace.RebuiltFaces.Count == 0)
+            {
+                return false;
+            }
+
+            List<PolygonFace> repairedFaces = ClonePolygonFaces(
+                workspace.RebuiltFaces);
+            const int maxRepairIterations = 8;
+
+            for (int iteration = 0; iteration < maxRepairIterations; iteration++)
+            {
+                EdgeWearTJunctionRepairDiagnostics repairDiagnostics;
+                List<EdgeWearTJunctionRepairRecord> repairRecords =
+                    CollectTopologyTJunctionRepairRecords(
+                        repairedFaces,
+                        closureStartFaceIndex,
+                        topologyMinimumStableEdgeLength,
+                        out repairDiagnostics);
+
+                if (repairDiagnostics.CandidateCount == 0)
+                {
+                    break;
+                }
+
+                stats.WorkspaceTJunctionRepairIterationCount++;
+                stats.WorkspaceTJunctionRepairCandidateCount +=
+                    repairDiagnostics.CandidateCount;
+                stats.WorkspaceTJunctionRepairBaseCandidateCount +=
+                    repairDiagnostics.BaseCandidateCount;
+                stats.WorkspaceTJunctionRepairConvexEdgeWearCandidateCount +=
+                    repairDiagnostics.ConvexEdgeWearCandidateCount;
+                stats.WorkspaceTJunctionRepairClosureCandidateCount +=
+                    repairDiagnostics.ClosureCandidateCount;
+                stats.WorkspaceTJunctionRepairSkippedClosureEdgeCount +=
+                    repairDiagnostics.SkippedClosureEdgeCount;
+
+                float repairSplitTolerance =
+                    CalculateTopologyTJunctionTolerance(
+                        topologyMinimumStableEdgeLength);
+                int insertedCount = ApplyTJunctionRepairRecords(
+                    repairedFaces,
+                    repairRecords,
+                    minimumStableFaceArea,
+                    repairSplitTolerance,
+                    ref stats);
+                stats.WorkspaceTJunctionRepairInsertedVertexCount += insertedCount;
+
+                if (insertedCount == 0)
+                {
+                    break;
+                }
+            }
+
+            EdgeWearTopologyStats repairedTopology = AuditEdgeWearTopology(
+                repairedFaces,
+                topologyMinimumStableEdgeLength);
+            stats.WorkspaceFacesAfterTJunctionRepairCount = repairedFaces.Count;
+            stats.WorkspaceConvexEdgeWearFacesAfterTJunctionRepairCount =
+                CountFeatureFaces(
+                    repairedFaces,
+                    PolygonFaceFeature.ConvexEdgeWear);
+            stats.WorkspaceOpenEdgesAfterTJunctionRepairCount =
+                repairedTopology.OpenEdgeCount;
+            stats.WorkspaceNonManifoldEdgesAfterTJunctionRepairCount =
+                repairedTopology.NonManifoldEdgeCount;
+            stats.WorkspaceTJunctionsAfterTJunctionRepairCount =
+                repairedTopology.TJunctionCount;
+
+            bool repaired = repairedTopology.OpenEdgeCount == 0 &&
+                repairedTopology.NonManifoldEdgeCount == 0 &&
+                repairedTopology.TJunctionCount == 0;
+            if (!repaired)
+            {
+                return false;
+            }
+
+            workspace.RebuiltFaces.Clear();
+            workspace.RebuiltFaces.AddRange(repairedFaces);
+            return true;
+        }
+
+
+        private static List<EdgeWearTJunctionRepairRecord> CollectTopologyTJunctionRepairRecords(
+            List<PolygonFace> faces,
+            int closureStartFaceIndex,
+            float minimumStableEdgeLength,
+            out EdgeWearTJunctionRepairDiagnostics diagnostics)
+        {
+            diagnostics = new EdgeWearTJunctionRepairDiagnostics();
+            List<EdgeWearTJunctionRepairRecord> records =
+                new List<EdgeWearTJunctionRepairRecord>();
+            if (faces == null || faces.Count == 0)
+            {
+                return records;
+            }
+
+            Dictionary<VertexKey, Vector3> uniqueVertices =
+                new Dictionary<VertexKey, Vector3>();
+            List<EdgeWearTopologyEdgeSegmentRecord> edgeSegments =
+                new List<EdgeWearTopologyEdgeSegmentRecord>();
+
+            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
+            {
+                PolygonFace face = faces[faceIndex];
+                List<Vector3> vertices = face.Vertices;
+                if (vertices == null || vertices.Count < 3)
+                {
+                    continue;
+                }
+
+                for (int vertexIndex = 0;
+                     vertexIndex < vertices.Count;
+                     vertexIndex++)
+                {
+                    Vector3 start = vertices[vertexIndex];
+                    Vector3 end = vertices[(vertexIndex + 1) % vertices.Count];
+                    if (AreSamePoint(start, end))
+                    {
+                        continue;
+                    }
+
+                    VertexKey startKey = new VertexKey(start);
+                    VertexKey endKey = new VertexKey(end);
+                    if (!uniqueVertices.ContainsKey(startKey))
+                    {
+                        uniqueVertices.Add(startKey, start);
+                    }
+
+                    if (!uniqueVertices.ContainsKey(endKey))
+                    {
+                        uniqueVertices.Add(endKey, end);
+                    }
+
+                    edgeSegments.Add(
+                        new EdgeWearTopologyEdgeSegmentRecord(
+                            new TopologyEdgeSegment(
+                                start,
+                                end,
+                                startKey,
+                                endKey),
+                            face.Feature,
+                            faceIndex >= closureStartFaceIndex,
+                            faceIndex,
+                            vertexIndex));
+                }
+            }
+
+            if (uniqueVertices.Count == 0 || edgeSegments.Count == 0)
+            {
+                return records;
+            }
+
+            float tolerance = CalculateTopologyTJunctionTolerance(
+                minimumStableEdgeLength);
+            float toleranceSqr = tolerance * tolerance;
+
+            foreach (KeyValuePair<VertexKey, Vector3> vertex in uniqueVertices)
+            {
+                bool countedVertex = false;
+                for (int edgeIndex = 0;
+                     edgeIndex < edgeSegments.Count;
+                     edgeIndex++)
+                {
+                    EdgeWearTopologyEdgeSegmentRecord edgeRecord = edgeSegments[edgeIndex];
+                    TopologyEdgeSegment edge = edgeRecord.Segment;
+                    if (vertex.Key.Equals(edge.StartKey) ||
+                        vertex.Key.Equals(edge.EndKey))
+                    {
+                        continue;
+                    }
+
+                    if (!IsPointOnSegmentInterior(
+                            vertex.Value,
+                            edge.Start,
+                            edge.End,
+                            toleranceSqr))
+                    {
+                        continue;
+                    }
+
+                    if (!countedVertex)
+                    {
+                        diagnostics.CandidateCount++;
+                        countedVertex = true;
+                    }
+
+                    if (edgeRecord.IsClosureEdge)
+                    {
+                        diagnostics.ClosureCandidateCount++;
+                    }
+                    else if (edgeRecord.Feature == PolygonFaceFeature.Base)
+                    {
+                        diagnostics.BaseCandidateCount++;
+                    }
+                    else
+                    {
+                        diagnostics.ConvexEdgeWearCandidateCount++;
+                    }
+
+                    float t = CalculateSegmentParameter(
+                        vertex.Value,
+                        edge.Start,
+                        edge.End);
+                    records.Add(
+                        new EdgeWearTJunctionRepairRecord(
+                            edgeRecord.FaceIndex,
+                            edgeRecord.EdgeVertexIndex,
+                            vertex.Value,
+                            t));
+                }
+            }
+
+            return records;
+        }
+
+        private static int ApplyTJunctionRepairRecords(
+            List<PolygonFace> faces,
+            List<EdgeWearTJunctionRepairRecord> repairRecords,
+            float minimumStableFaceArea,
+            float repairSplitTolerance,
+            ref EdgeWearGraphBuildStats stats)
+        {
+            if (repairRecords == null || repairRecords.Count == 0)
+            {
+                return 0;
+            }
+
+            Dictionary<int, List<EdgeWearTJunctionEdgeInsertion>> insertionsByFace =
+                new Dictionary<int, List<EdgeWearTJunctionEdgeInsertion>>();
+            HashSet<EdgeWearTJunctionInsertionKey> uniqueInsertions =
+                new HashSet<EdgeWearTJunctionInsertionKey>();
+            float repairMinimumEdgeLengthSqr =
+                repairSplitTolerance * repairSplitTolerance;
+
+            for (int recordIndex = 0;
+                 recordIndex < repairRecords.Count;
+                 recordIndex++)
+            {
+                EdgeWearTJunctionRepairRecord record = repairRecords[recordIndex];
+                if (record.FaceIndex < 0 || record.FaceIndex >= faces.Count)
+                {
+                    continue;
+                }
+
+                PolygonFace face = faces[record.FaceIndex];
+                if (face.Vertices == null ||
+                    record.EdgeVertexIndex < 0 ||
+                    record.EdgeVertexIndex >= face.Vertices.Count)
+                {
+                    continue;
+                }
+
+                Vector3 start = face.Vertices[record.EdgeVertexIndex];
+                Vector3 end = face.Vertices[
+                    (record.EdgeVertexIndex + 1) % face.Vertices.Count];
+                if (AreSamePoint(record.Point, start))
+                {
+                    stats.WorkspaceTJunctionRepairSkippedEndpointMatchCount++;
+                    stats.WorkspaceTJunctionRepairTooNearStartCount++;
+                    continue;
+                }
+
+                if (AreSamePoint(record.Point, end))
+                {
+                    stats.WorkspaceTJunctionRepairSkippedEndpointMatchCount++;
+                    stats.WorkspaceTJunctionRepairTooNearEndCount++;
+                    continue;
+                }
+
+                if ((record.Point - start).sqrMagnitude <= repairMinimumEdgeLengthSqr)
+                {
+                    stats.WorkspaceTJunctionRepairTooNearStartCount++;
+                }
+
+                if ((record.Point - end).sqrMagnitude <= repairMinimumEdgeLengthSqr)
+                {
+                    stats.WorkspaceTJunctionRepairTooNearEndCount++;
+                }
+
+                EdgeWearTJunctionInsertionKey insertionKey =
+                    new EdgeWearTJunctionInsertionKey(
+                        record.FaceIndex,
+                        record.EdgeVertexIndex,
+                        new VertexKey(record.Point));
+                if (!uniqueInsertions.Add(insertionKey))
+                {
+                    stats.WorkspaceTJunctionRepairSkippedDuplicateInsertionCount++;
+                    continue;
+                }
+
+                if (!insertionsByFace.TryGetValue(
+                        record.FaceIndex,
+                        out List<EdgeWearTJunctionEdgeInsertion> faceInsertions))
+                {
+                    faceInsertions = new List<EdgeWearTJunctionEdgeInsertion>();
+                    insertionsByFace.Add(record.FaceIndex, faceInsertions);
+                }
+
+                faceInsertions.Add(
+                    new EdgeWearTJunctionEdgeInsertion(
+                        record.EdgeVertexIndex,
+                        record.Point,
+                        record.T));
+            }
+
+            if (insertionsByFace.Count == 0)
+            {
+                stats.WorkspaceTJunctionRepairFailedNoInsertionCount++;
+                return 0;
+            }
+
+            Dictionary<int, PolygonFace> repairedFaces =
+                new Dictionary<int, PolygonFace>();
+            int insertedCount = 0;
+            foreach (KeyValuePair<int, List<EdgeWearTJunctionEdgeInsertion>> entry in insertionsByFace)
+            {
+                PolygonFace sourceFace = faces[entry.Key];
+                EdgeWearTJunctionRepairFaceFailureReason failureReason;
+                if (!TryBuildTJunctionRepairedFace(
+                        sourceFace,
+                        entry.Value,
+                        minimumStableFaceArea,
+                        repairSplitTolerance,
+                        out PolygonFace repairedFace,
+                        out int faceInsertedCount,
+                        out failureReason))
+                {
+                    stats.WorkspaceTJunctionRepairFailedFaceCount++;
+                    RegisterTJunctionRepairFaceFailure(
+                        failureReason,
+                        ref stats);
+                    return 0;
+                }
+
+                repairedFaces.Add(entry.Key, repairedFace);
+                insertedCount += faceInsertedCount;
+            }
+
+            if (insertedCount <= 0)
+            {
+                stats.WorkspaceTJunctionRepairFailedNoInsertionCount++;
+                return 0;
+            }
+
+            foreach (KeyValuePair<int, PolygonFace> replacement in repairedFaces)
+            {
+                faces[replacement.Key] = replacement.Value;
+                stats.WorkspaceTJunctionRepairAppliedFaceCount++;
+            }
+
+            return insertedCount;
+        }
+
+        private static void RegisterTJunctionRepairFaceFailure(
+            EdgeWearTJunctionRepairFaceFailureReason failureReason,
+            ref EdgeWearGraphBuildStats stats)
+        {
+            switch (failureReason)
+            {
+                case EdgeWearTJunctionRepairFaceFailureReason.NoInsertion:
+                    stats.WorkspaceTJunctionRepairFailedNoInsertionCount++;
+                    break;
+                case EdgeWearTJunctionRepairFaceFailureReason.Area:
+                    stats.WorkspaceTJunctionRepairFailedAreaCount++;
+                    break;
+                case EdgeWearTJunctionRepairFaceFailureReason.ShortEdge:
+                    stats.WorkspaceTJunctionRepairFailedShortEdgeCount++;
+                    break;
+                case EdgeWearTJunctionRepairFaceFailureReason.NonFinite:
+                    stats.WorkspaceTJunctionRepairFailedNonFiniteCount++;
+                    break;
+            }
+        }
+
+        private static bool TryBuildTJunctionRepairedFace(
+            PolygonFace sourceFace,
+            List<EdgeWearTJunctionEdgeInsertion> insertions,
+            float minimumStableFaceArea,
+            float repairSplitTolerance,
+            out PolygonFace repairedFace,
+            out int insertedCount,
+            out EdgeWearTJunctionRepairFaceFailureReason failureReason)
+        {
+            repairedFace = null;
+            insertedCount = 0;
+            failureReason = EdgeWearTJunctionRepairFaceFailureReason.NoInsertion;
+            if (sourceFace == null ||
+                sourceFace.Vertices == null ||
+                sourceFace.Vertices.Count < 3)
+            {
+                return false;
+            }
+
+            Dictionary<int, List<EdgeWearTJunctionEdgeInsertion>> insertionsByEdge =
+                new Dictionary<int, List<EdgeWearTJunctionEdgeInsertion>>();
+            for (int insertionIndex = 0;
+                 insertionIndex < insertions.Count;
+                 insertionIndex++)
+            {
+                EdgeWearTJunctionEdgeInsertion insertion = insertions[insertionIndex];
+                if (!insertionsByEdge.TryGetValue(
+                        insertion.EdgeVertexIndex,
+                        out List<EdgeWearTJunctionEdgeInsertion> edgeInsertions))
+                {
+                    edgeInsertions = new List<EdgeWearTJunctionEdgeInsertion>();
+                    insertionsByEdge.Add(insertion.EdgeVertexIndex, edgeInsertions);
+                }
+
+                edgeInsertions.Add(insertion);
+            }
+
+            foreach (List<EdgeWearTJunctionEdgeInsertion> edgeInsertions in insertionsByEdge.Values)
+            {
+                edgeInsertions.Sort((left, right) => left.T.CompareTo(right.T));
+            }
+
+            List<Vector3> vertices = sourceFace.Vertices;
+            List<Vector3> repairedVertices = new List<Vector3>(
+                vertices.Count + insertions.Count);
+            for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
+            {
+                AddPointIfDifferent(repairedVertices, vertices[vertexIndex]);
+                if (!insertionsByEdge.TryGetValue(
+                        vertexIndex,
+                        out List<EdgeWearTJunctionEdgeInsertion> edgeInsertions))
+                {
+                    continue;
+                }
+
+                Vector3 edgeEnd = vertices[(vertexIndex + 1) % vertices.Count];
+                for (int insertionIndex = 0;
+                     insertionIndex < edgeInsertions.Count;
+                     insertionIndex++)
+                {
+                    Vector3 point = edgeInsertions[insertionIndex].Point;
+                    if (AreSamePoint(point, vertices[vertexIndex]) ||
+                        AreSamePoint(point, edgeEnd))
+                    {
+                        continue;
+                    }
+
+                    AddPointIfDifferent(repairedVertices, point);
+                    insertedCount++;
+                }
+            }
+
+            RemoveClosingDuplicate(repairedVertices);
+            if (repairedVertices.Count <= vertices.Count || insertedCount == 0)
+            {
+                failureReason = EdgeWearTJunctionRepairFaceFailureReason.NoInsertion;
+                return false;
+            }
+
+            if (!ValidateTJunctionRepairedFace(
+                    repairedVertices,
+                    minimumStableFaceArea,
+                    repairSplitTolerance,
+                    out failureReason))
+            {
+                return false;
+            }
+
+            repairedFace = new PolygonFace(
+                repairedVertices,
+                sourceFace.Normal,
+                sourceFace.Feature,
+                sourceFace.FeatureStrength);
+            return true;
+        }
+
+        private static bool ValidateTJunctionRepairedFace(
+            List<Vector3> vertices,
+            float minimumStableFaceArea,
+            float repairSplitTolerance,
+            out EdgeWearTJunctionRepairFaceFailureReason failureReason)
+        {
+            failureReason = EdgeWearTJunctionRepairFaceFailureReason.NoInsertion;
+            if (vertices == null || vertices.Count < 3)
+            {
+                return false;
+            }
+
+            for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
+            {
+                if (!IsFinite(vertices[vertexIndex]))
+                {
+                    failureReason = EdgeWearTJunctionRepairFaceFailureReason.NonFinite;
+                    return false;
+                }
+            }
+
+            if (CalculatePolygonArea(vertices) <= minimumStableFaceArea)
+            {
+                failureReason = EdgeWearTJunctionRepairFaceFailureReason.Area;
+                return false;
+            }
+
+            float minimumEdgeLengthSqr =
+                repairSplitTolerance * repairSplitTolerance;
+            for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
+            {
+                Vector3 start = vertices[vertexIndex];
+                Vector3 end = vertices[(vertexIndex + 1) % vertices.Count];
+                if ((end - start).sqrMagnitude <= minimumEdgeLengthSqr)
+                {
+                    failureReason = EdgeWearTJunctionRepairFaceFailureReason.ShortEdge;
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static float CalculateSegmentParameter(
+            Vector3 point,
+            Vector3 start,
+            Vector3 end)
+        {
+            Vector3 segment = end - start;
+            float segmentLengthSqr = segment.sqrMagnitude;
+            if (segmentLengthSqr <= MinimumEdgeLengthSqr)
+            {
+                return 0f;
+            }
+
+            return Mathf.Clamp01(
+                Vector3.Dot(point - start, segment) / segmentLengthSqr);
         }
 
         private static bool IsPointOnSegmentInterior(
@@ -5227,6 +6133,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 if (faces[i].Feature == feature)
                 {
                     count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static int EstimateTriangulatedTriangleCount(
+            List<PolygonFace> faces,
+            PolygonFaceFeature feature)
+        {
+            int count = 0;
+            for (int i = 0; i < faces.Count; i++)
+            {
+                PolygonFace face = faces[i];
+                if (face.Feature == feature)
+                {
+                    count += Mathf.Max(0, face.Vertices.Count - 2);
                 }
             }
 
@@ -7535,16 +8458,30 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public readonly TopologyEdgeSegment Segment;
             public readonly PolygonFaceFeature Feature;
             public readonly bool IsClosureEdge;
+            public readonly int FaceIndex;
+            public readonly int EdgeVertexIndex;
 
             public EdgeWearTopologyEdgeSegmentRecord(
                 TopologyEdgeSegment segment,
                 PolygonFaceFeature feature,
-                bool isClosureEdge)
+                bool isClosureEdge,
+                int faceIndex,
+                int edgeVertexIndex)
             {
                 Segment = segment;
                 Feature = feature;
                 IsClosureEdge = isClosureEdge;
+                FaceIndex = faceIndex;
+                EdgeVertexIndex = edgeVertexIndex;
             }
+        }
+
+        private enum EdgeWearTJunctionRepairFaceFailureReason
+        {
+            NoInsertion,
+            Area,
+            ShortEdge,
+            NonFinite
         }
 
         private struct EdgeWearTJunctionDiagnostics
@@ -7553,6 +8490,92 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int OnClosureEdgeCount;
             public int OnBaseEdgeCount;
             public int OnConvexEdgeWearEdgeCount;
+        }
+
+        private struct EdgeWearTJunctionRepairDiagnostics
+        {
+            public int CandidateCount;
+            public int BaseCandidateCount;
+            public int ConvexEdgeWearCandidateCount;
+            public int ClosureCandidateCount;
+            public int SkippedClosureEdgeCount;
+        }
+
+        private readonly struct EdgeWearTJunctionRepairRecord
+        {
+            public readonly int FaceIndex;
+            public readonly int EdgeVertexIndex;
+            public readonly Vector3 Point;
+            public readonly float T;
+
+            public EdgeWearTJunctionRepairRecord(
+                int faceIndex,
+                int edgeVertexIndex,
+                Vector3 point,
+                float t)
+            {
+                FaceIndex = faceIndex;
+                EdgeVertexIndex = edgeVertexIndex;
+                Point = point;
+                T = Mathf.Clamp01(t);
+            }
+        }
+
+        private readonly struct EdgeWearTJunctionEdgeInsertion
+        {
+            public readonly int EdgeVertexIndex;
+            public readonly Vector3 Point;
+            public readonly float T;
+
+            public EdgeWearTJunctionEdgeInsertion(
+                int edgeVertexIndex,
+                Vector3 point,
+                float t)
+            {
+                EdgeVertexIndex = edgeVertexIndex;
+                Point = point;
+                T = Mathf.Clamp01(t);
+            }
+        }
+
+        private readonly struct EdgeWearTJunctionInsertionKey : IEquatable<EdgeWearTJunctionInsertionKey>
+        {
+            private readonly int faceIndex;
+            private readonly int edgeVertexIndex;
+            private readonly VertexKey pointKey;
+
+            public EdgeWearTJunctionInsertionKey(
+                int faceIndex,
+                int edgeVertexIndex,
+                VertexKey pointKey)
+            {
+                this.faceIndex = faceIndex;
+                this.edgeVertexIndex = edgeVertexIndex;
+                this.pointKey = pointKey;
+            }
+
+            public bool Equals(EdgeWearTJunctionInsertionKey other)
+            {
+                return faceIndex == other.faceIndex &&
+                    edgeVertexIndex == other.edgeVertexIndex &&
+                    pointKey.Equals(other.pointKey);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is EdgeWearTJunctionInsertionKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hash = faceIndex;
+                    hash = (hash * 397) ^ edgeVertexIndex;
+                    hash = (hash * 397) ^ pointKey.GetHashCode();
+                    return hash;
+                }
+            }
         }
 
         private sealed class EdgeWearTopologyGraph
@@ -7916,6 +8939,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int WorkspaceConvexEdgeWearFaceCount;
             public int WorkspaceFacesAfterRibbonsCount;
             public int WorkspaceOpenEdgesAfterRibbonsCount;
+            public int WorkspaceNonManifoldEdgesAfterRibbonsCount;
+            public int WorkspaceTJunctionsAfterRibbonsCount;
             public int WorkspaceOpenEdgesNearGraphVerticesAfterRibbonsCount;
             public int WorkspaceOpenEdgesAwayFromGraphVerticesAfterRibbonsCount;
             public int WorkspaceOpenEdgesNearSelectedEdgesAfterRibbonsCount;
@@ -7928,6 +8953,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int WorkspaceOpenEdgeEndpointVerticesAfterRibbonsCount;
             public int WorkspaceOpenEdgeEndpointLeavesAfterRibbonsCount;
             public int WorkspaceOpenEdgeEndpointBranchesAfterRibbonsCount;
+            public int WorkspaceFacesAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceConvexEdgeWearFacesAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceOpenEdgesAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceNonManifoldEdgesAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceTJunctionsAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceOpenEdgeComponentsAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceOpenEdgeIsolatedComponentsAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceOpenEdgeLongestComponentEdgesAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceOpenEdgeEndpointVerticesAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceOpenEdgeEndpointLeavesAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceOpenEdgeEndpointBranchesAfterPreClosureTJunctionRepairCount;
             public int CornerPatchVertexCount;
             public int CornerPatchBuiltCount;
             public int CornerPatchFaceBuiltCount;
@@ -7973,6 +9009,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int OpenCycleClosureInvalidNormalCount;
             public int OpenCycleClosureDegenerateTriangleCount;
             public int OpenCycleClosureInvalidFaceCount;
+            public int OpenCycleClosureInvalidFaceAreaCount;
+            public int OpenCycleClosureInvalidFaceShortEdgeCount;
+            public int OpenCycleClosureInvalidFaceNonFiniteCount;
+            public int OpenCycleClosureInvalidFaceDuplicatePointCount;
+            public int OpenCycleClosureCapVerticesMinCount;
+            public int OpenCycleClosureCapVerticesMaxCount;
             public int WorkspaceFacesAfterComponentClosureCount;
             public int WorkspaceConvexEdgeWearFacesAfterComponentClosureCount;
             public int WorkspaceOpenEdgesAfterComponentClosureCount;
@@ -7981,6 +9023,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int WorkspaceTJunctionsOnClosureEdgesAfterComponentClosureCount;
             public int WorkspaceTJunctionsOnBaseEdgesAfterComponentClosureCount;
             public int WorkspaceTJunctionsOnConvexEdgeWearEdgesAfterComponentClosureCount;
+            public int WorkspaceTJunctionRepairCandidateCount;
+            public int WorkspaceTJunctionRepairBaseCandidateCount;
+            public int WorkspaceTJunctionRepairConvexEdgeWearCandidateCount;
+            public int WorkspaceTJunctionRepairClosureCandidateCount;
+            public int WorkspaceTJunctionRepairInsertedVertexCount;
+            public int WorkspaceTJunctionRepairSkippedClosureEdgeCount;
+            public int WorkspaceTJunctionRepairSkippedEndpointMatchCount;
+            public int WorkspaceTJunctionRepairSkippedDuplicateInsertionCount;
+            public int WorkspaceTJunctionRepairTooNearStartCount;
+            public int WorkspaceTJunctionRepairTooNearEndCount;
+            public int WorkspaceTJunctionRepairFailedFaceCount;
+            public int WorkspaceTJunctionRepairFailedNoInsertionCount;
+            public int WorkspaceTJunctionRepairFailedAreaCount;
+            public int WorkspaceTJunctionRepairFailedShortEdgeCount;
+            public int WorkspaceTJunctionRepairFailedNonFiniteCount;
+            public int WorkspaceTJunctionRepairAppliedFaceCount;
+            public int WorkspaceTJunctionRepairIterationCount;
+            public int WorkspaceFacesAfterTJunctionRepairCount;
+            public int WorkspaceConvexEdgeWearFacesAfterTJunctionRepairCount;
+            public int WorkspaceOpenEdgesAfterTJunctionRepairCount;
+            public int WorkspaceNonManifoldEdgesAfterTJunctionRepairCount;
+            public int WorkspaceTJunctionsAfterTJunctionRepairCount;
         }
 
         private struct EdgeWearCornerClosureStats
@@ -8020,6 +9084,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int SkippedCornerClosureCount;
             public int ConstructedBevelPlaneCount;
             public int ProducedBevelFaceCount;
+            public int CommittedConvexEdgeWearFaceCount;
+            public int CommittedConvexEdgeWearTriangleEstimateCount;
+            public int CommittedConvexEdgeWearRenderedVertexEstimateCount;
             public int BevelDepthScalePercent;
             public int GraphVertexCount;
             public int GraphEdgeCount;
@@ -8071,6 +9138,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int WorkspaceConvexEdgeWearFaceCount;
             public int WorkspaceFacesAfterRibbonsCount;
             public int WorkspaceOpenEdgesAfterRibbonsCount;
+            public int WorkspaceNonManifoldEdgesAfterRibbonsCount;
+            public int WorkspaceTJunctionsAfterRibbonsCount;
             public int WorkspaceOpenEdgesNearGraphVerticesAfterRibbonsCount;
             public int WorkspaceOpenEdgesAwayFromGraphVerticesAfterRibbonsCount;
             public int WorkspaceOpenEdgesNearSelectedEdgesAfterRibbonsCount;
@@ -8083,6 +9152,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int WorkspaceOpenEdgeEndpointVerticesAfterRibbonsCount;
             public int WorkspaceOpenEdgeEndpointLeavesAfterRibbonsCount;
             public int WorkspaceOpenEdgeEndpointBranchesAfterRibbonsCount;
+            public int WorkspaceFacesAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceConvexEdgeWearFacesAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceOpenEdgesAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceNonManifoldEdgesAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceTJunctionsAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceOpenEdgeComponentsAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceOpenEdgeIsolatedComponentsAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceOpenEdgeLongestComponentEdgesAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceOpenEdgeEndpointVerticesAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceOpenEdgeEndpointLeavesAfterPreClosureTJunctionRepairCount;
+            public int WorkspaceOpenEdgeEndpointBranchesAfterPreClosureTJunctionRepairCount;
             public int CornerPatchVertexCount;
             public int CornerPatchBuiltCount;
             public int CornerPatchFaceBuiltCount;
@@ -8128,6 +9208,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int OpenCycleClosureInvalidNormalCount;
             public int OpenCycleClosureDegenerateTriangleCount;
             public int OpenCycleClosureInvalidFaceCount;
+            public int OpenCycleClosureInvalidFaceAreaCount;
+            public int OpenCycleClosureInvalidFaceShortEdgeCount;
+            public int OpenCycleClosureInvalidFaceNonFiniteCount;
+            public int OpenCycleClosureInvalidFaceDuplicatePointCount;
+            public int OpenCycleClosureCapVerticesMinCount;
+            public int OpenCycleClosureCapVerticesMaxCount;
             public int WorkspaceFacesAfterComponentClosureCount;
             public int WorkspaceConvexEdgeWearFacesAfterComponentClosureCount;
             public int WorkspaceOpenEdgesAfterComponentClosureCount;
@@ -8136,6 +9222,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int WorkspaceTJunctionsOnClosureEdgesAfterComponentClosureCount;
             public int WorkspaceTJunctionsOnBaseEdgesAfterComponentClosureCount;
             public int WorkspaceTJunctionsOnConvexEdgeWearEdgesAfterComponentClosureCount;
+            public int WorkspaceTJunctionRepairCandidateCount;
+            public int WorkspaceTJunctionRepairBaseCandidateCount;
+            public int WorkspaceTJunctionRepairConvexEdgeWearCandidateCount;
+            public int WorkspaceTJunctionRepairClosureCandidateCount;
+            public int WorkspaceTJunctionRepairInsertedVertexCount;
+            public int WorkspaceTJunctionRepairSkippedClosureEdgeCount;
+            public int WorkspaceTJunctionRepairSkippedEndpointMatchCount;
+            public int WorkspaceTJunctionRepairSkippedDuplicateInsertionCount;
+            public int WorkspaceTJunctionRepairTooNearStartCount;
+            public int WorkspaceTJunctionRepairTooNearEndCount;
+            public int WorkspaceTJunctionRepairFailedFaceCount;
+            public int WorkspaceTJunctionRepairFailedNoInsertionCount;
+            public int WorkspaceTJunctionRepairFailedAreaCount;
+            public int WorkspaceTJunctionRepairFailedShortEdgeCount;
+            public int WorkspaceTJunctionRepairFailedNonFiniteCount;
+            public int WorkspaceTJunctionRepairAppliedFaceCount;
+            public int WorkspaceTJunctionRepairIterationCount;
+            public int WorkspaceFacesAfterTJunctionRepairCount;
+            public int WorkspaceConvexEdgeWearFacesAfterTJunctionRepairCount;
+            public int WorkspaceOpenEdgesAfterTJunctionRepairCount;
+            public int WorkspaceNonManifoldEdgesAfterTJunctionRepairCount;
+            public int WorkspaceTJunctionsAfterTJunctionRepairCount;
             public int TopologyOpenEdges;
             public int TopologyNonManifoldEdges;
             public int TopologyTJunctions;
@@ -8162,6 +9270,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 SkippedCornerClosureCount = 0;
                 ConstructedBevelPlaneCount = 0;
                 ProducedBevelFaceCount = 0;
+                CommittedConvexEdgeWearFaceCount = 0;
+                CommittedConvexEdgeWearTriangleEstimateCount = 0;
+                CommittedConvexEdgeWearRenderedVertexEstimateCount = 0;
                 BevelDepthScalePercent = 0;
                 GraphVertexCount = 0;
                 GraphEdgeCount = 0;
@@ -8213,6 +9324,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 WorkspaceConvexEdgeWearFaceCount = 0;
                 WorkspaceFacesAfterRibbonsCount = 0;
                 WorkspaceOpenEdgesAfterRibbonsCount = 0;
+                WorkspaceNonManifoldEdgesAfterRibbonsCount = 0;
+                WorkspaceTJunctionsAfterRibbonsCount = 0;
                 WorkspaceOpenEdgesNearGraphVerticesAfterRibbonsCount = 0;
                 WorkspaceOpenEdgesAwayFromGraphVerticesAfterRibbonsCount = 0;
                 WorkspaceOpenEdgesNearSelectedEdgesAfterRibbonsCount = 0;
@@ -8225,6 +9338,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 WorkspaceOpenEdgeEndpointVerticesAfterRibbonsCount = 0;
                 WorkspaceOpenEdgeEndpointLeavesAfterRibbonsCount = 0;
                 WorkspaceOpenEdgeEndpointBranchesAfterRibbonsCount = 0;
+                WorkspaceFacesAfterPreClosureTJunctionRepairCount = 0;
+                WorkspaceConvexEdgeWearFacesAfterPreClosureTJunctionRepairCount = 0;
+                WorkspaceOpenEdgesAfterPreClosureTJunctionRepairCount = 0;
+                WorkspaceNonManifoldEdgesAfterPreClosureTJunctionRepairCount = 0;
+                WorkspaceTJunctionsAfterPreClosureTJunctionRepairCount = 0;
+                WorkspaceOpenEdgeComponentsAfterPreClosureTJunctionRepairCount = 0;
+                WorkspaceOpenEdgeIsolatedComponentsAfterPreClosureTJunctionRepairCount = 0;
+                WorkspaceOpenEdgeLongestComponentEdgesAfterPreClosureTJunctionRepairCount = 0;
+                WorkspaceOpenEdgeEndpointVerticesAfterPreClosureTJunctionRepairCount = 0;
+                WorkspaceOpenEdgeEndpointLeavesAfterPreClosureTJunctionRepairCount = 0;
+                WorkspaceOpenEdgeEndpointBranchesAfterPreClosureTJunctionRepairCount = 0;
                 CornerPatchVertexCount = 0;
                 CornerPatchBuiltCount = 0;
                 CornerPatchFaceBuiltCount = 0;
@@ -8270,6 +9394,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 OpenCycleClosureInvalidNormalCount = 0;
                 OpenCycleClosureDegenerateTriangleCount = 0;
                 OpenCycleClosureInvalidFaceCount = 0;
+                OpenCycleClosureInvalidFaceAreaCount = 0;
+                OpenCycleClosureInvalidFaceShortEdgeCount = 0;
+                OpenCycleClosureInvalidFaceNonFiniteCount = 0;
+                OpenCycleClosureInvalidFaceDuplicatePointCount = 0;
+                OpenCycleClosureCapVerticesMinCount = 0;
+                OpenCycleClosureCapVerticesMaxCount = 0;
                 WorkspaceFacesAfterComponentClosureCount = 0;
                 WorkspaceConvexEdgeWearFacesAfterComponentClosureCount = 0;
                 WorkspaceOpenEdgesAfterComponentClosureCount = 0;
@@ -8278,6 +9408,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 WorkspaceTJunctionsOnClosureEdgesAfterComponentClosureCount = 0;
                 WorkspaceTJunctionsOnBaseEdgesAfterComponentClosureCount = 0;
                 WorkspaceTJunctionsOnConvexEdgeWearEdgesAfterComponentClosureCount = 0;
+                WorkspaceTJunctionRepairCandidateCount = 0;
+                WorkspaceTJunctionRepairBaseCandidateCount = 0;
+                WorkspaceTJunctionRepairConvexEdgeWearCandidateCount = 0;
+                WorkspaceTJunctionRepairClosureCandidateCount = 0;
+                WorkspaceTJunctionRepairInsertedVertexCount = 0;
+                WorkspaceTJunctionRepairSkippedClosureEdgeCount = 0;
+                WorkspaceTJunctionRepairSkippedEndpointMatchCount = 0;
+                WorkspaceTJunctionRepairSkippedDuplicateInsertionCount = 0;
+                WorkspaceTJunctionRepairTooNearStartCount = 0;
+                WorkspaceTJunctionRepairTooNearEndCount = 0;
+                WorkspaceTJunctionRepairFailedFaceCount = 0;
+                WorkspaceTJunctionRepairFailedNoInsertionCount = 0;
+                WorkspaceTJunctionRepairFailedAreaCount = 0;
+                WorkspaceTJunctionRepairFailedShortEdgeCount = 0;
+                WorkspaceTJunctionRepairFailedNonFiniteCount = 0;
+                WorkspaceTJunctionRepairAppliedFaceCount = 0;
+                WorkspaceTJunctionRepairIterationCount = 0;
+                WorkspaceFacesAfterTJunctionRepairCount = 0;
+                WorkspaceConvexEdgeWearFacesAfterTJunctionRepairCount = 0;
+                WorkspaceOpenEdgesAfterTJunctionRepairCount = 0;
+                WorkspaceNonManifoldEdgesAfterTJunctionRepairCount = 0;
+                WorkspaceTJunctionsAfterTJunctionRepairCount = 0;
                 TopologyOpenEdges = 0;
                 TopologyNonManifoldEdges = 0;
                 TopologyTJunctions = 0;
@@ -8336,6 +9488,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 WorkspaceConvexEdgeWearFaceCount = graphStats.WorkspaceConvexEdgeWearFaceCount;
                 WorkspaceFacesAfterRibbonsCount = graphStats.WorkspaceFacesAfterRibbonsCount;
                 WorkspaceOpenEdgesAfterRibbonsCount = graphStats.WorkspaceOpenEdgesAfterRibbonsCount;
+                WorkspaceNonManifoldEdgesAfterRibbonsCount = graphStats.WorkspaceNonManifoldEdgesAfterRibbonsCount;
+                WorkspaceTJunctionsAfterRibbonsCount = graphStats.WorkspaceTJunctionsAfterRibbonsCount;
                 WorkspaceOpenEdgesNearGraphVerticesAfterRibbonsCount = graphStats.WorkspaceOpenEdgesNearGraphVerticesAfterRibbonsCount;
                 WorkspaceOpenEdgesAwayFromGraphVerticesAfterRibbonsCount = graphStats.WorkspaceOpenEdgesAwayFromGraphVerticesAfterRibbonsCount;
                 WorkspaceOpenEdgesNearSelectedEdgesAfterRibbonsCount = graphStats.WorkspaceOpenEdgesNearSelectedEdgesAfterRibbonsCount;
@@ -8348,6 +9502,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 WorkspaceOpenEdgeEndpointVerticesAfterRibbonsCount = graphStats.WorkspaceOpenEdgeEndpointVerticesAfterRibbonsCount;
                 WorkspaceOpenEdgeEndpointLeavesAfterRibbonsCount = graphStats.WorkspaceOpenEdgeEndpointLeavesAfterRibbonsCount;
                 WorkspaceOpenEdgeEndpointBranchesAfterRibbonsCount = graphStats.WorkspaceOpenEdgeEndpointBranchesAfterRibbonsCount;
+                WorkspaceFacesAfterPreClosureTJunctionRepairCount = graphStats.WorkspaceFacesAfterPreClosureTJunctionRepairCount;
+                WorkspaceConvexEdgeWearFacesAfterPreClosureTJunctionRepairCount = graphStats.WorkspaceConvexEdgeWearFacesAfterPreClosureTJunctionRepairCount;
+                WorkspaceOpenEdgesAfterPreClosureTJunctionRepairCount = graphStats.WorkspaceOpenEdgesAfterPreClosureTJunctionRepairCount;
+                WorkspaceNonManifoldEdgesAfterPreClosureTJunctionRepairCount = graphStats.WorkspaceNonManifoldEdgesAfterPreClosureTJunctionRepairCount;
+                WorkspaceTJunctionsAfterPreClosureTJunctionRepairCount = graphStats.WorkspaceTJunctionsAfterPreClosureTJunctionRepairCount;
+                WorkspaceOpenEdgeComponentsAfterPreClosureTJunctionRepairCount = graphStats.WorkspaceOpenEdgeComponentsAfterPreClosureTJunctionRepairCount;
+                WorkspaceOpenEdgeIsolatedComponentsAfterPreClosureTJunctionRepairCount = graphStats.WorkspaceOpenEdgeIsolatedComponentsAfterPreClosureTJunctionRepairCount;
+                WorkspaceOpenEdgeLongestComponentEdgesAfterPreClosureTJunctionRepairCount = graphStats.WorkspaceOpenEdgeLongestComponentEdgesAfterPreClosureTJunctionRepairCount;
+                WorkspaceOpenEdgeEndpointVerticesAfterPreClosureTJunctionRepairCount = graphStats.WorkspaceOpenEdgeEndpointVerticesAfterPreClosureTJunctionRepairCount;
+                WorkspaceOpenEdgeEndpointLeavesAfterPreClosureTJunctionRepairCount = graphStats.WorkspaceOpenEdgeEndpointLeavesAfterPreClosureTJunctionRepairCount;
+                WorkspaceOpenEdgeEndpointBranchesAfterPreClosureTJunctionRepairCount = graphStats.WorkspaceOpenEdgeEndpointBranchesAfterPreClosureTJunctionRepairCount;
                 CornerPatchVertexCount = graphStats.CornerPatchVertexCount;
                 CornerPatchBuiltCount = graphStats.CornerPatchBuiltCount;
                 CornerPatchFaceBuiltCount = graphStats.CornerPatchFaceBuiltCount;
@@ -8393,6 +9558,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 OpenCycleClosureInvalidNormalCount = graphStats.OpenCycleClosureInvalidNormalCount;
                 OpenCycleClosureDegenerateTriangleCount = graphStats.OpenCycleClosureDegenerateTriangleCount;
                 OpenCycleClosureInvalidFaceCount = graphStats.OpenCycleClosureInvalidFaceCount;
+                OpenCycleClosureInvalidFaceAreaCount = graphStats.OpenCycleClosureInvalidFaceAreaCount;
+                OpenCycleClosureInvalidFaceShortEdgeCount = graphStats.OpenCycleClosureInvalidFaceShortEdgeCount;
+                OpenCycleClosureInvalidFaceNonFiniteCount = graphStats.OpenCycleClosureInvalidFaceNonFiniteCount;
+                OpenCycleClosureInvalidFaceDuplicatePointCount = graphStats.OpenCycleClosureInvalidFaceDuplicatePointCount;
+                OpenCycleClosureCapVerticesMinCount = graphStats.OpenCycleClosureCapVerticesMinCount;
+                OpenCycleClosureCapVerticesMaxCount = graphStats.OpenCycleClosureCapVerticesMaxCount;
                 WorkspaceFacesAfterComponentClosureCount = graphStats.WorkspaceFacesAfterComponentClosureCount;
                 WorkspaceConvexEdgeWearFacesAfterComponentClosureCount = graphStats.WorkspaceConvexEdgeWearFacesAfterComponentClosureCount;
                 WorkspaceOpenEdgesAfterComponentClosureCount = graphStats.WorkspaceOpenEdgesAfterComponentClosureCount;
@@ -8401,6 +9572,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 WorkspaceTJunctionsOnClosureEdgesAfterComponentClosureCount = graphStats.WorkspaceTJunctionsOnClosureEdgesAfterComponentClosureCount;
                 WorkspaceTJunctionsOnBaseEdgesAfterComponentClosureCount = graphStats.WorkspaceTJunctionsOnBaseEdgesAfterComponentClosureCount;
                 WorkspaceTJunctionsOnConvexEdgeWearEdgesAfterComponentClosureCount = graphStats.WorkspaceTJunctionsOnConvexEdgeWearEdgesAfterComponentClosureCount;
+                WorkspaceTJunctionRepairCandidateCount = graphStats.WorkspaceTJunctionRepairCandidateCount;
+                WorkspaceTJunctionRepairBaseCandidateCount = graphStats.WorkspaceTJunctionRepairBaseCandidateCount;
+                WorkspaceTJunctionRepairConvexEdgeWearCandidateCount = graphStats.WorkspaceTJunctionRepairConvexEdgeWearCandidateCount;
+                WorkspaceTJunctionRepairClosureCandidateCount = graphStats.WorkspaceTJunctionRepairClosureCandidateCount;
+                WorkspaceTJunctionRepairInsertedVertexCount = graphStats.WorkspaceTJunctionRepairInsertedVertexCount;
+                WorkspaceTJunctionRepairSkippedClosureEdgeCount = graphStats.WorkspaceTJunctionRepairSkippedClosureEdgeCount;
+                WorkspaceTJunctionRepairSkippedEndpointMatchCount = graphStats.WorkspaceTJunctionRepairSkippedEndpointMatchCount;
+                WorkspaceTJunctionRepairSkippedDuplicateInsertionCount = graphStats.WorkspaceTJunctionRepairSkippedDuplicateInsertionCount;
+                WorkspaceTJunctionRepairTooNearStartCount = graphStats.WorkspaceTJunctionRepairTooNearStartCount;
+                WorkspaceTJunctionRepairTooNearEndCount = graphStats.WorkspaceTJunctionRepairTooNearEndCount;
+                WorkspaceTJunctionRepairFailedFaceCount = graphStats.WorkspaceTJunctionRepairFailedFaceCount;
+                WorkspaceTJunctionRepairFailedNoInsertionCount = graphStats.WorkspaceTJunctionRepairFailedNoInsertionCount;
+                WorkspaceTJunctionRepairFailedAreaCount = graphStats.WorkspaceTJunctionRepairFailedAreaCount;
+                WorkspaceTJunctionRepairFailedShortEdgeCount = graphStats.WorkspaceTJunctionRepairFailedShortEdgeCount;
+                WorkspaceTJunctionRepairFailedNonFiniteCount = graphStats.WorkspaceTJunctionRepairFailedNonFiniteCount;
+                WorkspaceTJunctionRepairAppliedFaceCount = graphStats.WorkspaceTJunctionRepairAppliedFaceCount;
+                WorkspaceTJunctionRepairIterationCount = graphStats.WorkspaceTJunctionRepairIterationCount;
+                WorkspaceFacesAfterTJunctionRepairCount = graphStats.WorkspaceFacesAfterTJunctionRepairCount;
+                WorkspaceConvexEdgeWearFacesAfterTJunctionRepairCount = graphStats.WorkspaceConvexEdgeWearFacesAfterTJunctionRepairCount;
+                WorkspaceOpenEdgesAfterTJunctionRepairCount = graphStats.WorkspaceOpenEdgesAfterTJunctionRepairCount;
+                WorkspaceNonManifoldEdgesAfterTJunctionRepairCount = graphStats.WorkspaceNonManifoldEdgesAfterTJunctionRepairCount;
+                WorkspaceTJunctionsAfterTJunctionRepairCount = graphStats.WorkspaceTJunctionsAfterTJunctionRepairCount;
             }
 
             public void RegisterReject(EdgeWearBevelRejectReason reason)
@@ -8473,6 +9666,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     $"skippedCornerClosures={SkippedCornerClosureCount}, " +
                     $"constructedBevelPlanes={ConstructedBevelPlaneCount}, " +
                     $"producedBevelFaces={ProducedBevelFaceCount}, " +
+                    $"committedConvexEdgeWearFaces={CommittedConvexEdgeWearFaceCount}, " +
+                    $"committedConvexEdgeWearTrianglesEstimate={CommittedConvexEdgeWearTriangleEstimateCount}, " +
+                    $"committedConvexEdgeWearRenderedVerticesEstimate={CommittedConvexEdgeWearRenderedVertexEstimateCount}, " +
                     $"bevelDepthScalePercent={BevelDepthScalePercent}, " +
                     $"graphVertices={GraphVertexCount}, " +
                     $"graphEdges={GraphEdgeCount}, " +
@@ -8524,6 +9720,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     $"workspaceConvexEdgeWearFaces={WorkspaceConvexEdgeWearFaceCount}, " +
                     $"workspaceFacesAfterRibbons={WorkspaceFacesAfterRibbonsCount}, " +
                     $"workspaceOpenEdgesAfterRibbons={WorkspaceOpenEdgesAfterRibbonsCount}, " +
+                    $"workspaceNonManifoldEdgesAfterRibbons={WorkspaceNonManifoldEdgesAfterRibbonsCount}, " +
+                    $"workspaceTJunctionsAfterRibbons={WorkspaceTJunctionsAfterRibbonsCount}, " +
                     $"workspaceOpenEdgesNearGraphVerticesAfterRibbons={WorkspaceOpenEdgesNearGraphVerticesAfterRibbonsCount}, " +
                     $"workspaceOpenEdgesAwayFromGraphVerticesAfterRibbons={WorkspaceOpenEdgesAwayFromGraphVerticesAfterRibbonsCount}, " +
                     $"workspaceOpenEdgesNearSelectedEdgesAfterRibbons={WorkspaceOpenEdgesNearSelectedEdgesAfterRibbonsCount}, " +
@@ -8536,6 +9734,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     $"workspaceOpenEdgeEndpointVerticesAfterRibbons={WorkspaceOpenEdgeEndpointVerticesAfterRibbonsCount}, " +
                     $"workspaceOpenEdgeEndpointLeavesAfterRibbons={WorkspaceOpenEdgeEndpointLeavesAfterRibbonsCount}, " +
                     $"workspaceOpenEdgeEndpointBranchesAfterRibbons={WorkspaceOpenEdgeEndpointBranchesAfterRibbonsCount}, " +
+                    $"workspaceFacesAfterPreClosureTJunctionRepair={WorkspaceFacesAfterPreClosureTJunctionRepairCount}, " +
+                    $"workspaceConvexEdgeWearFacesAfterPreClosureTJunctionRepair={WorkspaceConvexEdgeWearFacesAfterPreClosureTJunctionRepairCount}, " +
+                    $"workspaceOpenEdgesAfterPreClosureTJunctionRepair={WorkspaceOpenEdgesAfterPreClosureTJunctionRepairCount}, " +
+                    $"workspaceNonManifoldEdgesAfterPreClosureTJunctionRepair={WorkspaceNonManifoldEdgesAfterPreClosureTJunctionRepairCount}, " +
+                    $"workspaceTJunctionsAfterPreClosureTJunctionRepair={WorkspaceTJunctionsAfterPreClosureTJunctionRepairCount}, " +
+                    $"workspaceOpenEdgeComponentsAfterPreClosureTJunctionRepair={WorkspaceOpenEdgeComponentsAfterPreClosureTJunctionRepairCount}, " +
+                    $"workspaceOpenEdgeIsolatedComponentsAfterPreClosureTJunctionRepair={WorkspaceOpenEdgeIsolatedComponentsAfterPreClosureTJunctionRepairCount}, " +
+                    $"workspaceOpenEdgeLongestComponentEdgesAfterPreClosureTJunctionRepair={WorkspaceOpenEdgeLongestComponentEdgesAfterPreClosureTJunctionRepairCount}, " +
+                    $"workspaceOpenEdgeEndpointVerticesAfterPreClosureTJunctionRepair={WorkspaceOpenEdgeEndpointVerticesAfterPreClosureTJunctionRepairCount}, " +
+                    $"workspaceOpenEdgeEndpointLeavesAfterPreClosureTJunctionRepair={WorkspaceOpenEdgeEndpointLeavesAfterPreClosureTJunctionRepairCount}, " +
+                    $"workspaceOpenEdgeEndpointBranchesAfterPreClosureTJunctionRepair={WorkspaceOpenEdgeEndpointBranchesAfterPreClosureTJunctionRepairCount}, " +
                     $"cornerPatchVertices={CornerPatchVertexCount}, " +
                     $"cornerPatchesBuilt={CornerPatchBuiltCount}, " +
                     $"cornerPatchFacesBuilt={CornerPatchFaceBuiltCount}, " +
@@ -8581,6 +9790,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     $"openCycleClosureInvalidNormals={OpenCycleClosureInvalidNormalCount}, " +
                     $"openCycleClosureDegenerateTriangles={OpenCycleClosureDegenerateTriangleCount}, " +
                     $"openCycleClosureInvalidFaces={OpenCycleClosureInvalidFaceCount}, " +
+                    $"openCycleClosureInvalidFaceArea={OpenCycleClosureInvalidFaceAreaCount}, " +
+                    $"openCycleClosureInvalidFaceShortEdge={OpenCycleClosureInvalidFaceShortEdgeCount}, " +
+                    $"openCycleClosureInvalidFaceNonFinite={OpenCycleClosureInvalidFaceNonFiniteCount}, " +
+                    $"openCycleClosureInvalidFaceDuplicatePoint={OpenCycleClosureInvalidFaceDuplicatePointCount}, " +
+                    $"openCycleClosureCapVerticesMin={OpenCycleClosureCapVerticesMinCount}, " +
+                    $"openCycleClosureCapVerticesMax={OpenCycleClosureCapVerticesMaxCount}, " +
                     $"workspaceFacesAfterComponentClosure={WorkspaceFacesAfterComponentClosureCount}, " +
                     $"workspaceConvexEdgeWearFacesAfterComponentClosure={WorkspaceConvexEdgeWearFacesAfterComponentClosureCount}, " +
                     $"workspaceOpenEdgesAfterComponentClosure={WorkspaceOpenEdgesAfterComponentClosureCount}, " +
@@ -8589,6 +9804,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     $"workspaceTJunctionsOnClosureEdgesAfterComponentClosure={WorkspaceTJunctionsOnClosureEdgesAfterComponentClosureCount}, " +
                     $"workspaceTJunctionsOnBaseEdgesAfterComponentClosure={WorkspaceTJunctionsOnBaseEdgesAfterComponentClosureCount}, " +
                     $"workspaceTJunctionsOnConvexEdgeWearEdgesAfterComponentClosure={WorkspaceTJunctionsOnConvexEdgeWearEdgesAfterComponentClosureCount}, " +
+                    $"workspaceTJunctionRepairCandidates={WorkspaceTJunctionRepairCandidateCount}, " +
+                    $"workspaceTJunctionRepairBaseCandidates={WorkspaceTJunctionRepairBaseCandidateCount}, " +
+                    $"workspaceTJunctionRepairConvexEdgeWearCandidates={WorkspaceTJunctionRepairConvexEdgeWearCandidateCount}, " +
+                    $"workspaceTJunctionRepairClosureCandidates={WorkspaceTJunctionRepairClosureCandidateCount}, " +
+                    $"workspaceTJunctionRepairInsertedVertices={WorkspaceTJunctionRepairInsertedVertexCount}, " +
+                    $"workspaceTJunctionRepairSkippedClosureEdges={WorkspaceTJunctionRepairSkippedClosureEdgeCount}, " +
+                    $"workspaceTJunctionRepairSkippedEndpointMatches={WorkspaceTJunctionRepairSkippedEndpointMatchCount}, " +
+                    $"workspaceTJunctionRepairSkippedDuplicateInsertions={WorkspaceTJunctionRepairSkippedDuplicateInsertionCount}, " +
+                    $"workspaceTJunctionRepairTooNearStart={WorkspaceTJunctionRepairTooNearStartCount}, " +
+                    $"workspaceTJunctionRepairTooNearEnd={WorkspaceTJunctionRepairTooNearEndCount}, " +
+                    $"workspaceTJunctionRepairFailedFaces={WorkspaceTJunctionRepairFailedFaceCount}, " +
+                    $"workspaceTJunctionRepairFailedNoInsertion={WorkspaceTJunctionRepairFailedNoInsertionCount}, " +
+                    $"workspaceTJunctionRepairFailedArea={WorkspaceTJunctionRepairFailedAreaCount}, " +
+                    $"workspaceTJunctionRepairFailedShortEdge={WorkspaceTJunctionRepairFailedShortEdgeCount}, " +
+                    $"workspaceTJunctionRepairFailedNonFinite={WorkspaceTJunctionRepairFailedNonFiniteCount}, " +
+                    $"workspaceTJunctionRepairAppliedFaces={WorkspaceTJunctionRepairAppliedFaceCount}, " +
+                    $"workspaceTJunctionRepairIterations={WorkspaceTJunctionRepairIterationCount}, " +
+                    $"workspaceFacesAfterTJunctionRepair={WorkspaceFacesAfterTJunctionRepairCount}, " +
+                    $"workspaceConvexEdgeWearFacesAfterTJunctionRepair={WorkspaceConvexEdgeWearFacesAfterTJunctionRepairCount}, " +
+                    $"workspaceOpenEdgesAfterTJunctionRepair={WorkspaceOpenEdgesAfterTJunctionRepairCount}, " +
+                    $"workspaceNonManifoldEdgesAfterTJunctionRepair={WorkspaceNonManifoldEdgesAfterTJunctionRepairCount}, " +
+                    $"workspaceTJunctionsAfterTJunctionRepair={WorkspaceTJunctionsAfterTJunctionRepairCount}, " +
                     $"topologyOpenEdges={TopologyOpenEdges}, " +
                     $"topologyNonManifoldEdges={TopologyNonManifoldEdges}, " +
                     $"topologyTJunctions={TopologyTJunctions}, " +

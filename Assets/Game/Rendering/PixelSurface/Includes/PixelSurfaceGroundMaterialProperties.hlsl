@@ -1,5 +1,6 @@
 #ifndef PS3D_PIXELSURFACEGROUNDMATERIALPROPERTIES_HLSL
 #define PS3D_PIXELSURFACEGROUNDMATERIALPROPERTIES_HLSL
+#define PS3D_PIXELSURFACEGROUND_MATERIAL_PROPERTIES 1
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _BaseColor;
@@ -38,6 +39,30 @@
                 float _GroundFeatureMaskInfluence;
                 float4 _GroundFeatureDirection;
                 float _GroundFeatureSeed;
+                float _GroundDirectionalStreakStrength;
+                float _GroundDirectionalStreakScale;
+                float _GroundDirectionalStreakContrast;
+                float _GroundDirectionalStreakMaskInfluence;
+                float4 _GroundDirectionalStreakDirection;
+                float _GroundDirectionalStreakSeed;
+                float _GroundPooledWetnessStrength;
+                float _GroundPooledWetnessScale;
+                float _GroundPooledWetnessContrast;
+                float _GroundPooledWetnessMaskInfluence;
+                float4 _GroundPooledWetnessDirection;
+                float _GroundPooledWetnessSeed;
+                float _GroundTrampledWearStrength;
+                float _GroundTrampledWearScale;
+                float _GroundTrampledWearContrast;
+                float _GroundTrampledWearMaskInfluence;
+                float4 _GroundTrampledWearDirection;
+                float _GroundTrampledWearSeed;
+                float _GroundPaintedAccentLineStrength;
+                float _GroundPaintedAccentLineScale;
+                float _GroundPaintedAccentLineContrast;
+                float _GroundPaintedAccentLineMaskInfluence;
+                float4 _GroundPaintedAccentLineDirection;
+                float _GroundPaintedAccentLineSeed;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;

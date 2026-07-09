@@ -15,6 +15,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [InspectorName("Pooled Wetness")]
         PooledWetness = 12,
 
+        [InspectorName("Painted Accent Lines")]
+        PaintedAccentLines = 20,
+
         [InspectorName("Pebble Scatter")]
         PebbleScatter = 30,
 

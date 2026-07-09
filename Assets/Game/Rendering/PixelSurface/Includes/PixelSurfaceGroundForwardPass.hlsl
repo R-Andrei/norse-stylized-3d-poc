@@ -1,12 +1,6 @@
 #ifndef PS3D_PIXELSURFACEGROUNDFORWARDPASS_HLSL
 #define PS3D_PIXELSURFACEGROUNDFORWARDPASS_HLSL
 
-            bool PS3D_IsGroundFeatureMode(float expectedMode)
-            {
-                return abs(_GroundFeatureMode - expectedMode) < 0.25 &&
-                    _GroundFeatureStrength > 0.0001;
-            }
-
             float ResolveGroundDirectionalStreakFeature(
                 Varyings input,
                 float exposureMask,
@@ -14,12 +8,12 @@
                 float rockyDryMask,
                 float contractMask)
             {
-                if (!PS3D_IsGroundFeatureMode(1.0))
+                if (_GroundDirectionalStreakStrength <= 0.0001)
                 {
                     return 0.0;
                 }
 
-                float2 direction = _GroundFeatureDirection.xy;
+                float2 direction = _GroundDirectionalStreakDirection.xy;
 
                 if (dot(direction, direction) < 0.0001)
                 {
@@ -31,8 +25,8 @@
                 float2 positionXZ = input.positionWS.xz;
                 float along = dot(positionXZ, direction);
                 float across = dot(positionXZ, crossDirection);
-                float scale = max(0.1, _GroundFeatureScale);
-                float seed = _PixelSeed * 0.017 + _GroundFeatureSeed * 0.071;
+                float scale = max(0.1, _GroundDirectionalStreakScale);
+                float seed = _PixelSeed * 0.017 + _GroundDirectionalStreakSeed * 0.071;
 
                 float lane = PS3D_ValueNoise31(
                     float3(
@@ -47,9 +41,9 @@
                 float combined = saturate(
                     lane * 0.78 +
                     scrape * 0.22);
-                float contrast = lerp(1.15, 3.8, saturate(_GroundFeatureContrast));
+                float contrast = lerp(1.15, 3.8, saturate(_GroundDirectionalStreakContrast));
                 float signedFeature =
-                    (combined - 0.5) * contrast * saturate(_GroundFeatureStrength);
+                    (combined - 0.5) * contrast * saturate(_GroundDirectionalStreakStrength);
                 float semanticGate = saturate(
                     exposureMask * 0.68 +
                     rockyDryMask * 0.20 +
@@ -57,7 +51,7 @@
                 float maskGate = lerp(
                     1.0,
                     semanticGate,
-                    saturate(_GroundFeatureMaskInfluence));
+                    saturate(_GroundDirectionalStreakMaskInfluence));
 
                 return clamp(
                     signedFeature * maskGate * contractMask,
@@ -72,13 +66,13 @@
                 float rockyDryMask,
                 float contractMask)
             {
-                if (!PS3D_IsGroundFeatureMode(2.0))
+                if (_GroundPooledWetnessStrength <= 0.0001)
                 {
                     return 0.0;
                 }
 
-                float scale = max(0.1, _GroundFeatureScale);
-                float seed = _PixelSeed * 0.019 + _GroundFeatureSeed * 0.083;
+                float scale = max(0.1, _GroundPooledWetnessScale);
+                float seed = _PixelSeed * 0.019 + _GroundPooledWetnessSeed * 0.083;
                 float2 positionXZ = input.positionWS.xz;
                 float broad = PS3D_ValueNoise31(
                     float3(
@@ -91,7 +85,7 @@
                         positionXZ.y / (scale * 0.42) + seed * 0.29,
                         seed + 83.11));
                 float combined = saturate(broad * 0.74 + detail * 0.26);
-                float contrast = lerp(0.65, 2.40, saturate(_GroundFeatureContrast));
+                float contrast = lerp(0.65, 2.40, saturate(_GroundPooledWetnessContrast));
                 float poolShape = saturate((combined - 0.48) * contrast + 0.5);
                 float semanticGate = saturate(
                     dampDepositMask * 0.70 +
@@ -100,12 +94,12 @@
                 float maskGate = lerp(
                     1.0,
                     semanticGate,
-                    saturate(_GroundFeatureMaskInfluence));
+                    saturate(_GroundPooledWetnessMaskInfluence));
 
                 return saturate(
                     poolShape *
                     maskGate *
-                    saturate(_GroundFeatureStrength) *
+                    saturate(_GroundPooledWetnessStrength) *
                     contractMask);
             }
 
@@ -116,13 +110,13 @@
                 float rockyDryMask,
                 float contractMask)
             {
-                if (!PS3D_IsGroundFeatureMode(3.0))
+                if (_GroundTrampledWearStrength <= 0.0001)
                 {
                     return 0.0;
                 }
 
-                float scale = max(0.1, _GroundFeatureScale);
-                float seed = _PixelSeed * 0.023 + _GroundFeatureSeed * 0.097;
+                float scale = max(0.1, _GroundTrampledWearScale);
+                float seed = _PixelSeed * 0.023 + _GroundTrampledWearSeed * 0.097;
                 float2 positionXZ = input.positionWS.xz;
                 float broad = PS3D_ValueNoise31(
                     float3(
@@ -143,7 +137,7 @@
                     broad * 0.52 +
                     scrape * 0.34 +
                     grit * 0.14);
-                float contrast = lerp(0.85, 3.20, saturate(_GroundFeatureContrast));
+                float contrast = lerp(0.85, 3.20, saturate(_GroundTrampledWearContrast));
                 float breakup = saturate((combined - 0.42) * contrast + 0.5);
                 float semanticGate = saturate(
                     compactionMask * 0.90 +
@@ -152,12 +146,12 @@
                 float maskGate = lerp(
                     compactionMask,
                     semanticGate,
-                    saturate(_GroundFeatureMaskInfluence));
+                    saturate(_GroundTrampledWearMaskInfluence));
 
                 return saturate(
                     breakup *
                     maskGate *
-                    saturate(_GroundFeatureStrength) *
+                    saturate(_GroundTrampledWearStrength) *
                     contractMask);
             }
 
@@ -260,6 +254,18 @@
                     groundDampDeposit,
                     groundRockyDry,
                     contractMask);
+                float3 paintedAccentLineRelief = ResolveGroundPaintedAccentLineReliefFeature(
+                    input,
+                    exposureMask,
+                    groundDampDeposit,
+                    groundVegetation,
+                    groundCompaction,
+                    groundShore,
+                    groundRockyDry,
+                    contractMask);
+                float paintedAccentLinesFeature = paintedAccentLineRelief.x;
+                float paintedAccentReliefFeature = paintedAccentLineRelief.y;
+                float paintedAccentSignedRelief = paintedAccentLineRelief.z;
                 float profileContrast =
                     max(0.0, _ProfileContrast) *
                     lerp(1.0, max(0.0, _FrostContrast), saturate(_FrostStrength));
@@ -341,7 +347,7 @@
                 half3 featureTarget = PS3D_ApplyValuePreservingTint(
                     albedo * (half)max(0.0, 1.0 + directionalFeature * 0.16),
                     (half3)_FrostColor.rgb,
-                    saturate(_GroundFeatureStrength) * 0.34);
+                    saturate(_GroundDirectionalStreakStrength) * 0.34);
                 albedo = lerp(
                     albedo,
                     featureTarget,
@@ -352,7 +358,7 @@
                     (half)max(
                         0.0,
                         1.0 - pooledWetnessFeature *
-                        (0.08 + saturate(_GroundFeatureStrength) * 0.12));
+                        (0.08 + saturate(_GroundPooledWetnessStrength) * 0.12));
                 pooledWetnessTarget = PS3D_ApplyValuePreservingTint(
                     pooledWetnessTarget,
                     (half3)_GroundDampTint.rgb,
@@ -367,7 +373,7 @@
                     (half)max(
                         0.0,
                         1.0 - trampledWearFeature *
-                        (0.16 + saturate(_GroundFeatureContrast) * 0.12));
+                        (0.16 + saturate(_GroundTrampledWearContrast) * 0.12));
                 trampledWearTarget = PS3D_ApplyValuePreservingTint(
                     trampledWearTarget,
                     (half3)_GroundDampTint.rgb,
@@ -376,6 +382,38 @@
                     albedo,
                     trampledWearTarget,
                     (half)(trampledWearFeature * 0.55));
+
+                half3 paintedAccentTint = lerp(
+                    (half3)_GroundDampTint.rgb,
+                    (half3)_GroundVegetationTint.rgb,
+                    (half)saturate(groundVegetationVisual * 1.25));
+                paintedAccentTint = lerp(
+                    paintedAccentTint,
+                    (half3)_FrostColor.rgb,
+                    (half)saturate(snowPatch * 0.62));
+                half3 paintedAccentTarget =
+                    albedo *
+                    (half)max(
+                        0.0,
+                        1.0 - paintedAccentLinesFeature *
+                        (0.10 + saturate(_GroundPaintedAccentLineContrast) * 0.10));
+                paintedAccentTarget = PS3D_ApplyValuePreservingTint(
+                    paintedAccentTarget,
+                    paintedAccentTint,
+                    saturate(0.18 + paintedAccentLinesFeature * 0.28));
+                albedo = lerp(
+                    albedo,
+                    paintedAccentTarget,
+                    (half)(paintedAccentLinesFeature * 0.64));
+
+                float paintedReliefScale =
+                    paintedAccentReliefFeature *
+                    (0.035 + saturate(_GroundPaintedAccentLineContrast) * 0.050);
+                float paintedReliefValue = clamp(
+                    paintedAccentSignedRelief * paintedReliefScale,
+                    -0.070,
+                    0.052);
+                albedo *= (half)max(0.0, 1.0 + paintedReliefValue);
 
                 float wetness = saturate(_Wetness);
                 float wetGlobalDarken =
@@ -456,12 +494,22 @@
                     ResolveGroundDampDepositMask(input),
                     ResolveGroundRockyDryMask(input),
                     contractMask);
+                float paintedAccentLinesFeature = ResolveGroundPaintedAccentLinesFeature(
+                    input,
+                    ResolveGroundExposureMask(input) * contractMask,
+                    ResolveGroundDampDepositMask(input),
+                    ResolveGroundVegetationMask(input),
+                    ResolveGroundCompactionMask(input),
+                    ResolveGroundShoreMask(input),
+                    ResolveGroundRockyDryMask(input),
+                    contractMask);
 
                 return saturate(
                     (half)_Smoothness +
                     (half)_Wetness * (half)_WetSmoothnessBoost * 0.22h +
                     (half)pooledWetnessFeature * 0.025h -
-                    (half)trampledWearFeature * 0.030h +
+                    (half)trampledWearFeature * 0.030h -
+                    (half)paintedAccentLinesFeature * 0.012h +
                     (half)_MonolithicFlatten *
                     (half)_MonolithicSmoothnessBoost -
                     (half)_FrostStrength * 0.06h);
@@ -507,6 +555,15 @@
                     ResolveGroundDampDepositMask(input),
                     ResolveGroundRockyDryMask(input),
                     contractMask);
+                float paintedAccentLinesFeature = ResolveGroundPaintedAccentLinesFeature(
+                    input,
+                    ResolveGroundExposureMask(input) * contractMask,
+                    ResolveGroundDampDepositMask(input),
+                    ResolveGroundVegetationMask(input),
+                    ResolveGroundCompactionMask(input),
+                    ResolveGroundShoreMask(input),
+                    ResolveGroundRockyDryMask(input),
+                    contractMask);
 
                 SurfaceData surfaceData = (SurfaceData)0;
                 surfaceData.albedo = albedo;
@@ -527,7 +584,11 @@
                     lerp(
                         1.0h,
                         0.82h,
-                        saturate((half)trampledWearFeature));
+                        saturate((half)trampledWearFeature)) *
+                    lerp(
+                        1.0h,
+                        0.94h,
+                        saturate((half)paintedAccentLinesFeature));
                 surfaceData.metallic = 0.0h;
                 surfaceData.smoothness = ResolveGroundProfileSmoothness(input);
                 surfaceData.normalTS = half3(0.0h, 0.0h, 1.0h);

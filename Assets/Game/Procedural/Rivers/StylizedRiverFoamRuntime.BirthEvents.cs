@@ -112,6 +112,8 @@ namespace ProgrammaticStylized3D.Rivers
                 BaseRadius = resolvedHalfWidth,
                 SourceAmount = resolvedAmount,
                 RemainingLife = Mathf.Clamp01(remainingLife),
+                AmountEnvelopeFloor = 0f,
+                RadiusEnvelopeFloor = 0f,
                 PatternSeed = patternSeed,
                 ShapeSeed = shapeSeed,
                 SourceFillSeed = sourceFillSeed,
@@ -192,14 +194,22 @@ namespace ProgrammaticStylized3D.Rivers
                     out float headGlobalDistance,
                     out float headAcrossNormalized);
                 float envelope = ResolveProgressiveRibbonEnvelope(progress);
+                float amountEnvelope = Mathf.Lerp(
+                    Mathf.Clamp01(compositionEvent.AmountEnvelopeFloor),
+                    1f,
+                    envelope);
+                float radiusEnvelope = Mathf.Lerp(
+                    Mathf.Clamp01(compositionEvent.RadiusEnvelopeFloor),
+                    1f,
+                    envelope);
                 float headRadius = ResolveProgressiveRibbonRadius(
                     compositionEvent.BaseRadius,
                     progress,
                     compositionEvent.WidthPhase,
-                    envelope,
+                    radiusEnvelope,
                     compositionEvent.WidthVariation);
                 float headAmount = Mathf.Clamp01(
-                    compositionEvent.SourceAmount) * envelope;
+                    compositionEvent.SourceAmount) * amountEnvelope;
 
                 float segmentLength = Vector2.Distance(
                     new Vector2(
@@ -500,6 +510,516 @@ namespace ProgrammaticStylized3D.Rivers
             latestFoamCompositionPreviousAcrossNormalized = 0f;
             lastFoamCompositionSegmentLength = 0f;
             ResetProgressiveBirthDiagnosticSession();
+        }
+
+        private enum AutomaticShoreSourceRecipe
+        {
+            ShoreRibbon,
+            InwardWash
+        }
+
+        private readonly struct AutomaticShoreSourceProfile
+        {
+            public AutomaticShoreSourceProfile(
+                bool enabled,
+                float coverage,
+                float activity,
+                float patchSize,
+                StylizedRiverFoamShorePattern pattern)
+            {
+                Enabled = enabled;
+                Coverage = Mathf.Clamp01(coverage);
+                Activity = Mathf.Clamp01(activity);
+                PatchSize = Mathf.Clamp01(patchSize);
+                Pattern = pattern;
+            }
+
+            public bool Enabled { get; }
+            public float Coverage { get; }
+            public float Activity { get; }
+            public float PatchSize { get; }
+            public StylizedRiverFoamShorePattern Pattern { get; }
+
+            public float SlotSpacingMetres => Mathf.Lerp(
+                AutomaticShoreSourceMaximumSlotSpacingMetres,
+                AutomaticShoreSourceMinimumSlotSpacingMetres,
+                Mathf.Sqrt(Coverage));
+            public float EventsPerSecond => Mathf.Lerp(
+                AutomaticShoreSourceMinimumEventsPerSecond,
+                AutomaticShoreSourceMaximumEventsPerSecond,
+                Activity);
+        }
+
+        private bool IsAutomaticSourcePopulationActive =>
+            river != null && river.FoamEnabled &&
+            river.FoamAutomaticBirthEnabled &&
+            river.FoamAutomaticShoreBirthActive &&
+            river.FoamShoreFoamCoverage > 0.0001f &&
+            river.FoamShoreFoamActivity > 0.0001f &&
+            river.FreezeAmount < 0.999f && river.Domain.IsValid;
+
+        private bool AdvanceAutomaticBirthSources(
+            float deltaTime,
+            float now)
+        {
+            automaticShoreBirthSubmittedLastUpdate = 0;
+            automaticShoreBirthRejectedLastUpdate = 0;
+
+            if (!ResolveAutomaticShoreSourceProfile(
+                    out AutomaticShoreSourceProfile shoreProfile,
+                    out string inactiveStatus))
+            {
+                automaticShoreBirthAccumulator = 0f;
+                automaticShoreBirthStatus = inactiveStatus;
+                return false;
+            }
+
+            automaticShoreBirthAccumulator += Mathf.Max(0f, deltaTime) *
+                shoreProfile.EventsPerSecond;
+            if (automaticShoreBirthAccumulator < 1f)
+            {
+                float secondsUntilNext =
+                    (1f - automaticShoreBirthAccumulator) /
+                    Mathf.Max(0.01f, shoreProfile.EventsPerSecond);
+                automaticShoreBirthStatus =
+                    $"Armed / {river.FoamSourcePopulationPreset} / next shore source event in {secondsUntilNext:0.00}s";
+                return false;
+            }
+
+            int startsThisUpdate = 0;
+            int skippedThisUpdate = 0;
+            while (automaticShoreBirthAccumulator >= 1f &&
+                   startsThisUpdate < AutomaticShoreSourceMaximumStartsPerUpdate)
+            {
+                if (TryStartAutomaticShoreSourceEvent(
+                        shoreProfile,
+                        now,
+                        out int skippedSlots))
+                {
+                    automaticShoreBirthAccumulator -= 1f;
+                    startsThisUpdate++;
+                    skippedThisUpdate += skippedSlots;
+                    continue;
+                }
+
+                automaticShoreBirthAccumulator = Mathf.Min(
+                    automaticShoreBirthAccumulator,
+                    0.999f);
+                skippedThisUpdate += skippedSlots;
+                break;
+            }
+
+            automaticShoreBirthSubmittedLastUpdate = startsThisUpdate;
+            automaticShoreBirthRejectedLastUpdate = skippedThisUpdate;
+            automaticShoreBirthSubmittedTotal += startsThisUpdate;
+            automaticShoreBirthStatus = startsThisUpdate > 0
+                ? $"Started {startsThisUpdate} deterministic shore source event(s), skipped {skippedThisUpdate} slot(s)"
+                : $"Scanned deterministic shore source slots, started 0, skipped {skippedThisUpdate}";
+            return startsThisUpdate > 0;
+        }
+
+        private bool ResolveAutomaticShoreSourceProfile(
+            out AutomaticShoreSourceProfile profile,
+            out string inactiveStatus)
+        {
+            profile = default;
+            if (river == null || !river.FoamEnabled)
+            {
+                inactiveStatus = "Foam disabled";
+                return false;
+            }
+
+            if (!river.FoamAutomaticBirthEnabled)
+            {
+                inactiveStatus = "Automatic source population disabled";
+                return false;
+            }
+
+            if (river.FreezeAmount >= 0.999f || !river.Domain.IsValid)
+            {
+                inactiveStatus = "Waiting for active river domain";
+                return false;
+            }
+
+            if (fieldWidth <= 0 || fieldHeight <= 0 ||
+                fieldLength <= 0.0001f || validFieldLength <= 0.0001f)
+            {
+                inactiveStatus = "Waiting for Foam field resources";
+                return false;
+            }
+
+            if (river.FoamSourcePopulationPreset ==
+                StylizedRiverFoamSourcePopulationPreset.Off)
+            {
+                inactiveStatus = "Source population preset Off";
+                return false;
+            }
+
+            if (!river.FoamSourcePopulationPresetImplemented)
+            {
+                inactiveStatus =
+                    $"Preset {river.FoamSourcePopulationPreset} is documented but not implemented yet";
+                return false;
+            }
+
+            if (!river.FoamAutomaticShoreBirthActive)
+            {
+                inactiveStatus = "Shore/contact source class disabled";
+                return false;
+            }
+
+            float coverage = river.FoamShoreFoamCoverage;
+            float activity = river.FoamShoreFoamActivity;
+            if (coverage <= 0.0001f)
+            {
+                inactiveStatus = "Shore foam coverage is zero";
+                return false;
+            }
+
+            if (activity <= 0.0001f)
+            {
+                inactiveStatus = "Shore foam activity is zero";
+                return false;
+            }
+
+            profile = new AutomaticShoreSourceProfile(
+                true,
+                coverage,
+                activity,
+                river.FoamShoreFoamPatchSize,
+                river.FoamShoreFoamPattern);
+            inactiveStatus = string.Empty;
+            return profile.Enabled;
+        }
+
+        private bool TryStartAutomaticShoreSourceEvent(
+            AutomaticShoreSourceProfile profile,
+            float now,
+            out int skippedSlots)
+        {
+            skippedSlots = 0;
+            if (river == null || !river.Domain.IsValid)
+            {
+                return false;
+            }
+
+            float spacing = Mathf.Max(0.25f, profile.SlotSpacingMetres);
+            int longitudinalSlotCount = Mathf.Max(
+                1,
+                Mathf.FloorToInt(validFieldLength / spacing));
+            int totalSlotCount = longitudinalSlotCount * 2;
+            int scanBudget = Mathf.Min(
+                Mathf.Max(2, totalSlotCount),
+                AutomaticShoreSourceMaximumScansPerUpdate);
+
+            for (int scan = 0; scan < scanBudget; scan++)
+            {
+                int slotCursor = automaticShoreBirthCursor++;
+                int wrappedSlot = PositiveModulo(slotCursor, totalSlotCount);
+                int cycleIndex = slotCursor / Mathf.Max(1, totalSlotCount);
+                int longitudinalIndex = wrappedSlot / 2;
+                int sideIndex = wrappedSlot & 1;
+                float sideSign = sideIndex == 0 ? -1f : 1f;
+                float slotSeed = river.VisualSeed * 0.137f +
+                    wrappedSlot * 17.317f +
+                    cycleIndex * 31.619f;
+
+                if (Hash01(slotSeed + 1.7f) > profile.Coverage)
+                {
+                    skippedSlots++;
+                    continue;
+                }
+
+                float slotJitter = (Hash01(slotSeed + 2.9f) - 0.5f) * 0.45f;
+                float candidateT = (longitudinalIndex + 0.5f + slotJitter) /
+                    Mathf.Max(1, longitudinalSlotCount);
+                float globalDistance = Mathf.Lerp(
+                    river.Domain.GlobalDistanceMinimum,
+                    river.Domain.GlobalDistanceMinimum + validFieldLength,
+                    Mathf.Clamp01(candidateT));
+
+                StylizedRiverSplineSample sample =
+                    river.Domain.SampleAtGlobalDistance(globalDistance);
+                float visibleHalfWidth = sample.GetVisibleHalfWidth(sideSign);
+                if (visibleHalfWidth <= 0.05f)
+                {
+                    skippedSlots++;
+                    continue;
+                }
+
+                AutomaticShoreSourceRecipe recipe =
+                    ResolveAutomaticShoreRecipe(profile.Pattern, slotSeed);
+                if (TryBeginAutomaticShoreSourceEvent(
+                        profile,
+                        recipe,
+                        slotSeed,
+                        globalDistance,
+                        sideSign,
+                        visibleHalfWidth))
+                {
+                    idleSince = 0.0;
+                    return true;
+                }
+
+                skippedSlots++;
+            }
+
+            return false;
+        }
+
+        private AutomaticShoreSourceRecipe ResolveAutomaticShoreRecipe(
+            StylizedRiverFoamShorePattern pattern,
+            float seed)
+        {
+            return pattern switch
+            {
+                StylizedRiverFoamShorePattern.ShoreRibbons =>
+                    AutomaticShoreSourceRecipe.ShoreRibbon,
+                StylizedRiverFoamShorePattern.InwardWash =>
+                    AutomaticShoreSourceRecipe.InwardWash,
+                _ => Hash01(seed + 4.1f) < 0.62f
+                    ? AutomaticShoreSourceRecipe.ShoreRibbon
+                    : AutomaticShoreSourceRecipe.InwardWash
+            };
+        }
+
+        private bool TryBeginAutomaticShoreSourceEvent(
+            AutomaticShoreSourceProfile profile,
+            AutomaticShoreSourceRecipe recipe,
+            float seed,
+            float globalDistance,
+            float sideSign,
+            float visibleHalfWidth)
+        {
+            float size = profile.PatchSize;
+            float inwardBase = Mathf.Lerp(0.030f, 0.115f, size);
+            float inwardJitter = Mathf.Lerp(0.015f, 0.080f, size) *
+                Hash01(seed + 5.3f);
+            float inwardMetres = Mathf.Clamp(
+                inwardBase + inwardJitter,
+                0.020f,
+                Mathf.Max(0.025f, visibleHalfWidth * 0.28f));
+            float acrossMetres = sideSign *
+                Mathf.Max(0f, visibleHalfWidth - inwardMetres);
+            float acrossNormalized = Mathf.Clamp(
+                acrossMetres / Mathf.Max(0.0001f, visibleHalfWidth),
+                -0.985f,
+                0.985f);
+
+            float patchScale = Mathf.Lerp(0.75f, 1.35f, Hash01(seed + 6.5f));
+            float baseRadius;
+            float amount;
+            float remainingLife;
+            float duration;
+            float travelDistance;
+            float acrossDrift;
+            float pathWander;
+            float strokeAspect;
+            float widthVariation;
+            float amountEnvelopeFloor;
+            float radiusEnvelopeFloor;
+
+            switch (recipe)
+            {
+                case AutomaticShoreSourceRecipe.InwardWash:
+                    baseRadius = Mathf.Lerp(0.045f, 0.120f, size) * patchScale;
+                    amount = Mathf.Lerp(0.68f, 0.95f, size);
+                    remainingLife = Mathf.Lerp(0.50f, 0.80f, size);
+                    duration = Mathf.Lerp(
+                        AutomaticShoreWashMinimumDuration,
+                        AutomaticShoreWashMaximumDuration,
+                        Hash01(seed + 7.7f));
+                    travelDistance = Mathf.Lerp(0.10f, 0.45f, size) *
+                        Mathf.Lerp(0.80f, 1.25f, Hash01(seed + 8.9f));
+                    acrossDrift = -sideSign * Mathf.Lerp(0.045f, 0.16f, size) *
+                        Mathf.Lerp(0.75f, 1.20f, Hash01(seed + 9.1f));
+                    pathWander = Mathf.Lerp(0.10f, 0.38f, Hash01(seed + 10.3f));
+                    strokeAspect = Mathf.Lerp(2.0f, 3.8f, size);
+                    widthVariation = Mathf.Lerp(0.08f, 0.24f, Hash01(seed + 11.5f));
+                    amountEnvelopeFloor = 0.78f;
+                    radiusEnvelopeFloor = 0.45f;
+                    break;
+                default:
+                    baseRadius = Mathf.Lerp(0.035f, 0.090f, size) * patchScale;
+                    amount = Mathf.Lerp(0.62f, 0.90f, size);
+                    remainingLife = Mathf.Lerp(0.45f, 0.75f, size);
+                    duration = Mathf.Lerp(
+                        AutomaticShoreRibbonMinimumDuration,
+                        AutomaticShoreRibbonMaximumDuration,
+                        Hash01(seed + 7.7f));
+                    travelDistance = Mathf.Lerp(0.35f, 1.25f, size) *
+                        Mathf.Lerp(0.75f, 1.20f, Hash01(seed + 8.9f));
+                    acrossDrift = -sideSign * Mathf.Lerp(0.005f, 0.040f, size) *
+                        Mathf.Lerp(0.50f, 1.20f, Hash01(seed + 9.1f));
+                    pathWander = Mathf.Lerp(0.08f, 0.28f, Hash01(seed + 10.3f));
+                    strokeAspect = Mathf.Lerp(2.8f, 5.2f, size);
+                    widthVariation = Mathf.Lerp(0.06f, 0.20f, Hash01(seed + 11.5f));
+                    amountEnvelopeFloor = 0.84f;
+                    radiusEnvelopeFloor = 0.38f;
+                    break;
+            }
+
+            baseRadius = Mathf.Clamp(
+                baseRadius,
+                0.030f,
+                Mathf.Max(0.030f, visibleHalfWidth * 0.18f));
+            float sourceKey = river.VisualSeed * 0.317f +
+                globalDistance * 13.731f +
+                acrossNormalized * 29.137f +
+                seed * 0.071f +
+                (recipe == AutomaticShoreSourceRecipe.InwardWash ? 503f : 211f);
+
+            return BeginFoamCompositionEvent(
+                globalDistance,
+                acrossNormalized,
+                baseRadius,
+                amount,
+                remainingLife,
+                duration,
+                travelDistance,
+                acrossDrift,
+                pathWander,
+                strokeAspect,
+                widthVariation,
+                amountEnvelopeFloor,
+                radiusEnvelopeFloor,
+                sourceKey);
+        }
+
+        private bool BeginFoamCompositionEvent(
+            float startGlobalDistance,
+            float startAcrossNormalized,
+            float baseRadius,
+            float amount,
+            float remainingLife,
+            float duration,
+            float travelDistance,
+            float acrossDrift,
+            float pathWander,
+            float strokeAspect,
+            float widthVariation,
+            float amountEnvelopeFloor,
+            float radiusEnvelopeFloor,
+            float sourceKey)
+        {
+            if (river == null || !river.FoamEnabled ||
+                river.FreezeAmount >= 0.999f ||
+                !river.Domain.IsValid)
+            {
+                foamCompositionRejectedCount++;
+                return false;
+            }
+
+            int slotIndex = FindFreeFoamCompositionSlot();
+            if (slotIndex < 0)
+            {
+                foamCompositionRejectedCount++;
+                return false;
+            }
+
+            float flowDirection = river.FlowDirection >= 0f ? 1f : -1f;
+            float clampedStartGlobalDistance = Mathf.Clamp(
+                startGlobalDistance,
+                river.Domain.GlobalDistanceMinimum,
+                river.Domain.GlobalDistanceMaximum);
+            float availableDownstreamDistance = Mathf.Max(
+                0f,
+                flowDirection > 0f
+                    ? river.Domain.GlobalDistanceMaximum - clampedStartGlobalDistance
+                    : clampedStartGlobalDistance - river.Domain.GlobalDistanceMinimum);
+            float resolvedTravelDistance = Mathf.Min(
+                Mathf.Max(0.01f, Mathf.Abs(travelDistance)),
+                availableDownstreamDistance);
+            float resolvedAmount = Mathf.Clamp01(amount);
+            if (resolvedTravelDistance <= 0.01f ||
+                resolvedAmount <= 0.0001f)
+            {
+                foamCompositionRejectedCount++;
+                return false;
+            }
+
+            if (activeFoamCompositionEventCount == 0)
+            {
+                ResetProgressiveBirthDiagnosticSession();
+            }
+
+            int eventId = ++foamCompositionSequence;
+            float startAcross = Mathf.Clamp(startAcrossNormalized, -1f, 1f);
+            float resolvedRadius = Mathf.Max(0.020f, baseRadius);
+            float sourceFillFeatureSize =
+                ResolveSourceFillFeatureSize(resolvedRadius);
+            float resolvedDuration = Mathf.Max(0.05f, duration);
+            float resolvedDrift = Mathf.Clamp(acrossDrift, -1f, 1f);
+            float resolvedWander = Mathf.Clamp01(pathWander);
+            float shapeSeed = sourceKey + 37.719f;
+            float patternSeed = sourceKey + ProgressivePatternSeedSalt;
+            float sourceFillSeed = sourceKey + ProgressiveSourceFillSeedSalt;
+            float bendSign = Hash01(shapeSeed + 11.3f) < 0.5f ? -1f : 1f;
+            float startRadius = ResolveProgressiveRibbonRadius(
+                resolvedRadius,
+                0f,
+                0f,
+                Mathf.Clamp01(radiusEnvelopeFloor),
+                Mathf.Clamp(widthVariation, 0f, 0.65f));
+
+            foamCompositionEvents[slotIndex] = new FoamCompositionEvent
+            {
+                Active = true,
+                EventId = eventId,
+                StartGlobalDistance = clampedStartGlobalDistance,
+                StartAcrossNormalized = startAcross,
+                Duration = resolvedDuration,
+                TravelDistance = resolvedTravelDistance,
+                FlowDirection = flowDirection,
+                AcrossDrift = resolvedDrift,
+                PathWander = resolvedWander,
+                BaseRadius = resolvedRadius,
+                SourceAmount = resolvedAmount,
+                RemainingLife = Mathf.Clamp01(remainingLife),
+                AmountEnvelopeFloor = Mathf.Clamp01(amountEnvelopeFloor),
+                RadiusEnvelopeFloor = Mathf.Clamp01(radiusEnvelopeFloor),
+                PatternSeed = patternSeed,
+                ShapeSeed = shapeSeed,
+                SourceFillSeed = sourceFillSeed,
+                SourceFillFeatureSize = sourceFillFeatureSize,
+                BendSign = bendSign,
+                WidthPhase = Hash01(shapeSeed + 19.7f) * Mathf.PI * 2f,
+                StrokeAspect = Mathf.Clamp(strokeAspect, 1f, 6f),
+                WidthVariation = Mathf.Clamp(widthVariation, 0f, 0.65f),
+                Elapsed = 0f,
+                PreviousGlobalDistance = clampedStartGlobalDistance,
+                PreviousAcrossNormalized = startAcross,
+                PreviousRadius = startRadius,
+                PreviousEmissionAmount = Mathf.Clamp01(
+                    resolvedAmount * Mathf.Clamp01(amountEnvelopeFloor)),
+                DebugTrajectoryPending = true
+            };
+
+            materialLifetimeAuthorityActive = true;
+            materialLifetimeEmptyMetricReadbacks = 0;
+            lifetimeAuthorityStatus =
+                "Remaining Life / automatic shore source event";
+            activeFoamCompositionEventCount++;
+            foamCompositionStartedCount++;
+            latestFoamCompositionEventId = eventId;
+            latestFoamCompositionProgress = 0f;
+            latestFoamCompositionHeadDistanceNormalized =
+                GlobalDistanceToNormalized(clampedStartGlobalDistance);
+            latestFoamCompositionPreviousDistanceNormalized =
+                latestFoamCompositionHeadDistanceNormalized;
+            latestFoamCompositionHeadAcrossNormalized = startAcross;
+            latestFoamCompositionPreviousAcrossNormalized = startAcross;
+            lastFoamCompositionSegmentLength = 0f;
+            simulationAccumulator = Mathf.Max(
+                simulationAccumulator,
+                1f / Mathf.Max(1f, ResolveUpdateRate()));
+            idleSince = 0.0;
+            return true;
+        }
+
+        private int ResolveAutomaticShoreBirthBudgetPerTick()
+        {
+            return AutomaticShoreSourceMaximumStartsPerUpdate;
         }
 
         private int ResolveFoamCompositionBirthBudgetPerStep()

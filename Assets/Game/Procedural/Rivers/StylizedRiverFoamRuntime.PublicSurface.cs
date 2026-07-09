@@ -695,6 +695,15 @@ namespace ProgrammaticStylized3D.Rivers
             progressiveBirthDebugCumulativeAffectedTexels;
         public bool ProgressiveBirthSourceDebugActive =>
             IsProgressiveBirthSourceDebugActive;
+        public string AutomaticShoreBirthStatus => automaticShoreBirthStatus;
+        public int AutomaticShoreBirthSubmittedLastUpdate =>
+            automaticShoreBirthSubmittedLastUpdate;
+        public int AutomaticShoreBirthRejectedLastUpdate =>
+            automaticShoreBirthRejectedLastUpdate;
+        public int AutomaticShoreBirthSubmittedTotal =>
+            automaticShoreBirthSubmittedTotal;
+        public int AutomaticShoreBirthBudgetPerTick =>
+            ResolveAutomaticShoreBirthBudgetPerTick();
         public int InjectedLastUpdate => injectedLastUpdate;
         public float LastInjectionBoundaryCoverage => lastInjectionBoundaryCoverage;
         public bool LastInjectionStateSynchronized =>
@@ -735,7 +744,8 @@ namespace ProgrammaticStylized3D.Rivers
             pendingInjections.Count == 0 &&
             !pendingIsolatedLifeProbe &&
             activeFoamCompositionEventCount == 0 &&
-            pendingMaterialBirths.Count == 0;
+            pendingMaterialBirths.Count == 0 &&
+            !IsAutomaticSourcePopulationActive;
         public long EstimatedMemoryBytes =>
             EstimateTextureBytes(stateA) +
             EstimateTextureBytes(stateB) +

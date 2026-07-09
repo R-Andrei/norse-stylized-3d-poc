@@ -36,7 +36,7 @@ The desired result is a broad, readable stage floor whose surface feels designed
 
 ## Current State
 
-### Current Implementation Status After Patch U and Style Doctrine Pivot
+### Current Implementation Status After Patch V3E
 
 The ground upgrade has moved beyond the original single snow-material improvement pass. The current system now has a real surface-style framework, and the design direction has pivoted from feature accumulation to a shared visual doctrine.
 
@@ -47,17 +47,19 @@ The ground upgrade has moved beyond the original single snow-material improvemen
 | Static semantic masks | Implemented baseline | Vertex color and UV2 carry tonal, exposure, damp/deposit, vegetation, compaction, shore, rocky/dry, and authored standing-water/puddle-potential data. |
 | Ground/corridor material contract | Implemented | `GeneratedGround` resolves visual state and applies it by `MaterialPropertyBlock`; river corridors remain dependent renderers and must remain style-agnostic. |
 | Component-owned surface authoring | Implemented | `GeneratedGround` exposes top-level Surface Family and Surface Variant controls. |
-| Asset-backed visual families | Implemented baseline | `GroundSurfaceStyleProfile` assets own visual families such as Snowfield and Wet Mudflat. Families define surface identity; they do not define the global art language alone. |
+| Asset-backed visual families | Implemented baseline | `GroundSurfaceStyleProfile` assets own visual families such as Snowfield, Wet Mudflat, and Grassland. Families define surface identity; they do not define the global art language alone. |
 | Asset-backed variants | Implemented baseline | `GroundSurfaceVariantRecipe` stores stable ids, display names, material controls, and feature recipes. Variants tune the shared style stack. |
-| Feature-module recipe layer | Implemented baseline | `GroundSurfaceFeatureRecipe` supports explicit cost classes and shader-only proof features. The current resolver is still too narrow because it effectively selects one supported shader feature; future work should aggregate known style layers. |
-| Snowfield family | Implemented baseline | `GSSP_Snowfield` and `GSP_Snowfield` exist. Variants are temporary art baselines and must be retuned under the new doctrine. |
+| Feature-module recipe layer | Implemented stack baseline in Patch V3 | `GroundSurfaceFeatureRecipe` supports explicit cost classes. `GeneratedGround` now resolves the first enabled ShaderOnly recipe of each supported kind and writes explicit shader-property blocks, so variants can combine supported features. |
+| Snowfield family | Implemented baseline | `GSSP_Snowfield` and `GSP_Snowfield` exist. Variants are calm baseline snow floors under the new doctrine. |
 | Wet Mudflat family | Implemented baseline | `GSSP_WetMudflat` and `GSP_WetMudflat` exist. Patch Q reset the family to matte earth until explicit puddle/rut/debris features exist. |
+| Grassland family | Implemented baseline in Patch V2B | `GSSP_Grassland` and `GSP_Grassland` add the missing living-ground baseline for shared feature validation. No vegetation rendering is included. |
 | Style profile editor | Implemented in Patch R | Style assets have a readable custom editor with variant cards, feature summaries, duplicate support, and validation warnings. |
 | Style asset live refresh | Implemented in Patch S | Editing a style asset can refresh open `GeneratedGround` users without manual scene rebuilds for material/property-block changes. |
 | Ground modifier surface/height contract | Implemented in Patch T | `GroundModifier` can affect height, authored surface masks, or both; legacy Flatten compaction behavior is preserved. |
 | TrampledWear proof feature | Implemented/prototyped in Patch U | `TrampledWear` reads `UV2.x` compaction/path. It is now considered an experiment/proof of the mask-to-feature route, not the active art-direction priority. |
 | Runtime surface state | Deferred | Wetness, snow depth, compression, footprints, and trample maps remain future work. Runtime work must wait until the static visual language is validated. |
-| Style calibration pass | Active next direction | The next priority is a general visual calibration pass: base simplicity, macro patches, painted accent lines, contact accents, sparse motifs, and multi-layer feature resolving. |
+| Painted accent lines | Implemented foundation in Patch V3; curved relief model in Patch V3E | `PaintedAccentLines` is the first stackable doctrine layer. Patch V3D decouples line spacing from stroke size and caps strokes in world units. Patch V3E replaces straight/bar-like micro-strokes with curved terrain-fold strokes and adds subtle painted relief shading so the feature reads as visual mound/crease detail rather than flat line stamps. |
+| GeneratedGround debug views | Implemented in Patch V3B; dropdown cleanup in Patch V3C | Generated-ground debug selection is now exposed on the `GeneratedGround` component and written through renderer-local material property blocks. Material asset debug controls are fallback/internal only. |
 
 Current conceptual split:
 
@@ -129,10 +131,10 @@ Original limitations that motivated this upgrade. Items marked as implemented ar
 - [x] `BuildSurfaceMetadata` originally wrote one broad variation value and left material classification at `0`; it now writes semantic masks.
 - [x] `BuildMeshData` originally wrote neutral vertex color channels; it now writes the documented vertex color/UV2 surface contract.
 - [x] The ground originally had no object-owned material property block equivalent to `GeneratedMass`; `GeneratedGround` now applies resolved material controls through `MaterialPropertyBlock`.
-- [x] The ground originally had no authored surface profile asset; `GSP_Snowfield` and `GSP_WetMudflat` now exist.
+- [x] The ground originally had no authored surface profile asset; `GSP_Snowfield`, `GSP_WetMudflat`, and `GSP_Grassland` now exist.
 - [x] The ground originally had no static mask contract for snow potential, wetness potential, dirt/deposit, vegetation suitability, or terrain type blending; the baseline semantic contract now exists.
 - [ ] The ground still has no runtime surface state texture for rain, footprints, snow compression, grass trampling, or mud/water accumulation; this is now deliberately deferred until the static visual language is proven.
-- [~] Early material output read as pale, low-contrast procedural fuzz. Baseline Snowfield and Wet Mudflat now exist, but final detail should come from the shared visual stack: calm base, macro patches, painted accent lines, contact accents, and sparse motifs before niche runtime features.
+- [~] Early material output read as pale, low-contrast procedural fuzz. Baseline Snowfield, Wet Mudflat, and Grassland now exist, but final detail should come from the shared visual stack: calm base, macro patches, painted accent lines, contact accents, and sparse motifs before niche runtime features.
 
 ## Design Constraints
 
@@ -225,13 +227,14 @@ However, `TrampledWear` is now classified as a proof/experiment, not the next vi
 | 1 | Patch V0 — Ground Visual Doctrine Documentation | Completed. `Ground_Visual_Design_and_Architecture.md` now owns the sacred ground design baseline; this implementation plan records technical alignment. |
 | 2 | Patch V1 — Style Calibration Setup | Completed as a temporary `Style Calibration` surface family with four comparison variants: Calm Base, Hades Accent Proxy, Hybrid Target Proxy, and Pixel-Faceted. |
 | 3 | Patch V2 — Base Ground Simplification | Implemented as an asset/docs retune. Snowfield and Wet Mudflat now use calmer matte bases with lower pixel variation, lower patch contrast, and reduced broad noise so future accents can sit on top. |
-| 4 | Patch V3 — Painted Accent Lines | Implement the first foundational shared style layer: short, broken, slightly curved, dark/value-shifted crease/mound strokes. Shader-only first pass. |
-| 5 | Patch V4 — Contact / Edge Accent Layer | Add localized accent response near shores, rocks, modifier boundaries, paths, banks, and object contact zones. Use existing masks first; add new generated/contact masks only when justified. |
-| 6 | Patch V5 — Sparse Motif Layer | Add reusable sparse marks such as chips, cracks, scuffs, stains, snow scratches, stones, or debris hints. Avoid stamp spam. |
-| 7 | Patch V6 — Feature Stack Resolver | Replace the effective first-supported-feature model with aggregation of known shared doctrine layers. A variant should tune multiple style layers, not choose exactly one feature mode. |
-| 8 | Later | Ground Surface Runtime State Stub | Revisit runtime wetness, snow depth, compression, footprints, and disturbance after the static visual stack is accepted. |
-| 9 | Later | Footprints / Rain / Puddles / Grass Integration | Build on the runtime state contract only after the visual doctrine is stable. |
-| 10 | Future | Mixed Terrain / Profile Blending | Add explicit support for blended surface families such as snow over mud, rocky scrub over soil, or worn path through snow. |
+| 4 | Patch V2B — Grassland Baseline Family | Implemented as a production `Grassland` family with Clean, Patchy, Damp, and Worn Meadow variants. Establishes the canonical three-family test set. |
+| 5 | Patch V3 — Shader Feature Stack + Painted Accent Lines | Implemented. Variants now use a real shader feature stack, and Painted Accent Lines are the first stackable doctrine layer. |
+| 6 | Patch V4 — Contact / Edge Accent Layer | Add localized accent response near shores, rocks, modifier boundaries, paths, banks, and object contact zones. Use existing masks first; add new generated/contact masks only when justified. |
+| 7 | Patch V5 — Sparse Motif Layer | Add reusable sparse marks such as chips, cracks, scuffs, stains, snow scratches, stones, or debris hints. Avoid stamp spam. |
+| 8 | Patch V6 — Feature Stack Authoring Polish | Add richer warnings, cost summaries, duplicate/combination guidance, and editor UX after more stack layers exist. |
+| 9 | Later | Ground Surface Runtime State Stub | Revisit runtime wetness, snow depth, compression, footprints, and disturbance after the static visual stack is accepted. |
+| 10 | Later | Footprints / Rain / Puddles / Grass Integration | Build on the runtime state contract only after the visual doctrine is stable. |
+| 11 | Future | Mixed Terrain / Profile Blending | Add explicit support for blended surface families such as snow over mud, rocky scrub over soil, or worn path through snow. |
 
 ### Paused runtime roadmap
 
@@ -266,7 +269,7 @@ Historical mapping:
 | Static surface mask contract | Implemented baseline through vertex color and UV2 channels. |
 | Ground material property block | Implemented through `GeneratedGround` material/property-block resolver. |
 | Dedicated ground shader | Implemented as `SH_PixelGroundSurfaceLit.shader`. |
-| Terrain profile asset set | Implemented baseline with Snowfield and Wet Mudflat. |
+| Terrain profile asset set | Implemented baseline with Snowfield, Wet Mudflat, and Grassland. |
 | Runtime state design | Deferred after doctrine pivot. Contract remains documented, but implementation is no longer the immediate milestone. |
 | Footprints / rain / grass | Deferred until the static visual doctrine stack works. |
 | Mixed terrain/profile blending | Future work. |
@@ -362,6 +365,163 @@ Patch V2 does not implement:
 
 The success condition is not that the ground already looks like Hades. The success condition is that Snowfield and Wet Mudflat become calm, readable stage floors that can accept future painted accents without fighting base noise.
 
+## Patch V2B - Grassland Baseline Family
+
+Patch V2B adds a real production `Grassland` family before Patch V3 painted accent lines.
+
+Reason:
+
+```text
+Snowfield   = pale, cold, soft, low-value ground
+Wet Mudflat = dark, earthy, damp, matte ground
+Grassland   = green/olive, living, medium-value ground
+```
+
+Future shared doctrine layers need this three-family test set. Testing only snow and mud biases the system toward extreme pale/dark materials and leaves no medium-value living-ground baseline.
+
+Changed assets:
+
+```text
+Assets/Game/Demo/Profiles/Ground/GSP_Grassland.asset
+Assets/Game/Demo/Profiles/Ground/Styles/GSSP_Grassland.asset
+```
+
+`GSP_Grassland` semantic intent:
+
+- high vegetation suitability;
+- moderate damp/deposit potential;
+- low snow eligibility;
+- moderate footprint visibility;
+- soft broad tonal patches;
+- moderate rain absorption;
+- high grass recovery speed for later vegetation/runtime systems.
+
+`GSSP_Grassland` variants:
+
+| Variant id | Display name | Intent |
+| --- | --- | --- |
+| `grassland.clean_meadow` | Clean Meadow | Calm muted olive meadow baseline. Low noise and broad soft variation. |
+| `grassland.patchy_meadow` | Patchy Meadow | Slightly more exposed earth/olive patching. Still calm and non-speckled. |
+| `grassland.damp_meadow` | Damp Meadow | Cooler/darker green for river-adjacent or damp living ground. Uses a tiny `PooledWetness` proof response, not real puddles. |
+| `grassland.worn_meadow` | Worn Meadow | Browner, compressed/path-capable meadow. Uses restrained `TrampledWear` so authored compaction can be tested on grassland. |
+
+`Style Calibration` remains a temporary development family. It is not Grassland and should not be treated as production content.
+
+Patch V2B does not implement:
+
+- grass blades or vegetation placement;
+- foliage density maps, wind animation, physics, or trampling;
+- painted accent lines;
+- contact/edge accents;
+- sparse motifs;
+- feature-stack aggregation;
+- runtime wetness, snow compression, footprints, rain, puddles, roads, or wagon tracks;
+- new shader properties, components, scene changes, or river logic.
+
+The success condition is that Grassland becomes a calm third baseline for upcoming shared feature work, not that it already looks like finished grass or foliage.
+
+## Patch V3 - Shader Feature Stack and Painted Accent Lines
+
+Patch V3 corrects the feature architecture and adds the first real doctrine-layer visual feature.
+
+### Feature stack contract
+
+The serialized asset model was already list-based:
+
+```text
+GroundSurfaceVariantRecipe.features
+```
+
+Patch V3 makes the renderer honor that list as a stack:
+
+```text
+variant feature list
+  -> first enabled ShaderOnly recipe per supported kind
+  -> explicit MaterialPropertyBlock block per feature kind
+  -> shader applies all supported layers in stable renderer-defined order
+```
+
+Supported ShaderOnly feature kinds after Patch V3:
+
+```text
+DirectionalStreaks
+PooledWetness
+TrampledWear
+PaintedAccentLines
+```
+
+Rules:
+
+- features are not mutually exclusive by default;
+- first enabled recipe of each kind wins;
+- duplicate enabled same-kind recipes are authoring mistakes;
+- unsupported feature kinds may remain serialized but do not render;
+- non-ShaderOnly cost classes remain reserved until their renderer path exists;
+- shader composition order is not controlled by the asset list order;
+- `_GroundFeatureMode` is a deprecated proof-feature compatibility property and must not be extended with new modes.
+
+### Painted Accent Lines
+
+`PaintedAccentLines` is a shader-only, visual-only layer for Hades-1-like ground accents.
+
+It creates short, broken, slightly curved, dark/value-shifted stroke masks from world-space procedural cells and semantic mask gating. Patch V3D refines the raw mask after validation showed the first implementation produced large isolated strips. Patch V3E then changes the primitive from straight/micro-bar strokes into short curved terrain-fold strokes with a soft signed relief body. Scale controls accent spacing/grouping rather than raw stroke length; stroke length and thickness are capped in world units. It is intended to suggest:
+
+```text
+grass folds
+mud creases
+snow wrinkles
+small mound lines
+soft contour breaks
+surface age
+```
+
+It explicitly does not add:
+
+```text
+textures
+decals
+height deformation
+mesh changes
+runtime state
+footprints
+puddles
+grass blades
+contact accents
+sparse motif stamps
+```
+
+### Style asset usage
+
+Patch V3 adds `PaintedAccentLines` recipes to the canonical families:
+
+```text
+Snowfield
+Wet Mudflat
+Grassland
+```
+
+It also updates Style Calibration's Hades/Hybrid lanes to use real Painted Accent Lines instead of relying only on DirectionalStreaks as a proxy.
+
+This enables combinations such as:
+
+```text
+grassland.damp_meadow
+  PooledWetness
+  PaintedAccentLines
+
+grassland.worn_meadow
+  TrampledWear
+  PaintedAccentLines
+
+mudflat.trampled
+  TrampledWear
+  PaintedAccentLines
+
+snowfield.wind_scoured
+  DirectionalStreaks
+  PaintedAccentLines
+```
+
 ## Validation Plan
 
 Validation must happen from the actual isometric/gameplay camera first. Close editor inspection is secondary. The ground is successful only if it reads as a coherent stage for characters, rivers, rocks, props, combat telegraphs, and atmosphere.
@@ -390,7 +550,40 @@ Checklist:
 - [ ] Confirm `Wet Mudflat -> Trampled` still responds to compaction/path masks, but does not make trampled wear the main visual foundation.
 - [ ] Confirm `Wind-Scoured` remains directional but no longer dominates as a fake final accent-line solution.
 - [ ] Confirm the base ground may look plain; that is acceptable until Patch V3 adds real painted accent lines.
+
+### Grassland Baseline Validation
+
+- [ ] Confirm `GeneratedGround` exposes `Surface Family = Grassland`.
+- [ ] Test `Clean Meadow`, `Patchy Meadow`, `Damp Meadow`, and `Worn Meadow` from the gameplay camera.
+- [ ] Confirm Grassland reads as calm muted living ground, not a grass-blade/foliage system.
+- [ ] Confirm `Damp Meadow` remains matte and does not look like puddles or glossy wet grass.
+- [ ] Confirm `Worn Meadow` can be used with compaction/path masks without becoming the main style foundation.
+- [ ] Confirm the river corridor still follows the selected Grassland style.
 - [ ] Confirm river corridor material sync still follows the selected ground style.
+
+### Painted Accent Lines / Feature Stack Validation
+
+- [ ] Confirm Unity compiles after Patch V3.
+- [ ] Confirm style assets can contain multiple enabled ShaderOnly features without being treated as invalid.
+- [ ] Confirm `Snowfield -> Wind-Scoured` still shows DirectionalStreaks and also receives Painted Accent Lines.
+- [ ] Confirm `Wet Mudflat -> Trampled` still responds to compaction/path masks and also receives Painted Accent Lines.
+- [ ] Confirm `Grassland -> Damp Meadow` can show PooledWetness and Painted Accent Lines together.
+- [ ] Confirm `Grassland -> Worn Meadow` can show TrampledWear and Painted Accent Lines together.
+- [ ] Select `GeneratedGround -> Ground Debug -> Debug View -> Ground Painted Accent Lines` and confirm the raw line mask is visible.
+- [ ] Confirm the raw mask uses small clustered strokes, not large isolated bars/crescents.
+- [ ] Confirm line scale changes spacing/grouping without creating huge strokes.
+- [ ] Confirm Snowfield is not scratched everywhere.
+- [ ] Confirm Wet Mudflat does not turn into crack/noise texture.
+- [ ] Confirm Grassland does not turn into grass-blade hair.
+
+### Object-Level Ground Debug Validation
+
+- [ ] Confirm `GeneratedGround` Inspector shows `Ground Debug -> Debug View`.
+- [ ] Switch to `Ground Compaction Path` from the `GeneratedGround` Inspector and confirm the mask appears without editing the material asset.
+- [ ] Switch to `Ground Painted Accent Lines` from the `GeneratedGround` Inspector and confirm the raw accent-line mask appears.
+- [ ] Press `Clear Debug View` and confirm normal rendering returns.
+- [ ] Confirm changing debug views refreshes material properties only and does not regenerate the mesh.
+
 
 ### Gameplay Validation
 
@@ -429,7 +622,8 @@ Checklist:
 - [ ] Inspect shore influence mask.
 - [ ] Inspect compaction/path influence mask.
 - [ ] Inspect standing-water/puddle-potential mask.
-- [ ] Add doctrine-layer debug views later when painted accent lines/contact accents become real shader layers.
+- [ ] Inspect painted accent line mask from `GeneratedGround -> Ground Debug`.
+- [ ] Confirm debug view changes do not regenerate terrain or require opening material assets.
 - [ ] Inspect runtime wetness/snow/compression only after runtime state exists.
 
 ## Suggested Initial Tuning
@@ -492,9 +686,9 @@ Still open after the doctrine pivot:
 - Should painted accent lines be generated entirely in shader from world-space noise, from a baked/generated mask, or from a cheap hybrid?
 - Which existing masks should bias accent-line density first: tonal patch, damp/deposit, shore, compaction, or modifier priority?
 - How should contact/edge accents be sourced for generated masses and props: existing placement data, ground modifiers, object stamps, or a later contact-mask bake?
-- When should the feature resolver move from first-supported-feature selection to multi-layer aggregation?
+- How much additional editor UX is needed now that Patch V3 implements the first shader feature stack?
 - How many doctrine-layer controls should be exposed in `GroundSurfaceStyleProfileEditor` before the UI becomes cluttered?
-- What debug views are needed for painted accent lines, contact accents, and sparse motifs?
+- What debug views are needed for contact accents and sparse motifs after `GroundPaintedAccentLines`?
 - How much pixel/faceted breakup should remain in the final style, if any?
 - What runtime state resolution is needed later for footprints from the game camera, after the static style is validated?
 
@@ -581,9 +775,9 @@ Risk:
 
 Mitigation:
 
-- evolve toward a feature-stack resolver that aggregates known shared layers;
+- keep using the Patch V3 shader feature stack as the canonical composition path;
 - require each feature recipe to map to a doctrine layer;
-- do not keep adding feature modes that cannot coexist.
+- do not reintroduce mutually exclusive feature modes that cannot coexist.
 
 ### Profiles Become Premature Biome System
 
@@ -593,7 +787,7 @@ Risk:
 
 Mitigation:
 
-- calibrate the doctrine on existing Snowfield and Wet Mudflat first;
+- calibrate the doctrine on existing Snowfield, Wet Mudflat, and Grassland first;
 - add new families only to test a specific style-layer need;
 - defer production biome/world assembly.
 
@@ -651,7 +845,7 @@ The first doctrine milestone is complete when:
 
 - the docs define restrained stylized terrain as the canonical target;
 - `GeneratedGround` still exposes family/variant authoring;
-- existing Snowfield and Wet Mudflat variants are retuned or calibrated under the doctrine;
+- existing Snowfield, Wet Mudflat, and Grassland variants are retuned or calibrated under the doctrine;
 - the same clearing can demonstrate at least two style-calibration lanes, including the preferred hybrid target;
 - the calm base reads as intentional from the game camera;
 - broad macro patches are visible but not noisy;
@@ -671,13 +865,51 @@ Active checklist after the doctrine pivot:
 - [x] Patch V0 - document and lock the new ground visual doctrine.
 - [x] Patch V1 - create style calibration setup.
 - [x] Patch V2 - simplify and retune calm base ground.
-- [ ] Patch V3 - prototype painted accent lines.
+- [x] Patch V2B - add Grassland baseline family and establish the three-family test set.
+- [x] Patch V3 - implement shader feature stack and painted accent lines.
+- [x] Patch V3C - fix object-level debug dropdown labels and Unity 6.5 obsolete editor refresh warning.
+- [x] Patch V3D - refine Painted Accent Lines raw mask from large strips into smaller clustered micro-strokes.
+- [x] Patch V3E - replace straight line stamps with curved visual-relief terrain-fold strokes.
 - [ ] Patch V4 - prototype contact/edge accents.
 - [ ] Patch V5 - prototype sparse motif/stamp layer.
-- [ ] Patch V6 - aggregate feature recipes into a shared style-layer stack.
+- [ ] Patch V6 - feature-stack authoring polish, warnings, and per-kind drawers.
 - [ ] Later - resume runtime state design only after static doctrine validation.
 
 Historical patch notes remain below for context.
+
+### 2026-07-09 — Patch V3E: Painted Accent Lines Curved Relief Model
+
+Validation after V3D showed the raw mask was thinner but still fundamentally read as straight 2D bars/line stamps rather than the Hades-1-like curved mound/crease marks defined by the ground doctrine. Patch V3E keeps the shader feature stack and object-level debug workflow unchanged, but replaces the straight micro-stroke primitive with short irregular curved stroke paths built from several local control points. The feature now also outputs a soft signed relief body used for subtle painted shadow/highlight value shaping. This is visual relief only: no terrain mesh height, collision, decals, textures, runtime state, or generated atlases are added.
+
+### 2026-07-09 — Patch V3D: Painted Accent Lines Mask Refinement
+
+Refined the raw `GroundPaintedAccentLines` mask after object-level debug validation showed the first V3 generator was drawing oversized isolated strips/crescents. Patch V3D keeps the feature stack architecture unchanged and updates only the procedural mask primitive: scale now controls group spacing, stroke length/thickness are capped in world units, accents are generated as smaller micro-strokes, and a broad cluster gate prevents uniform hatching. No color-response tuning, style asset retuning, runtime state, decals, textures, mesh changes, or contact accents were added.
+
+### 2026-07-09 — Patch V3C: GeneratedGround Debug UX Hotfix
+
+Fixed two validation blockers from the V3/V3B workflow: object-level `GeneratedGround` debug labels no longer use slash characters that Unity treats as submenu separators, and `GroundSurfaceStyleProfileEditor` no longer uses the obsolete `FindObjectsByType` overload with `FindObjectsSortMode`. This patch does not change shader logic, style recipes, mask generation, or Painted Accent Lines behavior.
+
+### 2026-07-09 — Patch V3B: GeneratedGround Object-Level Debug Views
+
+Exposed ground debug selection directly on `GeneratedGround` under `Ground Debug`. The component now writes `_MaskDebugMode` through its `MaterialPropertyBlock`, so authors can validate ground masks and doctrine-layer debug views from the generated-ground object without opening shared material assets. Debug changes refresh material properties only and do not regenerate terrain.
+
+### 2026-07-09 — Patch V3A: Generated-Mass Shader Compile Hotfix
+
+Fixed compile isolation after Patch V3 by guarding the ground-only painted-accent-line resolver so `PS3D/Pixel Surface Lit` / generated-mass shader paths no longer compile references to ground-only uniforms.
+
+### 2026-07-09 — Patch V3: Shader Feature Stack and Painted Accent Lines
+
+Changed the ground feature renderer from the old single `_GroundFeatureMode` proof slot to explicit stackable shader-property blocks per supported feature kind. Added `PaintedAccentLines = 20` as the first doctrine-layer feature. Updated Snowfield, Wet Mudflat, Grassland, and Style Calibration assets so Painted Accent Lines can coexist with DirectionalStreaks, PooledWetness, and TrampledWear. Added `GroundPaintedAccentLines = 28` debug mode.
+
+### 2026-07-09 — Patch V2B: Grassland Baseline Family
+
+Implemented as an asset/docs patch after validation confirmed Snowfield and Wet Mudflat baselines but identified the need for a living-ground family before shared feature work.
+
+- Added `GSP_Grassland.asset` as a semantic profile with high vegetation suitability, moderate damp/deposit response, low snow eligibility, and soft broad patches.
+- Added `GSSP_Grassland.asset` as a production surface family.
+- Added `Clean Meadow`, `Patchy Meadow`, `Damp Meadow`, and `Worn Meadow` variants.
+- Kept the patch asset-only; no grass blades, vegetation rendering, runtime state, shader changes, river logic, or scene edits were added.
+- Established Snowfield, Wet Mudflat, and Grassland as the canonical three-family test set for Patch V3 and later shared style layers.
 
 ### 2026-07-09 — Patch V2: Base Ground Simplification and Calibration Cleanup
 
@@ -948,7 +1180,7 @@ Directional Streaks
 
 Directional Streaks exists because wind-scoured snow, sand, ash, and dust cannot be represented convincingly by colour and macro-noise sliders alone. The first implementation is deliberately cheap: it uses world-position noise, a stable direction vector, the existing pixel seed, and the selected variant's feature recipe. It does not allocate textures, add atlases, change generated mesh data, or create runtime state.
 
-The renderer contract added by Patch M is:
+Historical Patch M renderer contract:
 
 ```text
 _GroundFeatureMode
@@ -960,7 +1192,7 @@ _GroundFeatureDirection
 _GroundFeatureSeed
 ```
 
-`GeneratedGround` resolves the selected style variant, picks the first enabled shader-only feature, and pushes those values through the existing material-property-block path. If no shader-only feature is active, it writes neutral feature values. River corridor renderers remain style-agnostic and continue to receive the resolved parent-ground material contract through the same property block refresh path.
+This single-slot contract is superseded by Patch V3. Current ground rendering resolves the feature list as a stack and writes explicit property blocks per supported feature kind. `_GroundFeatureMode` remains only as a hidden compatibility property and must not receive new feature modes. River corridor renderers remain style-agnostic and continue to receive the resolved parent-ground material contract through the same property block refresh path.
 
 Current Snowfield feature usage:
 
@@ -1020,25 +1252,9 @@ mudflat.frozen_thaw
   colder thawing mud, partial frost response, lighter pooled wetness.
 ```
 
-Patch N also makes `Pooled Wetness` a renderable shader-only feature. It uses the same feature property-block contract added in Patch M:
+Patch N also made `Pooled Wetness` a renderable shader-only proof feature. Historically it used the single `_GroundFeatureMode` contract added in Patch M.
 
-```text
-_GroundFeatureMode
-_GroundFeatureStrength
-_GroundFeatureScale
-_GroundFeatureContrast
-_GroundFeatureMaskInfluence
-_GroundFeatureDirection
-_GroundFeatureSeed
-```
-
-Feature mode values are currently:
-
-```text
-0 = no shader-only feature
-1 = Directional Streaks
-2 = Pooled Wetness
-```
+That path is superseded by Patch V3. `PooledWetness` is now one supported layer in the shader feature stack and can coexist with other supported ShaderOnly features such as PaintedAccentLines.
 
 Pooled Wetness is deliberately cheap. It uses world-position procedural noise, damp/deposit mask, shore mask, rocky/dry suppression, the feature recipe seed, and the selected variant's strength/scale/contrast/mask influence. It darkens and damp-tints local pools and adds local smoothness/specular response in the ground shader. It does not allocate textures, add atlases, generate new mesh data, or create runtime state.
 
@@ -1250,7 +1466,7 @@ Rules after Patch Q:
 
 Patch R reconciles the ground roadmap with the architecture that now exists after Patches J through Q and adds a custom editor for `GroundSurfaceStyleProfile` assets.
 
-The documentation update records the split between semantic surface profiles, visual style profiles, variant recipes, material controls, feature recipes, and the `GeneratedGround` resolver. Its roadmap was later superseded by Patch V0, which pauses the immediate runtime-state queue and makes style calibration, painted accent lines, contact accents, sparse motifs, and feature-stack aggregation the active direction.
+The documentation update records the split between semantic surface profiles, visual style profiles, variant recipes, material controls, feature recipes, and the `GeneratedGround` resolver. Its roadmap was later superseded by Patch V0, which paused the immediate runtime-state queue and made style calibration, painted accent lines, contact accents, sparse motifs, and feature-stack aggregation the active direction. Patch V3 later implemented the first shader feature stack baseline.
 
 The `GroundSurfaceStyleProfile` editor makes style assets practical to edit before more surface families are added. It adds:
 

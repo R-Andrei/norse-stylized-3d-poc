@@ -2,9 +2,11 @@
 
 Status: active implementation checklist  
 Current target: EW-4D0 — Variable-Profile Topology Bevel Graph  
-Current step: EW-4D0.6T3 — T-Junction-Safe Open-Cycle Polygon Closure
+Current step: EW-4D0.7 — Final Topology Validation and Active-Path Switch
 
----
+## EW-4D0.7 final topology validation and active-path switch note
+
+EW-4D0.6T7 proved the rebuild workspace can reach zero open edges, zero non-manifold edges, and zero T-junctions after pre-closure T-junction repair, branch-aware open-boundary cycle decomposition, and topology-scale closure-cap validation. EW-4D0.7 is the first active commit step: successful EW-4D construction now explicitly commits the rebuilt workspace to the generated polygon face list and bypasses the obsolete EW-4C half-space fallback. This is a correctness/visibility patch, not density tuning; committed ConvexEdgeWear faces also report estimated triangulated triangles and rendered vertices so EW-4D0.8 can reduce sample density by quality tier.
 
 ## 1. Hard rules
 
@@ -119,7 +121,10 @@ openCycleClosureFacesExpected == openCycleClosureComponentsInput
 openCycleClosureFacesBuilt == openCycleClosureFacesExpected
 workspaceOpenEdgesAfterComponentClosure == 0
 workspaceNonManifoldEdgesAfterComponentClosure == 0
-workspaceTJunctionsAfterComponentClosure == 0
+workspaceTJunctionRepairFailedFaces == 0
+workspaceOpenEdgesAfterTJunctionRepair == 0
+workspaceNonManifoldEdgesAfterTJunctionRepair == 0
+workspaceTJunctionsAfterTJunctionRepair == 0
 baseFaceValidationFailures == 0
 workspaceBaseFaces == graphFaces
 profileSegments == 3
@@ -281,20 +286,45 @@ workspaceTJunctionsAfterComponentClosure=19
 
 Verdict: per-triangle fan closure proved the open-cycle topology can close open edges and avoid non-manifold edges, but the radial centre-fan diagonals create T-junctions.
 
-### EW-4D0.6T3 — T-junction-safe open-cycle polygon closure — current
+### EW-4D0.6T3 — T-junction-safe open-cycle polygon closure — completed as cap-shape proof
+
+EW-4D0.6T3 replaced centre-fan closure triangles with one ordered ConvexEdgeWear polygon cap per traced open-edge cycle.
+
+Validation result to carry forward:
+
+```text
+openCycleClosureEdgesInput=226
+openCycleClosureComponentsInput=22
+openCycleClosureComponentsBuilt=22
+openCycleClosureComponentsFailed=0
+openCycleClosureFacesExpected=22
+openCycleClosureFacesBuilt=22
+workspaceOpenEdgesAfterComponentClosure=0
+workspaceNonManifoldEdgesAfterComponentClosure=0
+workspaceTJunctionsAfterComponentClosure=12
+workspaceTJunctionsOnClosureEdgesAfterComponentClosure=0
+workspaceTJunctionsOnBaseEdgesAfterComponentClosure=9
+workspaceTJunctionsOnConvexEdgeWearEdgesAfterComponentClosure=3
+```
+
+Verdict: polygon caps are the correct open-edge closure shape; the remaining failures are pre-existing Base/ConvexEdgeWear workspace edge T-junctions, not closure-cap edges.
+
+### EW-4D0.6T4 — Workspace T-junction edge split repair — completed as failed-face diagnostic
+
+EW-4D0.6T4 found the expected 12 repair candidates, but aborted before applying insertions because one repaired face failed validation. That proved the repair target was correct and the validation scale was too strict for topology edge splitting.
+
+### EW-4D0.6T4b — Robust T-junction edge split repair — completed as tolerance/closure-edge diagnostic
 
 Implementation requirements:
 
 ```text
-- Keep actual post-ribbon open edges as the closure source.
-- Require endpoint valence 2 for every open-edge endpoint.
-- Trace each connected component into an ordered cycle.
-- Compute centre = average(cycle vertices) for each cycle.
-- Build one ConvexEdgeWear polygon cap per traced open-edge component.
-- Preserve the traced cycle vertex order so cap boundary edges exactly match the real open edges.
-- Compute a robust orientation normal from aligned per-edge triangle normals, but do not create radial centre-fan topology edges.
-- Build the full closure face list transactionally and append only on success.
-- Audit post-closure open edges, non-manifold edges, and T-junctions.
+- Keep EW-4D0.6T3 polygon open-cycle closure unchanged.
+- After component closure, collect audited T-junction vertices on non-closure Base and ConvexEdgeWear edges.
+- Split every affected workspace polygon edge by inserting the exact audited vertex between that edge's endpoints.
+- Validate repaired split faces at topology-repair edge length.
+- Track too-near-start/end, no-insertion, area, short-edge, non-finite, and applied-face counters.
+- Apply repair transactionally against a cloned workspace-face list.
+- Re-audit repaired workspace topology before accepting the step.
 - Keep the step workspace-only; final visible commit remains EW-4D0.7.
 ```
 
@@ -306,18 +336,31 @@ openCycleClosureComponentsInput == workspaceOpenEdgeComponentsAfterRibbons
 openCycleClosureComponentsBuilt == openCycleClosureComponentsInput
 openCycleClosureFacesExpected == openCycleClosureComponentsInput
 openCycleClosureFacesBuilt == openCycleClosureFacesExpected
-openCycleClosureNonCycleEndpoints == 0
-openCycleClosureTraceFailures == 0
-openCycleClosureTooSmallCycles == 0
-openCycleClosureInvalidNormals == 0
-openCycleClosureDegenerateTriangles == 0
-openCycleClosureInvalidFaces == 0
 workspaceOpenEdgesAfterComponentClosure == 0
 workspaceNonManifoldEdgesAfterComponentClosure == 0
-workspaceTJunctionsAfterComponentClosure == 0
+workspaceTJunctionRepairCandidates > 0
+workspaceTJunctionRepairFailedFaces == 0
+workspaceTJunctionRepairFailedArea == 0
+workspaceTJunctionRepairFailedShortEdge == 0
+workspaceTJunctionRepairFailedNonFinite == 0
+workspaceTJunctionRepairAppliedFaces > 0
+workspaceOpenEdgesAfterTJunctionRepair == 0
+workspaceNonManifoldEdgesAfterTJunctionRepair == 0
+workspaceTJunctionsAfterTJunctionRepair == 0
 ```
 
-### EW-4D0.7 — Final topology validation and active-path switch
+
+### EW-4D0.6T6 — Pre-closure T-junction repair and recomputed open-cycle closure — current
+
+Evidence that motivates this step: EW-4D0.6T4c eliminated the 12 post-closure T-junctions by splitting audited Base, ConvexEdgeWear, and closure-cap edges, but the post-closure split introduced 4 non-manifold edges. That proves the split repair target is real, but the ordering is wrong: closure caps must be generated from the already-split boundary, not repaired afterward.
+
+EW-4D0.6T6 keeps the T5 workspace sequence but changes closure tracing to branch-aware cycle decomposition: ribbons, audit/repair T-junctions in the post-ribbon workspace, recompute actual open-edge diagnostics, trace open cycles from the repaired boundary, then build polygon closure caps from that repaired cycle graph. The target remains strict: zero open edges, zero non-manifold edges, and zero T-junctions after component closure.
+
+### EW-4D0.6T7 — Topology-scale closure cap validation — completed
+
+Validation after EW-4D0.6T6 proved the branch-aware tracer is no longer the blocker: `openCycleClosureNonCycleEndpoints=0`, `openCycleClosureTraceFailures=0`, and `openCycleClosureTooSmallCycles=0`. It then failed on `openCycleClosureInvalidFaces=1` after one component built, so EW-4D0.6T7 keeps the topology path and changes only closure cap validation. Repaired split vertices must remain in cap boundaries; cap edge-length validation therefore uses the same topology/audit tolerance scale used by T-junction repair, not the broader ribbon-generation edge scale. New counters identify cap rejection by area, short edge, non-finite point, duplicate-point collapse, and min/max cap vertex count.
+
+### EW-4D0.7 — Final topology validation and active-path switch — current
 
 Implementation requirements:
 
@@ -420,15 +463,45 @@ openCycleClosureFacesExpected == openCycleClosureComponentsInput
 openCycleClosureFacesBuilt == openCycleClosureFacesExpected
 workspaceOpenEdgesAfterComponentClosure == 0
 workspaceNonManifoldEdgesAfterComponentClosure == 0
-workspaceTJunctionsAfterComponentClosure == 0
+workspaceTJunctionRepairFailedFaces == 0
+workspaceOpenEdgesAfterTJunctionRepair == 0
+workspaceNonManifoldEdgesAfterTJunctionRepair == 0
+workspaceTJunctionsAfterTJunctionRepair == 0
 ```
 
 Expected visual result:
 
 ```text
 Convex Edge Wear may still be black.
-EW-4D0.5 emits ribbon faces only inside the temporary rebuild workspace. EW-4D0.6T3 closes actual post-ribbon open cycles in that same workspace using one ordered polygon cap per traced open-edge component. Final visible commit still waits for EW-4D0.7 final topology validation and active-path switch.
 ```
+
+EW-4D0.6T4b proved the repair records still targeted the right 12 T-junction vertices, but no insertions were committed because closure cap edges were skipped and one repaired split face failed short-edge validation:
+
+```text
+workspaceTJunctionRepairCandidates=12
+workspaceTJunctionRepairSkippedClosureEdges=12
+workspaceTJunctionRepairTooNearStart=4
+workspaceTJunctionRepairTooNearEnd=1
+workspaceTJunctionRepairFailedShortEdge=1
+workspaceTJunctionRepairInsertedVertices=0
+workspaceTJunctionsAfterTJunctionRepair=12
+```
+
+### EW-4D0.6T4c — Closure-inclusive T-junction split repair — completed as ordering proof
+
+Checklist:
+
+```text
+include closure cap edges in T-junction repair records
+use the audit T-junction tolerance for repaired split-edge validation
+keep polygon open-cycle closure unchanged
+keep repair transactional
+require workspaceOpenEdgesAfterTJunctionRepair == 0
+require workspaceNonManifoldEdgesAfterTJunctionRepair == 0
+require workspaceTJunctionsAfterTJunctionRepair == 0
+```
+
+EW-4D0.5 emits ribbon faces only inside the temporary rebuild workspace. EW-4D0.6T3 proved one ordered polygon cap per traced open-edge component can close the workspace, and EW-4D0.6T4c proved the audited split targets are real but must not be repaired after caps are built. EW-4D0.6T6 moved T-junction splitting into the post-ribbon, pre-closure workspace, recomputed open-edge cycles, and proved branch-aware tracing works. EW-4D0.6T7 keeps that topology path and narrows the active blocker to closure cap validation scale. Final visible commit still waits for EW-4D0.7 final topology validation and active-path switch.
 
 ---
 

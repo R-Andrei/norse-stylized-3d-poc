@@ -164,6 +164,19 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MediumMaterialTemporalUpdateRate = 12f;
         private const float HighMaterialTemporalUpdateRate = 16f;
         private const float ManualTestShapeVariety = 0f;
+        private const float AutomaticShoreSourceMinimumSlotSpacingMetres = 3.5f;
+        private const float AutomaticShoreSourceMaximumSlotSpacingMetres = 12.0f;
+        private const float AutomaticShoreSourceMinimumEventsPerSecond = 0.25f;
+        private const float AutomaticShoreSourceMaximumEventsPerSecond = 3.0f;
+        private const int AutomaticShoreSourceMaximumStartsPerUpdate = 2;
+        private const int AutomaticShoreSourceMaximumScansPerUpdate = 32;
+        private const float AutomaticShoreRibbonMinimumDuration = 0.45f;
+        private const float AutomaticShoreRibbonMaximumDuration = 0.90f;
+        private const float AutomaticShoreWashMinimumDuration = 0.55f;
+        private const float AutomaticShoreWashMaximumDuration = 1.10f;
+        private const float AutomaticShoreBirthPatternSeedSalt = 307.733f;
+        private const float AutomaticShoreBirthSourceFillSeedSalt = 419.371f;
+        private const float AutomaticShoreBirthShapeSeedSalt = 521.909f;
         private const float PresenceMetricThreshold = 0.16432f;
         private const float IntegratedAreaFixedPointScale = 4096f;
 

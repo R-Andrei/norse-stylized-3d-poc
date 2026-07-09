@@ -109,6 +109,8 @@ namespace ProgrammaticStylized3D.Rivers
             public float BaseRadius;
             public float SourceAmount;
             public float RemainingLife;
+            public float AmountEnvelopeFloor;
+            public float RadiusEnvelopeFloor;
             public float PatternSeed;
             public float ShapeSeed;
             public float SourceFillSeed;

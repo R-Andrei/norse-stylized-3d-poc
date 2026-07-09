@@ -45,6 +45,30 @@ Shader "PS3D/Pixel Ground Surface Lit"
         [HideInInspector] _GroundFeatureMaskInfluence("Ground Feature Mask Influence", Range(0, 1)) = 0.5
         [HideInInspector] _GroundFeatureDirection("Ground Feature Direction", Vector) = (1, 0, 0, 0)
         [HideInInspector] _GroundFeatureSeed("Ground Feature Seed", Float) = 0
+        [HideInInspector] _GroundDirectionalStreakStrength("Ground Directional Streak Strength", Range(0, 1)) = 0
+        [HideInInspector] _GroundDirectionalStreakScale("Ground Directional Streak Scale", Range(0.1, 30)) = 5
+        [HideInInspector] _GroundDirectionalStreakContrast("Ground Directional Streak Contrast", Range(0, 1)) = 0.5
+        [HideInInspector] _GroundDirectionalStreakMaskInfluence("Ground Directional Streak Mask Influence", Range(0, 1)) = 0.5
+        [HideInInspector] _GroundDirectionalStreakDirection("Ground Directional Streak Direction", Vector) = (1, 0, 0, 0)
+        [HideInInspector] _GroundDirectionalStreakSeed("Ground Directional Streak Seed", Float) = 0
+        [HideInInspector] _GroundPooledWetnessStrength("Ground Pooled Wetness Strength", Range(0, 1)) = 0
+        [HideInInspector] _GroundPooledWetnessScale("Ground Pooled Wetness Scale", Range(0.1, 30)) = 5
+        [HideInInspector] _GroundPooledWetnessContrast("Ground Pooled Wetness Contrast", Range(0, 1)) = 0.5
+        [HideInInspector] _GroundPooledWetnessMaskInfluence("Ground Pooled Wetness Mask Influence", Range(0, 1)) = 0.5
+        [HideInInspector] _GroundPooledWetnessDirection("Ground Pooled Wetness Direction", Vector) = (1, 0, 0, 0)
+        [HideInInspector] _GroundPooledWetnessSeed("Ground Pooled Wetness Seed", Float) = 0
+        [HideInInspector] _GroundTrampledWearStrength("Ground Trampled Wear Strength", Range(0, 1)) = 0
+        [HideInInspector] _GroundTrampledWearScale("Ground Trampled Wear Scale", Range(0.1, 30)) = 5
+        [HideInInspector] _GroundTrampledWearContrast("Ground Trampled Wear Contrast", Range(0, 1)) = 0.5
+        [HideInInspector] _GroundTrampledWearMaskInfluence("Ground Trampled Wear Mask Influence", Range(0, 1)) = 0.5
+        [HideInInspector] _GroundTrampledWearDirection("Ground Trampled Wear Direction", Vector) = (1, 0, 0, 0)
+        [HideInInspector] _GroundTrampledWearSeed("Ground Trampled Wear Seed", Float) = 0
+        [HideInInspector] _GroundPaintedAccentLineStrength("Ground Painted Accent Line Strength", Range(0, 1)) = 0
+        [HideInInspector] _GroundPaintedAccentLineScale("Ground Painted Accent Line Scale", Range(0.1, 30)) = 5
+        [HideInInspector] _GroundPaintedAccentLineContrast("Ground Painted Accent Line Contrast", Range(0, 1)) = 0.5
+        [HideInInspector] _GroundPaintedAccentLineMaskInfluence("Ground Painted Accent Line Mask Influence", Range(0, 1)) = 0.5
+        [HideInInspector] _GroundPaintedAccentLineDirection("Ground Painted Accent Line Direction", Vector) = (1, 0, 0, 0)
+        [HideInInspector] _GroundPaintedAccentLineSeed("Ground Painted Accent Line Seed", Float) = 0
 
         [Header(Stylized Value Shaping)]
         _HighlightCompressStrength("Highlight Compress Strength", Range(0, 0.5)) = 0.08

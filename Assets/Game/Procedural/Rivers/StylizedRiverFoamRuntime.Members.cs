@@ -92,6 +92,13 @@ namespace ProgrammaticStylized3D.Rivers
         private int materialStepCountSinceSession;
         private int birthCommandsThisFrame;
         private double lastBirthCommandAt = -1.0;
+        private float automaticShoreBirthAccumulator;
+        private int automaticShoreBirthCursor;
+        private int automaticShoreBirthSubmittedLastUpdate;
+        private int automaticShoreBirthRejectedLastUpdate;
+        private int automaticShoreBirthSubmittedTotal;
+        private string automaticShoreBirthStatus =
+            "Automatic source population disabled";
         private StylizedRiverFoamMajorTopology majorTopology;
         private StylizedRiverFoamConnectorTopology connectorTopology;
         private StylizedRiverFoamPocketTopology pocketTopology;

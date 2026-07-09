@@ -1441,7 +1441,7 @@ This was introduced because the first 5.13 validation showed Film Source, Film S
 
 ### River Foam 4.11C.5.13C note
 
-`4.11C.5.13C` corrects Layer D Film Source semantics. Generic Layer B support/contact/topology must not become visual film by itself. Film Source is now material-derived, with support used only as bias/suppression. If future river art direction needs environmental contact film that appears without spawned material, implement it as a separate named product with its own debug view and rules rather than reusing generic topology support as Film Source.
+`4.11C.5.13C` corrects Layer D Film Source semantics. Generic Layer B support/contact/topology must not become visual film by itself. Film Source is now material-derived, with support used only as bias/suppression. The first path toward shore/rock/contact-looking foam should be Layer C source population: birth real persistent material where environmental source candidates justify it, then let support/lifetime capture decide how long it survives. Do not add a separate visual-only environmental film product before validating that source-population route.
 
 
 ## Addendum — River Foam 4.11C.5.13C validation and next-chat continuation target
@@ -1551,7 +1551,285 @@ Final Foam remains unchanged.
 
 ### Next continuation target after 5.13D validation
 
-If 5.13D validates well, the next decision is whether Layer D macro shape is good enough to continue toward Final Foam integration or whether one more Layer D tuning pass is needed. Do not switch Final Foam until the user accepts the Layer D macro result in debug views.
+5.13D validation showed that material-derived spread from one central manual ribbon remains visually limited. The corrected next step is not a new environmental/contact-film layer. The correct next step is automatic Layer C source population: birth real persistent material near supported environmental source candidates, then use existing support/lifetime capture plus Layer D spread.
 
-If 5.13D is still too blunt, tune the same compute formulas again before adding new architecture. If it becomes too thin or loses useful broad sheets, relax `supportShape`, cross-flow gates, or bridge contribution slightly, but do not reintroduce support-only Film Source.
+## Addendum — River Foam 4.11C.5.14A Automatic Shore/Contact Source Population
 
+Use this as the current continuation point after `4.11C.5.14A`.
+
+### Audit result
+
+```text
+Manual/progressive birth exists.
+Support/lifetime capture exists.
+Layer B shore/pressure/lee topology sources exist.
+Layer D material-derived Film Source / Film Support exists.
+Automatic birth near specific environmental places was missing.
+```
+
+Therefore the intended architecture remains:
+
+```text
+Layer B support/contact/topology
+  -> Layer C real material birth and Remaining Life capture
+  -> Layer D material-derived visual spread
+  -> Layer E local shader polish
+```
+
+### Implemented first source class
+
+`4.11C.5.14A` adds a disabled-by-default Automatic Source Population foldout and the first conservative source class: sparse shore/contact material birth. This creates real persistent FoamState material through the existing `PendingInjection` / `QueueMaterialBirth` / `InjectFoam` path.
+
+Changed code files:
+
+```text
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RuntimeUpdates.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs
+```
+
+### Hard constraints preserved
+
+```text
+Automatic birth is off by default.
+Support/topology still cannot render as foam from zero material.
+No Final Foam integration changed.
+No new Environmental Contact Film product was added.
+No entity/pocket/connected-component system was added.
+Layer D still does not write FoamState.
+```
+
+### Validation target
+
+```text
+With Automatic Birth disabled, behavior should match 5.13D.
+When enabled, Material Presence should receive sparse shore/contact births.
+Material Remaining Life should show support-preserved material near shore/contact zones.
+Foam Film Source and Foam Film Support should derive from those real births.
+Final Foam should remain unchanged.
+```
+
+### Next continuation target after 5.14A
+
+First validate whether sparse shore/contact source population creates useful real material in the intended places. If it does, the next source classes should be obstacle/pressure contact birth, lee/wake birth, and connector/major-support birth. If it overfills the river, reduce birth amount, acceptance, radius, or per-tick budget before adding any new source classes.
+
+
+## Addendum — River Foam 4.11C.5.14B / 5.14C Source Population Controls
+
+Use this as the current continuation point after `4.11C.5.14C`.
+
+### Validation result that caused 5.14B
+
+`4.11C.5.14A` successfully proved automatic Layer C birth plumbing, but the first shore source controls were too crude. With Automatic Birth enabled and the old `Shore Contact Birth Amount` around `0.35`, Material Remaining Life showed some shore survival, but the births appeared as large blocky chunks, sometimes river-wide or wider.
+
+The conclusion was:
+
+```text
+Architecture validated: automatic material birth + support capture works.
+Source-scale tuning failed: one amount slider produced oversized compound chunks.
+```
+
+The correct fix was not a new visual film layer and not another hard-coded constant tweak. The correct fix was source-class-specific spawning.
+
+### 5.14B result
+
+`4.11C.5.14B` introduced source-population presets and a Shore Contact Birth profile. The source-class idea was correct, but the Inspector exposed too many low-level controls:
+
+```text
+Density
+Budget Per Tick
+Minimum Support
+Inward Offset Metres
+Band Width Metres
+Seed Radius Metres
+Seed Elongation
+Stroke Length Metres
+Initial Amount
+Initial Life
+Jitter
+Shape Mode
+```
+
+This was rejected as authoring/control bloat. It forced the user to tune implementation details rather than the intended shore-foam behavior.
+
+### Implemented 5.14C controls
+
+`4.11C.5.14C` keeps source-class-specific spawning but simplifies Shore Contact Birth to one deterministic hidden recipe with four English-facing controls:
+
+```text
+Coverage      how much shoreline receives foam over time
+Size          how large each shore seed/stroke is
+Strength      how visible new shore foam is at birth
+Persistence   how much initial life new shore foam receives
+```
+
+The Source Population foldout now exposes:
+
+```text
+Automatic Foam Birth
+Spawn Preset
+Shore Foam
+  Coverage
+  Size
+  Strength
+  Persistence
+Runtime Status / Queued counts
+```
+
+Hidden shore recipe rules:
+
+```text
+Shore foam always uses small deterministic strokes.
+Compound shore blobs are not used.
+Coverage maps to candidate spacing/acceptance and internal budget.
+Size maps to conservative radius/stroke length.
+Strength maps to initial persistent material presence.
+Persistence maps to initial Remaining Life.
+Candidate variation is deterministic from river seed, candidate identity, and repeat cycle, not wall-clock randomness.
+Support capture still controls long-term survival.
+```
+
+### Changed code files in 5.14C
+
+```text
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs
+```
+
+### Hard constraints preserved
+
+```text
+Automatic birth remains globally gated.
+Only Shore Contact Birth is implemented.
+No Final Foam integration changed.
+No support-only Film Source was reintroduced.
+No Environmental Contact Film visual product was added.
+No entity/pocket/connected-component system was added.
+Layer D still does not write FoamState.
+```
+
+### Validation target
+
+Use:
+
+```text
+Material Presence
+Material Remaining Life
+Foam Film Source
+Foam Film Support
+Final Foam
+```
+
+Expected result:
+
+```text
+With Automatic Foam Birth disabled, behavior matches the previous baseline.
+With Spawn Preset = Shore Contact Test, shore births appear as small deterministic edge strokes/flecks.
+At Coverage around 0.35, births should not become river-wide chunks.
+Changing Coverage should change how much shoreline receives births over time, not footprint or life.
+Changing Size should change footprint while keeping births near-shore.
+Changing Strength should affect new material visibility.
+Changing Persistence should affect initial survival before support capture.
+Foam Film Source and Film Support should derive from real material births.
+Final Foam remains unchanged.
+```
+
+### Next continuation target after 5.14C
+
+First validate the simplified Shore Contact Test preset. If it still overfills, tune the hidden shore recipe constants and deterministic acceptance. If shore birth validates as controllable small strokes/flecks, the next source class should be either Obstacle Contact Birth or Lee/Wake Birth, implemented one class at a time through the same Layer C material-birth path and exposed through similarly small intent-level controls.
+
+## Addendum — River Foam 4.11C.5.14D Deterministic Shore Source Events
+
+Use this as the current continuation point after `4.11C.5.14D`.
+
+### Why 5.14D exists
+
+`4.11C.5.14C` simplified the Source Population controls, but runtime validation showed that the hidden shore recipe was too starved and too same-shaped. Even with controls maxed, barely any foam spawned. The few spawned shapes read as isolated one-shot strokes, not as a coherent shore/contact source system.
+
+The rejected direction is many faint deposits that accumulate into visible foam. The target reference shows crisp high-value foam: thin streamlines, shore/contact ribbons, broad but sharp sheets, rock/bank-attached arcs, and branching connectors. The source system therefore needs deterministic placement of normal-strength source events, not many weak material deposits.
+
+### Implemented contract
+
+`4.11C.5.14D` remains architecturally compliant:
+
+```text
+Layer B/domain shore context
+  -> deterministic shore source slots
+  -> Layer C progressive source events
+  -> real persistent FoamState material
+  -> support/lifetime capture
+  -> Layer D material-derived spread
+  -> Final Foam unchanged
+```
+
+No new visual-only environmental/contact-film texture was added. Support topology still does not become foam. Remaining Life rules are unchanged.
+
+### Current controls
+
+The Source Population UI should show only:
+
+```text
+Automatic Foam Birth
+Spawn Preset
+Shore Foam
+  Coverage
+  Activity
+  Patch Size
+  Pattern
+```
+
+`Pattern` options are:
+
+```text
+Mixed
+Shore Ribbons
+Inward Wash
+```
+
+### Current implementation
+
+The shore source class now uses deterministic source slots across both banks. The scheduler starts bounded source events from eligible slots. Events are full-strength material births revealed progressively through the existing composition-event path.
+
+Implemented recipes:
+
+```text
+Shore Ribbon:
+  bank-parallel opaque source event near the shore contact band.
+
+Inward Wash:
+  shore-attached source event that drifts inward/downstream from the bank.
+```
+
+### Validation instructions
+
+Validate in this order:
+
+```text
+1. Material Presence
+2. Material Remaining Life
+3. Foam Film Source
+4. Foam Film Support
+5. Final Foam
+```
+
+Expected behavior:
+
+```text
+Coverage ~0.45 / Activity ~0.45 / Patch Size ~0.35 / Pattern Mixed should start visible, opaque shore events over time.
+Shore Ribbons should produce bank-parallel events.
+Inward Wash should produce inward/downstream tongues.
+Events should distribute across the river chunk over time.
+Events should not be faint deposits, random one-shot specks, giant river-wide blobs, or support-only topology.
+Final Foam should remain unchanged.
+```
+
+### Next likely work
+
+If 5.14D validates, tune only the four high-level shore controls or hidden recipe constants. Do not add river-body, obstacle-contact, or lee/wake source classes until shore source events are acceptable. If 5.14D still looks wrong, diagnose whether the issue is slot eligibility, recipe geometry, progressive reveal envelope, or support/lifetime capture before adding new systems.

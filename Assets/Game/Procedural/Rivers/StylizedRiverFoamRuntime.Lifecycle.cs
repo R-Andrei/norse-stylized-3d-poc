@@ -172,7 +172,8 @@ namespace ProgrammaticStylized3D.Rivers
                 pendingInjections.Count > 0 ||
                 pendingMaterialBirths.Count > 0 ||
                 pendingIsolatedLifeProbe ||
-                activeFoamCompositionEventCount > 0;
+                activeFoamCompositionEventCount > 0 ||
+                IsAutomaticSourcePopulationActive;
             bool hasWork = materialWork || topologyDebugActive ||
                 progressiveBirthDebugActive || motionFieldDebugActive ||
                 shapeProductDebugActive;
@@ -284,11 +285,14 @@ namespace ProgrammaticStylized3D.Rivers
 
                 bool foamCompositionDeposited =
                     AdvanceFoamCompositionEvents(stepDuration, now);
+                bool automaticBirthDeposited =
+                    AdvanceAutomaticBirthSources(stepDuration, now);
                 bool materialStepActive = currentState != null ||
                     materialLifetimeAuthorityActive ||
-                    foamCompositionDeposited ||
+                    foamCompositionDeposited || automaticBirthDeposited ||
                     activeFoamCompositionEventCount > 0 ||
-                    pendingMaterialBirths.Count > 0;
+                    pendingMaterialBirths.Count > 0 ||
+                    IsAutomaticSourcePopulationActive;
 
                 bool measureTopology = false;
                 if (materialStepActive)
@@ -620,6 +624,12 @@ namespace ProgrammaticStylized3D.Rivers
             lastConfiguredAbsoluteLifeProbeActive = false;
             birthCommandsThisFrame = 0;
             lastBirthCommandAt = -1.0;
+            automaticShoreBirthAccumulator = 0f;
+            automaticShoreBirthSubmittedLastUpdate = 0;
+            automaticShoreBirthRejectedLastUpdate = 0;
+            automaticShoreBirthStatus = river != null && river.FoamAutomaticBirthEnabled
+                ? "Cleared / automatic source population remains enabled"
+                : "Automatic source population disabled";
             simulationInterpolation = 1f;
             lastRenderInterpolationAlpha = simulationInterpolation;
             idleSince = Time.realtimeSinceStartupAsDouble;

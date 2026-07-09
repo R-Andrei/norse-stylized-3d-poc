@@ -287,7 +287,7 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 
 ### Current status after architecture lock
 
-Stage 6 is in the `4.11C` manually-born persistent material phase. The code already has persistent `FoamState`, external Motion Field / obstacle-routing inputs, `_FoamShapeMask`, `Foam Evaluated Shape`, and `Foam Shape Difference` debug views. The 5.9z coherent coordinate-warp prototype proved the Layer D product slot and C# binding path, and 5.10 validation proved it produced nonzero signed differences, but it was visually ineffective because tiny inverse-sampled coordinate displacement cannot create broad sheet/bridge/pinch behavior from solid masks. 5.10B retired that warp and reset Layer D to a clean pass-through baseline. 5.11 then proved that Layer D local breakup is also the wrong place for fine detail because it exposes foam-field cell/ribbon artifacts; 5.11B retires that probe and restores the clean pass-through baseline again.
+Stage 6 is in the `4.11C` persistent material recovery phase. Manual/progressive birth is implemented. `4.11C.5.14A` added the first disabled-by-default automatic Layer C shore/contact source path, `4.11C.5.14B` established source-class-specific spawning, and `4.11C.5.14C` simplifies the shore birth Inspector to four intent controls: Coverage, Size, Strength, and Persistence. The code already has persistent `FoamState`, external Motion Field / obstacle-routing inputs, `_FoamShapeMask`, `Foam Evaluated Shape`, and `Foam Shape Difference` debug views. The 5.9z coherent coordinate-warp prototype proved the Layer D product slot and C# binding path, and 5.10 validation proved it produced nonzero signed differences, but it was visually ineffective because tiny inverse-sampled coordinate displacement cannot create broad sheet/bridge/pinch behavior from solid masks. 5.10B retired that warp and reset Layer D to a clean pass-through baseline. 5.11 then proved that Layer D local breakup is also the wrong place for fine detail because it exposes foam-field cell/ribbon artifacts; 5.11B retires that probe and restores the clean pass-through baseline again.
 
 Therefore the active direction is no longer “tune coherent deformation harder.” The active direction is the corrected acyclic layer architecture:
 
@@ -363,14 +363,15 @@ The current approved order is:
 3. Failed 5.9z warp retirement — complete in 4.11C.5.10B; EvaluateFoamShape is back to pass-through clipped Persistent Presence so future work starts from a clean Layer D baseline.
 4. Layer E shader-side local detail probe — implemented in `4.11C.5.12` as debug-only `Foam Shader Detail Probe` / `Foam Shader Detail Difference`; validate cheap sub-cell chipping/fray/cuts at rendered-pixel scale without mutating `_FoamShapeMask` or `FoamState`.
 5. Low-res Layer D Film Source / Film Support — implemented through `4.11C.5.13`; `5.13B` fixed domain-space sampling, `5.13C` fixed support-topology contamination, and `5.13D` tunes spread shape.
-6. Validate 5.13D Film Support shape quality — compare Film Source, Film Support, Evaluated Shape, Shape Difference, and unchanged Final Foam.
-7. Full-res _FoamShapeMask integration — combine persistent material, visual support, valid fluid, and exclusion into macro structure only after Layer D is visually accepted.
-8. Final Foam consumes _FoamShapeMask — only after Layer D visibly outperforms current final foam.
-8. Thin bright streak layer — shader-side local detail, separate from broad film structure; this may merge with item 4 if the probe is accepted.
-9. Optional visual-only history — only if flicker becomes a real issue.
-10. Performance tiers and chunk scheduling — formalize update rates, resolution tiers, active chunk caps, and profiling counters.
+6. Layer C automatic source population — `4.11C.5.14A` adds the first conservative shore/contact birth source class as real persistent FoamState material, disabled by default and routed through the existing birth/injection pipeline. `4.11C.5.14B` establishes source-class-specific spawning, and `4.11C.5.14C` removes bloated low-level controls in favor of Coverage, Size, Strength, and Persistence for shore foam.
+7. Validate automatic shore/contact birth with `Material Presence`, `Material Remaining Life`, `Foam Film Source`, `Foam Film Support`, `Foam Evaluated Shape`, `Foam Shape Difference`, and unchanged Final Foam. At density around 0.35, shore birth should produce small sparse strokes/seeds, not river-wide chunks.
+8. Full-res _FoamShapeMask integration — combine persistent material, visual support, valid fluid, and exclusion into macro structure only after source placement plus Layer D shape are visually accepted.
+9. Final Foam consumes _FoamShapeMask — only after Layer D visibly outperforms current final foam.
+10. Thin bright streak layer — shader-side local detail, separate from broad film structure; this may merge with item 4 if the probe is accepted.
+11. Optional visual-only history — only if flicker becomes a real issue.
+12. Performance tiers and chunk scheduling — formalize update rates, resolution tiers, active chunk caps, and profiling counters.
 
-Do not continue to automatic birth population until manually-born material, evaluated shape, transport, and final render pass the corrected contracts.
+Automatic birth population is now allowed only as Layer C source population: it must create real persistent material through the existing birth path, must remain disabled by default, must use source-class-specific strategies, and must not make generic support/topology render as foam.
 
 ### Public workflow and debug requirements
 
@@ -477,3 +478,45 @@ Layer D Film Source is now material-gated. The previous 5.13/5.13B formula allow
 The compute pass now uses a narrower support-bias range, weaker and source-gated cross-flow spread, stricter bridge thresholds, lower bridge contribution, and a more conservative `supportShape` contribution in `EvaluateFoamShape`. The intended result is a Film Support field that remains broader than Film Source but is less uniformly inflated and less capsule-like.
 
 Validation should compare `Foam Film Source`, `Foam Film Support`, `Foam Evaluated Shape`, `Foam Shape Difference`, and `Final Foam`.
+
+## Stage 6 Foam update — 4.11C.5.14A
+
+`4.11C.5.14A` begins the automatic source-population phase without adding a new visual-film authority. The audit result is that manual/progressive birth, support/lifetime capture, topology/contact fields, and Layer D material-derived spread already exist; the missing piece is automatic material birth near specific supported places.
+
+The patch adds a disabled-by-default **Automatic Source Population** inspector foldout and the first conservative source class: sparse shore/contact births. These births create real persistent FoamState material through the existing `PendingInjection` / `QueueMaterialBirth` / `InjectFoam` path. Support topology then preserves or suppresses the born material through the existing Remaining Life rules.
+
+The patch deliberately does not add environmental/contact film as a separate visual product, does not switch Final Foam to `_FoamShapeMask`, and does not allow support/topology to render as foam from zero material.
+
+Validation should enable Automatic Foam Birth and compare `Material Presence`, `Material Remaining Life`, `Foam Film Source`, `Foam Film Support`, `Foam Evaluated Shape`, `Foam Shape Difference`, and unchanged `Final Foam`. The original `Shore Contact Birth Amount` and the bloated `5.14B` low-level controls are superseded by the `4.11C.5.14C` shore controls.
+
+## Stage 6 Foam update — 4.11C.5.14B / 5.14C
+
+`4.11C.5.14B` was a spawning-control pass. Validation of `5.14A` proved automatic shore birth and support capture work, but also showed that the old `Shore Contact Birth Amount` slider produced oversized blocky chunks because it controlled density, footprint, material amount, initial life, elongation, and compound shape at once.
+
+`5.14B` correctly introduced source-population presets and source-class-specific spawning, but it exposed too many low-level shore controls. `4.11C.5.14C` simplified the shore UI, but validation showed the hidden implementation was too sparse and same-shaped. `4.11C.5.14D` replaces one-shot shore strokes with deterministic full-strength shore source events.
+
+The current shore controls are:
+
+```text
+Coverage
+Activity
+Patch Size
+Pattern
+```
+
+The implemented patterns are `Mixed`, `Shore Ribbons`, and `Inward Wash`. The active implemented source class is still shore/contact only; River Body, Obstacle Contact, and Lee/Wake presets are documented placeholders and intentionally do not spawn yet. Final Foam remains unchanged.
+
+
+
+## Stage 6 Foam update — 4.11C.5.14D
+
+`4.11C.5.14D` keeps automatic source population in Layer C and rewrites shore birth as deterministic source events. The patch explicitly rejects a many-faint-deposits accumulation model. Instead, bounded deterministic shore slots start normal-strength progressive source events that reveal their area spatially over time.
+
+Two shore event recipes are implemented first:
+
+```text
+Shore Ribbon   bank-parallel opaque material source event
+Inward Wash    shore-attached inward/downstream source event
+```
+
+Both recipes create real persistent `FoamState` material through the existing progressive composition / injection path. Support topology still only affects survival/capture after material exists. Layer D and Final Foam integration are unchanged.

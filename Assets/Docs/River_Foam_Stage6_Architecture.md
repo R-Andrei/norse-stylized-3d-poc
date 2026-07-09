@@ -604,12 +604,39 @@ final color/opacity
 large hidden neighbour-sampled morphology that writes back to FoamState
 ```
 
-## 4.7 Current status
+## 4.7 Source population contract
+
+Source population is Layer C birth preparation. It may read Layer A/B context, choose where real material should be born, and queue birth through the same persistent material injection path used by manual sources.
+
+Source population must obey this rule:
+
+```text
+support/context may choose birth candidates;
+only Layer C birth creates material;
+support/context must not render as foam by itself.
+```
+
+The intended route for shore, rock, wake, and current-seam foam is therefore:
+
+```text
+Layer B environmental support/contact/wake context
+  -> Layer C automatic source population creates real FoamState material
+  -> Layer C support/negative aging captures or kills that material
+  -> Layer D derives broad visual film from the material
+  -> Layer E adds pixel-scale breakup/streaks/polish
+```
+
+This replaces the earlier temptation to add a separate visual-only environmental film authority. Such a visual-only product is postponed and should not be introduced until source population has been tested and found insufficient.
+
+Patch `4.11C.5.14A` added the first automatic source class: conservative shore/contact birth. Validation proved the plumbing but showed the first control design was too crude. Patch `4.11C.5.14B` correctly moved toward source-class-specific spawning, but exposed too many low-level controls. Patch `4.11C.5.14C` simplified the UI, but its hidden one-shot shore stroke recipe was too sparse and same-shaped. Patch `4.11C.5.14D` replaces that recipe with deterministic full-strength shore source events controlled by Coverage, Activity, Patch Size, and Pattern. Shore Contact Birth remains the only implemented automatic source class; river-body, obstacle-contact, and lee/wake presets are documented placeholders until shore birth validates.
+
+## 4.8 Current status
 
 Active/trusted:
 
 ```text
 manual/source birth
+conservative automatic shore/contact source population when explicitly enabled, now controlled by a simplified shore-specific spawn recipe
 source-to-persistent merge
 downstream phase transport
 lifecycle aging
@@ -628,7 +655,7 @@ hidden neighbour-resampling morphology that writes persistent state
 
 Actual lateral material transport is currently not active and must not be implied by debug labels.
 
-## 4.8 Connectivity invariant
+## 4.9 Connectivity invariant
 
 Layer C is the only layer that can truthfully say:
 
@@ -764,7 +791,7 @@ Known non-urgent caveats:
 ```text
 The transition-hold fallback may still bind persistent state where the shape mask is expected; evaluated-shape debug during topology transition should be treated cautiously until a dedicated transition ShapeMask snapshot exists.
 Shader-side Final Foam still owns legacy macro shaping until the accepted Layer D film/shape product replaces it.
-Low-res Layer D Film Source and Film Support helpers exist after `4.11C.5.13`; coordinate-space and support-source semantics were corrected and validated through `4.11C.5.13B` and `4.11C.5.13C`. The remaining work is shape/spread tuning before any Final Foam switch.
+Low-res Layer D Film Source and Film Support helpers exist after `4.11C.5.13`; coordinate-space and support-source semantics were corrected and validated through `4.11C.5.13B` and `4.11C.5.13C`, and spread was tuned in `4.11C.5.13D`. The latest architectural correction is that Layer D should not be asked to invent shore/rock/contact film from a single central manual ribbon. Source placement belongs in Layer C source population first; Layer D then spreads material-derived products.
 ```
 
 ## 5.3.2 4.11C.5.10B validation response and reset
@@ -2150,3 +2177,42 @@ No phase/cell-grid stutter returns.
 Final Foam remains unchanged.
 ```
 
+
+
+### 2026-07-09 — River Foam 4.11C.5.14A Layer C Automatic Shore/Contact Source Population
+
+Audited the current birth architecture after 5.13D validation. The audit found that manual/progressive birth, support/lifetime capture, topology/contact fields, and Layer D material-derived spread exist, but automatic birth near specific environmental locations was missing. The correct next step is therefore Layer C source population, not a new Layer D environmental-film authority.
+
+Implemented the first conservative source class: disabled-by-default automatic shore/contact birth. The runtime scans sparse shore-support-band candidates at a low fixed cadence, accepts a bounded subset based on the river seed and amount, then queues real persistent material through `PendingInjection`, `QueueMaterialBirth`, and the existing `InjectFoam` compute kernel. The material then lives or dies under the existing support/negative aging system.
+
+This patch initially added Inspector controls under `Source Population`: `Automatic Birth Enabled` and `Shore Contact Birth Amount`, plus runtime counters/status. Validation showed that the single amount slider was overloaded and could create large shore chunks. Patch `4.11C.5.14B` then overcorrected by exposing too many implementation controls. Patch `4.11C.5.14C` simplified the control surface, but validation showed the hidden implementation was too starved. Patch `4.11C.5.14D` keeps the Layer C source-population route and uses deterministic full-strength source events controlled by Coverage, Activity, Patch Size, and Pattern. It does not switch Final Foam, does not create support-only Film Source, does not add a visual-only environmental film texture, and does not create entities or pocket IDs.
+
+
+### 2026-07-09 — River Foam 4.11C.5.14B Source Population Controls / Shore Birth Profile
+
+Validated `4.11C.5.14A` enough to confirm automatic birth works, but the old `Shore Contact Birth Amount` created large blocky chunks because it controlled density, footprint, initial amount, initial life, elongation, and compound shape together. This was a source-profile design problem, not a Layer C architecture problem.
+
+`4.11C.5.14B` correctly defined source-class-specific spawning as the contract for future automatic birth, but its Inspector exposed too many implementation controls and was not suitable for authoring or validation.
+
+### 2026-07-09 — River Foam 4.11C.5.14C Simplified Shore Spawn Controls
+
+`4.11C.5.14C` keeps the source-class-specific spawning contract but removes the low-level shore controls from the Inspector. Shore Contact Birth is now a deterministic sparse shoreline-stroke recipe controlled by four intent-level values: Coverage, Size, Strength, and Persistence.
+
+The shore recipe no longer exposes per-tick budget, support threshold, inward band, radius, elongation, stroke length, initial amount, initial life, jitter, or shape mode. Internally, Coverage maps to candidate spacing/acceptance and budget; Size maps to conservative radius/stroke length; Strength maps to initial material presence; Persistence maps to initial Remaining Life. Shore birth always uses small deterministic strokes, never compound blobs.
+
+### 2026-07-09 — River Foam 4.11C.5.14D Deterministic Shore Source Events
+
+`4.11C.5.14D` replaces the `5.14C` one-shot sparse shore stroke recipe with deterministic shore source events. The architectural rule is unchanged: automatic shore birth creates real persistent Layer C material through the existing progressive composition / material injection path; support/lifetime capture decides survival; Layer D may only spread material-derived film; Final Foam remains unchanged.
+
+The patch rejects faint-deposit accumulation as the shore strategy. Automatic shore events now spawn normal-strength material and reveal their area spatially over the event duration. This is intended to reduce the visual read of a completed patch teleporting into existence without paying for many weak births.
+
+The Source Population UI now exposes only:
+
+```text
+Coverage
+Activity
+Patch Size
+Pattern: Mixed / Shore Ribbons / Inward Wash
+```
+
+Two recipes are implemented: `Shore Ribbon`, a bank-parallel opaque ribbon source event, and `Inward Wash`, a shore-attached event that drifts inward/downstream from the bank contact band. Both are scheduled through deterministic slots distributed along both banks, bounded by a maximum number of starts and scans per update.

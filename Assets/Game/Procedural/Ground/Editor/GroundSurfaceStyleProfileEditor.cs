@@ -382,7 +382,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             if (resolvedCostClass != GroundSurfaceFeatureCostClass.ShaderOnly)
             {
                 EditorGUILayout.HelpBox(
-                    "This feature cost class is reserved for future generated-texture/runtime modules and is not rendered by the current shader-only path.",
+                    "This feature cost class is reserved for future generated-texture/runtime modules and is not rendered by the current shader feature stack.",
                     MessageType.Info);
                 return;
             }
@@ -390,7 +390,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             if (!IsCurrentlyRenderableShaderFeature(resolvedKind))
             {
                 EditorGUILayout.HelpBox(
-                    $"{resolvedKind} is reserved in the feature contract but is not implemented by the current ground shader path.",
+                    $"{resolvedKind} is reserved in the feature contract but is not implemented by the current ground shader feature stack.",
                     MessageType.Info);
             }
         }
@@ -465,6 +465,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 return;
             }
 
+            HashSet<GroundSurfaceFeatureKind> seenShaderFeatureKinds =
+                new HashSet<GroundSurfaceFeatureKind>();
+
             for (int index = 0; index < features.arraySize; index++)
             {
                 SerializedProperty feature =
@@ -493,16 +496,26 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         MessageType.Warning);
                 }
                 else if (resolvedCostClass == GroundSurfaceFeatureCostClass.ShaderOnly &&
+                         IsCurrentlyRenderableShaderFeature(resolvedKind))
+                {
+                    if (!seenShaderFeatureKinds.Add(resolvedKind))
+                    {
+                        EditorGUILayout.HelpBox(
+                            $"Variant '{variantId}' has multiple enabled '{resolvedKind}' shader features. The shader feature stack uses the first enabled recipe of each kind.",
+                            MessageType.Warning);
+                    }
+                }
+                else if (resolvedCostClass == GroundSurfaceFeatureCostClass.ShaderOnly &&
                          !IsCurrentlyRenderableShaderFeature(resolvedKind))
                 {
                     EditorGUILayout.HelpBox(
-                        $"Variant '{variantId}' uses '{resolvedKind}', which is reserved but not currently rendered.",
+                        $"Variant '{variantId}' uses '{resolvedKind}', which is reserved but not currently rendered by the shader feature stack.",
                         MessageType.Info);
                 }
                 else if (resolvedCostClass != GroundSurfaceFeatureCostClass.ShaderOnly)
                 {
                     EditorGUILayout.HelpBox(
-                        $"Variant '{variantId}' uses a non-shader feature cost class. That is a reserved future path and currently has no renderer output.",
+                        $"Variant '{variantId}' uses a non-shader feature cost class. That is a reserved future path and currently has no shader feature stack output.",
                         MessageType.Info);
                 }
             }
@@ -757,8 +770,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             int refreshedCount = 0;
 
             GeneratedGround[] grounds = UnityEngine.Object.FindObjectsByType<GeneratedGround>(
-                FindObjectsInactive.Include,
-                FindObjectsSortMode.None);
+                FindObjectsInactive.Include);
 
             for (int index = 0; index < grounds.Length; index++)
             {
@@ -852,6 +864,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         {
             return kind == GroundSurfaceFeatureKind.DirectionalStreaks ||
                 kind == GroundSurfaceFeatureKind.PooledWetness ||
+                kind == GroundSurfaceFeatureKind.PaintedAccentLines ||
                 kind == GroundSurfaceFeatureKind.TrampledWear;
         }
     }

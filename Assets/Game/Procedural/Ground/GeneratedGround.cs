@@ -70,6 +70,41 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         Wide
     }
 
+    public enum GeneratedGroundDebugView
+    {
+        None = 0,
+
+        [InspectorName("Ground Tonal")]
+        GroundTonal = 7,
+
+        [InspectorName("Ground Exposure")]
+        GroundExposure = 8,
+
+        [InspectorName("Ground Damp Deposit")]
+        GroundDampDeposit = 9,
+
+        [InspectorName("Ground Vegetation")]
+        GroundVegetation = 10,
+
+        [InspectorName("Ground Compaction Path")]
+        GroundCompaction = 11,
+
+        [InspectorName("Ground Shore")]
+        GroundShore = 12,
+
+        [InspectorName("Ground Rocky Dry")]
+        GroundRockyDry = 13,
+
+        [InspectorName("Ground Combined")]
+        GroundCombined = 14,
+
+        [InspectorName("Ground Standing Water Potential")]
+        GroundStandingWaterPotential = 27,
+
+        [InspectorName("Ground Painted Accent Lines")]
+        GroundPaintedAccentLines = 28
+    }
+
     public enum GroundSurfaceType
     {
         [InspectorName("Snowfield")]
@@ -232,6 +267,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private bool regenerateOnValidate = true;
 
+        [Tooltip("Renderer-local ground debug view. This is written through the GeneratedGround material property block so validation does not require editing shared material assets.")]
+        [SerializeField]
+        private GeneratedGroundDebugView debugView =
+            GeneratedGroundDebugView.None;
+
         [SerializeField, HideInInspector]
         private GroundModifier[] modifiers = Array.Empty<GroundModifier>();
 
@@ -329,6 +369,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_Smoothness");
         private static readonly int SpecularStrengthId =
             Shader.PropertyToID("_SpecularStrength");
+        private static readonly int MaskDebugModeId =
+            Shader.PropertyToID("_MaskDebugMode");
         private static readonly int GroundFeatureModeId =
             Shader.PropertyToID("_GroundFeatureMode");
         private static readonly int GroundFeatureStrengthId =
@@ -344,12 +386,46 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private static readonly int GroundFeatureSeedId =
             Shader.PropertyToID("_GroundFeatureSeed");
 
+        private static readonly GroundShaderFeaturePropertyIds
+            GroundDirectionalStreakFeatureIds =
+                new GroundShaderFeaturePropertyIds("_GroundDirectionalStreak");
+        private static readonly GroundShaderFeaturePropertyIds
+            GroundPooledWetnessFeatureIds =
+                new GroundShaderFeaturePropertyIds("_GroundPooledWetness");
+        private static readonly GroundShaderFeaturePropertyIds
+            GroundTrampledWearFeatureIds =
+                new GroundShaderFeaturePropertyIds("_GroundTrampledWear");
+        private static readonly GroundShaderFeaturePropertyIds
+            GroundPaintedAccentLineFeatureIds =
+                new GroundShaderFeaturePropertyIds("_GroundPaintedAccentLine");
+
+        private struct GroundShaderFeaturePropertyIds
+        {
+            public readonly int StrengthId;
+            public readonly int ScaleId;
+            public readonly int ContrastId;
+            public readonly int MaskInfluenceId;
+            public readonly int DirectionId;
+            public readonly int SeedId;
+
+            public GroundShaderFeaturePropertyIds(string prefix)
+            {
+                StrengthId = Shader.PropertyToID(prefix + "Strength");
+                ScaleId = Shader.PropertyToID(prefix + "Scale");
+                ContrastId = Shader.PropertyToID(prefix + "Contrast");
+                MaskInfluenceId = Shader.PropertyToID(prefix + "MaskInfluence");
+                DirectionId = Shader.PropertyToID(prefix + "Direction");
+                SeedId = Shader.PropertyToID(prefix + "Seed");
+            }
+        }
+
         public GroundRecipe Recipe => recipe;
         public GroundSurfaceStyleProfile SurfaceStyleProfile =>
             surfaceStyleProfile;
         public string SurfaceVariantId => surfaceVariantId;
         public bool OverrideSurfaceProfile => overrideSurfaceProfile;
         public bool OverrideMaterialControls => overrideMaterialControls;
+        public GeneratedGroundDebugView DebugView => debugView;
         public GroundSurfaceProfile SurfaceProfile => ResolveSurfaceProfile();
         public GroundSurfaceType SurfaceType => groundSurfaceType;
         public GroundSnowfieldVariant SnowfieldVariant => snowfieldVariant;
@@ -609,6 +685,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             overrideMaterialControls = true;
             snowfieldVariant = GroundSnowfieldVariant.Custom;
             RefreshSurfaceMaterialProperties();
+        }
+
+        public void SetDebugView(
+            GeneratedGroundDebugView value)
+        {
+            debugView = value;
+            RefreshSurfaceMaterialProperties();
+        }
+
+        public void ClearDebugView()
+        {
+            SetDebugView(GeneratedGroundDebugView.None);
         }
 
         public void RefreshSurfaceMaterialProperties()
@@ -930,12 +1018,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return groundMaterialControls;
         }
 
-        private GroundSurfaceFeatureRecipe ResolvePrimaryShaderFeature()
+        private GroundSurfaceFeatureRecipe ResolveShaderFeature(
+            GroundSurfaceFeatureKind kind)
         {
             GroundSurfaceVariantRecipe variant = ResolveSurfaceVariant();
 
             if (variant != null &&
                 variant.TryGetFirstShaderFeature(
+                    kind,
                     out GroundSurfaceFeatureRecipe feature))
             {
                 return feature;
@@ -1263,6 +1353,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             materialProperties.SetFloat(
                 SpecularStrengthId,
                 resolvedMaterialControls.SpecularStrength);
+            materialProperties.SetFloat(
+                MaskDebugModeId,
+                (float)debugView);
 
             ApplyResolvedFeatureMaterialProperties(materialProperties);
 
@@ -1272,68 +1365,75 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private void ApplyResolvedFeatureMaterialProperties(
             MaterialPropertyBlock properties)
         {
-            GroundSurfaceFeatureRecipe feature = ResolvePrimaryShaderFeature();
+            // Retire the old single-feature slot for active rendering while
+            // keeping the hidden material properties written to safe values for
+            // serialized-material compatibility.
+            properties.SetFloat(GroundFeatureModeId, 0f);
+            properties.SetFloat(GroundFeatureStrengthId, 0f);
+            properties.SetFloat(GroundFeatureScaleId, 1f);
+            properties.SetFloat(GroundFeatureContrastId, 0f);
+            properties.SetFloat(GroundFeatureMaskInfluenceId, 0f);
+            properties.SetVector(
+                GroundFeatureDirectionId,
+                new Vector4(1f, 0f, 0f, 0f));
+            properties.SetFloat(GroundFeatureSeedId, 0f);
 
-            if (feature == null ||
-                !TryResolveShaderFeatureMode(feature.Kind, out float mode))
+            ApplyFeatureRecipe(
+                properties,
+                ResolveShaderFeature(GroundSurfaceFeatureKind.DirectionalStreaks),
+                GroundDirectionalStreakFeatureIds);
+            ApplyFeatureRecipe(
+                properties,
+                ResolveShaderFeature(GroundSurfaceFeatureKind.PooledWetness),
+                GroundPooledWetnessFeatureIds);
+            ApplyFeatureRecipe(
+                properties,
+                ResolveShaderFeature(GroundSurfaceFeatureKind.TrampledWear),
+                GroundTrampledWearFeatureIds);
+            ApplyFeatureRecipe(
+                properties,
+                ResolveShaderFeature(GroundSurfaceFeatureKind.PaintedAccentLines),
+                GroundPaintedAccentLineFeatureIds);
+        }
+
+        private static void ApplyFeatureRecipe(
+            MaterialPropertyBlock properties,
+            GroundSurfaceFeatureRecipe feature,
+            GroundShaderFeaturePropertyIds propertyIds)
+        {
+            if (feature == null || !feature.CanApplyAsShaderOnly)
             {
-                properties.SetFloat(GroundFeatureModeId, 0f);
-                properties.SetFloat(GroundFeatureStrengthId, 0f);
-                properties.SetFloat(GroundFeatureScaleId, 1f);
-                properties.SetFloat(GroundFeatureContrastId, 0f);
-                properties.SetFloat(GroundFeatureMaskInfluenceId, 0f);
+                properties.SetFloat(propertyIds.StrengthId, 0f);
+                properties.SetFloat(propertyIds.ScaleId, 5f);
+                properties.SetFloat(propertyIds.ContrastId, 0.5f);
+                properties.SetFloat(propertyIds.MaskInfluenceId, 0.5f);
                 properties.SetVector(
-                    GroundFeatureDirectionId,
+                    propertyIds.DirectionId,
                     new Vector4(1f, 0f, 0f, 0f));
-                properties.SetFloat(GroundFeatureSeedId, 0f);
+                properties.SetFloat(propertyIds.SeedId, 0f);
                 return;
             }
 
             Vector2 direction = feature.Direction;
 
-            properties.SetFloat(GroundFeatureModeId, mode);
             properties.SetFloat(
-                GroundFeatureStrengthId,
+                propertyIds.StrengthId,
                 feature.Strength);
             properties.SetFloat(
-                GroundFeatureScaleId,
+                propertyIds.ScaleId,
                 feature.Scale);
             properties.SetFloat(
-                GroundFeatureContrastId,
+                propertyIds.ContrastId,
                 feature.Contrast);
             properties.SetFloat(
-                GroundFeatureMaskInfluenceId,
+                propertyIds.MaskInfluenceId,
                 feature.MaskInfluence);
             properties.SetVector(
-                GroundFeatureDirectionId,
+                propertyIds.DirectionId,
                 new Vector4(direction.x, direction.y, 0f, 0f));
             properties.SetFloat(
-                GroundFeatureSeedId,
+                propertyIds.SeedId,
                 feature.SeedOffset);
-        }
-
-        private static bool TryResolveShaderFeatureMode(
-            GroundSurfaceFeatureKind kind,
-            out float mode)
-        {
-            switch (kind)
-            {
-                case GroundSurfaceFeatureKind.DirectionalStreaks:
-                    mode = 1f;
-                    return true;
-
-                case GroundSurfaceFeatureKind.PooledWetness:
-                    mode = 2f;
-                    return true;
-
-                case GroundSurfaceFeatureKind.TrampledWear:
-                    mode = 3f;
-                    return true;
-
-                default:
-                    mode = 0f;
-                    return false;
-            }
         }
 
         private void EnsureGeneratedMesh()

@@ -39,6 +39,31 @@ namespace ProgrammaticStylized3D.Rivers
         Custom
     }
 
+    public enum StylizedRiverFoamSourcePopulationPreset
+    {
+        Custom,
+        ShoreContactTest,
+        RiverBodyTest,
+        ObstacleContactTest,
+        LeeWakeTest,
+        BalancedMixedTest,
+        Off
+    }
+
+    public enum StylizedRiverFoamShorePattern
+    {
+        Mixed,
+        ShoreRibbons,
+        InwardWash
+    }
+
+    public enum StylizedRiverFoamBirthShapeMode
+    {
+        Ellipse,
+        Stroke,
+        Compound
+    }
+
     public enum StylizedRiverMotionPreset
     {
         Still,
@@ -777,6 +802,39 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterEventAmount = 0.5f;
 
+        [Tooltip("Enables conservative automatic Layer C material birth from source candidates. This creates real persistent FoamState material through the existing birth pipeline; support topology then decides how long it survives. Disabled by default so validation can compare against manual sources honestly.")]
+        [SerializeField] private bool foamAutomaticBirthEnabled;
+
+        [Tooltip("Selects which automatic source-population strategy is active. Shore Contact Test is the only implemented automatic source class in Patch 4.11C.5.14B; the other entries are documented placeholders and intentionally do not spawn yet.")]
+        [SerializeField]
+        private StylizedRiverFoamSourcePopulationPreset foamSourcePopulationPreset =
+            StylizedRiverFoamSourcePopulationPreset.ShoreContactTest;
+
+        [Tooltip("Enables the shore/contact source class when the source population preset allows shore birth. Shore foam creates real persistent material near the bank; support topology then decides how long it survives.")]
+        [SerializeField] private bool foamAutomaticShoreBirthEnabled = true;
+
+        [Tooltip("How much of the shoreline can participate in deterministic shore source events over time. This controls slot eligibility, not opacity or patch size.")]
+        [FormerlySerializedAs("foamAutomaticShoreBirthAmount")]
+        [FormerlySerializedAs("foamShoreBirthDensity")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamShoreFoamCoverage = 0.45f;
+
+        [Tooltip("How often new shore source events start. Higher values create more full-strength shore ribbons or inward-wash tongues per second; it does not make individual events larger.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamShoreFoamActivity = 0.45f;
+
+        [Tooltip("How large each deterministic shore source event is. Higher values lengthen/widen the spawned ribbon or inward-wash tongue.")]
+        [FormerlySerializedAs("foamShoreFoamSize")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamShoreFoamPatchSize = 0.35f;
+
+        [Tooltip("Chooses the deterministic shore source recipe. Mixed alternates shore-parallel ribbons and inward wash tongues from stable source slots.")]
+        [SerializeField] private StylizedRiverFoamShorePattern foamShoreFoamPattern =
+            StylizedRiverFoamShorePattern.Mixed;
+
+        [SerializeField, HideInInspector] private float foamShoreFoamStrength = 0.35f;
+        [SerializeField, HideInInspector] private float foamShoreFoamPersistence = 0.30f;
+
         [Tooltip("Lifetime in seconds for unsupported Foam in neutral water. Positive topology slows local aging, while Negative Aging Pressure suppresses that preservation and then accelerates Remaining Life loss. This controls persistent material life, not topology lifetime.")]
         [Range(MinimumFoamNeutralLifetime, MaximumFoamNeutralLifetime)]
         [SerializeField]
@@ -1358,6 +1416,44 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamConnectorWeakSpanAmount);
         public float FoamFreeWaterEventAmount =>
             Mathf.Clamp01(foamFreeWaterEventAmount);
+        public bool FoamAutomaticBirthEnabled => foamAutomaticBirthEnabled;
+        public StylizedRiverFoamSourcePopulationPreset FoamSourcePopulationPreset =>
+            foamSourcePopulationPreset;
+        public bool FoamAutomaticShoreBirthEnabled =>
+            foamAutomaticShoreBirthEnabled;
+        public bool FoamAutomaticShoreBirthActive =>
+            FoamAutomaticBirthEnabled &&
+            FoamAutomaticShoreBirthEnabled &&
+            FoamSourcePopulationPreset != StylizedRiverFoamSourcePopulationPreset.Off &&
+            (FoamSourcePopulationPreset ==
+                StylizedRiverFoamSourcePopulationPreset.ShoreContactTest ||
+             FoamSourcePopulationPreset ==
+                StylizedRiverFoamSourcePopulationPreset.Custom ||
+             FoamSourcePopulationPreset ==
+                StylizedRiverFoamSourcePopulationPreset.BalancedMixedTest);
+        public bool FoamSourcePopulationPresetImplemented =>
+            FoamSourcePopulationPreset ==
+                StylizedRiverFoamSourcePopulationPreset.ShoreContactTest ||
+            FoamSourcePopulationPreset ==
+                StylizedRiverFoamSourcePopulationPreset.Custom ||
+            FoamSourcePopulationPreset ==
+                StylizedRiverFoamSourcePopulationPreset.BalancedMixedTest ||
+            FoamSourcePopulationPreset ==
+                StylizedRiverFoamSourcePopulationPreset.Off;
+        public float FoamShoreFoamCoverage =>
+            Mathf.Clamp01(foamShoreFoamCoverage);
+        public float FoamShoreFoamActivity =>
+            Mathf.Clamp01(foamShoreFoamActivity);
+        public float FoamShoreFoamPatchSize =>
+            Mathf.Clamp01(foamShoreFoamPatchSize);
+        public StylizedRiverFoamShorePattern FoamShoreFoamPattern =>
+            foamShoreFoamPattern;
+        public float FoamShoreFoamSize =>
+            FoamShoreFoamPatchSize;
+        public float FoamShoreFoamStrength =>
+            Mathf.Clamp01(foamShoreFoamStrength);
+        public float FoamShoreFoamPersistence =>
+            Mathf.Clamp01(foamShoreFoamPersistence);
         public float FoamNeutralLifetime =>
             Mathf.Clamp(
                 foamNeutralLifetime,
@@ -2999,6 +3095,16 @@ namespace ProgrammaticStylized3D.Rivers
                 foamConnectorWeakSpanAmount);
             foamFreeWaterEventAmount = Mathf.Clamp01(
                 foamFreeWaterEventAmount);
+            foamShoreFoamCoverage = Mathf.Clamp01(
+                foamShoreFoamCoverage);
+            foamShoreFoamActivity = Mathf.Clamp01(
+                foamShoreFoamActivity);
+            foamShoreFoamPatchSize = Mathf.Clamp01(
+                foamShoreFoamPatchSize);
+            foamShoreFoamStrength = Mathf.Clamp01(
+                foamShoreFoamStrength);
+            foamShoreFoamPersistence = Mathf.Clamp01(
+                foamShoreFoamPersistence);
             foamNeutralLifetime = Mathf.Clamp(
                 foamNeutralLifetime,
                 MinimumFoamNeutralLifetime,

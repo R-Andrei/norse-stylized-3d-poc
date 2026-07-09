@@ -30,6 +30,11 @@ namespace ProgrammaticStylized3D.Rendering
         // those serialized debug values remain stable.
         GroundStandingWaterPotential = 27,
 
+        // Raw shader-only painted accent line mask. Kept after the ground
+        // standing-water value and outside the existing 15-26 generated-mass
+        // diagnostic range.
+        GroundPaintedAccentLines = 28,
+
         // GeneratedMass generic boundary-atlas diagnostics. These are
         // intentionally placed after the ground debug modes so existing
         // serialized GeneratedMass debug values 0-6 remain stable.

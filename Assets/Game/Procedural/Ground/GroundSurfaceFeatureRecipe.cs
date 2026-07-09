@@ -6,7 +6,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
     [Serializable]
     public sealed class GroundSurfaceFeatureRecipe
     {
-        [Tooltip("Feature module represented by this recipe entry. Patch M applies Directional Streaks, Patch N applies Pooled Wetness, and Patch U applies Trampled Wear as shader-only proof features; the other kinds reserve the asset contract for later modules.")]
+        [Tooltip("Feature module represented by this recipe entry. Shader-only entries are resolved as a stack: variants may combine Directional Streaks, Pooled Wetness, Trampled Wear, Painted Accent Lines, and later supported layers.")]
         [SerializeField]
         private GroundSurfaceFeatureKind kind =
             GroundSurfaceFeatureKind.None;
@@ -15,7 +15,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private bool enabled = true;
 
-        [Tooltip("Budget class used by future quality gates. Patch M only applies Shader Only features.")]
+        [Tooltip("Budget class used by current and future quality gates. Shader Only entries can be resolved by the ground shader feature stack when their feature kind is implemented.")]
         [SerializeField]
         private GroundSurfaceFeatureCostClass costClass =
             GroundSurfaceFeatureCostClass.ShaderOnly;
@@ -40,7 +40,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float maskInfluence = 0.5f;
 
-        [Tooltip("Stable world X/Z direction for directional features. Directional Streaks consumes this as direction; Pooled Wetness ignores it.")]
+        [Tooltip("Stable world X/Z direction for directional features. Directional Streaks and Painted Accent Lines consume this as a directional bias; Pooled Wetness and Trampled Wear may ignore it.")]
         [SerializeField]
         private Vector2 direction = new Vector2(0.82f, 0.36f);
 

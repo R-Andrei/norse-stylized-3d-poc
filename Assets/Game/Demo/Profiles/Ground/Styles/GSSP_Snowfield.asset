@@ -66,6 +66,15 @@ MonoBehaviour:
       maskInfluence: 0.85
       direction: {x: 0.82, y: 0.36}
       seedOffset: 11
+    - kind: 20
+      enabled: 1
+      costClass: 0
+      strength: 0.08
+      scale: 6.8
+      contrast: 0.2
+      maskInfluence: 0.56
+      direction: {x: 0.82, y: 0.36}
+      seedOffset: 301
   - id: snowfield.patchy
     displayName: Patchy
     materialControls:
@@ -117,6 +126,15 @@ MonoBehaviour:
       maskInfluence: 0.52
       direction: {x: 0.82, y: 0.36}
       seedOffset: 23
+    - kind: 20
+      enabled: 1
+      costClass: 0
+      strength: 0.12
+      scale: 6.1
+      contrast: 0.28
+      maskInfluence: 0.64
+      direction: {x: 0.82, y: 0.36}
+      seedOffset: 311
   - id: snowfield.dirty_thawing
     displayName: Dirty Thawing
     materialControls:
@@ -158,7 +176,16 @@ MonoBehaviour:
       monolithicSmoothnessBoost: 0.18
       smoothness: 0.17
       specularStrength: 0.11
-    features: []
+    features:
+    - kind: 20
+      enabled: 1
+      costClass: 0
+      strength: 0.18
+      scale: 5.4
+      contrast: 0.36
+      maskInfluence: 0.72
+      direction: {x: 0.82, y: 0.36}
+      seedOffset: 317
   - id: snowfield.wind_scoured
     displayName: Wind-Scoured
     materialControls:
@@ -210,3 +237,12 @@ MonoBehaviour:
       maskInfluence: 0.28
       direction: {x: 0.82, y: 0.36}
       seedOffset: 41
+    - kind: 20
+      enabled: 1
+      costClass: 0
+      strength: 0.1
+      scale: 6.6
+      contrast: 0.26
+      maskInfluence: 0.62
+      direction: {x: 0.82, y: 0.36}
+      seedOffset: 331
