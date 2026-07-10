@@ -313,10 +313,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentStrokeLengthMin");
             SerializedProperty paintedAccentStrokeLengthMax =
                 feature.FindPropertyRelative("paintedAccentStrokeLengthMax");
-            SerializedProperty paintedAccentStrokeBaseAngleDegrees =
-                feature.FindPropertyRelative("paintedAccentStrokeBaseAngleDegrees");
+            SerializedProperty paintedAccentStrokeFacingDirectionDegrees =
+                feature.FindPropertyRelative("paintedAccentStrokeFacingDirectionDegrees");
             SerializedProperty paintedAccentStrokeAngleJitterDegrees =
                 feature.FindPropertyRelative("paintedAccentStrokeAngleJitterDegrees");
+            SerializedProperty paintedAccentFoldHeight =
+                feature.FindPropertyRelative("paintedAccentFoldHeight");
+            SerializedProperty paintedAccentFoldIrregularity =
+                feature.FindPropertyRelative("paintedAccentFoldIrregularity");
+            SerializedProperty paintedAccentFoldBroadness =
+                feature.FindPropertyRelative("paintedAccentFoldBroadness");
+            SerializedProperty paintedAccentFoldEndTaper =
+                feature.FindPropertyRelative("paintedAccentFoldEndTaper");
 
             string featureKey = $"feature_{features.propertyPath}_{index}";
             bool expanded = GetFoldout(featureKey, false);
@@ -377,7 +385,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         0.35f,
                         new GUIContent(
                             "Stroke Width",
-                            "Preview/runtime ribbon width in metres for generated 3D surface strokes. The fold-field R channel is baked from these strokes instead of inferred from noise blobs."));
+                            "Source-line/core width in metres. It controls baked line coverage and contributes to the derived 3D fold footprint; Fold Broadness scales the raised preview separately."));
                     EditorGUILayout.Slider(
                         paintedAccentStrokeDensity,
                         0f,
@@ -400,19 +408,51 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                             "Stroke Length Max",
                             "Maximum generated 3D stroke length in metres."));
                     EditorGUILayout.Slider(
-                        paintedAccentStrokeBaseAngleDegrees,
+                        paintedAccentStrokeFacingDirectionDegrees,
                         0f,
-                        180f,
+                        360f,
                         new GUIContent(
-                            "Base Angle Degrees",
-                            "Preferred local X/Z orientation for generated 3D Painted Accent strokes. 0 and 180 are equivalent because strokes are undirected."));
+                            "Facing Direction Degrees",
+                            "Local X/Z player or camera-facing direction. Generated 3D strokes are perpendicular to this direction before signed Angle Jitter is applied."));
                     EditorGUILayout.Slider(
                         paintedAccentStrokeAngleJitterDegrees,
                         0f,
                         30f,
                         new GUIContent(
                             "Angle Jitter Degrees",
-                            "Maximum signed angle offset in degrees around Base Angle Degrees. Each stroke rolls independently between -value and +value."));
+                            "Maximum signed angle offset in degrees around the perpendicular stroke angle derived from Facing Direction Degrees. Each stroke rolls independently between -value and +value."));
+                    EditorGUILayout.Space(4f);
+                    EditorGUILayout.LabelField(
+                        "Stochastic 3D Fold Surface",
+                        EditorStyles.miniBoldLabel);
+                    EditorGUILayout.Slider(
+                        paintedAccentFoldHeight,
+                        0f,
+                        0.40f,
+                        new GUIContent(
+                            "Fold Height",
+                            "Maximum raised height in metres, applied along the sampled ground normal."));
+                    EditorGUILayout.Slider(
+                        paintedAccentFoldIrregularity,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Fold Irregularity",
+                            "Strength of deterministic smooth profile variation across and along each stroke. This does not add lateral centerline squiggle."));
+                    EditorGUILayout.Slider(
+                        paintedAccentFoldBroadness,
+                        0.50f,
+                        1.80f,
+                        new GUIContent(
+                            "Fold Broadness",
+                            "Multiplier for the 3D fold footprint width and the broadness of its smooth stochastic profile."));
+                    EditorGUILayout.Slider(
+                        paintedAccentFoldEndTaper,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Fold End Taper",
+                            "How much of the stroke length blends the raised profile back into the ground at each end."));
 
                     if (paintedAccentStrokeLengthMax.floatValue <
                         paintedAccentStrokeLengthMin.floatValue + 0.05f)
@@ -669,8 +709,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentStrokeLengthMin");
             SerializedProperty strokeLengthMax =
                 feature.FindPropertyRelative("paintedAccentStrokeLengthMax");
+            SerializedProperty strokeFacingDirectionDegrees =
+                feature.FindPropertyRelative("paintedAccentStrokeFacingDirectionDegrees");
             SerializedProperty strokeAngleJitterDegrees =
                 feature.FindPropertyRelative("paintedAccentStrokeAngleJitterDegrees");
+            SerializedProperty foldHeight =
+                feature.FindPropertyRelative("paintedAccentFoldHeight");
+            SerializedProperty foldIrregularity =
+                feature.FindPropertyRelative("paintedAccentFoldIrregularity");
+            SerializedProperty foldBroadness =
+                feature.FindPropertyRelative("paintedAccentFoldBroadness");
+            SerializedProperty foldEndTaper =
+                feature.FindPropertyRelative("paintedAccentFoldEndTaper");
 
             if (strokeWidth != null)
             {
@@ -692,9 +742,34 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 strokeLengthMax.floatValue = 1.55f;
             }
 
+            if (strokeFacingDirectionDegrees != null)
+            {
+                strokeFacingDirectionDegrees.floatValue = 90f;
+            }
+
             if (strokeAngleJitterDegrees != null)
             {
                 strokeAngleJitterDegrees.floatValue = 18f;
+            }
+
+            if (foldHeight != null)
+            {
+                foldHeight.floatValue = 0.12f;
+            }
+
+            if (foldIrregularity != null)
+            {
+                foldIrregularity.floatValue = 0.55f;
+            }
+
+            if (foldBroadness != null)
+            {
+                foldBroadness.floatValue = 1f;
+            }
+
+            if (foldEndTaper != null)
+            {
+                foldEndTaper.floatValue = 0.65f;
             }
         }
 

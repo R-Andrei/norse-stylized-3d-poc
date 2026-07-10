@@ -672,62 +672,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     0.006f,
                     0.028f,
                     Mathf.InverseLerp(0.25f, 2f, settings.EdgeWearWidth));
-                HashSet<int> forcedDeferredEdges = new HashSet<int>();
-                ChamferCornerStats cornerStats = default;
-                ChamferEmissionStats emissionStats = default;
-                bool cornersReady = false;
-                bool emissionReady = false;
-                string cornerBlocker = string.Empty;
-                string emissionBlocker = string.Empty;
-
-                const int MaximumCompatibilityPasses = 8;
-                for (int compatibilityPass = 0;
-                     compatibilityPass < MaximumCompatibilityPasses;
-                     compatibilityPass++)
-                {
-                    cornerStats = new ChamferCornerStats();
-                    cornersReady = AuditExplicitChamferCornerSolution(
-                        faces,
-                        context,
-                        requestedWidth,
-                        minimumStableEdgeLength,
-                        maximumDimension * maximumDimension * 0.000001f,
-                        forcedDeferredEdges,
-                        ref cornerStats,
-                        out ChamferCornerSolution cornerSolution,
-                        out cornerBlocker);
-                    if (!cornersReady)
-                    {
-                        break;
-                    }
-
-                    emissionStats = new ChamferEmissionStats();
-                    emissionStats.CompatibilityPassCount = compatibilityPass + 1;
-                    emissionReady = AuditProvisionalChamferEmission(
-                        faces,
-                        context,
-                        cornerSolution,
-                        minimumStableEdgeLength,
-                        maximumDimension * maximumDimension * 0.000001f,
-                        ref emissionStats,
-                        out HashSet<int> conflictingEdges,
-                        out emissionBlocker);
-                    emissionStats.ConflictDeferredEdgeCount =
-                        forcedDeferredEdges.Count + conflictingEdges.Count;
-                    if (emissionReady || conflictingEdges.Count == 0)
-                    {
-                        break;
-                    }
-
-                    int previousDeferredCount = forcedDeferredEdges.Count;
-                    forcedDeferredEdges.UnionWith(conflictingEdges);
-                    if (forcedDeferredEdges.Count == previousDeferredCount)
-                    {
-                        emissionBlocker =
-                            "active vertex-boundary conflicts did not produce a new deterministic deferral";
-                        break;
-                    }
-                }
+                ChamferCornerStats cornerStats = new ChamferCornerStats();
+                bool cornersReady = AuditExplicitChamferCornerSolution(
+                    faces,
+                    context,
+                    requestedWidth,
+                    minimumStableEdgeLength,
+                    maximumDimension * maximumDimension * 0.000001f,
+                    null,
+                    ref cornerStats,
+                    out ChamferCornerSolution cornerSolution,
+                    out string cornerBlocker);
 
                 LogChamferCornerAudit(
                     cornerStats,
@@ -735,6 +690,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     cornerBlocker);
                 if (cornersReady)
                 {
+                    ChamferEmissionStats emissionStats = new ChamferEmissionStats();
+                    bool emissionReady = AuditProvisionalChamferEmission(
+                        faces,
+                        context,
+                        cornerSolution,
+                        minimumStableEdgeLength,
+                        maximumDimension * maximumDimension * 0.000001f,
+                        ref emissionStats,
+                        out string emissionBlocker);
                     LogChamferEmissionAudit(
                         emissionStats,
                         emissionReady,
@@ -742,10 +706,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
             }
 
-            // EW-C2R rebuilds the active positive-width edge network, defers
-            // deterministic duplicate-boundary conflicts, audits provisional
-            // replacement faces and one-strip quads, then discards them. The
-            // original PolygonFace list remains rendered until vertex patches pass.
+            // EW-C2S4 preserves raw face/segment provenance, segments every
+            // source-compatible provisional T-junction (including guarded preserved
+            // source-boundary subdivision) before boundary normalization, updates
+            // split boundary ownership, audits compact unique failures, then discards
+            // the provisional result. The original PolygonFace list remains rendered
+            // until explicit vertex patches pass.
         }
 
         private static List<EdgeWearBevelCandidate> BuildEdgeWearBevelCandidates(
@@ -1488,11 +1454,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
             }
 
-            if (!TryReconcileChamferUnselectedInternalEdges(
+            if (!TryBuildChamferSharedEdgeSpans(
                     context,
                     corners,
                     widthByEdge,
                     minimumStableEdgeLength,
+                    out Dictionary<int, ChamferSharedEdgeSpan> sharedSpans,
                     ref stats,
                     out blocker))
             {
@@ -1503,6 +1470,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     sourceFaces,
                     context,
                     corners,
+                    sharedSpans,
                     minimumStableEdgeLength,
                     minimumStableFaceArea,
                     ref stats,
@@ -1536,7 +1504,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 stats.MinimumSolvedWidth = 0f;
             }
-            solution = new ChamferCornerSolution(corners, widthByEdge);
+            solution = new ChamferCornerSolution(corners, widthByEdge, sharedSpans);
             stats.ReadyForEmission = 1;
             return true;
         }
@@ -2247,15 +2215,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return IsFinite(solved);
         }
 
-        private static bool TryReconcileChamferUnselectedInternalEdges(
+        private static bool TryBuildChamferSharedEdgeSpans(
             ChamferTopologyContext context,
             Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners,
             Dictionary<int, float> widthByEdge,
             float minimumStableEdgeLength,
+            out Dictionary<int, ChamferSharedEdgeSpan> sharedSpans,
             ref ChamferCornerStats stats,
             out string blocker)
         {
             blocker = string.Empty;
+            sharedSpans = new Dictionary<int, ChamferSharedEdgeSpan>();
             for (int edgeIndex = 0;
                  edgeIndex < context.Graph.Edges.Count;
                  edgeIndex++)
@@ -2277,7 +2247,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 if (edgeLength <= PointMergeDistance)
                 {
                     stats.SharedUnselectedEndpointFailureCount++;
-                    blocker = "an unselected internal source edge is degenerate";
+                    blocker = "an inactive internal source edge is degenerate";
                     return false;
                 }
                 Vector3 direction = edgeVector / edgeLength;
@@ -2292,38 +2262,43 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     new ChamferFaceCornerKey(edge.FaceB, edge.VertexB)];
 
                 stats.SharedUnselectedEndpointsChecked += 2;
-                bool exactA = new VertexKey(aA.Position).Equals(new VertexKey(bA.Position));
-                bool exactB = new VertexKey(aB.Position).Equals(new VertexKey(bB.Position));
-                if (exactA && exactB)
-                {
-                    stats.SharedUnselectedEndpointsExact += 2;
-                    continue;
-                }
-
                 float a0 = Vector3.Dot(aA.Position - sourceA, direction);
                 float a1 = Vector3.Dot(aB.Position - sourceA, direction);
                 float b0 = Vector3.Dot(bA.Position - sourceA, direction);
                 float b1 = Vector3.Dot(bB.Position - sourceA, direction);
                 float sharedStart = Mathf.Max(Mathf.Min(a0, a1), Mathf.Min(b0, b1));
                 float sharedEnd = Mathf.Min(Mathf.Max(a0, a1), Mathf.Max(b0, b1));
-                float requiredSharedLength = Mathf.Min(
-                    minimumStableEdgeLength,
-                    edgeLength);
-                if (sharedEnd - sharedStart + PointMergeDistance <
-                    requiredSharedLength)
+                float requiredSharedLength = Mathf.Min(minimumStableEdgeLength, edgeLength);
+                if (sharedEnd - sharedStart + PointMergeDistance < requiredSharedLength)
                 {
                     stats.SharedUnselectedEndpointFailureCount++;
-                    blocker = "incident faces have no stable common interval on an unselected edge";
+                    blocker = "incident faces have no stable common span on an inactive internal edge";
                     return false;
                 }
 
-                Vector3 pointA = sourceA + direction * sharedStart;
-                Vector3 pointB = sourceA + direction * sharedEnd;
-                aA.Position = pointA;
-                bA.Position = pointA;
-                aB.Position = pointB;
-                bB.Position = pointB;
-                stats.SharedUnselectedEndpointsReconciled += 2;
+                Vector3 sharedPointA = sourceA + direction * sharedStart;
+                Vector3 sharedPointB = sourceA + direction * sharedEnd;
+                sharedSpans.Add(
+                    edgeIndex,
+                    new ChamferSharedEdgeSpan(
+                        edgeIndex,
+                        edge.FaceA,
+                        edge.FaceB,
+                        edge.VertexA,
+                        edge.VertexB,
+                        sharedPointA,
+                        sharedPointB));
+
+                bool exactA = new VertexKey(aA.Position).Equals(new VertexKey(bA.Position));
+                bool exactB = new VertexKey(aB.Position).Equals(new VertexKey(bB.Position));
+                if (exactA && exactB)
+                {
+                    stats.SharedUnselectedEndpointsExact += 2;
+                }
+                else
+                {
+                    stats.SharedUnselectedEndpointsReconciled += 2;
+                }
             }
             return true;
         }
@@ -2332,6 +2307,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<PolygonFace> sourceFaces,
             ChamferTopologyContext context,
             Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners,
+            Dictionary<int, ChamferSharedEdgeSpan> sharedSpans,
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
             ref ChamferCornerStats stats,
@@ -2345,14 +2321,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EdgeWearGraphFace graphFace = context.Graph.Faces[faceIndex];
                 PolygonFace sourceFace = sourceFaces[graphFace.SourceFaceIndex];
                 List<Vector3> solvedFace = new List<Vector3>(
-                    graphFace.VertexIndices.Count);
+                    graphFace.VertexIndices.Count * 3);
                 for (int i = 0; i < graphFace.VertexIndices.Count; i++)
                 {
-                    solvedFace.Add(corners[
-                        new ChamferFaceCornerKey(
-                            faceIndex,
-                            graphFace.VertexIndices[i])].Position);
+                    int startVertex = graphFace.VertexIndices[i];
+                    int endVertex = graphFace.VertexIndices[
+                        (i + 1) % graphFace.VertexIndices.Count];
+                    int sourceEdgeIndex = graphFace.EdgeIndices[i];
+                    AppendChamferReplacementEdgeChain(
+                        faceIndex,
+                        startVertex,
+                        endVertex,
+                        sourceEdgeIndex,
+                        corners,
+                        sharedSpans,
+                        solvedFace,
+                        null);
                 }
+                RemoveClosingDuplicate(solvedFace);
 
                 if (CalculatePolygonArea(solvedFace) <= minimumStableFaceArea)
                 {
@@ -2371,15 +2357,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     Vector3 start = solvedFace[i];
                     Vector3 end = solvedFace[(i + 1) % solvedFace.Count];
-                    int sourceEdgeIndex = graphFace.EdgeIndices[i];
-                    float sourceLength = GetGraphEdgeLength(
-                        context.Graph,
-                        sourceEdgeIndex);
-                    if ((end - start).magnitude < minimumStableEdgeLength &&
-                        sourceLength >= minimumStableEdgeLength)
+                    if (new VertexKey(start).Equals(new VertexKey(end)))
                     {
                         stats.ReplacementEdgeCollapseFailureCount++;
-                        blocker = "a previously stable source edge collapses in a replacement face";
+                        blocker = "a replacement face contains a collapsed emitted edge";
                         return false;
                     }
                 }
@@ -2473,6 +2454,1427 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return true;
         }
 
+        private static void AppendChamferReplacementEdgeChain(
+            int faceIndex,
+            int orientedStartVertex,
+            int orientedEndVertex,
+            int sourceEdgeIndex,
+            Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners,
+            Dictionary<int, ChamferSharedEdgeSpan> sharedSpans,
+            List<Vector3> output,
+            List<ChamferExpectedVertexBoundary> vertexBoundaries)
+        {
+            Vector3 start = corners[
+                new ChamferFaceCornerKey(
+                    faceIndex,
+                    orientedStartVertex)].Position;
+            Vector3 end = corners[
+                new ChamferFaceCornerKey(
+                    faceIndex,
+                    orientedEndVertex)].Position;
+            AppendUniquePoint(output, start);
+
+            if (sharedSpans.TryGetValue(
+                    sourceEdgeIndex,
+                    out ChamferSharedEdgeSpan span))
+            {
+                bool forward = orientedStartVertex == span.VertexA &&
+                    orientedEndVertex == span.VertexB;
+                Vector3 sharedStart = forward
+                    ? span.SharedAtVertexA
+                    : span.SharedAtVertexB;
+                Vector3 sharedEnd = forward
+                    ? span.SharedAtVertexB
+                    : span.SharedAtVertexA;
+
+                if (!new VertexKey(start).Equals(new VertexKey(sharedStart)))
+                {
+                    if (vertexBoundaries != null)
+                    {
+                        AddExpectedVertexBoundary(
+                            vertexBoundaries,
+                            orientedStartVertex,
+                            sourceEdgeIndex,
+                            faceIndex,
+                            ChamferVertexBoundaryKind.UnselectedEdgeTail,
+                            start,
+                            sharedStart);
+                    }
+                    AppendUniquePoint(output, sharedStart);
+                }
+                else
+                {
+                    AppendUniquePoint(output, sharedStart);
+                }
+
+                AppendUniquePoint(output, sharedEnd);
+                if (!new VertexKey(sharedEnd).Equals(new VertexKey(end)))
+                {
+                    if (vertexBoundaries != null)
+                    {
+                        AddExpectedVertexBoundary(
+                            vertexBoundaries,
+                            orientedEndVertex,
+                            sourceEdgeIndex,
+                            faceIndex,
+                            ChamferVertexBoundaryKind.UnselectedEdgeTail,
+                            sharedEnd,
+                            end);
+                    }
+                }
+            }
+
+            AppendUniquePoint(output, end);
+        }
+
+        private static void AppendUniquePoint(
+            List<Vector3> points,
+            Vector3 point)
+        {
+            if (points.Count == 0 ||
+                !new VertexKey(points[points.Count - 1]).Equals(
+                    new VertexKey(point)))
+            {
+                points.Add(point);
+            }
+        }
+
+        private static void AddExpectedVertexBoundary(
+            List<ChamferExpectedVertexBoundary> boundaries,
+            int sourceVertexIndex,
+            int sourceEdgeIndex,
+            int faceIndex,
+            ChamferVertexBoundaryKind kind,
+            Vector3 start,
+            Vector3 end)
+        {
+            VertexKey startKey = new VertexKey(start);
+            VertexKey endKey = new VertexKey(end);
+            if (startKey.Equals(endKey))
+            {
+                return;
+            }
+            boundaries.Add(new ChamferExpectedVertexBoundary(
+                sourceVertexIndex,
+                sourceEdgeIndex,
+                faceIndex,
+                kind,
+                start,
+                end,
+                new TopologyEdgeKey(startKey, endKey)));
+        }
+
+        private static Dictionary<TopologyEdgeKey, int>
+            BuildTopologyEdgeUseCounts(List<PolygonFace> faces)
+        {
+            Dictionary<TopologyEdgeKey, int> counts =
+                new Dictionary<TopologyEdgeKey, int>();
+            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
+            {
+                List<Vector3> vertices = faces[faceIndex].Vertices;
+                if (vertices == null || vertices.Count < 3)
+                {
+                    continue;
+                }
+                for (int i = 0; i < vertices.Count; i++)
+                {
+                    VertexKey a = new VertexKey(vertices[i]);
+                    VertexKey b = new VertexKey(vertices[(i + 1) % vertices.Count]);
+                    if (a.Equals(b))
+                    {
+                        continue;
+                    }
+                    TopologyEdgeKey key = new TopologyEdgeKey(a, b);
+                    counts.TryGetValue(key, out int count);
+                    counts[key] = count + 1;
+                }
+            }
+            return counts;
+        }
+
+        private static void AuditExpectedVertexBoundaryComponents(
+            List<ChamferExpectedVertexBoundary> boundaries,
+            ref ChamferEmissionStats stats)
+        {
+            Dictionary<int, List<ChamferExpectedVertexBoundary>> byVertex =
+                new Dictionary<int, List<ChamferExpectedVertexBoundary>>();
+            for (int i = 0; i < boundaries.Count; i++)
+            {
+                ChamferExpectedVertexBoundary boundary = boundaries[i];
+                if (!byVertex.TryGetValue(
+                        boundary.SourceVertexIndex,
+                        out List<ChamferExpectedVertexBoundary> list))
+                {
+                    list = new List<ChamferExpectedVertexBoundary>();
+                    byVertex.Add(boundary.SourceVertexIndex, list);
+                }
+                list.Add(boundary);
+            }
+
+            foreach (KeyValuePair<int, List<ChamferExpectedVertexBoundary>> pair
+                     in byVertex)
+            {
+                List<ChamferExpectedVertexBoundary> edges = pair.Value;
+                Dictionary<VertexKey, List<int>> adjacency =
+                    new Dictionary<VertexKey, List<int>>();
+                HashSet<TopologyEdgeKey> unique =
+                    new HashSet<TopologyEdgeKey>();
+                for (int i = 0; i < edges.Count; i++)
+                {
+                    if (!unique.Add(edges[i].Key))
+                    {
+                        stats.VertexBoundaryDuplicateFailureCount++;
+                        continue;
+                    }
+                    AddBoundaryAdjacency(adjacency, edges[i].Key.First, i);
+                    AddBoundaryAdjacency(adjacency, edges[i].Key.Second, i);
+                }
+
+                foreach (KeyValuePair<VertexKey, List<int>> degree in adjacency)
+                {
+                    if (degree.Value.Count > 2)
+                    {
+                        stats.VertexBoundaryBranchFailureCount++;
+                    }
+                }
+
+                HashSet<int> visited = new HashSet<int>();
+                for (int edgeIndex = 0; edgeIndex < edges.Count; edgeIndex++)
+                {
+                    if (!visited.Add(edgeIndex))
+                    {
+                        continue;
+                    }
+                    stats.VertexBoundaryComponentCount++;
+                    Queue<int> queue = new Queue<int>();
+                    queue.Enqueue(edgeIndex);
+                    HashSet<VertexKey> componentVertices =
+                        new HashSet<VertexKey>();
+                    while (queue.Count > 0)
+                    {
+                        int current = queue.Dequeue();
+                        TopologyEdgeKey key = edges[current].Key;
+                        componentVertices.Add(key.First);
+                        componentVertices.Add(key.Second);
+                        EnqueueAdjacentBoundaryEdges(
+                            key.First,
+                            adjacency,
+                            visited,
+                            queue);
+                        EnqueueAdjacentBoundaryEdges(
+                            key.Second,
+                            adjacency,
+                            visited,
+                            queue);
+                    }
+
+                    int degreeOne = 0;
+                    bool invalid = false;
+                    foreach (VertexKey vertex in componentVertices)
+                    {
+                        int degree = adjacency[vertex].Count;
+                        if (degree == 1)
+                        {
+                            degreeOne++;
+                        }
+                        else if (degree != 2)
+                        {
+                            invalid = true;
+                        }
+                    }
+                    if (!invalid && degreeOne == 0)
+                    {
+                        stats.VertexBoundaryClosedLoopCount++;
+                    }
+                    else if (!invalid && degreeOne == 2)
+                    {
+                        stats.VertexBoundaryOpenChainCount++;
+                    }
+                    else
+                    {
+                        stats.VertexBoundaryBranchFailureCount++;
+                    }
+                }
+            }
+        }
+
+        private static void AddBoundaryAdjacency(
+            Dictionary<VertexKey, List<int>> adjacency,
+            VertexKey key,
+            int edgeIndex)
+        {
+            if (!adjacency.TryGetValue(key, out List<int> list))
+            {
+                list = new List<int>();
+                adjacency.Add(key, list);
+            }
+            list.Add(edgeIndex);
+        }
+
+        private static void EnqueueAdjacentBoundaryEdges(
+            VertexKey vertex,
+            Dictionary<VertexKey, List<int>> adjacency,
+            HashSet<int> visited,
+            Queue<int> queue)
+        {
+            List<int> adjacent = adjacency[vertex];
+            for (int i = 0; i < adjacent.Count; i++)
+            {
+                if (visited.Add(adjacent[i]))
+                {
+                    queue.Enqueue(adjacent[i]);
+                }
+            }
+        }
+
+
+        private static List<ChamferExpectedVertexBoundary>
+            NormalizeChamferVertexBoundaries(
+                List<ChamferExpectedVertexBoundary> registrations,
+                Dictionary<TopologyEdgeKey, int> useCounts,
+                List<ChamferProvisionalSegmentRecord> segments,
+                ref ChamferEmissionStats stats)
+        {
+            Dictionary<TopologyEdgeKey, List<ChamferExpectedVertexBoundary>> groups =
+                new Dictionary<TopologyEdgeKey, List<ChamferExpectedVertexBoundary>>();
+            for (int i = 0; i < registrations.Count; i++)
+            {
+                ChamferExpectedVertexBoundary boundary = registrations[i];
+                if (!groups.TryGetValue(
+                        boundary.Key,
+                        out List<ChamferExpectedVertexBoundary> group))
+                {
+                    group = new List<ChamferExpectedVertexBoundary>();
+                    groups.Add(boundary.Key, group);
+                }
+                group.Add(boundary);
+            }
+
+            List<ChamferExpectedVertexBoundary> normalized =
+                new List<ChamferExpectedVertexBoundary>(groups.Count);
+            foreach (KeyValuePair<TopologyEdgeKey, List<ChamferExpectedVertexBoundary>> pair
+                     in groups)
+            {
+                List<ChamferExpectedVertexBoundary> group = pair.Value;
+                if (group.Count == 1)
+                {
+                    normalized.Add(group[0]);
+                    stats.VertexBoundarySingleOwnerEdgeCount++;
+                    continue;
+                }
+
+                bool sameOwner = true;
+                ChamferExpectedVertexBoundary first = group[0];
+                for (int i = 1; i < group.Count; i++)
+                {
+                    ChamferExpectedVertexBoundary current = group[i];
+                    if (current.SourceVertexIndex != first.SourceVertexIndex ||
+                        current.SourceEdgeIndex != first.SourceEdgeIndex ||
+                        current.FaceIndex != first.FaceIndex ||
+                        current.Kind != first.Kind)
+                    {
+                        sameOwner = false;
+                        break;
+                    }
+                }
+
+                useCounts.TryGetValue(pair.Key, out int useCount);
+                if (group.Count == 2 && !sameOwner && useCount == 2)
+                {
+                    stats.VertexBoundaryCancelledInternalEdgeCount++;
+                    continue;
+                }
+
+                bool shouldLog =
+                    stats.VertexBoundarySameOwnerDuplicateFailureCount +
+                    stats.VertexBoundaryMultiOwnerFailureCount < 3;
+                if (sameOwner)
+                {
+                    stats.VertexBoundarySameOwnerDuplicateFailureCount++;
+                }
+                else
+                {
+                    stats.VertexBoundaryMultiOwnerFailureCount++;
+                }
+
+                if (shouldLog)
+                {
+                    LogChamferBoundaryOwnershipFailure(
+                        pair.Key,
+                        group,
+                        useCount,
+                        segments);
+                }
+            }
+            return normalized;
+        }
+
+        private static void LogChamferBoundaryOwnershipFailure(
+            TopologyEdgeKey key,
+            List<ChamferExpectedVertexBoundary> registrations,
+            int useCount,
+            List<ChamferProvisionalSegmentRecord> segments)
+        {
+            string message =
+                "GeneratedMass edge wear vertex-boundary ownership failure. " +
+                "registrations=" + registrations.Count +
+                ", provisionalUses=" + useCount;
+            for (int i = 0; i < registrations.Count; i++)
+            {
+                ChamferExpectedVertexBoundary boundary = registrations[i];
+                message +=
+                    ", registration[" + i + "]=" +
+                    "vertex:" + boundary.SourceVertexIndex +
+                    "/edge:" + boundary.SourceEdgeIndex +
+                    "/face:" + boundary.FaceIndex +
+                    "/kind:" + boundary.Kind;
+            }
+
+            int useIndex = 0;
+            for (int i = 0; i < segments.Count && useIndex < 6; i++)
+            {
+                ChamferProvisionalSegmentRecord segment = segments[i];
+                if (!segment.Key.Equals(key))
+                {
+                    continue;
+                }
+                message +=
+                    ", use[" + useIndex + "]=" +
+                    "faceRecord:" + segment.FaceRecordIndex +
+                    "/localEdge:" + segment.LocalEdgeIndex +
+                    "/faceKind:" + segment.FaceKind +
+                    "/role:" + segment.Role +
+                    "/sourceFace:" + segment.SourceFaceIndex +
+                    "/sourceEdge:" + segment.SourceEdgeIndex;
+                useIndex++;
+            }
+            Debug.LogWarning(message);
+        }
+
+        private static List<PolygonFace> ExtractChamferProvisionalFaces(
+            List<ChamferProvisionalFaceRecord> records)
+        {
+            List<PolygonFace> faces = new List<PolygonFace>(records.Count);
+            for (int i = 0; i < records.Count; i++)
+            {
+                faces.Add(records[i].Face);
+            }
+            return faces;
+        }
+
+        private static List<ChamferProvisionalSegmentRecord>
+            BuildChamferProvisionalSegmentRecords(
+                List<ChamferProvisionalFaceRecord> faceRecords,
+                List<ChamferExpectedVertexBoundary> boundaries,
+                HashSet<TopologyEdgeKey> expectedSourceBoundaryEdges,
+                Dictionary<int, ChamferSharedEdgeSpan> sharedSpans)
+        {
+            Dictionary<TopologyEdgeKey, ChamferVertexBoundaryKind> boundaryKinds =
+                new Dictionary<TopologyEdgeKey, ChamferVertexBoundaryKind>();
+            for (int i = 0; i < boundaries.Count; i++)
+            {
+                ChamferExpectedVertexBoundary boundary = boundaries[i];
+                if (!boundaryKinds.ContainsKey(boundary.Key) ||
+                    boundary.Kind == ChamferVertexBoundaryKind.BevelStripEndpoint)
+                {
+                    boundaryKinds[boundary.Key] = boundary.Kind;
+                }
+            }
+
+            HashSet<TopologyEdgeKey> sharedSpanKeys =
+                new HashSet<TopologyEdgeKey>();
+            foreach (ChamferSharedEdgeSpan span in sharedSpans.Values)
+            {
+                sharedSpanKeys.Add(new TopologyEdgeKey(
+                    new VertexKey(span.SharedAtVertexA),
+                    new VertexKey(span.SharedAtVertexB)));
+            }
+
+            List<ChamferProvisionalSegmentRecord> segments =
+                new List<ChamferProvisionalSegmentRecord>();
+            for (int faceIndex = 0; faceIndex < faceRecords.Count; faceIndex++)
+            {
+                ChamferProvisionalFaceRecord record = faceRecords[faceIndex];
+                List<Vector3> vertices = record.Face.Vertices;
+                if (vertices == null || vertices.Count < 2)
+                {
+                    continue;
+                }
+                for (int edgeIndex = 0; edgeIndex < vertices.Count; edgeIndex++)
+                {
+                    Vector3 start = vertices[edgeIndex];
+                    Vector3 end = vertices[(edgeIndex + 1) % vertices.Count];
+                    VertexKey startKey = new VertexKey(start);
+                    VertexKey endKey = new VertexKey(end);
+                    if (startKey.Equals(endKey))
+                    {
+                        continue;
+                    }
+                    TopologyEdgeKey key = new TopologyEdgeKey(startKey, endKey);
+                    ChamferSegmentRole role;
+                    if (boundaryKinds.TryGetValue(
+                            key,
+                            out ChamferVertexBoundaryKind boundaryKind))
+                    {
+                        role = boundaryKind ==
+                            ChamferVertexBoundaryKind.BevelStripEndpoint
+                            ? ChamferSegmentRole.BevelEndpoint
+                            : ChamferSegmentRole.ReplacementVertexTail;
+                    }
+                    else if (expectedSourceBoundaryEdges.Contains(key))
+                    {
+                        role = ChamferSegmentRole.PreservedSourceBoundary;
+                    }
+                    else if (record.Kind == ChamferProvisionalFaceKind.BevelStrip)
+                    {
+                        role = ChamferSegmentRole.BevelRail;
+                    }
+                    else if (sharedSpanKeys.Contains(key))
+                    {
+                        role = ChamferSegmentRole.ReplacementSharedSpan;
+                    }
+                    else
+                    {
+                        role = ChamferSegmentRole.ReplacementOrdinaryEdge;
+                    }
+
+                    segments.Add(new ChamferProvisionalSegmentRecord(
+                        faceIndex,
+                        edgeIndex,
+                        key,
+                        start,
+                        end,
+                        record.Kind,
+                        role,
+                        record.SourceFaceIndex,
+                        record.SourceEdgeIndex));
+                }
+            }
+            return segments;
+        }
+
+        private static Dictionary<VertexKey, ChamferBoundaryPointRecord>
+            BuildChamferBoundaryPointRecords(
+                List<ChamferExpectedVertexBoundary> boundaries)
+        {
+            Dictionary<VertexKey, ChamferBoundaryPointRecord> points =
+                new Dictionary<VertexKey, ChamferBoundaryPointRecord>();
+            for (int i = 0; i < boundaries.Count; i++)
+            {
+                ChamferExpectedVertexBoundary boundary = boundaries[i];
+                AddChamferBoundaryPointRecord(
+                    points,
+                    new VertexKey(boundary.Start),
+                    boundary.Start,
+                    boundary.SourceVertexIndex);
+                AddChamferBoundaryPointRecord(
+                    points,
+                    new VertexKey(boundary.End),
+                    boundary.End,
+                    boundary.SourceVertexIndex);
+            }
+            return points;
+        }
+
+        private static void AddChamferBoundaryPointRecord(
+            Dictionary<VertexKey, ChamferBoundaryPointRecord> points,
+            VertexKey key,
+            Vector3 position,
+            int sourceVertexIndex)
+        {
+            if (!points.TryGetValue(key, out ChamferBoundaryPointRecord point))
+            {
+                point = new ChamferBoundaryPointRecord(key, position);
+                points.Add(key, point);
+            }
+            point.SourceVertexIndices.Add(sourceVertexIndex);
+        }
+
+        private static bool IsChamferSplitCompatible(
+            ChamferBoundaryPointRecord point,
+            ChamferProvisionalSegmentRecord segment,
+            ChamferTopologyContext context,
+            HashSet<VertexKey> provisionalVertexKeys)
+        {
+            if (!HasValidRawChamferPointProvenance(
+                    point,
+                    context,
+                    provisionalVertexKeys))
+            {
+                return false;
+            }
+
+            if (segment.Role == ChamferSegmentRole.PreservedSourceBoundary)
+            {
+                // This is segmentation-only: the point already exists in the
+                // provisional mesh and does not move or seal the source boundary.
+                return segment.FaceKind ==
+                    ChamferProvisionalFaceKind.ReplacementBase;
+            }
+
+            foreach (int sourceVertexIndex in point.SourceVertexIndices)
+            {
+                if (segment.FaceKind == ChamferProvisionalFaceKind.BevelStrip)
+                {
+                    if (segment.SourceEdgeIndex < 0 ||
+                        segment.SourceEdgeIndex >= context.Graph.Edges.Count)
+                    {
+                        continue;
+                    }
+                    EdgeWearGraphEdge edge =
+                        context.Graph.Edges[segment.SourceEdgeIndex];
+                    if (edge.VertexA == sourceVertexIndex ||
+                        edge.VertexB == sourceVertexIndex)
+                    {
+                        return true;
+                    }
+                }
+                else
+                {
+                    if (segment.SourceFaceIndex < 0 ||
+                        segment.SourceFaceIndex >= context.Graph.Faces.Count)
+                    {
+                        continue;
+                    }
+                    EdgeWearGraphFace face =
+                        context.Graph.Faces[segment.SourceFaceIndex];
+                    if (face.VertexIndices.Contains(sourceVertexIndex))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static bool HasValidRawChamferPointProvenance(
+            ChamferBoundaryPointRecord point,
+            ChamferTopologyContext context,
+            HashSet<VertexKey> provisionalVertexKeys)
+        {
+            if (point.SourceVertexIndices.Count == 0 ||
+                !provisionalVertexKeys.Contains(point.Key))
+            {
+                return false;
+            }
+
+            foreach (int sourceVertexIndex in point.SourceVertexIndices)
+            {
+                if (sourceVertexIndex >= 0 &&
+                    sourceVertexIndex < context.Graph.Vertices.Count)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static HashSet<VertexKey> BuildChamferProvisionalVertexKeys(
+            List<ChamferProvisionalSegmentRecord> segments)
+        {
+            HashSet<VertexKey> keys = new HashSet<VertexKey>();
+            for (int i = 0; i < segments.Count; i++)
+            {
+                keys.Add(new VertexKey(segments[i].Start));
+                keys.Add(new VertexKey(segments[i].End));
+            }
+            return keys;
+        }
+
+        private static int SegmentRawChamferTJunctions(
+            List<ChamferProvisionalFaceRecord> faceRecords,
+            ChamferTopologyContext context,
+            Dictionary<int, ChamferSharedEdgeSpan> sharedSpans,
+            List<ChamferExpectedVertexBoundary> boundaries,
+            HashSet<TopologyEdgeKey> expectedSourceBoundaryEdges,
+            float minimumStableEdgeLength,
+            ref ChamferEmissionStats stats)
+        {
+            const int MaximumSegmentationPasses = 4;
+            int totalUniqueSplits = 0;
+            float tolerance = CalculateTopologyTJunctionTolerance(
+                minimumStableEdgeLength);
+            float toleranceSqr = tolerance * tolerance;
+            HashSet<ChamferTJunctionRecordKey> foundRecords =
+                new HashSet<ChamferTJunctionRecordKey>();
+            HashSet<ChamferTJunctionRecordKey> compatibleRecords =
+                new HashSet<ChamferTJunctionRecordKey>();
+
+            for (int pass = 0; pass < MaximumSegmentationPasses; pass++)
+            {
+                List<ChamferProvisionalSegmentRecord> segments =
+                    BuildChamferProvisionalSegmentRecords(
+                        faceRecords,
+                        boundaries,
+                        expectedSourceBoundaryEdges,
+                        sharedSpans);
+                HashSet<VertexKey> provisionalVertexKeys =
+                    BuildChamferProvisionalVertexKeys(segments);
+                Dictionary<TopologyEdgeKey, List<ChamferProvisionalSegmentRecord>>
+                    segmentsByKey =
+                        new Dictionary<TopologyEdgeKey, List<ChamferProvisionalSegmentRecord>>();
+                for (int i = 0; i < segments.Count; i++)
+                {
+                    ChamferProvisionalSegmentRecord segment = segments[i];
+                    if (!segmentsByKey.TryGetValue(
+                            segment.Key,
+                            out List<ChamferProvisionalSegmentRecord> group))
+                    {
+                        group = new List<ChamferProvisionalSegmentRecord>();
+                        segmentsByKey.Add(segment.Key, group);
+                    }
+                    group.Add(segment);
+                }
+
+                Dictionary<VertexKey, ChamferBoundaryPointRecord> points =
+                    BuildChamferBoundaryPointRecords(boundaries);
+                Dictionary<TopologyEdgeKey, List<ChamferSplitPoint>> splitPlans =
+                    new Dictionary<TopologyEdgeKey, List<ChamferSplitPoint>>();
+
+                foreach (KeyValuePair<TopologyEdgeKey,
+                         List<ChamferProvisionalSegmentRecord>> segmentPair
+                         in segmentsByKey)
+                {
+                    List<ChamferProvisionalSegmentRecord> uses =
+                        segmentPair.Value;
+                    if (uses.Count == 0)
+                    {
+                        continue;
+                    }
+                    ChamferProvisionalSegmentRecord representative = uses[0];
+                    foreach (ChamferBoundaryPointRecord point in points.Values)
+                    {
+                        if (point.Key.Equals(segmentPair.Key.First) ||
+                            point.Key.Equals(segmentPair.Key.Second) ||
+                            point.SourceVertexIndices.Count == 0 ||
+                            !provisionalVertexKeys.Contains(point.Key))
+                        {
+                            continue;
+                        }
+
+                        bool liesOnAnyUse = false;
+                        bool compatible = false;
+                        ChamferProvisionalSegmentRecord containingUse = representative;
+                        ChamferProvisionalSegmentRecord compatibleUse = representative;
+                        for (int useIndex = 0; useIndex < uses.Count; useIndex++)
+                        {
+                            ChamferProvisionalSegmentRecord use = uses[useIndex];
+                            if (!IsPointOnSegmentInterior(
+                                    point.Position,
+                                    use.Start,
+                                    use.End,
+                                    toleranceSqr))
+                            {
+                                continue;
+                            }
+                            liesOnAnyUse = true;
+                            containingUse = use;
+                            if (IsChamferSplitCompatible(
+                                    point,
+                                    use,
+                                    context,
+                                    provisionalVertexKeys))
+                            {
+                                compatible = true;
+                                compatibleUse = use;
+                                break;
+                            }
+                        }
+                        if (!liesOnAnyUse)
+                        {
+                            continue;
+                        }
+
+                        foundRecords.Add(new ChamferTJunctionRecordKey(
+                            point.Key,
+                            segmentPair.Key,
+                            containingUse.FaceRecordIndex,
+                            containingUse.Role));
+                        if (!compatible)
+                        {
+                            continue;
+                        }
+
+                        Vector3 compatibleSegment =
+                            compatibleUse.End - compatibleUse.Start;
+                        float compatibleLengthSqr =
+                            compatibleSegment.sqrMagnitude;
+                        if (compatibleLengthSqr <= MinimumEdgeLengthSqr)
+                        {
+                            continue;
+                        }
+                        float t = Vector3.Dot(
+                            point.Position - compatibleUse.Start,
+                            compatibleSegment) / compatibleLengthSqr;
+                        if (t <= 0f || t >= 1f)
+                        {
+                            continue;
+                        }
+
+                        if (!splitPlans.TryGetValue(
+                                segmentPair.Key,
+                                out List<ChamferSplitPoint> plan))
+                        {
+                            plan = new List<ChamferSplitPoint>();
+                            splitPlans.Add(segmentPair.Key, plan);
+                        }
+                        bool alreadyPlanned = false;
+                        for (int splitIndex = 0;
+                             splitIndex < plan.Count;
+                             splitIndex++)
+                        {
+                            if (plan[splitIndex].Key.Equals(point.Key))
+                            {
+                                alreadyPlanned = true;
+                                break;
+                            }
+                        }
+                        if (alreadyPlanned)
+                        {
+                            continue;
+                        }
+
+                        plan.Add(new ChamferSplitPoint(
+                            point.Key,
+                            point.Position,
+                            t,
+                            compatibleUse.FaceRecordIndex,
+                            compatibleUse.LocalEdgeIndex));
+                        compatibleRecords.Add(new ChamferTJunctionRecordKey(
+                            point.Key,
+                            segmentPair.Key,
+                            compatibleUse.FaceRecordIndex,
+                            compatibleUse.Role));
+                    }
+                }
+
+                if (splitPlans.Count == 0)
+                {
+                    break;
+                }
+
+                int appliedThisPass = ApplyChamferSplitPlans(
+                    faceRecords,
+                    boundaries,
+                    expectedSourceBoundaryEdges,
+                    sharedSpans,
+                    splitPlans,
+                    ref stats);
+                if (appliedThisPass == 0)
+                {
+                    break;
+                }
+                stats.TJunctionSegmentationPasses++;
+                totalUniqueSplits += appliedThisPass;
+            }
+
+            HashSet<ChamferTJunctionRecordKey> unresolvedRecords =
+                CollectUnresolvedRawChamferTJunctionRecords(
+                    faceRecords,
+                    sharedSpans,
+                    boundaries,
+                    expectedSourceBoundaryEdges,
+                    toleranceSqr);
+            foreach (ChamferTJunctionRecordKey record in unresolvedRecords)
+            {
+                foundRecords.Add(record);
+            }
+
+            stats.ProvenanceCompatibleTJunctionSplits = totalUniqueSplits;
+            stats.TJunctionRecordsFound = foundRecords.Count;
+            stats.TJunctionRecordsCompatible = compatibleRecords.Count;
+            stats.TJunctionRecordsIncompatible = unresolvedRecords.Count;
+            return totalUniqueSplits;
+        }
+
+        private static HashSet<ChamferTJunctionRecordKey>
+            CollectUnresolvedRawChamferTJunctionRecords(
+                List<ChamferProvisionalFaceRecord> faceRecords,
+                Dictionary<int, ChamferSharedEdgeSpan> sharedSpans,
+                List<ChamferExpectedVertexBoundary> boundaries,
+                HashSet<TopologyEdgeKey> expectedSourceBoundaryEdges,
+                float toleranceSqr)
+        {
+            List<ChamferProvisionalSegmentRecord> segments =
+                BuildChamferProvisionalSegmentRecords(
+                    faceRecords,
+                    boundaries,
+                    expectedSourceBoundaryEdges,
+                    sharedSpans);
+            HashSet<VertexKey> provisionalVertexKeys =
+                BuildChamferProvisionalVertexKeys(segments);
+            Dictionary<TopologyEdgeKey, List<ChamferProvisionalSegmentRecord>>
+                segmentsByKey =
+                    new Dictionary<TopologyEdgeKey, List<ChamferProvisionalSegmentRecord>>();
+            for (int i = 0; i < segments.Count; i++)
+            {
+                ChamferProvisionalSegmentRecord segment = segments[i];
+                if (!segmentsByKey.TryGetValue(
+                        segment.Key,
+                        out List<ChamferProvisionalSegmentRecord> group))
+                {
+                    group = new List<ChamferProvisionalSegmentRecord>();
+                    segmentsByKey.Add(segment.Key, group);
+                }
+                group.Add(segment);
+            }
+
+            Dictionary<VertexKey, ChamferBoundaryPointRecord> points =
+                BuildChamferBoundaryPointRecords(boundaries);
+            HashSet<ChamferTJunctionRecordKey> unresolved =
+                new HashSet<ChamferTJunctionRecordKey>();
+            foreach (KeyValuePair<TopologyEdgeKey,
+                     List<ChamferProvisionalSegmentRecord>> segmentPair
+                     in segmentsByKey)
+            {
+                List<ChamferProvisionalSegmentRecord> uses = segmentPair.Value;
+                if (uses.Count == 0)
+                {
+                    continue;
+                }
+                foreach (ChamferBoundaryPointRecord point in points.Values)
+                {
+                    if (point.Key.Equals(segmentPair.Key.First) ||
+                        point.Key.Equals(segmentPair.Key.Second) ||
+                        point.SourceVertexIndices.Count == 0 ||
+                        !provisionalVertexKeys.Contains(point.Key))
+                    {
+                        continue;
+                    }
+
+                    for (int useIndex = 0; useIndex < uses.Count; useIndex++)
+                    {
+                        ChamferProvisionalSegmentRecord use = uses[useIndex];
+                        if (!IsPointOnSegmentInterior(
+                                point.Position,
+                                use.Start,
+                                use.End,
+                                toleranceSqr))
+                        {
+                            continue;
+                        }
+
+                        unresolved.Add(new ChamferTJunctionRecordKey(
+                            point.Key,
+                            segmentPair.Key,
+                            use.FaceRecordIndex,
+                            use.Role));
+                        break;
+                    }
+                }
+            }
+            return unresolved;
+        }
+
+        private static int ApplyChamferSplitPlans(
+            List<ChamferProvisionalFaceRecord> faceRecords,
+            List<ChamferExpectedVertexBoundary> boundaries,
+            HashSet<TopologyEdgeKey> expectedSourceBoundaryEdges,
+            Dictionary<int, ChamferSharedEdgeSpan> sharedSpans,
+            Dictionary<TopologyEdgeKey, List<ChamferSplitPoint>> splitPlans,
+            ref ChamferEmissionStats stats)
+        {
+            Dictionary<TopologyEdgeKey, ChamferProvisionalSegmentRecord>
+                parentSegments =
+                    new Dictionary<TopologyEdgeKey, ChamferProvisionalSegmentRecord>();
+            foreach (TopologyEdgeKey key in splitPlans.Keys)
+            {
+                if (TryFindChamferSegmentForKey(
+                        faceRecords,
+                        key,
+                        out ChamferProvisionalSegmentRecord segment))
+                {
+                    parentSegments.Add(key, segment);
+                }
+            }
+
+            int uniqueSplitCount = 0;
+            foreach (List<ChamferSplitPoint> plan in splitPlans.Values)
+            {
+                uniqueSplitCount += plan.Count;
+            }
+
+            for (int faceIndex = 0; faceIndex < faceRecords.Count; faceIndex++)
+            {
+                ChamferProvisionalFaceRecord record = faceRecords[faceIndex];
+                List<Vector3> source = record.Face.Vertices;
+                List<Vector3> rebuilt = new List<Vector3>(source.Count + 4);
+                bool changed = false;
+                for (int edgeIndex = 0; edgeIndex < source.Count; edgeIndex++)
+                {
+                    Vector3 start = source[edgeIndex];
+                    Vector3 end = source[(edgeIndex + 1) % source.Count];
+                    TopologyEdgeKey key = new TopologyEdgeKey(
+                        new VertexKey(start),
+                        new VertexKey(end));
+                    rebuilt.Add(start);
+                    if (!splitPlans.TryGetValue(
+                            key,
+                            out List<ChamferSplitPoint> plan))
+                    {
+                        continue;
+                    }
+
+                    Vector3 segment = end - start;
+                    float lengthSqr = segment.sqrMagnitude;
+                    if (lengthSqr <= MinimumEdgeLengthSqr)
+                    {
+                        continue;
+                    }
+                    List<KeyValuePair<float, Vector3>> ordered =
+                        new List<KeyValuePair<float, Vector3>>(plan.Count);
+                    for (int i = 0; i < plan.Count; i++)
+                    {
+                        float t = Vector3.Dot(
+                            plan[i].Position - start,
+                            segment) / lengthSqr;
+                        ordered.Add(new KeyValuePair<float, Vector3>(
+                            t,
+                            plan[i].Position));
+                    }
+                    ordered.Sort((left, right) => left.Key.CompareTo(right.Key));
+                    VertexKey lastKey = new VertexKey(start);
+                    for (int i = 0; i < ordered.Count; i++)
+                    {
+                        VertexKey pointKey = new VertexKey(ordered[i].Value);
+                        if (pointKey.Equals(lastKey) ||
+                            pointKey.Equals(new VertexKey(end)))
+                        {
+                            continue;
+                        }
+                        rebuilt.Add(ordered[i].Value);
+                        lastKey = pointKey;
+                        changed = true;
+                        CountChamferSegmentSplit(
+                            record,
+                            key,
+                            boundaries,
+                            expectedSourceBoundaryEdges,
+                            sharedSpans,
+                            ref stats);
+                    }
+                }
+
+                if (changed)
+                {
+                    RemoveClosingDuplicate(rebuilt);
+                    record.Face = new PolygonFace(
+                        rebuilt,
+                        record.Face.Normal,
+                        record.Face.Feature,
+                        record.Face.FeatureStrength);
+                }
+            }
+
+            List<ChamferExpectedVertexBoundary> rebuiltBoundaries =
+                new List<ChamferExpectedVertexBoundary>(
+                    boundaries.Count + uniqueSplitCount);
+            for (int i = 0; i < boundaries.Count; i++)
+            {
+                ChamferExpectedVertexBoundary boundary = boundaries[i];
+                if (!splitPlans.TryGetValue(
+                        boundary.Key,
+                        out List<ChamferSplitPoint> plan))
+                {
+                    rebuiltBoundaries.Add(boundary);
+                    continue;
+                }
+                AppendSplitChamferBoundary(
+                    rebuiltBoundaries,
+                    boundary,
+                    plan,
+                    ref stats);
+            }
+            boundaries.Clear();
+            boundaries.AddRange(rebuiltBoundaries);
+
+            List<TopologyEdgeKey> sourceBoundaryParents =
+                new List<TopologyEdgeKey>();
+            foreach (TopologyEdgeKey key in expectedSourceBoundaryEdges)
+            {
+                if (splitPlans.ContainsKey(key))
+                {
+                    sourceBoundaryParents.Add(key);
+                }
+            }
+            for (int i = 0; i < sourceBoundaryParents.Count; i++)
+            {
+                TopologyEdgeKey parent = sourceBoundaryParents[i];
+                List<ChamferSplitPoint> plan = splitPlans[parent];
+                if (parentSegments.TryGetValue(
+                        parent,
+                        out ChamferProvisionalSegmentRecord representative))
+                {
+                    expectedSourceBoundaryEdges.Remove(parent);
+                    AppendSplitTopologyEdgeKeys(
+                        expectedSourceBoundaryEdges,
+                        representative.Start,
+                        representative.End,
+                        plan);
+                }
+            }
+            return uniqueSplitCount;
+        }
+
+        private static void CountChamferSegmentSplit(
+            ChamferProvisionalFaceRecord record,
+            TopologyEdgeKey key,
+            List<ChamferExpectedVertexBoundary> boundaries,
+            HashSet<TopologyEdgeKey> expectedSourceBoundaryEdges,
+            Dictionary<int, ChamferSharedEdgeSpan> sharedSpans,
+            ref ChamferEmissionStats stats)
+        {
+            if (expectedSourceBoundaryEdges.Contains(key))
+            {
+                stats.PreservedSourceBoundarySplitCount++;
+                return;
+            }
+
+            ChamferVertexBoundaryKind boundaryKind =
+                ChamferVertexBoundaryKind.UnselectedEdgeTail;
+            bool isExpectedBoundary = false;
+            for (int i = 0; i < boundaries.Count; i++)
+            {
+                if (!boundaries[i].Key.Equals(key))
+                {
+                    continue;
+                }
+                isExpectedBoundary = true;
+                boundaryKind = boundaries[i].Kind;
+                break;
+            }
+
+            if (record.Kind == ChamferProvisionalFaceKind.BevelStrip)
+            {
+                if (isExpectedBoundary &&
+                    boundaryKind == ChamferVertexBoundaryKind.BevelStripEndpoint)
+                {
+                    stats.BevelEndpointSplitCount++;
+                }
+                else
+                {
+                    stats.BevelRailSplitCount++;
+                }
+                return;
+            }
+            if (isExpectedBoundary)
+            {
+                stats.ReplacementTailEdgeSplitCount++;
+                return;
+            }
+            foreach (ChamferSharedEdgeSpan span in sharedSpans.Values)
+            {
+                TopologyEdgeKey sharedKey = new TopologyEdgeKey(
+                    new VertexKey(span.SharedAtVertexA),
+                    new VertexKey(span.SharedAtVertexB));
+                if (sharedKey.Equals(key))
+                {
+                    stats.ReplacementSharedSpanSplitCount++;
+                    return;
+                }
+            }
+            stats.ReplacementOrdinaryEdgeSplitCount++;
+        }
+
+        private static void AppendSplitChamferBoundary(
+            List<ChamferExpectedVertexBoundary> output,
+            ChamferExpectedVertexBoundary boundary,
+            List<ChamferSplitPoint> plan,
+            ref ChamferEmissionStats stats)
+        {
+            Vector3 segment = boundary.End - boundary.Start;
+            float lengthSqr = segment.sqrMagnitude;
+            if (lengthSqr <= MinimumEdgeLengthSqr)
+            {
+                output.Add(boundary);
+                return;
+            }
+            List<KeyValuePair<float, Vector3>> ordered =
+                new List<KeyValuePair<float, Vector3>>(plan.Count);
+            for (int i = 0; i < plan.Count; i++)
+            {
+                float t = Vector3.Dot(
+                    plan[i].Position - boundary.Start,
+                    segment) / lengthSqr;
+                ordered.Add(new KeyValuePair<float, Vector3>(
+                    t,
+                    plan[i].Position));
+            }
+            ordered.Sort((left, right) => left.Key.CompareTo(right.Key));
+
+            Vector3 current = boundary.Start;
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                Vector3 next = ordered[i].Value;
+                if (new VertexKey(current).Equals(new VertexKey(next)))
+                {
+                    continue;
+                }
+                AddExpectedVertexBoundary(
+                    output,
+                    boundary.SourceVertexIndex,
+                    boundary.SourceEdgeIndex,
+                    boundary.FaceIndex,
+                    boundary.Kind,
+                    current,
+                    next);
+                current = next;
+                stats.ExpectedBoundarySplitCount++;
+            }
+            if (!new VertexKey(current).Equals(new VertexKey(boundary.End)))
+            {
+                AddExpectedVertexBoundary(
+                    output,
+                    boundary.SourceVertexIndex,
+                    boundary.SourceEdgeIndex,
+                    boundary.FaceIndex,
+                    boundary.Kind,
+                    current,
+                    boundary.End);
+            }
+        }
+
+        private static bool TryFindChamferSegmentForKey(
+            List<ChamferProvisionalFaceRecord> faceRecords,
+            TopologyEdgeKey key,
+            out ChamferProvisionalSegmentRecord segment)
+        {
+            for (int faceIndex = 0; faceIndex < faceRecords.Count; faceIndex++)
+            {
+                List<Vector3> vertices = faceRecords[faceIndex].Face.Vertices;
+                for (int edgeIndex = 0; edgeIndex < vertices.Count; edgeIndex++)
+                {
+                    Vector3 start = vertices[edgeIndex];
+                    Vector3 end = vertices[(edgeIndex + 1) % vertices.Count];
+                    TopologyEdgeKey current = new TopologyEdgeKey(
+                        new VertexKey(start),
+                        new VertexKey(end));
+                    if (!current.Equals(key))
+                    {
+                        continue;
+                    }
+                    ChamferProvisionalFaceRecord record = faceRecords[faceIndex];
+                    segment = new ChamferProvisionalSegmentRecord(
+                        faceIndex,
+                        edgeIndex,
+                        current,
+                        start,
+                        end,
+                        record.Kind,
+                        ChamferSegmentRole.PreservedSourceBoundary,
+                        record.SourceFaceIndex,
+                        record.SourceEdgeIndex);
+                    return true;
+                }
+            }
+            segment = default;
+            return false;
+        }
+
+        private static void AppendSplitTopologyEdgeKeys(
+            HashSet<TopologyEdgeKey> output,
+            Vector3 start,
+            Vector3 end,
+            List<ChamferSplitPoint> plan)
+        {
+            Vector3 segment = end - start;
+            float lengthSqr = segment.sqrMagnitude;
+            if (lengthSqr <= MinimumEdgeLengthSqr)
+            {
+                return;
+            }
+            List<KeyValuePair<float, Vector3>> ordered =
+                new List<KeyValuePair<float, Vector3>>(plan.Count);
+            for (int i = 0; i < plan.Count; i++)
+            {
+                float t = Vector3.Dot(plan[i].Position - start, segment) / lengthSqr;
+                ordered.Add(new KeyValuePair<float, Vector3>(t, plan[i].Position));
+            }
+            ordered.Sort((left, right) => left.Key.CompareTo(right.Key));
+            Vector3 current = start;
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                Vector3 next = ordered[i].Value;
+                VertexKey currentKey = new VertexKey(current);
+                VertexKey nextKey = new VertexKey(next);
+                if (currentKey.Equals(nextKey))
+                {
+                    continue;
+                }
+                output.Add(new TopologyEdgeKey(currentKey, nextKey));
+                current = next;
+            }
+            VertexKey finalStart = new VertexKey(current);
+            VertexKey finalEnd = new VertexKey(end);
+            if (!finalStart.Equals(finalEnd))
+            {
+                output.Add(new TopologyEdgeKey(finalStart, finalEnd));
+            }
+        }
+
+        private static void LogFinalChamferTopologyFailures(
+            List<ChamferProvisionalSegmentRecord> segments,
+            float minimumStableEdgeLength,
+            ref ChamferEmissionStats stats)
+        {
+            const int MaximumDetailedFailures = 3;
+            Dictionary<TopologyEdgeKey, List<ChamferProvisionalSegmentRecord>>
+                usesByKey =
+                    new Dictionary<TopologyEdgeKey,
+                        List<ChamferProvisionalSegmentRecord>>();
+            Dictionary<VertexKey, Vector3> points =
+                new Dictionary<VertexKey, Vector3>();
+            for (int i = 0; i < segments.Count; i++)
+            {
+                ChamferProvisionalSegmentRecord segment = segments[i];
+                if (!usesByKey.TryGetValue(
+                        segment.Key,
+                        out List<ChamferProvisionalSegmentRecord> uses))
+                {
+                    uses = new List<ChamferProvisionalSegmentRecord>();
+                    usesByKey.Add(segment.Key, uses);
+                }
+                uses.Add(segment);
+                VertexKey startKey = new VertexKey(segment.Start);
+                VertexKey endKey = new VertexKey(segment.End);
+                if (!points.ContainsKey(startKey))
+                {
+                    points.Add(startKey, segment.Start);
+                }
+                if (!points.ContainsKey(endKey))
+                {
+                    points.Add(endKey, segment.End);
+                }
+            }
+
+            List<string> failures = new List<string>(MaximumDetailedFailures);
+            foreach (KeyValuePair<TopologyEdgeKey,
+                     List<ChamferProvisionalSegmentRecord>> pair in usesByKey)
+            {
+                if (pair.Value.Count <= 2 ||
+                    failures.Count >= MaximumDetailedFailures)
+                {
+                    continue;
+                }
+
+                ChamferProvisionalSegmentRecord representative = pair.Value[0];
+                string detail =
+                    "nonManifold{edgeStart=" + representative.Start +
+                    ", edgeEnd=" + representative.End +
+                    ", uses=" + pair.Value.Count;
+                for (int i = 0; i < pair.Value.Count && i < 6; i++)
+                {
+                    ChamferProvisionalSegmentRecord use = pair.Value[i];
+                    detail +=
+                        ", use[" + i + "]=" +
+                        "faceRecord:" + use.FaceRecordIndex +
+                        "/localEdge:" + use.LocalEdgeIndex +
+                        "/faceKind:" + use.FaceKind +
+                        "/role:" + use.Role +
+                        "/sourceFace:" + use.SourceFaceIndex +
+                        "/sourceEdge:" + use.SourceEdgeIndex;
+                }
+                failures.Add(detail + "}");
+                stats.FinalNonManifoldDiagnosticsLogged++;
+            }
+
+            if (failures.Count < MaximumDetailedFailures)
+            {
+                float tolerance = CalculateTopologyTJunctionTolerance(
+                    minimumStableEdgeLength);
+                float toleranceSqr = tolerance * tolerance;
+                HashSet<ChamferTJunctionRecordKey> diagnosticKeys =
+                    new HashSet<ChamferTJunctionRecordKey>();
+                foreach (KeyValuePair<VertexKey, Vector3> point in points)
+                {
+                    if (failures.Count >= MaximumDetailedFailures)
+                    {
+                        break;
+                    }
+                    for (int i = 0; i < segments.Count; i++)
+                    {
+                        ChamferProvisionalSegmentRecord segment = segments[i];
+                        if (point.Key.Equals(new VertexKey(segment.Start)) ||
+                            point.Key.Equals(new VertexKey(segment.End)) ||
+                            !IsPointOnSegmentInterior(
+                                point.Value,
+                                segment.Start,
+                                segment.End,
+                                toleranceSqr))
+                        {
+                            continue;
+                        }
+
+                        ChamferTJunctionRecordKey diagnosticKey =
+                            new ChamferTJunctionRecordKey(
+                                point.Key,
+                                segment.Key,
+                                segment.FaceRecordIndex,
+                                segment.Role);
+                        if (!diagnosticKeys.Add(diagnosticKey))
+                        {
+                            continue;
+                        }
+
+                        string pointUses = string.Empty;
+                        int pointUseCount = 0;
+                        for (int j = 0;
+                             j < segments.Count && pointUseCount < 6;
+                             j++)
+                        {
+                            ChamferProvisionalSegmentRecord pointSegment =
+                                segments[j];
+                            if (!point.Key.Equals(
+                                    new VertexKey(pointSegment.Start)) &&
+                                !point.Key.Equals(
+                                    new VertexKey(pointSegment.End)))
+                            {
+                                continue;
+                            }
+                            pointUses +=
+                                ", pointUse[" + pointUseCount + "]=" +
+                                "faceRecord:" + pointSegment.FaceRecordIndex +
+                                "/localEdge:" + pointSegment.LocalEdgeIndex +
+                                "/faceKind:" + pointSegment.FaceKind +
+                                "/role:" + pointSegment.Role +
+                                "/sourceFace:" + pointSegment.SourceFaceIndex +
+                                "/sourceEdge:" + pointSegment.SourceEdgeIndex;
+                            pointUseCount++;
+                        }
+
+                        failures.Add(
+                            "tJunction{point=" + point.Value +
+                            ", containingEdgeStart=" + segment.Start +
+                            ", containingEdgeEnd=" + segment.End +
+                            ", containingFaceRecord=" +
+                                segment.FaceRecordIndex +
+                            ", containingLocalEdge=" + segment.LocalEdgeIndex +
+                            ", containingFaceKind=" + segment.FaceKind +
+                            ", containingRole=" + segment.Role +
+                            ", containingSourceFace=" +
+                                segment.SourceFaceIndex +
+                            ", containingSourceEdge=" +
+                                segment.SourceEdgeIndex +
+                            pointUses + "}");
+                        stats.FinalTJunctionDiagnosticsLogged++;
+                        break;
+                    }
+                }
+            }
+
+            string message =
+                "GeneratedMass edge wear final provisional topology failures. " +
+                "nonManifoldEdges=" + stats.ProvisionalNonManifoldEdgeCount +
+                ", tJunctions=" + stats.ProvisionalTJunctionCount +
+                ", " +
+                "loggedFailures=" + failures.Count;
+            for (int i = 0; i < failures.Count; i++)
+            {
+                message += ", failure[" + i + "]=" + failures[i];
+            }
+            Debug.LogWarning(message);
+        }
+
         private static bool AuditProvisionalChamferEmission(
             List<PolygonFace> sourceFaces,
             ChamferTopologyContext context,
@@ -2480,23 +3882,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
             ref ChamferEmissionStats stats,
-            out HashSet<int> conflictingEdges,
             out string blocker)
         {
-            conflictingEdges = new HashSet<int>();
             blocker = string.Empty;
             stats.SourceFaceCount = context.Graph.Faces.Count;
             stats.CandidateSelectedEdgeCount = context.SelectedSourceEdges.Count;
-            List<PolygonFace> provisionalFaces = new List<PolygonFace>(
-                context.Graph.Faces.Count + context.SelectedSourceEdges.Count);
+            List<ChamferProvisionalFaceRecord> provisionalFaceRecords =
+                new List<ChamferProvisionalFaceRecord>(
+                    context.Graph.Faces.Count +
+                    context.SelectedSourceEdges.Count);
             HashSet<TopologyEdgeKey> expectedSourceBoundaryEdges =
                 new HashSet<TopologyEdgeKey>();
-            List<ChamferStripEndpointBoundary> endpointBoundaries =
-                new List<ChamferStripEndpointBoundary>(
-                    context.SelectedSourceEdges.Count * 2);
+            List<ChamferExpectedVertexBoundary> vertexBoundaries =
+                new List<ChamferExpectedVertexBoundary>(
+                    context.SelectedSourceEdges.Count * 4);
             HashSet<TopologyEdgeKey> expectedVertexBoundaryEdges =
                 new HashSet<TopologyEdgeKey>();
 
+            stats.SharedInternalEdgeSpanCount = solution.SharedSpans.Count;
             for (int faceIndex = 0;
                  faceIndex < context.Graph.Faces.Count;
                  faceIndex++)
@@ -2505,28 +3908,30 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EdgeWearGraphFace graphFace = context.Graph.Faces[faceIndex];
                 PolygonFace sourceFace = sourceFaces[graphFace.SourceFaceIndex];
                 List<Vector3> vertices = new List<Vector3>(
-                    graphFace.VertexIndices.Count);
+                    graphFace.VertexIndices.Count * 3);
                 for (int i = 0; i < graphFace.VertexIndices.Count; i++)
                 {
-                    ChamferFaceCornerKey key = new ChamferFaceCornerKey(
+                    int startVertex = graphFace.VertexIndices[i];
+                    int endVertex = graphFace.VertexIndices[
+                        (i + 1) % graphFace.VertexIndices.Count];
+                    int sourceEdgeIndex = graphFace.EdgeIndices[i];
+                    AppendChamferReplacementEdgeChain(
                         faceIndex,
-                        graphFace.VertexIndices[i]);
-                    if (!solution.Corners.TryGetValue(
-                            key,
-                            out ChamferSolvedCorner corner))
-                    {
-                        stats.ReplacementFaceFailureCount++;
-                        blocker = "a replacement face is missing a solved corner";
-                        return false;
-                    }
-                    vertices.Add(corner.Position);
+                        startVertex,
+                        endVertex,
+                        sourceEdgeIndex,
+                        solution.Corners,
+                        solution.SharedSpans,
+                        vertices,
+                        vertexBoundaries);
                 }
+                RemoveClosingDuplicate(vertices);
 
                 if (CalculatePolygonArea(vertices) <= minimumStableFaceArea ||
                     !IsFinite(CalculatePolygonNormal(vertices)))
                 {
                     stats.ReplacementFaceFailureCount++;
-                    blocker = "a provisional replacement face is geometrically invalid";
+                    blocker = "a shared-span replacement face is geometrically invalid";
                     return false;
                 }
 
@@ -2534,15 +3939,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 if (Vector3.Dot(replacementNormal, sourceFace.Normal) <= 0.25f)
                 {
                     stats.ReplacementFaceFailureCount++;
-                    blocker = "a provisional replacement face has invalid winding";
+                    blocker = "a shared-span replacement face has invalid winding";
                     return false;
                 }
 
-                provisionalFaces.Add(new PolygonFace(
+                PolygonFace replacementFace = new PolygonFace(
                     vertices,
                     sourceFace.Normal,
                     sourceFace.Feature,
-                    sourceFace.FeatureStrength));
+                    sourceFace.FeatureStrength);
+                provisionalFaceRecords.Add(new ChamferProvisionalFaceRecord(
+                    replacementFace,
+                    ChamferProvisionalFaceKind.ReplacementBase,
+                    faceIndex,
+                    -1));
                 stats.ReplacementFacesBuilt++;
             }
 
@@ -2588,7 +3998,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 List<Vector3> strip = new List<Vector3> { a0, b0, b1, a1 };
                 Vector3 expectedNormal = selected.Candidate.BevelNormal;
                 Vector3 stripNormal = CalculatePolygonNormal(strip);
-                if (!IsFinite(stripNormal) || stripNormal.sqrMagnitude <= 0.00000001f)
+                if (!IsFinite(stripNormal) ||
+                    stripNormal.sqrMagnitude <= 0.00000001f)
                 {
                     stats.BevelStripFailureCount++;
                     blocker = "an active selected edge produces an invalid bevel strip normal";
@@ -2606,101 +4017,36 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     return false;
                 }
 
-                provisionalFaces.Add(new PolygonFace(
+                PolygonFace bevelFace = new PolygonFace(
                     strip,
                     stripNormal,
                     PolygonFaceFeature.ConvexEdgeWear,
-                    selected.Candidate.Strength));
+                    selected.Candidate.Strength);
+                provisionalFaceRecords.Add(new ChamferProvisionalFaceRecord(
+                    bevelFace,
+                    ChamferProvisionalFaceKind.BevelStrip,
+                    -1,
+                    edgeIndex));
                 stats.BevelStripsBuilt++;
                 stats.BevelStripQuadFaceCount++;
                 stats.BevelStripTriangleEstimate += 2;
 
-                TopologyEdgeKey boundaryAtA = new TopologyEdgeKey(
-                    new VertexKey(a0),
-                    new VertexKey(a1));
-                TopologyEdgeKey boundaryAtB = new TopologyEdgeKey(
-                    new VertexKey(b0),
-                    new VertexKey(b1));
-                endpointBoundaries.Add(new ChamferStripEndpointBoundary(
+                AddExpectedVertexBoundary(
+                    vertexBoundaries,
                     edge.VertexA,
                     edgeIndex,
                     edge.FaceA,
-                    edge.FaceB,
-                    boundaryAtA));
-                endpointBoundaries.Add(new ChamferStripEndpointBoundary(
+                    ChamferVertexBoundaryKind.BevelStripEndpoint,
+                    a0,
+                    a1);
+                AddExpectedVertexBoundary(
+                    vertexBoundaries,
                     edge.VertexB,
                     edgeIndex,
                     edge.FaceA,
-                    edge.FaceB,
-                    boundaryAtB));
-                expectedVertexBoundaryEdges.Add(boundaryAtA);
-                expectedVertexBoundaryEdges.Add(boundaryAtB);
-            }
-
-            stats.StripEndpointBoundaryRegistrationCount =
-                endpointBoundaries.Count;
-            Dictionary<TopologyEdgeKey, List<ChamferStripEndpointBoundary>>
-                endpointBoundariesByKey =
-                    new Dictionary<TopologyEdgeKey, List<ChamferStripEndpointBoundary>>();
-            for (int i = 0; i < endpointBoundaries.Count; i++)
-            {
-                ChamferStripEndpointBoundary boundary = endpointBoundaries[i];
-                if (!endpointBoundariesByKey.TryGetValue(
-                        boundary.Key,
-                        out List<ChamferStripEndpointBoundary> owners))
-                {
-                    owners = new List<ChamferStripEndpointBoundary>();
-                    endpointBoundariesByKey.Add(boundary.Key, owners);
-                }
-                owners.Add(boundary);
-            }
-
-            HashSet<int> duplicateBoundaryVertices = new HashSet<int>();
-            foreach (KeyValuePair<TopologyEdgeKey, List<ChamferStripEndpointBoundary>> pair
-                     in endpointBoundariesByKey)
-            {
-                List<ChamferStripEndpointBoundary> owners = pair.Value;
-                if (owners.Count <= 1)
-                {
-                    continue;
-                }
-
-                stats.DuplicateStripEndpointBoundaryKeyCount++;
-                stats.DuplicateStripEndpointBoundaryRegistrationCount +=
-                    owners.Count - 1;
-                for (int i = 0; i < owners.Count; i++)
-                {
-                    duplicateBoundaryVertices.Add(owners[i].SourceVertexIndex);
-                }
-
-                int keeperEdge = owners[0].SourceEdgeIndex;
-                for (int i = 1; i < owners.Count; i++)
-                {
-                    keeperEdge = ChooseChamferBoundaryConflictKeeper(
-                        context,
-                        keeperEdge,
-                        owners[i].SourceEdgeIndex);
-                }
-                for (int i = 0; i < owners.Count; i++)
-                {
-                    if (owners[i].SourceEdgeIndex != keeperEdge)
-                    {
-                        conflictingEdges.Add(owners[i].SourceEdgeIndex);
-                    }
-                }
-            }
-            stats.DuplicateBoundaryVertexCount = duplicateBoundaryVertices.Count;
-
-            AuditActiveChamferRuns(
-                context,
-                solution.WidthByEdge,
-                ref stats);
-
-            if (conflictingEdges.Count > 0)
-            {
-                blocker =
-                    "duplicate active strip-end boundaries require deterministic local edge deferral";
-                return false;
+                    ChamferVertexBoundaryKind.BevelStripEndpoint,
+                    b0,
+                    b1);
             }
 
             for (int edgeIndex = 0;
@@ -2713,6 +4059,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     continue;
                 }
                 int faceIndex = edge.FaceA >= 0 ? edge.FaceA : edge.FaceB;
+                if (faceIndex < 0)
+                {
+                    continue;
+                }
                 Vector3 a = solution.Corners[
                     new ChamferFaceCornerKey(faceIndex, edge.VertexA)].Position;
                 Vector3 b = solution.Corners[
@@ -2722,25 +4072,64 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     new VertexKey(b)));
             }
 
+            for (int i = 0; i < vertexBoundaries.Count; i++)
+            {
+                if (vertexBoundaries[i].Kind ==
+                    ChamferVertexBoundaryKind.BevelStripEndpoint)
+                {
+                    stats.StripEndpointBoundaryRegistrationCount++;
+                }
+                else
+                {
+                    stats.UnselectedTailBoundaryRegistrationCount++;
+                }
+            }
+
+            SegmentRawChamferTJunctions(
+                provisionalFaceRecords,
+                context,
+                solution.SharedSpans,
+                vertexBoundaries,
+                expectedSourceBoundaryEdges,
+                minimumStableEdgeLength,
+                ref stats);
+
+            stats.PostSegmentationBoundaryRegistrationCount =
+                vertexBoundaries.Count;
             stats.ExpectedSourceBoundaryEdgeCount =
                 expectedSourceBoundaryEdges.Count;
+
+            List<PolygonFace> provisionalFaces =
+                ExtractChamferProvisionalFaces(provisionalFaceRecords);
+            Dictionary<TopologyEdgeKey, int> useCounts =
+                BuildTopologyEdgeUseCounts(provisionalFaces);
+            List<ChamferProvisionalSegmentRecord> finalSegments =
+                BuildChamferProvisionalSegmentRecords(
+                    provisionalFaceRecords,
+                    vertexBoundaries,
+                    expectedSourceBoundaryEdges,
+                    solution.SharedSpans);
+            List<ChamferExpectedVertexBoundary> normalizedVertexBoundaries =
+                NormalizeChamferVertexBoundaries(
+                    vertexBoundaries,
+                    useCounts,
+                    finalSegments,
+                    ref stats);
+            for (int i = 0; i < normalizedVertexBoundaries.Count; i++)
+            {
+                expectedVertexBoundaryEdges.Add(
+                    normalizedVertexBoundaries[i].Key);
+            }
             stats.ExpectedVertexBoundaryEdgeCount =
                 expectedVertexBoundaryEdges.Count;
 
-            Dictionary<TopologyEdgeKey, int> useCounts =
-                new Dictionary<TopologyEdgeKey, int>();
-            for (int faceIndex = 0; faceIndex < provisionalFaces.Count; faceIndex++)
-            {
-                List<Vector3> vertices = provisionalFaces[faceIndex].Vertices;
-                for (int i = 0; i < vertices.Count; i++)
-                {
-                    TopologyEdgeKey key = new TopologyEdgeKey(
-                        new VertexKey(vertices[i]),
-                        new VertexKey(vertices[(i + 1) % vertices.Count]));
-                    useCounts.TryGetValue(key, out int useCount);
-                    useCounts[key] = useCount + 1;
-                }
-            }
+            AuditExpectedVertexBoundaryComponents(
+                normalizedVertexBoundaries,
+                ref stats);
+            AuditActiveChamferRuns(
+                context,
+                solution.WidthByEdge,
+                ref stats);
 
             HashSet<TopologyEdgeKey> actualOpenEdges =
                 new HashSet<TopologyEdgeKey>();
@@ -2791,72 +4180,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             stats.ProvisionalNonManifoldEdgeCount = Mathf.Max(
                 stats.ProvisionalNonManifoldEdgeCount,
                 topology.NonManifoldEdgeCount);
+            if (stats.ProvisionalNonManifoldEdgeCount > 0 ||
+                stats.ProvisionalTJunctionCount > 0)
+            {
+                LogFinalChamferTopologyFailures(
+                    finalSegments,
+                    minimumStableEdgeLength,
+                    ref stats);
+            }
 
             if (stats.MatchedSourceBoundaryEdgeCount !=
                     stats.ExpectedSourceBoundaryEdgeCount ||
                 stats.MissingExpectedVertexBoundaryEdgeCount > 0 ||
                 stats.UnexpectedProvisionalOpenEdgeCount > 0 ||
                 stats.ProvisionalNonManifoldEdgeCount > 0 ||
-                stats.ProvisionalTJunctionCount > 0)
+                stats.ProvisionalTJunctionCount > 0 ||
+                stats.VertexBoundarySameOwnerDuplicateFailureCount > 0 ||
+                stats.VertexBoundaryMultiOwnerFailureCount > 0 ||
+                stats.VertexBoundaryBranchFailureCount > 0 ||
+                stats.VertexBoundaryDuplicateFailureCount > 0)
             {
-                blocker = "provisional chamfer topology does not match the explicit source-boundary and vertex-patch boundary contract";
+                blocker = "raw-provenance segmented provisional topology does not match the explicit source-boundary and vertex-patch boundary contract";
                 return false;
             }
 
             stats.ReadyForVertexPatches = 1;
             return true;
-        }
-
-        private static int ChooseChamferBoundaryConflictKeeper(
-            ChamferTopologyContext context,
-            int firstEdgeIndex,
-            int secondEdgeIndex)
-        {
-            EdgeWearSelectedGraphEdge first = default;
-            EdgeWearSelectedGraphEdge second = default;
-            bool foundFirst = false;
-            bool foundSecond = false;
-            for (int i = 0; i < context.SelectedEdges.Count; i++)
-            {
-                EdgeWearSelectedGraphEdge selected = context.SelectedEdges[i];
-                if (selected.GraphEdgeIndex == firstEdgeIndex)
-                {
-                    first = selected;
-                    foundFirst = true;
-                }
-                if (selected.GraphEdgeIndex == secondEdgeIndex)
-                {
-                    second = selected;
-                    foundSecond = true;
-                }
-            }
-
-            if (foundFirst && foundSecond)
-            {
-                if (!Mathf.Approximately(
-                        first.Candidate.Strength,
-                        second.Candidate.Strength))
-                {
-                    return first.Candidate.Strength > second.Candidate.Strength
-                        ? firstEdgeIndex
-                        : secondEdgeIndex;
-                }
-
-                float firstLength = GetGraphEdgeLength(
-                    context.Graph,
-                    firstEdgeIndex);
-                float secondLength = GetGraphEdgeLength(
-                    context.Graph,
-                    secondEdgeIndex);
-                if (!Mathf.Approximately(firstLength, secondLength))
-                {
-                    return firstLength > secondLength
-                        ? firstEdgeIndex
-                        : secondEdgeIndex;
-                }
-            }
-
-            return Mathf.Min(firstEdgeIndex, secondEdgeIndex);
         }
 
         private static void AuditActiveChamferRuns(
@@ -5599,7 +6948,7 @@ private static List<Vector3> BuildSegmentedBoundary(
                 _ => 0
             };
         }
-        
+
 
         private static int GetBoundarySegments(SurfaceFacetDensity density)
         {
@@ -5866,6 +7215,9 @@ private readonly struct EdgeWearTopologyStats
             private readonly VertexKey first;
             private readonly VertexKey second;
 
+            public VertexKey First => first;
+            public VertexKey Second => second;
+
             public TopologyEdgeKey(VertexKey start, VertexKey end)
             {
                 if (start.CompareTo(end) <= 0)
@@ -5920,224 +7272,6 @@ private readonly struct EdgeWearTopologyStats
                 EndKey = endKey;
             }
         }
-        private sealed class ChamferTopologyContext
-        {
-            public readonly EdgeWearTopologyGraph Graph;
-            public readonly List<EdgeWearSelectedGraphEdge> SelectedEdges;
-            public readonly List<ChamferHalfEdge> HalfEdges;
-            public readonly HashSet<int> SelectedSourceEdges;
-
-            public ChamferTopologyContext(
-                EdgeWearTopologyGraph graph,
-                List<EdgeWearSelectedGraphEdge> selectedEdges,
-                List<ChamferHalfEdge> halfEdges)
-            {
-                Graph = graph;
-                SelectedEdges = selectedEdges;
-                HalfEdges = halfEdges;
-                SelectedSourceEdges = new HashSet<int>();
-                for (int i = 0; i < selectedEdges.Count; i++)
-                {
-                    SelectedSourceEdges.Add(selectedEdges[i].GraphEdgeIndex);
-                }
-            }
-        }
-
-        private readonly struct ChamferFaceCornerKey :
-            IEquatable<ChamferFaceCornerKey>
-        {
-            public readonly int FaceIndex;
-            public readonly int SourceVertexIndex;
-
-            public ChamferFaceCornerKey(int faceIndex, int sourceVertexIndex)
-            {
-                FaceIndex = faceIndex;
-                SourceVertexIndex = sourceVertexIndex;
-            }
-
-            public bool Equals(ChamferFaceCornerKey other)
-            {
-                return FaceIndex == other.FaceIndex &&
-                    SourceVertexIndex == other.SourceVertexIndex;
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is ChamferFaceCornerKey other && Equals(other);
-            }
-
-            public override int GetHashCode()
-            {
-                unchecked
-                {
-                    return (FaceIndex * 397) ^ SourceVertexIndex;
-                }
-            }
-        }
-
-        private sealed class ChamferSolvedCorner
-        {
-            public Vector3 Position;
-            public readonly int FaceIndex;
-            public readonly int SourceVertexIndex;
-            public readonly int PreviousSourceEdgeIndex;
-            public readonly int NextSourceEdgeIndex;
-            public readonly bool PreviousSelected;
-            public readonly bool NextSelected;
-
-            public ChamferSolvedCorner(
-                Vector3 position,
-                int faceIndex,
-                int sourceVertexIndex,
-                int previousSourceEdgeIndex,
-                int nextSourceEdgeIndex,
-                bool previousSelected,
-                bool nextSelected)
-            {
-                Position = position;
-                FaceIndex = faceIndex;
-                SourceVertexIndex = sourceVertexIndex;
-                PreviousSourceEdgeIndex = previousSourceEdgeIndex;
-                NextSourceEdgeIndex = nextSourceEdgeIndex;
-                PreviousSelected = previousSelected;
-                NextSelected = nextSelected;
-            }
-        }
-
-        private sealed class ChamferCornerSolution
-        {
-            public readonly Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> Corners;
-            public readonly Dictionary<int, float> WidthByEdge;
-
-            public ChamferCornerSolution(
-                Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners,
-                Dictionary<int, float> widthByEdge)
-            {
-                Corners = corners;
-                WidthByEdge = widthByEdge;
-            }
-        }
-
-        private readonly struct ChamferFaceLine
-        {
-            public readonly Vector3 Point;
-            public readonly Vector3 Direction;
-            public readonly int SourceEdgeIndex;
-            public readonly float Offset;
-
-            public ChamferFaceLine(
-                Vector3 point,
-                Vector3 direction,
-                int sourceEdgeIndex,
-                float offset)
-            {
-                Point = point;
-                Direction = direction;
-                SourceEdgeIndex = sourceEdgeIndex;
-                Offset = offset;
-            }
-        }
-
-        private readonly struct ChamferStripEndpointBoundary
-        {
-            public readonly int SourceVertexIndex;
-            public readonly int SourceEdgeIndex;
-            public readonly int FaceA;
-            public readonly int FaceB;
-            public readonly TopologyEdgeKey Key;
-
-            public ChamferStripEndpointBoundary(
-                int sourceVertexIndex,
-                int sourceEdgeIndex,
-                int faceA,
-                int faceB,
-                TopologyEdgeKey key)
-            {
-                SourceVertexIndex = sourceVertexIndex;
-                SourceEdgeIndex = sourceEdgeIndex;
-                FaceA = faceA;
-                FaceB = faceB;
-                Key = key;
-            }
-        }
-
-        private struct ChamferEmissionStats
-        {
-            public int SourceFaceCount;
-            public int ReplacementFacesAttempted;
-            public int ReplacementFacesBuilt;
-            public int ReplacementFaceFailureCount;
-            public int CandidateSelectedEdgeCount;
-            public int ActiveSelectedEdgeCount;
-            public int DeferredSelectedEdgeCount;
-            public int BevelStripsAttempted;
-            public int BevelStripsBuilt;
-            public int BevelStripFailureCount;
-            public int BevelStripQuadFaceCount;
-            public int BevelStripTriangleEstimate;
-            public int ExpectedSourceBoundaryEdgeCount;
-            public int MatchedSourceBoundaryEdgeCount;
-            public int ExpectedVertexBoundaryEdgeCount;
-            public int MatchedVertexBoundaryEdgeCount;
-            public int ProvisionalOpenEdgeCount;
-            public int UnexpectedProvisionalOpenEdgeCount;
-            public int MissingExpectedVertexBoundaryEdgeCount;
-            public int ProvisionalNonManifoldEdgeCount;
-            public int ProvisionalTJunctionCount;
-            public int StripEndpointBoundaryRegistrationCount;
-            public int DuplicateStripEndpointBoundaryKeyCount;
-            public int DuplicateStripEndpointBoundaryRegistrationCount;
-            public int DuplicateBoundaryVertexCount;
-            public int ConflictDeferredEdgeCount;
-            public int CompatibilityPassCount;
-            public int ActiveAffectedVertexCount;
-            public int ActiveSelectedRunCount;
-            public int ActiveClosedRunCount;
-            public int ActiveOpenRunCount;
-            public int ActiveMultipleRunVertexCount;
-            public int ActiveIsolatedEdgeRunCount;
-            public int ReadyForVertexPatches;
-
-            public string ToSummaryString()
-            {
-                return
-                    "sourceFaces=" + SourceFaceCount +
-                    ", replacementFacesAttempted=" + ReplacementFacesAttempted +
-                    ", replacementFacesBuilt=" + ReplacementFacesBuilt +
-                    ", replacementFaceFailures=" + ReplacementFaceFailureCount +
-                    ", candidateSelectedEdges=" + CandidateSelectedEdgeCount +
-                    ", activeSelectedEdges=" + ActiveSelectedEdgeCount +
-                    ", deferredSelectedEdges=" + DeferredSelectedEdgeCount +
-                    ", bevelStripsAttempted=" + BevelStripsAttempted +
-                    ", bevelStripsBuilt=" + BevelStripsBuilt +
-                    ", bevelStripFailures=" + BevelStripFailureCount +
-                    ", bevelStripQuadFaces=" + BevelStripQuadFaceCount +
-                    ", bevelStripTriangleEstimate=" + BevelStripTriangleEstimate +
-                    ", expectedSourceBoundaryEdges=" + ExpectedSourceBoundaryEdgeCount +
-                    ", matchedSourceBoundaryEdges=" + MatchedSourceBoundaryEdgeCount +
-                    ", expectedVertexBoundaryEdges=" + ExpectedVertexBoundaryEdgeCount +
-                    ", matchedVertexBoundaryEdges=" + MatchedVertexBoundaryEdgeCount +
-                    ", provisionalOpenEdges=" + ProvisionalOpenEdgeCount +
-                    ", unexpectedProvisionalOpenEdges=" + UnexpectedProvisionalOpenEdgeCount +
-                    ", missingExpectedVertexBoundaryEdges=" + MissingExpectedVertexBoundaryEdgeCount +
-                    ", provisionalNonManifoldEdges=" + ProvisionalNonManifoldEdgeCount +
-                    ", provisionalTJunctions=" + ProvisionalTJunctionCount +
-                    ", stripEndpointBoundaryRegistrations=" + StripEndpointBoundaryRegistrationCount +
-                    ", duplicateStripEndpointBoundaryKeys=" + DuplicateStripEndpointBoundaryKeyCount +
-                    ", duplicateStripEndpointBoundaryRegistrations=" + DuplicateStripEndpointBoundaryRegistrationCount +
-                    ", duplicateBoundaryVertices=" + DuplicateBoundaryVertexCount +
-                    ", conflictDeferredEdges=" + ConflictDeferredEdgeCount +
-                    ", compatibilityPasses=" + CompatibilityPassCount +
-                    ", activeAffectedVertices=" + ActiveAffectedVertexCount +
-                    ", activeSelectedRuns=" + ActiveSelectedRunCount +
-                    ", activeClosedRuns=" + ActiveClosedRunCount +
-                    ", activeOpenRuns=" + ActiveOpenRunCount +
-                    ", activeMultipleRunVertices=" + ActiveMultipleRunVertexCount +
-                    ", activeIsolatedEdgeRuns=" + ActiveIsolatedEdgeRunCount +
-                    ", readyForVertexPatches=" + ReadyForVertexPatches;
-            }
-        }
-
         private struct ChamferCornerStats
         {
             public int SourceFaceCount;
@@ -6274,6 +7408,466 @@ private readonly struct EdgeWearTopologyStats
             public int Previous = -1;
             public int Opposite = -1;
             public bool IsSelected;
+        }
+
+        private sealed class ChamferTopologyContext
+        {
+            public readonly EdgeWearTopologyGraph Graph;
+            public readonly List<EdgeWearSelectedGraphEdge> SelectedEdges;
+            public readonly List<ChamferHalfEdge> HalfEdges;
+            public readonly HashSet<int> SelectedSourceEdges;
+
+            public ChamferTopologyContext(
+                EdgeWearTopologyGraph graph,
+                List<EdgeWearSelectedGraphEdge> selectedEdges,
+                List<ChamferHalfEdge> halfEdges)
+            {
+                Graph = graph;
+                SelectedEdges = selectedEdges;
+                HalfEdges = halfEdges;
+                SelectedSourceEdges = new HashSet<int>();
+                for (int i = 0; i < selectedEdges.Count; i++)
+                {
+                    SelectedSourceEdges.Add(selectedEdges[i].GraphEdgeIndex);
+                }
+            }
+        }
+
+        private readonly struct ChamferFaceCornerKey :
+            IEquatable<ChamferFaceCornerKey>
+        {
+            public readonly int FaceIndex;
+            public readonly int SourceVertexIndex;
+
+            public ChamferFaceCornerKey(int faceIndex, int sourceVertexIndex)
+            {
+                FaceIndex = faceIndex;
+                SourceVertexIndex = sourceVertexIndex;
+            }
+
+            public bool Equals(ChamferFaceCornerKey other)
+            {
+                return FaceIndex == other.FaceIndex &&
+                    SourceVertexIndex == other.SourceVertexIndex;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is ChamferFaceCornerKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return (FaceIndex * 397) ^ SourceVertexIndex;
+                }
+            }
+        }
+
+        private sealed class ChamferSolvedCorner
+        {
+            public Vector3 Position;
+            public readonly int FaceIndex;
+            public readonly int SourceVertexIndex;
+            public readonly int PreviousSourceEdgeIndex;
+            public readonly int NextSourceEdgeIndex;
+            public readonly bool PreviousSelected;
+            public readonly bool NextSelected;
+
+            public ChamferSolvedCorner(
+                Vector3 position,
+                int faceIndex,
+                int sourceVertexIndex,
+                int previousSourceEdgeIndex,
+                int nextSourceEdgeIndex,
+                bool previousSelected,
+                bool nextSelected)
+            {
+                Position = position;
+                FaceIndex = faceIndex;
+                SourceVertexIndex = sourceVertexIndex;
+                PreviousSourceEdgeIndex = previousSourceEdgeIndex;
+                NextSourceEdgeIndex = nextSourceEdgeIndex;
+                PreviousSelected = previousSelected;
+                NextSelected = nextSelected;
+            }
+        }
+
+        private sealed class ChamferSharedEdgeSpan
+        {
+            public readonly int SourceEdgeIndex;
+            public readonly int FaceA;
+            public readonly int FaceB;
+            public readonly int VertexA;
+            public readonly int VertexB;
+            public readonly Vector3 SharedAtVertexA;
+            public readonly Vector3 SharedAtVertexB;
+
+            public ChamferSharedEdgeSpan(
+                int sourceEdgeIndex,
+                int faceA,
+                int faceB,
+                int vertexA,
+                int vertexB,
+                Vector3 sharedAtVertexA,
+                Vector3 sharedAtVertexB)
+            {
+                SourceEdgeIndex = sourceEdgeIndex;
+                FaceA = faceA;
+                FaceB = faceB;
+                VertexA = vertexA;
+                VertexB = vertexB;
+                SharedAtVertexA = sharedAtVertexA;
+                SharedAtVertexB = sharedAtVertexB;
+            }
+        }
+
+        private enum ChamferVertexBoundaryKind
+        {
+            BevelStripEndpoint,
+            UnselectedEdgeTail
+        }
+
+        private readonly struct ChamferExpectedVertexBoundary
+        {
+            public readonly int SourceVertexIndex;
+            public readonly int SourceEdgeIndex;
+            public readonly int FaceIndex;
+            public readonly ChamferVertexBoundaryKind Kind;
+            public readonly Vector3 Start;
+            public readonly Vector3 End;
+            public readonly TopologyEdgeKey Key;
+
+            public ChamferExpectedVertexBoundary(
+                int sourceVertexIndex,
+                int sourceEdgeIndex,
+                int faceIndex,
+                ChamferVertexBoundaryKind kind,
+                Vector3 start,
+                Vector3 end,
+                TopologyEdgeKey key)
+            {
+                SourceVertexIndex = sourceVertexIndex;
+                SourceEdgeIndex = sourceEdgeIndex;
+                FaceIndex = faceIndex;
+                Kind = kind;
+                Start = start;
+                End = end;
+                Key = key;
+            }
+        }
+
+        private enum ChamferProvisionalFaceKind
+        {
+            ReplacementBase,
+            BevelStrip
+        }
+
+        private enum ChamferSegmentRole
+        {
+            ReplacementSharedSpan,
+            ReplacementVertexTail,
+            ReplacementOrdinaryEdge,
+            PreservedSourceBoundary,
+            BevelRail,
+            BevelEndpoint
+        }
+
+        private sealed class ChamferProvisionalFaceRecord
+        {
+            public PolygonFace Face;
+            public readonly ChamferProvisionalFaceKind Kind;
+            public readonly int SourceFaceIndex;
+            public readonly int SourceEdgeIndex;
+
+            public ChamferProvisionalFaceRecord(
+                PolygonFace face,
+                ChamferProvisionalFaceKind kind,
+                int sourceFaceIndex,
+                int sourceEdgeIndex)
+            {
+                Face = face;
+                Kind = kind;
+                SourceFaceIndex = sourceFaceIndex;
+                SourceEdgeIndex = sourceEdgeIndex;
+            }
+        }
+
+        private readonly struct ChamferProvisionalSegmentRecord
+        {
+            public readonly int FaceRecordIndex;
+            public readonly int LocalEdgeIndex;
+            public readonly TopologyEdgeKey Key;
+            public readonly Vector3 Start;
+            public readonly Vector3 End;
+            public readonly ChamferProvisionalFaceKind FaceKind;
+            public readonly ChamferSegmentRole Role;
+            public readonly int SourceFaceIndex;
+            public readonly int SourceEdgeIndex;
+
+            public ChamferProvisionalSegmentRecord(
+                int faceRecordIndex,
+                int localEdgeIndex,
+                TopologyEdgeKey key,
+                Vector3 start,
+                Vector3 end,
+                ChamferProvisionalFaceKind faceKind,
+                ChamferSegmentRole role,
+                int sourceFaceIndex,
+                int sourceEdgeIndex)
+            {
+                FaceRecordIndex = faceRecordIndex;
+                LocalEdgeIndex = localEdgeIndex;
+                Key = key;
+                Start = start;
+                End = end;
+                FaceKind = faceKind;
+                Role = role;
+                SourceFaceIndex = sourceFaceIndex;
+                SourceEdgeIndex = sourceEdgeIndex;
+            }
+        }
+
+        private sealed class ChamferBoundaryPointRecord
+        {
+            public readonly VertexKey Key;
+            public readonly Vector3 Position;
+            public readonly HashSet<int> SourceVertexIndices =
+                new HashSet<int>();
+
+            public ChamferBoundaryPointRecord(
+                VertexKey key,
+                Vector3 position)
+            {
+                Key = key;
+                Position = position;
+            }
+        }
+
+        private readonly struct ChamferSplitPoint
+        {
+            public readonly VertexKey Key;
+            public readonly Vector3 Position;
+            public readonly float Parameter;
+            public readonly int CompatibleFaceRecordIndex;
+            public readonly int CompatibleLocalEdgeIndex;
+
+            public ChamferSplitPoint(
+                VertexKey key,
+                Vector3 position,
+                float parameter,
+                int compatibleFaceRecordIndex,
+                int compatibleLocalEdgeIndex)
+            {
+                Key = key;
+                Position = position;
+                Parameter = parameter;
+                CompatibleFaceRecordIndex = compatibleFaceRecordIndex;
+                CompatibleLocalEdgeIndex = compatibleLocalEdgeIndex;
+            }
+        }
+
+        private readonly struct ChamferTJunctionRecordKey :
+            IEquatable<ChamferTJunctionRecordKey>
+        {
+            private readonly VertexKey pointKey;
+            private readonly TopologyEdgeKey containingEdgeKey;
+            private readonly int faceRecordIndex;
+            private readonly ChamferSegmentRole segmentRole;
+
+            public ChamferTJunctionRecordKey(
+                VertexKey pointKey,
+                TopologyEdgeKey containingEdgeKey,
+                int faceRecordIndex,
+                ChamferSegmentRole segmentRole)
+            {
+                this.pointKey = pointKey;
+                this.containingEdgeKey = containingEdgeKey;
+                this.faceRecordIndex = faceRecordIndex;
+                this.segmentRole = segmentRole;
+            }
+
+            public bool Equals(ChamferTJunctionRecordKey other)
+            {
+                return pointKey.Equals(other.pointKey) &&
+                    containingEdgeKey.Equals(other.containingEdgeKey) &&
+                    faceRecordIndex == other.faceRecordIndex &&
+                    segmentRole == other.segmentRole;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is ChamferTJunctionRecordKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hash = pointKey.GetHashCode();
+                    hash = (hash * 397) ^ containingEdgeKey.GetHashCode();
+                    hash = (hash * 397) ^ faceRecordIndex;
+                    hash = (hash * 397) ^ (int)segmentRole;
+                    return hash;
+                }
+            }
+        }
+
+        private sealed class ChamferCornerSolution
+        {
+            public readonly Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> Corners;
+            public readonly Dictionary<int, float> WidthByEdge;
+            public readonly Dictionary<int, ChamferSharedEdgeSpan> SharedSpans;
+
+            public ChamferCornerSolution(
+                Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners,
+                Dictionary<int, float> widthByEdge,
+                Dictionary<int, ChamferSharedEdgeSpan> sharedSpans)
+            {
+                Corners = corners;
+                WidthByEdge = widthByEdge;
+                SharedSpans = sharedSpans;
+            }
+        }
+
+        private readonly struct ChamferFaceLine
+        {
+            public readonly Vector3 Point;
+            public readonly Vector3 Direction;
+            public readonly int SourceEdgeIndex;
+            public readonly float Offset;
+
+            public ChamferFaceLine(
+                Vector3 point,
+                Vector3 direction,
+                int sourceEdgeIndex,
+                float offset)
+            {
+                Point = point;
+                Direction = direction;
+                SourceEdgeIndex = sourceEdgeIndex;
+                Offset = offset;
+            }
+        }
+
+        private struct ChamferEmissionStats
+        {
+            public int SourceFaceCount;
+            public int ReplacementFacesAttempted;
+            public int ReplacementFacesBuilt;
+            public int ReplacementFaceFailureCount;
+            public int CandidateSelectedEdgeCount;
+            public int ActiveSelectedEdgeCount;
+            public int DeferredSelectedEdgeCount;
+            public int BevelStripsAttempted;
+            public int BevelStripsBuilt;
+            public int BevelStripFailureCount;
+            public int BevelStripQuadFaceCount;
+            public int BevelStripTriangleEstimate;
+            public int SharedInternalEdgeSpanCount;
+            public int ExpectedSourceBoundaryEdgeCount;
+            public int MatchedSourceBoundaryEdgeCount;
+            public int ExpectedVertexBoundaryEdgeCount;
+            public int MatchedVertexBoundaryEdgeCount;
+            public int ProvisionalOpenEdgeCount;
+            public int UnexpectedProvisionalOpenEdgeCount;
+            public int MissingExpectedVertexBoundaryEdgeCount;
+            public int ProvisionalNonManifoldEdgeCount;
+            public int ProvisionalTJunctionCount;
+            public int StripEndpointBoundaryRegistrationCount;
+            public int UnselectedTailBoundaryRegistrationCount;
+            public int PostSegmentationBoundaryRegistrationCount;
+            public int VertexBoundarySingleOwnerEdgeCount;
+            public int VertexBoundaryCancelledInternalEdgeCount;
+            public int VertexBoundarySameOwnerDuplicateFailureCount;
+            public int VertexBoundaryMultiOwnerFailureCount;
+            public int ProvenanceCompatibleTJunctionSplits;
+            public int TJunctionSegmentationPasses;
+            public int TJunctionRecordsFound;
+            public int TJunctionRecordsCompatible;
+            public int TJunctionRecordsIncompatible;
+            public int PreservedSourceBoundarySplitCount;
+            public int ReplacementOrdinaryEdgeSplitCount;
+            public int ReplacementSharedSpanSplitCount;
+            public int ReplacementTailEdgeSplitCount;
+            public int BevelRailSplitCount;
+            public int BevelEndpointSplitCount;
+            public int ExpectedBoundarySplitCount;
+            public int FinalNonManifoldDiagnosticsLogged;
+            public int FinalTJunctionDiagnosticsLogged;
+            public int VertexBoundaryComponentCount;
+            public int VertexBoundaryClosedLoopCount;
+            public int VertexBoundaryOpenChainCount;
+            public int VertexBoundaryBranchFailureCount;
+            public int VertexBoundaryDuplicateFailureCount;
+            public int ActiveAffectedVertexCount;
+            public int ActiveSelectedRunCount;
+            public int ActiveClosedRunCount;
+            public int ActiveOpenRunCount;
+            public int ActiveMultipleRunVertexCount;
+            public int ActiveIsolatedEdgeRunCount;
+            public int ReadyForVertexPatches;
+
+            public string ToSummaryString()
+            {
+                return
+                    "sourceFaces=" + SourceFaceCount +
+                    ", replacementFacesAttempted=" + ReplacementFacesAttempted +
+                    ", replacementFacesBuilt=" + ReplacementFacesBuilt +
+                    ", replacementFaceFailures=" + ReplacementFaceFailureCount +
+                    ", candidateSelectedEdges=" + CandidateSelectedEdgeCount +
+                    ", activeSelectedEdges=" + ActiveSelectedEdgeCount +
+                    ", deferredSelectedEdges=" + DeferredSelectedEdgeCount +
+                    ", bevelStripsAttempted=" + BevelStripsAttempted +
+                    ", bevelStripsBuilt=" + BevelStripsBuilt +
+                    ", bevelStripFailures=" + BevelStripFailureCount +
+                    ", bevelStripQuadFaces=" + BevelStripQuadFaceCount +
+                    ", bevelStripTriangleEstimate=" + BevelStripTriangleEstimate +
+                    ", sharedInternalEdgeSpans=" + SharedInternalEdgeSpanCount +
+                    ", expectedSourceBoundaryEdges=" + ExpectedSourceBoundaryEdgeCount +
+                    ", matchedSourceBoundaryEdges=" + MatchedSourceBoundaryEdgeCount +
+                    ", expectedVertexBoundaryEdges=" + ExpectedVertexBoundaryEdgeCount +
+                    ", matchedVertexBoundaryEdges=" + MatchedVertexBoundaryEdgeCount +
+                    ", provisionalOpenEdges=" + ProvisionalOpenEdgeCount +
+                    ", unexpectedProvisionalOpenEdges=" + UnexpectedProvisionalOpenEdgeCount +
+                    ", missingExpectedVertexBoundaryEdges=" + MissingExpectedVertexBoundaryEdgeCount +
+                    ", provisionalNonManifoldEdges=" + ProvisionalNonManifoldEdgeCount +
+                    ", provisionalTJunctions=" + ProvisionalTJunctionCount +
+                    ", stripEndpointBoundaryRegistrations=" + StripEndpointBoundaryRegistrationCount +
+                    ", unselectedTailBoundaryRegistrations=" + UnselectedTailBoundaryRegistrationCount +
+                    ", postSegmentationBoundaryRegistrations=" + PostSegmentationBoundaryRegistrationCount +
+                    ", vertexBoundarySingleOwnerEdges=" + VertexBoundarySingleOwnerEdgeCount +
+                    ", vertexBoundaryCancelledInternalEdges=" + VertexBoundaryCancelledInternalEdgeCount +
+                    ", vertexBoundarySameOwnerDuplicateFailures=" + VertexBoundarySameOwnerDuplicateFailureCount +
+                    ", vertexBoundaryMultiOwnerFailures=" + VertexBoundaryMultiOwnerFailureCount +
+                    ", provenanceCompatibleTJunctionSplits=" + ProvenanceCompatibleTJunctionSplits +
+                    ", tJunctionSegmentationPasses=" + TJunctionSegmentationPasses +
+                    ", tJunctionRecordsFound=" + TJunctionRecordsFound +
+                    ", tJunctionRecordsCompatible=" + TJunctionRecordsCompatible +
+                    ", tJunctionRecordsIncompatible=" + TJunctionRecordsIncompatible +
+                    ", preservedSourceBoundarySplits=" + PreservedSourceBoundarySplitCount +
+                    ", replacementOrdinaryEdgeSplits=" + ReplacementOrdinaryEdgeSplitCount +
+                    ", replacementSharedSpanSplits=" + ReplacementSharedSpanSplitCount +
+                    ", replacementTailEdgeSplits=" + ReplacementTailEdgeSplitCount +
+                    ", bevelRailSplits=" + BevelRailSplitCount +
+                    ", bevelEndpointSplits=" + BevelEndpointSplitCount +
+                    ", expectedBoundarySplits=" + ExpectedBoundarySplitCount +
+                    ", finalNonManifoldDiagnosticsLogged=" + FinalNonManifoldDiagnosticsLogged +
+                    ", finalTJunctionDiagnosticsLogged=" + FinalTJunctionDiagnosticsLogged +
+                    ", vertexBoundaryComponents=" + VertexBoundaryComponentCount +
+                    ", vertexBoundaryClosedLoops=" + VertexBoundaryClosedLoopCount +
+                    ", vertexBoundaryOpenChains=" + VertexBoundaryOpenChainCount +
+                    ", vertexBoundaryBranchFailures=" + VertexBoundaryBranchFailureCount +
+                    ", vertexBoundaryDuplicateFailures=" + VertexBoundaryDuplicateFailureCount +
+                    ", activeAffectedVertices=" + ActiveAffectedVertexCount +
+                    ", activeSelectedRuns=" + ActiveSelectedRunCount +
+                    ", activeClosedRuns=" + ActiveClosedRunCount +
+                    ", activeOpenRuns=" + ActiveOpenRunCount +
+                    ", activeMultipleRunVertices=" + ActiveMultipleRunVertexCount +
+                    ", activeIsolatedEdgeRuns=" + ActiveIsolatedEdgeRunCount +
+                    ", readyForVertexPatches=" + ReadyForVertexPatches;
+            }
         }
 
         private struct ChamferReadinessStats

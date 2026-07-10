@@ -1,10 +1,81 @@
 # Ground Generation Surface Upgrade Plan
 
+
+### 2026-07-10 — Patch V3J.3B: Stochastic 3D Fold Surface Preview
+
+Patch V3J.3B converts the validated flat 3D stroke preview into the first actual raised-form proof. Stroke placement, density, length, facing-direction perpendicularity, and signed angle jitter remain unchanged from V3J.3A4. The patch changes only the preview surface and its explicit profile controls.
+
+The implementation deliberately rejects a fixed semantic cross-section such as “outer edge / shoulder / crest / shoulder / outer edge.” Instead, every preview vertex samples one generic parametric surface:
+
+```text
+t = normalized distance along the accepted 3D stroke
+u = normalized distance across the fold, -1..1
+
+P(t, u) =
+    GroundPoint(t)
+  + SurfaceAcross(t) * u * HalfWidth
+  + SurfaceNormal(t) * Height(t, u)
+```
+
+`Height(t, u)` is generated from a deterministic smooth Gaussian-basis mixture. Each stroke seed produces one to four broad bases with independent center, width, amplitude, phase, and slow along-stroke evolution. The sum is normalized and multiplied by:
+
+```text
+EdgeEnvelope(u)           -> forces both side edges back to ground height
+AlongStrokeVariation(t)   -> creates slow height/profile undulation
+EndEnvelope(t)            -> blends both ends back to ground height
+Fold Height               -> normal-space height scale in metres
+```
+
+No basis is named or treated as a crest or shoulder. The same formula can yield one broad offset rise, a flatter plateau, overlapping low rises, uneven slopes, or subtle local dips. `Fold Irregularity` controls basis count and parameter variation; `Fold Broadness` controls footprint/profile spread; `Fold End Taper` controls the length of the start/end blend.
+
+Code changes:
+
+```text
+GroundSurfaceFeatureRecipe
+  adds Fold Height, Fold Irregularity, Fold Broadness, Fold End Taper
+  corrects the generic Direction tooltip: Painted Accent orientation uses Facing Direction Degrees
+
+GeneratedGround
+  replaces the flat two-vertex ribbon preview with an 11-sample cross-stroke surface
+  projects stroke tangents onto the sampled ground-normal plane
+  generates per-stroke deterministic Gaussian profile bases
+  re-samples ground height/normal at every lateral profile vertex
+  samples stochastic height across and along every stroke
+  recalculates mesh normals/tangents
+  uses a lit debug material for readable 3D form
+  replaces __FoldFieldLinePreview_Debug with __PaintedAccentFoldSurfacePreview_Debug
+  clears legacy line-preview children during rebuild/cleanup
+
+GeneratedGroundEditor / GroundSurfaceStyleProfileEditor
+  expose the four profile controls
+  replace Build/Clear 3D Line Preview with Build/Clear 3D Fold Preview
+
+GeneratedGround signature
+  includes all four profile controls so editor changes invalidate the generated Painted Accent data deterministically
+```
+
+V3J.3B remains editor/debug-only. It does not alter the production ground mesh, collider, gameplay height, shader final-render activation, or family presets. Validation should judge only whether the raised surfaces read as useful irregular ground folds. V3K is the decision patch for final geometry versus baked shader response versus a hybrid.
+
+### 2026-07-10 — Patch V3J.3A4: Perpendicular Facing-Direction Fix
+
+The validated orientation rule is:
+
+```text
+finalStrokeAngle =
+    Facing Direction Degrees
+  + 90 degrees
+  + random(-Angle Jitter Degrees, +Angle Jitter Degrees)
+```
+
+The generic `Direction` vector is not used for Painted Accent stroke orientation. `Facing Direction Degrees` represents player/camera facing in local X/Z; the line is perpendicular to that direction; the jitter roll is deterministic and signed per stroke.
+
+### 2026-07-10 — Patch V3J.3A3: Explicit Base-Angle Audit
+
+V3J.3A3 exposed that V3J.3A2 still jittered around a hidden diagonal feature direction. It added an explicit authored angle, which V3J.3A4 immediately redefined correctly as facing direction plus a perpendicular conversion. This is historical context only; V3J.3A4 is the active contract.
+
 ### 2026-07-10 — Patch V3J.3A2: Explicit Signed Angle Jitter Degrees
 
-Patch V3J.3A2 fixes the remaining angle-control failure from V3J.3A1 validation. Distribution was corrected, but the authored angle control was still a normalized compatibility field and did not give the user a direct degree value. The active control is now `Angle Jitter Degrees`, clamped 0-30. Generation applies the exact rule: resolve the preferred feature `Direction`, roll one deterministic random value per stroke in [-1,+1], multiply it by the authored degree value, and add that signed offset to the preferred angle before creating the stroke axis.
-
-This patch does not change stroke density, length, height profile, shader response, or final material behavior. It only makes angle variation explicit, signed, and inspectable.
+Patch V3J.3A2 replaced normalized angle variety/orientation families with a direct signed degree control. Validation then proved that the roll was still centered around a hidden legacy direction. V3J.3A3 and V3J.3A4 supersede its base-angle semantics; only the deterministic signed-degree-roll requirement remains current.
 
 ### 2026-07-10 — Patch V3J.3A1: 3D Stroke Distribution Fix
 
@@ -28,7 +99,7 @@ No height-profile, raised fold body, lateral squiggle, shader response, or final
 
 ### 2026-07-10 — Patch V3J.3A: 3D Stroke Distribution Controls
 
-Patch V3J.3A tunes the first 3D stroke preview without adding raised fold height yet. V3J.3R proved the code baseline could generate ground-following 3D stroke ribbons, but validation showed three layout problems: too few lines, strokes were too long, and orientation was too uniform. Lateral curvature is intentionally not treated as a current bug; height/cross-section deviation is the missing 3D form and belongs to V3J.3B.
+Patch V3J.3A tuned the first 3D stroke preview without adding raised fold height. V3J.3R proved the code baseline could generate ground-following 3D stroke ribbons, but validation showed three layout problems: too few lines, strokes were too long, and orientation was too uniform. Lateral curvature was intentionally not treated as a bug; V3J.3B now owns the missing height/profile proof.
 
 The patch adds explicit Painted Accent 3D stroke controls to `GroundSurfaceFeatureRecipe` and exposes them both in `GroundSurfaceStyleProfileEditor` and directly on the selected `GeneratedGround` inspector:
 
@@ -40,9 +111,9 @@ Painted Accent Stroke Length Max
 Painted Accent Stroke Angle Jitter Degrees
 ```
 
-The fold-field signature now includes all five controls, so changing density, length, or angle jitter invalidates and rebuilds the generated stroke/fold-field data. The generator no longer relies on `Strength` for approximate count or generic `Scale` for stroke length. Density is an approximate target count per 40x40 patch, length min/max are direct metre controls, and angle jitter applies an explicit symmetric signed offset in degrees around the preferred feature direction.
+The fold-field signature includes the layout controls, so changing density, length, facing direction, or angle jitter invalidates and rebuilds the generated stroke/fold-field data. The generator no longer relies on `Strength` for approximate count or generic `Scale` for stroke length. Density is an approximate target count per 40x40 patch and length min/max are direct metre controls. V3J.3A's preferred-direction wording is historical; V3J.3A4 established the active facing-direction-plus-perpendicular angle contract.
 
-Generation also now uses an expanded deterministic placement-attempt grid. This keeps placement stratified while making density more reliable after support-based rejection. The active validation target remains the editor/debug `Build 3D Line Preview`; the patch should not be judged as final 3D fold height or material response.
+Generation also uses an expanded deterministic placement-attempt grid. This keeps placement stratified while making density more reliable after support-based rejection. At the V3J.3A stage the validation target was the temporary `Build 3D Line Preview`; V3J.3B has now superseded it with `Build 3D Fold Preview`.
 
 ### 2026-07-10 — Patch V3J.3R: Painted Accent 3D Stroke Baseline Reconciliation
 
@@ -58,8 +129,8 @@ GroundPaintedAccentFoldFieldGenerator
 
 GeneratedGround
   stores generated `GroundPaintedAccentSurfaceStroke[]`
-  replaces Build/Clear Height Preview with Build/Clear 3D Line Preview
-  builds temporary mesh ribbons named `__FoldFieldLinePreview_Debug`
+  originally replaced Build/Clear Height Preview with a temporary flat 3D line preview
+  V3J.3B now replaces that temporary ribbon with the raised stochastic fold-surface preview
 
 GroundSurfaceFeatureRecipe
   removes peak-threshold / min-area / crest-width proof controls
@@ -68,7 +139,7 @@ GroundSurfaceFeatureRecipe
 GroundSurfaceStyleProfileEditor / GeneratedGroundEditor
   remove obsolete threshold-region tuning UI
   expose only 3D stroke width in feature assets and on GeneratedGround for preview tuning
-  expose Build 3D Line Preview / Clear 3D Line Preview on GeneratedGround
+  originally exposed Build/Clear 3D Line Preview; V3J.3B now exposes Build/Clear 3D Fold Preview
 
 SH_GroundFoldFieldHeightPreview
   removed as obsolete because the G-height grid preview is no longer the active diagnostic
@@ -83,7 +154,7 @@ B = stroke-relative signed side encoded 0..1
 A = semantic support / reserved
 ```
 
-Validation should focus on the 3D preview first: build the preview, inspect whether density, length, and orientation variety are usable, then move to V3J.3B for raised fold cross-section/height before deciding whether to promote the 3D result toward final rendering.
+The historical validation sequence first proved line density, length, and orientation through the temporary ribbon preview. V3J.3B now supplies the raised stochastic fold-surface preview required before deciding whether to promote the 3D result toward final rendering.
 
 ## Purpose
 
@@ -969,8 +1040,12 @@ Active checklist after the doctrine pivot:
 - [x] Patch V3J.1 - replace the failed broad-mask prototype with shader-side contour extraction from the G/body field.
 - [x] Patch V3J.2 - reconcile the failed shader-side approach by precomputing selected crest lines from thresholded G peak regions at generation/dirty time; validation still rejected the body/noise-first source model.
 - [x] Patch V3J.3R - retire the active body/noise-first line-inference path and establish generated 3D surface strokes as the Painted Accent source of truth.
-- [x] Patch V3J.3A - expose and implement 3D stroke density, length, width, and angle-variety controls for the 3D line preview.
-- [ ] Patch V3J.3B - add raised 3D fold cross-section/profile preview around accepted surface strokes.
+- [x] Patch V3J.3A - expose and implement 3D stroke density, length, width, and angle controls for the 3D line preview.
+- [x] Patch V3J.3A1 - globally shuffle candidate cells so accepted strokes populate the whole chunk; remove orientation families.
+- [x] Patch V3J.3A2 - expose explicit signed angle jitter in degrees; later superseded for base-angle semantics.
+- [x] Patch V3J.3A3 - audit and expose the hidden base angle.
+- [x] Patch V3J.3A4 - define the active facing-direction + 90 degrees + signed-jitter orientation contract.
+- [x] Patch V3J.3B - replace flat line ribbons with deterministic stochastic raised 3D fold-surface previews.
 - [ ] Patch V3K - decide whether the accepted raised 3D strokes become final geometry, baked shader response, or both.
 - [ ] Patch V3L - tune Painted Accent Lines per production family after the 3D stroke baseline is accepted.
 - [ ] Patch V4 - prototype contact/edge accents.
@@ -997,18 +1072,18 @@ stratified stroke placement over the local ground bounds
 
 The removed active code includes the continuous fractal body field, percentile body shaping, thresholded peak mask, connected-component labeling, boundary-distance crest scoring, and soft crest rasterizer. Those ideas remain documented as failed experiments only.
 
-The old height-preview workflow is also retired. The active debug tooling is now:
+The old height-preview workflow was retired in V3J.3R. Its temporary flat line-ribbon preview was then used through V3J.3A4 to validate placement, distribution, length, and orientation. V3J.3B supersedes that temporary preview with:
 
 ```text
 GeneratedGround Inspector:
-  Build 3D Line Preview
-  Clear 3D Line Preview
+  Build 3D Fold Preview
+  Clear 3D Fold Preview
 
 Preview child object:
-  __FoldFieldLinePreview_Debug
+  __PaintedAccentFoldSurfacePreview_Debug
 ```
 
-The next patch should not return to field/noise tuning. It should validate the 3D line geometry first, tune density/length/orientation in V3J.3A, and only then add raised fold cross-section height in V3J.3B.
+The active preview is now a raised stochastic surface sampled around the accepted 3D strokes. Field/noise-first line discovery remains retired.
 
 ### 2026-07-10 — Patch V3J.2: Precomputed Peak-Region Crest Lines
 
@@ -2150,7 +2225,18 @@ Patch V0 changes documentation only.
 V3J.3A2 still produced visually same-angle strokes because the signed jitter was applied around a hidden legacy `direction` vector. The default Painted Accent direction was already biased diagonally, and the GeneratedGround validation UI exposed only jitter, not the base angle. The corrected contract is now explicit:
 
 ```text
-finalStrokeAngle = Base Angle Degrees + random(-Angle Jitter Degrees, +Angle Jitter Degrees)
+finalStrokeAngle = Facing Direction Degrees + 90° + random(-Angle Jitter Degrees, +Angle Jitter Degrees)
 ```
 
-Painted Accent 3D strokes no longer use the generic feature `Direction` vector as their active orientation source. The GeneratedGround and style-profile editors expose `Base Angle Degrees` and `Angle Jitter Degrees` together so there is no hidden orientation bias during validation.
+Painted Accent 3D strokes no longer use the generic feature `Direction` vector as their active orientation source. The GeneratedGround and style-profile editors expose `Facing Direction Degrees` and `Angle Jitter Degrees`. The facing direction represents the player/camera-facing direction; generated strokes are perpendicular to it, then each stroke rolls a signed jitter around that perpendicular line angle.
+
+
+### Patch V3J.3A4 — Perpendicular Facing Direction Angle Fix
+
+The V3J.3A3 control still described the line angle directly. Validation showed the authored angle should instead describe the player/camera-facing direction, with generated strokes perpendicular to that direction. The active rule is now:
+
+```text
+finalStrokeAngle = Facing Direction Degrees + 90° + random(-Angle Jitter Degrees, +Angle Jitter Degrees)
+```
+
+This keeps the generator deterministic and keeps angle variation as simple signed jitter, but removes the 90-degree semantic mismatch from the authoring UI.

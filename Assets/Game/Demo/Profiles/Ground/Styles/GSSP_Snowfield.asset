@@ -70,7 +70,12 @@ MonoBehaviour:
       paintedAccentStrokeDensity: 34
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
-      paintedAccentStrokeAngleVariety: 0.85
+      paintedAccentStrokeFacingDirectionDegrees: 90
+      paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentFoldHeight: 0.12
+      paintedAccentFoldIrregularity: 0.55
+      paintedAccentFoldBroadness: 1
+      paintedAccentFoldEndTaper: 0.65
     - kind: 20
       enabled: 1
       costClass: 0
@@ -80,11 +85,16 @@ MonoBehaviour:
       maskInfluence: 0.56
       direction: {x: 0.82, y: 0.36}
       seedOffset: 301
-      paintedAccentStrokeWidth: 0.063
-      paintedAccentStrokeDensity: 29.4
+      paintedAccentStrokeWidth: 0.05
+      paintedAccentStrokeDensity: 36.3
       paintedAccentStrokeLengthMin: 0.55
-      paintedAccentStrokeLengthMax: 1.55
-      paintedAccentStrokeAngleVariety: 0.13
+      paintedAccentStrokeLengthMax: 2.08
+      paintedAccentStrokeFacingDirectionDegrees: 90
+      paintedAccentStrokeAngleJitterDegrees: 14.4
+      paintedAccentFoldHeight: 0.223
+      paintedAccentFoldIrregularity: 0.778
+      paintedAccentFoldBroadness: 0.749
+      paintedAccentFoldEndTaper: 0.65
   - id: snowfield.patchy
     displayName: Patchy
     materialControls:
@@ -140,7 +150,12 @@ MonoBehaviour:
       paintedAccentStrokeDensity: 34
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
-      paintedAccentStrokeAngleVariety: 0.85
+      paintedAccentStrokeFacingDirectionDegrees: 90
+      paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentFoldHeight: 0.12
+      paintedAccentFoldIrregularity: 0.55
+      paintedAccentFoldBroadness: 1
+      paintedAccentFoldEndTaper: 0.65
     - kind: 20
       enabled: 1
       costClass: 0
@@ -154,7 +169,12 @@ MonoBehaviour:
       paintedAccentStrokeDensity: 34
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
-      paintedAccentStrokeAngleVariety: 0.85
+      paintedAccentStrokeFacingDirectionDegrees: 90
+      paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentFoldHeight: 0.12
+      paintedAccentFoldIrregularity: 0.55
+      paintedAccentFoldBroadness: 1
+      paintedAccentFoldEndTaper: 0.65
   - id: snowfield.dirty_thawing
     displayName: Dirty Thawing
     materialControls:
@@ -210,7 +230,12 @@ MonoBehaviour:
       paintedAccentStrokeDensity: 34
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
-      paintedAccentStrokeAngleVariety: 0.85
+      paintedAccentStrokeFacingDirectionDegrees: 90
+      paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentFoldHeight: 0.12
+      paintedAccentFoldIrregularity: 0.55
+      paintedAccentFoldBroadness: 1
+      paintedAccentFoldEndTaper: 0.65
   - id: snowfield.wind_scoured
     displayName: Wind-Scoured
     materialControls:
@@ -266,7 +291,12 @@ MonoBehaviour:
       paintedAccentStrokeDensity: 34
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
-      paintedAccentStrokeAngleVariety: 0.85
+      paintedAccentStrokeFacingDirectionDegrees: 90
+      paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentFoldHeight: 0.12
+      paintedAccentFoldIrregularity: 0.55
+      paintedAccentFoldBroadness: 1
+      paintedAccentFoldEndTaper: 0.65
     - kind: 20
       enabled: 1
       costClass: 0
@@ -280,4 +310,9 @@ MonoBehaviour:
       paintedAccentStrokeDensity: 34
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
-      paintedAccentStrokeAngleVariety: 0.85
+      paintedAccentStrokeFacingDirectionDegrees: 90
+      paintedAccentStrokeAngleJitterDegrees: 18
+      paintedAccentFoldHeight: 0.12
+      paintedAccentFoldIrregularity: 0.55
+      paintedAccentFoldBroadness: 1
+      paintedAccentFoldEndTaper: 0.65

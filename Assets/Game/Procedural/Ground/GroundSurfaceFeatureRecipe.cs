@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ProgrammaticStylized3D.Geometry.Ground
 {
@@ -40,7 +41,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float maskInfluence = 0.5f;
 
-        [Tooltip("Stable world X/Z direction for directional features. Directional Streaks and Painted Accent Lines consume this as a directional bias; Pooled Wetness and Trampled Wear may ignore it.")]
+        [Tooltip("Stable world X/Z direction for directional features. Directional Streaks consume this as their directional bias. Painted Accent 3D strokes use Facing Direction Degrees instead; Pooled Wetness and Trampled Wear may ignore it.")]
         [SerializeField]
         private Vector2 direction = new Vector2(0.82f, 0.36f);
 
@@ -48,7 +49,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private int seedOffset;
 
-        [Tooltip("Painted Accent Lines only. Preview/runtime stroke ribbon width in metres for generated 3D surface strokes. The fold-field R channel is baked from these strokes instead of inferred from noise blobs.")]
+        [Tooltip("Painted Accent Lines only. Source-line/core width in metres for generated 3D surface strokes. It controls baked R coverage and contributes to the derived 3D fold footprint; Fold Broadness scales the raised preview surface separately.")]
         [Range(0.04f, 0.35f)]
         [SerializeField]
         private float paintedAccentStrokeWidth = 0.12f;
@@ -68,15 +69,36 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float paintedAccentStrokeLengthMax = 1.55f;
 
-        [Tooltip("Painted Accent Lines only. Preferred local X/Z orientation in degrees for generated 3D surface strokes. Angle Jitter Degrees rolls independently around this value for each stroke.")]
-        [Range(0f, 180f)]
+        [Tooltip("Painted Accent Lines only. Local X/Z player or camera-facing direction in degrees. Generated 3D surface strokes are perpendicular to this direction, then Angle Jitter Degrees rolls around that perpendicular stroke angle.")]
+        [Range(0f, 360f)]
         [SerializeField]
-        private float paintedAccentStrokeBaseAngleDegrees = 90f;
+        [FormerlySerializedAs("paintedAccentStrokeBaseAngleDegrees")]
+        private float paintedAccentStrokeFacingDirectionDegrees = 90f;
 
-        [Tooltip("Painted Accent Lines only. Maximum signed angle offset in degrees applied around Stroke Base Angle Degrees. Each stroke rolls independently in [-value, +value].")]
+        [Tooltip("Painted Accent Lines only. Maximum signed angle offset in degrees applied around the perpendicular stroke angle derived from Facing Direction Degrees. Each stroke rolls independently in [-value, +value].")]
         [Range(0f, 30f)]
         [SerializeField]
         private float paintedAccentStrokeAngleJitterDegrees = 18f;
+
+        [Tooltip("Painted Accent Lines only. Maximum raised height in metres for the generated 3D fold-surface preview. Height is applied along the sampled ground normal and tapers back to the ground at the fold edges and ends.")]
+        [Range(0f, 0.40f)]
+        [SerializeField]
+        private float paintedAccentFoldHeight = 0.12f;
+
+        [Tooltip("Painted Accent Lines only. Controls deterministic stochastic variation in the 3D fold profile. Zero approaches one clean broad profile; one allows several overlapping smooth basis functions and stronger slow height variation along the stroke.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float paintedAccentFoldIrregularity = 0.55f;
+
+        [Tooltip("Painted Accent Lines only. Multiplies the generated 3D fold footprint width and broadens or narrows the smooth stochastic profile. One preserves the generated body width.")]
+        [Range(0.50f, 1.80f)]
+        [SerializeField]
+        private float paintedAccentFoldBroadness = 1.0f;
+
+        [Tooltip("Painted Accent Lines only. Controls how much of each stroke length is used to blend the raised fold back into the ground. Zero keeps only a minimal anti-clipping fade; one uses long soft end tapers.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float paintedAccentFoldEndTaper = 0.65f;
 
         public GroundSurfaceFeatureKind Kind => kind;
 
@@ -132,11 +154,23 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 PaintedAccentStrokeLengthMin + 0.05f,
                 Mathf.Clamp(paintedAccentStrokeLengthMax, 0.25f, 6.0f));
 
-        public float PaintedAccentStrokeBaseAngleDegrees =>
-            Mathf.Clamp(paintedAccentStrokeBaseAngleDegrees, 0f, 180f);
+        public float PaintedAccentStrokeFacingDirectionDegrees =>
+            Mathf.Repeat(paintedAccentStrokeFacingDirectionDegrees, 360f);
 
         public float PaintedAccentStrokeAngleJitterDegrees =>
             Mathf.Clamp(paintedAccentStrokeAngleJitterDegrees, 0f, 30f);
+
+        public float PaintedAccentFoldHeight =>
+            Mathf.Clamp(paintedAccentFoldHeight, 0f, 0.40f);
+
+        public float PaintedAccentFoldIrregularity =>
+            Mathf.Clamp01(paintedAccentFoldIrregularity);
+
+        public float PaintedAccentFoldBroadness =>
+            Mathf.Clamp(paintedAccentFoldBroadness, 0.50f, 1.80f);
+
+        public float PaintedAccentFoldEndTaper =>
+            Mathf.Clamp01(paintedAccentFoldEndTaper);
 
         public bool CanApplyAsShaderOnly =>
             enabled &&

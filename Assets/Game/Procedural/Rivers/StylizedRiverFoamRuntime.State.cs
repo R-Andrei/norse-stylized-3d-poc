@@ -129,6 +129,7 @@ namespace ProgrammaticStylized3D.Rivers
             public float PatternSeed;
             public float SourceFillSeed;
             public float SourceFillFeatureSize;
+            public float SourceFillBlend;
             public float ShapeSeed;
             public float BreakupScaleMetres;
             public float BreakupStrength;
@@ -159,7 +160,7 @@ namespace ProgrammaticStylized3D.Rivers
             // z = breakup strength, w = curvature / signed object semi-arc lopsidedness / fragment rotation.
             public Vector4 Variation;
             // x = formation speed metres/second, y = moving-head trail metres,
-            // z = source path length metres, w reserved.
+            // z = source path length metres, w = source fill blend.
             public Vector4 Kinematics;
             // x = object/free-water centre lateral metres, y = object along half length or free-water half length,
             // z = object across half width or free-water half width, w = object contact offset / free-water shape parameter.

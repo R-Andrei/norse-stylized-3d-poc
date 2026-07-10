@@ -1299,6 +1299,9 @@ namespace ProgrammaticStylized3D.Rivers
                 BreakupScaleMetres = Mathf.Max(0.05f, breakupScaleMetres),
                 BreakupStrength = Mathf.Clamp01(breakupStrength),
                 Curvature = Mathf.Clamp(lopsidedness, -1f, 1f),
+                SourceFillBlend = sourceType == AutomaticFoamSourceEventType.ObjectContactArc
+                    ? 0.22f
+                    : (sourceType == AutomaticFoamSourceEventType.ObjectContactSemiArc ? 0.16f : 0.20f),
                 ObjectCentreAcrossMetres = source.AcrossMetres,
                 ObjectAlongHalfLengthMetres = Mathf.Max(
                     0.05f,
@@ -1957,6 +1960,9 @@ namespace ProgrammaticStylized3D.Rivers
                 BreakupScaleMetres = Mathf.Max(0.05f, breakupScaleMetres),
                 BreakupStrength = Mathf.Clamp01(breakupStrength),
                 Curvature = Mathf.Clamp(curvature, -1f, 1f),
+                SourceFillBlend = sourceType == AutomaticFoamSourceEventType.FreeWaterLaceConnector
+                    ? 0.18f
+                    : (sourceType == AutomaticFoamSourceEventType.FreeWaterTornFragment ? 0.32f : 0.06f),
                 ObjectCentreAcrossMetres = centreAcrossMetres,
                 ObjectAlongHalfLengthMetres = halfLength,
                 ObjectAcrossHalfWidthMetres = halfWidth,
@@ -2406,7 +2412,8 @@ namespace ProgrammaticStylized3D.Rivers
                 ShapeSeed = sourceKey + AutomaticShoreBirthShapeSeedSalt,
                 BreakupScaleMetres = Mathf.Max(0.10f, breakupScaleMetres),
                 BreakupStrength = Mathf.Clamp01(breakupStrength),
-                Curvature = curvature
+                Curvature = curvature,
+                SourceFillBlend = sourceType == AutomaticFoamSourceEventType.InwardWash ? 0.08f : 0.35f
             };
 
             activeAutomaticFoamSourceEventCount++;

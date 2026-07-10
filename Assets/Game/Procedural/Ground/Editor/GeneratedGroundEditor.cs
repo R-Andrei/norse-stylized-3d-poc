@@ -591,16 +591,28 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentStrokeLengthMin");
             SerializedProperty strokeLengthMax =
                 feature.FindPropertyRelative("paintedAccentStrokeLengthMax");
-            SerializedProperty strokeBaseAngleDegrees =
-                feature.FindPropertyRelative("paintedAccentStrokeBaseAngleDegrees");
+            SerializedProperty strokeFacingDirectionDegrees =
+                feature.FindPropertyRelative("paintedAccentStrokeFacingDirectionDegrees");
             SerializedProperty strokeAngleJitterDegrees =
                 feature.FindPropertyRelative("paintedAccentStrokeAngleJitterDegrees");
+            SerializedProperty foldHeight =
+                feature.FindPropertyRelative("paintedAccentFoldHeight");
+            SerializedProperty foldIrregularity =
+                feature.FindPropertyRelative("paintedAccentFoldIrregularity");
+            SerializedProperty foldBroadness =
+                feature.FindPropertyRelative("paintedAccentFoldBroadness");
+            SerializedProperty foldEndTaper =
+                feature.FindPropertyRelative("paintedAccentFoldEndTaper");
             if (strokeWidth == null ||
                 strokeDensity == null ||
                 strokeLengthMin == null ||
                 strokeLengthMax == null ||
-                strokeBaseAngleDegrees == null ||
-                strokeAngleJitterDegrees == null)
+                strokeFacingDirectionDegrees == null ||
+                strokeAngleJitterDegrees == null ||
+                foldHeight == null ||
+                foldIrregularity == null ||
+                foldBroadness == null ||
+                foldEndTaper == null)
             {
                 return;
             }
@@ -610,7 +622,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 "Painted Accent 3D Strokes",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Edits the selected surface variant's Painted Accent 3D stroke layout controls, then refreshes this GeneratedGround object's generated stroke/fold-field data. This controls line layout only; raised fold height comes in a later patch.",
+                "Edits the selected surface variant's Painted Accent 3D stroke layout and stochastic fold-surface controls. Rebuild the 3D Fold Preview after changes. The preview is debug geometry only and does not modify ground collision or production terrain geometry.",
                 MessageType.None);
 
             EditorGUI.BeginChangeCheck();
@@ -620,7 +632,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 0.35f,
                 new GUIContent(
                     "Stroke Width",
-                    "Preview/runtime ribbon width in metres for generated 3D Painted Accent surface strokes."));
+                    "Source-line/core width in metres. It controls baked line coverage and contributes to the derived 3D fold footprint."));
             EditorGUILayout.Slider(
                 strokeDensity,
                 0f,
@@ -643,19 +655,51 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     "Stroke Length Max",
                     "Maximum generated 3D stroke length in metres."));
             EditorGUILayout.Slider(
-                strokeBaseAngleDegrees,
+                strokeFacingDirectionDegrees,
                 0f,
-                180f,
+                360f,
                 new GUIContent(
-                    "Base Angle Degrees",
-                    "Preferred local X/Z orientation for generated 3D Painted Accent strokes. 0 and 180 are equivalent because strokes are undirected."));
+                    "Facing Direction Degrees",
+                    "Local X/Z player or camera-facing direction. Generated 3D strokes are perpendicular to this direction before signed Angle Jitter is applied."));
             EditorGUILayout.Slider(
                 strokeAngleJitterDegrees,
                 0f,
                 30f,
                 new GUIContent(
                     "Angle Jitter Degrees",
-                    "Maximum signed angle offset in degrees around Base Angle Degrees. Each stroke rolls independently between -value and +value."));
+                    "Maximum signed angle offset in degrees around the perpendicular stroke angle derived from Facing Direction Degrees. Each stroke rolls independently between -value and +value."));
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Stochastic 3D Fold Surface",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.Slider(
+                foldHeight,
+                0f,
+                0.40f,
+                new GUIContent(
+                    "Fold Height",
+                    "Maximum raised height in metres, applied along the sampled ground normal."));
+            EditorGUILayout.Slider(
+                foldIrregularity,
+                0f,
+                1f,
+                new GUIContent(
+                    "Fold Irregularity",
+                    "Strength of deterministic smooth profile variation across and along each stroke. This does not add lateral centerline squiggle."));
+            EditorGUILayout.Slider(
+                foldBroadness,
+                0.50f,
+                1.80f,
+                new GUIContent(
+                    "Fold Broadness",
+                    "Multiplier for the 3D fold footprint width and the broadness of its smooth stochastic profile."));
+            EditorGUILayout.Slider(
+                foldEndTaper,
+                0f,
+                1f,
+                new GUIContent(
+                    "Fold End Taper",
+                    "How much of the stroke length blends the raised profile back into the ground at each end."));
 
             if (strokeLengthMax.floatValue < strokeLengthMin.floatValue + 0.05f)
             {
@@ -670,7 +714,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             styleObject.ApplyModifiedProperties();
             EditorUtility.SetDirty(style);
             ApplyToTargets(
-                "Tune Painted Accent 3D Stroke Layout",
+                "Tune Painted Accent 3D Fold Surface",
                 ground => ground.RefreshSurfaceMaterialProperties());
         }
 
@@ -1298,26 +1342,26 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
-                "Painted Accent 3D Line Preview",
+                "Painted Accent 3D Fold Preview",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Builds an editor/debug-only mesh ribbon preview from generated 3D Painted Accent surface strokes. This previews actual ground-following line geometry and does not change the generated ground mesh, collision, or gameplay surface.",
+                "Builds an editor/debug-only raised fold surface from the generated ground-following 3D strokes. Each surface is sampled from a deterministic stochastic height formula rather than a fixed U-shaped cross-section. It does not change the generated ground mesh, collision, or gameplay surface.",
                 MessageType.None);
 
             EditorGUILayout.BeginHorizontal();
 
-            if (GUILayout.Button("Build 3D Line Preview"))
+            if (GUILayout.Button("Build 3D Fold Preview"))
             {
                 ApplyToTargets(
-                    "Build Painted Accent 3D Line Preview",
-                    ground => ground.BuildPaintedAccentFoldFieldLinePreview());
+                    "Build Painted Accent 3D Fold Preview",
+                    ground => ground.BuildPaintedAccentFoldSurfacePreview());
             }
 
-            if (GUILayout.Button("Clear 3D Line Preview"))
+            if (GUILayout.Button("Clear 3D Fold Preview"))
             {
                 ApplyToTargets(
-                    "Clear Painted Accent 3D Line Preview",
-                    ground => ground.ClearPaintedAccentFoldFieldLinePreview());
+                    "Clear Painted Accent 3D Fold Preview",
+                    ground => ground.ClearPaintedAccentFoldSurfacePreview());
             }
 
             EditorGUILayout.EndHorizontal();

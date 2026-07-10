@@ -84,6 +84,14 @@ float4 ResolveFoamSegmentInjectionSample(
     return float4(segmentShape, sourceAmount, segmentRadius, segmentT);
 }
 
+float FoamDistanceToSegment(float2 queryPosition, float2 segmentStart, float2 segmentEnd, out float segmentT)
+{
+    float2 axis = segmentEnd - segmentStart;
+    float axisLengthSquared = max(0.000001, dot(axis, axis));
+    segmentT = saturate(dot(queryPosition - segmentStart, axis) / axisLengthSquared);
+    return distance(queryPosition, segmentStart + axis * segmentT);
+}
+
 [numthreads(8, 8, 1)]
 void ClearRange(uint3 dispatchId : SV_DispatchThreadID)
 {
@@ -1108,10 +1116,13 @@ float FoamEvaluateFreeWaterCrossLaceConnectorSource(
         lateralMetres - sourceEvent.objectData.x);
 
     float halfLength = max(0.05, sourceEvent.objectData.y);
-    float baseWidth = max(0.008, sourceEvent.objectData.z);
+    float requestedWidth = max(0.0015, sourceEvent.objectData.z);
+    float cellSize = max(physicalCellSpacing.x, physicalCellSpacing.y);
+    float rasterWidth = max(requestedWidth, cellSize * 0.18);
+    float subCellCoverage = saturate(requestedWidth / max(0.0001, rasterWidth));
     float feather = max(
-        max(0.006, sourceEvent.shore.w * 0.58),
-        max(physicalCellSpacing.x, physicalCellSpacing.y) * 0.36);
+        max(0.002, sourceEvent.shore.w * 0.20),
+        cellSize * 0.16);
     float lateralDirectionSign = sourceEvent.objectData.w >= 0.0 ? 1.0 : -1.0;
     float pathLength = max(0.001, halfLength * 2.0);
     float trailFraction = saturate(sourceEvent.kinematics.y / pathLength);
@@ -1121,6 +1132,8 @@ float FoamEvaluateFreeWaterCrossLaceConnectorSource(
 
     float minDistance = 100000.0;
     float nearestT = 0.0;
+    float2 previousPoint = float2(0.0, 0.0);
+    float previousT = tailT;
 
     [unroll]
     for (int sampleIndex = 0; sampleIndex < 5; sampleIndex++)
@@ -1130,22 +1143,30 @@ float FoamEvaluateFreeWaterCrossLaceConnectorSource(
 
         float lateralPath = lerp(-halfLength, halfLength, t) * lateralDirectionSign;
         float flowBend =
-            sourceEvent.variation.w * baseWidth * 3.2 * sin(t * 3.14159265) +
-            baseWidth * 1.2 * sin(t * 6.2831853 + sourceEvent.header.w);
-        float d = distance(p, float2(flowBend, lateralPath));
+            sourceEvent.variation.w * rasterWidth * 3.2 * sin(t * 3.14159265) +
+            rasterWidth * 1.2 * sin(t * 6.2831853 + sourceEvent.header.w);
+        float2 currentPoint = float2(flowBend, lateralPath);
 
-        if (d < minDistance)
+        if (sampleIndex > 0)
         {
-            minDistance = d;
-            nearestT = t;
+            float segmentT;
+            float d = FoamDistanceToSegment(p, previousPoint, currentPoint, segmentT);
+            if (d < minDistance)
+            {
+                minDistance = d;
+                nearestT = lerp(previousT, t, segmentT);
+            }
         }
+
+        previousPoint = currentPoint;
+        previousT = t;
     }
 
     float widthNoise = EvaluateFoamSourceFillField(
         float2(nearestT * pathLength, p.x),
         sourceEvent.variation.x + 301.0,
         max(0.20, sourceEvent.material.w));
-    float localWidth = baseWidth * lerp(0.60, 1.55, widthNoise);
+    float localWidth = rasterWidth * lerp(0.75, 1.18, widthNoise);
     float stroke = 1.0 - smoothstep(
         localWidth,
         localWidth + feather,
@@ -1166,7 +1187,7 @@ float FoamEvaluateFreeWaterCrossLaceConnectorSource(
     float gapMask = smoothstep(0.16, 0.66, gapNoise);
 
     float shape = saturate(
-        stroke * max(0.25, endTaper) *
+        stroke * subCellCoverage * max(0.25, endTaper) *
         lerp(1.0, breakup * gapMask, 0.48));
     amountMultiplier = 0.94;
     return shape;
@@ -1410,19 +1431,7 @@ void RasterizeFoamSourceEvent(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float sourceFillBlend = sourceType < 1.5
-        ? 0.35
-        : (sourceType < 2.5
-            ? 0.08
-            : (sourceType < 3.5
-                ? 0.22
-                : (sourceType < 4.5
-                    ? 0.16
-                    : (sourceType < 5.5
-                        ? 0.20
-                        : (sourceType < 6.5
-                            ? 0.18
-                            : (sourceType < 7.5 ? 0.32 : 0.20))))));
+    float sourceFillBlend = saturate(sourceEvent.kinematics.w);
     float sourceFill = lerp(
         1.0,
         EvaluateFoamSourceFillCoverage(

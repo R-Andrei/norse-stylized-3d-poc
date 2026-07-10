@@ -262,7 +262,7 @@ namespace ProgrammaticStylized3D.Rivers
                         Mathf.Abs(endStorageGlobal - startStorageGlobal) +
                         sourceEvent.InwardReachMetres *
                         sourceEvent.InwardReachMetres),
-                    0f),
+                    Mathf.Clamp01(sourceEvent.SourceFillBlend)),
                 ObjectData = new Vector4(
                     sourceEvent.ObjectCentreAcrossMetres,
                     sourceEvent.ObjectAlongHalfLengthMetres,

@@ -116,18 +116,66 @@ EW-C — Explicit Single-Segment Chamfer Kernel
 - [ ] Rendered source geometry remains unchanged.
 
 
-## EW-C2R — Active vertex-run boundary reconstruction
+## EW-C2S3 — Raw-provenance segmentation and failure classification
 
-- [x] Preserve all strip endpoint registrations with source-edge and source-vertex provenance.
-- [x] Recompute active topology from positive-width edges after compatibility deferral.
-- [x] Detect duplicate active strip-end topology keys before accepting provisional geometry.
-- [x] Select deterministic conflict winners by strength, edge length, then graph-edge index.
-- [x] Force losing conflicting candidates to width zero and rerun the full corner solve.
-- [x] Keep the compatibility loop bounded and geometry commit disabled.
-- [ ] Validate zero duplicate strip-end keys on the reference seed.
-- [ ] Validate zero missing expected vertex boundaries.
-- [ ] Validate zero provisional T-junctions.
-- [ ] Require `readyForVertexPatches=1` before EW-C3.
+- [x] Remove EW-C2R duplicate-boundary compatibility deferral.
+- [x] Preserve the EW-C1R3 active positive-width edge network.
+- [x] Stop mutating solved corners during inactive-edge reconciliation.
+- [x] Build one immutable shared middle span per inactive internal source edge.
+- [x] Split replacement-face edge chains around shared spans.
+- [x] Register active strip endpoints as explicit vertex boundaries.
+- [x] Register face-specific inactive-edge tails as explicit vertex boundaries.
+- [x] Group vertex boundaries into source-vertex components.
+- [x] Build shared spans and explicit strip/tail boundary provenance.
+- [x] Normalize distinct-owner internal cancellations.
+- [x] Keep same-owner and multi-owner boundary conflicts as hard failures.
+- [x] Preserve replacement-face and bevel-strip provenance before topology audit.
+- [x] Reconstruct provisional segment records with face kind, role, local edge, and source owner.
+- [x] Move T-junction segmentation before ownership normalization.
+- [x] Use graph-face one-ring or source-edge endpoint ownership instead of endpoint-only ownership.
+- [x] Split every provisional use of a planned topology edge in identical parameter order.
+- [x] Split matching expected vertex-boundary registrations while preserving provenance.
+- [x] Update preserved source-boundary descendants when segmentation occurs.
+- [x] Run segmentation to a bounded fixed point.
+- [x] Print exact registration/use records for unresolved ownership groups.
+- [x] Keep geometry commit disabled.
+- [ ] Unity compiles without errors.
+- [ ] Previously passing placed masses remain `readyForVertexPatches=1`.
+- [ ] `tJunctionRecordsCompatible` and `provenanceCompatibleTJunctionSplits` become non-zero on previously failing T-junction cases.
+- [ ] `tJunctionRecordsIncompatible=0`, or every non-zero record has exact diagnostic provenance.
+- [ ] Validate exact source-boundary preservation.
+- [ ] Validate zero missing and zero unexpected provisional openings.
+- [ ] Validate zero same-owner and multi-owner boundary failures.
+- [ ] Validate zero non-manifold edges and zero T-junctions.
+- [ ] Require every representative placed mass to report `readyForVertexPatches=1` before EW-C3.
+
+## EW-C2S4 — Preserved-boundary subdivision and compact diagnostics
+
+- [x] Permit an existing raw-provenance provisional vertex to subdivide a segment explicitly classified as `PreservedSourceBoundary` without requiring containing-face one-ring membership.
+- [x] Require at least one source-vertex owner and confirm the point is an actual provisional mesh vertex.
+- [x] Retain stable-length, endpoint-distance, strict-interior parameter, and point-to-segment tolerance guards.
+- [x] Split every provisional use of the containing topology edge consistently.
+- [x] Replace every split source-boundary parent with its ordered child edge chain.
+- [x] Add `preservedSourceBoundarySplits` and prevent preserved-boundary splits from incrementing `replacementOrdinaryEdgeSplits`.
+- [x] Keep bounded fixed-point segmentation.
+- [x] Count unique T-junction records rather than repeated pass encounters.
+- [x] Suppress intermediate compatible/incompatible per-pair logs.
+- [x] Emit at most one final topology warning containing at most three unique actionable records.
+- [x] Keep geometry commit disabled.
+
+### Exit criteria
+
+- [ ] Unity compiles without errors.
+- [ ] The known test rock retains `activeSelectedEdges=33` and `deferredSelectedEdges=3`.
+- [ ] The known test rock reports `preservedSourceBoundarySplits=3`.
+- [ ] The known test rock reports exact source-boundary descendant matching; expected value is 7 for that topology.
+- [ ] `unexpectedProvisionalOpenEdges=0`.
+- [ ] `missingExpectedVertexBoundaryEdges=0`.
+- [ ] `provisionalNonManifoldEdges=0`.
+- [ ] `provisionalTJunctions=0`.
+- [ ] `readyForVertexPatches=1`.
+- [ ] One regeneration emits only readiness, corner, and provisional-emission summaries unless the final topology fails.
+- [ ] Every representative placed mass reports `readyForVertexPatches=1` before EW-C3 begins.
 
 ## EW-C3 — Crude vertex-run patches
 
