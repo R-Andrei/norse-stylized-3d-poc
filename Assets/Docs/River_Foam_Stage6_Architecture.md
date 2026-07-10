@@ -2280,3 +2280,17 @@ The implemented Shore Foam category keeps Coverage and Activity as category-leve
 Each implemented shore pattern now owns its own source-authoring controls: Formation Speed multiplier, dimensions, Initial Life, and Breakup Strength. `Initial Life` is the normalized Remaining Life written into newly born persistent material; it is not event duration. Event duration still derives from source path distance divided by formation speed.
 
 Dimension selection now uses a correlated event scale plus small per-axis jitter and aspect guards. This preserves deterministic variety without allowing short/fat or reach/width-incoherent shore wash events.
+
+### 4.11C.5.15A Object Foam source category
+
+Object Foam extends the Layer C source-event rasterizer with static-object source events. The anchor list is exported from the existing disturbance runtime static source registry, keeping scheduling deterministic and bounded on CPU. GPU rasterization evaluates object-local contact arc/fleck masks, gates them by valid fluid, obstacle exclusion, and static pressure contact evidence, then merges births into persistent material state. This remains a spawning feature only; it does not change transport/evolution or Final Foam composition.
+
+### 4.11C.5.15A.1 Object Foam activation correction
+
+Object Foam activation is category-driven. `Spawn Preset` no longer silently disables Shore or Object source categories except when set to `Off`. The intended hierarchy is: `Automatic Foam Birth` global master switch, `Spawn Preset = Off` global disable, and per-category `Enabled` toggles for Shore/Object/Free Water. Object Foam runtime diagnostics include copied static source anchor count before events are scheduled.
+
+### 4.11C.5.15A.2 Object Contact Edge Field
+
+Object Foam now uses a local contact-edge field for final source shape authority. CPU static source snapshots still schedule bounded object events; the GPU contact field supplies per-cell contact confidence, object-to-water normal, and upstream/front-side relevance derived from obstacle exclusion plus static pressure/contact context.
+
+This preserves the selected performance model: no GPU readback, no texture-wide source spawning, no particle system, and no connected-component event generation. Object extents remain as coarse bounds only. Contact Arc and Contact Fleck masks now use field normal/tangent space so they can follow actual contact edges rather than object half-extent rectangles.

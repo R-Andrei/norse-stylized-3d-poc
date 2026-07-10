@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using System;
 using UnityEngine;
 
 namespace ProgrammaticStylized3D.Geometry.Ground
@@ -7,7 +7,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
     {
         public const int Resolution = 256;
 
-        private const int MaxCandidates = 768;
         private const float MinimumFieldSize = 0.0001f;
 
         public static Texture2D Generate(
@@ -16,7 +15,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             GroundSurfaceFeatureRecipe feature,
             int shapeSeed,
             out Vector4 originSize,
-            out Vector4 texelSize)
+            out Vector4 texelSize,
+            out float[] bodyValues)
         {
             originSize =
                 new Vector4(
@@ -31,34 +31,41 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     Resolution,
                     Resolution);
 
-            float[] rawHeights = new float[Resolution * Resolution];
-            float[] bodyHeights = new float[Resolution * Resolution];
-            float[] smoothedHeights = new float[Resolution * Resolution];
-            float[] supports = new float[Resolution * Resolution];
+            int pixelCount = Resolution * Resolution;
+            float[] rawField = new float[pixelCount];
+            float[] supportedField = new float[pixelCount];
+            float[] bodyField = new float[pixelCount];
+            float[] smoothedBody = new float[pixelCount];
+            float[] supportField = new float[pixelCount];
 
-            List<FoldCandidate> candidates =
-                BuildCandidates(
-                    originSize,
+            FieldSettings settings =
+                FieldSettings.Create(
                     feature,
                     shapeSeed);
 
-            RasterizeCandidates(
+            GenerateRawContinuousField(
                 originSize,
-                candidates,
-                feature,
-                rawHeights);
+                settings,
+                rawField);
 
             ApplySemanticSupport(
                 originSize,
                 baseSurface,
                 feature,
-                rawHeights,
-                bodyHeights,
-                supports);
+                rawField,
+                supportedField,
+                supportField);
 
-            SmoothHeightField(
-                bodyHeights,
-                smoothedHeights);
+            ShapeBodyField(
+                supportedField,
+                settings,
+                bodyField);
+
+            SmoothBodyField(
+                bodyField,
+                smoothedBody);
+
+            bodyValues = smoothedBody;
 
             Texture2D texture =
                 new Texture2D(
@@ -75,236 +82,136 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 };
 
             Color32[] pixels =
-                BuildPixels(
-                    smoothedHeights,
-                    supports,
-                    feature);
+                BuildPixelsFromContinuousField(
+                    originSize,
+                    smoothedBody,
+                    supportField,
+                    settings);
 
             texture.SetPixels32(pixels);
             texture.Apply(false, true);
             return texture;
         }
 
-        private static List<FoldCandidate> BuildCandidates(
+        private static void GenerateRawContinuousField(
             Vector4 originSize,
-            GroundSurfaceFeatureRecipe feature,
-            int shapeSeed)
+            FieldSettings settings,
+            float[] rawField)
         {
-            List<FoldCandidate> candidates =
-                new List<FoldCandidate>(MaxCandidates);
-
-            float strength =
-                feature != null
-                    ? Mathf.Clamp01(feature.Strength)
-                    : 0f;
-            float scale =
-                feature != null
-                    ? feature.Scale
-                    : 5f;
-            float contrast =
-                feature != null
-                    ? Mathf.Clamp01(feature.Contrast)
-                    : 0.5f;
-            Vector2 preferredDirection =
-                feature != null
-                    ? feature.Direction
-                    : Vector2.right;
-
-            if (preferredDirection.sqrMagnitude < 0.0001f)
+            for (int z = 0; z < Resolution; z++)
             {
-                preferredDirection = Vector2.right;
-            }
-
-            preferredDirection.Normalize();
-
-            int seed =
-                Hash(
-                    shapeSeed,
-                    feature != null ? feature.SeedOffset : 0,
-                    0x2E1B);
-            float cellSize =
-                Mathf.Clamp(scale * 0.45f, 0.85f, 3.25f);
-            float density =
-                Mathf.Lerp(0.18f, 0.48f, strength);
-            float directionBias =
-                Mathf.Lerp(0.08f, 0.30f, contrast);
-            int minCellX =
-                Mathf.FloorToInt(originSize.x / cellSize) - 1;
-            int maxCellX =
-                Mathf.CeilToInt((originSize.x + originSize.z) / cellSize) + 1;
-            int minCellZ =
-                Mathf.FloorToInt(originSize.y / cellSize) - 1;
-            int maxCellZ =
-                Mathf.CeilToInt((originSize.y + originSize.w) / cellSize) + 1;
-
-            for (int cellZ = minCellZ; cellZ <= maxCellZ; cellZ++)
-            {
-                for (int cellX = minCellX; cellX <= maxCellX; cellX++)
+                for (int x = 0; x < Resolution; x++)
                 {
-                    if (candidates.Count >= MaxCandidates)
-                    {
-                        return candidates;
-                    }
+                    int index = z * Resolution + x;
+                    Vector2 localXZ =
+                        TexelToLocalXZ(
+                            x,
+                            z,
+                            originSize);
 
-                    uint cellHash =
-                        HashUInt(
-                            cellX,
-                            cellZ,
-                            seed);
+                    Vector2 warpedXZ =
+                        ResolveDomainWarpedPosition(
+                            localXZ,
+                            settings);
 
-                    if (Hash01(cellHash, 11u) > density)
-                    {
-                        continue;
-                    }
+                    float broad =
+                        FractalValueNoise(
+                            warpedXZ / (settings.BaseScale * 2.35f),
+                            settings.Seed + 101);
+                    float medium =
+                        FractalValueNoise(
+                            warpedXZ / (settings.BaseScale * 1.05f),
+                            settings.Seed + 211);
+                    float ridgeSource =
+                        FractalValueNoise(
+                            warpedXZ / (settings.BaseScale * 0.72f),
+                            settings.Seed + 307);
 
-                    Vector2 randomDirection =
-                        DirectionFromAngle(
-                            Hash01(cellHash, 17u) * Mathf.PI * 2f);
-                    Vector2 direction =
-                        Vector2.Lerp(
-                            randomDirection,
-                            preferredDirection,
-                            directionBias);
-                    if (direction.sqrMagnitude < 0.0001f)
-                    {
-                        direction = randomDirection;
-                    }
+                    float ridge =
+                        1f - Mathf.Abs(ridgeSource * 2f - 1f);
+                    ridge =
+                        Mathf.Pow(
+                            Mathf.Clamp01(ridge),
+                            settings.RidgePower);
 
-                    direction.Normalize();
-                    Vector2 crossDirection =
-                        new Vector2(-direction.y, direction.x);
+                    float directional =
+                        ResolveDirectionalContinuity(
+                            warpedXZ,
+                            settings);
 
-                    Vector2 center =
-                        new Vector2(
-                            (cellX + Mathf.Lerp(0.18f, 0.82f, Hash01(cellHash, 23u))) *
-                            cellSize,
-                            (cellZ + Mathf.Lerp(0.18f, 0.82f, Hash01(cellHash, 29u))) *
-                            cellSize);
+                    float raw =
+                        broad * 0.48f +
+                        medium * 0.24f +
+                        ridge * 0.20f +
+                        directional * 0.08f;
 
-                    float majorRadius =
-                        cellSize *
-                        Mathf.Lerp(0.42f, 1.05f, Hash01(cellHash, 31u));
-                    float minorRadius =
-                        majorRadius *
-                        Mathf.Lerp(0.34f, 0.68f, Hash01(cellHash, 37u));
-                    float amplitude =
-                        Mathf.Lerp(0.52f, 1.00f, Hash01(cellHash, 41u)) *
-                        Mathf.Lerp(0.82f, 1.18f, strength);
-                    float warpStrength =
-                        cellSize *
-                        Mathf.Lerp(0.035f, 0.085f, contrast);
-
-                    candidates.Add(
-                        new FoldCandidate(
-                            center,
-                            direction,
-                            crossDirection,
-                            majorRadius,
-                            minorRadius,
-                            amplitude,
-                            warpStrength,
-                            Hash(cellX, cellZ, seed ^ 0x5F35)));
+                    rawField[index] =
+                        Mathf.Pow(
+                            Mathf.Clamp01(raw),
+                            settings.RawPower);
                 }
             }
-
-            return candidates;
         }
 
-        private static void RasterizeCandidates(
-            Vector4 originSize,
-            List<FoldCandidate> candidates,
-            GroundSurfaceFeatureRecipe feature,
-            float[] rawHeights)
+        private static Vector2 ResolveDomainWarpedPosition(
+            Vector2 localXZ,
+            FieldSettings settings)
         {
-            float contrast =
-                feature != null
-                    ? Mathf.Clamp01(feature.Contrast)
-                    : 0.5f;
-            float contrastPower =
-                Mathf.Lerp(1.15f, 2.35f, contrast);
+            Vector2 warpSampleXZ =
+                localXZ / (settings.BaseScale * 1.75f);
+            float warpX =
+                FractalValueNoise(
+                    warpSampleXZ,
+                    settings.Seed + 401);
+            float warpY =
+                FractalValueNoise(
+                    warpSampleXZ + new Vector2(17.31f, -9.73f),
+                    settings.Seed + 503);
 
-            foreach (FoldCandidate candidate in candidates)
-            {
-                float boundRadius =
-                    candidate.MajorRadius + candidate.WarpStrength + 0.15f;
-                int minX =
-                    WorldToTexelX(candidate.Center.x - boundRadius, originSize);
-                int maxX =
-                    WorldToTexelX(candidate.Center.x + boundRadius, originSize);
-                int minZ =
-                    WorldToTexelZ(candidate.Center.y - boundRadius, originSize);
-                int maxZ =
-                    WorldToTexelZ(candidate.Center.y + boundRadius, originSize);
+            Vector2 warp =
+                new Vector2(
+                    warpX * 2f - 1f,
+                    warpY * 2f - 1f);
 
-                for (int z = minZ; z <= maxZ; z++)
-                {
-                    for (int x = minX; x <= maxX; x++)
-                    {
-                        Vector2 localXZ =
-                            TexelToLocalXZ(
-                                x,
-                                z,
-                                originSize);
-                        Vector2 warp =
-                            ResolveWarp(
-                                localXZ,
-                                candidate);
-                        Vector2 delta =
-                            localXZ + warp * candidate.WarpStrength -
-                            candidate.Center;
-                        float along =
-                            Vector2.Dot(delta, candidate.Direction);
-                        float across =
-                            Vector2.Dot(delta, candidate.CrossDirection);
-                        float normalizedDistance =
-                            along * along /
-                            Mathf.Max(
-                                0.0001f,
-                                candidate.MajorRadius * candidate.MajorRadius) +
-                            across * across /
-                            Mathf.Max(
-                                0.0001f,
-                                candidate.MinorRadius * candidate.MinorRadius);
+            return localXZ + warp * settings.WarpStrength;
+        }
 
-                        if (normalizedDistance >= 1.0f)
-                        {
-                            continue;
-                        }
+        private static float ResolveDirectionalContinuity(
+            Vector2 warpedXZ,
+            FieldSettings settings)
+        {
+            Vector2 alongAcross =
+                new Vector2(
+                    Vector2.Dot(warpedXZ, settings.Direction),
+                    Vector2.Dot(warpedXZ, settings.CrossDirection));
 
-                        float candidateBody =
-                            Smooth01(1f - Mathf.Clamp01(normalizedDistance));
-                        candidateBody =
-                            Mathf.Pow(candidateBody, contrastPower) *
-                            candidate.Amplitude;
+            float lane =
+                FractalValueNoise(
+                    new Vector2(
+                        alongAcross.x / (settings.BaseScale * 1.75f),
+                        alongAcross.y / (settings.BaseScale * 0.58f)),
+                    settings.Seed + 607);
 
-                        int index = z * Resolution + x;
-                        if (candidateBody > rawHeights[index])
-                        {
-                            rawHeights[index] = candidateBody;
-                        }
-                    }
-                }
-            }
+            float ridge =
+                1f - Mathf.Abs(lane * 2f - 1f);
+
+            return Mathf.Pow(
+                Mathf.Clamp01(ridge),
+                Mathf.Lerp(1.60f, 3.10f, settings.Contrast));
         }
 
         private static void ApplySemanticSupport(
             Vector4 originSize,
             GroundHeightFieldSnapshot baseSurface,
             GroundSurfaceFeatureRecipe feature,
-            float[] rawHeights,
-            float[] bodyHeights,
-            float[] supports)
+            float[] rawField,
+            float[] supportedField,
+            float[] supportField)
         {
-            float strength =
-                feature != null
-                    ? Mathf.Clamp01(feature.Strength)
-                    : 0f;
             float maskInfluence =
                 feature != null
                     ? Mathf.Clamp01(feature.MaskInfluence)
                     : 0f;
-            float bodyScale =
-                Mathf.Lerp(0.78f, 1.32f, strength);
 
             for (int z = 0; z < Resolution; z++)
             {
@@ -321,14 +228,71 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             baseSurface,
                             localXZ,
                             maskInfluence);
-                    supports[index] = support;
-                    bodyHeights[index] =
-                        Mathf.Clamp01(rawHeights[index] * support * bodyScale);
+
+                    supportField[index] = support;
+                    supportedField[index] = rawField[index] * support;
                 }
             }
         }
 
-        private static void SmoothHeightField(
+        private static void ShapeBodyField(
+            float[] supportedField,
+            FieldSettings settings,
+            float[] bodyField)
+        {
+            float threshold =
+                ResolvePercentileThreshold(
+                    supportedField,
+                    1f - settings.TargetCoverage);
+
+            float highThreshold =
+                Mathf.Min(
+                    1f,
+                    threshold + settings.ThresholdSoftness);
+
+            for (int index = 0; index < supportedField.Length; index++)
+            {
+                float body =
+                    SmoothStep(
+                        threshold,
+                        highThreshold,
+                        supportedField[index]);
+
+                body =
+                    Mathf.Pow(
+                        Mathf.Clamp01(body),
+                        settings.BodyPower) *
+                    settings.BodyIntensity;
+
+                bodyField[index] = Mathf.Clamp01(body);
+            }
+        }
+
+        private static float ResolvePercentileThreshold(
+            float[] values,
+            float percentile)
+        {
+            if (values == null || values.Length == 0)
+            {
+                return 1f;
+            }
+
+            float[] sorted =
+                (float[])values.Clone();
+            Array.Sort(sorted);
+
+            int index =
+                Mathf.Clamp(
+                    Mathf.RoundToInt(
+                        Mathf.Clamp01(percentile) *
+                        (sorted.Length - 1)),
+                    0,
+                    sorted.Length - 1);
+
+            return sorted[index];
+        }
+
+        private static void SmoothBodyField(
             float[] source,
             float[] destination)
         {
@@ -343,49 +307,40 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     int xp = Mathf.Min(Resolution - 1, x + 1);
                     int index = z * Resolution + x;
 
-                    float neighborAverage =
+                    float cardinalAverage =
                         (source[z * Resolution + xm] +
                          source[z * Resolution + xp] +
                          source[zm * Resolution + x] +
                          source[zp * Resolution + x]) *
                         0.25f;
 
+                    float diagonalAverage =
+                        (source[zm * Resolution + xm] +
+                         source[zm * Resolution + xp] +
+                         source[zp * Resolution + xm] +
+                         source[zp * Resolution + xp]) *
+                        0.25f;
+
+                    float neighborAverage =
+                        cardinalAverage * 0.72f +
+                        diagonalAverage * 0.28f;
+
                     destination[index] =
                         Mathf.Clamp01(
-                            source[index] * 0.65f +
-                            neighborAverage * 0.35f);
+                            source[index] * 0.72f +
+                            neighborAverage * 0.28f);
                 }
             }
         }
 
-        private static Color32[] BuildPixels(
-            float[] heights,
-            float[] supports,
-            GroundSurfaceFeatureRecipe feature)
+        private static Color32[] BuildPixelsFromContinuousField(
+            Vector4 originSize,
+            float[] bodyField,
+            float[] supportField,
+            FieldSettings settings)
         {
             Color32[] pixels =
                 new Color32[Resolution * Resolution];
-
-            float contrast =
-                feature != null
-                    ? Mathf.Clamp01(feature.Contrast)
-                    : 0.5f;
-            Vector2 direction =
-                feature != null
-                    ? feature.Direction
-                    : Vector2.right;
-
-            if (direction.sqrMagnitude < 0.0001f)
-            {
-                direction = Vector2.right;
-            }
-
-            direction.Normalize();
-
-            float gradientScale =
-                Mathf.Lerp(22f, 46f, contrast);
-            float edgeScale =
-                Mathf.Lerp(18f, 42f, contrast);
 
             for (int z = 0; z < Resolution; z++)
             {
@@ -398,17 +353,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     int xp = Mathf.Min(Resolution - 1, x + 1);
                     int index = z * Resolution + x;
 
-                    float body = Mathf.Clamp01(heights[index]);
+                    float body =
+                        Mathf.Clamp01(bodyField[index]);
                     float dx =
-                        heights[z * Resolution + xp] -
-                        heights[z * Resolution + xm];
+                        bodyField[z * Resolution + xp] -
+                        bodyField[z * Resolution + xm];
                     float dz =
-                        heights[zp * Resolution + x] -
-                        heights[zm * Resolution + x];
-                    Vector2 gradient = new Vector2(dx, dz);
-                    float gradientMagnitude = gradient.magnitude;
-                    float gradientStrength =
-                        Mathf.Clamp01(gradientMagnitude * gradientScale);
+                        bodyField[zp * Resolution + x] -
+                        bodyField[zm * Resolution + x];
+                    Vector2 gradient =
+                        new Vector2(dx, dz);
+                    float gradientMagnitude =
+                        gradient.magnitude;
                     float signed = 0f;
 
                     if (gradientMagnitude > 0.00001f)
@@ -416,28 +372,47 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         signed =
                             Vector2.Dot(
                                 gradient / gradientMagnitude,
-                                direction) *
-                            gradientStrength;
+                                settings.Direction) *
+                            Mathf.Clamp01(
+                                gradientMagnitude *
+                                settings.SignedGradientScale);
                     }
 
+                    Vector2 localXZ =
+                        TexelToLocalXZ(
+                            x,
+                            z,
+                            originSize);
                     float edge =
-                        Mathf.Clamp01(gradientMagnitude * edgeScale);
+                        Mathf.Clamp01(
+                            gradientMagnitude *
+                            settings.EdgeGradientScale);
                     float heightGate =
-                        SmoothStep(0.08f, 0.28f, body) *
-                        (1f - SmoothStep(0.86f, 1.0f, body));
+                        SmoothStep(0.10f, 0.32f, body) *
+                        (1f - SmoothStep(0.88f, 1.0f, body));
                     float sideGate =
                         Mathf.Clamp01(0.5f + signed * 0.5f);
+                    float breakNoise =
+                        FractalValueNoise(
+                            localXZ / (settings.BaseScale * 0.55f),
+                            settings.Seed + 701);
+                    float breakGate =
+                        SmoothStep(0.28f, 0.62f, breakNoise);
                     float line =
                         Mathf.Pow(
-                            Mathf.Clamp01(edge * heightGate * sideGate),
-                            1.20f);
+                            Mathf.Clamp01(
+                                edge *
+                                heightGate *
+                                sideGate *
+                                breakGate),
+                            1.25f);
 
                     pixels[index] =
                         new Color32(
                             ToByte(line),
                             ToByte(body),
                             ToByte(0.5f + signed * 0.5f),
-                            ToByte(supports[index]));
+                            ToByte(supportField[index]));
                 }
             }
 
@@ -470,29 +445,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 maskInfluence);
         }
 
-        private static Vector2 ResolveWarp(
-            Vector2 localXZ,
-            FoldCandidate candidate)
-        {
-            float frequency = 0.72f;
-            float x =
-                ValueNoise(
-                    localXZ.x * frequency + candidate.WarpSeed * 0.013f,
-                    localXZ.y * frequency - candidate.WarpSeed * 0.017f,
-                    candidate.WarpSeed) *
-                2f -
-                1f;
-            float y =
-                ValueNoise(
-                    localXZ.x * frequency - candidate.WarpSeed * 0.019f,
-                    localXZ.y * frequency + candidate.WarpSeed * 0.011f,
-                    candidate.WarpSeed ^ 0x6A09) *
-                2f -
-                1f;
-
-            return new Vector2(x, y);
-        }
-
         private static Vector2 TexelToLocalXZ(
             int x,
             int z,
@@ -506,30 +458,52 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 originSize.y + v * originSize.w);
         }
 
-        private static int WorldToTexelX(
-            float localX,
-            Vector4 originSize)
+        private static float FractalValueNoise(
+            Vector2 coordinate,
+            int seed)
         {
-            float u =
-                (localX - originSize.x) /
-                Mathf.Max(MinimumFieldSize, originSize.z);
-            return Mathf.Clamp(
-                Mathf.FloorToInt(u * Resolution),
-                0,
-                Resolution - 1);
+            float value = 0f;
+            float amplitude = 0.5f;
+            float frequency = 1f;
+            float amplitudeSum = 0f;
+
+            for (int octave = 0; octave < 4; octave++)
+            {
+                value +=
+                    ValueNoise(
+                        coordinate.x * frequency,
+                        coordinate.y * frequency,
+                        seed + octave * 131) *
+                    amplitude;
+                amplitudeSum += amplitude;
+                frequency *= 2.03f;
+                amplitude *= 0.5f;
+            }
+
+            return value / Mathf.Max(0.0001f, amplitudeSum);
         }
 
-        private static int WorldToTexelZ(
-            float localZ,
-            Vector4 originSize)
+        private static float ValueNoise(
+            float x,
+            float y,
+            int seed)
         {
-            float v =
-                (localZ - originSize.y) /
-                Mathf.Max(MinimumFieldSize, originSize.w);
-            return Mathf.Clamp(
-                Mathf.FloorToInt(v * Resolution),
-                0,
-                Resolution - 1);
+            int ix = Mathf.FloorToInt(x);
+            int iy = Mathf.FloorToInt(y);
+            float fx = x - ix;
+            float fy = y - iy;
+            float sx = Smooth01(fx);
+            float sy = Smooth01(fy);
+
+            float a = Hash01(HashUInt(ix, iy, seed), 3u);
+            float b = Hash01(HashUInt(ix + 1, iy, seed), 5u);
+            float c = Hash01(HashUInt(ix, iy + 1, seed), 7u);
+            float d = Hash01(HashUInt(ix + 1, iy + 1, seed), 11u);
+
+            return Mathf.Lerp(
+                Mathf.Lerp(a, b, sx),
+                Mathf.Lerp(c, d, sx),
+                sy);
         }
 
         private static float Smooth01(float value)
@@ -557,47 +531,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 Mathf.RoundToInt(Mathf.Clamp01(value) * 255f),
                 0,
                 255);
-        }
-
-        private static Vector2 DirectionFromAngle(float angle)
-        {
-            return new Vector2(
-                Mathf.Cos(angle),
-                Mathf.Sin(angle));
-        }
-
-        private static float Hash01(uint hash, uint salt)
-        {
-            uint value = hash ^ (salt * 0x9E3779B9u);
-            value ^= value >> 16;
-            value *= 0x7FEB352Du;
-            value ^= value >> 15;
-            value *= 0x846CA68Bu;
-            value ^= value >> 16;
-            return (value & 0x00FFFFFFu) / 16777215f;
-        }
-
-        private static float ValueNoise(
-            float x,
-            float y,
-            int seed)
-        {
-            int ix = Mathf.FloorToInt(x);
-            int iy = Mathf.FloorToInt(y);
-            float fx = x - ix;
-            float fy = y - iy;
-            float sx = Smooth01(fx);
-            float sy = Smooth01(fy);
-
-            float a = Hash01(HashUInt(ix, iy, seed), 3u);
-            float b = Hash01(HashUInt(ix + 1, iy, seed), 5u);
-            float c = Hash01(HashUInt(ix, iy + 1, seed), 7u);
-            float d = Hash01(HashUInt(ix + 1, iy + 1, seed), 11u);
-
-            return Mathf.Lerp(
-                Mathf.Lerp(a, b, sx),
-                Mathf.Lerp(c, d, sx),
-                sy);
         }
 
         private static int Hash(
@@ -633,36 +566,144 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
         }
 
-        private readonly struct FoldCandidate
+        private static float Hash01(
+            uint hash,
+            uint salt)
         {
-            public FoldCandidate(
-                Vector2 center,
-                Vector2 direction,
-                Vector2 crossDirection,
-                float majorRadius,
-                float minorRadius,
-                float amplitude,
+            uint value = hash ^ (salt * 0x9E3779B9u);
+            value ^= value >> 16;
+            value *= 0x7FEB352Du;
+            value ^= value >> 15;
+            value *= 0x846CA68Bu;
+            value ^= value >> 16;
+            return (value & 0x00FFFFFFu) / 16777215f;
+        }
+
+        private readonly struct FieldSettings
+        {
+            private FieldSettings(
+                int seed,
+                float strength,
+                float contrast,
+                float baseScale,
+                float targetCoverage,
+                float thresholdSoftness,
+                float bodyPower,
+                float bodyIntensity,
+                float ridgePower,
+                float rawPower,
                 float warpStrength,
-                int warpSeed)
+                float signedGradientScale,
+                float edgeGradientScale,
+                Vector2 direction,
+                Vector2 crossDirection)
             {
-                Center = center;
+                Seed = seed;
+                Strength = strength;
+                Contrast = contrast;
+                BaseScale = baseScale;
+                TargetCoverage = targetCoverage;
+                ThresholdSoftness = thresholdSoftness;
+                BodyPower = bodyPower;
+                BodyIntensity = bodyIntensity;
+                RidgePower = ridgePower;
+                RawPower = rawPower;
+                WarpStrength = warpStrength;
+                SignedGradientScale = signedGradientScale;
+                EdgeGradientScale = edgeGradientScale;
                 Direction = direction;
                 CrossDirection = crossDirection;
-                MajorRadius = majorRadius;
-                MinorRadius = minorRadius;
-                Amplitude = amplitude;
-                WarpStrength = warpStrength;
-                WarpSeed = warpSeed;
             }
 
-            public Vector2 Center { get; }
+            public int Seed { get; }
+            public float Strength { get; }
+            public float Contrast { get; }
+            public float BaseScale { get; }
+            public float TargetCoverage { get; }
+            public float ThresholdSoftness { get; }
+            public float BodyPower { get; }
+            public float BodyIntensity { get; }
+            public float RidgePower { get; }
+            public float RawPower { get; }
+            public float WarpStrength { get; }
+            public float SignedGradientScale { get; }
+            public float EdgeGradientScale { get; }
             public Vector2 Direction { get; }
             public Vector2 CrossDirection { get; }
-            public float MajorRadius { get; }
-            public float MinorRadius { get; }
-            public float Amplitude { get; }
-            public float WarpStrength { get; }
-            public int WarpSeed { get; }
+
+            public static FieldSettings Create(
+                GroundSurfaceFeatureRecipe feature,
+                int shapeSeed)
+            {
+                float strength =
+                    feature != null
+                        ? Mathf.Clamp01(feature.Strength)
+                        : 0f;
+                float contrast =
+                    feature != null
+                        ? Mathf.Clamp01(feature.Contrast)
+                        : 0.5f;
+                float scale =
+                    feature != null
+                        ? feature.Scale
+                        : 5f;
+                Vector2 direction =
+                    feature != null
+                        ? feature.Direction
+                        : Vector2.right;
+
+                if (direction.sqrMagnitude < 0.0001f)
+                {
+                    direction = Vector2.right;
+                }
+
+                direction.Normalize();
+
+                Vector2 crossDirection =
+                    new Vector2(-direction.y, direction.x);
+                int seed =
+                    Hash(
+                        shapeSeed,
+                        feature != null ? feature.SeedOffset : 0,
+                        0x4466);
+                float baseScale =
+                    Mathf.Clamp(scale, 2.0f, 12.0f);
+                float targetCoverage =
+                    Mathf.Lerp(0.08f, 0.22f, strength);
+                float thresholdSoftness =
+                    Mathf.Lerp(0.18f, 0.07f, contrast);
+                float bodyPower =
+                    Mathf.Lerp(1.22f, 0.82f, strength);
+                float bodyIntensity =
+                    Mathf.Lerp(0.72f, 1.0f, strength);
+                float ridgePower =
+                    Mathf.Lerp(1.45f, 3.25f, contrast);
+                float rawPower =
+                    Mathf.Lerp(1.05f, 1.65f, contrast);
+                float warpStrength =
+                    baseScale * Mathf.Lerp(0.12f, 0.42f, contrast);
+                float signedGradientScale =
+                    Mathf.Lerp(18f, 42f, contrast);
+                float edgeGradientScale =
+                    Mathf.Lerp(18f, 44f, contrast);
+
+                return new FieldSettings(
+                    seed,
+                    strength,
+                    contrast,
+                    baseScale,
+                    targetCoverage,
+                    thresholdSoftness,
+                    bodyPower,
+                    bodyIntensity,
+                    ridgePower,
+                    rawPower,
+                    warpStrength,
+                    signedGradientScale,
+                    edgeGradientScale,
+                    direction,
+                    crossDirection);
+            }
         }
     }
 }

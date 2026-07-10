@@ -25,6 +25,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private bool showFoamBirthFreeWaterFoam;
         private bool showFoamBirthShoreRibbonPattern;
         private bool showFoamBirthInwardWashPattern;
+        private bool showFoamBirthObjectContactArcPattern;
+        private bool showFoamBirthObjectContactFleckPattern;
         private bool showFoamManualSourceMotion;
         private bool showFoamShapeResidueDiagnostics;
         private bool showFoamRuntimeResourceDiagnostics;
@@ -1726,12 +1728,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Next Debug Section",
                 ResolveFoamLikelyProblem(runtime));
 
-            if (runtimeAvailable && hiddenArea > Mathf.Max(0.05f, visibleArea * 0.25f))
-            {
-                EditorGUILayout.HelpBox(
-                    "Stored Foam is much larger than visible Foam. Open Material Shape if the visible mask looks wrong, or Lifetime + Topology if Foam should have died but remains stored.",
-                    MessageType.Warning);
-            }
+            bool hiddenStoredFoamHigh = runtimeAvailable &&
+                hiddenArea > Mathf.Max(0.05f, visibleArea * 0.25f);
+            EditorGUILayout.LabelField(
+                "Stored / Visible Balance",
+                runtimeAvailable
+                    ? hiddenStoredFoamHigh
+                        ? "High hidden stored foam"
+                        : "OK"
+                    : "Runtime unavailable");
 
             DrawFoamTransportWarnings(runtime);
             EditorGUI.indentLevel--;
@@ -2310,7 +2315,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUI.indentLevel++;
             EditorGUILayout.HelpBox(
-                "Automatic birth creates real persistent FoamState material. This section is the authoring framework for source categories; Shore Foam is implemented, while Object Foam and Free Water Foam are staged for later source classes.",
+                "Automatic birth creates real persistent FoamState material. Off disables automatic birth; otherwise each source category is controlled by its own Enabled toggle. Shore and Object Foam are implemented; Free Water Foam is staged for later source classes.",
                 MessageType.None);
 
             EditorGUILayout.PropertyField(
@@ -2322,7 +2327,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("foamSourcePopulationPreset"),
                 new GUIContent(
                     "Spawn Preset",
-                    "Selects the active automatic source strategy. Shore Contact Test is implemented; object and free-water source classes are documented placeholders."));
+                    "Off disables automatic birth. Other presets are authoring/validation presets; Shore and Object source categories are controlled by their own Enabled toggles."));
 
             EditorGUILayout.Space(4f);
             showFoamBirthShoreFoam = EditorGUILayout.Foldout(
@@ -2336,7 +2341,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     Find("foamAutomaticShoreBirthEnabled"),
                     new GUIContent(
                         "Enabled",
-                        "Enables deterministic shore/contact Layer C material birth when the selected source preset allows shore sources."));
+                        "Enables deterministic shore/contact Layer C material birth when Automatic Foam Birth is on and Spawn Preset is not Off."));
                 EditorGUILayout.PropertyField(
                     Find("foamShoreFoamCoverage"),
                     new GUIContent(
@@ -2490,16 +2495,149 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             if (showFoamBirthObjectFoam)
             {
                 EditorGUI.indentLevel++;
-                using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.PropertyField(
+                    Find("foamAutomaticObjectBirthEnabled"),
+                    new GUIContent(
+                        "Enabled",
+                        "Enables deterministic static object/contact Layer C material birth when Automatic Foam Birth is on and Spawn Preset is not Off."));
+                EditorGUILayout.PropertyField(
+                    Find("foamObjectFoamCoverage"),
+                    new GUIContent(
+                        "Coverage",
+                        "How much of the registered static object/contact population can participate in deterministic source events over time."));
+                EditorGUILayout.PropertyField(
+                    Find("foamObjectFoamActivity"),
+                    new GUIContent(
+                        "Activity",
+                        "How often new object-contact source events start."));
+                EditorGUILayout.PropertyField(
+                    Find("foamObjectFoamFormationSpeedMetresPerSecond"),
+                    new GUIContent(
+                        "Global Formation Speed",
+                        "Base source reveal speed in metres per second for Object Foam."));
+                EditorGUILayout.PropertyField(
+                    Find("foamObjectFoamPattern"),
+                    new GUIContent(
+                        "Debug Pattern Mode",
+                        "Mixed uses the normalized pattern weights below. Contact Arcs and Contact Flecks force one pattern for validation."));
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField("Pattern Mix", EditorStyles.boldLabel);
+                SerializedProperty arcWeight = Find("foamObjectContactArcPatternWeight");
+                SerializedProperty fleckWeight = Find("foamObjectContactFleckPatternWeight");
+                DrawNormalizedPatternWeight(
+                    arcWeight,
+                    fleckWeight,
+                    new GUIContent(
+                        "Contact Arcs",
+                        "Normalized share of Mixed Object Foam events assigned to contact arcs. Editing this automatically updates Contact Flecks to keep the mix sum at one."));
+                DrawNormalizedPatternWeight(
+                    fleckWeight,
+                    arcWeight,
+                    new GUIContent(
+                        "Contact Flecks",
+                        "Normalized share of Mixed Object Foam events assigned to contact flecks. Editing this automatically updates Contact Arcs to keep the mix sum at one."));
+
+                EditorGUILayout.Space(4f);
+                showFoamBirthObjectContactArcPattern = EditorGUILayout.Foldout(
+                    showFoamBirthObjectContactArcPattern,
+                    "Object Contact Arc Pattern",
+                    true);
+                if (showFoamBirthObjectContactArcPattern)
                 {
-                    EditorGUILayout.Toggle(
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        Find("foamObjectContactArcFormationSpeedMultiplier"),
                         new GUIContent(
-                            "Enabled",
-                            "Object-contact source spawning is the next source class after Shore Foam."),
-                        false);
+                            "Formation Speed",
+                            "Multiplier applied to Object Foam Global Formation Speed for Contact Arc events only."));
+                    DrawMinMaxMetreControls(
+                        "Arc Length",
+                        Find("foamObjectContactArcLengthMinMetres"),
+                        Find("foamObjectContactArcLengthMaxMetres"));
+                    DrawMinMaxMetreControls(
+                        "Width",
+                        Find("foamObjectContactArcWidthMinMetres"),
+                        Find("foamObjectContactArcWidthMaxMetres"));
+                    DrawMinMaxMetreControls(
+                        "Contact Offset",
+                        Find("foamObjectContactArcOffsetMinMetres"),
+                        Find("foamObjectContactArcOffsetMaxMetres"));
+                    DrawMinMaxUnitControls(
+                        "Initial Life",
+                        Find("foamObjectContactArcInitialLifeMin"),
+                        Find("foamObjectContactArcInitialLifeMax"),
+                        "Initial normalized Remaining Life assigned to spawned material. One means full authored foam lifetime; lower values die sooner under the normal aging rules.");
+                    DrawMinMaxUnitControls(
+                        "Breakup Strength",
+                        Find("foamObjectContactArcBreakupStrengthMin"),
+                        Find("foamObjectContactArcBreakupStrengthMax"),
+                        "Deterministic edge/source breakup strength for this pattern.");
+                    EditorGUI.indentLevel--;
                 }
+
+                showFoamBirthObjectContactFleckPattern = EditorGUILayout.Foldout(
+                    showFoamBirthObjectContactFleckPattern,
+                    "Object Contact Fleck Pattern",
+                    true);
+                if (showFoamBirthObjectContactFleckPattern)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        Find("foamObjectContactFleckFormationSpeedMultiplier"),
+                        new GUIContent(
+                            "Formation Speed",
+                            "Multiplier applied to Object Foam Global Formation Speed for Contact Fleck events only."));
+                    DrawMinMaxMetreControls(
+                        "Fleck Length",
+                        Find("foamObjectContactFleckLengthMinMetres"),
+                        Find("foamObjectContactFleckLengthMaxMetres"));
+                    DrawMinMaxMetreControls(
+                        "Width",
+                        Find("foamObjectContactFleckWidthMinMetres"),
+                        Find("foamObjectContactFleckWidthMaxMetres"));
+                    DrawMinMaxMetreControls(
+                        "Contact Offset",
+                        Find("foamObjectContactFleckOffsetMinMetres"),
+                        Find("foamObjectContactFleckOffsetMaxMetres"));
+                    DrawMinMaxUnitControls(
+                        "Initial Life",
+                        Find("foamObjectContactFleckInitialLifeMin"),
+                        Find("foamObjectContactFleckInitialLifeMax"),
+                        "Initial normalized Remaining Life assigned to spawned material. One means full authored foam lifetime; lower values die sooner under the normal aging rules.");
+                    DrawMinMaxUnitControls(
+                        "Breakup Strength",
+                        Find("foamObjectContactFleckBreakupStrengthMin"),
+                        Find("foamObjectContactFleckBreakupStrengthMax"),
+                        "Deterministic edge/source breakup strength for this pattern.");
+                    EditorGUI.indentLevel--;
+                }
+
+                if (runtime != null)
+                {
+                    EditorGUILayout.Space(4f);
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.LabelField(
+                        "Runtime Status",
+                        runtime.AutomaticObjectBirthStatus);
+                    EditorGUILayout.LabelField(
+                        "Source Anchors",
+                        runtime.AutomaticObjectBirthAnchorCountLastUpdate.ToString("N0"));
+                    EditorGUILayout.LabelField(
+                        "Events Started",
+                        $"{runtime.AutomaticObjectBirthSubmittedLastUpdate} started / {runtime.AutomaticObjectBirthRejectedLastUpdate} skipped, max {runtime.AutomaticObjectBirthBudgetPerTick}/update");
+                    EditorGUILayout.LabelField(
+                        "Events Total",
+                        runtime.AutomaticObjectBirthSubmittedTotal.ToString("N0"));
+                    EditorGUI.indentLevel--;
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("Runtime", "Unavailable");
+                }
+
                 EditorGUILayout.HelpBox(
-                    "Not implemented yet. This section reserves the same source-category authoring structure for future rock/object contact, lee, and wake birth patterns.",
+                    "Static Object Foam is Layer C birth only: contact arcs/flecks are anchored from registered static disturbance sources, then gated by obstacle exclusion and static pressure on the GPU.",
                     MessageType.Info);
                 EditorGUI.indentLevel--;
             }

@@ -18,6 +18,8 @@ RWStructuredBuffer<uint> _FoamBirthDebugCounters;
 Texture2D<float4> _FoamBoundary;
 RWTexture2D<float> _FoamObstacleExclusionWrite;
 Texture2D<float> _FoamObstacleExclusionRead;
+RWTexture2D<float4> _FoamObjectContactFieldWrite;
+Texture2D<float4> _FoamObjectContactFieldRead;
 Texture2D<float> _FoamMotionLaneRead;
 Texture2D<float2> _FoamObstacleRoutingRead;
 Texture2D<float4> _FoamTopologyGeneratedRead;

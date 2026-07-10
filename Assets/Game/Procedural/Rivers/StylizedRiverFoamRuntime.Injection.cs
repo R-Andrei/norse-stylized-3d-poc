@@ -162,6 +162,29 @@ namespace ProgrammaticStylized3D.Rivers
 
             automaticFoamSourceEventBuffer.SetData(automaticFoamSourceEventGpuData);
 
+            bool objectSourceActive = false;
+            for (int index = 0; index < automaticFoamSourceEvents.Length; index++)
+            {
+                AutomaticFoamSourceEvent sourceEvent =
+                    automaticFoamSourceEvents[index];
+                if (!sourceEvent.Active)
+                {
+                    continue;
+                }
+
+                if (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
+                    sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactFleck)
+                {
+                    objectSourceActive = true;
+                    break;
+                }
+            }
+
+            if (objectSourceActive)
+            {
+                BuildObjectContactField();
+            }
+
             using (RasterizeAutomaticSourceProfilerMarker.Auto())
             {
                 for (int index = 0; index < automaticFoamSourceEvents.Length; index++)
@@ -238,7 +261,12 @@ namespace ProgrammaticStylized3D.Rivers
                         Mathf.Abs(endStorageGlobal - startStorageGlobal) +
                         sourceEvent.InwardReachMetres *
                         sourceEvent.InwardReachMetres),
-                    0f)
+                    0f),
+                ObjectData = new Vector4(
+                    sourceEvent.ObjectCentreAcrossMetres,
+                    sourceEvent.ObjectAlongHalfLengthMetres,
+                    sourceEvent.ObjectAcrossHalfWidthMetres,
+                    sourceEvent.ObjectContactOffsetMetres)
             };
         }
 
@@ -256,6 +284,18 @@ namespace ProgrammaticStylized3D.Rivers
             float padding = Mathf.Max(
                 sourceEvent.FeatherMetres * 2f,
                 Mathf.Max(sourceEvent.WidthMetres, sourceEvent.InwardReachMetres) * 1.25f);
+            if (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
+                sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactFleck)
+            {
+                padding = Mathf.Max(
+                    padding,
+                    Mathf.Max(
+                        sourceEvent.ObjectAlongHalfLengthMetres,
+                        sourceEvent.ObjectAcrossHalfWidthMetres) +
+                    sourceEvent.ObjectContactOffsetMetres +
+                    sourceEvent.WidthMetres * 4f +
+                    sourceEvent.FeatherMetres * 2f);
+            }
             int startX = Mathf.Clamp(
                 GlobalDistanceToX(Mathf.Min(startStorageGlobal, endStorageGlobal) - padding) - 2,
                 0,
@@ -300,12 +340,105 @@ namespace ProgrammaticStylized3D.Rivers
                 rasterizeFoamSourceEventKernel,
                 "_FoamCurrentShoreEdgesRead",
                 currentShoreEdgesTexture);
+            disturbanceRuntime ??=
+                GetComponent<StylizedRiverDisturbanceRuntime>();
+            RenderTexture staticPressureSource = disturbanceRuntime != null &&
+                disturbanceRuntime.IsAllocated
+                    ? disturbanceRuntime.StaticPressureTexture
+                    : null;
+            bool staticPressureAvailable = IsCreatedTexture(staticPressureSource);
+            Texture staticPressureTexture = staticPressureAvailable
+                ? (Texture)staticPressureSource
+                : (neutralDisturbanceTexture != null
+                    ? (Texture)neutralDisturbanceTexture
+                    : Texture2D.blackTexture);
+            Vector2Int staticPressureDimensions = staticPressureAvailable
+                ? disturbanceRuntime.StaticPressureTextureDimensions
+                : Vector2Int.one;
+            computeShader.SetInts(
+                "_FoamStaticPressureDimensions",
+                staticPressureDimensions.x,
+                staticPressureDimensions.y);
+            computeShader.SetTexture(
+                rasterizeFoamSourceEventKernel,
+                "_FoamStaticPressureField",
+                staticPressureTexture);
+            Texture objectContactFieldReadTexture =
+                IsCreatedTexture(objectContactFieldTexture)
+                    ? (Texture)objectContactFieldTexture
+                    : (IsCreatedTexture(neutralDisturbanceTexture)
+                        ? (Texture)neutralDisturbanceTexture
+                        : Texture2D.blackTexture);
+            computeShader.SetTexture(
+                rasterizeFoamSourceEventKernel,
+                "_FoamObjectContactFieldRead",
+                objectContactFieldReadTexture);
             computeShader.SetTexture(
                 rasterizeFoamSourceEventKernel,
                 "_FoamStateWrite",
                 target);
 
             Dispatch(rasterizeFoamSourceEventKernel, countX, fieldHeight);
+        }
+
+        private void BuildObjectContactField()
+        {
+            if (computeShader == null || buildObjectContactFieldKernel < 0 ||
+                objectContactFieldTexture == null || !objectContactFieldTexture.IsCreated() ||
+                boundaryTexture == null || obstacleExclusionTexture == null ||
+                metricBuffer == null || fieldWidth <= 0 || fieldHeight <= 0)
+            {
+                return;
+            }
+
+            disturbanceRuntime ??=
+                GetComponent<StylizedRiverDisturbanceRuntime>();
+            RenderTexture staticPressureSource = disturbanceRuntime != null &&
+                disturbanceRuntime.IsAllocated
+                    ? disturbanceRuntime.StaticPressureTexture
+                    : null;
+            bool staticPressureAvailable = IsCreatedTexture(staticPressureSource);
+            Texture staticPressureTexture = staticPressureAvailable
+                ? (Texture)staticPressureSource
+                : (neutralDisturbanceTexture != null
+                    ? (Texture)neutralDisturbanceTexture
+                    : Texture2D.blackTexture);
+            Vector2Int staticPressureDimensions = staticPressureAvailable
+                ? disturbanceRuntime.StaticPressureTextureDimensions
+                : Vector2Int.one;
+
+            computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
+            computeShader.SetInts(
+                "_FoamStaticPressureDimensions",
+                staticPressureDimensions.x,
+                staticPressureDimensions.y);
+            computeShader.SetFloat("_FoamGlobalStart", river.Domain.GlobalDistanceMinimum);
+            computeShader.SetFloat("_FoamFieldLength", fieldLength);
+            computeShader.SetFloat(
+                "_FoamFlowDirection",
+                river != null && river.FlowDirection >= 0f ? 1f : -1f);
+            computeShader.SetBuffer(
+                buildObjectContactFieldKernel,
+                "_FoamMetricRows",
+                metricBuffer);
+            computeShader.SetTexture(
+                buildObjectContactFieldKernel,
+                "_FoamBoundary",
+                boundaryTexture);
+            computeShader.SetTexture(
+                buildObjectContactFieldKernel,
+                "_FoamObstacleExclusionRead",
+                obstacleExclusionTexture);
+            computeShader.SetTexture(
+                buildObjectContactFieldKernel,
+                "_FoamStaticPressureField",
+                staticPressureTexture);
+            computeShader.SetTexture(
+                buildObjectContactFieldKernel,
+                "_FoamObjectContactFieldWrite",
+                objectContactFieldTexture);
+
+            Dispatch(buildObjectContactFieldKernel, fieldWidth, fieldHeight);
         }
 
 

@@ -33,6 +33,7 @@ namespace ProgrammaticStylized3D.Rivers
         private RenderTexture evolvingWeakSpanNegativeTexture;
         private RenderTexture currentShoreEdgesTexture;
         private RenderTexture obstacleExclusionTexture;
+        private RenderTexture objectContactFieldTexture;
         private Texture2D motionLaneTexture;
         private Texture2D obstacleRoutingTexture;
         private RenderTexture neutralDisturbanceTexture;
@@ -98,10 +99,18 @@ namespace ProgrammaticStylized3D.Rivers
         private int automaticShoreBirthSubmittedLastUpdate;
         private int automaticShoreBirthRejectedLastUpdate;
         private int automaticShoreBirthSubmittedTotal;
+        private float automaticObjectBirthAccumulator;
+        private int automaticObjectBirthCursor;
+        private int automaticObjectBirthSubmittedLastUpdate;
+        private int automaticObjectBirthRejectedLastUpdate;
+        private int automaticObjectBirthSubmittedTotal;
+        private int automaticObjectBirthAnchorCountLastUpdate;
         private int activeAutomaticFoamSourceEventCount;
         private int automaticSourceEventsRasterizedLastUpdate;
         private string automaticShoreBirthStatus =
             "Automatic source population disabled";
+        private string automaticObjectBirthStatus =
+            "Object source population disabled";
         private StylizedRiverFoamMajorTopology majorTopology;
         private StylizedRiverFoamConnectorTopology connectorTopology;
         private StylizedRiverFoamPocketTopology pocketTopology;
@@ -211,6 +220,8 @@ namespace ProgrammaticStylized3D.Rivers
             new FoamSourceEventGpuData[AutomaticFoamSourceEventCapacity];
         private readonly uint[] progressiveBirthDebugCounterReadback =
             new uint[ProgressiveBirthDebugCounterCount];
+        private readonly List<RiverFoamStaticObjectSource>
+            automaticObjectFoamSources = new();
         private readonly List<MeshFilter> obstacleExclusionMeshFilters = new();
         private readonly List<MeshFilter> topologyCacheFingerprintMeshFilters =
             new();
@@ -412,6 +423,7 @@ namespace ProgrammaticStylized3D.Rivers
         private int buildEvolvingMajorSupportKernel = -1;
         private int clearObstacleExclusionKernel = -1;
         private int updateObstacleExclusionKernel = -1;
+        private int buildObjectContactFieldKernel = -1;
         private int resetTopologyMetricsKernel = -1;
         private int measureTopologyMetricsKernel = -1;
         private int phaseCommitKernel = -1;

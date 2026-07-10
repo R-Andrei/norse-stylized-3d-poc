@@ -17,6 +17,9 @@ struct FoamSourceEventData
     // x = formation speed metres/second, y = moving-head trail metres,
     // z = source path length metres, w reserved.
     float4 kinematics;
+    // x = object centre lateral metres, y = object along half length,
+    // z = object across half width, w = object contact offset metres.
+    float4 objectData;
 };
 
 struct FoamMetricRow

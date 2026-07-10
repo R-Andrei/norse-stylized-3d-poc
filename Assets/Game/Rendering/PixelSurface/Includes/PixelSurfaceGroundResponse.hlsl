@@ -433,6 +433,80 @@
                     clamp(signedRelief * finalGate, -1.0, 1.0));
             }
 
+            float3 ResolveGroundPaintedAccentFinalPrototypeDebugColor(
+                Varyings input,
+                float exposureMask,
+                float dampDepositMask,
+                float vegetationMask,
+                float compactionMask,
+                float shoreMask,
+                float rockyDryMask,
+                float contractMask)
+            {
+                if (_GroundPaintedAccentFoldFieldEnabled <= 0.5)
+                {
+                    return float3(0.025, 0.025, 0.035);
+                }
+
+                float3 foldField = ResolveGroundPaintedAccentFoldFieldFeature(input);
+                float foldLineMask = saturate(foldField.x);
+                float body = saturate(foldField.y);
+                float signedSide = clamp(foldField.z, -1.0, 1.0);
+
+                // V3J.0 proof rule: G/body is context, not visible paint.
+                // Visibility is driven by the narrow selected contour channel plus
+                // signed-side polarity, so broad G blobs do not become stains.
+                float bodyBand =
+                    smoothstep(0.06, 0.30, body) *
+                    (1.0 - smoothstep(0.86, 1.0, body));
+                float selectedContour =
+                    saturate(pow(max(foldLineMask, 0.0001), 0.72) * bodyBand * contractMask);
+                float signedMagnitude = saturate(abs(signedSide) * 1.35);
+
+                float creaseMask =
+                    saturate(selectedContour * (0.72 + signedMagnitude * 0.34));
+                float liftMask =
+                    saturate(selectedContour * saturate(signedSide * 0.5 + 0.5) * 0.42);
+                float contextMask =
+                    saturate(body * selectedContour * 0.18);
+
+                float snowBias = saturate(exposureMask * 0.70 + rockyDryMask * 0.20);
+                float dampBias = saturate(dampDepositMask * 0.65 + shoreMask * 0.34 + compactionMask * 0.18);
+                float vegetationBias = saturate(vegetationMask * 0.65);
+
+                float3 baseColor = lerp(
+                    float3(0.53, 0.50, 0.44),
+                    float3(0.72, 0.75, 0.70),
+                    snowBias);
+                baseColor = lerp(
+                    baseColor,
+                    float3(0.43, 0.40, 0.35),
+                    dampBias * 0.34);
+                baseColor = lerp(
+                    baseColor,
+                    float3(0.49, 0.55, 0.41),
+                    vegetationBias * 0.26);
+
+                float3 creaseTint = lerp(
+                    float3(0.31, 0.29, 0.25),
+                    float3(0.42, 0.45, 0.43),
+                    snowBias);
+                float3 liftTint = lerp(
+                    float3(0.74, 0.68, 0.52),
+                    float3(0.86, 0.86, 0.76),
+                    snowBias);
+
+                float3 result = baseColor;
+                result = lerp(
+                    result,
+                    creaseTint,
+                    creaseMask * 0.62);
+                result += liftTint * liftMask * 0.10;
+                result *= 1.0 - contextMask * 0.10;
+
+                return saturate(result);
+            }
+
             float3 ResolveGroundPaintedAccentFeature(
                 Varyings input,
                 float exposureMask,

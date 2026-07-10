@@ -93,6 +93,8 @@ namespace ProgrammaticStylized3D.Rivers
                 currentShoreEdgesTexture != null &&
                 obstacleExclusionTexture != null &&
                 obstacleExclusionTexture.IsCreated() &&
+                objectContactFieldTexture != null &&
+                objectContactFieldTexture.IsCreated() &&
                 motionLaneTexture != null &&
                 obstacleRoutingTexture != null &&
                 neutralDisturbanceTexture != null &&
@@ -228,6 +230,8 @@ namespace ProgrammaticStylized3D.Rivers
                         obstacleExclusionTexture =
                             CreateObstacleExclusionTexture(
                                 "PS3D_RiverFoam_ObstacleExclusion");
+                        objectContactFieldTexture = CreateFieldTexture(
+                            "PS3D_RiverFoam_ObjectContactField");
                         motionLaneTexture = CreateMotionLaneTexture();
                         obstacleRoutingTexture = CreateObstacleRoutingTexture();
                     }
@@ -263,6 +267,7 @@ namespace ProgrammaticStylized3D.Rivers
                         ClearRenderTexture(evolvingFreeWaterNegativeTexture);
                         ClearRenderTexture(evolvingConnectorTexture);
                         ClearRenderTexture(evolvingWeakSpanNegativeTexture);
+                        ClearRenderTexture(objectContactFieldTexture);
                     }
 
                     initializationPhase = InitializationPhase.AllocateBuffers;
@@ -968,6 +973,7 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseTexture(ref evolvingWeakSpanNegativeTexture);
             ReleaseTexture(ref currentShoreEdgesTexture);
             ReleaseTexture(ref obstacleExclusionTexture);
+            ReleaseTexture(ref objectContactFieldTexture);
             if (motionLaneTexture != null)
             {
                 DestroyUnityObject(motionLaneTexture);
@@ -1096,6 +1102,7 @@ namespace ProgrammaticStylized3D.Rivers
             buildEvolvingMajorSupportKernel = -1;
             clearObstacleExclusionKernel = -1;
             updateObstacleExclusionKernel = -1;
+            buildObjectContactFieldKernel = -1;
             resetTopologyMetricsKernel = -1;
             measureTopologyMetricsKernel = -1;
             phaseCommitKernel = -1;

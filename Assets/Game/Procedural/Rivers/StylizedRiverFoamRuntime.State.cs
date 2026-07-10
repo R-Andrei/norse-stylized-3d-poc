@@ -99,7 +99,9 @@ namespace ProgrammaticStylized3D.Rivers
         {
             None = 0,
             ShoreRibbon = 1,
-            InwardWash = 2
+            InwardWash = 2,
+            ObjectContactArc = 3,
+            ObjectContactFleck = 4
         }
 
         private struct AutomaticFoamSourceEvent
@@ -127,6 +129,10 @@ namespace ProgrammaticStylized3D.Rivers
             public float BreakupScaleMetres;
             public float BreakupStrength;
             public float Curvature;
+            public float ObjectCentreAcrossMetres;
+            public float ObjectAlongHalfLengthMetres;
+            public float ObjectAcrossHalfWidthMetres;
+            public float ObjectContactOffsetMetres;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -149,6 +155,9 @@ namespace ProgrammaticStylized3D.Rivers
             // x = formation speed metres/second, y = moving-head trail metres,
             // z = source path length metres, w reserved.
             public Vector4 Kinematics;
+            // x = object centre lateral metres, y = object along half length,
+            // z = object across half width, w = object contact offset metres.
+            public Vector4 ObjectData;
         }
 
         private struct FoamCompositionEvent

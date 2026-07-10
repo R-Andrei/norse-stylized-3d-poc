@@ -2779,7 +2779,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Ground.GeneratedGround
   recipe:
-    shapeSeed: 8304
+    shapeSeed: 6761
     patchSize: 1
     resolution: 1
     patchCoordinate: {x: 0, y: 0}
@@ -2792,8 +2792,8 @@ MonoBehaviour:
     edgeBlend: 1
     surfaceVariation: 0.42
     useModifiers: 1
-  surfaceStyleProfile: {fileID: 11400000, guid: 1f5a9dc3b8df4e2b9c9124c8a7f44367, type: 2}
-  surfaceVariantId: grassland.clean_meadow
+  surfaceStyleProfile: {fileID: 11400000, guid: 9ba42932860747dfa76b99b97bb289df, type: 2}
+  surfaceVariantId: snowfield.clean
   overrideSurfaceProfile: 0
   surfaceProfile: {fileID: 11400000, guid: 92d482aa5a37c7f41b644f1390ff89c6, type: 2}
   overrideMaterialControls: 0
@@ -2840,33 +2840,33 @@ MonoBehaviour:
   snowfieldVariant: 2
   surfaceStyleMigrationVersion: 1
   regenerateOnValidate: 1
-  debugView: 28
+  debugView: 31
   modifiers:
   - {fileID: 1356653796}
   rivers:
   - {fileID: 1626776158}
   lastSurfaceMaskDiagnostics: 'Surface masks (min/max/avg/p05/p95)
 
-    Tonal: 0.372/0.611/0.478/0.406/0.549
+    Tonal: 0.378/0.607/0.481/0.416/0.549
 
     Exposure:
-    0.215/0.764/0.488/0.215/0.764
+    0.285/0.879/0.532/0.285/0.879
 
-    DampDeposit: 0.227/0.526/0.385/0.289/0.475
+    DampDeposit: 0.219/0.540/0.357/0.283/0.443
 
     Vegetation:
-    0.409/0.687/0.614/0.506/0.660
+    0.104/0.176/0.161/0.126/0.171
 
     Compaction: 0.000/1.000/0.053/0.000/0.741
 
     Shore:
     0.000/0.279/0.009/0.000/0.032
 
-    RockyDry: 0.138/0.216/0.178/0.151/0.204
+    RockyDry: 0.090/0.140/0.114/0.098/0.131
 
     StandingWater:
     0.000/0.000/0.000/0.000/0.000'
-  lastValidatedGenerationSignature: 1667266530
+  lastValidatedGenerationSignature: -1333915891
 --- !u!64 &593135562
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -4008,7 +4008,7 @@ Transform:
   m_GameObject: {fileID: 799756163}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -9.213, y: 0.01, z: -8.506}
+  m_LocalPosition: {x: -9.213, y: -0.139, z: -8.506}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4791,10 +4791,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -8495,7 +8495,7 @@ Transform:
   m_GameObject: {fileID: 1595308776}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -9.242, y: -0.056, z: -6.928}
+  m_LocalPosition: {x: -9.242, y: -0.115, z: -6.928}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -9296,8 +9296,8 @@ MonoBehaviour:
   foamConnectorWeakSpanAmount: 0.443
   foamFreeWaterEventAmount: 0.409
   foamAutomaticBirthEnabled: 1
-  foamSourcePopulationPreset: 1
-  foamAutomaticShoreBirthEnabled: 1
+  foamSourcePopulationPreset: 0
+  foamAutomaticShoreBirthEnabled: 0
   foamShoreFoamCoverage: 0.821
   foamShoreFoamActivity: 0.91
   foamShoreFoamPatchSize: 0.679
@@ -9329,6 +9329,35 @@ MonoBehaviour:
   foamInwardWashInitialLifeMax: 1
   foamInwardWashBreakupStrengthMin: 0.04
   foamInwardWashBreakupStrengthMax: 0.14
+  foamAutomaticObjectBirthEnabled: 1
+  foamObjectFoamCoverage: 0.866
+  foamObjectFoamActivity: 0.669
+  foamObjectFoamFormationSpeedMetresPerSecond: 0.75
+  foamObjectFoamPattern: 0
+  foamObjectContactArcPatternWeight: 0.682
+  foamObjectContactFleckPatternWeight: 0.31800002
+  foamObjectContactArcFormationSpeedMultiplier: 1
+  foamObjectContactArcLengthMinMetres: 0.45
+  foamObjectContactArcLengthMaxMetres: 1.8
+  foamObjectContactArcWidthMinMetres: 0.035
+  foamObjectContactArcWidthMaxMetres: 0.12
+  foamObjectContactArcOffsetMinMetres: 0.015
+  foamObjectContactArcOffsetMaxMetres: 0.12
+  foamObjectContactArcInitialLifeMin: 0.75
+  foamObjectContactArcInitialLifeMax: 1
+  foamObjectContactArcBreakupStrengthMin: 0.08
+  foamObjectContactArcBreakupStrengthMax: 0.28
+  foamObjectContactFleckFormationSpeedMultiplier: 1
+  foamObjectContactFleckLengthMinMetres: 0.12
+  foamObjectContactFleckLengthMaxMetres: 0.55
+  foamObjectContactFleckWidthMinMetres: 0.025
+  foamObjectContactFleckWidthMaxMetres: 0.08
+  foamObjectContactFleckOffsetMinMetres: 0.02
+  foamObjectContactFleckOffsetMaxMetres: 0.16
+  foamObjectContactFleckInitialLifeMin: 0.55
+  foamObjectContactFleckInitialLifeMax: 0.9
+  foamObjectContactFleckBreakupStrengthMin: 0.18
+  foamObjectContactFleckBreakupStrengthMax: 0.45
   foamShoreFoamStrength: 0.35
   foamShoreFoamPersistence: 0.3
   foamNeutralLifetime: 8

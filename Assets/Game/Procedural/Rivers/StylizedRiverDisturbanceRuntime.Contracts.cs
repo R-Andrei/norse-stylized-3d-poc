@@ -7,6 +7,51 @@ using UnityEngine.Rendering;
 
 namespace ProgrammaticStylized3D.Rivers
 {
+
+    public readonly struct RiverFoamStaticObjectSource
+    {
+        public RiverFoamStaticObjectSource(
+            EntityId sourceId,
+            EntityId ownerId,
+            float globalDistance,
+            float acrossMetres,
+            float acrossNormalized,
+            float surfaceHalfWidth,
+            float alongHalfLength,
+            float acrossHalfWidth,
+            float staticPressureAlongHalfLength,
+            float staticPressureAcrossHalfWidth,
+            float staticTargetHeightMetres,
+            float phase)
+        {
+            SourceId = sourceId;
+            OwnerId = ownerId;
+            GlobalDistance = globalDistance;
+            AcrossMetres = acrossMetres;
+            AcrossNormalized = acrossNormalized;
+            SurfaceHalfWidth = surfaceHalfWidth;
+            AlongHalfLength = alongHalfLength;
+            AcrossHalfWidth = acrossHalfWidth;
+            StaticPressureAlongHalfLength = staticPressureAlongHalfLength;
+            StaticPressureAcrossHalfWidth = staticPressureAcrossHalfWidth;
+            StaticTargetHeightMetres = staticTargetHeightMetres;
+            Phase = phase;
+        }
+
+        public EntityId SourceId { get; }
+        public EntityId OwnerId { get; }
+        public float GlobalDistance { get; }
+        public float AcrossMetres { get; }
+        public float AcrossNormalized { get; }
+        public float SurfaceHalfWidth { get; }
+        public float AlongHalfLength { get; }
+        public float AcrossHalfWidth { get; }
+        public float StaticPressureAlongHalfLength { get; }
+        public float StaticPressureAcrossHalfWidth { get; }
+        public float StaticTargetHeightMetres { get; }
+        public float Phase { get; }
+    }
+
     public readonly struct GeneratedRiverDisturbanceDiagnostics
     {
         public GeneratedRiverDisturbanceDiagnostics(

@@ -57,6 +57,13 @@ namespace ProgrammaticStylized3D.Rivers
         InwardWash
     }
 
+    public enum StylizedRiverFoamObjectPattern
+    {
+        Mixed,
+        ContactArcs,
+        ContactFlecks
+    }
+
     public enum StylizedRiverFoamBirthShapeMode
     {
         Ellipse,
@@ -808,7 +815,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Enables conservative automatic Layer C material birth from source candidates. This creates real persistent FoamState material through the existing birth pipeline; support topology then decides how long it survives. Disabled by default so validation can compare against manual sources honestly.")]
         [SerializeField] private bool foamAutomaticBirthEnabled;
 
-        [Tooltip("Selects which automatic source-population strategy is active. Shore Contact Test is the only implemented automatic source class in Patch 4.11C.5.14B; the other entries are documented placeholders and intentionally do not spawn yet.")]
+        [Tooltip("Selects which automatic source-population strategy is active. Shore Contact Test and Obstacle Contact Test are implemented Layer C source-spawning classes. Free-water source entries remain documented placeholders.")]
         [SerializeField]
         private StylizedRiverFoamSourcePopulationPreset foamSourcePopulationPreset =
             StylizedRiverFoamSourcePopulationPreset.ShoreContactTest;
@@ -946,6 +953,126 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Maximum deterministic breakup strength for Inward Wash sources.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamInwardWashBreakupStrengthMax = 0.14f;
+
+
+        [Tooltip("Enables deterministic static object/contact Layer C material birth when the selected source preset allows object sources.")]
+        [SerializeField] private bool foamAutomaticObjectBirthEnabled = true;
+
+        [Tooltip("How much of the registered static object/contact population can participate in deterministic Object Foam source events over time. This controls object eligibility, not opacity or patch size.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectFoamCoverage = 0.45f;
+
+        [Tooltip("How often new static object/contact source events start. Higher values start more full-strength contact arcs or flecks per second.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectFoamActivity = 0.35f;
+
+        [Tooltip("Base source reveal speed in metres per second for Object Foam. Per-pattern Formation Speed multipliers can make individual object patterns reveal faster or slower.")]
+        [Range(
+            MinimumShoreFoamFormationSpeedMetresPerSecond,
+            MaximumShoreFoamFormationSpeedMetresPerSecond)]
+        [SerializeField]
+        private float foamObjectFoamFormationSpeedMetresPerSecond =
+            DefaultShoreFoamFormationSpeedMetresPerSecond;
+
+        [Tooltip("Chooses the deterministic object-contact source recipe. Mixed uses the normalized Contact Arc / Contact Fleck pattern weights below; the pure modes force one pattern for debugging.")]
+        [SerializeField] private StylizedRiverFoamObjectPattern foamObjectFoamPattern =
+            StylizedRiverFoamObjectPattern.Mixed;
+
+        [Tooltip("Normalized Object Foam mix share for contact-arc sources when Pattern is Mixed. The editor keeps this and Contact Fleck Weight summing to one.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactArcPatternWeight = 0.75f;
+
+        [Tooltip("Normalized Object Foam mix share for contact-fleck sources when Pattern is Mixed. The editor keeps this and Contact Arc Weight summing to one.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactFleckPatternWeight = 0.25f;
+
+        [Tooltip("Per-pattern multiplier for how fast Object Contact Arc sources reveal along their path.")]
+        [Range(0.10f, 3.00f)]
+        [SerializeField] private float foamObjectContactArcFormationSpeedMultiplier = 1.00f;
+
+        [Tooltip("Minimum authored Object Contact Arc length in metres before deterministic variation is applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamObjectContactArcLengthMinMetres = 0.45f;
+
+        [Tooltip("Maximum authored Object Contact Arc length in metres before deterministic variation is applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamObjectContactArcLengthMaxMetres = 1.80f;
+
+        [Tooltip("Minimum authored Object Contact Arc width in metres before deterministic variation is applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamObjectContactArcWidthMinMetres = 0.035f;
+
+        [Tooltip("Maximum authored Object Contact Arc width in metres before deterministic variation is applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamObjectContactArcWidthMaxMetres = 0.120f;
+
+        [Tooltip("Minimum offset from the obstacle pressure/contact edge for Object Contact Arc sources.")]
+        [Min(0f)]
+        [SerializeField] private float foamObjectContactArcOffsetMinMetres = 0.015f;
+
+        [Tooltip("Maximum offset from the obstacle pressure/contact edge for Object Contact Arc sources.")]
+        [Min(0f)]
+        [SerializeField] private float foamObjectContactArcOffsetMaxMetres = 0.120f;
+
+        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Object Contact Arc material.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactArcInitialLifeMin = 0.75f;
+
+        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Object Contact Arc material.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactArcInitialLifeMax = 1.00f;
+
+        [Tooltip("Minimum deterministic breakup strength for Object Contact Arc sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactArcBreakupStrengthMin = 0.08f;
+
+        [Tooltip("Maximum deterministic breakup strength for Object Contact Arc sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactArcBreakupStrengthMax = 0.28f;
+
+        [Tooltip("Per-pattern multiplier for how fast Object Contact Fleck sources reveal along their path.")]
+        [Range(0.10f, 3.00f)]
+        [SerializeField] private float foamObjectContactFleckFormationSpeedMultiplier = 1.00f;
+
+        [Tooltip("Minimum authored Object Contact Fleck length in metres before deterministic variation is applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamObjectContactFleckLengthMinMetres = 0.12f;
+
+        [Tooltip("Maximum authored Object Contact Fleck length in metres before deterministic variation is applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamObjectContactFleckLengthMaxMetres = 0.55f;
+
+        [Tooltip("Minimum authored Object Contact Fleck width in metres before deterministic variation is applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamObjectContactFleckWidthMinMetres = 0.025f;
+
+        [Tooltip("Maximum authored Object Contact Fleck width in metres before deterministic variation is applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamObjectContactFleckWidthMaxMetres = 0.080f;
+
+        [Tooltip("Minimum offset from the obstacle pressure/contact edge for Object Contact Fleck sources.")]
+        [Min(0f)]
+        [SerializeField] private float foamObjectContactFleckOffsetMinMetres = 0.020f;
+
+        [Tooltip("Maximum offset from the obstacle pressure/contact edge for Object Contact Fleck sources.")]
+        [Min(0f)]
+        [SerializeField] private float foamObjectContactFleckOffsetMaxMetres = 0.160f;
+
+        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Object Contact Fleck material.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactFleckInitialLifeMin = 0.55f;
+
+        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Object Contact Fleck material.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactFleckInitialLifeMax = 0.90f;
+
+        [Tooltip("Minimum deterministic breakup strength for Object Contact Fleck sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactFleckBreakupStrengthMin = 0.18f;
+
+        [Tooltip("Maximum deterministic breakup strength for Object Contact Fleck sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactFleckBreakupStrengthMax = 0.45f;
 
         [SerializeField, HideInInspector] private float foamShoreFoamStrength = 0.35f;
         [SerializeField, HideInInspector] private float foamShoreFoamPersistence = 0.30f;
@@ -1539,16 +1666,18 @@ namespace ProgrammaticStylized3D.Rivers
         public bool FoamAutomaticShoreBirthActive =>
             FoamAutomaticBirthEnabled &&
             FoamAutomaticShoreBirthEnabled &&
-            FoamSourcePopulationPreset != StylizedRiverFoamSourcePopulationPreset.Off &&
-            (FoamSourcePopulationPreset ==
-                StylizedRiverFoamSourcePopulationPreset.ShoreContactTest ||
-             FoamSourcePopulationPreset ==
-                StylizedRiverFoamSourcePopulationPreset.Custom ||
-             FoamSourcePopulationPreset ==
-                StylizedRiverFoamSourcePopulationPreset.BalancedMixedTest);
+            FoamSourcePopulationPreset != StylizedRiverFoamSourcePopulationPreset.Off;
+        public bool FoamAutomaticObjectBirthEnabled =>
+            foamAutomaticObjectBirthEnabled;
+        public bool FoamAutomaticObjectBirthActive =>
+            FoamAutomaticBirthEnabled &&
+            FoamAutomaticObjectBirthEnabled &&
+            FoamSourcePopulationPreset != StylizedRiverFoamSourcePopulationPreset.Off;
         public bool FoamSourcePopulationPresetImplemented =>
             FoamSourcePopulationPreset ==
                 StylizedRiverFoamSourcePopulationPreset.ShoreContactTest ||
+            FoamSourcePopulationPreset ==
+                StylizedRiverFoamSourcePopulationPreset.ObstacleContactTest ||
             FoamSourcePopulationPreset ==
                 StylizedRiverFoamSourcePopulationPreset.Custom ||
             FoamSourcePopulationPreset ==
@@ -1652,6 +1781,94 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(Mathf.Max(
                 foamInwardWashBreakupStrengthMin,
                 foamInwardWashBreakupStrengthMax));
+
+        public float FoamObjectFoamCoverage =>
+            Mathf.Clamp01(foamObjectFoamCoverage);
+        public float FoamObjectFoamActivity =>
+            Mathf.Clamp01(foamObjectFoamActivity);
+        public float FoamObjectFoamFormationSpeedMetresPerSecond =>
+            Mathf.Clamp(
+                foamObjectFoamFormationSpeedMetresPerSecond,
+                MinimumShoreFoamFormationSpeedMetresPerSecond,
+                MaximumShoreFoamFormationSpeedMetresPerSecond);
+        public StylizedRiverFoamObjectPattern FoamObjectFoamPattern =>
+            foamObjectFoamPattern;
+        public float FoamObjectContactArcPatternWeight =>
+            Mathf.Clamp01(foamObjectContactArcPatternWeight);
+        public float FoamObjectContactFleckPatternWeight =>
+            Mathf.Clamp01(foamObjectContactFleckPatternWeight);
+        public float FoamObjectContactArcFormationSpeedMultiplier =>
+            Mathf.Clamp(foamObjectContactArcFormationSpeedMultiplier, 0.10f, 3.00f);
+        public float FoamObjectContactArcLengthMinMetres =>
+            Mathf.Max(0.05f, Mathf.Min(
+                foamObjectContactArcLengthMinMetres,
+                foamObjectContactArcLengthMaxMetres));
+        public float FoamObjectContactArcLengthMaxMetres =>
+            Mathf.Max(FoamObjectContactArcLengthMinMetres, foamObjectContactArcLengthMaxMetres);
+        public float FoamObjectContactArcWidthMinMetres =>
+            Mathf.Max(0.005f, Mathf.Min(
+                foamObjectContactArcWidthMinMetres,
+                foamObjectContactArcWidthMaxMetres));
+        public float FoamObjectContactArcWidthMaxMetres =>
+            Mathf.Max(FoamObjectContactArcWidthMinMetres, foamObjectContactArcWidthMaxMetres);
+        public float FoamObjectContactArcOffsetMinMetres =>
+            Mathf.Max(0f, Mathf.Min(
+                foamObjectContactArcOffsetMinMetres,
+                foamObjectContactArcOffsetMaxMetres));
+        public float FoamObjectContactArcOffsetMaxMetres =>
+            Mathf.Max(FoamObjectContactArcOffsetMinMetres, foamObjectContactArcOffsetMaxMetres);
+        public float FoamObjectContactArcInitialLifeMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamObjectContactArcInitialLifeMin,
+                foamObjectContactArcInitialLifeMax));
+        public float FoamObjectContactArcInitialLifeMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamObjectContactArcInitialLifeMin,
+                foamObjectContactArcInitialLifeMax));
+        public float FoamObjectContactArcBreakupStrengthMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamObjectContactArcBreakupStrengthMin,
+                foamObjectContactArcBreakupStrengthMax));
+        public float FoamObjectContactArcBreakupStrengthMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamObjectContactArcBreakupStrengthMin,
+                foamObjectContactArcBreakupStrengthMax));
+        public float FoamObjectContactFleckFormationSpeedMultiplier =>
+            Mathf.Clamp(foamObjectContactFleckFormationSpeedMultiplier, 0.10f, 3.00f);
+        public float FoamObjectContactFleckLengthMinMetres =>
+            Mathf.Max(0.05f, Mathf.Min(
+                foamObjectContactFleckLengthMinMetres,
+                foamObjectContactFleckLengthMaxMetres));
+        public float FoamObjectContactFleckLengthMaxMetres =>
+            Mathf.Max(FoamObjectContactFleckLengthMinMetres, foamObjectContactFleckLengthMaxMetres);
+        public float FoamObjectContactFleckWidthMinMetres =>
+            Mathf.Max(0.005f, Mathf.Min(
+                foamObjectContactFleckWidthMinMetres,
+                foamObjectContactFleckWidthMaxMetres));
+        public float FoamObjectContactFleckWidthMaxMetres =>
+            Mathf.Max(FoamObjectContactFleckWidthMinMetres, foamObjectContactFleckWidthMaxMetres);
+        public float FoamObjectContactFleckOffsetMinMetres =>
+            Mathf.Max(0f, Mathf.Min(
+                foamObjectContactFleckOffsetMinMetres,
+                foamObjectContactFleckOffsetMaxMetres));
+        public float FoamObjectContactFleckOffsetMaxMetres =>
+            Mathf.Max(FoamObjectContactFleckOffsetMinMetres, foamObjectContactFleckOffsetMaxMetres);
+        public float FoamObjectContactFleckInitialLifeMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamObjectContactFleckInitialLifeMin,
+                foamObjectContactFleckInitialLifeMax));
+        public float FoamObjectContactFleckInitialLifeMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamObjectContactFleckInitialLifeMin,
+                foamObjectContactFleckInitialLifeMax));
+        public float FoamObjectContactFleckBreakupStrengthMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamObjectContactFleckBreakupStrengthMin,
+                foamObjectContactFleckBreakupStrengthMax));
+        public float FoamObjectContactFleckBreakupStrengthMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamObjectContactFleckBreakupStrengthMin,
+                foamObjectContactFleckBreakupStrengthMax));
         public float FoamShoreFoamStrength =>
             Mathf.Clamp01(foamShoreFoamStrength);
         public float FoamShoreFoamPersistence =>
@@ -1832,6 +2049,25 @@ namespace ProgrammaticStylized3D.Rivers
             foamInwardWashPatternWeight /= total;
         }
 
+        private void NormalizeObjectPatternWeights()
+        {
+            foamObjectContactArcPatternWeight = Mathf.Clamp01(
+                foamObjectContactArcPatternWeight);
+            foamObjectContactFleckPatternWeight = Mathf.Clamp01(
+                foamObjectContactFleckPatternWeight);
+            float total = foamObjectContactArcPatternWeight +
+                foamObjectContactFleckPatternWeight;
+            if (total <= 0.0001f)
+            {
+                foamObjectContactArcPatternWeight = 0.75f;
+                foamObjectContactFleckPatternWeight = 0.25f;
+                return;
+            }
+
+            foamObjectContactArcPatternWeight /= total;
+            foamObjectContactFleckPatternWeight /= total;
+        }
+
         private void SanitizeShoreFoamPatternControls()
         {
             foamShoreRibbonFormationSpeedMultiplier = Mathf.Clamp(
@@ -1883,6 +2119,62 @@ namespace ProgrammaticStylized3D.Rivers
             SanitizeUnitRange(
                 ref foamInwardWashBreakupStrengthMin,
                 ref foamInwardWashBreakupStrengthMax);
+        }
+
+        private void SanitizeObjectFoamPatternControls()
+        {
+            foamObjectFoamCoverage = Mathf.Clamp01(foamObjectFoamCoverage);
+            foamObjectFoamActivity = Mathf.Clamp01(foamObjectFoamActivity);
+            foamObjectFoamFormationSpeedMetresPerSecond = Mathf.Clamp(
+                foamObjectFoamFormationSpeedMetresPerSecond,
+                MinimumShoreFoamFormationSpeedMetresPerSecond,
+                MaximumShoreFoamFormationSpeedMetresPerSecond);
+            NormalizeObjectPatternWeights();
+            foamObjectContactArcFormationSpeedMultiplier = Mathf.Clamp(
+                foamObjectContactArcFormationSpeedMultiplier,
+                0.10f,
+                3.00f);
+            SanitizePositiveRange(
+                ref foamObjectContactArcLengthMinMetres,
+                ref foamObjectContactArcLengthMaxMetres,
+                0.05f);
+            SanitizePositiveRange(
+                ref foamObjectContactArcWidthMinMetres,
+                ref foamObjectContactArcWidthMaxMetres,
+                0.005f);
+            SanitizePositiveRange(
+                ref foamObjectContactArcOffsetMinMetres,
+                ref foamObjectContactArcOffsetMaxMetres,
+                0f);
+            SanitizeUnitRange(
+                ref foamObjectContactArcInitialLifeMin,
+                ref foamObjectContactArcInitialLifeMax);
+            SanitizeUnitRange(
+                ref foamObjectContactArcBreakupStrengthMin,
+                ref foamObjectContactArcBreakupStrengthMax);
+
+            foamObjectContactFleckFormationSpeedMultiplier = Mathf.Clamp(
+                foamObjectContactFleckFormationSpeedMultiplier,
+                0.10f,
+                3.00f);
+            SanitizePositiveRange(
+                ref foamObjectContactFleckLengthMinMetres,
+                ref foamObjectContactFleckLengthMaxMetres,
+                0.05f);
+            SanitizePositiveRange(
+                ref foamObjectContactFleckWidthMinMetres,
+                ref foamObjectContactFleckWidthMaxMetres,
+                0.005f);
+            SanitizePositiveRange(
+                ref foamObjectContactFleckOffsetMinMetres,
+                ref foamObjectContactFleckOffsetMaxMetres,
+                0f);
+            SanitizeUnitRange(
+                ref foamObjectContactFleckInitialLifeMin,
+                ref foamObjectContactFleckInitialLifeMax);
+            SanitizeUnitRange(
+                ref foamObjectContactFleckBreakupStrengthMin,
+                ref foamObjectContactFleckBreakupStrengthMax);
         }
 
         private static void SanitizePositiveRange(
@@ -3410,6 +3702,7 @@ namespace ProgrammaticStylized3D.Rivers
                 MaximumShoreFoamFormationSpeedMetresPerSecond);
             NormalizeShorePatternWeights();
             SanitizeShoreFoamPatternControls();
+            SanitizeObjectFoamPatternControls();
             foamShoreFoamStrength = Mathf.Clamp01(
                 foamShoreFoamStrength);
             foamShoreFoamPersistence = Mathf.Clamp01(

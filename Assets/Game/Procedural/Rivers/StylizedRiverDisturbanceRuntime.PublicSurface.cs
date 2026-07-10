@@ -48,6 +48,70 @@ namespace ProgrammaticStylized3D.Rivers
             : Vector2Int.one;
         public int ActiveWakeChunkCount => CountActiveWakeChunks();
         public int ContinuousSourceCount => continuousSources.Count;
+
+        public void CopyStaticObjectFoamSourcesTo(
+            List<RiverFoamStaticObjectSource> output)
+        {
+            if (output == null)
+            {
+                return;
+            }
+
+            output.Clear();
+            river ??= GetComponent<StylizedRiver>();
+            if (river == null || !river.Domain.IsValid)
+            {
+                return;
+            }
+
+            foreach (KeyValuePair<EntityId, ContinuousSource> pair in
+                     continuousSources)
+            {
+                ContinuousSource source = pair.Value;
+                MeshFilter meshFilter = source.ObstacleExclusionMeshFilter;
+                if (!source.IsStatic ||
+                    !source.StationaryObstruction ||
+                    meshFilter == null ||
+                    meshFilter.sharedMesh == null ||
+                    !meshFilter.gameObject.activeInHierarchy ||
+                    source.StaticTargetHeightMetres <= 0.0001f ||
+                    !river.TryProjectWorldPoint(
+                        source.WorldPosition,
+                        out StylizedRiverProjection projection) ||
+                    !projection.IsInside)
+                {
+                    continue;
+                }
+
+                StylizedRiverSplineSample sample =
+                    river.SampleAtLocalDistance(projection.LocalDistance);
+                float surfaceHalfWidth = Mathf.Max(
+                    0.05f,
+                    sample.GetSurfaceHalfWidth(projection.AcrossMetres));
+                float acrossNormalized = Mathf.Clamp(
+                    projection.AcrossMetres / surfaceHalfWidth,
+                    -1f,
+                    1f);
+
+                output.Add(new RiverFoamStaticObjectSource(
+                    pair.Key,
+                    source.OwnerId,
+                    projection.GlobalDistance,
+                    projection.AcrossMetres,
+                    acrossNormalized,
+                    surfaceHalfWidth,
+                    Mathf.Max(0.05f, source.AlongHalfLength),
+                    Mathf.Max(0.05f, source.AcrossHalfWidth),
+                    Mathf.Max(0.05f, source.StaticPressureAlongHalfLength),
+                    Mathf.Max(0.05f, source.StaticPressureAcrossHalfWidth),
+                    Mathf.Max(0f, source.StaticTargetHeightMetres),
+                    source.Phase));
+            }
+
+            output.Sort((left, right) =>
+                left.SourceId.CompareTo(right.SourceId));
+        }
+
         public int PendingImpactCount => pendingImpacts.Count;
         public int ActiveImpactReservationCount =>
             activeImpactReservations.Count;

@@ -11,6 +11,7 @@
 #pragma kernel BuildEvolvingMajorSupport
 #pragma kernel ClearObstacleExclusion
 #pragma kernel UpdateObstacleExclusion
+#pragma kernel BuildFoamObjectContactField
 #pragma kernel ResetTopologyMetrics
 #pragma kernel MeasureTopologyMetrics
 #pragma kernel CommitPhaseTransport
@@ -746,6 +747,178 @@ float FoamEvaluateInwardWashSource(
     return shape;
 }
 
+
+float4 FoamLoadObjectContactField(int2 coordinate)
+{
+    int2 clamped = clamp(
+        coordinate,
+        int2(0, 0),
+        max(int2(0, 0), _FoamDimensions - int2(1, 1)));
+    return _FoamObjectContactFieldRead.Load(int3(clamped, 0));
+}
+
+float FoamEvaluateObjectContactArcSource(
+    FoamSourceEventData sourceEvent,
+    float globalDistance,
+    float lateralMetres,
+    float2 physicalCellSpacing,
+    int2 coordinate,
+    out float amountMultiplier)
+{
+    float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
+    float localAlong = (globalDistance - sourceEvent.distance.z) * flowDirection;
+    float localAcross = lateralMetres - sourceEvent.objectData.x;
+    float alongHalf = max(0.04, sourceEvent.objectData.y);
+    float acrossHalf = max(0.04, sourceEvent.objectData.z);
+    float contactOffset = max(0.0, sourceEvent.objectData.w);
+    float width = max(0.006, sourceEvent.shore.y);
+    float feather = max(
+        max(0.006, sourceEvent.shore.w * 0.70),
+        max(physicalCellSpacing.x, physicalCellSpacing.y) * 0.38);
+    float progress = saturate(sourceEvent.header.z);
+    float totalLength = max(
+        0.001,
+        abs(sourceEvent.distance.y - sourceEvent.distance.x));
+
+    float4 contact = FoamLoadObjectContactField(coordinate);
+    float contactConfidence = saturate(contact.r);
+    if (contactConfidence <= 0.001)
+    {
+        amountMultiplier = 0.0;
+        return 0.0;
+    }
+
+    float2 normal = contact.gb;
+    float normalLength = length(normal);
+    if (normalLength <= 0.001)
+    {
+        normal = float2(-flowDirection, 0.0);
+    }
+    else
+    {
+        normal /= normalLength;
+    }
+
+    float2 tangent = float2(-normal.y, normal.x);
+    float2 local = float2(localAlong, localAcross);
+    float tangentDistance = dot(local, tangent);
+    float normalDistance = dot(local, normal);
+
+    float revealedHalfLength = max(
+        width * 1.4,
+        max(feather, totalLength * 0.5 * progress));
+    float lengthMask = 1.0 - smoothstep(
+        revealedHalfLength,
+        revealedHalfLength + max(feather, totalLength * 0.08),
+        abs(tangentDistance));
+
+    float coarseAlongGate = 1.0 - smoothstep(
+        alongHalf + contactOffset + totalLength * 0.75,
+        alongHalf + contactOffset + totalLength * 0.75 + feather * 2.0,
+        abs(localAlong));
+    float coarseAcrossGate = 1.0 - smoothstep(
+        acrossHalf + contactOffset + width * 4.0 + feather,
+        acrossHalf + contactOffset + width * 4.0 + feather * 3.0,
+        abs(localAcross));
+    float outwardGate = smoothstep(
+        -feather * 1.5,
+        feather * 0.75,
+        normalDistance + max(contactOffset, width));
+
+    float edgeBand = contactConfidence * contact.a;
+    float breakup = FoamSourceEventBreakup(
+        float2(tangentDistance, normalDistance),
+        sourceEvent.variation.x,
+        sourceEvent.variation.y,
+        sourceEvent.variation.z,
+        physicalCellSpacing);
+    float shape = saturate(edgeBand * lengthMask * coarseAlongGate *
+        coarseAcrossGate * outwardGate * lerp(1.0, breakup, 0.30));
+
+    amountMultiplier = lerp(0.88, 1.0, saturate(contact.a));
+    return shape;
+}
+
+float FoamEvaluateObjectContactFleckSource(
+    FoamSourceEventData sourceEvent,
+    float globalDistance,
+    float lateralMetres,
+    float2 physicalCellSpacing,
+    int2 coordinate,
+    out float amountMultiplier)
+{
+    float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
+    float localAlong = (globalDistance - sourceEvent.distance.z) * flowDirection;
+    float localAcross = lateralMetres - sourceEvent.objectData.x;
+    float alongHalf = max(0.04, sourceEvent.objectData.y);
+    float acrossHalf = max(0.04, sourceEvent.objectData.z);
+    float contactOffset = max(0.0, sourceEvent.objectData.w);
+    float width = max(0.006, sourceEvent.shore.y);
+    float feather = max(
+        max(0.005, sourceEvent.shore.w * 0.55),
+        max(physicalCellSpacing.x, physicalCellSpacing.y) * 0.30);
+
+    float4 contact = FoamLoadObjectContactField(coordinate);
+    float contactConfidence = saturate(contact.r);
+    if (contactConfidence <= 0.001)
+    {
+        amountMultiplier = 0.0;
+        return 0.0;
+    }
+
+    float2 normal = contact.gb;
+    float normalLength = length(normal);
+    if (normalLength <= 0.001)
+    {
+        normal = float2(-flowDirection, 0.0);
+    }
+    else
+    {
+        normal /= normalLength;
+    }
+
+    float2 tangent = float2(-normal.y, normal.x);
+    float2 local = float2(localAlong, localAcross);
+    float tangentDistance = dot(local, tangent);
+    float normalDistance = dot(local, normal);
+    float seed = sourceEvent.header.w;
+    float totalLength = max(
+        0.001,
+        abs(sourceEvent.distance.y - sourceEvent.distance.x));
+    float tangentOffset = (FoamHash11(seed + 37.0) - 0.5) *
+        max(width * 2.0, totalLength * 0.65);
+    float halfLength = max(width * 1.35, totalLength * 0.25);
+    float tangentCapsule = max(abs(tangentDistance - tangentOffset) - halfLength, 0.0);
+    float normalBandDistance = abs(normalDistance - contactOffset * 0.25);
+    float distanceToFleck = length(float2(tangentCapsule, normalBandDistance));
+    float stroke = 1.0 - smoothstep(
+        width,
+        width + feather,
+        distanceToFleck);
+    float progress = saturate(sourceEvent.header.z);
+    float revealMask = smoothstep(0.0, 0.18, progress);
+    float coarseAlongGate = 1.0 - smoothstep(
+        alongHalf + contactOffset + totalLength,
+        alongHalf + contactOffset + totalLength + feather * 2.0,
+        abs(localAlong));
+    float coarseAcrossGate = 1.0 - smoothstep(
+        acrossHalf + contactOffset + width * 4.0 + feather,
+        acrossHalf + contactOffset + width * 4.0 + feather * 3.0,
+        abs(localAcross));
+    float breakup = FoamSourceEventBreakup(
+        float2(tangentDistance, normalDistance),
+        sourceEvent.variation.x,
+        sourceEvent.variation.y,
+        sourceEvent.variation.z,
+        physicalCellSpacing);
+    float shape = saturate(stroke * revealMask * contactConfidence *
+        contact.a * coarseAlongGate * coarseAcrossGate *
+        lerp(1.0, breakup, 0.46));
+
+    amountMultiplier = lerp(0.82, 1.0, saturate(contact.a));
+    return shape;
+}
+
 [numthreads(8, 8, 1)]
 void RasterizeFoamSourceEvent(uint3 dispatchId : SV_DispatchThreadID)
 {
@@ -805,13 +978,15 @@ void RasterizeFoamSourceEvent(uint3 dispatchId : SV_DispatchThreadID)
     float inwardMetres = sourceEvent.header.y < 0.0
         ? lateralMetres - shoreMetres
         : shoreMetres - lateralMetres;
-    if (inwardMetres < -max(sourceEvent.shore.w, physicalCellSpacing.y))
+    bool shoreSource = sourceType < 2.5;
+    if (shoreSource && inwardMetres < -max(sourceEvent.shore.w, physicalCellSpacing.y))
     {
         return;
     }
 
     float amountMultiplier = 1.0;
     float shape = 0.0;
+    float2 domainUV = FoamTexelCentreUV(uint2((uint)x, (uint)y), _FoamDimensions);
     if (sourceType < 1.5)
     {
         shape = FoamEvaluateShoreRibbonSource(
@@ -822,7 +997,7 @@ void RasterizeFoamSourceEvent(uint3 dispatchId : SV_DispatchThreadID)
             physicalCellSpacing,
             amountMultiplier);
     }
-    else
+    else if (sourceType < 2.5)
     {
         shape = FoamEvaluateInwardWashSource(
             sourceEvent,
@@ -832,13 +1007,33 @@ void RasterizeFoamSourceEvent(uint3 dispatchId : SV_DispatchThreadID)
             physicalCellSpacing,
             amountMultiplier);
     }
+    else if (sourceType < 3.5)
+    {
+        shape = FoamEvaluateObjectContactArcSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            physicalCellSpacing,
+            coordinate,
+            amountMultiplier);
+    }
+    else
+    {
+        shape = FoamEvaluateObjectContactFleckSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            physicalCellSpacing,
+            coordinate,
+            amountMultiplier);
+    }
 
     if (shape <= FoamMaterialStateEpsilon)
     {
         return;
     }
 
-    float sourceFillBlend = sourceType < 1.5 ? 0.35 : 0.08;
+    float sourceFillBlend = sourceType < 1.5 ? 0.35 : (sourceType < 2.5 ? 0.08 : (sourceType < 3.5 ? 0.22 : 0.16));
     float sourceFill = lerp(
         1.0,
         EvaluateFoamSourceFillCoverage(
@@ -1211,6 +1406,112 @@ void UpdateObstacleExclusion(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     _FoamObstacleExclusionWrite[coordinate] = 1.0;
+}
+
+float FoamLoadObstacleClamped(int2 coordinate)
+{
+    int2 clamped = clamp(
+        coordinate,
+        int2(0, 0),
+        max(int2(0, 0), _FoamDimensions - int2(1, 1)));
+    return saturate(_FoamObstacleExclusionRead.Load(int3(clamped, 0)));
+}
+
+[numthreads(8, 8, 1)]
+void BuildFoamObjectContactField(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamDimensions.x ||
+        dispatchId.y >= (uint)_FoamDimensions.y)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(dispatchId.xy);
+    float coverage = LoadBoundaryCoverage(coordinate);
+    float obstacle = FoamLoadObstacleClamped(coordinate);
+    if (coverage <= 0.001 || obstacle > 0.5)
+    {
+        _FoamObjectContactFieldWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
+    FoamMetricRow metric = _FoamMetricRows[coordinate.x];
+    float2 physicalCellSpacing = float2(
+        max(0.01, metric.widthsAndSpacing.z),
+        max(0.01, metric.widthsAndSpacing.w));
+
+    float2 gradientToObstacle = float2(0.0, 0.0);
+    float contactAccumulation = 0.0;
+    [unroll]
+    for (int oy = -2; oy <= 2; oy++)
+    {
+        [unroll]
+        for (int ox = -2; ox <= 2; ox++)
+        {
+            if (ox == 0 && oy == 0)
+            {
+                continue;
+            }
+
+            float solid = FoamLoadObstacleClamped(coordinate + int2(ox, oy));
+            if (solid <= 0.001)
+            {
+                continue;
+            }
+
+            float2 offset = float2(
+                (float)ox * physicalCellSpacing.x,
+                (float)oy * physicalCellSpacing.y);
+            float distanceMetres = max(0.001, length(offset));
+            float reachMetres = max(
+                0.03,
+                max(physicalCellSpacing.x, physicalCellSpacing.y) * 2.55);
+            float radiusWeight = saturate(1.0 - distanceMetres / reachMetres);
+            float weightedSolid = solid * radiusWeight / (1.0 + distanceMetres);
+            gradientToObstacle += offset * weightedSolid;
+            contactAccumulation += weightedSolid;
+        }
+    }
+
+    if (contactAccumulation <= 0.0001)
+    {
+        _FoamObjectContactFieldWrite[coordinate] = 0.0.xxxx;
+        return;
+    }
+
+    float gradientLength = length(gradientToObstacle);
+    float2 waterNormal = gradientLength > 0.001
+        ? -gradientToObstacle / gradientLength
+        : float2(-_FoamFlowDirection, 0.0);
+
+    float2 domainUV = FoamTexelCentreUV(dispatchId.xy, _FoamDimensions);
+    float4 pressure = SampleStaticPressureBilinear(domainUV);
+    float pressurePresence = smoothstep(0.00035, 0.0045, max(0.0, pressure.r));
+    float pressureGradientLength = length(pressure.gb);
+    if (pressureGradientLength > 0.0001)
+    {
+        float2 pressureNormal = normalize(pressure.gb);
+        if (dot(pressureNormal, waterNormal) < 0.0)
+        {
+            pressureNormal = -pressureNormal;
+        }
+
+        waterNormal = normalize(lerp(
+            waterNormal,
+            pressureNormal,
+            saturate(pressurePresence * 0.35)));
+    }
+
+    float proximity = saturate(contactAccumulation * 0.90);
+    float confidence = saturate(proximity * lerp(0.62, 1.0, pressurePresence));
+    float upstreamFacing = dot(waterNormal, float2(-_FoamFlowDirection, 0.0));
+    float frontSideRelevance = saturate(0.22 + 0.78 * (upstreamFacing * 0.5 + 0.5));
+
+    _FoamObjectContactFieldWrite[coordinate] = float4(
+        confidence,
+        waterNormal.x,
+        waterNormal.y,
+        frontSideRelevance);
 }
 
 [numthreads(8, 8, 1)]

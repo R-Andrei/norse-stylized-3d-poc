@@ -40,6 +40,10 @@ namespace ProgrammaticStylized3D.Rendering
         GroundPaintedAccentRelief = 29,
         GroundPaintedAccentSignedRelief = 30,
 
+        // Debug-only final-response proof for generated fold-field data. This
+        // deliberately does not re-enable normal final-render contribution.
+        GroundPaintedAccentFinalPrototype = 31,
+
         // GeneratedMass generic boundary-atlas diagnostics. These are
         // intentionally placed after the ground debug modes so existing
         // serialized GeneratedMass debug values 0-6 remain stable.

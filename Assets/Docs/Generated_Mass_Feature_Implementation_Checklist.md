@@ -2,7 +2,7 @@
 
 Status: active implementation checklist  
 Current implementation target: **EW-B — Deterministic Selected-Edge Bevel Kernel**  
-Current implementation step: **EW-B1S — Legacy Bevel Construction Purge**
+Current implementation step: **EW-B3R3 — Two-Edge Corner Cap Closure**
 
 ---
 
@@ -12,10 +12,11 @@ Current implementation step: **EW-B1S — Legacy Bevel Construction Purge**
 - Do not implement final convex edge wear with FeatureAtlas0/1.
 - Do not use overlay meshes as the final production solution.
 - Do not weaken topology validation to make geometry visible.
-- Do not drop individual selected candidates to hide construction errors.
 - Do not tune material response before physical bevel geometry is valid.
 - Dirty-time generation may be heavier; runtime memory and runtime per-frame cost should stay reasonable.
 - Keep docs updated in the same patch as each implementation step.
+- Do not reintroduce retired local bevel, sampled-ribbon, workspace, or open-cycle closure construction.
+- Do not use per-edge global half-space cuts as the active edge-wear construction primitive.
 ```
 
 ---
@@ -26,9 +27,9 @@ Final plane-cut GeneratedMass convex edge wear should be:
 
 ```text
 main-mesh deterministic selected-edge bevel geometry
-+ explicit source-face replacement faces
-+ explicit selected-edge bevel/chamfer faces
-+ explicit affected-vertex caps/transitions
++ source-face replacement polygons
++ source-edge local bevel bridge faces
++ source-vertex local cap patches
 + UV2.z / vertex color ConvexEdgeWear material markers
 + shader response on marked generated geometry after geometry is stable
 ```
@@ -37,192 +38,98 @@ FeatureAtlas0/1 are temporary debug/broad-mask tools only. They are not the norm
 
 ---
 
-## 3. Superseded active checklist branch
-
-EW-4D/R3 is no longer the active checklist branch.
-
-Superseded active representation:
-
-```text
-generated main-mesh variable-profile bevel ribbons
-+ actual open-cycle closure caps triangulated before final topology audit
-+ UV2.z / vertex color ConvexEdgeWear material markers
-```
-
-Reason for superseding:
-
-```text
-- R3 builds candidate/graph/ribbon intermediate data but fails inside closure-cap triangulation.
-- Latest validation had accepted=0, producedBevelFaces=0, committedConvexEdgeWearFaces=0.
-- The failure happens after ribbonFacesBuilt=750 and workspaceTJunctionsAfterPreClosureTJunctionRepair=0.
-- The post-ribbon closure model is therefore too fragile to remain the active foundation.
-```
-
-Do not retain EW-4D construction code as inactive source-level fallback. Historical notes may remain in docs, but the active source must not carry retired bevel-construction systems forward.
-
----
-
-## 4. EW-B staged checklist
+## 3. Completed cleanup steps
 
 ### EW-B0 — Edge Wear Bevel Kernel Reconciliation — complete
 
-Implementation requirements:
-
 ```text
-- Route active edge-wear construction through TryBuildDeterministicSelectedEdgeBevelKernelFaces(...).
-- Build/reuse the source topology graph.
-- Map selected candidates to graph edges.
-- Report graph/candidate stats.
-- Set deterministicKernelPending=1.
-- Fail closed before geometry emission.
-- Kept old EW-4D/R3 construction path inactive at B0; EW-B1S removes the retired construction path.
-- Rewrite docs so EW-B is the only active plan.
+- Active route moved to TryBuildDeterministicSelectedEdgeBevelKernelFaces(...).
+- Docs stopped treating EW-4D/R3 as current.
 ```
 
-Validation success:
+### EW-B1S — Legacy bevel-construction purge — complete
 
 ```text
-Unity compiles.
-Generated_Mass_Framework.md names EW-B0 / EW-B as current.
-Generated_Mass_Edge_Wear_Recovery_Architecture.md names EW-B0 / EW-B as current.
-Generated_Mass_Feature_Implementation_Checklist.md names EW-B0 / EW-B as current.
-ApplyGeneratedEdgeWearBevels calls TryBuildDeterministicSelectedEdgeBevelKernelFaces, not TryBuildTopologyGraphEdgeWearBevelFaces.
-Regeneration with edge wear enabled leaves geometry unchanged and reports deterministicKernelPending=1.
+- Removed retired local-bevel, half-space fallback, sampled-ribbon/workspace, open-cycle-closure, corner-patch, and workspace-T-junction-repair construction code from MassGenerator.cs.
+- Active summary no longer reports ribbon/open-cycle/workspace diagnostic spam.
+- EW-B source graph / selected edge / affected vertex classification remains active.
 ```
 
-### EW-B1S — Legacy bevel-construction purge — current
-
-Implementation requirements:
+### EW-B2 — Source-Graph Beveled Mass Emission — complete as evidence, superseded as construction primitive
 
 ```text
-- Remove retired local-bevel, half-space, sampled-ribbon/workspace, open-cycle-closure, corner-patch, and workspace-T-junction-repair construction code from MassGenerator.cs.
-- Remove legacy ribbon/open-cycle/workspace counters from the active warning summary.
-- Keep candidate selection, topology graph construction, selected graph-edge mapping, final topology audit, triangle preview, and ConvexEdgeWear material-marker plumbing.
-- Add/keep EW-B-specific selected-edge and affected-vertex records.
-- Fail closed with deterministicKernelGeometryPending=1 before geometry emission.
-```
-
-Validation success:
-
-```text
-Unity compiles.
-Search MassGenerator.cs: TryBuildLocalEdgeWearBevelFaces, TryBuildTopologyGraphEdgeWearBevelFaces, TryAppendEdgeWearOpenCycleClosureFaces, EdgeWearTopologyRebuildWorkspace, EdgeWearProfileGrid, EndpointCapAccumulator are absent.
-Regeneration with edge wear enabled emits a short EW-B log with deterministicKernelGeometryPending=1.
-No ribbon/open-cycle/workspace counters appear in the active summary.
-No bevel geometry is expected yet.
-```
-
-### EW-B1R — Clean isolated-edge bevel case
-
-Implementation requirements:
-
-```text
-- Use DeterministicBevelEdgeRecord and DeterministicBevelVertexRecord only.
-- Support selected edges whose endpoints are both isolated selected-edge endpoints.
-- Emit deterministic Base replacement faces, one ConvexEdgeWear bevel face, and explicit endpoint caps.
-- Defer two-edge and multi-edge vertex stars to EW-B2.
-- Commit only after topology and triangle-preview validation.
-```
-
-Strict exclusions:
-
-```text
-- no retired helper calls
-- no sampled variable-profile grids
-- no ribbon-density controls
-- no open-cycle closure
-- no edge-width variation
-- no shader/material tuning
-```
-
-### EW-B2 — Affected-vertex cap correctness
-
-Implementation requirements:
-
-```text
-- Support one selected incident edge at a vertex.
-- Support two selected incident edges at a vertex.
-- Support three or more selected incident edges at a vertex.
-- Support mixed selected/unselected incident edge stars.
-- Sort cap/transition geometry from source adjacency, not arbitrary open-hole tracing.
-```
-
-Validation success:
-
-```text
-no missing caps at selected-edge endpoints
-no open edges around affected vertices
-no non-manifold vertex caps
-no T-junctions introduced by cap transitions
-```
-
-### EW-B3 — Real generated-rock validation
-
-Implementation requirements:
-
-```text
-- Validate the constant-width kernel on normal generated mass seeds.
-- Keep coverage/amount/width controls wired.
-- Measure face/triangle/rendered-vertex cost.
-- Identify unsupported topology cases before adding variation.
-```
-
-Validation success:
-
-```text
-multiple generated rock seeds commit bevel geometry
-no seed fails because of post-ribbon closure/cap tracing
-diagnostics identify any unsupported source-vertex cases explicitly
-```
-
-### EW-B4 — Multi-segment profile and irregularity
-
-Implementation requirements:
-
-```text
-- Add controlled bevel profiles after the single-segment kernel is stable.
-- Add width/strength variation only after topology stays stable.
-- Preserve budget limits by quality tier.
-```
-
-Validation success:
-
-```text
-profile changes alter bevel shape without changing topology validity
-variation does not introduce slivers or unclosed caps
-rendered vertex cost remains within accepted tier budgets or is explicitly reported
-```
-
-### EW-B5 — Mask/material response refinement
-
-Implementation requirements:
-
-```text
-- Use UV2.z / vertex alpha ConvexEdgeWear data from generated bevel/cap faces.
-- Tune brightness/tint/smoothness/falloff response.
-- Add edge-wear mask widening/softening only after geometry is stable.
-```
-
-Validation success:
-
-```text
-Convex Edge Wear debug view matches generated bevel/cap geometry
-normal render shows inspiration-like exposed edge wear on physical bevels
-material response remains independent from topology validity
+- Proved source-graph pre-triangulation bevel emission can commit valid topology cheaply.
+- Produced committed geometry with topologyOpenEdges=0, topologyNonManifoldEdges=0, topologyTJunctions=0.
+- Failed visually because one global selected-edge cut plane can slice unrelated faces and create long strips/gouges.
 ```
 
 ---
 
-## 5. Do not resume until EW-B1/B2 pass
+## 4. EW-B3R3 — Two-Edge Corner Cap Closure — current
 
-Do not resume these items until the deterministic bevel kernel is structurally valid:
+Implementation requirements:
 
 ```text
-EW-4D0.8 density/budget tuning
-closure-cap ear-clipping fixes
-sampled-ribbon closure repair
-shader response tuning
-mask expansion
-cracks/grooves
-rock fracture/plate features
+- Build source topology graph from final Base PolygonFace list.
+- Map selected convex candidates to graph edges.
+- Build DeterministicBevelEdgeRecord and DeterministicBevelVertexRecord diagnostics.
+- For each affected source face, build one local offset replacement polygon.
+- Record one rail segment for each source face-edge.
+- For each selected graph edge, build one local ConvexEdgeWear bridge face between adjacent face rails.
+- For unselected graph edges whose adjacent rails separated because neighboring vertices moved, build a Base transition bridge.
+- For multi-edge affected source vertices, build ConvexEdgeWear cap triangles from replacement-corner points ordered around the source vertex star.
+- For isolated endpoint affected source vertices, build ConvexEdgeWear terminal cap triangles using the original source vertex as an apex plus stable replacement boundary points.
+- For two-edge affected source vertices, build ConvexEdgeWear corner-patch triangles from ordered unique cap points; do not use the isolated endpoint apex path.
+- Triangulate ConvexEdgeWear polygons before commit.
+- Run final topology audit and triangle-emission preview.
+- Commit only if open/non-manifold/T-junction counts are zero and ConvexEdgeWear triangle preview skips are zero.
 ```
+
+Validation success:
+
+```text
+Unity compiles.
+deterministicKernelGeometryPending=0.
+deterministicKernelGlobalCutsApplied=0.
+deterministicKernelFaceOffsetPolygonsBuilt>0.
+deterministicKernelLocalBevelFacesBuilt>0.
+deterministicKernelVertexCapsBuilt>0.
+committedConvexEdgeWearFaces>0.
+committedConvexEdgeWearNgonFaces=0.
+triangulationPreviewSkippedConvexEdgeWearTriangles=0.
+topologyOpenEdges=0.
+topologyNonManifoldEdges=0.
+topologyTJunctions=0.
+Convex Edge Wear debug view shows local generated bevel geometry without B2 slice/gouge artifacts.
+```
+
+---
+
+## 5. Later steps, blocked until EW-B3 validates
+
+```text
+EW-B4 — bevel width/coverage tuning after local geometry commits.
+EW-B5 — irregular edge-wear mask expansion and material response.
+EW-B6 — optional profile/softness/variation only after deterministic geometry remains stable.
+```
+
+## Next work items
+
+1. Validate EW-B3 on the same dense 36-selected-edge mass.
+2. If EW-B3 fails, use faceOffset/rails/localBevel/vertexCap counters to identify the blocker.
+3. If EW-B3 commits, inspect final render and Convex Edge Wear debug for the B2 clipping/gouge artifacts.
+
+
+### EW-B3R — Deterministic vertex-star cap closure — current
+
+```text
+- Keep EW-B3 local face-offset and local edge-bridge construction.
+- Build vertex caps from source face-owned replacement-corner records.
+- Order cap boundaries around each source vertex using source vertex-star normals.
+- Emit cap triangles directly; do not create arbitrary n-gon caps.
+- Add per-cap-case diagnostics for isolated, two-edge, and multi-star vertices.
+- Required gate: vertexCapsBuilt == vertexCapsAttempted and openEdgesAfterBuild == 0 before commit.
+```
+
+
+EW-B3R3 note: two-edge corner vertices must not use the isolated endpoint apex cap path; they use ordered unique cap points and centre/boundary triangulation instead.

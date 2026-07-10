@@ -1539,3 +1539,17 @@ Changed:
 Important definition: `Initial Life` is the normalized Remaining Life assigned to newly spawned persistent FoamState material. It is not event duration; formation duration remains path-distance divided by formation speed.
 
 Validation target: Material Remaining Life first. Confirm Shore Ribbon and Inward Wash controls affect only their own patterns, Mixed pattern shares remain normalized, and Final Foam remains unchanged.
+
+### 4.11C.5.15A — Static Object Contact Foam Birth
+
+Enabled the Object Foam source category for Layer C birth validation. Static object sources are exported from the disturbance runtime and scheduled on CPU as bounded source events. The existing source-event rasterizer now supports Object Contact Arc and Object Contact Fleck types and writes real FoamState material, gated by obstacle exclusion and static pressure contact support.
+
+### 4.11C.5.15A.1 — Object Birth Activation Wiring Fix
+
+Fixed Object Foam activation after validation showed the runtime status remained `Object source population disabled` even with Object Foam enabled. Shore/Object category active properties no longer use hidden preset-specific gates. The preset now only globally disables automatic birth when set to Off; source categories are controlled by their own Enabled toggles. Added Object Foam source anchor diagnostics to the inspector.
+
+### 4.11C.5.15A.2 — Object Contact Edge Field
+
+Implemented after Object Foam successfully spawned but showed rectangular/slab-like contact patches. Added a GPU object contact field built from obstacle exclusion and static pressure. The field stores contact confidence, contact normal, and front/side relevance. Object Contact Arc and Contact Fleck source events now shape against this field in contact normal/tangent space, while object extents remain coarse scheduling/bounding data only.
+
+Validation target: Material Remaining Life should show less rectangular object contact foam, with arcs/flecks hugging actual obstacle contact regions and no material inside obstacle footprints.

@@ -560,3 +560,9 @@ After 5.14G, the next step stayed on shore spawning and converted the hardcoded 
 For Shore Foam, `Mixed` now uses normalized pattern shares instead of a hardcoded ribbon/wash split. Shore Ribbon and Inward Wash each expose per-pattern Formation Speed, dimensions, Initial Life, and Breakup Strength. Runtime sampling is correlated and aspect-guarded so Length / Width / Reach do not randomize into incoherent combinations.
 
 This is still spawning-only work. Object-contact spawning, free-water spawning, foam evolution, Layer D tuning, and Final Foam integration remain later steps.
+
+- 4.11C.5.15A: Object Foam birth category enabled for static object/contact spawning. Contact Arcs and Contact Flecks are CPU-scheduled from static disturbance source snapshots and GPU-gated by obstacle exclusion/static pressure. Free-water source spawning remains staged after object contact birth validation.
+
+- 4.11C.5.15A.1: Object Foam activation wiring fix. Source-category toggles are now authoritative when automatic birth is enabled and the preset is not Off; Object Foam runtime diagnostics include static source anchor count.
+
+- 4.11C.5.15A.2: Object Foam shape refinement through an Object Contact Edge Field. The field is built from obstacle exclusion and static pressure/contact evidence, then sampled by Contact Arc/Fleck source events so object births follow contact edges rather than rectangular object half-extents. This remains Layer C spawning only; no wake-tail, free-water, Layer D, or Final Foam integration was added.

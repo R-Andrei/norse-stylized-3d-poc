@@ -254,7 +254,7 @@
                     groundDampDeposit,
                     groundRockyDry,
                     contractMask);
-                float3 paintedAccentLineRelief = ResolveGroundPaintedAccentFeature(
+                float3 paintedAccentLineRelief = ResolveGroundPaintedAccentLineReliefFeature(
                     input,
                     exposureMask,
                     groundDampDeposit,
@@ -266,6 +266,21 @@
                 float paintedAccentLinesFeature = paintedAccentLineRelief.x;
                 float paintedAccentReliefFeature = paintedAccentLineRelief.y;
                 float paintedAccentSignedRelief = paintedAccentLineRelief.z;
+
+#if defined(PS3D_PIXELSURFACEGROUND_MATERIAL_PROPERTIES)
+                // Patch V3I.3A:
+                // Generated fold-field data is currently diagnostic only.
+                // It must feed Painted Accent debug views and the height preview,
+                // but must not alter the normal final ground render until the
+                // final visual response is explicitly rebuilt in V3J/V3K.
+                if (_GroundPaintedAccentFoldFieldEnabled > 0.5)
+                {
+                    paintedAccentLinesFeature = 0.0;
+                    paintedAccentReliefFeature = 0.0;
+                    paintedAccentSignedRelief = 0.0;
+                }
+#endif
+
                 float profileContrast =
                     max(0.0, _ProfileContrast) *
                     lerp(1.0, max(0.0, _FrostContrast), saturate(_FrostStrength));
@@ -391,66 +406,29 @@
                     paintedAccentTint,
                     (half3)_FrostColor.rgb,
                     (half)saturate(snowPatch * 0.62));
-                float paintedAccentContrast =
-                    saturate(_GroundPaintedAccentLineContrast);
-                float paintedAccentStrength =
-                    saturate(_GroundPaintedAccentLineStrength);
-                float paintedAccentResponse =
-                    saturate(0.55 + paintedAccentStrength * 0.65);
                 half3 paintedAccentTarget =
                     albedo *
                     (half)max(
                         0.0,
                         1.0 - paintedAccentLinesFeature *
-                        paintedAccentResponse *
-                        (0.20 + paintedAccentContrast * 0.22));
+                        (0.10 + saturate(_GroundPaintedAccentLineContrast) * 0.10));
                 paintedAccentTarget = PS3D_ApplyValuePreservingTint(
                     paintedAccentTarget,
                     paintedAccentTint,
-                    saturate(0.16 + paintedAccentLinesFeature * 0.34));
+                    saturate(0.18 + paintedAccentLinesFeature * 0.28));
                 albedo = lerp(
                     albedo,
                     paintedAccentTarget,
-                    (half)saturate(
-                        paintedAccentLinesFeature *
-                        (0.72 + paintedAccentResponse * 0.22)));
+                    (half)(paintedAccentLinesFeature * 0.64));
 
-                // Painted relief is deliberately value-side shading, not normal
-                // perturbation or mesh displacement. The signed channel now
-                // represents continuous side lobes beside the crease, while the
-                // broader body supplies a small shared fold lift.
-                float paintedReliefShadow =
-                    saturate(-paintedAccentSignedRelief) *
-                    paintedAccentResponse *
-                    (0.30 + paintedAccentContrast * 0.20);
-                float paintedReliefHighlight =
-                    saturate(paintedAccentSignedRelief) *
-                    paintedAccentResponse *
-                    (0.20 + paintedAccentContrast * 0.17);
-                float paintedReliefBodyLift =
+                float paintedReliefScale =
                     paintedAccentReliefFeature *
-                    paintedAccentResponse *
-                    (0.025 + paintedAccentContrast * 0.035);
-                albedo *= (half)max(0.0, 1.0 - paintedReliefShadow);
-                half3 paintedReliefHighlightTint = lerp(
-                    _BaseColor.rgb,
-                    _FrostColor.rgb,
-                    (half)saturate(snowPatch * 0.45));
-                half3 paintedReliefHighlightTarget =
-                    albedo *
-                    (half)max(
-                        0.0,
-                        1.0 + paintedReliefHighlight + paintedReliefBodyLift);
-                paintedReliefHighlightTarget = PS3D_ApplyValuePreservingTint(
-                    paintedReliefHighlightTarget,
-                    paintedReliefHighlightTint,
-                    saturate(paintedReliefHighlight * 1.75));
-                albedo = lerp(
-                    albedo,
-                    paintedReliefHighlightTarget,
-                    (half)saturate(
-                        paintedReliefHighlight * 2.35 +
-                        paintedReliefBodyLift * 0.90));
+                    (0.035 + saturate(_GroundPaintedAccentLineContrast) * 0.050);
+                float paintedReliefValue = clamp(
+                    paintedAccentSignedRelief * paintedReliefScale,
+                    -0.070,
+                    0.052);
+                albedo *= (half)max(0.0, 1.0 + paintedReliefValue);
 
                 float wetness = saturate(_Wetness);
                 float wetGlobalDarken =

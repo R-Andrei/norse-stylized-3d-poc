@@ -24,7 +24,7 @@ namespace ProgrammaticStylized3D.Rivers
         // Patch 4.11C.5.14E separates final automatic source
         // rasterization from the manual/debug injection primitive path. Keep
         // this bounded: source events are authored vocabulary, not particles.
-        private const int AutomaticFoamSourceEventCapacity = 16;
+        private const int AutomaticFoamSourceEventCapacity = 32;
         private const int LowFoamCompositionBirthBudgetPerStep = 2;
         private const int MediumFoamCompositionBirthBudgetPerStep = 4;
         private const int HighFoamCompositionBirthBudgetPerStep = 6;
@@ -168,6 +168,18 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MediumMaterialTemporalUpdateRate = 12f;
         private const float HighMaterialTemporalUpdateRate = 16f;
         private const float ManualTestShapeVariety = 0f;
+
+        private const float AutomaticObjectSourceMinimumEventsPerSecond = 0.08f;
+        private const float AutomaticObjectSourceMaximumEventsPerSecond = 3.0f;
+        private const int AutomaticObjectSourceMaximumStartsPerUpdate = 2;
+        private const int AutomaticObjectSourceMaximumScansPerUpdate = 32;
+        private const float AutomaticObjectSourceMinimumDuration = 0.35f;
+        private const float AutomaticObjectSourceMaximumDuration = 4.0f;
+        private const float AutomaticObjectSourceMinimumHeadTrailMetres = 0.06f;
+        private const float AutomaticObjectSourceMaximumHeadTrailMetres = 0.42f;
+        private const float AutomaticObjectBirthPatternSeedSalt = 337.183f;
+        private const float AutomaticObjectBirthSourceFillSeedSalt = 613.719f;
+        private const float AutomaticObjectBirthShapeSeedSalt = 877.421f;
         private const float AutomaticShoreSourceMinimumSlotSpacingMetres = 3.5f;
         private const float AutomaticShoreSourceMaximumSlotSpacingMetres = 12.0f;
         private const float AutomaticShoreSourceMinimumEventsPerSecond = 0.25f;

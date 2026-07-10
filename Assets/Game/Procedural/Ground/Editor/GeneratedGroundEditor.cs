@@ -1116,6 +1116,32 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         ground.Regenerate();
                     });
             }
+
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Fold Field Debug",
+                EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Builds an editor/debug-only preview mesh from the current Painted Accent fold-field G channel. This does not change the generated ground mesh, collision, or gameplay surface.",
+                MessageType.None);
+
+            EditorGUILayout.BeginHorizontal();
+
+            if (GUILayout.Button("Build Height Preview"))
+            {
+                ApplyToTargets(
+                    "Build Fold Field Height Preview",
+                    ground => ground.BuildPaintedAccentFoldFieldHeightPreview());
+            }
+
+            if (GUILayout.Button("Clear Height Preview"))
+            {
+                ApplyToTargets(
+                    "Clear Fold Field Height Preview",
+                    ground => ground.ClearPaintedAccentFoldFieldHeightPreview());
+            }
+
+            EditorGUILayout.EndHorizontal();
         }
 
         private static GroundSurfaceStyleProfile[] LoadAvailableStyleProfiles()

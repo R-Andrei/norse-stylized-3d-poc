@@ -704,6 +704,18 @@ namespace ProgrammaticStylized3D.Rivers
             automaticShoreBirthSubmittedTotal;
         public int AutomaticShoreBirthBudgetPerTick =>
             ResolveAutomaticShoreBirthBudgetPerTick();
+
+        public string AutomaticObjectBirthStatus => automaticObjectBirthStatus;
+        public int AutomaticObjectBirthSubmittedLastUpdate =>
+            automaticObjectBirthSubmittedLastUpdate;
+        public int AutomaticObjectBirthRejectedLastUpdate =>
+            automaticObjectBirthRejectedLastUpdate;
+        public int AutomaticObjectBirthSubmittedTotal =>
+            automaticObjectBirthSubmittedTotal;
+        public int AutomaticObjectBirthAnchorCountLastUpdate =>
+            automaticObjectBirthAnchorCountLastUpdate;
+        public int AutomaticObjectBirthBudgetPerTick =>
+            AutomaticObjectSourceMaximumStartsPerUpdate;
         public int InjectedLastUpdate => injectedLastUpdate;
         public float LastInjectionBoundaryCoverage => lastInjectionBoundaryCoverage;
         public bool LastInjectionStateSynchronized =>
@@ -772,6 +784,7 @@ namespace ProgrammaticStylized3D.Rivers
             EstimateTextureBytes(freeWaterNegativeMaskTextureArray) +
             EstimateTextureBytes(currentShoreEdgesTexture) +
             EstimateTextureBytes(obstacleExclusionTexture) +
+            EstimateTextureBytes(objectContactFieldTexture) +
             EstimateTextureBytes(motionLaneTexture) +
             EstimateTextureBytes(obstacleRoutingTexture) +
             EstimateTextureBytes(neutralDisturbanceTexture) +

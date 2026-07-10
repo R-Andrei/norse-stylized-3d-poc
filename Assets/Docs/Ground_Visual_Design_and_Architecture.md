@@ -375,6 +375,334 @@ They must not become:
 - hard black outlines unrelated to lighting/material;
 - a mud-only or grass-only feature silo.
 
+#### Patch V3I Validation and V3I.1 Body-Shape Correction
+
+Patch V3I validated the new data path: the ground is now reading generated local-space fold-field texture data instead of the retired curve-distance stroke fallback when `PaintedAccentLines` is active. The three debug channels changed exactly as expected for the first prototype:
+
+```text
+Ground Painted Accent Relief:
+  showed the generated G/body field as soft pale fold bodies
+
+Ground Painted Accent Signed Relief:
+  showed gradient polarity around those bodies
+
+Ground Painted Accent Lines:
+  showed rough edge/crescent candidates derived from the bodies
+```
+
+The result proved the architecture but not the final body shape. The V3I generator used one soft elongated ellipse per candidate, so the relief field read as repeated large oval/leaf stamps. That is still the wrong art read for the final target.
+
+Patch V3I.1 corrects the body generator before any line-art polish. The candidate primitive changes from:
+
+```text
+one soft ellipse
+```
+
+to:
+
+```text
+one short curved tapered ridge/fold body
+  with variable width
+  asymmetric side weight
+  deterministic local warp
+  optional small side lobe
+  lower density and more negative space
+```
+
+This keeps the accepted field-first architecture:
+
+```text
+fold body first
+then signed polarity
+then rough contour/line candidate
+```
+
+It does not return to line-first curve strokes. It also does not introduce mesh displacement, collision, fake normals, 3D preview tooling, family tuning, or final line extraction. The validation target remains `Ground Painted Accent Relief`: it should read less like large oval stamps and more like short irregular low terrain folds/ridges. Final contour extraction remains Patch V3J.
+
+
+#### Patch V3I.2A - Candidate-Stamp Generator Retirement
+
+Patch V3I.2A is a cleanup/redirection patch before the next generator implementation. It removes the V3I/V3I.1 candidate-stamp generator internals from the active code path and replaces them with a neutral 256x256 placeholder texture.
+
+The V3I/V3I.1 validation outcome is now locked:
+
+```text
+V3I proved:
+  GeneratedGround-owned fold-field texture plumbing works.
+  Local-space sampling works.
+  The R/G/B/A debug contract is active.
+  New shape / seed changes update generated data.
+
+V3I failed visually because:
+  the generator still created discrete procedural shapes.
+  the relief channel read as large oval/leaf stamps.
+
+V3I.1 improved:
+  ellipses became smaller curved tapered forms.
+  density was reduced.
+  bodies were less uniformly oval.
+
+V3I.1 still failed visually because:
+  the model remained candidate/stamp based.
+  the output read as sparse brush marks, not a natural secondary height layer.
+```
+
+Therefore, the following systems are retired as an active direction:
+
+```text
+BuildCandidates(...)
+RasterizeCandidates(...)
+FoldCandidate
+candidate density/cell spawning
+candidate curvature/asymmetry/side-lobe stamp model
+ellipse/ridge stamp language as the source of the body field
+```
+
+The retained systems are:
+
+```text
+GeneratedGround-owned fold texture lifecycle
+local/object-space sampling
+256x256 RGBA32 active-chunk policy
+R/G/B/A texture contract
+debug views
+shader router
+retired curve-distance fallback for inactive/missing generated data
+```
+
+The next accepted implementation is continuous field generation:
+
+```text
+continuous domain-warped scalar field F(local x, local z)
+  -> shaped visual height/body G
+  -> gradient polarity B
+  -> rough selected contour/edge R
+```
+
+Patch V3I.2A intentionally produces a blank/neutral generated fold texture for active `PaintedAccentLines` chunks. This prevents further visual tuning of the rejected stamp generator while keeping compile/runtime plumbing intact for Patch V3I.2. It is expected that Painted Accent Relief / Signed Relief / Lines debug views will show no generated fold marks during this transition.
+
+Patch V3I.2 will replace the neutral placeholder with:
+
+```text
+GenerateBaseNoiseField(...)
+GenerateDomainWarp(...)
+ShapeContinuousBodyField(...)
+ApplySemanticSupport(...)
+SmoothBodyField(...)
+BuildPixelsFromContinuousField(...)
+```
+
+No candidate spawning, no stamp rasterization, no mesh displacement, no 3D preview tooling, no final line extraction, and no family tuning are part of V3I.2A.
+
+
+#### Patch V3I.2 - Continuous Domain-Warped Fold Height Field
+
+Patch V3I.2 replaces the neutral V3I.2A placeholder with the first continuous scalar-field implementation. This is the first generator that matches the accepted field-first direction instead of the rejected candidate/stamp direction.
+
+The active model is now:
+
+```text
+continuous domain-warped scalar field F(local x, local z)
+  -> shaped visual height/body G
+  -> gradient polarity B
+  -> rough selected contour/edge R
+```
+
+The generator no longer uses:
+
+```text
+BuildCandidates(...)
+RasterizeCandidates(...)
+FoldCandidate
+discrete mark spawning
+ellipse stamps
+curved ridge stamps
+```
+
+The V3I.2 field generation pipeline is:
+
+```text
+local chunk coordinate
+  -> deterministic domain warp
+  -> broad fractal value field
+  -> medium fractal value field
+  -> ridge-like fractal component
+  -> directional continuity component
+  -> semantic support from the existing generated ground masks
+  -> percentile-based coverage threshold
+  -> soft body shaping
+  -> light smoothing
+  -> R/G/B/A texture write
+```
+
+The coverage normalization is important. The generator does not use one hard global threshold; it resolves a percentile threshold from the generated field so the active body coverage remains bounded by feature strength:
+
+```text
+low strength  -> lower active coverage
+high strength -> higher active coverage
+```
+
+This is intended to prevent both failure extremes:
+
+```text
+full-screen cloudy mush
+isolated procedural stamps
+```
+
+The texture contract remains unchanged:
+
+```text
+R = rough contour/edge candidate from G
+G = continuous visual fold-height/body field
+B = signed side from the gradient of G, encoded 0..1
+A = semantic support / reserved
+```
+
+The primary validation target remains `Ground Painted Accent Relief`, which displays the G/body field projected on the current ground surface. `Ground Painted Accent Lines` remains a rough derivation and is not final line extraction. V3J remains the line extraction polish patch.
+
+This implementation is still visual-only:
+
+```text
+no mesh displacement
+no collision change
+no fake normal
+no production terrain deformation
+```
+
+A true debug height preview is explicitly planned as the next diagnostic tooling layer:
+
+```text
+Patch V3I.3 - Fold Field Height Preview Debug Mesh
+```
+
+The chosen preview approach is Option B: generate an editor/debug-only preview mesh from the fold-field texture and displace that preview by the G channel. This will show the field honestly at preview resolution instead of relying on the existing ground mesh density. It must remain debug-only and must not imply gameplay displacement.
+
+
+
+#### Patch V3I.3 - Fold Field Height Preview Debug Mesh
+
+Patch V3I.3 implements the planned Option B diagnostic preview. The existing `Ground Painted Accent Relief`, `Ground Painted Accent Signed Relief`, and `Ground Painted Accent Lines` views remain projected texture-channel debug modes. They are useful, but they do not show the field as actual relief.
+
+The new preview is editor/debug-only:
+
+```text
+Generated fold-field G channel
+  -> temporary child preview mesh
+  -> vertex height = sampled ground height + G * debug height scale + small lift
+```
+
+The preview mesh is intentionally separate from the production ground mesh:
+
+```text
+does not modify the generated ground mesh
+does not modify collision
+does not change gameplay terrain
+does not imply production displacement
+does not require new layers or tags
+```
+
+The preview mesh is created as a child object named:
+
+```text
+__FoldFieldHeightPreview_Debug
+```
+
+The `GeneratedGround` inspector exposes:
+
+```text
+Build Height Preview
+Clear Height Preview
+```
+
+This preview uses the same generated G/body values that are written into the fold-field texture, not a GPU readback or a second approximation. `GroundPaintedAccentFoldFieldGenerator.Generate(...)` now returns the generated body array alongside the uploaded texture so the debug mesh can be built from the exact same scalar field.
+
+This patch is diagnostic only. It does not tune the continuous field generator and does not perform final contour extraction. The next decision should be based on inspecting the projected G channel and the height preview mesh together.
+
+
+#### Patch V3I.3A - Debug Isolation and Preview Color Readability
+
+Patch V3I.3 validation exposed two pipeline issues:
+
+```text
+1. The generated fold field could still influence the normal final ground render.
+2. The preview mesh had real displacement, but its material did not visualize height values from top view.
+```
+
+Patch V3I.3A fixes those issues before any generator tuning. The generated fold field remains diagnostic-only until final response is deliberately rebuilt in V3J/V3K.
+
+Final render isolation rule:
+
+```text
+Generated fold-field data may feed:
+  Ground Painted Accent Relief
+  Ground Painted Accent Signed Relief
+  Ground Painted Accent Lines
+  Ground Painted Accent Final Prototype
+  Fold Field Height Preview mesh
+
+Generated fold-field data must not feed:
+  normal final albedo
+  normal final smoothness
+  normal final specular
+  production material response
+```
+
+The final forward pass now zeros Painted Accent final-render contribution while `_GroundPaintedAccentFoldFieldEnabled` is active. This preserves the debug data path while preventing the experimental G field from appearing as noise in the normal game render.
+
+The height preview mesh now uses an explicit hidden debug shader:
+
+```text
+Hidden/PS3D/Ground Fold Field Height Preview
+```
+
+The shader reads the preview mesh vertex color/body value and maps it to a visible low/mid/high debug gradient. This makes the height field readable from top view as well as from profile. The preview renderer also disables shadow casting and shadow receiving so the preview does not contaminate lighting diagnostics.
+
+Preview cleanup was also made more robust: clearing the preview removes all child objects whose names begin with `__FoldFieldHeightPreview_Debug`, rather than relying on only one exact child lookup.
+
+V3I.3A is a correctness patch only:
+
+```text
+no generator tuning
+no final line extraction
+no production displacement
+no collision changes
+```
+
+
+#### Patch V3J.0 - Painted Accent Final Visual-Response Proof
+
+Patch V3J.0 adds one debug-only view:
+
+```text
+Ground Painted Accent Final Prototype
+```
+
+This view exists to answer a specific architecture question before generator tuning continues: can the generated fold-field contract be turned into the intended painted fold/crease visual language? It is not a production render path and does not remove the V3I.3A final-render isolation rule.
+
+The prototype response treats the generated channels as follows:
+
+```text
+R = selected contour / narrow visible crease source
+G = soft fold body / context gate only
+B = signed side / crease-highlight polarity
+A = support / still reserved for field semantics
+```
+
+The important rule is that `G` must not directly become broad albedo darkening. The previous V3I.3 validation proved that broad body modulation reads as noisy stains. In V3J.0, `G` only gates where the narrow `R` contour is allowed to become visible; the prototype color is driven by a crease mask, a smaller side highlight mask, and a very low context term.
+
+This patch intentionally does not tune the field generator. A bad field can still make bad shapes. The proof target is narrower: if the current ugly field can still produce crease-like marks when only the contour/signed channels are emphasized, the architecture is viable and the next patch should improve field shape/placement. If the prototype still reads as stains despite the restricted response, the response model or channel contract needs revision before generator tuning.
+
+V3J.0 is limited to:
+
+```text
+debug-mode enum plumbing
+shader-only prototype visualization
+documentation of the proof contract
+```
+
+It does not add mesh displacement, collision changes, production normal perturbation, family tuning, generator tuning, new components, decals, or runtime state.
+
+
 ### Pillar 4 - Contact and Edge Accents
 
 Ground should visually respond around meaningful geometry and semantic boundaries. This is one of the main ways an isometric scene looks authored instead of assembled.

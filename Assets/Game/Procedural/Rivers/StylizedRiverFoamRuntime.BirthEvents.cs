@@ -554,15 +554,63 @@ namespace ProgrammaticStylized3D.Rivers
                 Activity);
         }
 
+
+
+        private enum AutomaticObjectSourceRecipe
+        {
+            ContactArc,
+            ContactFleck
+        }
+
+        private readonly struct AutomaticObjectSourceProfile
+        {
+            public AutomaticObjectSourceProfile(
+                bool enabled,
+                float coverage,
+                float activity,
+                float formationSpeedMetresPerSecond,
+                StylizedRiverFoamObjectPattern pattern)
+            {
+                Enabled = enabled;
+                Coverage = Mathf.Clamp01(coverage);
+                Activity = Mathf.Clamp01(activity);
+                FormationSpeedMetresPerSecond = Mathf.Max(0.01f, formationSpeedMetresPerSecond);
+                Pattern = pattern;
+            }
+
+            public bool Enabled { get; }
+            public float Coverage { get; }
+            public float Activity { get; }
+            public float FormationSpeedMetresPerSecond { get; }
+            public StylizedRiverFoamObjectPattern Pattern { get; }
+
+            public float EventsPerSecond => Mathf.Lerp(
+                AutomaticObjectSourceMinimumEventsPerSecond,
+                AutomaticObjectSourceMaximumEventsPerSecond,
+                Activity);
+        }
         private bool IsAutomaticSourcePopulationActive =>
             river != null && river.FoamEnabled &&
             river.FoamAutomaticBirthEnabled &&
-            river.FoamAutomaticShoreBirthActive &&
-            river.FoamShoreFoamCoverage > 0.0001f &&
-            river.FoamShoreFoamActivity > 0.0001f &&
-            river.FreezeAmount < 0.999f && river.Domain.IsValid;
+            river.FreezeAmount < 0.999f && river.Domain.IsValid &&
+            ((river.FoamAutomaticShoreBirthActive &&
+              river.FoamShoreFoamCoverage > 0.0001f &&
+              river.FoamShoreFoamActivity > 0.0001f) ||
+             (river.FoamAutomaticObjectBirthActive &&
+              river.FoamObjectFoamCoverage > 0.0001f &&
+              river.FoamObjectFoamActivity > 0.0001f));
 
         private bool AdvanceAutomaticBirthSources(
+            float deltaTime,
+            float now)
+        {
+            bool startedAny = false;
+            startedAny |= AdvanceAutomaticShoreBirthSources(deltaTime, now);
+            startedAny |= AdvanceAutomaticObjectBirthSources(deltaTime, now);
+            return startedAny;
+        }
+
+        private bool AdvanceAutomaticShoreBirthSources(
             float deltaTime,
             float now)
         {
@@ -695,6 +743,510 @@ namespace ProgrammaticStylized3D.Rivers
                 river.FoamShoreFoamPattern);
             inactiveStatus = string.Empty;
             return profile.Enabled;
+        }
+
+
+        private bool AdvanceAutomaticObjectBirthSources(
+            float deltaTime,
+            float now)
+        {
+            automaticObjectBirthSubmittedLastUpdate = 0;
+            automaticObjectBirthRejectedLastUpdate = 0;
+            automaticObjectBirthAnchorCountLastUpdate = 0;
+
+            if (!ResolveAutomaticObjectSourceProfile(
+                    out AutomaticObjectSourceProfile objectProfile,
+                    out string inactiveStatus))
+            {
+                automaticObjectBirthAccumulator = 0f;
+                automaticObjectBirthStatus = inactiveStatus;
+                return false;
+            }
+
+            disturbanceRuntime ??= GetComponent<StylizedRiverDisturbanceRuntime>();
+            if (disturbanceRuntime == null)
+            {
+                automaticObjectBirthAccumulator = 0f;
+                automaticObjectBirthStatus = "Waiting for disturbance runtime";
+                return false;
+            }
+
+            disturbanceRuntime.CopyStaticObjectFoamSourcesTo(
+                automaticObjectFoamSources);
+            automaticObjectBirthAnchorCountLastUpdate =
+                automaticObjectFoamSources.Count;
+            if (automaticObjectFoamSources.Count <= 0)
+            {
+                automaticObjectBirthAccumulator = 0f;
+                automaticObjectBirthStatus =
+                    "No registered static object source anchors";
+                return false;
+            }
+
+            automaticObjectBirthAccumulator += Mathf.Max(0f, deltaTime) *
+                objectProfile.EventsPerSecond;
+            if (automaticObjectBirthAccumulator < 1f)
+            {
+                float secondsUntilNext =
+                    (1f - automaticObjectBirthAccumulator) /
+                    Mathf.Max(0.01f, objectProfile.EventsPerSecond);
+                automaticObjectBirthStatus =
+                    $"Armed / {automaticObjectFoamSources.Count} static object source(s) / next object source event in {secondsUntilNext:0.00}s";
+                return false;
+            }
+
+            int startsThisUpdate = 0;
+            int skippedThisUpdate = 0;
+            while (automaticObjectBirthAccumulator >= 1f &&
+                   startsThisUpdate < AutomaticObjectSourceMaximumStartsPerUpdate)
+            {
+                if (TryStartAutomaticObjectSourceEvent(
+                        objectProfile,
+                        out int skippedObjects))
+                {
+                    automaticObjectBirthAccumulator -= 1f;
+                    startsThisUpdate++;
+                    skippedThisUpdate += skippedObjects;
+                    continue;
+                }
+
+                automaticObjectBirthAccumulator = Mathf.Min(
+                    automaticObjectBirthAccumulator,
+                    0.999f);
+                skippedThisUpdate += skippedObjects;
+                break;
+            }
+
+            automaticObjectBirthSubmittedLastUpdate = startsThisUpdate;
+            automaticObjectBirthRejectedLastUpdate = skippedThisUpdate;
+            automaticObjectBirthSubmittedTotal += startsThisUpdate;
+            automaticObjectBirthStatus = startsThisUpdate > 0
+                ? $"Started {startsThisUpdate} deterministic object source event(s), skipped {skippedThisUpdate} source(s)"
+                : $"Scanned deterministic object source anchors, started 0, skipped {skippedThisUpdate}";
+            return startsThisUpdate > 0;
+        }
+
+        private bool ResolveAutomaticObjectSourceProfile(
+            out AutomaticObjectSourceProfile profile,
+            out string inactiveStatus)
+        {
+            profile = default;
+            if (river == null || !river.FoamEnabled)
+            {
+                inactiveStatus = "Foam disabled";
+                return false;
+            }
+
+            if (!river.FoamAutomaticBirthEnabled)
+            {
+                inactiveStatus = "Automatic source population disabled";
+                return false;
+            }
+
+            if (river.FreezeAmount >= 0.999f || !river.Domain.IsValid)
+            {
+                inactiveStatus = "Waiting for active river domain";
+                return false;
+            }
+
+            if (fieldWidth <= 0 || fieldHeight <= 0 ||
+                fieldLength <= 0.0001f || validFieldLength <= 0.0001f)
+            {
+                inactiveStatus = "Waiting for Foam field resources";
+                return false;
+            }
+
+            if (river.FoamSourcePopulationPreset ==
+                StylizedRiverFoamSourcePopulationPreset.Off)
+            {
+                inactiveStatus = "Source population preset Off";
+                return false;
+            }
+
+            if (!river.FoamAutomaticObjectBirthActive)
+            {
+                inactiveStatus = "Object source class disabled";
+                return false;
+            }
+
+            float coverage = river.FoamObjectFoamCoverage;
+            float activity = river.FoamObjectFoamActivity;
+            if (coverage <= 0.0001f)
+            {
+                inactiveStatus = "Object foam coverage is zero";
+                return false;
+            }
+
+            if (activity <= 0.0001f)
+            {
+                inactiveStatus = "Object foam activity is zero";
+                return false;
+            }
+
+            profile = new AutomaticObjectSourceProfile(
+                true,
+                coverage,
+                activity,
+                river.FoamObjectFoamFormationSpeedMetresPerSecond,
+                river.FoamObjectFoamPattern);
+            inactiveStatus = string.Empty;
+            return profile.Enabled;
+        }
+
+        private bool TryStartAutomaticObjectSourceEvent(
+            AutomaticObjectSourceProfile profile,
+            out int skippedObjects)
+        {
+            skippedObjects = 0;
+            int sourceCount = automaticObjectFoamSources.Count;
+            if (river == null || !river.Domain.IsValid || sourceCount <= 0)
+            {
+                return false;
+            }
+
+            int scanBudget = Mathf.Min(
+                Mathf.Max(1, sourceCount),
+                AutomaticObjectSourceMaximumScansPerUpdate);
+            for (int scan = 0; scan < scanBudget; scan++)
+            {
+                int cursor = automaticObjectBirthCursor++;
+                int cycleIndex = cursor / Mathf.Max(1, sourceCount);
+                int scanIndex = PositiveModulo(cursor, sourceCount);
+                int sourceIndex = ResolvePermutedAutomaticObjectSourceIndex(
+                    scanIndex,
+                    sourceCount,
+                    cycleIndex);
+                RiverFoamStaticObjectSource source =
+                    automaticObjectFoamSources[sourceIndex];
+                float sourceSeed = river.VisualSeed * 0.191f +
+                    source.SourceId.GetHashCode() * 0.017f +
+                    cycleIndex * 37.613f +
+                    source.Phase * 11.0f;
+
+                if (Hash01(sourceSeed + 1.7f) > profile.Coverage)
+                {
+                    skippedObjects++;
+                    continue;
+                }
+
+                AutomaticObjectSourceRecipe recipe =
+                    ResolveAutomaticObjectRecipe(profile.Pattern, sourceSeed);
+                if (TryBeginAutomaticObjectSourceEvent(
+                        profile,
+                        recipe,
+                        source,
+                        sourceSeed))
+                {
+                    idleSince = 0.0;
+                    return true;
+                }
+
+                skippedObjects++;
+            }
+
+            return false;
+        }
+
+        private AutomaticObjectSourceRecipe ResolveAutomaticObjectRecipe(
+            StylizedRiverFoamObjectPattern pattern,
+            float seed)
+        {
+            switch (pattern)
+            {
+                case StylizedRiverFoamObjectPattern.ContactArcs:
+                    return AutomaticObjectSourceRecipe.ContactArc;
+                case StylizedRiverFoamObjectPattern.ContactFlecks:
+                    return AutomaticObjectSourceRecipe.ContactFleck;
+            }
+
+            float arcWeight = river != null
+                ? river.FoamObjectContactArcPatternWeight
+                : 0.75f;
+            float fleckWeight = river != null
+                ? river.FoamObjectContactFleckPatternWeight
+                : 0.25f;
+            float totalWeight = Mathf.Max(0f, arcWeight) +
+                Mathf.Max(0f, fleckWeight);
+            if (totalWeight <= 0.0001f)
+            {
+                return AutomaticObjectSourceRecipe.ContactArc;
+            }
+
+            float normalizedArc = Mathf.Clamp01(arcWeight / totalWeight);
+            return Hash01(seed + 4.1f) < normalizedArc
+                ? AutomaticObjectSourceRecipe.ContactArc
+                : AutomaticObjectSourceRecipe.ContactFleck;
+        }
+
+        private bool TryBeginAutomaticObjectSourceEvent(
+            AutomaticObjectSourceProfile profile,
+            AutomaticObjectSourceRecipe recipe,
+            RiverFoamStaticObjectSource source,
+            float seed)
+        {
+            float flowDirection = river.FlowDirection >= 0f ? 1f : -1f;
+            float eventScale = Mathf.Clamp01(
+                Mathf.Lerp(0.78f, 1.18f, Hash01(seed + 6.5f)));
+            float widthJitter = Mathf.Lerp(0.92f, 1.08f, Hash01(seed + 7.1f));
+            float offsetJitter = Mathf.Lerp(0.85f, 1.15f, Hash01(seed + 8.3f));
+            float sourceKey = river.VisualSeed * 0.417f +
+                source.GlobalDistance * 9.731f +
+                source.AcrossMetres * 19.137f +
+                source.SourceId.GetHashCode() * 0.011f +
+                (recipe == AutomaticObjectSourceRecipe.ContactFleck ? 907f : 701f);
+
+            float length;
+            float width;
+            float offset;
+            float amount;
+            float remainingLife;
+            float breakupScale;
+            float breakupStrength;
+            float patternFormationSpeedMultiplier;
+            if (recipe == AutomaticObjectSourceRecipe.ContactFleck)
+            {
+                length = Mathf.Lerp(
+                    river.FoamObjectContactFleckLengthMinMetres,
+                    river.FoamObjectContactFleckLengthMaxMetres,
+                    eventScale);
+                width = Mathf.Lerp(
+                    river.FoamObjectContactFleckWidthMinMetres,
+                    river.FoamObjectContactFleckWidthMaxMetres,
+                    eventScale) * widthJitter;
+                offset = Mathf.Lerp(
+                    river.FoamObjectContactFleckOffsetMinMetres,
+                    river.FoamObjectContactFleckOffsetMaxMetres,
+                    eventScale) * offsetJitter;
+                remainingLife = Mathf.Lerp(
+                    river.FoamObjectContactFleckInitialLifeMin,
+                    river.FoamObjectContactFleckInitialLifeMax,
+                    eventScale);
+                breakupScale = Mathf.Lerp(0.08f, 0.22f, Hash01(seed + 9.5f));
+                breakupStrength = Mathf.Lerp(
+                    river.FoamObjectContactFleckBreakupStrengthMin,
+                    river.FoamObjectContactFleckBreakupStrengthMax,
+                    Hash01(seed + 10.1f));
+                patternFormationSpeedMultiplier =
+                    river.FoamObjectContactFleckFormationSpeedMultiplier;
+                amount = Mathf.Lerp(0.82f, 0.97f, eventScale);
+            }
+            else
+            {
+                length = Mathf.Lerp(
+                    river.FoamObjectContactArcLengthMinMetres,
+                    river.FoamObjectContactArcLengthMaxMetres,
+                    eventScale);
+                width = Mathf.Lerp(
+                    river.FoamObjectContactArcWidthMinMetres,
+                    river.FoamObjectContactArcWidthMaxMetres,
+                    eventScale) * widthJitter;
+                offset = Mathf.Lerp(
+                    river.FoamObjectContactArcOffsetMinMetres,
+                    river.FoamObjectContactArcOffsetMaxMetres,
+                    eventScale) * offsetJitter;
+                remainingLife = Mathf.Lerp(
+                    river.FoamObjectContactArcInitialLifeMin,
+                    river.FoamObjectContactArcInitialLifeMax,
+                    eventScale);
+                breakupScale = Mathf.Lerp(0.18f, 0.55f, Hash01(seed + 9.5f));
+                breakupStrength = Mathf.Lerp(
+                    river.FoamObjectContactArcBreakupStrengthMin,
+                    river.FoamObjectContactArcBreakupStrengthMax,
+                    Hash01(seed + 10.1f));
+                patternFormationSpeedMultiplier =
+                    river.FoamObjectContactArcFormationSpeedMultiplier;
+                amount = Mathf.Lerp(0.88f, 1.0f, eventScale);
+            }
+
+            length = Mathf.Clamp(
+                length,
+                0.05f,
+                Mathf.Max(0.05f, source.StaticPressureAcrossHalfWidth * 2.6f));
+            width = Mathf.Clamp(
+                width,
+                0.012f,
+                Mathf.Max(0.020f, length * 0.18f));
+            offset = Mathf.Clamp(
+                offset,
+                0.0f,
+                Mathf.Max(0.01f, source.SurfaceHalfWidth * 0.10f));
+            float feather = Mathf.Clamp(
+                Mathf.Max(width * 0.65f, source.SurfaceHalfWidth * 0.010f),
+                0.020f,
+                0.110f);
+            float halfLength = length * 0.5f;
+            float startGlobalDistance = Mathf.Clamp(
+                source.GlobalDistance - flowDirection * halfLength,
+                river.Domain.GlobalDistanceMinimum,
+                river.Domain.GlobalDistanceMaximum);
+            float endGlobalDistance = Mathf.Clamp(
+                source.GlobalDistance + flowDirection * halfLength,
+                river.Domain.GlobalDistanceMinimum,
+                river.Domain.GlobalDistanceMaximum);
+            float longitudinalDistance = Mathf.Abs(endGlobalDistance - startGlobalDistance);
+            if (longitudinalDistance <= 0.05f)
+            {
+                foamCompositionRejectedCount++;
+                return false;
+            }
+
+            float formationSpeed = Mathf.Max(
+                0.05f,
+                profile.FormationSpeedMetresPerSecond *
+                Mathf.Clamp(patternFormationSpeedMultiplier, 0.10f, 3.00f) *
+                Mathf.Lerp(0.90f, 1.10f, Hash01(seed + 12.5f)));
+            float sourcePathDistance = longitudinalDistance;
+            float duration = Mathf.Clamp(
+                sourcePathDistance / formationSpeed,
+                AutomaticObjectSourceMinimumDuration,
+                AutomaticObjectSourceMaximumDuration);
+            float materialStepDuration = 1f / Mathf.Max(1f, ResolveUpdateRate());
+            float headTrailMetres = Mathf.Clamp(
+                Mathf.Max(feather * 1.35f, formationSpeed * materialStepDuration * 1.50f),
+                AutomaticObjectSourceMinimumHeadTrailMetres,
+                Mathf.Min(
+                    AutomaticObjectSourceMaximumHeadTrailMetres,
+                    Mathf.Max(AutomaticObjectSourceMinimumHeadTrailMetres, sourcePathDistance * 0.30f)));
+
+            return BeginAutomaticObjectFoamSourceEvent(
+                recipe,
+                source,
+                startGlobalDistance,
+                endGlobalDistance,
+                duration,
+                formationSpeed,
+                headTrailMetres,
+                offset,
+                width,
+                feather,
+                amount,
+                remainingLife,
+                sourceKey,
+                breakupScale,
+                breakupStrength);
+        }
+
+        private bool BeginAutomaticObjectFoamSourceEvent(
+            AutomaticObjectSourceRecipe recipe,
+            RiverFoamStaticObjectSource source,
+            float startGlobalDistance,
+            float endGlobalDistance,
+            float duration,
+            float formationSpeedMetresPerSecond,
+            float headTrailMetres,
+            float contactOffsetMetres,
+            float widthMetres,
+            float featherMetres,
+            float amount,
+            float remainingLife,
+            float sourceKey,
+            float breakupScaleMetres,
+            float breakupStrength)
+        {
+            if (river == null || !river.FoamEnabled ||
+                river.FreezeAmount >= 0.999f || !river.Domain.IsValid)
+            {
+                foamCompositionRejectedCount++;
+                return false;
+            }
+
+            int slotIndex = FindFreeAutomaticFoamSourceSlot();
+            if (slotIndex < 0)
+            {
+                foamCompositionRejectedCount++;
+                return false;
+            }
+
+            int eventId = ++foamCompositionSequence;
+            AutomaticFoamSourceEventType sourceType = recipe ==
+                AutomaticObjectSourceRecipe.ContactFleck
+                    ? AutomaticFoamSourceEventType.ObjectContactFleck
+                    : AutomaticFoamSourceEventType.ObjectContactArc;
+
+            automaticFoamSourceEvents[slotIndex] = new AutomaticFoamSourceEvent
+            {
+                Active = true,
+                EventId = eventId,
+                Type = sourceType,
+                SideSign = 1f,
+                StartGlobalDistance = startGlobalDistance,
+                EndGlobalDistance = endGlobalDistance,
+                Duration = Mathf.Max(AutomaticObjectSourceMinimumDuration, duration),
+                Elapsed = 0f,
+                FormationSpeedMetresPerSecond = Mathf.Max(0.01f, formationSpeedMetresPerSecond),
+                HeadTrailMetres = Mathf.Clamp(
+                    headTrailMetres,
+                    AutomaticObjectSourceMinimumHeadTrailMetres,
+                    AutomaticObjectSourceMaximumHeadTrailMetres),
+                ShoreInsetMetres = Mathf.Max(0f, contactOffsetMetres),
+                WidthMetres = Mathf.Max(0.01f, widthMetres),
+                InwardReachMetres = Mathf.Max(
+                    0.01f,
+                    Mathf.Max(source.StaticPressureAlongHalfLength, source.StaticPressureAcrossHalfWidth)),
+                FeatherMetres = Mathf.Max(0.01f, featherMetres),
+                SourceAmount = Mathf.Clamp01(amount),
+                RemainingLife = Mathf.Clamp01(remainingLife),
+                PatternSeed = sourceKey + AutomaticObjectBirthPatternSeedSalt,
+                SourceFillSeed = sourceKey + AutomaticObjectBirthSourceFillSeedSalt,
+                SourceFillFeatureSize = Mathf.Max(
+                    SourceFillMinimumFeatureSizeMetres * 0.55f,
+                    Mathf.Max(widthMetres * 1.5f, featherMetres * 1.25f)),
+                ShapeSeed = sourceKey + AutomaticObjectBirthShapeSeedSalt,
+                BreakupScaleMetres = Mathf.Max(0.05f, breakupScaleMetres),
+                BreakupStrength = Mathf.Clamp01(breakupStrength),
+                Curvature = 0f,
+                ObjectCentreAcrossMetres = source.AcrossMetres,
+                ObjectAlongHalfLengthMetres = Mathf.Max(
+                    0.05f,
+                    source.StaticPressureAlongHalfLength),
+                ObjectAcrossHalfWidthMetres = Mathf.Max(
+                    0.05f,
+                    source.StaticPressureAcrossHalfWidth),
+                ObjectContactOffsetMetres = Mathf.Max(0f, contactOffsetMetres)
+            };
+
+            activeAutomaticFoamSourceEventCount++;
+            foamCompositionStartedCount++;
+            latestFoamCompositionEventId = eventId;
+            latestFoamCompositionProgress = 0f;
+            latestFoamCompositionHeadDistanceNormalized =
+                GlobalDistanceToNormalized(startGlobalDistance);
+            latestFoamCompositionPreviousDistanceNormalized =
+                latestFoamCompositionHeadDistanceNormalized;
+            latestFoamCompositionHeadAcrossNormalized = source.AcrossNormalized;
+            latestFoamCompositionPreviousAcrossNormalized = source.AcrossNormalized;
+            lastFoamCompositionSegmentLength = 0f;
+            materialLifetimeAuthorityActive = true;
+            materialLifetimeEmptyMetricReadbacks = 0;
+            lifetimeAuthorityStatus =
+                "Remaining Life / automatic object source-event rasterizer";
+            RecordMaterialBirthCommand();
+            simulationAccumulator = Mathf.Max(
+                simulationAccumulator,
+                1f / Mathf.Max(1f, ResolveUpdateRate()));
+            idleSince = 0.0;
+            return true;
+        }
+
+        private int ResolvePermutedAutomaticObjectSourceIndex(
+            int scanIndex,
+            int sourceCount,
+            int cycleIndex)
+        {
+            if (sourceCount <= 1)
+            {
+                return 0;
+            }
+
+            int stride = ResolveCoprimeAutomaticSourceStride(
+                sourceCount,
+                cycleIndex + 73);
+            int offset = PositiveModulo(
+                Mathf.RoundToInt(Hash01(
+                    river.VisualSeed * 0.193f + cycleIndex * 23.731f) *
+                    sourceCount),
+                sourceCount);
+            return PositiveModulo(offset + scanIndex * stride, sourceCount);
         }
 
         private bool TryStartAutomaticShoreSourceEvent(

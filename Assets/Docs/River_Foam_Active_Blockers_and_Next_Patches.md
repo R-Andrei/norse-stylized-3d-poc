@@ -1069,3 +1069,43 @@ Implemented direction:
 - Dimension sampling now uses one correlated event scale with small axis jitter and aspect guards.
 
 Validation target: use Material Remaining Life first. Confirm the main Shore Foam controls still work, pattern weights keep Mixed composition normalized, per-pattern Formation Speed affects only that pattern, and Initial Life changes how long newly spawned material survives under normal aging. Final Foam remains out of scope.
+
+## Patch 4.11C.5.15A — Static Object Contact Foam Birth
+
+Status: implemented in this patch.
+
+This patch keeps the work scoped to Layer C spawning. It enables the Object Foam category in the Foam Birth authoring framework and adds CPU-scheduled static object/contact source events anchored from `StylizedRiverDisturbanceRuntime`'s registered static source data. The GPU source-event rasterizer remains the only automatic birth path and writes real persistent `FoamState` material through `FoamMergeBornPresence`.
+
+Implementation decisions:
+
+- Source scheduling uses exported static object source snapshots instead of scanning the obstacle texture for spawn candidates.
+- The obstacle exclusion texture is used as a do-not-spawn-inside-solid gate.
+- The static pressure texture is used as a contact relevance gate/bias for object contact arcs/flecks.
+- Object Foam currently exposes Contact Arcs and Contact Flecks only. Wake tails and free-water foam remain later source classes.
+
+Validation target: in Material Remaining Life, Object Foam should produce upstream/side contact arcs and small flecks around registered static river obstacles without filling obstacle footprints or generating full rings.
+
+## Patch 4.11C.5.15A.1 — Object Birth Activation Wiring Fix
+
+5.15A was intended to spawn Object Foam, but validation showed `Runtime Status: Object source population disabled` while Object Foam was enabled. The root cause was that the source-category active properties still treated `Spawn Preset` as a hard category gate. Object Foam could be enabled in its foldout but remain inactive unless the top-level preset was `ObstacleContactTest`, `Custom`, or `BalancedMixedTest`.
+
+5.15A.1 makes source-category toggles authoritative: `Automatic Foam Birth` is the global switch, `Spawn Preset = Off` disables all automatic birth, and each category's `Enabled` toggle controls that category. Object Foam now also reports the number of static source anchors copied from the disturbance runtime, so activation failures can be separated from registration/export failures.
+
+## Patch 4.11C.5.15A.2 — Object Contact Edge Field
+
+Status: implemented after 5.15A.1 validation proved Object Foam events spawned, but Contact Arc/Fleck masks were visibly crude and rectangular.
+
+Reason for the patch:
+
+- 5.15A shaped object foam primarily from object-local half extents, which produced box-like front/side bands.
+- The correct spawning architecture remains CPU-scheduled bounded object source events, but the visible mask needs to follow actual water/object contact evidence instead of a rectangle approximation.
+- A GPU contact-edge field is the best quality/performance step: it is cheap at current foam resolutions, has no GPU readback, and gives the source-event rasterizer local contact confidence and normal data.
+
+Implemented direction:
+
+- Added `PS3D_RiverFoam_ObjectContactField`, an ARGBHalf field built from obstacle exclusion plus static pressure/contact evidence.
+- The field stores contact confidence, object-to-water normal, and upstream/front-side relevance.
+- Object Contact Arc and Contact Fleck rasterization now samples this field and uses contact normal/tangent space instead of drawing box-like bands from object extents alone.
+- Object extents remain only as coarse event bounds/rejection windows, preserving bounded CPU scheduling and range-limited GPU dispatch.
+
+Validation target: in Material Remaining Life, Object Contact Arcs should read as partial edge-hugging arcs or shoulder strokes rather than rectangular slabs. Contact Flecks should read as small contact slivers/fragments. No material should appear inside obstacle footprints. Shore Foam remains out of scope except for regression checks.

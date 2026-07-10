@@ -623,14 +623,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     bounds.size.x,
                     Mathf.Max(bounds.size.y, bounds.size.z)));
 
-            // EW-B1S keeps the EW-4A.1 control contract: Width owns physical
+            // EW-B3 keeps the EW-4A.1 control contract: Width owns physical
             // bevel depth, Amount owns generated material strength, and
             // Softness is reserved for material/normal response. The active
-            // construction route is now the deterministic selected-edge bevel
-            // kernel scaffold. Legacy local-bevel, half-space, sampled-ribbon,
-            // workspace, and open-cycle closure construction code has been
-            // stripped from this source; EW-B geometry must be authored through
-            // EW-B-specific records and functions only.
+            // construction route emits source-owned local bevel geometry from
+            // the final source graph before triangulation. It does not apply
+            // per-edge global half-space cuts, sampled ribbons, or open-cycle
+            // closure.
             float width01 = Mathf.InverseLerp(0.25f, 2f, settings.EdgeWearWidth);
             float bevelDepth = maximumDimension * Mathf.Lerp(0.0035f, 0.0115f, width01);
             bevelDepth = Mathf.Clamp(
@@ -685,10 +684,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     out List<PolygonFace> rebuiltFaces,
                     ref stats))
             {
-                // EW-B1S fail-closed: this purge patch intentionally stops
-                // after deterministic graph/edge/vertex classification. EW-B1R
-                // will add the first clean isolated-edge geometry case without
-                // delegating to retired bevel-construction code.
+                // EW-B3 fail-closed: source-owned local bevel emission did
+                // not pass its validation gates.
                 WarnEdgeWearBevelFailure(stats);
                 return;
             }
@@ -756,7 +753,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             faces.Clear();
             faces.AddRange(ClonePolygonFaces(rebuiltFaces));
 
-            stats.AcceptedCount = selectedCount;
+            stats.AcceptedCount = stats.DeterministicKernelLocalBevelFaceBuiltCount > 0
+                ? stats.DeterministicKernelLocalBevelFaceBuiltCount
+                : selectedCount;
 
             LogEdgeWearBevelCommit(stats);
         }
@@ -920,11 +919,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             rebuiltFaces = null;
 
-            // EW-B1S: legacy construction purge. The active EW-B path now
-            // stops after source graph/candidate/vertex classification. It
-            // intentionally does not call any EW-4B/EW-4C/EW-4D local bevel,
-            // half-space, sampled-ribbon, workspace, or open-cycle closure
-            // construction code. EW-B1R will add geometry from these records.
+            // EW-B3R: source-owned local bevel network emission with
+            // deterministic source-vertex cap closure. The final generated
+            // source polyhedron owns every output face: source faces emit local
+            // replacement polygons, selected source edges emit local bevel faces
+            // between adjacent face rails, and affected source vertices emit
+            // cap triangles ordered from the source vertex star. No per-edge
+            // global half-space cuts are used for edge wear.
             if (!TryBuildEdgeWearTopologyGraph(
                     faces,
                     out EdgeWearTopologyGraph graph,
@@ -959,7 +960,1374 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     ref stats);
 
             stats.ApplyGraphStats(graphStats);
-            stats.DeterministicKernelGeometryPendingCount = 1;
+            ApplyDeterministicKernelSourceStats(
+                graph,
+                selectedEdges,
+                edgeRecords,
+                vertexRecords,
+                ref stats);
+            stats.DeterministicKernelGeometryPendingCount = 0;
+            stats.DeterministicKernelGlobalCutAppliedCount = 0;
+
+            if (edgeRecords.Count == 0)
+            {
+                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationGlobal);
+                return false;
+            }
+
+            if (!TryBuildSourceOwnedLocalBevelNetwork(
+                    graph,
+                    edgeRecords,
+                    vertexRecords,
+                    bevelDepth,
+                    minimumStableFaceArea,
+                    minimumStableEdgeLength,
+                    out rebuiltFaces,
+                    ref stats))
+            {
+                return false;
+            }
+
+            TriangulateConvexEdgeWearPolygons(
+                rebuiltFaces,
+                minimumStableFaceArea,
+                minimumStableEdgeLength,
+                ref stats);
+
+            WeldSharedVertices(rebuiltFaces);
+            SanitizeAllFaces(rebuiltFaces);
+
+            EdgeWearTopologyStats kernelTopology = AuditEdgeWearTopology(
+                rebuiltFaces,
+                minimumStableEdgeLength);
+            stats.DeterministicKernelOpenEdgesAfterBuildCount =
+                kernelTopology.OpenEdgeCount;
+            stats.DeterministicKernelNonManifoldEdgesAfterBuildCount =
+                kernelTopology.NonManifoldEdgeCount;
+            stats.DeterministicKernelTJunctionsAfterBuildCount =
+                kernelTopology.TJunctionCount;
+
+            if (kernelTopology.OpenEdgeCount != 0)
+            {
+                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationOpenEdge);
+                return false;
+            }
+
+            if (kernelTopology.NonManifoldEdgeCount != 0)
+            {
+                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationNonManifoldEdge);
+                return false;
+            }
+
+            if (kernelTopology.TJunctionCount != 0)
+            {
+                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationTJunction);
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryBuildSourceOwnedLocalBevelNetwork(
+            EdgeWearTopologyGraph graph,
+            List<DeterministicBevelEdgeRecord> edgeRecords,
+            List<DeterministicBevelVertexRecord> vertexRecords,
+            float bevelDepth,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength,
+            out List<PolygonFace> rebuiltFaces,
+            ref EdgeWearBevelBuildStats stats)
+        {
+            rebuiltFaces = new List<PolygonFace>();
+
+            HashSet<int> selectedEdgeIndices = new HashSet<int>();
+            for (int i = 0; i < edgeRecords.Count; i++)
+            {
+                selectedEdgeIndices.Add(edgeRecords[i].GraphEdgeIndex);
+            }
+
+            HashSet<int> affectedFaces = new HashSet<int>();
+            HashSet<int> affectedVertices = new HashSet<int>();
+            for (int i = 0; i < edgeRecords.Count; i++)
+            {
+                if (edgeRecords[i].FaceA >= 0)
+                {
+                    affectedFaces.Add(edgeRecords[i].FaceA);
+                }
+
+                if (edgeRecords[i].FaceB >= 0)
+                {
+                    affectedFaces.Add(edgeRecords[i].FaceB);
+                }
+
+                affectedVertices.Add(edgeRecords[i].StartVertexIndex);
+                affectedVertices.Add(edgeRecords[i].EndVertexIndex);
+            }
+
+            Dictionary<DeterministicBevelRailKey, DeterministicBevelRailRecord> rails =
+                new Dictionary<DeterministicBevelRailKey, DeterministicBevelRailRecord>();
+            Dictionary<int, List<DeterministicBevelVertexCapPoint>> vertexCapPoints =
+                new Dictionary<int, List<DeterministicBevelVertexCapPoint>>();
+
+            for (int graphFaceIndex = 0;
+                 graphFaceIndex < graph.Faces.Count;
+                 graphFaceIndex++)
+            {
+                EdgeWearGraphFace graphFace = graph.Faces[graphFaceIndex];
+                bool affectedFace = affectedFaces.Contains(graphFace.SourceFaceIndex);
+                if (!affectedFace)
+                {
+                    rebuiltFaces.Add(
+                        new PolygonFace(
+                            new List<Vector3>(graphFace.SourceFace.Vertices),
+                            graphFace.SourceFace.Normal,
+                            graphFace.SourceFace.Feature,
+                            graphFace.SourceFace.FeatureStrength));
+                    continue;
+                }
+
+                stats.DeterministicKernelFaceOffsetPolygonAttemptCount++;
+                if (!TryBuildDeterministicFaceOffsetPolygon(
+                        graph,
+                        graphFace,
+                        selectedEdgeIndices,
+                        affectedVertices,
+                        bevelDepth,
+                        minimumStableFaceArea,
+                        minimumStableEdgeLength,
+                        out PolygonFace replacementFace,
+                        rails,
+                        vertexCapPoints))
+                {
+                    stats.DeterministicKernelFaceOffsetPolygonFailedCount++;
+                    stats.RegisterReject(EdgeWearBevelRejectReason.ValidationBaseFace);
+                    rebuiltFaces = null;
+                    return false;
+                }
+
+                rebuiltFaces.Add(replacementFace);
+                stats.DeterministicKernelFaceOffsetPolygonBuiltCount++;
+            }
+
+            int expectedRails = 0;
+            for (int i = 0; i < graph.Faces.Count; i++)
+            {
+                expectedRails += graph.Faces[i].EdgeIndices.Count;
+            }
+
+            stats.DeterministicKernelRailsExpectedCount = expectedRails;
+            stats.DeterministicKernelRailsBuiltCount = rails.Count;
+
+            for (int graphEdgeIndex = 0;
+                 graphEdgeIndex < graph.Edges.Count;
+                 graphEdgeIndex++)
+            {
+                EdgeWearGraphEdge edge = graph.Edges[graphEdgeIndex];
+                if (edge.FaceA < 0 || edge.FaceB < 0)
+                {
+                    continue;
+                }
+
+                bool selected = selectedEdgeIndices.Contains(graphEdgeIndex);
+                if (selected)
+                {
+                    stats.DeterministicKernelLocalBevelFaceAttemptCount++;
+                }
+
+                if (!TryGetRail(
+                        rails,
+                        edge.FaceA,
+                        graphEdgeIndex,
+                        out DeterministicBevelRailRecord railA) ||
+                    !TryGetRail(
+                        rails,
+                        edge.FaceB,
+                        graphEdgeIndex,
+                        out DeterministicBevelRailRecord railB))
+                {
+                    if (selected)
+                    {
+                        stats.DeterministicKernelRailsMissingCount++;
+                        stats.DeterministicKernelLocalBevelFaceFailedCount++;
+                    }
+
+                    continue;
+                }
+
+                if (selected)
+                {
+                    if (!TryBuildDeterministicEdgeBridgeFace(
+                            railA,
+                            railB,
+                            PolygonFaceFeature.ConvexEdgeWear,
+                            ResolveSelectedEdgeFeatureStrength(
+                                edgeRecords,
+                                graphEdgeIndex),
+                            ResolveSelectedEdgeNormal(
+                                edgeRecords,
+                                graphEdgeIndex,
+                                railA,
+                                railB),
+                            minimumStableFaceArea,
+                            minimumStableEdgeLength,
+                            out PolygonFace bevelFace))
+                    {
+                        stats.DeterministicKernelLocalBevelFaceFailedCount++;
+                        continue;
+                    }
+
+                    rebuiltFaces.Add(bevelFace);
+                    stats.DeterministicKernelLocalBevelFaceBuiltCount++;
+                    stats.DeterministicKernelBevelFacesBuiltCount++;
+                    continue;
+                }
+
+                if (RailsCoincide(railA, railB, minimumStableEdgeLength))
+                {
+                    continue;
+                }
+
+                if (TryBuildDeterministicEdgeBridgeFace(
+                        railA,
+                        railB,
+                        PolygonFaceFeature.Base,
+                        0f,
+                        Vector3.zero,
+                        minimumStableFaceArea,
+                        minimumStableEdgeLength,
+                        out PolygonFace transitionFace))
+                {
+                    rebuiltFaces.Add(transitionFace);
+                    stats.DeterministicKernelTransitionFacesBuiltCount++;
+                }
+            }
+
+            stats.DeterministicKernelSupportedEdgeCount =
+                stats.DeterministicKernelLocalBevelFaceBuiltCount;
+            stats.DeterministicKernelDeferredEdgeCount = Mathf.Max(
+                0,
+                edgeRecords.Count - stats.DeterministicKernelLocalBevelFaceBuiltCount);
+
+            for (int i = 0; i < vertexRecords.Count; i++)
+            {
+                DeterministicBevelVertexRecord vertex = vertexRecords[i];
+                if (!affectedVertices.Contains(vertex.VertexIndex))
+                {
+                    continue;
+                }
+
+                stats.DeterministicKernelVertexCapAttemptCount++;
+                RegisterDeterministicVertexCapAttempt(vertex.Case, ref stats);
+                if (!vertexCapPoints.TryGetValue(
+                        vertex.VertexIndex,
+                        out List<DeterministicBevelVertexCapPoint> points))
+                {
+                    stats.DeterministicKernelVertexCapFailedCount++;
+                    RegisterDeterministicVertexCapFailure(vertex.Case, ref stats);
+                    stats.DeterministicKernelVertexCapDuplicatePointFailureCount++;
+                    continue;
+                }
+
+                if (!TryBuildDeterministicVertexCapFaces(
+                        graph,
+                        vertex,
+                        points,
+                        minimumStableFaceArea,
+                        minimumStableEdgeLength,
+                        out List<PolygonFace> capFaces,
+                        ref stats))
+                {
+                    stats.DeterministicKernelVertexCapFailedCount++;
+                    RegisterDeterministicVertexCapFailure(vertex.Case, ref stats);
+                    continue;
+                }
+
+                rebuiltFaces.AddRange(capFaces);
+                stats.DeterministicKernelVertexCapBuiltCount++;
+                RegisterDeterministicVertexCapBuilt(vertex.Case, ref stats);
+            }
+
+            if (stats.DeterministicKernelFaceOffsetPolygonBuiltCount == 0 ||
+                stats.DeterministicKernelLocalBevelFaceBuiltCount == 0)
+            {
+                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationBevelFace);
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryBuildDeterministicFaceOffsetPolygon(
+            EdgeWearTopologyGraph graph,
+            EdgeWearGraphFace graphFace,
+            HashSet<int> selectedEdgeIndices,
+            HashSet<int> affectedVertices,
+            float bevelDepth,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength,
+            out PolygonFace replacementFace,
+            Dictionary<DeterministicBevelRailKey, DeterministicBevelRailRecord> rails,
+            Dictionary<int, List<DeterministicBevelVertexCapPoint>> vertexCapPoints)
+        {
+            replacementFace = null;
+            PolygonFace sourceFace = graphFace.SourceFace;
+            int vertexCount = graphFace.VertexIndices.Count;
+            if (vertexCount < 3 || graphFace.EdgeIndices.Count != vertexCount)
+            {
+                return false;
+            }
+
+            List<DeterministicFaceOffsetLine> lines =
+                new List<DeterministicFaceOffsetLine>(vertexCount);
+            float minimumFaceEdgeLength = float.PositiveInfinity;
+            for (int i = 0; i < vertexCount; i++)
+            {
+                Vector3 start = graph.Vertices[graphFace.VertexIndices[i]].Position;
+                Vector3 end = graph.Vertices[graphFace.VertexIndices[(i + 1) % vertexCount]].Position;
+                minimumFaceEdgeLength = Mathf.Min(
+                    minimumFaceEdgeLength,
+                    (end - start).magnitude);
+            }
+
+            float localWidth = Mathf.Min(
+                bevelDepth,
+                Mathf.Max(minimumStableEdgeLength * 2f, minimumFaceEdgeLength * 0.22f));
+
+            for (int i = 0; i < vertexCount; i++)
+            {
+                int edgeIndex = graphFace.EdgeIndices[i];
+                Vector3 start = graph.Vertices[graphFace.VertexIndices[i]].Position;
+                Vector3 end = graph.Vertices[graphFace.VertexIndices[(i + 1) % vertexCount]].Position;
+                Vector3 edgeVector = end - start;
+                if (edgeVector.sqrMagnitude <= MinimumEdgeLengthSqr)
+                {
+                    return false;
+                }
+
+                Vector3 direction = edgeVector.normalized;
+                Vector3 inward = Vector3.Cross(sourceFace.Normal, direction);
+                if (inward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(inward))
+                {
+                    return false;
+                }
+
+                inward.Normalize();
+                bool selected = selectedEdgeIndices.Contains(edgeIndex);
+                Vector3 point = selected
+                    ? start + inward * localWidth
+                    : start;
+
+                lines.Add(
+                    new DeterministicFaceOffsetLine(
+                        edgeIndex,
+                        graphFace.VertexIndices[i],
+                        graphFace.VertexIndices[(i + 1) % vertexCount],
+                        selected,
+                        start,
+                        point,
+                        direction,
+                        inward));
+            }
+
+            List<Vector3> replacementPoints = new List<Vector3>(vertexCount);
+            for (int i = 0; i < vertexCount; i++)
+            {
+                DeterministicFaceOffsetLine previous =
+                    lines[(i - 1 + vertexCount) % vertexCount];
+                DeterministicFaceOffsetLine current = lines[i];
+                int vertexIndex = graphFace.VertexIndices[i];
+                Vector3 original = graph.Vertices[vertexIndex].Position;
+
+                Vector3 corner;
+                if (!TryIntersectFaceOffsetLines(
+                        previous,
+                        current,
+                        sourceFace.Normal,
+                        out corner))
+                {
+                    Vector3 offset = Vector3.zero;
+                    if (previous.Selected)
+                    {
+                        offset += previous.Inward;
+                    }
+
+                    if (current.Selected)
+                    {
+                        offset += current.Inward;
+                    }
+
+                    corner = offset.sqrMagnitude > MinimumEdgeLengthSqr
+                        ? original + offset.normalized * localWidth
+                        : original;
+                }
+
+                replacementPoints.Add(corner);
+                if (affectedVertices.Contains(vertexIndex))
+                {
+                    AddVertexCapPoint(
+                        vertexCapPoints,
+                        vertexIndex,
+                        graphFace.SourceFaceIndex,
+                        previous.GraphEdgeIndex,
+                        current.GraphEdgeIndex,
+                        corner);
+                }
+            }
+
+            List<Vector3> cleaned = SanitizePolygon(
+                replacementPoints,
+                sourceFace.Normal);
+            if (cleaned.Count != replacementPoints.Count ||
+                cleaned.Count < 3 ||
+                CalculatePolygonArea(cleaned) <= minimumStableFaceArea ||
+                !FaceEdgesAreStable(cleaned, minimumStableEdgeLength))
+            {
+                return false;
+            }
+
+            replacementFace = new PolygonFace(
+                cleaned,
+                sourceFace.Normal,
+                PolygonFaceFeature.Base,
+                0f);
+
+            for (int i = 0; i < vertexCount; i++)
+            {
+                DeterministicBevelRailKey key =
+                    new DeterministicBevelRailKey(
+                        graphFace.SourceFaceIndex,
+                        graphFace.EdgeIndices[i]);
+                rails[key] =
+                    new DeterministicBevelRailRecord(
+                        graphFace.SourceFaceIndex,
+                        graphFace.EdgeIndices[i],
+                        graphFace.VertexIndices[i],
+                        graphFace.VertexIndices[(i + 1) % vertexCount],
+                        replacementPoints[i],
+                        replacementPoints[(i + 1) % vertexCount]);
+            }
+
+            return true;
+        }
+
+        private static bool TryIntersectFaceOffsetLines(
+            DeterministicFaceOffsetLine first,
+            DeterministicFaceOffsetLine second,
+            Vector3 normal,
+            out Vector3 point)
+        {
+            point = Vector3.zero;
+            Vector3 tangent = first.Direction;
+            if (tangent.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                return false;
+            }
+
+            tangent.Normalize();
+            Vector3 bitangent = Vector3.Cross(normal, tangent);
+            if (bitangent.sqrMagnitude <= MinimumEdgeLengthSqr)
+            {
+                return false;
+            }
+
+            bitangent.Normalize();
+
+            Vector2 p = new Vector2(
+                Vector3.Dot(first.Point, tangent),
+                Vector3.Dot(first.Point, bitangent));
+            Vector2 r = new Vector2(
+                Vector3.Dot(first.Direction, tangent),
+                Vector3.Dot(first.Direction, bitangent));
+            Vector2 q = new Vector2(
+                Vector3.Dot(second.Point, tangent),
+                Vector3.Dot(second.Point, bitangent));
+            Vector2 s = new Vector2(
+                Vector3.Dot(second.Direction, tangent),
+                Vector3.Dot(second.Direction, bitangent));
+
+            float denominator = Cross2D(r, s);
+            if (Mathf.Abs(denominator) <= PlaneEpsilon)
+            {
+                return false;
+            }
+
+            Vector2 delta = q - p;
+            float t = Cross2D(delta, s) / denominator;
+            point = first.Point + first.Direction * t;
+            return IsFinite(point);
+        }
+
+        private static bool TryGetRail(
+            Dictionary<DeterministicBevelRailKey, DeterministicBevelRailRecord> rails,
+            int faceIndex,
+            int graphEdgeIndex,
+            out DeterministicBevelRailRecord rail)
+        {
+            return rails.TryGetValue(
+                new DeterministicBevelRailKey(faceIndex, graphEdgeIndex),
+                out rail);
+        }
+
+        private static bool TryBuildDeterministicEdgeBridgeFace(
+            DeterministicBevelRailRecord first,
+            DeterministicBevelRailRecord second,
+            PolygonFaceFeature feature,
+            float featureStrength,
+            Vector3 preferredNormal,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength,
+            out PolygonFace face)
+        {
+            face = null;
+            Vector3 firstStart = first.StartPoint;
+            Vector3 firstEnd = first.EndPoint;
+            Vector3 secondStart = GetRailPointForVertex(second, first.StartVertexIndex);
+            Vector3 secondEnd = GetRailPointForVertex(second, first.EndVertexIndex);
+
+            if (!IsFinite(secondStart) || !IsFinite(secondEnd))
+            {
+                return false;
+            }
+
+            List<Vector3> points = new List<Vector3>
+            {
+                firstStart,
+                firstEnd,
+                secondEnd,
+                secondStart
+            };
+
+            Vector3 normal = preferredNormal.sqrMagnitude > MinimumEdgeLengthSqr
+                ? preferredNormal.normalized
+                : CalculatePolygonNormal(points);
+            if (normal.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(normal))
+            {
+                return false;
+            }
+
+            points = SanitizePolygon(points, normal);
+            if (points.Count < 3 ||
+                CalculatePolygonArea(points) <= minimumStableFaceArea ||
+                !FaceEdgesAreStable(points, minimumStableEdgeLength))
+            {
+                return false;
+            }
+
+            face = new PolygonFace(
+                points,
+                normal,
+                feature,
+                featureStrength);
+            return true;
+        }
+
+        private static bool TryBuildDeterministicVertexCapFaces(
+            EdgeWearTopologyGraph graph,
+            DeterministicBevelVertexRecord vertex,
+            List<DeterministicBevelVertexCapPoint> rawPoints,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength,
+            out List<PolygonFace> capFaces,
+            ref EdgeWearBevelBuildStats stats)
+        {
+            if (vertex.Case == DeterministicBevelVertexCase.IsolatedEndpoint)
+            {
+                return TryBuildLowValenceDeterministicVertexCapFaces(
+                    graph,
+                    vertex,
+                    rawPoints,
+                    out capFaces,
+                    ref stats);
+            }
+
+            if (vertex.Case == DeterministicBevelVertexCase.TwoEdgeCorner)
+            {
+                return TryBuildTwoEdgeCornerDeterministicVertexCapFaces(
+                    graph,
+                    vertex,
+                    rawPoints,
+                    out capFaces,
+                    ref stats);
+            }
+
+            capFaces = null;
+            if (!TryBuildOrderedVertexCapBoundary(
+                    graph,
+                    vertex,
+                    rawPoints,
+                    out List<Vector3> boundary,
+                    out Vector3 outward,
+                    ref stats))
+            {
+                return false;
+            }
+
+            if (boundary.Count < 3)
+            {
+                stats.DeterministicKernelVertexCapTooSmallFailureCount++;
+                return false;
+            }
+
+            Vector3 centre = CalculateAverage(boundary);
+            if (!IsFinite(centre))
+            {
+                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
+                return false;
+            }
+
+            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
+            {
+                outward = graph.Vertices[vertex.VertexIndex].Position - centre;
+            }
+
+            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
+            {
+                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
+                return false;
+            }
+
+            outward.Normalize();
+            capFaces = new List<PolygonFace>(boundary.Count);
+            for (int i = 0; i < boundary.Count; i++)
+            {
+                Vector3 a = centre;
+                Vector3 b = boundary[i];
+                Vector3 c = boundary[(i + 1) % boundary.Count];
+                if (PreviewTriangleEmission(
+                        a,
+                        b,
+                        c,
+                        outward,
+                        0f) != TriangleEmissionPreviewResult.Emitted)
+                {
+                    stats.DeterministicKernelVertexCapAreaFailureCount++;
+                    return false;
+                }
+
+                Vector3 triangleNormal = Vector3.Cross(b - a, c - a);
+                if (triangleNormal.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(triangleNormal))
+                {
+                    stats.DeterministicKernelVertexCapAreaFailureCount++;
+                    return false;
+                }
+
+                if (Vector3.Dot(triangleNormal, outward) < 0f)
+                {
+                    Vector3 temporary = b;
+                    b = c;
+                    c = temporary;
+                    triangleNormal = -triangleNormal;
+                }
+
+                List<Vector3> triangle = new List<Vector3> { a, b, c };
+                if (CalculatePolygonArea(triangle) <= minimumStableFaceArea ||
+                    !FaceEdgesAreStable(triangle, minimumStableEdgeLength))
+                {
+                    stats.DeterministicKernelVertexCapAreaFailureCount++;
+                    return false;
+                }
+
+                capFaces.Add(
+                    new PolygonFace(
+                        triangle,
+                        triangleNormal.normalized,
+                        PolygonFaceFeature.ConvexEdgeWear,
+                        1f));
+            }
+
+            if (capFaces.Count != boundary.Count)
+            {
+                stats.DeterministicKernelVertexCapTooSmallFailureCount++;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryBuildLowValenceDeterministicVertexCapFaces(
+            EdgeWearTopologyGraph graph,
+            DeterministicBevelVertexRecord vertex,
+            List<DeterministicBevelVertexCapPoint> rawPoints,
+            out List<PolygonFace> capFaces,
+            ref EdgeWearBevelBuildStats stats)
+        {
+            capFaces = null;
+            stats.DeterministicKernelVertexCapLowValenceAttemptCount++;
+
+            if (vertex.VertexIndex < 0 || vertex.VertexIndex >= graph.Vertices.Count)
+            {
+                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
+                stats.DeterministicKernelVertexCapLowValenceFailedCount++;
+                return false;
+            }
+
+            Vector3 apex = graph.Vertices[vertex.VertexIndex].Position;
+            if (!IsFinite(apex))
+            {
+                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
+                stats.DeterministicKernelVertexCapLowValenceFailedCount++;
+                return false;
+            }
+
+            Vector3 outward = CalculateVertexStarNormal(graph, vertex.VertexIndex);
+            List<Vector3> boundary = CollectUniqueVertexCapPoints(rawPoints, apex);
+            if (boundary.Count < 2)
+            {
+                stats.DeterministicKernelVertexCapLowValenceInsufficientBoundaryFailureCount++;
+                stats.DeterministicKernelVertexCapLowValenceFailedCount++;
+                return false;
+            }
+
+            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
+            {
+                Vector3 average = CalculateAverage(boundary);
+                outward = apex - average;
+            }
+
+            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
+            {
+                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
+                stats.DeterministicKernelVertexCapLowValenceFailedCount++;
+                return false;
+            }
+
+            outward.Normalize();
+            SortVertexCapBoundaryByAngle(boundary, apex, outward);
+            capFaces = new List<PolygonFace>(Mathf.Max(1, boundary.Count));
+            int triangleCount = boundary.Count == 2 ? 1 : boundary.Count;
+            for (int i = 0; i < triangleCount; i++)
+            {
+                Vector3 a = apex;
+                Vector3 b = boundary[i];
+                Vector3 c = boundary[(i + 1) % boundary.Count];
+                if (!TryCreateDeterministicVertexCapTriangle(
+                        a,
+                        b,
+                        c,
+                        outward,
+                        out PolygonFace triangleFace))
+                {
+                    stats.DeterministicKernelVertexCapAreaFailureCount++;
+                    stats.DeterministicKernelVertexCapLowValenceFailedCount++;
+                    return false;
+                }
+
+                capFaces.Add(triangleFace);
+                stats.DeterministicKernelVertexCapLowValenceApexTriangleBuiltCount++;
+            }
+
+            if (capFaces.Count == 0)
+            {
+                stats.DeterministicKernelVertexCapTooSmallFailureCount++;
+                stats.DeterministicKernelVertexCapLowValenceFailedCount++;
+                return false;
+            }
+
+            stats.DeterministicKernelVertexCapLowValenceBuiltCount++;
+            return true;
+        }
+
+        private static bool TryBuildTwoEdgeCornerDeterministicVertexCapFaces(
+            EdgeWearTopologyGraph graph,
+            DeterministicBevelVertexRecord vertex,
+            List<DeterministicBevelVertexCapPoint> rawPoints,
+            out List<PolygonFace> capFaces,
+            ref EdgeWearBevelBuildStats stats)
+        {
+            capFaces = null;
+            stats.DeterministicKernelVertexCapTwoEdgeCornerPatchAttemptCount++;
+
+            if (vertex.VertexIndex < 0 || vertex.VertexIndex >= graph.Vertices.Count)
+            {
+                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
+                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
+                return false;
+            }
+
+            Vector3 origin = graph.Vertices[vertex.VertexIndex].Position;
+            if (!IsFinite(origin))
+            {
+                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
+                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
+                return false;
+            }
+
+            List<Vector3> boundary = CollectUniqueVertexCapPoints(rawPoints, origin);
+            if (boundary.Count < 3)
+            {
+                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchInsufficientBoundaryFailureCount++;
+                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
+                return false;
+            }
+
+            Vector3 outward = CalculateVertexStarNormal(graph, vertex.VertexIndex);
+            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
+            {
+                Vector3 average = CalculateAverage(boundary);
+                outward = origin - average;
+            }
+
+            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
+            {
+                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
+                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
+                return false;
+            }
+
+            outward.Normalize();
+            SortVertexCapBoundaryByAngle(boundary, origin, outward);
+
+            if (!TryCalculateRawPolygonNormal(
+                    boundary,
+                    PointMergeDistance,
+                    out Vector3 boundaryNormal))
+            {
+                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchAreaFailureCount++;
+                stats.DeterministicKernelVertexCapAreaFailureCount++;
+                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
+                return false;
+            }
+
+            if (Vector3.Dot(boundaryNormal, outward) < 0f)
+            {
+                boundary.Reverse();
+            }
+
+            capFaces = new List<PolygonFace>(boundary.Count);
+            if (boundary.Count == 3)
+            {
+                if (!TryCreateDeterministicVertexCapTriangle(
+                        boundary[0],
+                        boundary[1],
+                        boundary[2],
+                        outward,
+                        out PolygonFace triangleFace))
+                {
+                    stats.DeterministicKernelVertexCapTwoEdgeCornerPatchAreaFailureCount++;
+                    stats.DeterministicKernelVertexCapAreaFailureCount++;
+                    stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
+                    return false;
+                }
+
+                capFaces.Add(triangleFace);
+                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchTriangleBuiltCount++;
+            }
+            else
+            {
+                Vector3 centre = CalculateAverage(boundary);
+                if (!IsFinite(centre))
+                {
+                    stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
+                    stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
+                    return false;
+                }
+
+                for (int i = 0; i < boundary.Count; i++)
+                {
+                    if (!TryCreateDeterministicVertexCapTriangle(
+                            centre,
+                            boundary[i],
+                            boundary[(i + 1) % boundary.Count],
+                            outward,
+                            out PolygonFace triangleFace))
+                    {
+                        stats.DeterministicKernelVertexCapTwoEdgeCornerPatchAreaFailureCount++;
+                        stats.DeterministicKernelVertexCapAreaFailureCount++;
+                        stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
+                        return false;
+                    }
+
+                    capFaces.Add(triangleFace);
+                    stats.DeterministicKernelVertexCapTwoEdgeCornerPatchTriangleBuiltCount++;
+                }
+            }
+
+            if (capFaces.Count == 0)
+            {
+                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchAreaFailureCount++;
+                stats.DeterministicKernelVertexCapAreaFailureCount++;
+                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
+                return false;
+            }
+
+            stats.DeterministicKernelVertexCapTwoEdgeCornerPatchBuiltCount++;
+            return true;
+        }
+
+        private static bool TryCreateDeterministicVertexCapTriangle(
+            Vector3 a,
+            Vector3 b,
+            Vector3 c,
+            Vector3 outward,
+            out PolygonFace face)
+        {
+            face = null;
+            if (PreviewTriangleEmission(
+                    a,
+                    b,
+                    c,
+                    outward,
+                    0f) != TriangleEmissionPreviewResult.Emitted)
+            {
+                return false;
+            }
+
+            Vector3 triangleNormal = Vector3.Cross(b - a, c - a);
+            if (triangleNormal.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(triangleNormal))
+            {
+                return false;
+            }
+
+            if (Vector3.Dot(triangleNormal, outward) < 0f)
+            {
+                Vector3 temporary = b;
+                b = c;
+                c = temporary;
+                triangleNormal = -triangleNormal;
+            }
+
+            face = new PolygonFace(
+                new List<Vector3> { a, b, c },
+                triangleNormal.normalized,
+                PolygonFaceFeature.ConvexEdgeWear,
+                1f);
+            return true;
+        }
+
+        private static List<Vector3> CollectUniqueVertexCapPoints(
+            List<DeterministicBevelVertexCapPoint> rawPoints,
+            Vector3 apex)
+        {
+            List<Vector3> unique = new List<Vector3>();
+            for (int i = 0; i < rawPoints.Count; i++)
+            {
+                Vector3 point = rawPoints[i].Point;
+                if (!IsFinite(point) ||
+                    (point - apex).sqrMagnitude <= PointMergeDistanceSqr)
+                {
+                    continue;
+                }
+
+                bool duplicate = false;
+                for (int j = 0; j < unique.Count; j++)
+                {
+                    if ((point - unique[j]).sqrMagnitude <= PointMergeDistanceSqr)
+                    {
+                        duplicate = true;
+                        break;
+                    }
+                }
+
+                if (!duplicate)
+                {
+                    unique.Add(point);
+                }
+            }
+
+            return unique;
+        }
+
+        private static void SortVertexCapBoundaryByAngle(
+            List<Vector3> boundary,
+            Vector3 origin,
+            Vector3 outward)
+        {
+            if (boundary.Count <= 2)
+            {
+                return;
+            }
+
+            Vector3 tangent = Mathf.Abs(outward.y) < 0.9f
+                ? Vector3.Cross(outward, Vector3.up)
+                : Vector3.Cross(outward, Vector3.right);
+            if (tangent.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(tangent))
+            {
+                return;
+            }
+
+            tangent.Normalize();
+            Vector3 bitangent = Vector3.Cross(outward, tangent);
+            if (bitangent.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(bitangent))
+            {
+                return;
+            }
+
+            bitangent.Normalize();
+            boundary.Sort((left, right) =>
+            {
+                Vector3 leftOffset = left - origin;
+                Vector3 rightOffset = right - origin;
+                float leftAngle = Mathf.Atan2(
+                    Vector3.Dot(leftOffset, bitangent),
+                    Vector3.Dot(leftOffset, tangent));
+                float rightAngle = Mathf.Atan2(
+                    Vector3.Dot(rightOffset, bitangent),
+                    Vector3.Dot(rightOffset, tangent));
+                return leftAngle.CompareTo(rightAngle);
+            });
+        }
+
+        private static bool TryBuildOrderedVertexCapBoundary(
+            EdgeWearTopologyGraph graph,
+            DeterministicBevelVertexRecord vertex,
+            List<DeterministicBevelVertexCapPoint> rawPoints,
+            out List<Vector3> boundary,
+            out Vector3 outward,
+            ref EdgeWearBevelBuildStats stats)
+        {
+            boundary = new List<Vector3>();
+            outward = Vector3.zero;
+            if (vertex.VertexIndex < 0 || vertex.VertexIndex >= graph.Vertices.Count)
+            {
+                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
+                return false;
+            }
+
+            EdgeWearGraphVertex graphVertex = graph.Vertices[vertex.VertexIndex];
+            Dictionary<int, Vector3> pointByFace = new Dictionary<int, Vector3>();
+            for (int i = 0; i < rawPoints.Count; i++)
+            {
+                DeterministicBevelVertexCapPoint capPoint = rawPoints[i];
+                if (!IsFinite(capPoint.Point))
+                {
+                    stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
+                    continue;
+                }
+
+                if (!pointByFace.ContainsKey(capPoint.FaceIndex))
+                {
+                    pointByFace.Add(capPoint.FaceIndex, capPoint.Point);
+                }
+            }
+
+            if (pointByFace.Count < 3)
+            {
+                stats.DeterministicKernelVertexCapDuplicatePointFailureCount++;
+                return false;
+            }
+
+            outward = CalculateVertexStarNormal(graph, vertex.VertexIndex);
+            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
+            {
+                Vector3 average = Vector3.zero;
+                foreach (Vector3 point in pointByFace.Values)
+                {
+                    average += point;
+                }
+
+                average /= pointByFace.Count;
+                outward = graphVertex.Position - average;
+            }
+
+            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
+            {
+                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
+                return false;
+            }
+
+            outward.Normalize();
+            Vector3 tangent = Mathf.Abs(outward.y) < 0.9f
+                ? Vector3.Cross(outward, Vector3.up)
+                : Vector3.Cross(outward, Vector3.right);
+            if (tangent.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(tangent))
+            {
+                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
+                return false;
+            }
+
+            tangent.Normalize();
+            Vector3 bitangent = Vector3.Cross(outward, tangent);
+            if (bitangent.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(bitangent))
+            {
+                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
+                return false;
+            }
+
+            bitangent.Normalize();
+            List<DeterministicBevelVertexCapPoint> ordered =
+                new List<DeterministicBevelVertexCapPoint>(pointByFace.Count);
+            foreach (KeyValuePair<int, Vector3> pair in pointByFace)
+            {
+                ordered.Add(new DeterministicBevelVertexCapPoint(pair.Key, pair.Value));
+            }
+
+            Vector3 origin = graphVertex.Position;
+            ordered.Sort((left, right) =>
+            {
+                Vector3 leftOffset = left.Point - origin;
+                Vector3 rightOffset = right.Point - origin;
+                float leftAngle = Mathf.Atan2(
+                    Vector3.Dot(leftOffset, bitangent),
+                    Vector3.Dot(leftOffset, tangent));
+                float rightAngle = Mathf.Atan2(
+                    Vector3.Dot(rightOffset, bitangent),
+                    Vector3.Dot(rightOffset, tangent));
+                return leftAngle.CompareTo(rightAngle);
+            });
+
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                Vector3 point = ordered[i].Point;
+                bool duplicate = false;
+                for (int j = 0; j < boundary.Count; j++)
+                {
+                    if ((point - boundary[j]).sqrMagnitude <= PointMergeDistanceSqr)
+                    {
+                        duplicate = true;
+                        break;
+                    }
+                }
+
+                if (!duplicate)
+                {
+                    boundary.Add(point);
+                }
+            }
+
+            if (boundary.Count < 3)
+            {
+                stats.DeterministicKernelVertexCapDuplicatePointFailureCount++;
+                return false;
+            }
+
+            if (!TryCalculateRawPolygonNormal(
+                    boundary,
+                    PointMergeDistance,
+                    out Vector3 boundaryNormal))
+            {
+                stats.DeterministicKernelVertexCapAreaFailureCount++;
+                return false;
+            }
+
+            if (Vector3.Dot(boundaryNormal, outward) < 0f)
+            {
+                boundary.Reverse();
+            }
+
+            return true;
+        }
+
+        private static Vector3 CalculateVertexStarNormal(
+            EdgeWearTopologyGraph graph,
+            int vertexIndex)
+        {
+            Vector3 normal = Vector3.zero;
+            if (vertexIndex < 0 || vertexIndex >= graph.Vertices.Count)
+            {
+                return normal;
+            }
+
+            EdgeWearGraphVertex vertex = graph.Vertices[vertexIndex];
+            for (int i = 0; i < vertex.FaceIndices.Count; i++)
+            {
+                int faceIndex = vertex.FaceIndices[i];
+                if (faceIndex < 0 || faceIndex >= graph.Faces.Count)
+                {
+                    continue;
+                }
+
+                Vector3 faceNormal = graph.Faces[faceIndex].SourceFace.Normal;
+                if (faceNormal.sqrMagnitude > MinimumEdgeLengthSqr && IsFinite(faceNormal))
+                {
+                    normal += faceNormal.normalized;
+                }
+            }
+
+            return normal.sqrMagnitude > MinimumEdgeLengthSqr && IsFinite(normal)
+                ? normal.normalized
+                : Vector3.zero;
+        }
+
+        private static Vector3 GetRailPointForVertex(
+            DeterministicBevelRailRecord rail,
+            int vertexIndex)
+        {
+            if (rail.StartVertexIndex == vertexIndex)
+            {
+                return rail.StartPoint;
+            }
+
+            if (rail.EndVertexIndex == vertexIndex)
+            {
+                return rail.EndPoint;
+            }
+
+            return new Vector3(float.NaN, float.NaN, float.NaN);
+        }
+
+        private static bool RailsCoincide(
+            DeterministicBevelRailRecord first,
+            DeterministicBevelRailRecord second,
+            float minimumStableEdgeLength)
+        {
+            float tolerance = Mathf.Max(PointMergeDistance, minimumStableEdgeLength * 0.35f);
+            return
+                (AreWithinDistance(first.StartPoint, second.StartPoint, tolerance) &&
+                 AreWithinDistance(first.EndPoint, second.EndPoint, tolerance)) ||
+                (AreWithinDistance(first.StartPoint, second.EndPoint, tolerance) &&
+                 AreWithinDistance(first.EndPoint, second.StartPoint, tolerance));
+        }
+
+        private static Vector3 ResolveSelectedEdgeNormal(
+            List<DeterministicBevelEdgeRecord> edgeRecords,
+            int graphEdgeIndex,
+            DeterministicBevelRailRecord first,
+            DeterministicBevelRailRecord second)
+        {
+            for (int i = 0; i < edgeRecords.Count; i++)
+            {
+                if (edgeRecords[i].GraphEdgeIndex == graphEdgeIndex &&
+                    edgeRecords[i].Candidate.BevelNormal.sqrMagnitude > MinimumEdgeLengthSqr)
+                {
+                    return edgeRecords[i].Candidate.BevelNormal.normalized;
+                }
+            }
+
+            List<Vector3> points = new List<Vector3>
+            {
+                first.StartPoint,
+                first.EndPoint,
+                second.EndPoint,
+                second.StartPoint
+            };
+            return CalculatePolygonNormal(points);
+        }
+
+        private static float ResolveSelectedEdgeFeatureStrength(
+            List<DeterministicBevelEdgeRecord> edgeRecords,
+            int graphEdgeIndex)
+        {
+            for (int i = 0; i < edgeRecords.Count; i++)
+            {
+                if (edgeRecords[i].GraphEdgeIndex == graphEdgeIndex)
+                {
+                    return edgeRecords[i].Candidate.Strength;
+                }
+            }
+
+            return 1f;
+        }
+
+        private static void AddVertexCapPoint(
+            Dictionary<int, List<DeterministicBevelVertexCapPoint>> capPoints,
+            int vertexIndex,
+            int faceIndex,
+            int previousEdgeIndex,
+            int nextEdgeIndex,
+            Vector3 point)
+        {
+            if (!capPoints.TryGetValue(
+                    vertexIndex,
+                    out List<DeterministicBevelVertexCapPoint> points))
+            {
+                points = new List<DeterministicBevelVertexCapPoint>();
+                capPoints.Add(vertexIndex, points);
+            }
+
+            for (int i = 0; i < points.Count; i++)
+            {
+                DeterministicBevelVertexCapPoint existing = points[i];
+                if (existing.FaceIndex == faceIndex &&
+                    existing.PreviousEdgeIndex == previousEdgeIndex &&
+                    existing.NextEdgeIndex == nextEdgeIndex &&
+                    (existing.Point - point).sqrMagnitude <= PointMergeDistanceSqr)
+                {
+                    return;
+                }
+            }
+
+            points.Add(
+                new DeterministicBevelVertexCapPoint(
+                    faceIndex,
+                    previousEdgeIndex,
+                    nextEdgeIndex,
+                    point));
+        }
+
+        private static void RegisterDeterministicVertexCapAttempt(
+            DeterministicBevelVertexCase vertexCase,
+            ref EdgeWearBevelBuildStats stats)
+        {
+            switch (vertexCase)
+            {
+                case DeterministicBevelVertexCase.IsolatedEndpoint:
+                    stats.DeterministicKernelVertexCapIsolatedAttemptCount++;
+                    break;
+                case DeterministicBevelVertexCase.TwoEdgeCorner:
+                    stats.DeterministicKernelVertexCapTwoEdgeAttemptCount++;
+                    break;
+                case DeterministicBevelVertexCase.MultiEdgeStar:
+                    stats.DeterministicKernelVertexCapMultiStarAttemptCount++;
+                    break;
+            }
+        }
+
+        private static void RegisterDeterministicVertexCapBuilt(
+            DeterministicBevelVertexCase vertexCase,
+            ref EdgeWearBevelBuildStats stats)
+        {
+            switch (vertexCase)
+            {
+                case DeterministicBevelVertexCase.IsolatedEndpoint:
+                    stats.DeterministicKernelVertexCapIsolatedBuiltCount++;
+                    break;
+                case DeterministicBevelVertexCase.TwoEdgeCorner:
+                    stats.DeterministicKernelVertexCapTwoEdgeBuiltCount++;
+                    break;
+                case DeterministicBevelVertexCase.MultiEdgeStar:
+                    stats.DeterministicKernelVertexCapMultiStarBuiltCount++;
+                    break;
+            }
+        }
+
+        private static void RegisterDeterministicVertexCapFailure(
+            DeterministicBevelVertexCase vertexCase,
+            ref EdgeWearBevelBuildStats stats)
+        {
+            switch (vertexCase)
+            {
+                case DeterministicBevelVertexCase.IsolatedEndpoint:
+                    stats.DeterministicKernelVertexCapIsolatedFailedCount++;
+                    break;
+                case DeterministicBevelVertexCase.TwoEdgeCorner:
+                    stats.DeterministicKernelVertexCapTwoEdgeFailedCount++;
+                    break;
+                case DeterministicBevelVertexCase.MultiEdgeStar:
+                    stats.DeterministicKernelVertexCapMultiStarFailedCount++;
+                    break;
+            }
+        }
+
+        private static bool FaceEdgesAreStable(
+            List<Vector3> points,
+            float minimumStableEdgeLength)
+        {
+            float minimumStableEdgeLengthSqr =
+                minimumStableEdgeLength * minimumStableEdgeLength;
+            for (int i = 0; i < points.Count; i++)
+            {
+                if ((points[(i + 1) % points.Count] - points[i]).sqrMagnitude <=
+                    minimumStableEdgeLengthSqr)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static float Cross2D(Vector2 left, Vector2 right)
+        {
+            return left.x * right.y - left.y * right.x;
+        }
+
+        private static void ApplyDeterministicKernelSourceStats(
+            EdgeWearTopologyGraph graph,
+            List<EdgeWearSelectedGraphEdge> selectedEdges,
+            List<DeterministicBevelEdgeRecord> edgeRecords,
+            List<DeterministicBevelVertexRecord> vertexRecords,
+            ref EdgeWearBevelBuildStats stats)
+        {
             stats.DeterministicKernelMappedSelectedEdgeCount = selectedEdges.Count;
             stats.DeterministicKernelSourceFaceCount = graph.Faces.Count;
             stats.DeterministicKernelSourceEdgeCount = graph.Edges.Count;
@@ -985,8 +2353,75 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             stats.DeterministicKernelUnaffectedFacePreservedCount = Mathf.Max(
                 0,
                 graph.Faces.Count - affectedFaces.Count);
-            stats.RejectedUnknown++;
-            return false;
+        }
+
+        private static void TriangulateConvexEdgeWearPolygons(
+            List<PolygonFace> faces,
+            float minimumStableFaceArea,
+            float minimumStableEdgeLength,
+            ref EdgeWearBevelBuildStats stats)
+        {
+            List<PolygonFace> rebuilt = new List<PolygonFace>(faces.Count);
+            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
+            {
+                PolygonFace face = faces[faceIndex];
+                if (face.Feature != PolygonFaceFeature.ConvexEdgeWear ||
+                    face.Vertices.Count <= 3)
+                {
+                    rebuilt.Add(face);
+                    continue;
+                }
+
+                List<Vector3> clean = SanitizePolygon(face.Vertices, face.Normal);
+                if (clean.Count < 3 ||
+                    CalculatePolygonArea(clean) <= minimumStableFaceArea)
+                {
+                    stats.DeterministicKernelConvexWearTriangulationFailedCount++;
+                    continue;
+                }
+
+                int builtTriangles = 0;
+                for (int i = 1; i < clean.Count - 1; i++)
+                {
+                    List<Vector3> triangle = new List<Vector3>
+                    {
+                        clean[0],
+                        clean[i],
+                        clean[i + 1]
+                    };
+
+                    triangle = SanitizePolygon(triangle, face.Normal);
+                    if (triangle.Count != 3 ||
+                        PreviewTriangleEmission(
+                            triangle[0],
+                            triangle[1],
+                            triangle[2],
+                            face.Normal,
+                            0f) != TriangleEmissionPreviewResult.Emitted)
+                    {
+                        stats.DeterministicKernelConvexWearTriangulationFailedCount++;
+                        continue;
+                    }
+
+                    rebuilt.Add(
+                        new PolygonFace(
+                            triangle,
+                            face.Normal,
+                            PolygonFaceFeature.ConvexEdgeWear,
+                            face.FeatureStrength));
+                    builtTriangles++;
+                }
+
+                if (builtTriangles > 0)
+                {
+                    stats.DeterministicKernelConvexWearPolygonsTriangulatedCount++;
+                    stats.DeterministicKernelConvexWearTrianglesBuiltCount +=
+                        builtTriangles;
+                }
+            }
+
+            faces.Clear();
+            faces.AddRange(rebuilt);
         }
 
         private static List<DeterministicBevelEdgeRecord> BuildDeterministicBevelEdgeRecords(
@@ -1164,10 +2599,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         }
 
 
-        // EW-4D/R3 research path retained inactive for audit/reference while
-        // EW-B1 is implemented. It should not be called by the active generated
-        // edge-wear route because it builds sampled ribbons and then infers
-        // closure caps from leftover open-edge components.
+        // EW-B shared source-topology graph builder. This is active kernel
+        // infrastructure: it maps final generated source faces to vertices,
+        // edges, face ownership, and selected convex graph edges before any
+        // bevel geometry is emitted.
         private static bool TryBuildEdgeWearTopologyGraph(
             List<PolygonFace> faces,
             out EdgeWearTopologyGraph graph,
@@ -1556,10 +2991,48 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         continue;
                     }
 
-}
+                    if (IsPointOnSegmentInterior(
+                            vertex.Value,
+                            edge.Start,
+                            edge.End,
+                            toleranceSqr))
+                    {
+                        count++;
+                        break;
+                    }
+                }
             }
 
             return count;
+        }
+
+        private static bool IsPointOnSegmentInterior(
+            Vector3 point,
+            Vector3 start,
+            Vector3 end,
+            float toleranceSqr)
+        {
+            Vector3 segment = end - start;
+            float segmentLengthSqr = segment.sqrMagnitude;
+            if (segmentLengthSqr <= MinimumEdgeLengthSqr)
+            {
+                return false;
+            }
+
+            if ((point - start).sqrMagnitude <= toleranceSqr ||
+                (point - end).sqrMagnitude <= toleranceSqr)
+            {
+                return false;
+            }
+
+            float t = Vector3.Dot(point - start, segment) / segmentLengthSqr;
+            if (t <= 0f || t >= 1f)
+            {
+                return false;
+            }
+
+            Vector3 closest = start + segment * t;
+            return (point - closest).sqrMagnitude <= toleranceSqr;
         }
 
         private static float CalculateTopologyTJunctionTolerance(
@@ -1783,32 +3256,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             return count;
-        }
-
-        private static bool ValidateLocalEdgeWearFace(
-            List<Vector3> vertices,
-            float minimumStableFaceArea,
-            float minimumStableEdgeLength)
-        {
-            if (vertices.Count < 3 ||
-                CalculatePolygonArea(vertices) <= minimumStableFaceArea)
-            {
-                return false;
-            }
-
-            float minimumEdgeLengthSqr =
-                minimumStableEdgeLength * minimumStableEdgeLength;
-            for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
-            {
-                Vector3 start = vertices[vertexIndex];
-                Vector3 end = vertices[(vertexIndex + 1) % vertices.Count];
-                if ((end - start).sqrMagnitude <= minimumEdgeLengthSqr)
-                {
-                    return false;
-                }
-            }
-
-            return true;
         }
 
         private static bool ValidatePolyhedronFaces(
@@ -4402,6 +5849,120 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             BoundaryOrInvalid
         }
 
+        private readonly struct DeterministicBevelVertexCapPoint
+        {
+            public readonly int FaceIndex;
+            public readonly int PreviousEdgeIndex;
+            public readonly int NextEdgeIndex;
+            public readonly Vector3 Point;
+
+            public DeterministicBevelVertexCapPoint(int faceIndex, Vector3 point)
+                : this(faceIndex, -1, -1, point)
+            {
+            }
+
+            public DeterministicBevelVertexCapPoint(
+                int faceIndex,
+                int previousEdgeIndex,
+                int nextEdgeIndex,
+                Vector3 point)
+            {
+                FaceIndex = faceIndex;
+                PreviousEdgeIndex = previousEdgeIndex;
+                NextEdgeIndex = nextEdgeIndex;
+                Point = point;
+            }
+        }
+
+        private readonly struct DeterministicBevelRailKey : IEquatable<DeterministicBevelRailKey>
+        {
+            public readonly int FaceIndex;
+            public readonly int GraphEdgeIndex;
+
+            public DeterministicBevelRailKey(int faceIndex, int graphEdgeIndex)
+            {
+                FaceIndex = faceIndex;
+                GraphEdgeIndex = graphEdgeIndex;
+            }
+
+            public bool Equals(DeterministicBevelRailKey other)
+            {
+                return FaceIndex == other.FaceIndex &&
+                    GraphEdgeIndex == other.GraphEdgeIndex;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is DeterministicBevelRailKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return (FaceIndex * 397) ^ GraphEdgeIndex;
+                }
+            }
+        }
+
+        private readonly struct DeterministicBevelRailRecord
+        {
+            public readonly int FaceIndex;
+            public readonly int GraphEdgeIndex;
+            public readonly int StartVertexIndex;
+            public readonly int EndVertexIndex;
+            public readonly Vector3 StartPoint;
+            public readonly Vector3 EndPoint;
+
+            public DeterministicBevelRailRecord(
+                int faceIndex,
+                int graphEdgeIndex,
+                int startVertexIndex,
+                int endVertexIndex,
+                Vector3 startPoint,
+                Vector3 endPoint)
+            {
+                FaceIndex = faceIndex;
+                GraphEdgeIndex = graphEdgeIndex;
+                StartVertexIndex = startVertexIndex;
+                EndVertexIndex = endVertexIndex;
+                StartPoint = startPoint;
+                EndPoint = endPoint;
+            }
+        }
+
+        private readonly struct DeterministicFaceOffsetLine
+        {
+            public readonly int GraphEdgeIndex;
+            public readonly int StartVertexIndex;
+            public readonly int EndVertexIndex;
+            public readonly bool Selected;
+            public readonly Vector3 OriginalStart;
+            public readonly Vector3 Point;
+            public readonly Vector3 Direction;
+            public readonly Vector3 Inward;
+
+            public DeterministicFaceOffsetLine(
+                int graphEdgeIndex,
+                int startVertexIndex,
+                int endVertexIndex,
+                bool selected,
+                Vector3 originalStart,
+                Vector3 point,
+                Vector3 direction,
+                Vector3 inward)
+            {
+                GraphEdgeIndex = graphEdgeIndex;
+                StartVertexIndex = startVertexIndex;
+                EndVertexIndex = endVertexIndex;
+                Selected = selected;
+                OriginalStart = originalStart;
+                Point = point;
+                Direction = direction;
+                Inward = inward;
+            }
+        }
+
         private readonly struct DeterministicBevelEdgeRecord
         {
             public readonly int GraphEdgeIndex;
@@ -4577,6 +6138,52 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int DeterministicKernelInvalidAdjacencyEdgeCount;
             public int DeterministicKernelSupportedEdgeCount;
             public int DeterministicKernelDeferredEdgeCount;
+            public int DeterministicKernelBevelFacesBuiltCount;
+            public int DeterministicKernelConvexWearPolygonsTriangulatedCount;
+            public int DeterministicKernelConvexWearTrianglesBuiltCount;
+            public int DeterministicKernelConvexWearTriangulationFailedCount;
+            public int DeterministicKernelOpenEdgesAfterBuildCount;
+            public int DeterministicKernelNonManifoldEdgesAfterBuildCount;
+            public int DeterministicKernelTJunctionsAfterBuildCount;
+            public int DeterministicKernelGlobalCutAppliedCount;
+            public int DeterministicKernelFaceOffsetPolygonAttemptCount;
+            public int DeterministicKernelFaceOffsetPolygonBuiltCount;
+            public int DeterministicKernelFaceOffsetPolygonFailedCount;
+            public int DeterministicKernelRailsExpectedCount;
+            public int DeterministicKernelRailsBuiltCount;
+            public int DeterministicKernelRailsMissingCount;
+            public int DeterministicKernelLocalBevelFaceAttemptCount;
+            public int DeterministicKernelLocalBevelFaceBuiltCount;
+            public int DeterministicKernelLocalBevelFaceFailedCount;
+            public int DeterministicKernelTransitionFacesBuiltCount;
+            public int DeterministicKernelVertexCapAttemptCount;
+            public int DeterministicKernelVertexCapBuiltCount;
+            public int DeterministicKernelVertexCapFailedCount;
+            public int DeterministicKernelVertexCapIsolatedAttemptCount;
+            public int DeterministicKernelVertexCapIsolatedBuiltCount;
+            public int DeterministicKernelVertexCapIsolatedFailedCount;
+            public int DeterministicKernelVertexCapTwoEdgeAttemptCount;
+            public int DeterministicKernelVertexCapTwoEdgeBuiltCount;
+            public int DeterministicKernelVertexCapTwoEdgeFailedCount;
+            public int DeterministicKernelVertexCapMultiStarAttemptCount;
+            public int DeterministicKernelVertexCapMultiStarBuiltCount;
+            public int DeterministicKernelVertexCapMultiStarFailedCount;
+            public int DeterministicKernelVertexCapOrderingFailureCount;
+            public int DeterministicKernelVertexCapDuplicatePointFailureCount;
+            public int DeterministicKernelVertexCapAreaFailureCount;
+            public int DeterministicKernelVertexCapLowValenceAttemptCount;
+            public int DeterministicKernelVertexCapLowValenceBuiltCount;
+            public int DeterministicKernelVertexCapLowValenceFailedCount;
+            public int DeterministicKernelVertexCapLowValenceApexTriangleBuiltCount;
+            public int DeterministicKernelVertexCapLowValenceInsufficientBoundaryFailureCount;
+            public int DeterministicKernelVertexCapTwoEdgeCornerPatchAttemptCount;
+            public int DeterministicKernelVertexCapTwoEdgeCornerPatchBuiltCount;
+            public int DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount;
+            public int DeterministicKernelVertexCapTwoEdgeCornerPatchTriangleBuiltCount;
+            public int DeterministicKernelVertexCapTwoEdgeCornerPatchInsufficientBoundaryFailureCount;
+            public int DeterministicKernelVertexCapTwoEdgeCornerPatchAreaFailureCount;
+            public int DeterministicKernelVertexCapNonFiniteFailureCount;
+            public int DeterministicKernelVertexCapTooSmallFailureCount;
             public int RejectedUnknown;
 
             public EdgeWearBevelBuildStats(int candidateCount, int selectedCount)
@@ -4641,6 +6248,52 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 DeterministicKernelInvalidAdjacencyEdgeCount = 0;
                 DeterministicKernelSupportedEdgeCount = 0;
                 DeterministicKernelDeferredEdgeCount = 0;
+                DeterministicKernelBevelFacesBuiltCount = 0;
+                DeterministicKernelConvexWearPolygonsTriangulatedCount = 0;
+                DeterministicKernelConvexWearTrianglesBuiltCount = 0;
+                DeterministicKernelConvexWearTriangulationFailedCount = 0;
+                DeterministicKernelOpenEdgesAfterBuildCount = 0;
+                DeterministicKernelNonManifoldEdgesAfterBuildCount = 0;
+                DeterministicKernelTJunctionsAfterBuildCount = 0;
+                DeterministicKernelGlobalCutAppliedCount = 0;
+                DeterministicKernelFaceOffsetPolygonAttemptCount = 0;
+                DeterministicKernelFaceOffsetPolygonBuiltCount = 0;
+                DeterministicKernelFaceOffsetPolygonFailedCount = 0;
+                DeterministicKernelRailsExpectedCount = 0;
+                DeterministicKernelRailsBuiltCount = 0;
+                DeterministicKernelRailsMissingCount = 0;
+                DeterministicKernelLocalBevelFaceAttemptCount = 0;
+                DeterministicKernelLocalBevelFaceBuiltCount = 0;
+                DeterministicKernelLocalBevelFaceFailedCount = 0;
+                DeterministicKernelTransitionFacesBuiltCount = 0;
+                DeterministicKernelVertexCapAttemptCount = 0;
+                DeterministicKernelVertexCapBuiltCount = 0;
+                DeterministicKernelVertexCapFailedCount = 0;
+                DeterministicKernelVertexCapIsolatedAttemptCount = 0;
+                DeterministicKernelVertexCapIsolatedBuiltCount = 0;
+                DeterministicKernelVertexCapIsolatedFailedCount = 0;
+                DeterministicKernelVertexCapTwoEdgeAttemptCount = 0;
+                DeterministicKernelVertexCapTwoEdgeBuiltCount = 0;
+                DeterministicKernelVertexCapTwoEdgeFailedCount = 0;
+                DeterministicKernelVertexCapMultiStarAttemptCount = 0;
+                DeterministicKernelVertexCapMultiStarBuiltCount = 0;
+                DeterministicKernelVertexCapMultiStarFailedCount = 0;
+                DeterministicKernelVertexCapOrderingFailureCount = 0;
+                DeterministicKernelVertexCapDuplicatePointFailureCount = 0;
+                DeterministicKernelVertexCapAreaFailureCount = 0;
+                DeterministicKernelVertexCapLowValenceAttemptCount = 0;
+                DeterministicKernelVertexCapLowValenceBuiltCount = 0;
+                DeterministicKernelVertexCapLowValenceFailedCount = 0;
+                DeterministicKernelVertexCapLowValenceApexTriangleBuiltCount = 0;
+                DeterministicKernelVertexCapLowValenceInsufficientBoundaryFailureCount = 0;
+                DeterministicKernelVertexCapTwoEdgeCornerPatchAttemptCount = 0;
+                DeterministicKernelVertexCapTwoEdgeCornerPatchBuiltCount = 0;
+                DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount = 0;
+                DeterministicKernelVertexCapTwoEdgeCornerPatchTriangleBuiltCount = 0;
+                DeterministicKernelVertexCapTwoEdgeCornerPatchInsufficientBoundaryFailureCount = 0;
+                DeterministicKernelVertexCapTwoEdgeCornerPatchAreaFailureCount = 0;
+                DeterministicKernelVertexCapNonFiniteFailureCount = 0;
+                DeterministicKernelVertexCapTooSmallFailureCount = 0;
                 RejectedUnknown = 0;
             }
 
@@ -4777,6 +6430,52 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     $"deterministicKernelInvalidAdjacencyEdges={DeterministicKernelInvalidAdjacencyEdgeCount}, " +
                     $"deterministicKernelSupportedEdges={DeterministicKernelSupportedEdgeCount}, " +
                     $"deterministicKernelDeferredEdges={DeterministicKernelDeferredEdgeCount}, " +
+                    $"deterministicKernelBevelFacesBuilt={DeterministicKernelBevelFacesBuiltCount}, " +
+                    $"deterministicKernelConvexWearPolygonsTriangulated={DeterministicKernelConvexWearPolygonsTriangulatedCount}, " +
+                    $"deterministicKernelConvexWearTrianglesBuilt={DeterministicKernelConvexWearTrianglesBuiltCount}, " +
+                    $"deterministicKernelConvexWearTriangulationFailures={DeterministicKernelConvexWearTriangulationFailedCount}, " +
+                    $"deterministicKernelOpenEdgesAfterBuild={DeterministicKernelOpenEdgesAfterBuildCount}, " +
+                    $"deterministicKernelNonManifoldEdgesAfterBuild={DeterministicKernelNonManifoldEdgesAfterBuildCount}, " +
+                    $"deterministicKernelTJunctionsAfterBuild={DeterministicKernelTJunctionsAfterBuildCount}, " +
+                    $"deterministicKernelGlobalCutsApplied={DeterministicKernelGlobalCutAppliedCount}, " +
+                    $"deterministicKernelFaceOffsetPolygonsAttempted={DeterministicKernelFaceOffsetPolygonAttemptCount}, " +
+                    $"deterministicKernelFaceOffsetPolygonsBuilt={DeterministicKernelFaceOffsetPolygonBuiltCount}, " +
+                    $"deterministicKernelFaceOffsetPolygonFailures={DeterministicKernelFaceOffsetPolygonFailedCount}, " +
+                    $"deterministicKernelRailsExpected={DeterministicKernelRailsExpectedCount}, " +
+                    $"deterministicKernelRailsBuilt={DeterministicKernelRailsBuiltCount}, " +
+                    $"deterministicKernelRailsMissing={DeterministicKernelRailsMissingCount}, " +
+                    $"deterministicKernelLocalBevelFacesAttempted={DeterministicKernelLocalBevelFaceAttemptCount}, " +
+                    $"deterministicKernelLocalBevelFacesBuilt={DeterministicKernelLocalBevelFaceBuiltCount}, " +
+                    $"deterministicKernelLocalBevelFaceFailures={DeterministicKernelLocalBevelFaceFailedCount}, " +
+                    $"deterministicKernelTransitionFacesBuilt={DeterministicKernelTransitionFacesBuiltCount}, " +
+                    $"deterministicKernelVertexCapsAttempted={DeterministicKernelVertexCapAttemptCount}, " +
+                    $"deterministicKernelVertexCapsBuilt={DeterministicKernelVertexCapBuiltCount}, " +
+                    $"deterministicKernelVertexCapFailures={DeterministicKernelVertexCapFailedCount}, " +
+                    $"deterministicKernelVertexCapIsolatedAttempted={DeterministicKernelVertexCapIsolatedAttemptCount}, " +
+                    $"deterministicKernelVertexCapIsolatedBuilt={DeterministicKernelVertexCapIsolatedBuiltCount}, " +
+                    $"deterministicKernelVertexCapIsolatedFailed={DeterministicKernelVertexCapIsolatedFailedCount}, " +
+                    $"deterministicKernelVertexCapTwoEdgeAttempted={DeterministicKernelVertexCapTwoEdgeAttemptCount}, " +
+                    $"deterministicKernelVertexCapTwoEdgeBuilt={DeterministicKernelVertexCapTwoEdgeBuiltCount}, " +
+                    $"deterministicKernelVertexCapTwoEdgeFailed={DeterministicKernelVertexCapTwoEdgeFailedCount}, " +
+                    $"deterministicKernelVertexCapMultiStarAttempted={DeterministicKernelVertexCapMultiStarAttemptCount}, " +
+                    $"deterministicKernelVertexCapMultiStarBuilt={DeterministicKernelVertexCapMultiStarBuiltCount}, " +
+                    $"deterministicKernelVertexCapMultiStarFailed={DeterministicKernelVertexCapMultiStarFailedCount}, " +
+                    $"deterministicKernelVertexCapOrderingFailures={DeterministicKernelVertexCapOrderingFailureCount}, " +
+                    $"deterministicKernelVertexCapDuplicatePointFailures={DeterministicKernelVertexCapDuplicatePointFailureCount}, " +
+                    $"deterministicKernelVertexCapAreaFailures={DeterministicKernelVertexCapAreaFailureCount}, " +
+                    $"deterministicKernelVertexCapLowValenceAttempted={DeterministicKernelVertexCapLowValenceAttemptCount}, " +
+                    $"deterministicKernelVertexCapLowValenceBuilt={DeterministicKernelVertexCapLowValenceBuiltCount}, " +
+                    $"deterministicKernelVertexCapLowValenceFailed={DeterministicKernelVertexCapLowValenceFailedCount}, " +
+                    $"deterministicKernelVertexCapLowValenceApexTrianglesBuilt={DeterministicKernelVertexCapLowValenceApexTriangleBuiltCount}, " +
+                    $"deterministicKernelVertexCapLowValenceInsufficientBoundaryFailures={DeterministicKernelVertexCapLowValenceInsufficientBoundaryFailureCount}, " +
+                    $"deterministicKernelVertexCapTwoEdgeCornerPatchAttempted={DeterministicKernelVertexCapTwoEdgeCornerPatchAttemptCount}, " +
+                    $"deterministicKernelVertexCapTwoEdgeCornerPatchBuilt={DeterministicKernelVertexCapTwoEdgeCornerPatchBuiltCount}, " +
+                    $"deterministicKernelVertexCapTwoEdgeCornerPatchFailed={DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount}, " +
+                    $"deterministicKernelVertexCapTwoEdgeCornerPatchTrianglesBuilt={DeterministicKernelVertexCapTwoEdgeCornerPatchTriangleBuiltCount}, " +
+                    $"deterministicKernelVertexCapTwoEdgeCornerPatchInsufficientBoundaryFailures={DeterministicKernelVertexCapTwoEdgeCornerPatchInsufficientBoundaryFailureCount}, " +
+                    $"deterministicKernelVertexCapTwoEdgeCornerPatchAreaFailures={DeterministicKernelVertexCapTwoEdgeCornerPatchAreaFailureCount}, " +
+                    $"deterministicKernelVertexCapNonFiniteFailures={DeterministicKernelVertexCapNonFiniteFailureCount}, " +
+                    $"deterministicKernelVertexCapTooSmallFailures={DeterministicKernelVertexCapTooSmallFailureCount}, " +
                     $"rejectedValidationBaseFace={RejectedValidationBaseFace}, " +
                     $"rejectedValidationBevelFace={RejectedValidationBevelFace}, " +
                     $"rejectedValidationCapFace={RejectedValidationCapFace}, " +

@@ -1954,3 +1954,17 @@ Current shore-spawning status:
 - Runtime event sampling uses correlated scale and aspect guards to avoid incoherent length/width/reach combinations.
 
 Next recommended validation: stay in `Material Remaining Life`. Validate the control framework, especially normalized weights, per-pattern Formation Speed, and Initial Life. If shore spawning is authorable enough, the next source class should be Object Foam spawning. Do not move to free-water foam, Layer D tuning, or Final Foam before shore/object birth are acceptable.
+
+## 4.11C.5.15A handoff note
+
+Object Foam spawning is now implemented as a Layer C birth source category. Validate with Shore Foam disabled or low and Object Foam enabled in Material Remaining Life. Expected result: object-contact arcs/flecks near static generated obstacles, no material inside obstacle masks, no free-water or wake-tail behavior yet.
+
+## 4.11C.5.15A.1 handoff note
+
+If Object Foam is enabled and automatic birth is on, object source population should now run for any non-Off source preset. The previous 5.15A build left Object Foam behind a hidden preset gate, causing `Object source population disabled` and zero events. The inspector now reports `Source Anchors` for Object Foam. If anchors are zero, inspect disturbance static source registration/export; if anchors are greater than zero but events remain zero, inspect scheduling/rejection.
+
+## 4.11C.5.15A.2 handoff note
+
+Object Foam now has a GPU Object Contact Edge Field. The 5.15A/5.15A.1 object event scheduler remains unchanged and CPU-bounded; only the object-contact source shape authority changed. The contact field is built from the exact obstacle exclusion field and static pressure/contact evidence. Contact Arc/Fleck masks sample the field and shape in contact normal/tangent space, so they should be less box-like than the earlier object half-extent bands.
+
+Validate in Material Remaining Life with Shore Foam off/low and Object Foam on. If contact foam is still poor, inspect the contact field construction/gating before changing scheduling.

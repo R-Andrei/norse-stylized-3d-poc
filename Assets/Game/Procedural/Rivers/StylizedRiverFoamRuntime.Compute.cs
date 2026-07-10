@@ -30,6 +30,8 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.FindKernel("ClearObstacleExclusion");
             updateObstacleExclusionKernel =
                 computeShader.FindKernel("UpdateObstacleExclusion");
+            buildObjectContactFieldKernel =
+                computeShader.FindKernel("BuildFoamObjectContactField");
             resetTopologyMetricsKernel =
                 computeShader.FindKernel("ResetTopologyMetrics");
             measureTopologyMetricsKernel =
