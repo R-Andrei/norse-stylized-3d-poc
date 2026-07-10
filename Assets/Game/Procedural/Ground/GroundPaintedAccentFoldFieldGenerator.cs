@@ -592,12 +592,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             FieldSettings settings,
             uint strokeHash)
         {
-            Vector2 preferred = ResolveSafeAxis(settings.Direction);
-            float preferredAngle = Mathf.Atan2(preferred.y, preferred.x);
-            float maxJitterDegrees = settings.AngleJitterDegrees;
+            float baseAngleDegrees = settings.StrokeBaseAngleDegrees;
             float signedRoll = Hash01(strokeHash, 73u) * 2f - 1f;
-            float jitterDegrees = signedRoll * maxJitterDegrees;
-            float finalAngle = preferredAngle + jitterDegrees * Mathf.Deg2Rad;
+            float jitterDegrees = signedRoll * settings.AngleJitterDegrees;
+            float finalAngle =
+                (baseAngleDegrees + jitterDegrees) *
+                Mathf.Deg2Rad;
 
             return new Vector2(
                 Mathf.Cos(finalAngle),
@@ -702,8 +702,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 float strokeLengthMax,
                 float strokeWidthWorld,
                 float bodyWidthWorld,
-                float angleJitterDegrees,
-                Vector2 direction)
+                float strokeBaseAngleDegrees,
+                float angleJitterDegrees)
             {
                 Seed = seed;
                 Strength = strength;
@@ -713,8 +713,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 StrokeLengthMax = Mathf.Max(strokeLengthMin + 0.05f, strokeLengthMax);
                 StrokeWidthWorld = strokeWidthWorld;
                 BodyWidthWorld = bodyWidthWorld;
+                StrokeBaseAngleDegrees = strokeBaseAngleDegrees;
                 AngleJitterDegrees = angleJitterDegrees;
-                Direction = direction;
             }
 
             public int Seed { get; }
@@ -725,8 +725,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             public float StrokeLengthMax { get; }
             public float StrokeWidthWorld { get; }
             public float BodyWidthWorld { get; }
+            public float StrokeBaseAngleDegrees { get; }
             public float AngleJitterDegrees { get; }
-            public Vector2 Direction { get; }
 
             public static FieldSettings Create(
                 GroundSurfaceFeatureRecipe feature,
@@ -741,13 +741,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     feature != null
                         ? Mathf.Clamp01(feature.Contrast)
                         : 0.5f;
-                Vector2 direction =
-                    feature != null
-                        ? feature.Direction
-                        : Vector2.right;
-
-                direction = ResolveSafeAxis(direction);
-
                 int seed =
                     Hash(
                         shapeSeed,
@@ -781,6 +774,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     Mathf.Max(
                         strokeWidthWorld * 3.25f,
                         strokeLengthMax * 0.12f);
+                float strokeBaseAngleDegrees =
+                    feature != null
+                        ? feature.PaintedAccentStrokeBaseAngleDegrees
+                        : 90f;
                 float angleJitterDegrees =
                     feature != null
                         ? feature.PaintedAccentStrokeAngleJitterDegrees
@@ -795,8 +792,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     strokeLengthMax,
                     strokeWidthWorld,
                     bodyWidthWorld,
-                    angleJitterDegrees,
-                    direction);
+                    strokeBaseAngleDegrees,
+                    angleJitterDegrees);
             }
         }
     }

@@ -115,6 +115,20 @@ EW-C — Explicit Single-Segment Chamfer Kernel
 - [ ] `readyForVertexPatches=1`.
 - [ ] Rendered source geometry remains unchanged.
 
+
+## EW-C2R — Active vertex-run boundary reconstruction
+
+- [x] Preserve all strip endpoint registrations with source-edge and source-vertex provenance.
+- [x] Recompute active topology from positive-width edges after compatibility deferral.
+- [x] Detect duplicate active strip-end topology keys before accepting provisional geometry.
+- [x] Select deterministic conflict winners by strength, edge length, then graph-edge index.
+- [x] Force losing conflicting candidates to width zero and rerun the full corner solve.
+- [x] Keep the compatibility loop bounded and geometry commit disabled.
+- [ ] Validate zero duplicate strip-end keys on the reference seed.
+- [ ] Validate zero missing expected vertex boundaries.
+- [ ] Validate zero provisional T-junctions.
+- [ ] Require `readyForVertexPatches=1` before EW-C3.
+
 ## EW-C3 — Crude vertex-run patches
 
 - [ ] Emit a centre fan for a closed selected run.

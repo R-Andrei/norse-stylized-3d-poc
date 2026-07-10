@@ -1602,15 +1602,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 hash = hash * 31 + Quantize(
                     feature != null ? feature.PaintedAccentStrokeLengthMax : 0f);
                 hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentStrokeBaseAngleDegrees : 0f);
+                hash = hash * 31 + Quantize(
                     feature != null ? feature.PaintedAccentStrokeAngleJitterDegrees : 0f);
 
-                Vector2 direction =
-                    feature != null
-                        ? feature.Direction
-                        : Vector2.right;
-
-                hash = hash * 31 + Quantize(direction.x);
-                hash = hash * 31 + Quantize(direction.y);
                 hash = hash * 31 +
                     (feature != null ? feature.SeedOffset : 0);
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-EW-C is the active recovery architecture. EW-B is rejected and removed from active code. EW-C0 topology readiness and EW-C1 solved-corner/rail readiness are validated. EW-C2 now builds and audits provisional replacement faces and one-strip edge quads without committing them to the rendered mass.
+EW-C is the active recovery architecture. EW-B is rejected and removed from active code. EW-C0 topology readiness and EW-C1 solved-corner/rail readiness are validated. EW-C2R now reconstructs the positive-width active vertex runs, tracks every strip endpoint with source provenance, and deterministically defers local duplicate-boundary conflicts before accepting provisional geometry.
 
 The target is a **crude, single-segment physical chamfer**, not a general-purpose smooth bevel modifier.
 
@@ -238,6 +238,32 @@ Implemented as a geometry-neutral proof. Solve one stable replacement point per 
 ### EW-C2 — Replacement faces and one-strip edge geometry
 
 Emit replacement `Base` faces and one `ConvexEdgeWear` quad per selected internal edge. Corner openings remain intentional and have explicit source provenance.
+
+
+### EW-C2R — Active vertex-run reconstruction
+
+The original EW-C2 audit exposed duplicate active strip-end segments and provisional T-junctions after width-based edge deferral. EW-C2R therefore treats the positive-width edge set as the authoritative active topology.
+
+Each strip endpoint record stores:
+
+- source vertex index;
+- source edge index;
+- both incident source faces;
+- generated topology-edge key.
+
+Endpoint records are grouped by generated key. A key with more than one active source-edge owner is a local topology conflict, not a valid patch boundary. A deterministic winner is retained by feature strength, then source-edge length, then graph-edge index. Losing source edges are forced to width zero and the entire EW-C1 solve is rerun.
+
+The compatibility loop is bounded. It may reduce visible coverage, but it may not relax the final topology contract. After convergence the provisional mesh must report:
+
+```text
+duplicateStripEndpointBoundaryKeys=0
+missingExpectedVertexBoundaryEdges=0
+unexpectedProvisionalOpenEdges=0
+provisionalNonManifoldEdges=0
+provisionalTJunctions=0
+```
+
+Only this converged active-run topology may be passed to EW-C3.
 
 ### EW-C3 — Crude vertex-run patches
 

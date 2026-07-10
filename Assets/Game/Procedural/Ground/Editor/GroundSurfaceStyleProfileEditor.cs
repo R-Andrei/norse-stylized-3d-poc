@@ -313,6 +313,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentStrokeLengthMin");
             SerializedProperty paintedAccentStrokeLengthMax =
                 feature.FindPropertyRelative("paintedAccentStrokeLengthMax");
+            SerializedProperty paintedAccentStrokeBaseAngleDegrees =
+                feature.FindPropertyRelative("paintedAccentStrokeBaseAngleDegrees");
             SerializedProperty paintedAccentStrokeAngleJitterDegrees =
                 feature.FindPropertyRelative("paintedAccentStrokeAngleJitterDegrees");
 
@@ -398,12 +400,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                             "Stroke Length Max",
                             "Maximum generated 3D stroke length in metres."));
                     EditorGUILayout.Slider(
+                        paintedAccentStrokeBaseAngleDegrees,
+                        0f,
+                        180f,
+                        new GUIContent(
+                            "Base Angle Degrees",
+                            "Preferred local X/Z orientation for generated 3D Painted Accent strokes. 0 and 180 are equivalent because strokes are undirected."));
+                    EditorGUILayout.Slider(
                         paintedAccentStrokeAngleJitterDegrees,
                         0f,
                         30f,
                         new GUIContent(
                             "Angle Jitter Degrees",
-                            "Maximum signed angle offset in degrees around the preferred Direction. Each stroke rolls independently between -value and +value."));
+                            "Maximum signed angle offset in degrees around Base Angle Degrees. Each stroke rolls independently between -value and +value."));
 
                     if (paintedAccentStrokeLengthMax.floatValue <
                         paintedAccentStrokeLengthMin.floatValue + 0.05f)

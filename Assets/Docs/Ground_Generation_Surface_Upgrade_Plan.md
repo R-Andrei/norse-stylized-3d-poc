@@ -2143,3 +2143,14 @@ Rules after Patch V0:
 
 Patch V0 changes documentation only.
 
+
+
+### Patch V3J.3A3 correction — explicit base angle plus signed jitter
+
+V3J.3A2 still produced visually same-angle strokes because the signed jitter was applied around a hidden legacy `direction` vector. The default Painted Accent direction was already biased diagonally, and the GeneratedGround validation UI exposed only jitter, not the base angle. The corrected contract is now explicit:
+
+```text
+finalStrokeAngle = Base Angle Degrees + random(-Angle Jitter Degrees, +Angle Jitter Degrees)
+```
+
+Painted Accent 3D strokes no longer use the generic feature `Direction` vector as their active orientation source. The GeneratedGround and style-profile editors expose `Base Angle Degrees` and `Angle Jitter Degrees` together so there is no hidden orientation bias during validation.

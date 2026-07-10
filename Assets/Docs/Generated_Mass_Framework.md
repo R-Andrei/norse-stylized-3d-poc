@@ -3,7 +3,7 @@
 ## Status
 
 - **Active edge-wear architecture:** EW-C — Explicit Single-Segment Chamfer Kernel
-- **Current implementation step:** EW-C2 — Provisional replacement-face and one-strip bevel emission
+- **Current implementation step:** EW-C2R — Active vertex-run boundary reconstruction and compatibility deferral
 - **Geometry emission:** provisional build and audit only; final geometry commit remains disabled
 
 ## Feature goal
@@ -85,6 +85,21 @@ EW-C1R3 also:
 The next geometry patch may proceed only when the unified corner/shared-edge solve converges and the corner audit reports `readyForChamferEmission=1`.
 
 
+
+## EW-C2R active-run compatibility baseline
+
+EW-C2R refines the provisional emitter before any vertex patch is built. Every active strip endpoint is retained with explicit source-vertex and source-edge provenance instead of being reduced immediately to an undifferentiated topology-key set.
+
+After the EW-C1 width solve, the system reconstructs active selected runs from positive-width source edges. If multiple active strips claim the same endpoint segment at one source vertex, the conflict is resolved before topology is accepted:
+
+1. keep the candidate with greater feature strength;
+2. if tied, keep the longer source edge;
+3. if still tied, keep the lower graph-edge index;
+4. defer the deterministic losers to width zero;
+5. rerun the complete corner, shared-edge, replacement-face, and strip solve.
+
+This is bounded compatibility deferral, not post-hoc hole repair. The final provisional result must still have zero duplicate strip-end segments, zero unexpected openings, zero missing expected patch boundaries, zero non-manifold edges, and zero T-junctions.
+
 ## EW-C2 provisional emission baseline
 
 EW-C2 consumes the validated EW-C1 corner table and solved per-edge widths without recomputing them. It builds a temporary face list containing:
@@ -160,7 +175,8 @@ Chamfer topology is generated before gameplay and cached with the generated mass
 
 ## Next work items
 
-1. Validate EW-C2 provisional replacement-face and one-strip emission.
-2. Require all provisional openings to match explicit source-boundary or vertex-patch provenance.
-3. Implement EW-C3 crude vertex-run patches only after the provisional topology audit reports ready.
+1. Validate EW-C2R active-run reconstruction and deterministic compatibility deferral.
+2. Require zero duplicate strip-end segments and zero provisional T-junctions.
+3. Require all provisional openings to match explicit source-boundary or active vertex-run provenance.
+4. Implement EW-C3 crude vertex-run patches only after the provisional topology audit reports ready.
 4. Commit visible chamfer geometry only after EW-C3 preserves the source boundary set with zero new openings, non-manifold edges, or T-junctions.

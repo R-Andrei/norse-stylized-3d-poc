@@ -672,32 +672,69 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     0.006f,
                     0.028f,
                     Mathf.InverseLerp(0.25f, 2f, settings.EdgeWearWidth));
-                ChamferCornerStats cornerStats = new ChamferCornerStats();
-                bool cornersReady = AuditExplicitChamferCornerSolution(
-                    faces,
-                    context,
-                    requestedWidth,
-                    minimumStableEdgeLength,
-                    maximumDimension * maximumDimension * 0.000001f,
-                    ref cornerStats,
-                    out ChamferCornerSolution cornerSolution,
-                    out string cornerBlocker);
-                LogChamferCornerAudit(
-                    cornerStats,
-                    cornersReady,
-                    cornerBlocker);
+                HashSet<int> forcedDeferredEdges = new HashSet<int>();
+                ChamferCornerStats cornerStats = default;
+                ChamferEmissionStats emissionStats = default;
+                bool cornersReady = false;
+                bool emissionReady = false;
+                string cornerBlocker = string.Empty;
+                string emissionBlocker = string.Empty;
 
-                if (cornersReady)
+                const int MaximumCompatibilityPasses = 8;
+                for (int compatibilityPass = 0;
+                     compatibilityPass < MaximumCompatibilityPasses;
+                     compatibilityPass++)
                 {
-                    ChamferEmissionStats emissionStats = new ChamferEmissionStats();
-                    bool emissionReady = AuditProvisionalChamferEmission(
+                    cornerStats = new ChamferCornerStats();
+                    cornersReady = AuditExplicitChamferCornerSolution(
+                        faces,
+                        context,
+                        requestedWidth,
+                        minimumStableEdgeLength,
+                        maximumDimension * maximumDimension * 0.000001f,
+                        forcedDeferredEdges,
+                        ref cornerStats,
+                        out ChamferCornerSolution cornerSolution,
+                        out cornerBlocker);
+                    if (!cornersReady)
+                    {
+                        break;
+                    }
+
+                    emissionStats = new ChamferEmissionStats();
+                    emissionStats.CompatibilityPassCount = compatibilityPass + 1;
+                    emissionReady = AuditProvisionalChamferEmission(
                         faces,
                         context,
                         cornerSolution,
                         minimumStableEdgeLength,
                         maximumDimension * maximumDimension * 0.000001f,
                         ref emissionStats,
-                        out string emissionBlocker);
+                        out HashSet<int> conflictingEdges,
+                        out emissionBlocker);
+                    emissionStats.ConflictDeferredEdgeCount =
+                        forcedDeferredEdges.Count + conflictingEdges.Count;
+                    if (emissionReady || conflictingEdges.Count == 0)
+                    {
+                        break;
+                    }
+
+                    int previousDeferredCount = forcedDeferredEdges.Count;
+                    forcedDeferredEdges.UnionWith(conflictingEdges);
+                    if (forcedDeferredEdges.Count == previousDeferredCount)
+                    {
+                        emissionBlocker =
+                            "active vertex-boundary conflicts did not produce a new deterministic deferral";
+                        break;
+                    }
+                }
+
+                LogChamferCornerAudit(
+                    cornerStats,
+                    cornersReady,
+                    cornerBlocker);
+                if (cornersReady)
+                {
                     LogChamferEmissionAudit(
                         emissionStats,
                         emissionReady,
@@ -705,9 +742,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
             }
 
-            // EW-C2 builds and audits provisional replacement faces and one-strip
-            // bevel quads, then discards them. The original PolygonFace list
-            // remains the rendered geometry until vertex patches are proven.
+            // EW-C2R rebuilds the active positive-width edge network, defers
+            // deterministic duplicate-boundary conflicts, audits provisional
+            // replacement faces and one-strip quads, then discards them. The
+            // original PolygonFace list remains rendered until vertex patches pass.
         }
 
         private static List<EdgeWearBevelCandidate> BuildEdgeWearBevelCandidates(
@@ -1242,6 +1280,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float requestedWidth,
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
+            HashSet<int> forcedDeferredEdges,
             ref ChamferCornerStats stats,
             out ChamferCornerSolution solution,
             out string blocker)
@@ -1257,6 +1296,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 new Dictionary<int, float>(context.SelectedSourceEdges.Count);
             foreach (int edgeIndex in context.SelectedSourceEdges)
             {
+                if (forcedDeferredEdges != null &&
+                    forcedDeferredEdges.Contains(edgeIndex))
+                {
+                    widthByEdge.Add(edgeIndex, 0f);
+                    continue;
+                }
+
                 float solvedWidth = CalculateChamferEdgeWidth(
                     context.Graph,
                     edgeIndex,
@@ -2434,8 +2480,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
             ref ChamferEmissionStats stats,
+            out HashSet<int> conflictingEdges,
             out string blocker)
         {
+            conflictingEdges = new HashSet<int>();
             blocker = string.Empty;
             stats.SourceFaceCount = context.Graph.Faces.Count;
             stats.CandidateSelectedEdgeCount = context.SelectedSourceEdges.Count;
@@ -2443,6 +2491,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 context.Graph.Faces.Count + context.SelectedSourceEdges.Count);
             HashSet<TopologyEdgeKey> expectedSourceBoundaryEdges =
                 new HashSet<TopologyEdgeKey>();
+            List<ChamferStripEndpointBoundary> endpointBoundaries =
+                new List<ChamferStripEndpointBoundary>(
+                    context.SelectedSourceEdges.Count * 2);
             HashSet<TopologyEdgeKey> expectedVertexBoundaryEdges =
                 new HashSet<TopologyEdgeKey>();
 
@@ -2564,12 +2615,92 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 stats.BevelStripQuadFaceCount++;
                 stats.BevelStripTriangleEstimate += 2;
 
-                expectedVertexBoundaryEdges.Add(new TopologyEdgeKey(
+                TopologyEdgeKey boundaryAtA = new TopologyEdgeKey(
                     new VertexKey(a0),
-                    new VertexKey(a1)));
-                expectedVertexBoundaryEdges.Add(new TopologyEdgeKey(
+                    new VertexKey(a1));
+                TopologyEdgeKey boundaryAtB = new TopologyEdgeKey(
                     new VertexKey(b0),
-                    new VertexKey(b1)));
+                    new VertexKey(b1));
+                endpointBoundaries.Add(new ChamferStripEndpointBoundary(
+                    edge.VertexA,
+                    edgeIndex,
+                    edge.FaceA,
+                    edge.FaceB,
+                    boundaryAtA));
+                endpointBoundaries.Add(new ChamferStripEndpointBoundary(
+                    edge.VertexB,
+                    edgeIndex,
+                    edge.FaceA,
+                    edge.FaceB,
+                    boundaryAtB));
+                expectedVertexBoundaryEdges.Add(boundaryAtA);
+                expectedVertexBoundaryEdges.Add(boundaryAtB);
+            }
+
+            stats.StripEndpointBoundaryRegistrationCount =
+                endpointBoundaries.Count;
+            Dictionary<TopologyEdgeKey, List<ChamferStripEndpointBoundary>>
+                endpointBoundariesByKey =
+                    new Dictionary<TopologyEdgeKey, List<ChamferStripEndpointBoundary>>();
+            for (int i = 0; i < endpointBoundaries.Count; i++)
+            {
+                ChamferStripEndpointBoundary boundary = endpointBoundaries[i];
+                if (!endpointBoundariesByKey.TryGetValue(
+                        boundary.Key,
+                        out List<ChamferStripEndpointBoundary> owners))
+                {
+                    owners = new List<ChamferStripEndpointBoundary>();
+                    endpointBoundariesByKey.Add(boundary.Key, owners);
+                }
+                owners.Add(boundary);
+            }
+
+            HashSet<int> duplicateBoundaryVertices = new HashSet<int>();
+            foreach (KeyValuePair<TopologyEdgeKey, List<ChamferStripEndpointBoundary>> pair
+                     in endpointBoundariesByKey)
+            {
+                List<ChamferStripEndpointBoundary> owners = pair.Value;
+                if (owners.Count <= 1)
+                {
+                    continue;
+                }
+
+                stats.DuplicateStripEndpointBoundaryKeyCount++;
+                stats.DuplicateStripEndpointBoundaryRegistrationCount +=
+                    owners.Count - 1;
+                for (int i = 0; i < owners.Count; i++)
+                {
+                    duplicateBoundaryVertices.Add(owners[i].SourceVertexIndex);
+                }
+
+                int keeperEdge = owners[0].SourceEdgeIndex;
+                for (int i = 1; i < owners.Count; i++)
+                {
+                    keeperEdge = ChooseChamferBoundaryConflictKeeper(
+                        context,
+                        keeperEdge,
+                        owners[i].SourceEdgeIndex);
+                }
+                for (int i = 0; i < owners.Count; i++)
+                {
+                    if (owners[i].SourceEdgeIndex != keeperEdge)
+                    {
+                        conflictingEdges.Add(owners[i].SourceEdgeIndex);
+                    }
+                }
+            }
+            stats.DuplicateBoundaryVertexCount = duplicateBoundaryVertices.Count;
+
+            AuditActiveChamferRuns(
+                context,
+                solution.WidthByEdge,
+                ref stats);
+
+            if (conflictingEdges.Count > 0)
+            {
+                blocker =
+                    "duplicate active strip-end boundaries require deterministic local edge deferral";
+                return false;
             }
 
             for (int edgeIndex = 0;
@@ -2674,6 +2805,193 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             stats.ReadyForVertexPatches = 1;
             return true;
+        }
+
+        private static int ChooseChamferBoundaryConflictKeeper(
+            ChamferTopologyContext context,
+            int firstEdgeIndex,
+            int secondEdgeIndex)
+        {
+            EdgeWearSelectedGraphEdge first = default;
+            EdgeWearSelectedGraphEdge second = default;
+            bool foundFirst = false;
+            bool foundSecond = false;
+            for (int i = 0; i < context.SelectedEdges.Count; i++)
+            {
+                EdgeWearSelectedGraphEdge selected = context.SelectedEdges[i];
+                if (selected.GraphEdgeIndex == firstEdgeIndex)
+                {
+                    first = selected;
+                    foundFirst = true;
+                }
+                if (selected.GraphEdgeIndex == secondEdgeIndex)
+                {
+                    second = selected;
+                    foundSecond = true;
+                }
+            }
+
+            if (foundFirst && foundSecond)
+            {
+                if (!Mathf.Approximately(
+                        first.Candidate.Strength,
+                        second.Candidate.Strength))
+                {
+                    return first.Candidate.Strength > second.Candidate.Strength
+                        ? firstEdgeIndex
+                        : secondEdgeIndex;
+                }
+
+                float firstLength = GetGraphEdgeLength(
+                    context.Graph,
+                    firstEdgeIndex);
+                float secondLength = GetGraphEdgeLength(
+                    context.Graph,
+                    secondEdgeIndex);
+                if (!Mathf.Approximately(firstLength, secondLength))
+                {
+                    return firstLength > secondLength
+                        ? firstEdgeIndex
+                        : secondEdgeIndex;
+                }
+            }
+
+            return Mathf.Min(firstEdgeIndex, secondEdgeIndex);
+        }
+
+        private static void AuditActiveChamferRuns(
+            ChamferTopologyContext context,
+            Dictionary<int, float> widthByEdge,
+            ref ChamferEmissionStats stats)
+        {
+            List<List<int>> outgoingByVertex =
+                new List<List<int>>(context.Graph.Vertices.Count);
+            for (int i = 0; i < context.Graph.Vertices.Count; i++)
+            {
+                outgoingByVertex.Add(new List<int>());
+            }
+            for (int i = 0; i < context.HalfEdges.Count; i++)
+            {
+                outgoingByVertex[context.HalfEdges[i].OriginVertex].Add(i);
+            }
+
+            for (int vertexIndex = 0;
+                 vertexIndex < outgoingByVertex.Count;
+                 vertexIndex++)
+            {
+                List<int> outgoing = outgoingByVertex[vertexIndex];
+                if (outgoing.Count == 0)
+                {
+                    continue;
+                }
+
+                int start = -1;
+                bool openFan = false;
+                for (int i = 0; i < outgoing.Count; i++)
+                {
+                    ChamferHalfEdge candidate = context.HalfEdges[outgoing[i]];
+                    int previousOpposite =
+                        context.HalfEdges[candidate.Previous].Opposite;
+                    if (previousOpposite < 0)
+                    {
+                        start = candidate.Index;
+                        openFan = true;
+                        break;
+                    }
+                }
+                if (start < 0)
+                {
+                    start = outgoing[0];
+                }
+
+                List<int> ordered = new List<int>(outgoing.Count);
+                HashSet<int> visited = new HashSet<int>();
+                int current = start;
+                int guard = 0;
+                while (current >= 0 && guard++ <= outgoing.Count)
+                {
+                    if (!visited.Add(current))
+                    {
+                        break;
+                    }
+                    ordered.Add(current);
+                    ChamferHalfEdge halfEdge = context.HalfEdges[current];
+                    int next = halfEdge.Opposite >= 0
+                        ? context.HalfEdges[halfEdge.Opposite].Next
+                        : -1;
+                    if (next < 0 || next == start)
+                    {
+                        break;
+                    }
+                    current = next;
+                }
+                if (ordered.Count != outgoing.Count)
+                {
+                    continue;
+                }
+
+                bool anyActive = false;
+                int runCount = 0;
+                bool previousActive = openFan
+                    ? false
+                    : IsChamferHalfEdgeActive(
+                        context.HalfEdges[ordered[ordered.Count - 1]],
+                        widthByEdge);
+                int activeCount = 0;
+                for (int i = 0; i < ordered.Count; i++)
+                {
+                    bool active = IsChamferHalfEdgeActive(
+                        context.HalfEdges[ordered[i]],
+                        widthByEdge);
+                    if (active)
+                    {
+                        anyActive = true;
+                        activeCount++;
+                        if (!previousActive)
+                        {
+                            runCount++;
+                        }
+                    }
+                    previousActive = active;
+                }
+                if (!openFan && activeCount == ordered.Count && activeCount > 0)
+                {
+                    runCount = 1;
+                }
+                if (!anyActive)
+                {
+                    continue;
+                }
+
+                stats.ActiveAffectedVertexCount++;
+                stats.ActiveSelectedRunCount += runCount;
+                if (openFan)
+                {
+                    stats.ActiveOpenRunCount += runCount;
+                }
+                else
+                {
+                    stats.ActiveClosedRunCount += runCount;
+                }
+                if (runCount > 1)
+                {
+                    stats.ActiveMultipleRunVertexCount++;
+                }
+                if (activeCount == 1)
+                {
+                    stats.ActiveIsolatedEdgeRunCount++;
+                }
+            }
+        }
+
+        private static bool IsChamferHalfEdgeActive(
+            ChamferHalfEdge halfEdge,
+            Dictionary<int, float> widthByEdge)
+        {
+            return widthByEdge.TryGetValue(
+                    halfEdge.SourceEdgeIndex,
+                    out float width) &&
+                width > PointMergeDistance;
         }
 
         private static void LogChamferEmissionAudit(
@@ -5720,6 +6038,29 @@ private readonly struct EdgeWearTopologyStats
             }
         }
 
+        private readonly struct ChamferStripEndpointBoundary
+        {
+            public readonly int SourceVertexIndex;
+            public readonly int SourceEdgeIndex;
+            public readonly int FaceA;
+            public readonly int FaceB;
+            public readonly TopologyEdgeKey Key;
+
+            public ChamferStripEndpointBoundary(
+                int sourceVertexIndex,
+                int sourceEdgeIndex,
+                int faceA,
+                int faceB,
+                TopologyEdgeKey key)
+            {
+                SourceVertexIndex = sourceVertexIndex;
+                SourceEdgeIndex = sourceEdgeIndex;
+                FaceA = faceA;
+                FaceB = faceB;
+                Key = key;
+            }
+        }
+
         private struct ChamferEmissionStats
         {
             public int SourceFaceCount;
@@ -5743,6 +6084,18 @@ private readonly struct EdgeWearTopologyStats
             public int MissingExpectedVertexBoundaryEdgeCount;
             public int ProvisionalNonManifoldEdgeCount;
             public int ProvisionalTJunctionCount;
+            public int StripEndpointBoundaryRegistrationCount;
+            public int DuplicateStripEndpointBoundaryKeyCount;
+            public int DuplicateStripEndpointBoundaryRegistrationCount;
+            public int DuplicateBoundaryVertexCount;
+            public int ConflictDeferredEdgeCount;
+            public int CompatibilityPassCount;
+            public int ActiveAffectedVertexCount;
+            public int ActiveSelectedRunCount;
+            public int ActiveClosedRunCount;
+            public int ActiveOpenRunCount;
+            public int ActiveMultipleRunVertexCount;
+            public int ActiveIsolatedEdgeRunCount;
             public int ReadyForVertexPatches;
 
             public string ToSummaryString()
@@ -5769,6 +6122,18 @@ private readonly struct EdgeWearTopologyStats
                     ", missingExpectedVertexBoundaryEdges=" + MissingExpectedVertexBoundaryEdgeCount +
                     ", provisionalNonManifoldEdges=" + ProvisionalNonManifoldEdgeCount +
                     ", provisionalTJunctions=" + ProvisionalTJunctionCount +
+                    ", stripEndpointBoundaryRegistrations=" + StripEndpointBoundaryRegistrationCount +
+                    ", duplicateStripEndpointBoundaryKeys=" + DuplicateStripEndpointBoundaryKeyCount +
+                    ", duplicateStripEndpointBoundaryRegistrations=" + DuplicateStripEndpointBoundaryRegistrationCount +
+                    ", duplicateBoundaryVertices=" + DuplicateBoundaryVertexCount +
+                    ", conflictDeferredEdges=" + ConflictDeferredEdgeCount +
+                    ", compatibilityPasses=" + CompatibilityPassCount +
+                    ", activeAffectedVertices=" + ActiveAffectedVertexCount +
+                    ", activeSelectedRuns=" + ActiveSelectedRunCount +
+                    ", activeClosedRuns=" + ActiveClosedRunCount +
+                    ", activeOpenRuns=" + ActiveOpenRunCount +
+                    ", activeMultipleRunVertices=" + ActiveMultipleRunVertexCount +
+                    ", activeIsolatedEdgeRuns=" + ActiveIsolatedEdgeRunCount +
                     ", readyForVertexPatches=" + ReadyForVertexPatches;
             }
         }

@@ -68,7 +68,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float paintedAccentStrokeLengthMax = 1.55f;
 
-        [Tooltip("Painted Accent Lines only. Maximum signed angle offset in degrees applied around the preferred Direction. Each stroke rolls independently in [-value, +value].")]
+        [Tooltip("Painted Accent Lines only. Preferred local X/Z orientation in degrees for generated 3D surface strokes. Angle Jitter Degrees rolls independently around this value for each stroke.")]
+        [Range(0f, 180f)]
+        [SerializeField]
+        private float paintedAccentStrokeBaseAngleDegrees = 90f;
+
+        [Tooltip("Painted Accent Lines only. Maximum signed angle offset in degrees applied around Stroke Base Angle Degrees. Each stroke rolls independently in [-value, +value].")]
         [Range(0f, 30f)]
         [SerializeField]
         private float paintedAccentStrokeAngleJitterDegrees = 18f;
@@ -126,6 +131,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Mathf.Max(
                 PaintedAccentStrokeLengthMin + 0.05f,
                 Mathf.Clamp(paintedAccentStrokeLengthMax, 0.25f, 6.0f));
+
+        public float PaintedAccentStrokeBaseAngleDegrees =>
+            Mathf.Clamp(paintedAccentStrokeBaseAngleDegrees, 0f, 180f);
 
         public float PaintedAccentStrokeAngleJitterDegrees =>
             Mathf.Clamp(paintedAccentStrokeAngleJitterDegrees, 0f, 30f);
