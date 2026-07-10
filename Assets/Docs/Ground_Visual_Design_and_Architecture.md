@@ -10,6 +10,21 @@ implementation_documents:
   - Ground_Generation_Surface_Upgrade_Plan.md
 ---
 
+### 2026-07-11 — Patch V3J.3C1: Ridge Readability Calibration Candidate
+
+V3J.3C passed its topology and cost gates but failed the gameplay-camera readability gate: the narrow geometry read primarily as flat dark scratches, and increasing the persisted Clean Fold Height to `0.0386 m` did not expose a convincing raised form. V3J.3C1 is an **unvalidated calibration candidate**, not an accepted production representation.
+
+The candidate preserves the validated generated stroke descriptors and projected/debug rasterization. It does not change `GroundPaintedAccentFoldFieldGenerator`. The secondary ridge builder alone resamples every existing descriptor to at least seven longitudinal rows and reduces its cross-section from seven to five samples. For the demonstrated 36-stroke/five-source-point case this retains exactly 1,260 vertices and 1,728 triangles:
+
+```text
+36 strokes × 7 longitudinal samples × 5 cross samples = 1,260 vertices
+36 strokes × 6 longitudinal spans × 4 cross spans × 2 = 1,728 triangles
+```
+
+The proof-only Fold Height authoring range is temporarily extended from `0–0.05 m` to `0–0.15 m` without changing serialized defaults or style assets. The proof material changes from near-black to a neutral mid-value lit colour so geometry can be judged through lighting and silhouette rather than dark-line contrast. The build diagnostic now records requested height, longitudinal and cross sample counts, actual generated per-stroke peak heights, effective widths, material identity/colour, shadow mode, topology, memory estimate, and build time.
+
+Validation must use the same seed and gameplay camera at `0.02 m`, `0.06 m`, and `0.12 m`. Continue with secondary geometry only if a restrained height reads clearly. If only root-like or obstacle-like dimensions become readable, reject this representation and retain the validated descriptors for projected rendering.
+
 ### 2026-07-10 — Patch V3J.3C: Narrow Static Secondary Ridge Reconciliation
 
 V3J.3C resolves the V3J.3B decision gate. The active Painted Accent representation candidate is now a **separate, visual-only, narrow open ridge mesh** generated from the validated deterministic 3D surface-stroke descriptors. The existing `GeneratedGround` mesh and `MeshCollider` are immutable for this feature.

@@ -426,10 +426,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     EditorGUILayout.Slider(
                         paintedAccentFoldHeight,
                         0f,
-                        0.05f,
+                        0.15f,
                         new GUIContent(
                             "Fold Height",
-                            "Maximum raised ridge height in metres, applied along the sampled ground normal. Tiny accent marks should normally remain in the 0.006-0.025 metre range."));
+                            "Calibration-only maximum raised ridge height in metres. Test 0.02, 0.06, and 0.12 from the same gameplay camera; this extended range is not an accepted production default."));
                     EditorGUILayout.Slider(
                         paintedAccentFoldIrregularity,
                         0f,

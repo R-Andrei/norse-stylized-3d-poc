@@ -241,7 +241,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             "__FoldFieldLinePreview_Debug";
         private const float PaintedAccentRidgeBoundaryEmbedDepth = 0.002f;
         private const float PaintedAccentRidgeMinimumEndWidthScale = 0.12f;
-        private const int PaintedAccentFoldCrossSectionSampleCount = 7;
+        private const int PaintedAccentFoldCrossSectionSampleCount = 5;
+        private const int PaintedAccentRidgeMinimumLongitudinalSampleCount = 7;
 
         // Position (12) + normal (12) + UV0 (8). The proof mesh has no
         // tangents, vertex colours, collider data, or secondary streams.
@@ -1720,6 +1721,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             List<Vector2> uvs = new List<Vector2>();
             List<int> triangles = new List<int>();
             int builtStrokeCount = 0;
+            int minimumLongitudinalSampleCount = int.MaxValue;
+            int maximumLongitudinalSampleCount = 0;
+            long totalLongitudinalSampleCount = 0;
+            float minimumStrokePeakHeight = float.PositiveInfinity;
+            float maximumStrokePeakHeight = 0f;
+            double totalStrokePeakHeight = 0d;
+            float minimumEffectiveWidth = float.PositiveInfinity;
+            float maximumEffectiveWidth = 0f;
+            double totalEffectiveWidth = 0d;
+            long effectiveWidthSampleCount = 0;
 
             for (int strokeIndex = 0;
                  strokeIndex < paintedAccentSurfaceStrokes.Length;
@@ -1734,6 +1745,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
                 Vector3[] points = stroke.LocalPoints;
                 Vector3[] normals = stroke.LocalNormals;
+                int longitudinalSampleCount =
+                    Mathf.Max(
+                        PaintedAccentRidgeMinimumLongitudinalSampleCount,
+                        points.Length);
                 PaintedAccentFoldProfileBasis[] profileBases =
                     BuildPaintedAccentFoldProfileBases(
                         stroke.Seed,
@@ -1744,13 +1759,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 float strokeHeight =
                     foldHeight *
                     Mathf.Lerp(0.82f, 1f, stroke.Strength);
+                float strokePeakHeight = 0f;
 
-                for (int pointIndex = 0; pointIndex < points.Length; pointIndex++)
+                for (int pointIndex = 0;
+                     pointIndex < longitudinalSampleCount;
+                     pointIndex++)
                 {
                     float t =
-                        points.Length <= 1
+                        longitudinalSampleCount <= 1
                             ? 0f
-                            : pointIndex / (float)(points.Length - 1);
+                            : pointIndex /
+                              (float)(longitudinalSampleCount - 1);
                     float endEnvelope =
                         ResolvePaintedAccentFoldEndEnvelope(
                             t,
@@ -1762,18 +1781,27 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             1f,
                             endEnvelope);
                     float effectiveHalfWidth = halfWidth * widthScale;
+                    float effectiveWidth = effectiveHalfWidth * 2f;
+                    minimumEffectiveWidth =
+                        Mathf.Min(minimumEffectiveWidth, effectiveWidth);
+                    maximumEffectiveWidth =
+                        Mathf.Max(maximumEffectiveWidth, effectiveWidth);
+                    totalEffectiveWidth += effectiveWidth;
+                    effectiveWidthSampleCount++;
+
                     bool isEndBoundary =
                         pointIndex == 0 ||
-                        pointIndex == points.Length - 1;
-                    Vector3 normal =
-                        pointIndex < normals.Length &&
-                        normals[pointIndex].sqrMagnitude > 0.000001f
-                            ? normals[pointIndex].normalized
-                            : Vector3.up;
+                        pointIndex == longitudinalSampleCount - 1;
+                    ResolvePaintedAccentRidgeLongitudinalSample(
+                        points,
+                        normals,
+                        t,
+                        out Vector3 centerlinePoint,
+                        out Vector3 normal);
                     Vector3 tangent =
                         ResolveStrokePreviewTangent(
                             points,
-                            pointIndex,
+                            t,
                             normal);
                     Vector3 across =
                         Vector3.Cross(normal, tangent);
@@ -1807,8 +1835,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                                 foldIrregularity,
                                 endEnvelope);
                         float height = strokeHeight * normalizedHeight;
+                        strokePeakHeight = Mathf.Max(strokePeakHeight, height);
                         Vector3 lateralPosition =
-                            points[pointIndex] +
+                            centerlinePoint +
                             across * (u * effectiveHalfWidth);
                         Vector3 groundPosition = lateralPosition;
                         Vector3 liftNormal = normal;
@@ -1849,7 +1878,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 }
 
                 for (int pointIndex = 0;
-                     pointIndex < points.Length - 1;
+                     pointIndex < longitudinalSampleCount - 1;
                      pointIndex++)
                 {
                     for (int crossIndex = 0;
@@ -1873,6 +1902,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     }
                 }
 
+                minimumLongitudinalSampleCount =
+                    Mathf.Min(
+                        minimumLongitudinalSampleCount,
+                        longitudinalSampleCount);
+                maximumLongitudinalSampleCount =
+                    Mathf.Max(
+                        maximumLongitudinalSampleCount,
+                        longitudinalSampleCount);
+                totalLongitudinalSampleCount += longitudinalSampleCount;
+                minimumStrokePeakHeight =
+                    Mathf.Min(minimumStrokePeakHeight, strokePeakHeight);
+                maximumStrokePeakHeight =
+                    Mathf.Max(maximumStrokePeakHeight, strokePeakHeight);
+                totalStrokePeakHeight += strokePeakHeight;
                 builtStrokeCount++;
             }
 
@@ -1918,8 +1961,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             previewRenderer.receiveShadows = true;
             previewRenderer.motionVectorGenerationMode =
                 MotionVectorGenerationMode.Camera;
-            previewRenderer.sharedMaterial =
+            Material previewMaterial =
                 ResolvePaintedAccentRidgePreviewMaterial();
+            previewRenderer.sharedMaterial = previewMaterial;
 
             buildStopwatch.Stop();
             int triangleCount = triangles.Count / 3;
@@ -1930,10 +1974,58 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 (long)triangles.Count * indexStrideBytes;
             long estimatedRawMeshBytes =
                 estimatedVertexBufferBytes + estimatedIndexBufferBytes;
+            float meanLongitudinalSampleCount =
+                builtStrokeCount > 0
+                    ? totalLongitudinalSampleCount / (float)builtStrokeCount
+                    : 0f;
+            float meanStrokePeakHeight =
+                builtStrokeCount > 0
+                    ? (float)(totalStrokePeakHeight / builtStrokeCount)
+                    : 0f;
+            float meanEffectiveWidth =
+                effectiveWidthSampleCount > 0
+                    ? (float)(totalEffectiveWidth / effectiveWidthSampleCount)
+                    : 0f;
+            string materialShaderName =
+                previewMaterial != null && previewMaterial.shader != null
+                    ? previewMaterial.shader.name
+                    : "None";
+            Color materialBaseColor = Color.clear;
+            if (previewMaterial != null)
+            {
+                if (previewMaterial.HasProperty("_BaseColor"))
+                {
+                    materialBaseColor =
+                        previewMaterial.GetColor("_BaseColor");
+                }
+                else if (previewMaterial.HasProperty("_Color"))
+                {
+                    materialBaseColor =
+                        previewMaterial.GetColor("_Color");
+                }
+            }
 
             Debug.Log(
                 $"GeneratedGround Painted Accent ridge built: " +
                 $"strokes={builtStrokeCount}, " +
+                $"requestedFoldHeight={foldHeight:F4}, " +
+                $"crossSamples={PaintedAccentFoldCrossSectionSampleCount}, " +
+                $"longitudinalSamplesMin={minimumLongitudinalSampleCount}, " +
+                $"longitudinalSamplesMean={meanLongitudinalSampleCount:F2}, " +
+                $"longitudinalSamplesMax={maximumLongitudinalSampleCount}, " +
+                $"strokePeakHeightMin={minimumStrokePeakHeight:F4}, " +
+                $"strokePeakHeightMean={meanStrokePeakHeight:F4}, " +
+                $"strokePeakHeightMax={maximumStrokePeakHeight:F4}, " +
+                $"effectiveWidthMin={minimumEffectiveWidth:F4}, " +
+                $"effectiveWidthMean={meanEffectiveWidth:F4}, " +
+                $"effectiveWidthMax={maximumEffectiveWidth:F4}, " +
+                $"materialShader={materialShaderName}, " +
+                $"materialBaseColor=" +
+                $"({materialBaseColor.r:F3}," +
+                $"{materialBaseColor.g:F3}," +
+                $"{materialBaseColor.b:F3}," +
+                $"{materialBaseColor.a:F3}), " +
+                $"shadowCasting={previewRenderer.shadowCastingMode}, " +
                 $"vertices={vertices.Count}, " +
                 $"triangles={triangleCount}, " +
                 $"estimatedVertexBufferBytes={estimatedVertexBufferBytes}, " +
@@ -1998,9 +2090,58 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         StringComparison.Ordinal));
         }
 
+        private static void ResolvePaintedAccentRidgeLongitudinalSample(
+            Vector3[] points,
+            Vector3[] normals,
+            float t,
+            out Vector3 point,
+            out Vector3 normal)
+        {
+            t = Mathf.Clamp01(t);
+            float scaledIndex = t * (points.Length - 1);
+            int lowerIndex =
+                Mathf.Clamp(
+                    Mathf.FloorToInt(scaledIndex),
+                    0,
+                    points.Length - 1);
+            int upperIndex =
+                Mathf.Min(points.Length - 1, lowerIndex + 1);
+            float interpolation = scaledIndex - lowerIndex;
+
+            point =
+                Vector3.Lerp(
+                    points[lowerIndex],
+                    points[upperIndex],
+                    interpolation);
+
+            Vector3 lowerNormal =
+                lowerIndex < normals.Length &&
+                normals[lowerIndex].sqrMagnitude > 0.000001f
+                    ? normals[lowerIndex].normalized
+                    : Vector3.up;
+            Vector3 upperNormal =
+                upperIndex < normals.Length &&
+                normals[upperIndex].sqrMagnitude > 0.000001f
+                    ? normals[upperIndex].normalized
+                    : lowerNormal;
+            normal =
+                Vector3.Lerp(
+                    lowerNormal,
+                    upperNormal,
+                    interpolation);
+            if (normal.sqrMagnitude <= 0.000001f)
+            {
+                normal = Vector3.up;
+            }
+            else
+            {
+                normal.Normalize();
+            }
+        }
+
         private static Vector3 ResolveStrokePreviewTangent(
             Vector3[] points,
-            int pointIndex,
+            float t,
             Vector3 surfaceNormal)
         {
             if (points == null || points.Length < 2)
@@ -2008,10 +2149,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 return ResolvePreviewFallbackTangent(surfaceNormal);
             }
 
+            int centerIndex =
+                Mathf.Clamp(
+                    Mathf.RoundToInt(Mathf.Clamp01(t) * (points.Length - 1)),
+                    0,
+                    points.Length - 1);
             Vector3 previous =
-                points[Mathf.Max(0, pointIndex - 1)];
+                points[Mathf.Max(0, centerIndex - 1)];
             Vector3 next =
-                points[Mathf.Min(points.Length - 1, pointIndex + 1)];
+                points[Mathf.Min(points.Length - 1, centerIndex + 1)];
             Vector3 tangent =
                 Vector3.ProjectOnPlane(
                     next - previous,
@@ -2409,7 +2555,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     hideFlags = HideFlags.DontSave
                 };
 
-            Color previewColor = new Color(0.22f, 0.18f, 0.14f, 1f);
+            Color previewColor = new Color(0.50f, 0.46f, 0.40f, 1f);
             if (paintedAccentRidgePreviewMaterial.HasProperty("_BaseColor"))
             {
                 paintedAccentRidgePreviewMaterial.SetColor(
