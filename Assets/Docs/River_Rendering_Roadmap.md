@@ -566,3 +566,16 @@ This is still spawning-only work. Object-contact spawning, free-water spawning, 
 - 4.11C.5.15A.1: Object Foam activation wiring fix. Source-category toggles are now authoritative when automatic birth is enabled and the preset is not Off; Object Foam runtime diagnostics include static source anchor count.
 
 - 4.11C.5.15A.2: Object Foam shape refinement through an Object Contact Edge Field. The field is built from obstacle exclusion and static pressure/contact evidence, then sampled by Contact Arc/Fleck source events so object births follow contact edges rather than rectangular object half-extents. This remains Layer C spawning only; no wake-tail, free-water, Layer D, or Final Foam integration was added.
+
+- 4.11C.5.15A.3 / 5.15A.3.4: Object contact field edge-distance correction attempt failed due incomplete compute-resource wiring and was recovered. The stable runtime returns to the broad object-contact field with `_FoamObjectContactFieldRead` correctly declared and bound.
+
+- 4.11C.5.15A.4: Object Foam adds `Contact Semi-Arcs` as a third Layer C source pattern. Semi-arcs reuse the existing source-event rasterizer and object-contact field, carry deterministic signed lopsidedness through `Curvature` / `variation.w`, and evaluate a one-sided tangent window instead of the full-arc `abs(tangentDistance)` support. This targets lopsided object shoulder foam without adding free-water spawning, Layer D tuning, Final Foam integration, or new compute resources.
+
+## Foam Source Update — 4.11C.5.15B
+
+Free Water Foam birth is implemented as persistent material skeletons, not final rendered foam. The first two patterns are Lace Connectors and Torn Fragments. This should be validated in Material Remaining Life before judging Final Foam. Thin white glints visible in the inspiration footage are intentionally deferred to water-surface shader/rendering polish.
+
+### Foam Source Update — 4.11C.5.15B.2
+
+Added Cross-Lace Connectors to Free Water Foam. This is a horizontal/cross-current moving head+stroke pattern that complements the original with-flow Lace Connector and Torn Fragment patterns. The patch intentionally does not change Coverage/Activity or introduce shader glints; it only adds the missing source shape class needed for cross-river pale ribbons.
+

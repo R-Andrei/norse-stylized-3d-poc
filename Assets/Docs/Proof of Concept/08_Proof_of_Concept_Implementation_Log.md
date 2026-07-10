@@ -1553,3 +1553,22 @@ Fixed Object Foam activation after validation showed the runtime status remained
 Implemented after Object Foam successfully spawned but showed rectangular/slab-like contact patches. Added a GPU object contact field built from obstacle exclusion and static pressure. The field stores contact confidence, contact normal, and front/side relevance. Object Contact Arc and Contact Fleck source events now shape against this field in contact normal/tangent space, while object extents remain coarse scheduling/bounding data only.
 
 Validation target: Material Remaining Life should show less rectangular object contact foam, with arcs/flecks hugging actual obstacle contact regions and no material inside obstacle footprints.
+
+### 4.11C.5.15A.3 / 5.15A.3.4 — Object Contact Field Recovery
+
+The attempted object-contact edge-distance correction failed because compute resource declarations/bindings and C# fallbacks were not consistently updated as a complete file set. Recovery restored the stable object-contact field path and fixed the `_FoamObjectContactFieldRead` declaration/binding/fallback sequence. Current Object Foam therefore remains based on the 5.15A.2 broad contact field rather than a sharper distance-edge field.
+
+### 4.11C.5.15A.4 — Object Contact Semi-Arc Pattern
+
+Added `Contact Semi-Arcs` to Object Foam as a third Layer C source recipe. Mixed Object Foam now has normalized three-way weights for Contact Arcs, Contact Semi-Arcs, and Contact Flecks. Semi-Arc events use existing source-event data and store deterministic signed lopsidedness in `Curvature` / GPU `variation.w`; no new compute texture or binding was added. The compute rasterizer adds `FoamEvaluateObjectContactSemiArcSource`, using a one-sided tangent interval so contact foam can appear as a lopsided shoulder arc instead of only a symmetric bracket.
+
+Validation remains in `Material Remaining Life`: compare pure Contact Arcs, pure Contact Semi-Arcs, pure Contact Flecks, and Mixed. Final Foam remains unchanged.
+
+### 4.11C.5.15B — Free Water Lace / Fragment Birth
+
+Implemented Free Water Foam as a real automatic Layer C birth source category. Added Lace Connector head+stroke events and Torn Fragment progressive swept patch events. Added bounded deterministic open-water slot scheduling, two-pattern authoring controls, runtime diagnostics, and Y-range dispatch clipping for local automatic source events. This patch intentionally avoids spawning final-render glints or rectangular/sheet decals as persistent foam material.
+
+### 4.11C.5.15B.2 — Free Water Cross-Lace Connectors
+
+Added Cross-Lace Connectors as the third Free Water Foam birth pattern. The existing Lace Connector samples its path along the flow axis, so free-water birth produced mostly vertical/with-flow marks. Cross-Lace uses the same timed head+stroke insertion mechanic but samples along the lateral river axis, producing horizontal/cross-current ribbons while only bending slightly along flow. Coverage/Activity were intentionally left unchanged; any longer survival should be validated through Initial Life / lifetime tuning separately.
+

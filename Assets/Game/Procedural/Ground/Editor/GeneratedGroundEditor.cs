@@ -268,6 +268,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             DrawGroundSurfaceAuthoringSection();
             DrawGroundDebugSection();
+            DrawPaintedAccent3DStrokeControls();
             DrawGenerationSection();
             DrawPatchSection();
             DrawTransitionSection();
@@ -550,6 +551,174 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         ground => ground.ClearDebugView());
                 }
             }
+        }
+
+        private void DrawPaintedAccent3DStrokeControls()
+        {
+            if (targets.Length != 1)
+            {
+                return;
+            }
+
+            GroundSurfaceStyleProfile style =
+                surfaceStyleProfile.objectReferenceValue as
+                    GroundSurfaceStyleProfile;
+
+            if (style == null ||
+                string.IsNullOrWhiteSpace(surfaceVariantId.stringValue))
+            {
+                return;
+            }
+
+            SerializedObject styleObject = new SerializedObject(style);
+            styleObject.Update();
+
+            SerializedProperty feature =
+                FindSelectedPaintedAccentFeatureProperty(
+                    styleObject,
+                    surfaceVariantId.stringValue);
+
+            if (feature == null)
+            {
+                return;
+            }
+
+            SerializedProperty strokeWidth =
+                feature.FindPropertyRelative("paintedAccentStrokeWidth");
+            SerializedProperty strokeDensity =
+                feature.FindPropertyRelative("paintedAccentStrokeDensity");
+            SerializedProperty strokeLengthMin =
+                feature.FindPropertyRelative("paintedAccentStrokeLengthMin");
+            SerializedProperty strokeLengthMax =
+                feature.FindPropertyRelative("paintedAccentStrokeLengthMax");
+            SerializedProperty strokeAngleJitterDegrees =
+                feature.FindPropertyRelative("paintedAccentStrokeAngleJitterDegrees");
+            if (strokeWidth == null ||
+                strokeDensity == null ||
+                strokeLengthMin == null ||
+                strokeLengthMax == null ||
+                strokeAngleJitterDegrees == null)
+            {
+                return;
+            }
+
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField(
+                "Painted Accent 3D Strokes",
+                EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Edits the selected surface variant's Painted Accent 3D stroke layout controls, then refreshes this GeneratedGround object's generated stroke/fold-field data. This controls line layout only; raised fold height comes in a later patch.",
+                MessageType.None);
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.Slider(
+                strokeWidth,
+                0.04f,
+                0.35f,
+                new GUIContent(
+                    "Stroke Width",
+                    "Preview/runtime ribbon width in metres for generated 3D Painted Accent surface strokes."));
+            EditorGUILayout.Slider(
+                strokeDensity,
+                0f,
+                80f,
+                new GUIContent(
+                    "Stroke Density",
+                    "Approximate target number of generated 3D strokes per standard 40x40 ground patch."));
+            EditorGUILayout.Slider(
+                strokeLengthMin,
+                0.20f,
+                4.0f,
+                new GUIContent(
+                    "Stroke Length Min",
+                    "Minimum generated 3D stroke length in metres."));
+            EditorGUILayout.Slider(
+                strokeLengthMax,
+                0.25f,
+                6.0f,
+                new GUIContent(
+                    "Stroke Length Max",
+                    "Maximum generated 3D stroke length in metres."));
+            EditorGUILayout.Slider(
+                strokeAngleJitterDegrees,
+                0f,
+                30f,
+                new GUIContent(
+                    "Angle Jitter Degrees",
+                    "Maximum signed angle offset in degrees around the preferred Direction. Each stroke rolls independently between -value and +value."));
+
+            if (strokeLengthMax.floatValue < strokeLengthMin.floatValue + 0.05f)
+            {
+                strokeLengthMax.floatValue = strokeLengthMin.floatValue + 0.05f;
+            }
+
+            if (!EditorGUI.EndChangeCheck())
+            {
+                return;
+            }
+
+            styleObject.ApplyModifiedProperties();
+            EditorUtility.SetDirty(style);
+            ApplyToTargets(
+                "Tune Painted Accent 3D Stroke Layout",
+                ground => ground.RefreshSurfaceMaterialProperties());
+        }
+
+        private static SerializedProperty FindSelectedPaintedAccentFeatureProperty(
+            SerializedObject styleObject,
+            string variantId)
+        {
+            SerializedProperty variants =
+                styleObject.FindProperty("variants");
+
+            if (variants == null || !variants.isArray)
+            {
+                return null;
+            }
+
+            for (int variantIndex = 0;
+                 variantIndex < variants.arraySize;
+                 variantIndex++)
+            {
+                SerializedProperty variant =
+                    variants.GetArrayElementAtIndex(variantIndex);
+                SerializedProperty id =
+                    variant.FindPropertyRelative("id");
+
+                if (id == null || id.stringValue != variantId)
+                {
+                    continue;
+                }
+
+                SerializedProperty features =
+                    variant.FindPropertyRelative("features");
+
+                if (features == null || !features.isArray)
+                {
+                    return null;
+                }
+
+                for (int featureIndex = 0;
+                     featureIndex < features.arraySize;
+                     featureIndex++)
+                {
+                    SerializedProperty feature =
+                        features.GetArrayElementAtIndex(featureIndex);
+                    SerializedProperty kind =
+                        feature.FindPropertyRelative("kind");
+
+                    if (kind != null &&
+                        kind.intValue ==
+                        (int)GroundSurfaceFeatureKind.PaintedAccentLines)
+                    {
+                        return feature;
+                    }
+                }
+
+                return null;
+            }
+
+            return null;
         }
 
         private void DrawGenerationSection()
@@ -1119,26 +1288,26 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
-                "Fold Field Debug",
+                "Painted Accent 3D Line Preview",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Builds an editor/debug-only preview mesh from the current Painted Accent fold-field G channel. This does not change the generated ground mesh, collision, or gameplay surface.",
+                "Builds an editor/debug-only mesh ribbon preview from generated 3D Painted Accent surface strokes. This previews actual ground-following line geometry and does not change the generated ground mesh, collision, or gameplay surface.",
                 MessageType.None);
 
             EditorGUILayout.BeginHorizontal();
 
-            if (GUILayout.Button("Build Height Preview"))
+            if (GUILayout.Button("Build 3D Line Preview"))
             {
                 ApplyToTargets(
-                    "Build Fold Field Height Preview",
-                    ground => ground.BuildPaintedAccentFoldFieldHeightPreview());
+                    "Build Painted Accent 3D Line Preview",
+                    ground => ground.BuildPaintedAccentFoldFieldLinePreview());
             }
 
-            if (GUILayout.Button("Clear Height Preview"))
+            if (GUILayout.Button("Clear 3D Line Preview"))
             {
                 ApplyToTargets(
-                    "Clear Fold Field Height Preview",
-                    ground => ground.ClearPaintedAccentFoldFieldHeightPreview());
+                    "Clear Painted Accent 3D Line Preview",
+                    ground => ground.ClearPaintedAccentFoldFieldLinePreview());
             }
 
             EditorGUILayout.EndHorizontal();

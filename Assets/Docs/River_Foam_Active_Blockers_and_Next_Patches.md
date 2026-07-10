@@ -1109,3 +1109,57 @@ Implemented direction:
 - Object extents remain only as coarse event bounds/rejection windows, preserving bounded CPU scheduling and range-limited GPU dispatch.
 
 Validation target: in Material Remaining Life, Object Contact Arcs should read as partial edge-hugging arcs or shoulder strokes rather than rectangular slabs. Contact Flecks should read as small contact slivers/fragments. No material should appear inside obstacle footprints. Shore Foam remains out of scope except for regression checks.
+
+## Patch 4.11C.5.15A.3 / 5.15A.3.4 — Object Contact Field Recovery Note
+
+Status: 5.15A.3 attempted to reinterpret the object-contact field as a sharper contact-edge distance authority, but the patch failed because the compute resource/file set was incomplete. The observed failure sequence was a compute import/runtime break around `_FoamObjectContactFieldRead`, followed by a C# type mismatch where a `Texture2D` fallback was passed to a `RenderTexture` helper. 5.15A.3.4 restored the stable binding path: `_FoamObjectContactFieldRead` is declared in HLSL, bound from C# for `RasterizeFoamSourceEvent`, and falls back through existing created textures without the invalid `Texture2D`/`RenderTexture` call.
+
+Current stable state after recovery: Object Foam spawns again through the 5.15A.2 broad object-contact field. It is visually better than the first object pass, but Contact Arcs are still too symmetrical because the rasterizer evaluates full arcs around the tangent centreline. Do not retry the sharper edge-distance field correction in the same patch as source-pattern variation.
+
+## Patch 4.11C.5.15A.4 — Object Contact Semi-Arc Pattern
+
+Status: implemented as the next Layer C object-spawning variation patch. Scope remains Object Foam birth only; no free-water source spawning, wake-tail spawning, Layer D tuning, Final Foam composition change, or new compute resource was added.
+
+Reason for the patch:
+
+- The existing `ObjectContactArc` source is intentionally centred in contact tangent space, so it tends to produce symmetric bracket/full-arc shapes.
+- The inspiration target and validation screenshots need object foam to sometimes appear as a one-sided shoulder mark or partial/lopsided arc.
+- The already-existing `AutomaticFoamSourceEvent.Curvature` / GPU `variation.w` channel can carry signed lopsidedness, so this patch does not touch the fragile object-contact texture allocation/binding path.
+
+Implemented direction:
+
+- Added `ContactSemiArcs` as a third Object Foam pattern while preserving the existing serialized enum values for `Mixed`, `ContactArcs`, and `ContactFlecks`.
+- Added normalized three-way Mixed weights: Contact Arcs, Contact Semi-Arcs, and Contact Flecks.
+- Added per-pattern Semi-Arc controls for Formation Speed, Length, Width, Contact Offset, Initial Life, Breakup Strength, and Lopsidedness.
+- Added `ObjectContactSemiArc` automatic source event type and recipe selection.
+- CPU scheduling now assigns a deterministic signed lopsidedness value to semi-arc events and stores it in `Curvature` / GPU `variation.w`. Full arcs and flecks keep zero curvature/lopsidedness.
+- Added `FoamEvaluateObjectContactSemiArcSource`, which replaces the full-arc `abs(tangentDistance)` support with a signed one-sided tangent window: `-backReach < tangentDistance * side < revealedForwardReach`.
+
+Validation target: in `Material Remaining Life`, pure `Contact Arcs` should match the previous full-arc behavior, pure `Contact Flecks` should not regress, and pure `Contact Semi-Arcs` should produce visibly lopsided/one-sided object shoulder arcs without spawning inside obstacle footprints. Mixed should show all three object-source classes according to the normalized pattern weights.
+
+## Patch 4.11C.5.15B — Free Water Lace / Fragment Birth
+
+Status: implemented in this patch set.
+
+This patch enables the previously reserved Free Water Foam Layer C birth category. It deliberately does **not** spawn final-render glints or broad rectangular/sheet decals. It adds two persistent-material source grammars:
+
+- **Lace Connectors**: moving head + stroke events that draw sparse, curving, torn open-water connectors.
+- **Torn Fragments**: local asymmetric patch events revealed by a short linear sweep, so fragments grow in over time instead of popping in instantly.
+
+Free-water placement uses a bounded deterministic open-water slot lattice across longitudinal slots and five lateral lanes. Candidates are clipped to valid fluid by the existing GPU boundary/obstacle gate. A cheap static-object proximity reject keeps this source category from duplicating object-contact birth. The automatic source rasterizer now supports Y-range clipping for local free-water events while shore/object events keep full-height dispatch.
+
+Validation target: use Material Remaining Life with Shore and Object Foam disabled first. Expected result is open-water lace connectors plus detached torn fragments, not circles, rectangles, broad slabs, or specular scratches.
+
+## Patch 4.11C.5.15B.2 — Free Water Cross-Lace Connectors
+
+This patch adds the missing cross-current open-water birth grammar. `4.11C.5.15B` produced only with-flow Lace Connectors plus Torn Fragments, so open-water foam read too vertically/flow-aligned compared with the inspiration footage. `5.15B.2` adds **Cross-Lace Connectors** as a third Free Water Foam pattern: a moving head+stroke source whose primary sampled axis is lateral/across-river and whose secondary bend is along flow.
+
+Implementation notes:
+
+- No new textures, buffers, kernels, or readbacks.
+- Reuses the existing automatic source-event rasterizer and Y-range dispatch clipping.
+- Packs cross-lace shape data into existing event fields: `objectData.x = centreAcrossMetres`, `objectData.y = lateral half-length`, `objectData.z = ribbon width`, `objectData.w = lateral draw sign`.
+- Keeps Coverage/Activity unchanged; life tuning remains a separate validation/tuning decision.
+
+Validation target: pure `Cross-Lace Connectors` should produce horizontal/cross-current torn ribbons in `Material Remaining Life`, not rectangles, dots, slabs, or specular glints.
+

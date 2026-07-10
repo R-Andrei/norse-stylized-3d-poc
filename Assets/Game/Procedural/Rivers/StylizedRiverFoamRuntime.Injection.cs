@@ -173,7 +173,8 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 if (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
-                    sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactFleck)
+                    sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactFleck ||
+                    sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactSemiArc)
                 {
                     objectSourceActive = true;
                     break;
@@ -285,7 +286,8 @@ namespace ProgrammaticStylized3D.Rivers
                 sourceEvent.FeatherMetres * 2f,
                 Mathf.Max(sourceEvent.WidthMetres, sourceEvent.InwardReachMetres) * 1.25f);
             if (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
-                sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactFleck)
+                sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactFleck ||
+                sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactSemiArc)
             {
                 padding = Mathf.Max(
                     padding,
@@ -310,6 +312,35 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            int startY = 0;
+            int countY = fieldHeight;
+            if (sourceEvent.Type == AutomaticFoamSourceEventType.FreeWaterLaceConnector ||
+                sourceEvent.Type == AutomaticFoamSourceEventType.FreeWaterTornFragment ||
+                sourceEvent.Type == AutomaticFoamSourceEventType.FreeWaterCrossLaceConnector)
+            {
+                float centreAcross01 = Mathf.Clamp01(
+                    sourceEvent.CentreAcrossNormalized * 0.5f + 0.5f);
+                int centreY = Mathf.Clamp(
+                    Mathf.RoundToInt(centreAcross01 * Mathf.Max(0, fieldHeight - 1)),
+                    0,
+                    fieldHeight - 1);
+                float centreWorldDistance =
+                    (sourceEvent.StartGlobalDistance + sourceEvent.EndGlobalDistance) * 0.5f;
+                StylizedRiverSplineSample sample = river != null && river.Domain.IsValid
+                    ? river.Domain.SampleAtGlobalDistance(centreWorldDistance)
+                    : default;
+                float visibleHalfWidth = river != null && river.Domain.IsValid
+                    ? sample.GetVisibleHalfWidth(
+                        sourceEvent.CentreAcrossNormalized < 0f ? -1f : 1f)
+                    : 1f;
+                float normalizedPad = Mathf.Clamp01(
+                    sourceEvent.LateralPaddingMetres / Mathf.Max(0.10f, visibleHalfWidth));
+                int padY = Mathf.CeilToInt(normalizedPad * 0.5f * fieldHeight) + 3;
+                startY = Mathf.Clamp(centreY - padY, 0, fieldHeight - 1);
+                int endY = Mathf.Clamp(centreY + padY, 0, fieldHeight - 1);
+                countY = Mathf.Max(1, endY - startY + 1);
+            }
+
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
             computeShader.SetFloat("_FoamValidLength", validFieldLength);
             computeShader.SetFloat(
@@ -319,6 +350,8 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat("_FoamFieldLength", fieldLength);
             computeShader.SetInt("_FoamRangeStart", startX);
             computeShader.SetInt("_FoamRangeCount", countX);
+            computeShader.SetInt("_FoamRangeStartY", startY);
+            computeShader.SetInt("_FoamRangeCountY", countY);
             computeShader.SetInt("_FoamSourceEventIndex", eventIndex);
             computeShader.SetBuffer(
                 rasterizeFoamSourceEventKernel,
@@ -378,7 +411,7 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamStateWrite",
                 target);
 
-            Dispatch(rasterizeFoamSourceEventKernel, countX, fieldHeight);
+            Dispatch(rasterizeFoamSourceEventKernel, countX, countY);
         }
 
         private void BuildObjectContactField()

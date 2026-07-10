@@ -1,135 +1,146 @@
 # Generated Mass Feature Implementation Checklist
 
-Status: active implementation checklist  
-Current implementation target: **EW-B — Deterministic Selected-Edge Bevel Kernel**  
-Current implementation step: **EW-B3R3 — Two-Edge Corner Cap Closure**
-
----
-
-## 1. Hard rules
+## Active feature
 
 ```text
-- Do not implement final convex edge wear with FeatureAtlas0/1.
-- Do not use overlay meshes as the final production solution.
-- Do not weaken topology validation to make geometry visible.
-- Do not tune material response before physical bevel geometry is valid.
-- Dirty-time generation may be heavier; runtime memory and runtime per-frame cost should stay reasonable.
-- Keep docs updated in the same patch as each implementation step.
-- Do not reintroduce retired local bevel, sampled-ribbon, workspace, or open-cycle closure construction.
-- Do not use per-edge global half-space cuts as the active edge-wear construction primitive.
+EW-C — Explicit Single-Segment Chamfer Kernel
 ```
 
----
+## EW-C0 — Reconciliation and topology readiness
 
-## 2. Active representation
+### Code cleanup
 
-Final plane-cut GeneratedMass convex edge wear should be:
+- [x] Remove EW-B deterministic geometry entry point.
+- [x] Remove independent face-offset and rail-reconciliation construction.
+- [x] Remove generated open-edge ownership inference.
+- [x] Remove source-vertex cap reconstruction experiments.
+- [x] Remove isolated/two-edge/multi-star cap special cases.
+- [x] Remove EW-B-only records, reject reasons, counters, and summary output.
+- [x] Remove unused EW-B triangulation-preview machinery.
+- [x] Preserve candidate discovery, source graph, candidate mapping, and generic topology audit.
 
-```text
-main-mesh deterministic selected-edge bevel geometry
-+ source-face replacement polygons
-+ source-edge local bevel bridge faces
-+ source-vertex local cap patches
-+ UV2.z / vertex color ConvexEdgeWear material markers
-+ shader response on marked generated geometry after geometry is stable
-```
+### Healthy baseline
 
-FeatureAtlas0/1 are temporary debug/broad-mask tools only. They are not the normal-render convex edge-wear representation.
+- [x] Edge-wear geometry emission is intentionally disabled.
+- [x] Source `PolygonFace` geometry remains unchanged.
+- [x] Edge-wear enablement cannot empty or corrupt the source mass.
+- [x] Readiness output is separate from a geometry-failure message.
 
----
+### Topology readiness
 
-## 3. Completed cleanup steps
+- [x] Build directed half-edges from source graph faces.
+- [x] Link opposite half-edges.
+- [x] Trace source boundary loops.
+- [x] Count selected manifold, boundary, and non-manifold edges.
+- [x] Report affected open and closed vertex fans.
+- [ ] Validate exact ordered one-rings on representative seeds in Unity.
+- [ ] Validate exact contiguous selected-run counts in EW-C1.
 
-### EW-B0 — Edge Wear Bevel Kernel Reconciliation — complete
+### EW-C0 exit criteria
 
-```text
-- Active route moved to TryBuildDeterministicSelectedEdgeBevelKernelFaces(...).
-- Docs stopped treating EW-4D/R3 as current.
-```
+- [ ] Unity compiles without errors.
+- [ ] Current source mass renders unchanged.
+- [ ] Readiness log replaces the deterministic-kernel failure log.
+- [ ] Current seed reports 16 source faces, 29 vertices, 44 edges, and 4 source boundary edges.
+- [ ] Selected boundary edges are zero.
+- [ ] Selected non-manifold edges are zero.
+- [ ] Source non-manifold edges are zero.
+- [ ] Source T-junctions are zero.
+- [ ] Source boundary edges form traceable loop topology.
+- [ ] Canonical documents contain no active EW-B instructions.
 
-### EW-B1S — Legacy bevel-construction purge — complete
+## EW-C1R3 — Compatible-edge deferral and face-corner/rail solver
 
-```text
-- Removed retired local-bevel, half-space fallback, sampled-ribbon/workspace, open-cycle-closure, corner-patch, and workspace-T-junction-repair construction code from MassGenerator.cs.
-- Active summary no longer reports ribbon/open-cycle/workspace diagnostic spam.
-- EW-B source graph / selected edge / affected vertex classification remains active.
-```
+- [x] Reuse the validated source graph and directed half-edge topology through a `ChamferTopologyContext`.
+- [x] Solve one constant conservative initial width per selected source edge.
+- [x] Iteratively reduce participating source-edge widths when acute corners exceed the displacement limit.
+- [x] Feed failed unselected-edge common intervals back into the same monotonic solve.
+- [x] Use a bounded binary search to find the largest stable shared-edge width scale.
+- [x] Preserve pre-existing short unselected edges against their source length rather than a larger unrelated stability threshold.
+- [x] Keep each reduced width constant across both endpoints of the full selected source edge.
+- [x] Record convergence passes, clamp applications, clamped edge count, and the exact worst-corner identity.
+- [x] Compute one point per `(source face, source vertex)` corner.
+- [x] Preserve the source point when neither adjacent source edge is selected.
+- [x] Solve selected/unselected offset-line intersections.
+- [x] Solve selected/selected offset-line intersections.
+- [x] Reconcile exact shared endpoints on unselected internal source edges.
+- [x] Validate hypothetical replacement-face area, winding, and stable edge lengths.
+- [x] Validate future selected-edge strip span and rail length.
+- [x] Validate that source-boundary edges remain stable.
+- [x] Emit no geometry and preserve the original rendered mass.
 
-### EW-B2 — Source-Graph Beveled Mass Emission — complete as evidence, superseded as construction primitive
+### Exit criteria
 
-```text
-- Proved source-graph pre-triangulation bevel emission can commit valid topology cheaply.
-- Produced committed geometry with topologyOpenEdges=0, topologyNonManifoldEdges=0, topologyTJunctions=0.
-- Failed visually because one global selected-edge cut plane can slice unrelated faces and create long strips/gouges.
-```
+- [ ] Unity compiles without errors.
+- [ ] `expectedCorners` equals `solvedCorners`.
+- [ ] `cornerSolveFailures=0`.
+- [ ] `nonFiniteCorners=0`.
+- [ ] `cornerWidthConvergenceFailures=0`.
+- [ ] `cornerWidthBelowMinimumFailures=0`.
+- [ ] `sharedEdgeWidthConvergenceFailures=0`.
+- [ ] `sharedEdgeWidthBelowMinimumFailures=0`.
+- [ ] `excessiveDisplacementCorners=0`.
+- [ ] `replacementFacesValid` equals `sourceFaces`.
+- [ ] All replacement-face failure counters are zero.
+- [ ] `sharedUnselectedEndpointFailures=0`.
+- [ ] `selectedRailsValid` equals `selectedEdges`.
+- [ ] All selected-rail failure counters are zero.
+- [ ] `solvedBoundaryEdges` equals `sourceBoundaryEdges`.
+- [ ] `readyForChamferEmission=1`.
+- [ ] Final rendered geometry remains unchanged.
 
----
+## EW-C2 — Provisional replacement faces and one-strip edge geometry
 
-## 4. EW-B3R3 — Two-Edge Corner Cap Closure — current
+- [x] Reuse the validated EW-C1 corner and width solution without recomputation.
+- [x] Build one temporary replacement polygon per source face.
+- [x] Emit one temporary `ConvexEdgeWear` quad per active positive-width selected internal edge.
+- [x] Preserve candidate strength and orient each strip from explicit candidate normal provenance.
+- [x] Register solved source-boundary descendants explicitly.
+- [x] Register active-strip endpoint boundaries explicitly for EW-C3.
+- [x] Do not emit vertex-run corner patches.
+- [x] Audit actual provisional openings by exact topology-key set membership.
+- [x] Keep final geometry commit disabled.
 
-Implementation requirements:
+### Exit criteria
 
-```text
-- Build source topology graph from final Base PolygonFace list.
-- Map selected convex candidates to graph edges.
-- Build DeterministicBevelEdgeRecord and DeterministicBevelVertexRecord diagnostics.
-- For each affected source face, build one local offset replacement polygon.
-- Record one rail segment for each source face-edge.
-- For each selected graph edge, build one local ConvexEdgeWear bridge face between adjacent face rails.
-- For unselected graph edges whose adjacent rails separated because neighboring vertices moved, build a Base transition bridge.
-- For multi-edge affected source vertices, build ConvexEdgeWear cap triangles from replacement-corner points ordered around the source vertex star.
-- For isolated endpoint affected source vertices, build ConvexEdgeWear terminal cap triangles using the original source vertex as an apex plus stable replacement boundary points.
-- For two-edge affected source vertices, build ConvexEdgeWear corner-patch triangles from ordered unique cap points; do not use the isolated endpoint apex path.
-- Triangulate ConvexEdgeWear polygons before commit.
-- Run final topology audit and triangle-emission preview.
-- Commit only if open/non-manifold/T-junction counts are zero and ConvexEdgeWear triangle preview skips are zero.
-```
+- [ ] Unity compiles without errors.
+- [ ] `replacementFacesBuilt` equals `sourceFaces`.
+- [ ] `bevelStripsBuilt` equals `activeSelectedEdges`.
+- [ ] `matchedSourceBoundaryEdges` equals `expectedSourceBoundaryEdges`.
+- [ ] `matchedVertexBoundaryEdges` equals `expectedVertexBoundaryEdges`.
+- [ ] `unexpectedProvisionalOpenEdges=0`.
+- [ ] `missingExpectedVertexBoundaryEdges=0`.
+- [ ] `provisionalNonManifoldEdges=0`.
+- [ ] `provisionalTJunctions=0`.
+- [ ] `readyForVertexPatches=1`.
+- [ ] Rendered source geometry remains unchanged.
 
-Validation success:
+## EW-C3 — Crude vertex-run patches
 
-```text
-Unity compiles.
-deterministicKernelGeometryPending=0.
-deterministicKernelGlobalCutsApplied=0.
-deterministicKernelFaceOffsetPolygonsBuilt>0.
-deterministicKernelLocalBevelFacesBuilt>0.
-deterministicKernelVertexCapsBuilt>0.
-committedConvexEdgeWearFaces>0.
-committedConvexEdgeWearNgonFaces=0.
-triangulationPreviewSkippedConvexEdgeWearTriangles=0.
-topologyOpenEdges=0.
-topologyNonManifoldEdges=0.
-topologyTJunctions=0.
-Convex Edge Wear debug view shows local generated bevel geometry without B2 slice/gouge artifacts.
-```
+- [ ] Emit a centre fan for a closed selected run.
+- [ ] Emit a source-vertex-apex fan for an open selected run.
+- [ ] Emit separate patches for separated selected runs.
+- [ ] Preserve the validated source boundary identity.
 
----
+### Exit criteria
 
-## 5. Later steps, blocked until EW-B3 validates
+- [ ] Output boundaries equal the explicitly preserved source-boundary set.
+- [ ] Newly introduced open edges are zero.
+- [ ] Non-manifold edges are zero.
+- [ ] T-junctions are zero.
 
-```text
-EW-B4 — bevel width/coverage tuning after local geometry commits.
-EW-B5 — irregular edge-wear mask expansion and material response.
-EW-B6 — optional profile/softness/variation only after deterministic geometry remains stable.
-```
+## EW-C4 — Commit and visual proof
 
-## Next work items
+- [ ] Commit replacement faces, edge strips, and corner patches.
+- [ ] Confirm `ConvexEdgeWear` feature data reaches the final mesh.
+- [ ] Wire Amount, Coverage, and Width to their approved responsibilities.
+- [ ] Validate one-strip faceted chamfers in final rendering.
 
-1. Validate EW-B3 on the same dense 36-selected-edge mass.
-2. If EW-B3 fails, use faceOffset/rails/localBevel/vertexCap counters to identify the blocker.
-3. If EW-B3 commits, inspect final render and Convex Edge Wear debug for the B2 clipping/gouge artifacts.
+## EW-C5 — Controlled irregularity and material response
 
-
-### EW-B3R — Deterministic vertex-star cap closure — current
-
-```text
-- Keep EW-B3 local face-offset and local edge-bridge construction.
-- Build vertex caps from source face-owned replacement-corner records.
-- Order cap boundaries around each source vertex using source vertex-star normals.
-- Emit cap triangles directly; do not create arbitrary n-gon caps.
-- Add per-cap-case diagnostics for isolated, two-edge, and multi-star vertices.
-- Required gate: vertexCapsBuilt == vertexCapsAttempted and openEdgesAfterBuild == 0 before commit.
-```
+- [ ] Add deterministic width variation only after stable topology.
+- [ ] Add crude optional second strip only if visually necessary.
+- [ ] Add shader/material response without changing topology ownership.
 
 
-EW-B3R3 note: two-edge corner vertices must not use the isolated endpoint apex cap path; they use ordered unique cap points and centre/boundary triangulation instead.
+EW-C1R3 permits local candidate deferral: a selected candidate whose required solved width falls below the useful geometry threshold is assigned width zero and excluded from edge-strip emission. This is not a topology failure; it preserves the source surface while allowing compatible candidates to proceed.

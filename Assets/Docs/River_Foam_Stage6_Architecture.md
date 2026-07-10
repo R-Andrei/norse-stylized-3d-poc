@@ -2294,3 +2294,35 @@ Object Foam activation is category-driven. `Spawn Preset` no longer silently dis
 Object Foam now uses a local contact-edge field for final source shape authority. CPU static source snapshots still schedule bounded object events; the GPU contact field supplies per-cell contact confidence, object-to-water normal, and upstream/front-side relevance derived from obstacle exclusion plus static pressure/contact context.
 
 This preserves the selected performance model: no GPU readback, no texture-wide source spawning, no particle system, and no connected-component event generation. Object extents remain as coarse bounds only. Contact Arc and Contact Fleck masks now use field normal/tangent space so they can follow actual contact edges rather than object half-extent rectangles.
+
+## Addendum — 4.11C.5.15A.4 Object Contact Semi-Arcs
+
+Object Foam now has three Layer C source recipes: full Contact Arcs, lopsided Contact Semi-Arcs, and Contact Flecks. This is still persistent material birth, not Layer D shape evaluation and not Final Foam rendering.
+
+The reason for the additional recipe is mathematical: full Contact Arcs use a tangent-space mask centred by `abs(tangentDistance)`, which is stable but inherently symmetric. Contact Semi-Arcs use the same object-contact field and coarse object bounds, but carry deterministic signed lopsidedness through the existing source-event `Curvature` / GPU `variation.w` channel. The semi-arc evaluator projects into contact tangent space, multiplies by the signed side, and gates the source with a one-sided interval:
+
+```text
+-backReach < tangentDistance * side < revealedForwardReach
+```
+
+This keeps the selected performance model intact: no GPU readback, no connected-component extraction, no new textures or buffers, and no new object-contact resource binding. The object-contact field remains the 5.15A.2/5.15A.3.4 stable broad contact authority. Any future sharper edge-distance field correction must be a separate resource-audited patch.
+
+### Layer C Free Water Birth — 4.11C.5.15B
+
+Free Water Foam is now a Layer C source category alongside Shore Foam and Object Foam. It writes persistent material state through the same automatic source-event rasterizer instead of inserting final visual foam.
+
+Implemented source grammars:
+
+- **Lace Connector**: head+stroke emission along a curved open-water path. Earlier samples persist in FoamState while the head advances.
+- **Torn Fragment**: asymmetric local fragment shape revealed by a timed sweep. It is patch-shaped, but not instant.
+
+Bright glints/scratches from the visual reference remain out of Layer C. They belong to later shader/rendering work, not persistent material birth.
+
+The source-event dispatch path now supports an optional Y range. Existing shore/object events dispatch the full field height; free-water events dispatch only the lateral band required by their local shape.
+
+#### 4.11C.5.15B.2 Cross-Lace Connectors
+
+Free Water Foam now has a third source grammar: **Cross-Lace Connector**. The original Lace Connector is flow-aligned because its sampled path runs along global distance. Cross-Lace swaps that path basis so the source head travels across the river laterally while the ribbon only bends slightly along flow. This is intended to supply the horizontal/cross-current pale ribbons visible in the visual target without increasing global spawn density or inserting final foam art.
+
+Cross-Lace remains Layer C material birth only. It writes persistent FoamState through the existing automatic source-event rasterizer, is clipped by river boundary and obstacle exclusion, and uses the existing local X/Y dispatch bounds.
+

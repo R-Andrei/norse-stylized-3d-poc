@@ -448,61 +448,72 @@
                     return float3(0.025, 0.025, 0.035);
                 }
 
+                // V3J.3R proof rule: R is now baked from generated 3D
+                // ground-following surface strokes. The shader does not infer
+                // lines from body noise or contour bands at runtime; it only
+                // shades the selected stroke plus signed-side polarity.
                 float3 foldField = ResolveGroundPaintedAccentFoldFieldFeature(input);
-                float foldLineMask = saturate(foldField.x);
-                float body = saturate(foldField.y);
+                float selectedLineMask = saturate(foldField.x);
+                float bodyContext = saturate(foldField.y);
                 float signedSide = clamp(foldField.z, -1.0, 1.0);
 
-                // V3J.0 proof rule: G/body is context, not visible paint.
-                // Visibility is driven by the narrow selected contour channel plus
-                // signed-side polarity, so broad G blobs do not become stains.
-                float bodyBand =
-                    smoothstep(0.06, 0.30, body) *
-                    (1.0 - smoothstep(0.86, 1.0, body));
-                float selectedContour =
-                    saturate(pow(max(foldLineMask, 0.0001), 0.72) * bodyBand * contractMask);
-                float signedMagnitude = saturate(abs(signedSide) * 1.35);
-
+                // V3J.2A: the prototype view must be readable and must not
+                // shade the low-value R halo as a broad smudge. Keep the
+                // soft line for filtering, but derive the visible response
+                // mostly from the selected-line core.
+                float selectedLineCore =
+                    smoothstep(0.16, 0.46, selectedLineMask);
+                float selectedLineSoft =
+                    smoothstep(0.035, 0.18, selectedLineMask);
                 float creaseMask =
-                    saturate(selectedContour * (0.72 + signedMagnitude * 0.34));
-                float liftMask =
-                    saturate(selectedContour * saturate(signedSide * 0.5 + 0.5) * 0.42);
+                    saturate(selectedLineCore * contractMask * 1.35);
+                float edgeLiftMask =
+                    saturate((selectedLineSoft - selectedLineCore) * 0.18);
+
+                float darkSideMask =
+                    saturate(creaseMask * saturate(0.78 - signedSide * 0.52));
+                float lightSideMask =
+                    saturate(creaseMask * saturate(0.24 + signedSide * 0.76));
                 float contextMask =
-                    saturate(body * selectedContour * 0.18);
+                    saturate(bodyContext * selectedLineCore * 0.025);
 
                 float snowBias = saturate(exposureMask * 0.70 + rockyDryMask * 0.20);
                 float dampBias = saturate(dampDepositMask * 0.65 + shoreMask * 0.34 + compactionMask * 0.18);
                 float vegetationBias = saturate(vegetationMask * 0.65);
 
                 float3 baseColor = lerp(
-                    float3(0.53, 0.50, 0.44),
-                    float3(0.72, 0.75, 0.70),
+                    float3(0.52, 0.50, 0.45),
+                    float3(0.72, 0.74, 0.69),
                     snowBias);
                 baseColor = lerp(
                     baseColor,
-                    float3(0.43, 0.40, 0.35),
+                    float3(0.42, 0.39, 0.34),
                     dampBias * 0.34);
                 baseColor = lerp(
                     baseColor,
-                    float3(0.49, 0.55, 0.41),
+                    float3(0.48, 0.54, 0.40),
                     vegetationBias * 0.26);
 
-                float3 creaseTint = lerp(
-                    float3(0.31, 0.29, 0.25),
-                    float3(0.42, 0.45, 0.43),
+                float3 creaseColor = lerp(
+                    float3(0.20, 0.19, 0.17),
+                    float3(0.31, 0.32, 0.30),
                     snowBias);
-                float3 liftTint = lerp(
-                    float3(0.74, 0.68, 0.52),
-                    float3(0.86, 0.86, 0.76),
+                float3 liftColor = lerp(
+                    float3(0.82, 0.74, 0.52),
+                    float3(0.94, 0.92, 0.78),
                     snowBias);
 
                 float3 result = baseColor;
                 result = lerp(
                     result,
-                    creaseTint,
-                    creaseMask * 0.62);
-                result += liftTint * liftMask * 0.10;
-                result *= 1.0 - contextMask * 0.10;
+                    creaseColor,
+                    darkSideMask * 0.96);
+                result = lerp(
+                    result,
+                    liftColor,
+                    lightSideMask * 0.46);
+                result += edgeLiftMask * 0.025;
+                result *= 1.0 - contextMask * 0.03;
 
                 return saturate(result);
             }

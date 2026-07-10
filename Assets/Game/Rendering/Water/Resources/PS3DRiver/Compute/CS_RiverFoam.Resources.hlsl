@@ -108,6 +108,8 @@ int2 _FoamStaticWakeDimensions;
 int2 _FoamStaticPressureDimensions;
 int _FoamRangeStart;
 int _FoamRangeCount;
+int _FoamRangeStartY;
+int _FoamRangeCountY;
 int _FoamObstacleCellCount;
 int _FoamMajorEvolutionCount;
 int _FoamHostedNegativeEvolutionCount;

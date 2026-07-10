@@ -305,6 +305,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("direction");
             SerializedProperty seedOffset =
                 feature.FindPropertyRelative("seedOffset");
+            SerializedProperty paintedAccentStrokeWidth =
+                feature.FindPropertyRelative("paintedAccentStrokeWidth");
+            SerializedProperty paintedAccentStrokeDensity =
+                feature.FindPropertyRelative("paintedAccentStrokeDensity");
+            SerializedProperty paintedAccentStrokeLengthMin =
+                feature.FindPropertyRelative("paintedAccentStrokeLengthMin");
+            SerializedProperty paintedAccentStrokeLengthMax =
+                feature.FindPropertyRelative("paintedAccentStrokeLengthMax");
+            SerializedProperty paintedAccentStrokeAngleJitterDegrees =
+                feature.FindPropertyRelative("paintedAccentStrokeAngleJitterDegrees");
 
             string featureKey = $"feature_{features.propertyPath}_{index}";
             bool expanded = GetFoldout(featureKey, false);
@@ -351,6 +361,57 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 EditorGUILayout.Slider(maskInfluence, 0f, 1f);
                 EditorGUILayout.PropertyField(direction);
                 EditorGUILayout.PropertyField(seedOffset);
+
+                if ((GroundSurfaceFeatureKind)kind.intValue ==
+                    GroundSurfaceFeatureKind.PaintedAccentLines)
+                {
+                    EditorGUILayout.Space(4f);
+                    EditorGUILayout.LabelField(
+                        "Painted Accent 3D Strokes",
+                        EditorStyles.miniBoldLabel);
+                    EditorGUILayout.Slider(
+                        paintedAccentStrokeWidth,
+                        0.04f,
+                        0.35f,
+                        new GUIContent(
+                            "Stroke Width",
+                            "Preview/runtime ribbon width in metres for generated 3D surface strokes. The fold-field R channel is baked from these strokes instead of inferred from noise blobs."));
+                    EditorGUILayout.Slider(
+                        paintedAccentStrokeDensity,
+                        0f,
+                        80f,
+                        new GUIContent(
+                            "Stroke Density",
+                            "Approximate target number of generated 3D strokes per standard 40x40 ground patch."));
+                    EditorGUILayout.Slider(
+                        paintedAccentStrokeLengthMin,
+                        0.20f,
+                        4.0f,
+                        new GUIContent(
+                            "Stroke Length Min",
+                            "Minimum generated 3D stroke length in metres."));
+                    EditorGUILayout.Slider(
+                        paintedAccentStrokeLengthMax,
+                        0.25f,
+                        6.0f,
+                        new GUIContent(
+                            "Stroke Length Max",
+                            "Maximum generated 3D stroke length in metres."));
+                    EditorGUILayout.Slider(
+                        paintedAccentStrokeAngleJitterDegrees,
+                        0f,
+                        30f,
+                        new GUIContent(
+                            "Angle Jitter Degrees",
+                            "Maximum signed angle offset in degrees around the preferred Direction. Each stroke rolls independently between -value and +value."));
+
+                    if (paintedAccentStrokeLengthMax.floatValue <
+                        paintedAccentStrokeLengthMin.floatValue + 0.05f)
+                    {
+                        paintedAccentStrokeLengthMax.floatValue =
+                            paintedAccentStrokeLengthMin.floatValue + 0.05f;
+                    }
+                }
 
                 EditorGUI.indentLevel--;
             }
@@ -590,6 +651,42 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             feature.FindPropertyRelative("direction").vector2Value =
                 new Vector2(0.82f, 0.36f);
             feature.FindPropertyRelative("seedOffset").intValue = 0;
+
+            SerializedProperty strokeWidth =
+                feature.FindPropertyRelative("paintedAccentStrokeWidth");
+            SerializedProperty strokeDensity =
+                feature.FindPropertyRelative("paintedAccentStrokeDensity");
+            SerializedProperty strokeLengthMin =
+                feature.FindPropertyRelative("paintedAccentStrokeLengthMin");
+            SerializedProperty strokeLengthMax =
+                feature.FindPropertyRelative("paintedAccentStrokeLengthMax");
+            SerializedProperty strokeAngleJitterDegrees =
+                feature.FindPropertyRelative("paintedAccentStrokeAngleJitterDegrees");
+
+            if (strokeWidth != null)
+            {
+                strokeWidth.floatValue = 0.12f;
+            }
+
+            if (strokeDensity != null)
+            {
+                strokeDensity.floatValue = 34f;
+            }
+
+            if (strokeLengthMin != null)
+            {
+                strokeLengthMin.floatValue = 0.55f;
+            }
+
+            if (strokeLengthMax != null)
+            {
+                strokeLengthMax.floatValue = 1.55f;
+            }
+
+            if (strokeAngleJitterDegrees != null)
+            {
+                strokeAngleJitterDegrees.floatValue = 18f;
+            }
         }
 
         private void SetVariantDefaults(

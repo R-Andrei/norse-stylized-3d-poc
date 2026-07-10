@@ -716,6 +716,16 @@ namespace ProgrammaticStylized3D.Rivers
             automaticObjectBirthAnchorCountLastUpdate;
         public int AutomaticObjectBirthBudgetPerTick =>
             AutomaticObjectSourceMaximumStartsPerUpdate;
+
+        public string AutomaticFreeWaterBirthStatus => automaticFreeWaterBirthStatus;
+        public int AutomaticFreeWaterBirthSubmittedLastUpdate =>
+            automaticFreeWaterBirthSubmittedLastUpdate;
+        public int AutomaticFreeWaterBirthRejectedLastUpdate =>
+            automaticFreeWaterBirthRejectedLastUpdate;
+        public int AutomaticFreeWaterBirthSubmittedTotal =>
+            automaticFreeWaterBirthSubmittedTotal;
+        public int AutomaticFreeWaterBirthBudgetPerTick =>
+            AutomaticFreeWaterSourceMaximumStartsPerUpdate;
         public int InjectedLastUpdate => injectedLastUpdate;
         public float LastInjectionBoundaryCoverage => lastInjectionBoundaryCoverage;
         public bool LastInjectionStateSynchronized =>

@@ -23,9 +23,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private bool showFoamBirthShoreFoam = true;
         private bool showFoamBirthObjectFoam;
         private bool showFoamBirthFreeWaterFoam;
+        private bool showFoamBirthFreeWaterLacePattern;
+        private bool showFoamBirthFreeWaterCrossLacePattern;
+        private bool showFoamBirthFreeWaterFragmentPattern;
         private bool showFoamBirthShoreRibbonPattern;
         private bool showFoamBirthInwardWashPattern;
         private bool showFoamBirthObjectContactArcPattern;
+        private bool showFoamBirthObjectContactSemiArcPattern;
         private bool showFoamBirthObjectContactFleckPattern;
         private bool showFoamManualSourceMotion;
         private bool showFoamShapeResidueDiagnostics;
@@ -2268,6 +2272,41 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
         }
 
+        private void DrawNormalizedPatternWeight3(
+            SerializedProperty primary,
+            SerializedProperty secondary,
+            SerializedProperty tertiary,
+            GUIContent label)
+        {
+            EditorGUI.BeginChangeCheck();
+            float value = EditorGUILayout.Slider(
+                label,
+                primary.floatValue,
+                0f,
+                1f);
+            if (!EditorGUI.EndChangeCheck())
+            {
+                return;
+            }
+
+            value = Mathf.Clamp01(value);
+            float remaining = 1f - value;
+            float secondaryOld = Mathf.Clamp01(secondary.floatValue);
+            float tertiaryOld = Mathf.Clamp01(tertiary.floatValue);
+            float otherTotal = secondaryOld + tertiaryOld;
+
+            primary.floatValue = value;
+            if (otherTotal <= 0.0001f)
+            {
+                secondary.floatValue = remaining * 0.5f;
+                tertiary.floatValue = remaining * 0.5f;
+                return;
+            }
+
+            secondary.floatValue = remaining * (secondaryOld / otherTotal);
+            tertiary.floatValue = remaining * (tertiaryOld / otherTotal);
+        }
+
         private void DrawMinMaxMetreControls(
             string label,
             SerializedProperty minimum,
@@ -2315,7 +2354,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUI.indentLevel++;
             EditorGUILayout.HelpBox(
-                "Automatic birth creates real persistent FoamState material. Off disables automatic birth; otherwise each source category is controlled by its own Enabled toggle. Shore and Object Foam are implemented; Free Water Foam is staged for later source classes.",
+                "Automatic birth creates real persistent FoamState material. Off disables automatic birth; otherwise each source category is controlled by its own Enabled toggle. Shore, Object, and Free Water Foam are Layer C source classes.",
                 MessageType.None);
 
             EditorGUILayout.PropertyField(
@@ -2519,24 +2558,34 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     Find("foamObjectFoamPattern"),
                     new GUIContent(
                         "Debug Pattern Mode",
-                        "Mixed uses the normalized pattern weights below. Contact Arcs and Contact Flecks force one pattern for validation."));
+                        "Mixed uses the normalized pattern weights below. Contact Arcs, Contact Semi-Arcs, and Contact Flecks force one pattern for validation."));
 
                 EditorGUILayout.Space(4f);
                 EditorGUILayout.LabelField("Pattern Mix", EditorStyles.boldLabel);
                 SerializedProperty arcWeight = Find("foamObjectContactArcPatternWeight");
+                SerializedProperty semiArcWeight = Find("foamObjectContactSemiArcPatternWeight");
                 SerializedProperty fleckWeight = Find("foamObjectContactFleckPatternWeight");
-                DrawNormalizedPatternWeight(
+                DrawNormalizedPatternWeight3(
                     arcWeight,
+                    semiArcWeight,
                     fleckWeight,
                     new GUIContent(
                         "Contact Arcs",
-                        "Normalized share of Mixed Object Foam events assigned to contact arcs. Editing this automatically updates Contact Flecks to keep the mix sum at one."));
-                DrawNormalizedPatternWeight(
+                        "Normalized share of Mixed Object Foam events assigned to full contact arcs. Editing this preserves the relative share of the other object patterns."));
+                DrawNormalizedPatternWeight3(
+                    semiArcWeight,
+                    arcWeight,
+                    fleckWeight,
+                    new GUIContent(
+                        "Contact Semi-Arcs",
+                        "Normalized share of Mixed Object Foam events assigned to lopsided one-sided contact arcs. Editing this preserves the relative share of the other object patterns."));
+                DrawNormalizedPatternWeight3(
                     fleckWeight,
                     arcWeight,
+                    semiArcWeight,
                     new GUIContent(
                         "Contact Flecks",
-                        "Normalized share of Mixed Object Foam events assigned to contact flecks. Editing this automatically updates Contact Arcs to keep the mix sum at one."));
+                        "Normalized share of Mixed Object Foam events assigned to small contact flecks. Editing this preserves the relative share of the other object patterns."));
 
                 EditorGUILayout.Space(4f);
                 showFoamBirthObjectContactArcPattern = EditorGUILayout.Foldout(
@@ -2573,6 +2622,48 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         Find("foamObjectContactArcBreakupStrengthMin"),
                         Find("foamObjectContactArcBreakupStrengthMax"),
                         "Deterministic edge/source breakup strength for this pattern.");
+                    EditorGUI.indentLevel--;
+                }
+
+                showFoamBirthObjectContactSemiArcPattern = EditorGUILayout.Foldout(
+                    showFoamBirthObjectContactSemiArcPattern,
+                    "Object Contact Semi-Arc Pattern",
+                    true);
+                if (showFoamBirthObjectContactSemiArcPattern)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        Find("foamObjectContactSemiArcFormationSpeedMultiplier"),
+                        new GUIContent(
+                            "Formation Speed",
+                            "Multiplier applied to Object Foam Global Formation Speed for Contact Semi-Arc events only."));
+                    DrawMinMaxMetreControls(
+                        "Semi-Arc Length",
+                        Find("foamObjectContactSemiArcLengthMinMetres"),
+                        Find("foamObjectContactSemiArcLengthMaxMetres"));
+                    DrawMinMaxMetreControls(
+                        "Width",
+                        Find("foamObjectContactSemiArcWidthMinMetres"),
+                        Find("foamObjectContactSemiArcWidthMaxMetres"));
+                    DrawMinMaxMetreControls(
+                        "Contact Offset",
+                        Find("foamObjectContactSemiArcOffsetMinMetres"),
+                        Find("foamObjectContactSemiArcOffsetMaxMetres"));
+                    DrawMinMaxUnitControls(
+                        "Initial Life",
+                        Find("foamObjectContactSemiArcInitialLifeMin"),
+                        Find("foamObjectContactSemiArcInitialLifeMax"),
+                        "Initial normalized Remaining Life assigned to spawned material. One means full authored foam lifetime; lower values die sooner under the normal aging rules.");
+                    DrawMinMaxUnitControls(
+                        "Breakup Strength",
+                        Find("foamObjectContactSemiArcBreakupStrengthMin"),
+                        Find("foamObjectContactSemiArcBreakupStrengthMax"),
+                        "Deterministic edge/source breakup strength for this pattern.");
+                    DrawMinMaxUnitControls(
+                        "Lopsidedness",
+                        Find("foamObjectContactSemiArcLopsidednessMin"),
+                        Find("foamObjectContactSemiArcLopsidednessMax"),
+                        "Signed by event seed at runtime. Higher values push the source farther onto one shoulder of the object contact edge.");
                     EditorGUI.indentLevel--;
                 }
 
@@ -2637,7 +2728,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 }
 
                 EditorGUILayout.HelpBox(
-                    "Static Object Foam is Layer C birth only: contact arcs/flecks are anchored from registered static disturbance sources, then gated by obstacle exclusion and static pressure on the GPU.",
+                    "Static Object Foam is Layer C birth only: contact arcs, semi-arcs, and flecks are anchored from registered static disturbance sources, then gated by obstacle exclusion and static pressure on the GPU.",
                     MessageType.Info);
                 EditorGUI.indentLevel--;
             }
@@ -2649,22 +2740,195 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             if (showFoamBirthFreeWaterFoam)
             {
                 EditorGUI.indentLevel++;
-                using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.PropertyField(
+                    Find("foamAutomaticFreeWaterBirthEnabled"),
+                    new GUIContent(
+                        "Enabled",
+                        "Enables deterministic open-water Layer C material birth when Automatic Foam Birth is on and Spawn Preset is not Off."));
+                EditorGUILayout.PropertyField(
+                    Find("foamFreeWaterFoamCoverage"),
+                    new GUIContent(
+                        "Coverage",
+                        "How much of the deterministic open-water source lattice can participate over time."));
+                EditorGUILayout.PropertyField(
+                    Find("foamFreeWaterFoamActivity"),
+                    new GUIContent(
+                        "Activity",
+                        "How often new open-water source events start."));
+                EditorGUILayout.PropertyField(
+                    Find("foamFreeWaterFoamFormationSpeedMetresPerSecond"),
+                    new GUIContent(
+                        "Global Formation Speed",
+                        "Base source reveal speed in metres per second for Free Water Foam."));
+                EditorGUILayout.PropertyField(
+                    Find("foamFreeWaterFoamPattern"),
+                    new GUIContent(
+                        "Debug Pattern Mode",
+                        "Mixed uses the normalized pattern weights below. Lace Connectors, Cross-Lace Connectors, and Torn Fragments force one pattern for validation."));
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField("Pattern Mix", EditorStyles.boldLabel);
+                SerializedProperty laceWeight =
+                    Find("foamFreeWaterLaceConnectorPatternWeight");
+                SerializedProperty crossLaceWeight =
+                    Find("foamFreeWaterCrossLaceConnectorPatternWeight");
+                SerializedProperty fragmentWeight =
+                    Find("foamFreeWaterTornFragmentPatternWeight");
+                DrawNormalizedPatternWeight3(
+                    laceWeight,
+                    crossLaceWeight,
+                    fragmentWeight,
+                    new GUIContent(
+                        "Lace Connectors",
+                        "Normalized share of Mixed Free Water Foam events assigned to with-flow lace connector strokes. Editing this preserves the relative share of the other free-water patterns."));
+                DrawNormalizedPatternWeight3(
+                    crossLaceWeight,
+                    laceWeight,
+                    fragmentWeight,
+                    new GUIContent(
+                        "Cross-Lace Connectors",
+                        "Normalized share of Mixed Free Water Foam events assigned to cross-current horizontal lace strokes. Editing this preserves the relative share of the other free-water patterns."));
+                DrawNormalizedPatternWeight3(
+                    fragmentWeight,
+                    laceWeight,
+                    crossLaceWeight,
+                    new GUIContent(
+                        "Torn Fragments",
+                        "Normalized share of Mixed Free Water Foam events assigned to progressive swept torn fragments. Editing this preserves the relative share of the other free-water patterns."));
+
+                EditorGUILayout.Space(4f);
+                showFoamBirthFreeWaterLacePattern = EditorGUILayout.Foldout(
+                    showFoamBirthFreeWaterLacePattern,
+                    "Free Water Lace Connector Pattern",
+                    true);
+                if (showFoamBirthFreeWaterLacePattern)
                 {
-                    EditorGUILayout.Toggle(
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        Find("foamFreeWaterLaceFormationSpeedMultiplier"),
                         new GUIContent(
-                            "Enabled",
-                            "Free-water source spawning is intentionally staged until shore and object birth are acceptable."),
-                        false);
+                            "Formation Speed",
+                            "Multiplier applied to Free Water Global Formation Speed for Lace Connector events only."));
+                    DrawMinMaxMetreControls(
+                        "Length",
+                        Find("foamFreeWaterLaceLengthMinMetres"),
+                        Find("foamFreeWaterLaceLengthMaxMetres"));
+                    DrawMinMaxMetreControls(
+                        "Width",
+                        Find("foamFreeWaterLaceWidthMinMetres"),
+                        Find("foamFreeWaterLaceWidthMaxMetres"));
+                    DrawMinMaxUnitControls(
+                        "Initial Life",
+                        Find("foamFreeWaterLaceInitialLifeMin"),
+                        Find("foamFreeWaterLaceInitialLifeMax"),
+                        "Initial normalized Remaining Life assigned to spawned material. One means full authored foam lifetime; lower values die sooner under the normal aging rules.");
+                    DrawMinMaxUnitControls(
+                        "Breakup Strength",
+                        Find("foamFreeWaterLaceBreakupStrengthMin"),
+                        Find("foamFreeWaterLaceBreakupStrengthMax"),
+                        "Deterministic edge/source breakup strength for this pattern.");
+                    DrawMinMaxUnitControls(
+                        "Curvature",
+                        Find("foamFreeWaterLaceCurvatureMin"),
+                        Find("foamFreeWaterLaceCurvatureMax"),
+                        "Signed by event seed at runtime. Higher values bend the lace connector more strongly across open water.");
+                    EditorGUI.indentLevel--;
                 }
+
+                showFoamBirthFreeWaterCrossLacePattern = EditorGUILayout.Foldout(
+                    showFoamBirthFreeWaterCrossLacePattern,
+                    "Free Water Cross-Lace Connector Pattern",
+                    true);
+                if (showFoamBirthFreeWaterCrossLacePattern)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        Find("foamFreeWaterCrossLaceFormationSpeedMultiplier"),
+                        new GUIContent(
+                            "Formation Speed",
+                            "Multiplier applied to Free Water Global Formation Speed for Cross-Lace Connector events only."));
+                    DrawMinMaxMetreControls(
+                        "Lateral Length",
+                        Find("foamFreeWaterCrossLaceLengthMinMetres"),
+                        Find("foamFreeWaterCrossLaceLengthMaxMetres"));
+                    DrawMinMaxMetreControls(
+                        "Width",
+                        Find("foamFreeWaterCrossLaceWidthMinMetres"),
+                        Find("foamFreeWaterCrossLaceWidthMaxMetres"));
+                    DrawMinMaxUnitControls(
+                        "Initial Life",
+                        Find("foamFreeWaterCrossLaceInitialLifeMin"),
+                        Find("foamFreeWaterCrossLaceInitialLifeMax"),
+                        "Initial normalized Remaining Life assigned to spawned material. One means full authored foam lifetime; lower values die sooner under the normal aging rules.");
+                    DrawMinMaxUnitControls(
+                        "Breakup Strength",
+                        Find("foamFreeWaterCrossLaceBreakupStrengthMin"),
+                        Find("foamFreeWaterCrossLaceBreakupStrengthMax"),
+                        "Deterministic edge/source breakup strength for this pattern.");
+                    EditorGUI.indentLevel--;
+                }
+
+                showFoamBirthFreeWaterFragmentPattern = EditorGUILayout.Foldout(
+                    showFoamBirthFreeWaterFragmentPattern,
+                    "Free Water Torn Fragment Pattern",
+                    true);
+                if (showFoamBirthFreeWaterFragmentPattern)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(
+                        Find("foamFreeWaterFragmentFormationSpeedMultiplier"),
+                        new GUIContent(
+                            "Formation Speed",
+                            "Multiplier applied to Free Water Global Formation Speed for Torn Fragment events only."));
+                    DrawMinMaxMetreControls(
+                        "Length",
+                        Find("foamFreeWaterFragmentLengthMinMetres"),
+                        Find("foamFreeWaterFragmentLengthMaxMetres"));
+                    DrawMinMaxMetreControls(
+                        "Width",
+                        Find("foamFreeWaterFragmentWidthMinMetres"),
+                        Find("foamFreeWaterFragmentWidthMaxMetres"));
+                    DrawMinMaxUnitControls(
+                        "Initial Life",
+                        Find("foamFreeWaterFragmentInitialLifeMin"),
+                        Find("foamFreeWaterFragmentInitialLifeMax"),
+                        "Initial normalized Remaining Life assigned to spawned material. One means full authored foam lifetime; lower values die sooner under the normal aging rules.");
+                    DrawMinMaxUnitControls(
+                        "Breakup Strength",
+                        Find("foamFreeWaterFragmentBreakupStrengthMin"),
+                        Find("foamFreeWaterFragmentBreakupStrengthMax"),
+                        "Deterministic edge/source breakup strength for this pattern.");
+                    EditorGUI.indentLevel--;
+                }
+
+                if (runtime != null)
+                {
+                    EditorGUILayout.Space(4f);
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.LabelField(
+                        "Runtime Status",
+                        runtime.AutomaticFreeWaterBirthStatus);
+                    EditorGUILayout.LabelField(
+                        "Events Started",
+                        $"{runtime.AutomaticFreeWaterBirthSubmittedLastUpdate} started / {runtime.AutomaticFreeWaterBirthRejectedLastUpdate} skipped, max {runtime.AutomaticFreeWaterBirthBudgetPerTick}/update");
+                    EditorGUILayout.LabelField(
+                        "Events Total",
+                        runtime.AutomaticFreeWaterBirthSubmittedTotal.ToString("N0"));
+                    EditorGUI.indentLevel--;
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("Runtime", "Unavailable");
+                }
+
                 EditorGUILayout.HelpBox(
-                    "Not implemented yet. This section reserves the same source-category authoring structure for future open-water threads and sheet-border source patterns.",
+                    "Free Water Foam is Layer C birth only: Lace Connectors use a moving head+stroke along flow, Cross-Lace Connectors use a moving head+stroke across the river, and Torn Fragments use a progressive swept patch. Bright specular glints are intentionally not spawned as persistent material.",
                     MessageType.Info);
                 EditorGUI.indentLevel--;
             }
 
             EditorGUILayout.HelpBox(
-                "Validation target: Material Presence / Remaining Life should show shore-attached opaque material distributed across the chunk over time. Final Foam remains unchanged until Layer D integration is accepted.",
+                "Validation target: Material Presence / Remaining Life should show source-born persistent material only. Shore/Object/Free Water birth should not be judged by Final Foam until Layer D and shader integration are accepted.",
                 MessageType.Info);
 
             EditorGUI.indentLevel--;

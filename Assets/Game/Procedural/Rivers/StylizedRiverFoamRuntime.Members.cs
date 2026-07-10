@@ -105,12 +105,19 @@ namespace ProgrammaticStylized3D.Rivers
         private int automaticObjectBirthRejectedLastUpdate;
         private int automaticObjectBirthSubmittedTotal;
         private int automaticObjectBirthAnchorCountLastUpdate;
+        private float automaticFreeWaterBirthAccumulator;
+        private int automaticFreeWaterBirthCursor;
+        private int automaticFreeWaterBirthSubmittedLastUpdate;
+        private int automaticFreeWaterBirthRejectedLastUpdate;
+        private int automaticFreeWaterBirthSubmittedTotal;
         private int activeAutomaticFoamSourceEventCount;
         private int automaticSourceEventsRasterizedLastUpdate;
         private string automaticShoreBirthStatus =
             "Automatic source population disabled";
         private string automaticObjectBirthStatus =
             "Object source population disabled";
+        private string automaticFreeWaterBirthStatus =
+            "Free Water source population disabled";
         private StylizedRiverFoamMajorTopology majorTopology;
         private StylizedRiverFoamConnectorTopology connectorTopology;
         private StylizedRiverFoamPocketTopology pocketTopology;

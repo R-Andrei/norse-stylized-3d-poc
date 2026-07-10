@@ -233,10 +233,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             "snowfield.wind_scoured";
 
         private const int CurrentSurfaceStyleMigrationVersion = 1;
-        private const string PaintedAccentFoldFieldHeightPreviewName =
-            "__FoldFieldHeightPreview_Debug";
-        private const float PaintedAccentFoldFieldPreviewHeightScale = 1.0f;
-        private const float PaintedAccentFoldFieldPreviewLift = 0.03f;
+        private const string PaintedAccentFoldFieldLinePreviewName =
+            "__FoldFieldLinePreview_Debug";
+        private const float PaintedAccentFoldFieldLinePreviewLift = 0.035f;
 
         [SerializeField]
         private GroundRecipe recipe = new GroundRecipe();
@@ -311,7 +310,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private Vector4 paintedAccentFoldFieldTexelSize =
             new Vector4(1f, 1f, 1f, 1f);
         private int paintedAccentFoldFieldSignature;
-        private float[] paintedAccentFoldFieldBodyValues;
+        private GroundPaintedAccentSurfaceStroke[] paintedAccentSurfaceStrokes =
+            Array.Empty<GroundPaintedAccentSurfaceStroke>();
 
         private static readonly int BaseColorId =
             Shader.PropertyToID("_BaseColor");
@@ -1512,9 +1512,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     recipe != null ? recipe.ShapeSeed : 0,
                     out Vector4 originSize,
                     out Vector4 texelSize,
-                    out float[] bodyValues);
+                    out float[] bodyValues,
+                    out GroundPaintedAccentSurfaceStroke[] surfaceStrokes);
 
-            paintedAccentFoldFieldBodyValues = bodyValues;
+            paintedAccentSurfaceStrokes =
+                surfaceStrokes ?? Array.Empty<GroundPaintedAccentSurfaceStroke>();
             ReplacePaintedAccentFoldFieldTexture(generatedTexture);
             paintedAccentFoldFieldEnabled = true;
             paintedAccentFoldFieldOriginSize = originSize;
@@ -1535,7 +1537,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private void ApplyNeutralPaintedAccentFoldField()
         {
             paintedAccentFoldFieldEnabled = false;
-            paintedAccentFoldFieldBodyValues = null;
+            paintedAccentSurfaceStrokes = Array.Empty<GroundPaintedAccentSurfaceStroke>();
             ReplacePaintedAccentFoldFieldTexture(
                 CreateNeutralPaintedAccentFoldFieldTexture());
 
@@ -1591,6 +1593,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     feature != null ? feature.Contrast : 0f);
                 hash = hash * 31 + Quantize(
                     feature != null ? feature.MaskInfluence : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentStrokeWidth : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentStrokeDensity : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentStrokeLengthMin : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentStrokeLengthMax : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentStrokeAngleJitterDegrees : 0f);
 
                 Vector2 direction =
                     feature != null
@@ -1615,8 +1627,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
         }
 
-        [ContextMenu("Build Fold Field Height Preview")]
-        public void BuildPaintedAccentFoldFieldHeightPreview()
+        [ContextMenu("Build Painted Accent 3D Line Preview")]
+        public void BuildPaintedAccentFoldFieldLinePreview()
         {
             CacheComponents();
 
@@ -1630,105 +1642,112 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             paintedAccentFoldFieldSignature = 0;
             EnsurePaintedAccentFoldFieldCurrent();
 
-            if (!CanBuildPaintedAccentFoldFieldHeightPreview())
+            if (!CanBuildPaintedAccentFoldFieldLinePreview())
             {
-                ClearPaintedAccentFoldFieldHeightPreview();
+                ClearPaintedAccentFoldFieldLinePreview();
                 return;
             }
 
-            ClearPaintedAccentFoldFieldHeightPreview();
+            ClearPaintedAccentFoldFieldLinePreview();
 
-            int resolution =
-                GroundPaintedAccentFoldFieldGenerator.Resolution;
-            int vertexCount =
-                resolution * resolution;
-            Vector3[] vertices =
-                new Vector3[vertexCount];
-            Vector2[] uvs =
-                new Vector2[vertexCount];
-            Color[] colors =
-                new Color[vertexCount];
+            List<Vector3> vertices = new List<Vector3>();
+            List<Vector2> uvs = new List<Vector2>();
+            List<Color> colors = new List<Color>();
+            List<int> triangles = new List<int>();
 
-            for (int z = 0; z < resolution; z++)
+            for (int strokeIndex = 0;
+                 strokeIndex < paintedAccentSurfaceStrokes.Length;
+                 strokeIndex++)
             {
-                for (int x = 0; x < resolution; x++)
+                GroundPaintedAccentSurfaceStroke stroke =
+                    paintedAccentSurfaceStrokes[strokeIndex];
+                if (!stroke.IsValid)
                 {
-                    int index = z * resolution + x;
-                    float u = (x + 0.5f) / resolution;
-                    float v = (z + 0.5f) / resolution;
-                    Vector2 localXZ =
-                        new Vector2(
-                            paintedAccentFoldFieldOriginSize.x +
-                            u * paintedAccentFoldFieldOriginSize.z,
-                            paintedAccentFoldFieldOriginSize.y +
-                            v * paintedAccentFoldFieldOriginSize.w);
+                    continue;
+                }
 
-                    float height = 0f;
-                    if (baseSurface.TrySample(
-                            localXZ,
-                            out GroundSurfaceSample sample))
+                int baseVertex = vertices.Count;
+                Vector3[] points = stroke.LocalPoints;
+                Vector3[] normals = stroke.LocalNormals;
+
+                for (int pointIndex = 0; pointIndex < points.Length; pointIndex++)
+                {
+                    Vector3 tangent = ResolveStrokePreviewTangent(
+                        points,
+                        pointIndex);
+                    Vector3 normal =
+                        pointIndex < normals.Length &&
+                        normals[pointIndex].sqrMagnitude > 0.000001f
+                            ? normals[pointIndex].normalized
+                            : Vector3.up;
+                    Vector3 across =
+                        Vector3.Cross(normal, tangent);
+                    if (across.sqrMagnitude <= 0.000001f)
                     {
-                        height = sample.Height;
+                        across = Vector3.Cross(Vector3.up, tangent);
                     }
 
-                    float body =
-                        Mathf.Clamp01(
-                            paintedAccentFoldFieldBodyValues[index]);
+                    if (across.sqrMagnitude <= 0.000001f)
+                    {
+                        across = Vector3.right;
+                    }
 
-                    vertices[index] =
-                        new Vector3(
-                            localXZ.x,
-                            height +
-                            PaintedAccentFoldFieldPreviewLift +
-                            body * PaintedAccentFoldFieldPreviewHeightScale,
-                            localXZ.y);
-                    uvs[index] =
-                        new Vector2(u, v);
-                    colors[index] =
-                        new Color(body, body, body, 1f);
+                    across.Normalize();
+                    Vector3 center =
+                        points[pointIndex] +
+                        normal * PaintedAccentFoldFieldLinePreviewLift;
+                    float halfWidth = stroke.Width * 0.5f;
+
+                    vertices.Add(center - across * halfWidth);
+                    vertices.Add(center + across * halfWidth);
+
+                    float u =
+                        points.Length <= 1
+                            ? 0f
+                            : pointIndex / (float)(points.Length - 1);
+                    uvs.Add(new Vector2(u, 0f));
+                    uvs.Add(new Vector2(u, 1f));
+                    colors.Add(new Color(1f, 0.92f, 0.58f, 1f));
+                    colors.Add(new Color(1f, 0.92f, 0.58f, 1f));
+                }
+
+                for (int pointIndex = 0; pointIndex < points.Length - 1; pointIndex++)
+                {
+                    int a = baseVertex + pointIndex * 2;
+                    int b = a + 1;
+                    int c = a + 2;
+                    int d = a + 3;
+
+                    triangles.Add(a);
+                    triangles.Add(c);
+                    triangles.Add(b);
+                    triangles.Add(b);
+                    triangles.Add(c);
+                    triangles.Add(d);
                 }
             }
 
-            int quadCount =
-                (resolution - 1) * (resolution - 1);
-            int[] triangles =
-                new int[quadCount * 6];
-            int triangleIndex = 0;
-
-            for (int z = 0; z < resolution - 1; z++)
+            if (vertices.Count < 4 || triangles.Count < 6)
             {
-                for (int x = 0; x < resolution - 1; x++)
-                {
-                    int a = z * resolution + x;
-                    int b = a + 1;
-                    int c = a + resolution;
-                    int d = c + 1;
-
-                    triangles[triangleIndex++] = a;
-                    triangles[triangleIndex++] = c;
-                    triangles[triangleIndex++] = b;
-                    triangles[triangleIndex++] = b;
-                    triangles[triangleIndex++] = c;
-                    triangles[triangleIndex++] = d;
-                }
+                return;
             }
 
             Mesh previewMesh =
                 new Mesh
                 {
-                    name = "GeneratedGround_FoldFieldHeightPreview",
+                    name = "GeneratedGround_FoldFieldLinePreview",
                     hideFlags = HideFlags.DontSave,
                     indexFormat = IndexFormat.UInt32
                 };
-            previewMesh.vertices = vertices;
-            previewMesh.uv = uvs;
-            previewMesh.colors = colors;
-            previewMesh.triangles = triangles;
+            previewMesh.SetVertices(vertices);
+            previewMesh.SetUVs(0, uvs);
+            previewMesh.SetColors(colors);
+            previewMesh.SetTriangles(triangles, 0);
             previewMesh.RecalculateNormals();
             previewMesh.RecalculateBounds();
 
             GameObject previewObject =
-                new GameObject(PaintedAccentFoldFieldHeightPreviewName)
+                new GameObject(PaintedAccentFoldFieldLinePreviewName)
                 {
                     hideFlags = HideFlags.DontSave
                 };
@@ -1745,17 +1764,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             previewRenderer.shadowCastingMode = ShadowCastingMode.Off;
             previewRenderer.receiveShadows = false;
             previewRenderer.sharedMaterial =
-                CreatePaintedAccentFoldFieldHeightPreviewMaterial();
+                CreatePaintedAccentFoldFieldLinePreviewMaterial();
 
 #if UNITY_EDITOR
             Undo.RegisterCreatedObjectUndo(
                 previewObject,
-                "Build Fold Field Height Preview");
+                "Build Painted Accent 3D Line Preview");
 #endif
         }
 
-        [ContextMenu("Clear Fold Field Height Preview")]
-        public void ClearPaintedAccentFoldFieldHeightPreview()
+        [ContextMenu("Clear Painted Accent 3D Line Preview")]
+        public void ClearPaintedAccentFoldFieldLinePreview()
         {
             List<GameObject> previewObjects =
                 new List<GameObject>();
@@ -1767,7 +1786,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
                 if (child != null &&
                     child.name.StartsWith(
-                        PaintedAccentFoldFieldHeightPreviewName,
+                        PaintedAccentFoldFieldLinePreviewName,
                         StringComparison.Ordinal))
                 {
                     previewObjects.Add(child.gameObject);
@@ -1776,34 +1795,48 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             for (int index = 0; index < previewObjects.Count; index++)
             {
-                DestroyPaintedAccentFoldFieldHeightPreviewObject(
+                DestroyPaintedAccentFoldFieldLinePreviewObject(
                     previewObjects[index]);
             }
         }
 
-        private bool CanBuildPaintedAccentFoldFieldHeightPreview()
+        private bool CanBuildPaintedAccentFoldFieldLinePreview()
         {
-            int resolution =
-                GroundPaintedAccentFoldFieldGenerator.Resolution;
-            int expectedLength =
-                resolution * resolution;
-
             return paintedAccentFoldFieldEnabled &&
-                   paintedAccentFoldFieldBodyValues != null &&
-                   paintedAccentFoldFieldBodyValues.Length == expectedLength &&
+                   paintedAccentSurfaceStrokes != null &&
+                   paintedAccentSurfaceStrokes.Length > 0 &&
                    baseSurface != null &&
                    baseSurface.IsValid;
         }
 
-        private static Material CreatePaintedAccentFoldFieldHeightPreviewMaterial()
+        private static Vector3 ResolveStrokePreviewTangent(
+            Vector3[] points,
+            int pointIndex)
+        {
+            if (points == null || points.Length < 2)
+            {
+                return Vector3.forward;
+            }
+
+            Vector3 previous =
+                points[Mathf.Max(0, pointIndex - 1)];
+            Vector3 next =
+                points[Mathf.Min(points.Length - 1, pointIndex + 1)];
+            Vector3 tangent = next - previous;
+            tangent.y = 0f;
+
+            if (tangent.sqrMagnitude <= 0.000001f)
+            {
+                tangent = Vector3.forward;
+            }
+
+            return tangent.normalized;
+        }
+
+        private static Material CreatePaintedAccentFoldFieldLinePreviewMaterial()
         {
             Shader shader =
-                Shader.Find("Hidden/PS3D/Ground Fold Field Height Preview");
-
-            if (shader == null)
-            {
-                shader = Shader.Find("Universal Render Pipeline/Unlit");
-            }
+                Shader.Find("Universal Render Pipeline/Unlit");
 
             if (shader == null)
             {
@@ -1818,28 +1851,25 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Material material =
                 new Material(shader)
                 {
-                    name = "GeneratedGround_FoldFieldHeightPreview_Material",
+                    name = "GeneratedGround_FoldFieldLinePreview_Material",
                     hideFlags = HideFlags.DontSave
                 };
 
+            Color previewColor = new Color(0.96f, 0.86f, 0.46f, 1f);
             if (material.HasProperty("_BaseColor"))
             {
-                material.SetColor(
-                    "_BaseColor",
-                    new Color(0.82f, 0.82f, 0.72f, 1f));
+                material.SetColor("_BaseColor", previewColor);
             }
 
             if (material.HasProperty("_Color"))
             {
-                material.SetColor(
-                    "_Color",
-                    new Color(0.82f, 0.82f, 0.72f, 1f));
+                material.SetColor("_Color", previewColor);
             }
 
             return material;
         }
 
-        private static void DestroyPaintedAccentFoldFieldHeightPreviewObject(
+        private static void DestroyPaintedAccentFoldFieldLinePreviewObject(
             GameObject previewObject)
         {
             MeshFilter meshFilter =
@@ -1957,7 +1987,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         private void OnDestroy()
         {
-            ClearPaintedAccentFoldFieldHeightPreview();
+            ClearPaintedAccentFoldFieldLinePreview();
             ClearGeneratedAssignments();
 
             if (paintedAccentFoldFieldTexture != null)

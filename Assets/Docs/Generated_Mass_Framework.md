@@ -1,184 +1,166 @@
 # Generated Mass Framework
 
-Status: active framework definition  
-Current implementation target: **EW-B — Deterministic Selected-Edge Bevel Kernel**  
-Current implementation step: **EW-B3R3 — Two-Edge Corner Cap Closure**  
-Supersedes as active edge-wear routes: atlas-first/runtime edge-wear plans, EW-4A global cuts, EW-4B local strips, EW-4C half-space bevel-plane fallback, and EW-4D/R/R2/R3 sampled-ribbon plus open-cycle-closure bevel construction.
+## Status
 
-## 0. EW-B3R3 implementation status
+- **Active edge-wear architecture:** EW-C — Explicit Single-Segment Chamfer Kernel
+- **Current implementation step:** EW-C2 — Provisional replacement-face and one-strip bevel emission
+- **Geometry emission:** provisional build and audit only; final geometry commit remains disabled
 
-EW-B3R3 continues the source-owned local bevel network and fixes the current blocker: two-edge corner cap closure. EW-B3R2 proved isolated endpoint apex caps work (`2/2` isolated caps built) and multi-edge vertex-star caps remain solved (`18/18` multi-star caps built), but validation still failed because `7/8` two-edge corner caps failed by area. EW-B3R3 keeps isolated apex caps and multi-star ordered caps intact, then routes two-edge corners through a dedicated ordered corner-patch builder.
+## Feature goal
 
-Active edge-wear flow:
+Generated masses need a crude physical chamfer on selected exposed convex source edges. The first production target is deliberately limited:
 
-```text
-final source PolygonFace polyhedron after all mass cuts/chips
-→ source topology graph / edge-face adjacency
-→ selected convex graph edges
-→ per-source-face local offset replacement polygons
-→ per-selected-edge local ConvexEdgeWear bridge faces
-→ per-source-vertex local ConvexEdgeWear cap triangles ordered from the source vertex star
-→ final topology audit
-→ triangle-emission preview
-→ UV2.z / vertex alpha ConvexEdgeWear markers
-```
+- one bevel strip per selected manifold edge;
+- one new quadrilateral surface, or two triangles, between the two trimmed source faces;
+- crude triangle-fan corner closure;
+- no rounded profile, sampled ribbon, or arbitrary segment count;
+- no runtime topology work.
 
-Implementation facts:
+The chamfer is generated from the final source `PolygonFace` polyhedron before final triangulation.
 
-```text
-- Active edge-wear construction enters MassGenerator.TryBuildDeterministicSelectedEdgeBevelKernelFaces(...).
-- The active function does not call retired local-bevel, sampled-ribbon, workspace, open-cycle closure, or global selected-edge cut construction.
-- EW-B3R3 emits local bridge geometry, keeps source-vertex-star ordered cap triangles for multi-edge stars, uses original-source-vertex apex triangles only for isolated endpoints, and uses ordered unique corner-patch triangles for two-edge corners.
-- ConvexEdgeWear bevel/cap polygons are triangulated before commit, because final render fans ConvexEdgeWear faces.
-- Topology audit and triangle preview remain mandatory before commit.
-```
+## Canonical generation order
 
-The EW-B3R implementation is a deliberate source-graph emission step, not a render-triangle mesh post-process.
+1. Generate the final source mass faces.
+2. Discover and score convex edge-wear candidates.
+3. Select candidates from Coverage.
+4. Build explicit source topology.
+5. Preserve and classify source boundary loops.
+6. Order the incident face/edge fan at every affected source vertex.
+7. Solve one replacement corner per `(source face, source vertex)`.
+8. Emit one replacement polygon per affected source face.
+9. Emit one `ConvexEdgeWear` quad per selected internal manifold edge.
+10. Emit one crude corner patch per contiguous selected run at a source vertex.
+11. Validate that no new boundaries, non-manifold edges, or T-junctions were introduced.
+12. Triangulate once.
 
-### EW-B3R3 validation target
+## Validated EW-C0 healthy baseline
 
-EW-B3R3 fixes the EW-B3R2 validation result: local face offsets, rails, and all selected-edge bevel bridges were built; isolated caps reached `2/2`; multi-star caps stayed at `18/18`; two-edge corner caps remained the blocker at `1/8` built with `7` area failures. The active blocker is therefore two-edge corner cap construction, not multi-star ordering, isolated endpoint caps, edge selection, rails, shader output, or global clipping.
+EW-C0 performs only candidate selection and source-topology readiness auditing. It does not alter the source face list. With edge wear enabled, the generated mass must therefore render exactly as it did before physical edge-wear geometry.
 
-Expected success indicators:
+The readiness audit reports:
 
-```text
-deterministicKernelGlobalCutsApplied=0
-deterministicKernelFaceOffsetPolygonsBuilt=16
-deterministicKernelRailsBuilt=84
-deterministicKernelLocalBevelFacesBuilt=36
-deterministicKernelVertexCapsAttempted=28
-deterministicKernelVertexCapsBuilt=28
-deterministicKernelVertexCapFailures=0
-deterministicKernelVertexCapLowValenceBuilt=10
-deterministicKernelVertexCapLowValenceFailed=0
-deterministicKernelOpenEdgesAfterBuild=0
-deterministicKernelTJunctionsAfterBuild=0
-```
+- source faces, vertices, edges, and directed half-edges;
+- source boundary edges and traced boundary loops;
+- source non-manifold edges and T-junctions;
+- selected manifold, boundary, and non-manifold edges;
+- affected closed and open vertex fans;
+- selected-run readiness.
 
----
+A source boundary is not automatically an error. Future validation compares the output boundary set against the explicitly preserved source boundary set.
 
-## 1. Purpose
 
-Generated Mass is the reusable compact-mass framework for procedural rocks, boulders, ice chunks, ore chunks, ruin fragments, monoliths, fossils, and similar compact generated objects.
+## EW-C1 geometry-proof baseline
 
-It owns:
+EW-C1 keeps the source mass visually unchanged while solving the coordinates needed by the first chamfer emission patch. It builds one explicit replacement point for every `(source face, source vertex)` corner.
+
+Corner rules:
 
 ```text
-base compact-mass shape generation
-surface feature data
-feature-budget policy
-main-mesh feature support such as bevels/chamfers/grooves
-shader/material interpretation
-feature-oriented inspector controls
-debug views for validating generated data
+neither adjacent edge selected -> preserve source vertex
+one adjacent edge selected     -> selected offset line / source line intersection
+both adjacent edges selected   -> offset line / offset line intersection
 ```
 
-Core representation rule:
+For a source face edge `A -> B` with unit direction `d`, face normal `n`, inward in-plane direction `m`, and solved edge width `w`:
 
 ```text
-Use the representation that matches the feature.
-Hard edge features belong in mesh geometry or mesh-carried per-edge/per-face data.
-Broad soft fields may use vertex masks, procedural shader data, or temporary/debug atlases when justified.
-Do not force hard convex edge wear into packed low-resolution runtime atlases.
+d = normalize(B - A)
+m = normalize(n x d), sign-corrected toward the face centroid
+L(t) = A + w m + t d
 ```
 
----
+EW-C1R3 also:
 
-## 2. Current implementation facts
+- begins with one conservative constant width per selected source edge;
+- iteratively reduces participating edge widths when an acute corner creates an excessive miter displacement;
+- feeds insufficient common intervals on unselected internal edges back into the same monotonic width solve;
+- uses a bounded binary search to find the largest stable scale for selected edges controlling a failed shared interval;
+- keeps one width for the full source edge, so a correction at one endpoint propagates to the other endpoint;
+- reconciles the endpoint identity of every unselected internal source edge after convergence;
+- validates all hypothetical replacement polygons;
+- validates the four points needed by every future one-strip bevel quad;
+- verifies that the preserved source boundary loop does not collapse;
+- emits no replacement faces, bevel strips, or corner patches.
+
+The next geometry patch may proceed only when the unified corner/shared-edge solve converges and the corner audit reports `readyForChamferEmission=1`.
+
+
+## EW-C2 provisional emission baseline
+
+EW-C2 consumes the validated EW-C1 corner table and solved per-edge widths without recomputing them. It builds a temporary face list containing:
+
+- one replacement polygon for every source face;
+- one `ConvexEdgeWear` quad for every active positive-width selected edge;
+- no vertex-run corner patches yet.
+
+Every allowed provisional opening is registered before topology audit. The only valid open edges are:
+
+- the solved descendants of preserved source-boundary edges;
+- endpoint edges of active bevel strips that are reserved for EW-C3 vertex patches.
+
+The provisional topology must contain no unexpected openings, no missing expected vertex-patch boundaries, no non-manifold edges, and no T-junctions. The face list is discarded after audit and the original source mass remains the rendered geometry.
+
+## Validation invariant
+
+Let `B_source` be the preserved source-boundary edge set and `B_output` the output-boundary set.
 
 ```text
-GeneratedMass.cs
-- FormComplexity and SurfaceFacetDensity are separate artist-facing controls.
-- GenerationBudget still caps generated support-data cost.
-- Normal-render convex edge wear passes MassSurfaceFeatureSettings into MassGenerator.
-- Feature atlases are generated only for temporary/debug boundary Surface Mask Debug views.
-
-GeneratedMassFeatureAtlasBaker.cs
-- Retained as a temporary/debug boundary-field baker.
-- The atlas path is not the final representation for hard convex edge wear.
-
-MassGenerator.cs
-- FormComplexity controls major cut count / dominant plane count.
-- SurfaceFacetDensity controls surface triangulation density across major planes.
-- The rendered mesh emits one rendered vertex per triangle corner.
-- EW-B is the active recovery target for generated convex edge-wear bevel geometry.
-- EW-B3 emits deterministic local bevel faces and cap patches from the final source polyhedron graph before triangulation.
-- Retired local-bevel, sampled-ribbon/workspace, and open-cycle closure construction code is not used by the active path.
-
-SH_PixelSurfaceLit.shader and PixelSurface generated-mass includes
-- FeatureAtlas0/1 sampling remains available for boundary debug modes.
-- Normal rendering no longer samples FeatureAtlas0/1 for convex edge-wear material response.
-- Normal rendering shades UV2.z-marked generated geometry with generated mass edge-wear material controls.
+new boundaries = B_output - B_source
 ```
 
----
-
-## 3. Active convex edge-wear architecture
-
-EW-B target:
+A valid chamfer result requires:
 
 ```text
-source PolygonFace list
-→ source topology graph / edge-face adjacency
-→ selected convex graph edges
-→ deterministic selected-edge bevel kernel
-→ source-owned local bevel faces on the final source polyhedron
-→ ConvexEdgeWear bevel/cap triangles
-→ final topology audit
-→ UV2.z / vertex color ConvexEdgeWear markers
+new boundaries = 0
+output non-manifold edges = 0
+output T-junctions = 0
 ```
 
-EW-B3 emits bevel geometry by building source-face replacement polygons, local edge bridge faces, and source-vertex cap patches from shared graph-owned records. This handles dense selected-edge networks directly from the source graph and avoids both retired ribbon closure and EW-B2 global slice/gouge artifacts.
+It does not require a globally closed mesh when the source intentionally contains a boundary loop.
 
----
+## Width ownership
 
-## 4. Performance notes
+The first chamfer implementation will use one constant solved width per selected source edge.
 
-The logged source topology for the current validation rock is:
+For source edge `e=(u,v)`:
 
 ```text
-source faces = 16
-source edges = 44
-source vertices = 29
-selected edges = 36
-affected faces = 16
-affected vertices = 28
+w_e = min(requested width, feasible width at u, feasible width at v)
 ```
 
-The retired EW-4D0.7 successful-but-artifacted path estimated roughly:
+The initial conservative feasibility bound is:
 
 ```text
-committedConvexEdgeWearFaces = 776
-committedConvexEdgeWearTrianglesEstimate = 1681
-committedConvexEdgeWearRenderedVerticesEstimate = 5043
+w_max(vertex) = 0.25 * minimum adjacent source-edge length
 ```
 
-The EW-B3 local source-owned path should remain dramatically cheaper than EW-4D because it emits one face-local replacement polygon per source face, one local bridge face per selected edge, and one cap patch per affected vertex. It does not create sampled profile grids or hundreds of ribbon quads before closure.
+This coefficient is a proof-stage safety policy, not the final artistic mapping. After this first bound, EW-C1R3 performs a monotonic global pass. For any corner whose solved displacement `d` exceeds its permitted displacement `d_max`, each selected edge participating in that corner is reduced by `0.95 * d_max / d`, clamped conservatively while widths remain useful. Widths only decrease and remain constant along each complete source edge. When an unselected internal edge has no stable common interval, all selected edges controlling its four incident corners are reduced together until the interval is preserved. If preserving the source edge requires a chamfer below the useful stable width, those locally incompatible candidate edges are deferred by assigning width zero; the rest of the compatible selected network remains active. Pre-existing short source edges are required to preserve their own source length rather than an unrelated larger render threshold.
 
----
+## Preserved systems
 
-## 5. Current validation target
+- final-source candidate discovery;
+- convexity and scoring;
+- Coverage selection;
+- source topology graph;
+- generic topology audit;
+- material-feature identity for future `ConvexEdgeWear` faces.
 
-EW-B3 succeeds only if:
+## Retired architecture
 
-```text
-Unity compiles.
-The active route reports deterministicKernelGeometryPending=0.
-deterministicKernelLocalBevelFacesBuilt > 0.
-committedConvexEdgeWearFaces > 0.
-committedConvexEdgeWearNgonFaces = 0.
-triangulationPreviewSkippedConvexEdgeWearTriangles = 0.
-topologyOpenEdges = 0.
-topologyNonManifoldEdges = 0.
-topologyTJunctions = 0.
-Surface Mask Debug / Convex Edge Wear shows actual generated geometry.
-```
+EW-B is retired. It independently rebuilt source faces, emitted local bridge faces, then inferred ownership from resulting open-edge coordinates and attempted post-hoc cap closure. That architecture repeatedly produced unexplained boundaries and T-junctions. Its construction code, cap experiments, rail records, and EW-B-only diagnostics have been removed.
+
+## Performance policy
+
+Chamfer topology is generated before gameplay and cached with the generated mass. The first implementation prioritizes deterministic, low-complexity geometry:
+
+- one bevel strip per selected edge;
+- no subdivision profile;
+- no per-frame geometry work;
+- no atlas dependency for the physical chamfer.
 
 ## Next work items
 
-1. Validate EW-B3 on the current 36-selected-edge mass.
-2. If local emission fails, inspect faceOffset/rails/localBevel/vertexCap and topology-after-build counters.
-3. If geometry commits, assess visual bevel width and sliver/clipping behavior before adding variation or material-mask expansion.
-
-
-EW-B3R3 note: two-edge corner vertices must not use the isolated endpoint apex cap path; they use ordered unique cap points and centre/boundary triangulation instead.
+1. Validate EW-C2 provisional replacement-face and one-strip emission.
+2. Require all provisional openings to match explicit source-boundary or vertex-patch provenance.
+3. Implement EW-C3 crude vertex-run patches only after the provisional topology audit reports ready.
+4. Commit visible chamfer geometry only after EW-C3 preserves the source boundary set with zero new openings, non-manifold edges, or T-junctions.

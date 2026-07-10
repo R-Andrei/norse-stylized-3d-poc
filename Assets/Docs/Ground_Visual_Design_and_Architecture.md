@@ -9,6 +9,45 @@ related_documents: [PS3D-00, PS3D-01, PS3D-02, PS3D-04, PS3D-06]
 implementation_documents:
   - Ground_Generation_Surface_Upgrade_Plan.md
 ---
+### 2026-07-10 — Patch V3J.3A2: Explicit Signed Angle Jitter Degrees
+
+Patch V3J.3A2 keeps the V3J.3A1 whole-chunk distribution fix but corrects the remaining angle-control semantics. The active Painted Accent 3D stroke orientation rule is now deliberately simple: start with the feature `Direction`, roll one deterministic signed random value per stroke, multiply by `Angle Jitter Degrees`, and apply that offset in degrees. A value of 0 produces parallel strokes; a value of 30 allows offsets anywhere from -30 to +30 degrees. The generator no longer uses normalized angle variety or orientation families for Painted Accent 3D strokes.
+
+Raised fold height and cross-section form remain deferred to V3J.3B.
+
+### 2026-07-10 — Patch V3J.3A1: 3D Stroke Distribution Fix
+
+Patch V3J.3A1 corrects two V3J.3A layout bugs reported from the 3D line preview. First, stroke placement no longer walks cells sequentially from a random offset and stops as soon as enough strokes are accepted. That row-major traversal could populate only one side of the chunk because accepted strokes filled the target count before the traversal reached the rest of the patch. The generator now builds the full candidate-cell set, assigns each candidate a deterministic random sort key, globally sorts that set, and accepts from the shuffled order. This preserves deterministic generation while spreading accepted strokes across the whole chunk.
+
+Second, `Angle Variety` has been replaced in active code and UI by explicit `Angle Jitter Degrees`. V3J.3A used slash/vertical/backslash orientation families, but validation showed that this produced unwanted one-way/perpendicular orientation changes. The active rule is now: take the feature's preferred `Direction`, then apply a symmetric clockwise/counter-clockwise jitter of up to the authored degree value, clamped to 0-30 degrees. This gives `base - jitter`, `base`, and `base + jitter` variation, not multiple perpendicular families.
+
+This patch still does not add raised fold height, lateral squiggle, or cross-section form. The next meaningful visual step remains V3J.3B, which should sweep a height/profile cross-section along the accepted 3D surface strokes.
+
+### 2026-07-10 — Patch V3J.3A: 3D Stroke Distribution Controls
+
+Patch V3J.3A keeps the V3J.3R source-of-truth correction but fixes the first preview's layout problems: too few generated lines, overly long strokes, and overly uniform slash-like orientation. The patch deliberately does not solve raised fold height or lateral squiggle. The current validation target is still the line layout itself, because the user needs to see the full raised 3D result before judging whether lateral deviation is desirable.
+
+The active Painted Accent controls are now explicit for 3D surface-stroke layout:
+
+```text
+Stroke Width        -> preview/runtime ribbon width in metres
+Stroke Density      -> approximate stroke count per standard 40x40 patch
+Stroke Length Min   -> lower length bound in metres
+Stroke Length Max   -> upper length bound in metres
+Angle Jitter Degrees -> explicit symmetric +/- degree offset around the preferred feature direction
+```
+
+Generation no longer derives line count mainly from `Strength` or line length mainly from generic `Scale`. `Strength` remains feature intensity, while these new controls own the visible 3D stroke distribution. Stroke placement now uses a larger deterministic attempt grid so density changes produce more reliable preview changes after support rejection. Angle selection now means symmetric jitter around the preferred direction only; it does not introduce perpendicular orientation families.
+
+Raised 3D fold form remains the next step. Patch V3J.3B should sweep an actual cross-section/profile along the accepted surface strokes; V3J.3A is only the layout-control patch.
+
+### 2026-07-10 — Patch V3J.3R: Painted Accent 3D Stroke Baseline Reconciliation
+
+Patch V3J.3R resets the active Painted Accent baseline after the V3J.0-V3J.2 experiments proved the wrong source model. The prior active path generated a broad/noisy fold body field, tried to threshold or contour it, and then attempted to infer one useful line. Validation showed predictable failures: shader contour extraction produced embossed topographic soup, connected-region crest extraction produced fat blobs/ribbons, and threshold controls could not compensate for a bad body-first source.
+
+The active source of truth is now a generated 3D surface stroke. Each stroke is a short ground-following local-space curve sampled against `GroundHeightFieldSnapshot`; its points and normals are real 3D surface data. The fold-field texture remains available, but it is now derived from those 3D strokes: `R` is baked line coverage, `G` is the optional body/support around that line, `B` is stroke-relative side polarity, and `A` remains semantic support/reserved. Runtime shader work must consume this baked data; it must not rediscover regions or contours from noise.
+
+The old height-field preview has been removed from the active workflow and replaced by a 3D line/ribbon preview. The preview builds actual temporary mesh ribbons from the generated stroke points so the next validation answers the important question first: do the generated 3D surface lines themselves look promising enough to become the effect?
 
 # Ground Visual Design and Architecture
 
@@ -220,77 +259,146 @@ They are short, broken, Hades-1-like dark/value-shifted surface strokes. They sh
 
 They are visual only. They do not require terrain deformation.
 
-#### Chosen Implementation Direction - Generated Visual Fold Field
+#### Chosen Implementation Direction - Generated 3D Surface Strokes
 
-Patch V3G redirected Painted Accent Lines away from the earlier curve-distance stroke source model and toward generated visual fold-field data.
+Patch V3J.3R changes the Painted Accent source of truth.
 
-The rejected V3D-V3F.1 source model was:
+The active source model is no longer:
 
 ```text
-procedural curve stroke
-  -> distance-to-curve line mask
-  -> inflated tube-like relief body
-  -> side rails derived from curve side
+generate anonymous scalar/noise body field
+  -> threshold or contour the body
+  -> infer a representative line
 ```
 
-Validation showed this was the wrong representation. The debug views became useful, but they revealed the failure clearly: the line channel read as scratches, the relief channel read as fat tubes/capsules around those scratches, and the signed channel read as parallel rails. That path is kept only as fallback/comparison code while the generated fold-field replacement comes online. It must not be tuned further as the final solution.
+Validation retired that model. It produced either broad value-noise continents, embossed contour soup, or fat selected ribbons. The selected line is the visual feature we actually care about, so it should not be rediscovered from a noisy body field after the fact.
 
-The accepted source model is:
+The active source model is now:
 
 ```text
-generated visual fold field F(local x, local z)
-  -> relief/body channel from F
-  -> rough/selected line channel from the edge/gradient structure of F
-  -> signed side channel from the gradient/polarity of F
+generate short 3D surface stroke descriptors
+  -> walk/sample those strokes on the generated ground surface
+  -> preview the actual 3D stroke geometry
+  -> bake cheap R/G/B/A texture channels from the strokes for shader use
 ```
 
-This reverses the old dependency. The old model tried to make a line create the terrain fold. The new model creates an invisible visual terrain fold first, then derives the line from that fold. That matches the intended look: a thin painted/value-shifted crease on one useful side of a small raised, compressed, or wrinkled ground form.
-
-The feature remains visual-only:
+The stroke is a local-space 3D curve on the generated terrain surface. For each sampled point, the generator knows:
 
 ```text
-no terrain mesh displacement
+local 3D position on the ground
+surface/render normal from GroundHeightFieldSnapshot
+tangent along the stroke
+across-line direction on the surface
+stroke width, body width, strength, seed
+```
+
+This keeps the feature 3D at source while still allowing cheap shader rendering later. The texture is a baked representation of 3D surface strokes; it is not the authored source and must not be treated as a flat 2D decal system.
+
+The feature remains visual-only unless explicitly promoted later:
+
+```text
 no collision change
+no gameplay terrain deformation
 no runtime footprint/wetness simulation
-no decals
-no generated mesh channels
+no new layers or tags
+no production mesh modification during normal generation
 ```
+
+The immediate validation target is the 3D line/ribbon preview, not final material response. If the 3D lines look good enough, later patches can decide whether to keep them as actual geometry, bake them into the shader fold-field texture, or use both.
+
+#### Retired Painted Accent Experiments
+
+The following experiments are retained only as history and should not be tuned as active direction:
+
+```text
+V3D-V3F.1 curve-distance strokes:
+  line first -> inflated 2D relief tube -> side rails
+  failed as scratches/capsules/rails
+
+V3I/V3I.1 candidate stamps:
+  discrete oval/ridge stamps -> body/line channels
+  failed as leaf/brush stamps
+
+V3I.2 continuous body field:
+  domain-warped value field -> G body -> rough R/B
+  failed as blocky/noisy field placement for this line target
+
+V3J.0 final prototype:
+  trusted existing R as if it were already the selected line
+  failed as faint/blocky smudging
+
+V3J.1 shader contour extraction:
+  sampled neighboring G and drew local contour bands
+  failed as embossed topographic soup
+
+V3J.2 peak-region crest extraction:
+  thresholded G, labeled regions, inferred internal crest lines
+  threshold worked, but the source regions remained bad and selected lines read as fat blobs/ribbons
+```
+
+The lesson is now part of the baseline: **generate the 3D line intentionally, then derive any supporting body/texture response from that line.**
 
 #### Fold-Field Texture Contract
 
-Patch V3H added the inactive data skeleton. Patch V3I makes it active for chunks that have an enabled `PaintedAccentLines` feature.
-
-The generated texture contract is:
+The texture contract survives, but its source changes. Patch V3J.3R derives the generated fold-field texture from 3D surface strokes instead of from noise/body-first inference.
 
 ```text
-R = accent line / rough selected contour candidate
-G = relief body / visual fold-height field
-B = signed side encoded 0..1, with 0.5 as neutral
+R = baked selected stroke-line coverage from generated 3D surface strokes
+G = soft body/support around those strokes, for context or later shading
+B = stroke-relative signed side encoded 0..1, with 0.5 as neutral
 A = semantic support / reserved future validity channel
 ```
 
 The shader decodes the channels as:
 
 ```text
-line   = R
-relief = G
-signed = B * 2 - 1
+selectedLine = R
+bodyContext  = G
+signed       = B * 2 - 1
 ```
 
 The debug views keep their existing names but now mean:
 
 ```text
 Ground Painted Accent Lines
-  shows R: rough/selected contour candidates derived from the fold body
+  shows R: baked line coverage from generated 3D surface strokes
 
 Ground Painted Accent Relief
-  shows G: the underlying visual fold-height/body field
+  shows G: soft support/body around those 3D strokes
 
 Ground Painted Accent Signed Relief
-  shows B decoded as polarity: the gradient side used for painted shadow/highlight
+  shows B decoded as stroke-relative side polarity
+
+Ground Painted Accent Final Prototype
+  shades the baked R line with B polarity and weak G context
 ```
 
-For V3I, the relief/body channel is the main validation target. The line channel is intentionally a rough first derivation; final line extraction is a later patch.
+Runtime shader policy is strict: the shader samples baked channels and shades them. It does not perform connected-component labeling, contour extraction, body-field thresholding, or line discovery.
+
+#### 3D Line Preview Policy
+
+The old `Build Height Preview` / `Clear Height Preview` workflow is retired. It visualized the rejected G/body field as a displaced grid and therefore kept attention on the wrong artifact.
+
+The active preview is:
+
+```text
+GeneratedGround inspector:
+  Stroke Width
+  Build 3D Line Preview
+  Clear 3D Line Preview
+
+GeneratedGround child object:
+  __FoldFieldLinePreview_Debug
+```
+
+The preview mesh is built from the generated stroke descriptors. Each stroke point is lifted slightly along the sampled surface normal, then widened into a small ribbon using the local tangent and normal. This is editor/debug-only geometry:
+
+```text
+it does not modify the generated ground mesh
+it does not modify collision
+it does not imply production displacement
+it does not require a new layer/tag/component
+```
 
 #### Chunk-Library and Runtime Policy
 
@@ -701,6 +809,37 @@ documentation of the proof contract
 ```
 
 It does not add mesh displacement, collision changes, production normal perturbation, family tuning, generator tuning, new components, decals, or runtime state.
+
+V3J.1 correction also failed the actual target. It moved extraction into the shader, but the shader produced embossed contour soup: many local G level sets, not one selected line per meaningful fold. V3J.2 reconciles the architecture: region selection belongs to generation/dirty time, not the runtime fragment shader. The generator now thresholds G, labels connected peak regions, rejects small junk regions, extracts one representative internal crest line per accepted region, and writes that selected line to R. The Final Prototype shader consumes R directly and only uses G as weak context plus B for one-sided dark/light polarity.
+
+#### Patch V3J.2 - Precomputed Peak-Region Crest Lines
+
+Patch V3J.2 is the reconciliation patch after the failed V3J.0/V3J.1 shader-only proof attempts. The accepted division of responsibility is now:
+
+```text
+generation / dirty time:
+  generate continuous G/body field
+  apply a temporary peak threshold
+  identify connected peak regions
+  discard tiny regions
+  select one internal crest/accent line per accepted region
+  write that selected line to R
+
+runtime shader:
+  sample R/G/B/A
+  shade the already-selected R line
+  do not perform connected-component or contour-band extraction
+```
+
+Temporary authoring controls live on `GroundSurfaceFeatureRecipe` for `PaintedAccentLines` only:
+
+```text
+Painted Accent Peak Threshold
+Painted Accent Minimum Peak Area
+Painted Accent Crest Width Texels
+```
+
+These controls are proof/tuning controls, not final family art direction. The important contract is that `R` is now line-selection data, not a broad activity field and not a shader-derived contour approximation.
 
 
 ### Pillar 4 - Contact and Edge Accents
@@ -1360,7 +1499,7 @@ Accepted V3G direction:
 ```text
 generated visual fold field F(x,z)
   -> relief/body channel from F
-  -> line contour from selected edge/ridge/gradient rules
+  -> precomputed selected crest line from thresholded peak regions
   -> signed side from fold-field gradient/polarity
 ```
 
@@ -1382,7 +1521,7 @@ Patch V3G fold-field validation rule for Painted Accent Lines:
 Generated field debug first, extracted line second, final color last.
 ```
 
-`Ground Painted Accent Lines` debug should show the selected contour/ridge/edge strokes extracted from the fold field. `Ground Painted Accent Relief` should show the underlying visual fold-height/body field, not a widened line tube. `Ground Painted Accent Signed Relief` should show gradient/polarity information that can drive shadow/highlight side selection, not decorative parallel rails. The line contour should not show straight bars, giant crescent strips, continuous worms, full-screen hatching, dense hair-like noise, crack networks, or full closed outlines around every bump. Normal rendering should read as subtle visual mound/crease relief through painted shadow/highlight or, if later accepted, a tiny shader-only normal cue. Final family tuning must wait until the fold field, extracted line, and signed side read are all directionally correct.
+`Ground Painted Accent Lines` debug should show the selected crest/accent strokes extracted from thresholded peak regions of the fold field. `Ground Painted Accent Relief` should show the underlying visual fold-height/body field, not a widened line tube. `Ground Painted Accent Signed Relief` should show gradient/polarity information that can drive shadow/highlight side selection, not decorative parallel rails. The selected line should not show straight bars, giant crescent strips, continuous worms, full-screen hatching, dense hair-like noise, crack networks, many contour rings around one bump, or full closed outlines around every bump. Normal rendering should eventually read as subtle visual mound/crease relief through painted shadow/highlight or, if later accepted, a tiny shader-only normal cue. Final family tuning must wait until the fold field, selected line, and signed side read are all directionally correct.
 
 
 ### 2026-07-09 — Patch V3G: Painted Accent Direction Reset / Fold-Field Plan

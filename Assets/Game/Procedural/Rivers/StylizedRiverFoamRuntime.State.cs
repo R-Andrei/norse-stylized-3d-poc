@@ -101,7 +101,11 @@ namespace ProgrammaticStylized3D.Rivers
             ShoreRibbon = 1,
             InwardWash = 2,
             ObjectContactArc = 3,
-            ObjectContactFleck = 4
+            ObjectContactFleck = 4,
+            ObjectContactSemiArc = 5,
+            FreeWaterLaceConnector = 6,
+            FreeWaterTornFragment = 7,
+            FreeWaterCrossLaceConnector = 8
         }
 
         private struct AutomaticFoamSourceEvent
@@ -133,6 +137,8 @@ namespace ProgrammaticStylized3D.Rivers
             public float ObjectAlongHalfLengthMetres;
             public float ObjectAcrossHalfWidthMetres;
             public float ObjectContactOffsetMetres;
+            public float CentreAcrossNormalized;
+            public float LateralPaddingMetres;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -150,13 +156,13 @@ namespace ProgrammaticStylized3D.Rivers
             // w = source fill feature size.
             public Vector4 Material;
             // x = source fill seed, y = breakup scale,
-            // z = breakup strength, w = curvature.
+            // z = breakup strength, w = curvature / signed object semi-arc lopsidedness / fragment rotation.
             public Vector4 Variation;
             // x = formation speed metres/second, y = moving-head trail metres,
             // z = source path length metres, w reserved.
             public Vector4 Kinematics;
-            // x = object centre lateral metres, y = object along half length,
-            // z = object across half width, w = object contact offset metres.
+            // x = object/free-water centre lateral metres, y = object along half length or free-water half length,
+            // z = object across half width or free-water half width, w = object contact offset / free-water shape parameter.
             public Vector4 ObjectData;
         }
 

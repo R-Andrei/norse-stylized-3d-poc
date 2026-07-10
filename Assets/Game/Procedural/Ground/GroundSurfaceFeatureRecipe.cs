@@ -48,6 +48,31 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private int seedOffset;
 
+        [Tooltip("Painted Accent Lines only. Preview/runtime stroke ribbon width in metres for generated 3D surface strokes. The fold-field R channel is baked from these strokes instead of inferred from noise blobs.")]
+        [Range(0.04f, 0.35f)]
+        [SerializeField]
+        private float paintedAccentStrokeWidth = 0.12f;
+
+        [Tooltip("Painted Accent Lines only. Approximate target number of generated 3D surface strokes per standard 40x40 ground patch before placement rejection.")]
+        [Range(0f, 80f)]
+        [SerializeField]
+        private float paintedAccentStrokeDensity = 34f;
+
+        [Tooltip("Painted Accent Lines only. Minimum generated 3D surface stroke length in metres.")]
+        [Range(0.20f, 4.0f)]
+        [SerializeField]
+        private float paintedAccentStrokeLengthMin = 0.55f;
+
+        [Tooltip("Painted Accent Lines only. Maximum generated 3D surface stroke length in metres.")]
+        [Range(0.25f, 6.0f)]
+        [SerializeField]
+        private float paintedAccentStrokeLengthMax = 1.55f;
+
+        [Tooltip("Painted Accent Lines only. Maximum signed angle offset in degrees applied around the preferred Direction. Each stroke rolls independently in [-value, +value].")]
+        [Range(0f, 30f)]
+        [SerializeField]
+        private float paintedAccentStrokeAngleJitterDegrees = 18f;
+
         public GroundSurfaceFeatureKind Kind => kind;
 
         public bool Enabled => enabled;
@@ -76,6 +101,34 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         }
 
         public int SeedOffset => seedOffset;
+
+        public float PaintedAccentStrokeWidth
+        {
+            get
+            {
+                float value = paintedAccentStrokeWidth;
+                if (value <= 0.001f)
+                {
+                    value = 0.12f;
+                }
+
+                return Mathf.Clamp(value, 0.04f, 0.35f);
+            }
+        }
+
+        public float PaintedAccentStrokeDensity =>
+            Mathf.Clamp(paintedAccentStrokeDensity, 0f, 80f);
+
+        public float PaintedAccentStrokeLengthMin =>
+            Mathf.Clamp(paintedAccentStrokeLengthMin, 0.20f, 4.0f);
+
+        public float PaintedAccentStrokeLengthMax =>
+            Mathf.Max(
+                PaintedAccentStrokeLengthMin + 0.05f,
+                Mathf.Clamp(paintedAccentStrokeLengthMax, 0.25f, 6.0f));
+
+        public float PaintedAccentStrokeAngleJitterDegrees =>
+            Mathf.Clamp(paintedAccentStrokeAngleJitterDegrees, 0f, 30f);
 
         public bool CanApplyAsShaderOnly =>
             enabled &&

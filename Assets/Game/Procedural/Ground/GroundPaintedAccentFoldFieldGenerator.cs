@@ -1,13 +1,64 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ProgrammaticStylized3D.Geometry.Ground
 {
+    internal readonly struct GroundPaintedAccentSurfaceStroke
+    {
+        public GroundPaintedAccentSurfaceStroke(
+            Vector3[] localPoints,
+            Vector3[] localNormals,
+            float width,
+            float bodyWidth,
+            float strength,
+            int seed)
+        {
+            LocalPoints = localPoints ?? Array.Empty<Vector3>();
+            LocalNormals = localNormals ?? Array.Empty<Vector3>();
+            Width = Mathf.Max(0.001f, width);
+            BodyWidth = Mathf.Max(Width, bodyWidth);
+            Strength = Mathf.Clamp01(strength);
+            Seed = seed;
+        }
+
+        public Vector3[] LocalPoints { get; }
+        public Vector3[] LocalNormals { get; }
+        public float Width { get; }
+        public float BodyWidth { get; }
+        public float Strength { get; }
+        public int Seed { get; }
+
+        public bool IsValid =>
+            LocalPoints != null &&
+            LocalNormals != null &&
+            LocalPoints.Length >= 2 &&
+            LocalNormals.Length == LocalPoints.Length;
+    }
+
     internal static class GroundPaintedAccentFoldFieldGenerator
     {
         public const int Resolution = 256;
 
         private const float MinimumFieldSize = 0.0001f;
+        private const int MinimumStrokePointCount = 5;
+
+        private readonly struct StrokeCandidate
+        {
+            public StrokeCandidate(
+                int column,
+                int row,
+                uint sortKey)
+            {
+                Column = column;
+                Row = row;
+                SortKey = sortKey;
+            }
+
+            public int Column { get; }
+            public int Row { get; }
+            public uint SortKey { get; }
+        }
 
         public static Texture2D Generate(
             Bounds localBounds,
@@ -16,7 +67,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             int shapeSeed,
             out Vector4 originSize,
             out Vector4 texelSize,
-            out float[] bodyValues)
+            out float[] bodyValues,
+            out GroundPaintedAccentSurfaceStroke[] surfaceStrokes)
         {
             originSize =
                 new Vector4(
@@ -31,41 +83,36 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     Resolution,
                     Resolution);
 
-            int pixelCount = Resolution * Resolution;
-            float[] rawField = new float[pixelCount];
-            float[] supportedField = new float[pixelCount];
-            float[] bodyField = new float[pixelCount];
-            float[] smoothedBody = new float[pixelCount];
-            float[] supportField = new float[pixelCount];
-
             FieldSettings settings =
                 FieldSettings.Create(
                     feature,
-                    shapeSeed);
+                    shapeSeed,
+                    originSize);
 
-            GenerateRawContinuousField(
-                originSize,
-                settings,
-                rawField);
+            surfaceStrokes =
+                GenerateSurfaceStrokes(
+                    originSize,
+                    baseSurface,
+                    feature,
+                    settings);
 
-            ApplySemanticSupport(
+            float[] selectedLineField = new float[Resolution * Resolution];
+            float[] bodyField = new float[Resolution * Resolution];
+            float[] signedSideField = new float[Resolution * Resolution];
+            float[] supportField = new float[Resolution * Resolution];
+
+            RasterizeSurfaceStrokes(
                 originSize,
                 baseSurface,
                 feature,
-                rawField,
-                supportedField,
+                surfaceStrokes,
+                settings,
+                selectedLineField,
+                bodyField,
+                signedSideField,
                 supportField);
 
-            ShapeBodyField(
-                supportedField,
-                settings,
-                bodyField);
-
-            SmoothBodyField(
-                bodyField,
-                smoothedBody);
-
-            bodyValues = smoothedBody;
+            bodyValues = bodyField;
 
             Texture2D texture =
                 new Texture2D(
@@ -78,140 +125,258 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     name = "GeneratedGround_PaintedAccentFoldField",
                     hideFlags = HideFlags.DontSave,
                     wrapMode = TextureWrapMode.Clamp,
-                    filterMode = FilterMode.Bilinear
+                    filterMode = TextureFilterModeForFoldField()
                 };
 
             Color32[] pixels =
-                BuildPixelsFromContinuousField(
-                    originSize,
-                    smoothedBody,
-                    supportField,
-                    settings);
+                BuildPixelsFromSurfaceStrokeFields(
+                    selectedLineField,
+                    bodyField,
+                    signedSideField,
+                    supportField);
 
             texture.SetPixels32(pixels);
             texture.Apply(false, true);
             return texture;
         }
 
-        private static void GenerateRawContinuousField(
-            Vector4 originSize,
-            FieldSettings settings,
-            float[] rawField)
+        private static FilterMode TextureFilterModeForFoldField()
         {
-            for (int z = 0; z < Resolution; z++)
-            {
-                for (int x = 0; x < Resolution; x++)
-                {
-                    int index = z * Resolution + x;
-                    Vector2 localXZ =
-                        TexelToLocalXZ(
-                            x,
-                            z,
-                            originSize);
-
-                    Vector2 warpedXZ =
-                        ResolveDomainWarpedPosition(
-                            localXZ,
-                            settings);
-
-                    float broad =
-                        FractalValueNoise(
-                            warpedXZ / (settings.BaseScale * 2.35f),
-                            settings.Seed + 101);
-                    float medium =
-                        FractalValueNoise(
-                            warpedXZ / (settings.BaseScale * 1.05f),
-                            settings.Seed + 211);
-                    float ridgeSource =
-                        FractalValueNoise(
-                            warpedXZ / (settings.BaseScale * 0.72f),
-                            settings.Seed + 307);
-
-                    float ridge =
-                        1f - Mathf.Abs(ridgeSource * 2f - 1f);
-                    ridge =
-                        Mathf.Pow(
-                            Mathf.Clamp01(ridge),
-                            settings.RidgePower);
-
-                    float directional =
-                        ResolveDirectionalContinuity(
-                            warpedXZ,
-                            settings);
-
-                    float raw =
-                        broad * 0.48f +
-                        medium * 0.24f +
-                        ridge * 0.20f +
-                        directional * 0.08f;
-
-                    rawField[index] =
-                        Mathf.Pow(
-                            Mathf.Clamp01(raw),
-                            settings.RawPower);
-                }
-            }
+            return FilterMode.Bilinear;
         }
 
-        private static Vector2 ResolveDomainWarpedPosition(
-            Vector2 localXZ,
-            FieldSettings settings)
-        {
-            Vector2 warpSampleXZ =
-                localXZ / (settings.BaseScale * 1.75f);
-            float warpX =
-                FractalValueNoise(
-                    warpSampleXZ,
-                    settings.Seed + 401);
-            float warpY =
-                FractalValueNoise(
-                    warpSampleXZ + new Vector2(17.31f, -9.73f),
-                    settings.Seed + 503);
-
-            Vector2 warp =
-                new Vector2(
-                    warpX * 2f - 1f,
-                    warpY * 2f - 1f);
-
-            return localXZ + warp * settings.WarpStrength;
-        }
-
-        private static float ResolveDirectionalContinuity(
-            Vector2 warpedXZ,
-            FieldSettings settings)
-        {
-            Vector2 alongAcross =
-                new Vector2(
-                    Vector2.Dot(warpedXZ, settings.Direction),
-                    Vector2.Dot(warpedXZ, settings.CrossDirection));
-
-            float lane =
-                FractalValueNoise(
-                    new Vector2(
-                        alongAcross.x / (settings.BaseScale * 1.75f),
-                        alongAcross.y / (settings.BaseScale * 0.58f)),
-                    settings.Seed + 607);
-
-            float ridge =
-                1f - Mathf.Abs(lane * 2f - 1f);
-
-            return Mathf.Pow(
-                Mathf.Clamp01(ridge),
-                Mathf.Lerp(1.60f, 3.10f, settings.Contrast));
-        }
-
-        private static void ApplySemanticSupport(
+        private static GroundPaintedAccentSurfaceStroke[] GenerateSurfaceStrokes(
             Vector4 originSize,
             GroundHeightFieldSnapshot baseSurface,
             GroundSurfaceFeatureRecipe feature,
-            float[] rawField,
-            float[] supportedField,
+            FieldSettings settings)
+        {
+            if (baseSurface == null ||
+                !baseSurface.IsValid ||
+                settings.TargetStrokeCount <= 0)
+            {
+                return Array.Empty<GroundPaintedAccentSurfaceStroke>();
+            }
+
+            List<GroundPaintedAccentSurfaceStroke> strokes =
+                new List<GroundPaintedAccentSurfaceStroke>(settings.TargetStrokeCount);
+
+            float aspect =
+                Mathf.Max(0.25f, originSize.z / Mathf.Max(0.0001f, originSize.w));
+            int candidateCellCount =
+                Mathf.Max(
+                    settings.TargetStrokeCount,
+                    Mathf.CeilToInt(settings.TargetStrokeCount * 3.35f));
+            int columns =
+                Mathf.Max(
+                    1,
+                    Mathf.CeilToInt(Mathf.Sqrt(candidateCellCount * aspect)));
+            int rows =
+                Mathf.Max(
+                    1,
+                    Mathf.CeilToInt(candidateCellCount / (float)columns));
+            float cellWidth = originSize.z / columns;
+            float cellHeight = originSize.w / rows;
+            List<StrokeCandidate> candidates =
+                new List<StrokeCandidate>(columns * rows);
+
+            for (int row = 0; row < rows; row++)
+            {
+                for (int column = 0; column < columns; column++)
+                {
+                    int cellHash =
+                        Hash(
+                            column,
+                            row,
+                            settings.Seed);
+                    uint sortKey =
+                        (uint)Hash(
+                            cellHash,
+                            settings.Seed,
+                            0x4D3A);
+                    candidates.Add(
+                        new StrokeCandidate(
+                            column,
+                            row,
+                            sortKey));
+                }
+            }
+
+            candidates.Sort(CompareStrokeCandidates);
+
+            for (int attemptIndex = 0;
+                 attemptIndex < candidates.Count && strokes.Count < settings.TargetStrokeCount;
+                 attemptIndex++)
+            {
+                StrokeCandidate candidate = candidates[attemptIndex];
+                int column = candidate.Column;
+                int row = candidate.Row;
+
+                int cellHash =
+                    Hash(
+                        column,
+                        row,
+                        settings.Seed);
+                float jitterX = Hash01((uint)cellHash, 19u);
+                float jitterZ = Hash01((uint)cellHash, 31u);
+                float localX =
+                    originSize.x +
+                    (column + Mathf.Lerp(0.18f, 0.82f, jitterX)) * cellWidth;
+                float localZ =
+                    originSize.y +
+                    (row + Mathf.Lerp(0.18f, 0.82f, jitterZ)) * cellHeight;
+                Vector2 centerXZ = new Vector2(localX, localZ);
+
+                float support =
+                    ResolveSemanticSupport(
+                        baseSurface,
+                        centerXZ,
+                        feature != null ? feature.MaskInfluence : 0f);
+                float supportRoll = Hash01((uint)cellHash, 43u);
+                if (supportRoll > Mathf.Lerp(0.82f, 0.995f, support))
+                {
+                    continue;
+                }
+
+                Vector2 axis = ResolveStrokeAxis(settings, (uint)cellHash);
+                float length =
+                    Mathf.Lerp(
+                        settings.StrokeLengthMin,
+                        settings.StrokeLengthMax,
+                        Hash01((uint)cellHash, 53u));
+                float width =
+                    settings.StrokeWidthWorld *
+                    Mathf.Lerp(
+                        0.84f,
+                        1.18f,
+                        Hash01((uint)cellHash, 59u));
+                float bodyWidth =
+                    Mathf.Max(
+                        width * 2.75f,
+                        settings.BodyWidthWorld *
+                        Mathf.Lerp(
+                            0.82f,
+                            1.18f,
+                            Hash01((uint)cellHash, 61u)));
+                float curvature =
+                    bodyWidth *
+                    Mathf.Lerp(0.10f, 0.30f, settings.Contrast) *
+                    (Hash01((uint)cellHash, 67u) * 2f - 1f);
+                float strength =
+                    settings.Strength *
+                    Mathf.Lerp(0.78f, 1.0f, support) *
+                    Mathf.Lerp(0.80f, 1.0f, Hash01((uint)cellHash, 71u));
+
+                if (TryCreateSurfaceStroke(
+                        centerXZ,
+                        axis,
+                        length,
+                        width,
+                        bodyWidth,
+                        curvature,
+                        strength,
+                        cellHash,
+                        baseSurface,
+                        out GroundPaintedAccentSurfaceStroke stroke))
+                {
+                    strokes.Add(stroke);
+                }
+            }
+
+            return strokes.ToArray();
+        }
+
+        private static bool TryCreateSurfaceStroke(
+            Vector2 centerXZ,
+            Vector2 axis,
+            float length,
+            float width,
+            float bodyWidth,
+            float curvature,
+            float strength,
+            int strokeSeed,
+            GroundHeightFieldSnapshot baseSurface,
+            out GroundPaintedAccentSurfaceStroke stroke)
+        {
+            stroke = default;
+
+            axis = ResolveSafeAxis(axis);
+            Vector2 crossAxis = new Vector2(-axis.y, axis.x);
+            int pointCount =
+                Mathf.Clamp(
+                    Mathf.CeilToInt(length * 1.85f),
+                    MinimumStrokePointCount,
+                    11);
+            List<Vector3> localPoints = new List<Vector3>(pointCount);
+            List<Vector3> localNormals = new List<Vector3>(pointCount);
+            float phase = Hash01((uint)strokeSeed, 83u) * Mathf.PI * 2f;
+            float secondaryPhase = Hash01((uint)strokeSeed, 89u) * Mathf.PI * 2f;
+
+            for (int pointIndex = 0; pointIndex < pointCount; pointIndex++)
+            {
+                float t =
+                    pointCount <= 1
+                        ? 0f
+                        : pointIndex / (float)(pointCount - 1);
+                float signedT = t * 2f - 1f;
+                float endFade = Mathf.Sin(Mathf.Clamp01(t) * Mathf.PI);
+                float wobble =
+                    (Mathf.Sin(t * Mathf.PI * 1.35f + phase) * 0.72f +
+                     Mathf.Sin(t * Mathf.PI * 2.10f + secondaryPhase) * 0.28f) *
+                    curvature *
+                    endFade;
+                Vector2 localXZ =
+                    centerXZ +
+                    axis * (signedT * length * 0.5f) +
+                    crossAxis * wobble;
+
+                if (!baseSurface.TrySample(localXZ, out GroundSurfaceSample sample))
+                {
+                    continue;
+                }
+
+                localPoints.Add(new Vector3(localXZ.x, sample.Height, localXZ.y));
+                localNormals.Add(sample.RenderNormal);
+            }
+
+            if (localPoints.Count < MinimumStrokePointCount)
+            {
+                return false;
+            }
+
+            stroke =
+                new GroundPaintedAccentSurfaceStroke(
+                    localPoints.ToArray(),
+                    localNormals.ToArray(),
+                    width,
+                    bodyWidth,
+                    strength,
+                    strokeSeed);
+            return stroke.IsValid;
+        }
+
+        private static void RasterizeSurfaceStrokes(
+            Vector4 originSize,
+            GroundHeightFieldSnapshot baseSurface,
+            GroundSurfaceFeatureRecipe feature,
+            GroundPaintedAccentSurfaceStroke[] strokes,
+            FieldSettings settings,
+            float[] selectedLineField,
+            float[] bodyField,
+            float[] signedSideField,
             float[] supportField)
         {
             float maskInfluence =
                 feature != null
-                    ? Mathf.Clamp01(feature.MaskInfluence)
+                    ? feature.MaskInfluence
                     : 0f;
+            float texelWorldSize =
+                Mathf.Max(
+                    originSize.z,
+                    originSize.w) /
+                Resolution;
+            float lineFeather =
+                Mathf.Max(texelWorldSize * 0.85f, settings.StrokeWidthWorld * 0.20f);
 
             for (int z = 0; z < Resolution; z++)
             {
@@ -228,192 +393,157 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             baseSurface,
                             localXZ,
                             maskInfluence);
-
                     supportField[index] = support;
-                    supportedField[index] = rawField[index] * support;
-                }
-            }
-        }
 
-        private static void ShapeBodyField(
-            float[] supportedField,
-            FieldSettings settings,
-            float[] bodyField)
-        {
-            float threshold =
-                ResolvePercentileThreshold(
-                    supportedField,
-                    1f - settings.TargetCoverage);
+                    float bestBody = 0f;
+                    float bestSignedSide = 0f;
+                    float bestLine = 0f;
 
-            float highThreshold =
-                Mathf.Min(
-                    1f,
-                    threshold + settings.ThresholdSoftness);
-
-            for (int index = 0; index < supportedField.Length; index++)
-            {
-                float body =
-                    SmoothStep(
-                        threshold,
-                        highThreshold,
-                        supportedField[index]);
-
-                body =
-                    Mathf.Pow(
-                        Mathf.Clamp01(body),
-                        settings.BodyPower) *
-                    settings.BodyIntensity;
-
-                bodyField[index] = Mathf.Clamp01(body);
-            }
-        }
-
-        private static float ResolvePercentileThreshold(
-            float[] values,
-            float percentile)
-        {
-            if (values == null || values.Length == 0)
-            {
-                return 1f;
-            }
-
-            float[] sorted =
-                (float[])values.Clone();
-            Array.Sort(sorted);
-
-            int index =
-                Mathf.Clamp(
-                    Mathf.RoundToInt(
-                        Mathf.Clamp01(percentile) *
-                        (sorted.Length - 1)),
-                    0,
-                    sorted.Length - 1);
-
-            return sorted[index];
-        }
-
-        private static void SmoothBodyField(
-            float[] source,
-            float[] destination)
-        {
-            for (int z = 0; z < Resolution; z++)
-            {
-                int zm = Mathf.Max(0, z - 1);
-                int zp = Mathf.Min(Resolution - 1, z + 1);
-
-                for (int x = 0; x < Resolution; x++)
-                {
-                    int xm = Mathf.Max(0, x - 1);
-                    int xp = Mathf.Min(Resolution - 1, x + 1);
-                    int index = z * Resolution + x;
-
-                    float cardinalAverage =
-                        (source[z * Resolution + xm] +
-                         source[z * Resolution + xp] +
-                         source[zm * Resolution + x] +
-                         source[zp * Resolution + x]) *
-                        0.25f;
-
-                    float diagonalAverage =
-                        (source[zm * Resolution + xm] +
-                         source[zm * Resolution + xp] +
-                         source[zp * Resolution + xm] +
-                         source[zp * Resolution + xp]) *
-                        0.25f;
-
-                    float neighborAverage =
-                        cardinalAverage * 0.72f +
-                        diagonalAverage * 0.28f;
-
-                    destination[index] =
-                        Mathf.Clamp01(
-                            source[index] * 0.72f +
-                            neighborAverage * 0.28f);
-                }
-            }
-        }
-
-        private static Color32[] BuildPixelsFromContinuousField(
-            Vector4 originSize,
-            float[] bodyField,
-            float[] supportField,
-            FieldSettings settings)
-        {
-            Color32[] pixels =
-                new Color32[Resolution * Resolution];
-
-            for (int z = 0; z < Resolution; z++)
-            {
-                int zm = Mathf.Max(0, z - 1);
-                int zp = Mathf.Min(Resolution - 1, z + 1);
-
-                for (int x = 0; x < Resolution; x++)
-                {
-                    int xm = Mathf.Max(0, x - 1);
-                    int xp = Mathf.Min(Resolution - 1, x + 1);
-                    int index = z * Resolution + x;
-
-                    float body =
-                        Mathf.Clamp01(bodyField[index]);
-                    float dx =
-                        bodyField[z * Resolution + xp] -
-                        bodyField[z * Resolution + xm];
-                    float dz =
-                        bodyField[zp * Resolution + x] -
-                        bodyField[zm * Resolution + x];
-                    Vector2 gradient =
-                        new Vector2(dx, dz);
-                    float gradientMagnitude =
-                        gradient.magnitude;
-                    float signed = 0f;
-
-                    if (gradientMagnitude > 0.00001f)
+                    for (int strokeIndex = 0;
+                         strokeIndex < strokes.Length;
+                         strokeIndex++)
                     {
-                        signed =
-                            Vector2.Dot(
-                                gradient / gradientMagnitude,
-                                settings.Direction) *
-                            Mathf.Clamp01(
-                                gradientMagnitude *
-                                settings.SignedGradientScale);
+                        GroundPaintedAccentSurfaceStroke stroke =
+                            strokes[strokeIndex];
+                        if (!stroke.IsValid)
+                        {
+                            continue;
+                        }
+
+                        if (!TryResolveClosestStrokeSample(
+                                stroke,
+                                localXZ,
+                                out float distance,
+                                out float signedSide))
+                        {
+                            continue;
+                        }
+
+                        float lineHalfWidth =
+                            Mathf.Max(
+                                stroke.Width * 0.5f,
+                                texelWorldSize * 0.42f);
+                        float line =
+                            1f - SmoothStep(
+                                lineHalfWidth,
+                                lineHalfWidth + lineFeather,
+                                distance);
+                        float body =
+                            1f - SmoothStep(
+                                stroke.BodyWidth * 0.18f,
+                                stroke.BodyWidth,
+                                distance);
+
+                        line = Mathf.Clamp01(line) * stroke.Strength * support;
+                        body = Mathf.Clamp01(body) * stroke.Strength * support;
+
+                        if (line > bestLine)
+                        {
+                            bestLine = line;
+                        }
+
+                        if (body > bestBody)
+                        {
+                            bestBody = body;
+                            bestSignedSide = signedSide;
+                        }
                     }
 
-                    Vector2 localXZ =
-                        TexelToLocalXZ(
-                            x,
-                            z,
-                            originSize);
-                    float edge =
-                        Mathf.Clamp01(
-                            gradientMagnitude *
-                            settings.EdgeGradientScale);
-                    float heightGate =
-                        SmoothStep(0.10f, 0.32f, body) *
-                        (1f - SmoothStep(0.88f, 1.0f, body));
-                    float sideGate =
-                        Mathf.Clamp01(0.5f + signed * 0.5f);
-                    float breakNoise =
-                        FractalValueNoise(
-                            localXZ / (settings.BaseScale * 0.55f),
-                            settings.Seed + 701);
-                    float breakGate =
-                        SmoothStep(0.28f, 0.62f, breakNoise);
-                    float line =
-                        Mathf.Pow(
-                            Mathf.Clamp01(
-                                edge *
-                                heightGate *
-                                sideGate *
-                                breakGate),
-                            1.25f);
-
-                    pixels[index] =
-                        new Color32(
-                            ToByte(line),
-                            ToByte(body),
-                            ToByte(0.5f + signed * 0.5f),
-                            ToByte(supportField[index]));
+                    selectedLineField[index] = Mathf.Clamp01(bestLine);
+                    bodyField[index] = Mathf.Clamp01(bestBody);
+                    signedSideField[index] = Mathf.Clamp(bestSignedSide, -1f, 1f);
                 }
+            }
+        }
+
+        private static bool TryResolveClosestStrokeSample(
+            GroundPaintedAccentSurfaceStroke stroke,
+            Vector2 localXZ,
+            out float distance,
+            out float signedSide)
+        {
+            distance = float.PositiveInfinity;
+            signedSide = 0f;
+
+            Vector3[] points = stroke.LocalPoints;
+            if (points == null || points.Length < 2)
+            {
+                return false;
+            }
+
+            for (int pointIndex = 0; pointIndex < points.Length - 1; pointIndex++)
+            {
+                Vector2 start = new Vector2(
+                    points[pointIndex].x,
+                    points[pointIndex].z);
+                Vector2 end = new Vector2(
+                    points[pointIndex + 1].x,
+                    points[pointIndex + 1].z);
+                Vector2 segment = end - start;
+                float lengthSquared = segment.sqrMagnitude;
+                if (lengthSquared <= 0.000001f)
+                {
+                    continue;
+                }
+
+                float t =
+                    Mathf.Clamp01(
+                        Vector2.Dot(localXZ - start, segment) /
+                        lengthSquared);
+                Vector2 closest = start + segment * t;
+                Vector2 offset = localXZ - closest;
+                float candidateDistance = offset.magnitude;
+                if (candidateDistance >= distance)
+                {
+                    continue;
+                }
+
+                Vector2 segmentDirection = segment / Mathf.Sqrt(lengthSquared);
+                Vector2 sideAxis = new Vector2(-segmentDirection.y, segmentDirection.x);
+                float side =
+                    Vector2.Dot(offset, sideAxis) /
+                    Mathf.Max(0.0001f, stroke.BodyWidth);
+
+                distance = candidateDistance;
+                signedSide = Mathf.Clamp(side, -1f, 1f);
+            }
+
+            return !float.IsInfinity(distance);
+        }
+
+        private static Color32[] BuildPixelsFromSurfaceStrokeFields(
+            float[] selectedLineField,
+            float[] bodyField,
+            float[] signedSideField,
+            float[] supportField)
+        {
+            Color32[] pixels = new Color32[Resolution * Resolution];
+
+            for (int index = 0; index < pixels.Length; index++)
+            {
+                float selectedLine =
+                    selectedLineField != null && index < selectedLineField.Length
+                        ? Mathf.Clamp01(selectedLineField[index])
+                        : 0f;
+                float body =
+                    bodyField != null && index < bodyField.Length
+                        ? Mathf.Clamp01(bodyField[index])
+                        : 0f;
+                float signedSide =
+                    signedSideField != null && index < signedSideField.Length
+                        ? Mathf.Clamp(signedSideField[index], -1f, 1f)
+                        : 0f;
+                float support =
+                    supportField != null && index < supportField.Length
+                        ? Mathf.Clamp01(supportField[index])
+                        : 0f;
+
+                pixels[index] =
+                    new Color32(
+                        ToByte(selectedLine),
+                        ToByte(body),
+                        ToByte(0.5f + signedSide * 0.5f),
+                        ToByte(support));
             }
 
             return pixels;
@@ -442,7 +572,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             return Mathf.Lerp(
                 1f,
                 Mathf.Clamp01(semanticSupport),
-                maskInfluence);
+                Mathf.Clamp01(maskInfluence));
         }
 
         private static Vector2 TexelToLocalXZ(
@@ -458,58 +588,49 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 originSize.y + v * originSize.w);
         }
 
-        private static float FractalValueNoise(
-            Vector2 coordinate,
-            int seed)
+        private static Vector2 ResolveStrokeAxis(
+            FieldSettings settings,
+            uint strokeHash)
         {
-            float value = 0f;
-            float amplitude = 0.5f;
-            float frequency = 1f;
-            float amplitudeSum = 0f;
+            Vector2 preferred = ResolveSafeAxis(settings.Direction);
+            float preferredAngle = Mathf.Atan2(preferred.y, preferred.x);
+            float maxJitterDegrees = settings.AngleJitterDegrees;
+            float signedRoll = Hash01(strokeHash, 73u) * 2f - 1f;
+            float jitterDegrees = signedRoll * maxJitterDegrees;
+            float finalAngle = preferredAngle + jitterDegrees * Mathf.Deg2Rad;
 
-            for (int octave = 0; octave < 4; octave++)
+            return new Vector2(
+                Mathf.Cos(finalAngle),
+                Mathf.Sin(finalAngle));
+        }
+
+        private static int CompareStrokeCandidates(
+            StrokeCandidate left,
+            StrokeCandidate right)
+        {
+            int order = left.SortKey.CompareTo(right.SortKey);
+            if (order != 0)
             {
-                value +=
-                    ValueNoise(
-                        coordinate.x * frequency,
-                        coordinate.y * frequency,
-                        seed + octave * 131) *
-                    amplitude;
-                amplitudeSum += amplitude;
-                frequency *= 2.03f;
-                amplitude *= 0.5f;
+                return order;
             }
 
-            return value / Mathf.Max(0.0001f, amplitudeSum);
+            order = left.Row.CompareTo(right.Row);
+            if (order != 0)
+            {
+                return order;
+            }
+
+            return left.Column.CompareTo(right.Column);
         }
 
-        private static float ValueNoise(
-            float x,
-            float y,
-            int seed)
+        private static Vector2 ResolveSafeAxis(Vector2 axis)
         {
-            int ix = Mathf.FloorToInt(x);
-            int iy = Mathf.FloorToInt(y);
-            float fx = x - ix;
-            float fy = y - iy;
-            float sx = Smooth01(fx);
-            float sy = Smooth01(fy);
+            if (axis.sqrMagnitude < 0.0001f)
+            {
+                return Vector2.right;
+            }
 
-            float a = Hash01(HashUInt(ix, iy, seed), 3u);
-            float b = Hash01(HashUInt(ix + 1, iy, seed), 5u);
-            float c = Hash01(HashUInt(ix, iy + 1, seed), 7u);
-            float d = Hash01(HashUInt(ix + 1, iy + 1, seed), 11u);
-
-            return Mathf.Lerp(
-                Mathf.Lerp(a, b, sx),
-                Mathf.Lerp(c, d, sx),
-                sy);
-        }
-
-        private static float Smooth01(float value)
-        {
-            value = Mathf.Clamp01(value);
-            return value * value * (3f - 2f * value);
+            return axis.normalized;
         }
 
         private static float SmoothStep(
@@ -523,6 +644,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
 
             return Smooth01((value - edge0) / (edge1 - edge0));
+        }
+
+        private static float Smooth01(float value)
+        {
+            value = Mathf.Clamp01(value);
+            return value * value * (3f - 2f * value);
         }
 
         private static byte ToByte(float value)
@@ -544,25 +671,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 h = (h ^ (uint)a) * 16777619u;
                 h = (h ^ (uint)b) * 16777619u;
                 h = (h ^ (uint)salt) * 16777619u;
-                return (int)h;
-            }
-        }
-
-        private static uint HashUInt(
-            int x,
-            int y,
-            int seed)
-        {
-            unchecked
-            {
-                uint h = 2166136261u;
-                h = (h ^ (uint)x) * 16777619u;
-                h = (h ^ (uint)y) * 16777619u;
-                h = (h ^ (uint)seed) * 16777619u;
                 h ^= h >> 13;
                 h *= 1274126177u;
                 h ^= h >> 16;
-                return h;
+                return (int)h;
             }
         }
 
@@ -585,55 +697,41 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 int seed,
                 float strength,
                 float contrast,
-                float baseScale,
-                float targetCoverage,
-                float thresholdSoftness,
-                float bodyPower,
-                float bodyIntensity,
-                float ridgePower,
-                float rawPower,
-                float warpStrength,
-                float signedGradientScale,
-                float edgeGradientScale,
-                Vector2 direction,
-                Vector2 crossDirection)
+                int targetStrokeCount,
+                float strokeLengthMin,
+                float strokeLengthMax,
+                float strokeWidthWorld,
+                float bodyWidthWorld,
+                float angleJitterDegrees,
+                Vector2 direction)
             {
                 Seed = seed;
                 Strength = strength;
                 Contrast = contrast;
-                BaseScale = baseScale;
-                TargetCoverage = targetCoverage;
-                ThresholdSoftness = thresholdSoftness;
-                BodyPower = bodyPower;
-                BodyIntensity = bodyIntensity;
-                RidgePower = ridgePower;
-                RawPower = rawPower;
-                WarpStrength = warpStrength;
-                SignedGradientScale = signedGradientScale;
-                EdgeGradientScale = edgeGradientScale;
+                TargetStrokeCount = targetStrokeCount;
+                StrokeLengthMin = strokeLengthMin;
+                StrokeLengthMax = Mathf.Max(strokeLengthMin + 0.05f, strokeLengthMax);
+                StrokeWidthWorld = strokeWidthWorld;
+                BodyWidthWorld = bodyWidthWorld;
+                AngleJitterDegrees = angleJitterDegrees;
                 Direction = direction;
-                CrossDirection = crossDirection;
             }
 
             public int Seed { get; }
             public float Strength { get; }
             public float Contrast { get; }
-            public float BaseScale { get; }
-            public float TargetCoverage { get; }
-            public float ThresholdSoftness { get; }
-            public float BodyPower { get; }
-            public float BodyIntensity { get; }
-            public float RidgePower { get; }
-            public float RawPower { get; }
-            public float WarpStrength { get; }
-            public float SignedGradientScale { get; }
-            public float EdgeGradientScale { get; }
+            public int TargetStrokeCount { get; }
+            public float StrokeLengthMin { get; }
+            public float StrokeLengthMax { get; }
+            public float StrokeWidthWorld { get; }
+            public float BodyWidthWorld { get; }
+            public float AngleJitterDegrees { get; }
             public Vector2 Direction { get; }
-            public Vector2 CrossDirection { get; }
 
             public static FieldSettings Create(
                 GroundSurfaceFeatureRecipe feature,
-                int shapeSeed)
+                int shapeSeed,
+                Vector4 originSize)
             {
                 float strength =
                     feature != null
@@ -643,66 +741,62 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     feature != null
                         ? Mathf.Clamp01(feature.Contrast)
                         : 0.5f;
-                float scale =
-                    feature != null
-                        ? feature.Scale
-                        : 5f;
                 Vector2 direction =
                     feature != null
                         ? feature.Direction
                         : Vector2.right;
 
-                if (direction.sqrMagnitude < 0.0001f)
-                {
-                    direction = Vector2.right;
-                }
+                direction = ResolveSafeAxis(direction);
 
-                direction.Normalize();
-
-                Vector2 crossDirection =
-                    new Vector2(-direction.y, direction.x);
                 int seed =
                     Hash(
                         shapeSeed,
                         feature != null ? feature.SeedOffset : 0,
-                        0x4466);
-                float baseScale =
-                    Mathf.Clamp(scale, 2.0f, 12.0f);
-                float targetCoverage =
-                    Mathf.Lerp(0.08f, 0.22f, strength);
-                float thresholdSoftness =
-                    Mathf.Lerp(0.18f, 0.07f, contrast);
-                float bodyPower =
-                    Mathf.Lerp(1.22f, 0.82f, strength);
-                float bodyIntensity =
-                    Mathf.Lerp(0.72f, 1.0f, strength);
-                float ridgePower =
-                    Mathf.Lerp(1.45f, 3.25f, contrast);
-                float rawPower =
-                    Mathf.Lerp(1.05f, 1.65f, contrast);
-                float warpStrength =
-                    baseScale * Mathf.Lerp(0.12f, 0.42f, contrast);
-                float signedGradientScale =
-                    Mathf.Lerp(18f, 42f, contrast);
-                float edgeGradientScale =
-                    Mathf.Lerp(18f, 44f, contrast);
+                        0x5A3D);
+                float area = Mathf.Max(1f, originSize.z * originSize.w);
+                float areaFactor = Mathf.Max(0.05f, area / 1600f);
+                float strokeDensity =
+                    feature != null
+                        ? feature.PaintedAccentStrokeDensity
+                        : 34f;
+                int targetStrokeCount =
+                    Mathf.Clamp(
+                        Mathf.RoundToInt(strokeDensity * areaFactor),
+                        0,
+                        128);
+                float strokeLengthMin =
+                    feature != null
+                        ? feature.PaintedAccentStrokeLengthMin
+                        : 0.55f;
+                float strokeLengthMax =
+                    feature != null
+                        ? feature.PaintedAccentStrokeLengthMax
+                        : 1.55f;
+                strokeLengthMax = Mathf.Max(strokeLengthMin + 0.05f, strokeLengthMax);
+                float strokeWidthWorld =
+                    feature != null
+                        ? feature.PaintedAccentStrokeWidth
+                        : 0.12f;
+                float bodyWidthWorld =
+                    Mathf.Max(
+                        strokeWidthWorld * 3.25f,
+                        strokeLengthMax * 0.12f);
+                float angleJitterDegrees =
+                    feature != null
+                        ? feature.PaintedAccentStrokeAngleJitterDegrees
+                        : 18f;
 
                 return new FieldSettings(
                     seed,
-                    strength,
+                    Mathf.Max(0.05f, strength),
                     contrast,
-                    baseScale,
-                    targetCoverage,
-                    thresholdSoftness,
-                    bodyPower,
-                    bodyIntensity,
-                    ridgePower,
-                    rawPower,
-                    warpStrength,
-                    signedGradientScale,
-                    edgeGradientScale,
-                    direction,
-                    crossDirection);
+                    targetStrokeCount,
+                    strokeLengthMin,
+                    strokeLengthMax,
+                    strokeWidthWorld,
+                    bodyWidthWorld,
+                    angleJitterDegrees,
+                    direction);
             }
         }
     }

@@ -559,6 +559,7 @@ namespace ProgrammaticStylized3D.Rivers
         private enum AutomaticObjectSourceRecipe
         {
             ContactArc,
+            ContactSemiArc,
             ContactFleck
         }
 
@@ -589,6 +590,46 @@ namespace ProgrammaticStylized3D.Rivers
                 AutomaticObjectSourceMaximumEventsPerSecond,
                 Activity);
         }
+
+        private enum AutomaticFreeWaterSourceRecipe
+        {
+            LaceConnector,
+            CrossLaceConnector,
+            TornFragment
+        }
+
+        private readonly struct AutomaticFreeWaterSourceProfile
+        {
+            public AutomaticFreeWaterSourceProfile(
+                bool enabled,
+                float coverage,
+                float activity,
+                float formationSpeedMetresPerSecond,
+                StylizedRiverFoamFreeWaterPattern pattern)
+            {
+                Enabled = enabled;
+                Coverage = Mathf.Clamp01(coverage);
+                Activity = Mathf.Clamp01(activity);
+                FormationSpeedMetresPerSecond = Mathf.Max(0.01f, formationSpeedMetresPerSecond);
+                Pattern = pattern;
+            }
+
+            public bool Enabled { get; }
+            public float Coverage { get; }
+            public float Activity { get; }
+            public float FormationSpeedMetresPerSecond { get; }
+            public StylizedRiverFoamFreeWaterPattern Pattern { get; }
+
+            public float SlotSpacingMetres => Mathf.Lerp(
+                AutomaticFreeWaterSourceMaximumSlotSpacingMetres,
+                AutomaticFreeWaterSourceMinimumSlotSpacingMetres,
+                Mathf.Sqrt(Coverage));
+
+            public float EventsPerSecond => Mathf.Lerp(
+                AutomaticFreeWaterSourceMinimumEventsPerSecond,
+                AutomaticFreeWaterSourceMaximumEventsPerSecond,
+                Activity);
+        }
         private bool IsAutomaticSourcePopulationActive =>
             river != null && river.FoamEnabled &&
             river.FoamAutomaticBirthEnabled &&
@@ -598,7 +639,10 @@ namespace ProgrammaticStylized3D.Rivers
               river.FoamShoreFoamActivity > 0.0001f) ||
              (river.FoamAutomaticObjectBirthActive &&
               river.FoamObjectFoamCoverage > 0.0001f &&
-              river.FoamObjectFoamActivity > 0.0001f));
+              river.FoamObjectFoamActivity > 0.0001f) ||
+             (river.FoamAutomaticFreeWaterBirthActive &&
+              river.FoamFreeWaterFoamCoverage > 0.0001f &&
+              river.FoamFreeWaterFoamActivity > 0.0001f));
 
         private bool AdvanceAutomaticBirthSources(
             float deltaTime,
@@ -607,6 +651,7 @@ namespace ProgrammaticStylized3D.Rivers
             bool startedAny = false;
             startedAny |= AdvanceAutomaticShoreBirthSources(deltaTime, now);
             startedAny |= AdvanceAutomaticObjectBirthSources(deltaTime, now);
+            startedAny |= AdvanceAutomaticFreeWaterBirthSources(deltaTime, now);
             return startedAny;
         }
 
@@ -955,26 +1000,39 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 case StylizedRiverFoamObjectPattern.ContactArcs:
                     return AutomaticObjectSourceRecipe.ContactArc;
+                case StylizedRiverFoamObjectPattern.ContactSemiArcs:
+                    return AutomaticObjectSourceRecipe.ContactSemiArc;
                 case StylizedRiverFoamObjectPattern.ContactFlecks:
                     return AutomaticObjectSourceRecipe.ContactFleck;
             }
 
             float arcWeight = river != null
                 ? river.FoamObjectContactArcPatternWeight
-                : 0.75f;
+                : 0.45f;
+            float semiArcWeight = river != null
+                ? river.FoamObjectContactSemiArcPatternWeight
+                : 0.35f;
             float fleckWeight = river != null
                 ? river.FoamObjectContactFleckPatternWeight
-                : 0.25f;
-            float totalWeight = Mathf.Max(0f, arcWeight) +
-                Mathf.Max(0f, fleckWeight);
+                : 0.20f;
+            arcWeight = Mathf.Max(0f, arcWeight);
+            semiArcWeight = Mathf.Max(0f, semiArcWeight);
+            fleckWeight = Mathf.Max(0f, fleckWeight);
+            float totalWeight = arcWeight + semiArcWeight + fleckWeight;
             if (totalWeight <= 0.0001f)
             {
                 return AutomaticObjectSourceRecipe.ContactArc;
             }
 
-            float normalizedArc = Mathf.Clamp01(arcWeight / totalWeight);
-            return Hash01(seed + 4.1f) < normalizedArc
-                ? AutomaticObjectSourceRecipe.ContactArc
+            float roll = Hash01(seed + 4.1f) * totalWeight;
+            if (roll < arcWeight)
+            {
+                return AutomaticObjectSourceRecipe.ContactArc;
+            }
+
+            roll -= arcWeight;
+            return roll < semiArcWeight
+                ? AutomaticObjectSourceRecipe.ContactSemiArc
                 : AutomaticObjectSourceRecipe.ContactFleck;
         }
 
@@ -993,7 +1051,9 @@ namespace ProgrammaticStylized3D.Rivers
                 source.GlobalDistance * 9.731f +
                 source.AcrossMetres * 19.137f +
                 source.SourceId.GetHashCode() * 0.011f +
-                (recipe == AutomaticObjectSourceRecipe.ContactFleck ? 907f : 701f);
+                (recipe == AutomaticObjectSourceRecipe.ContactFleck
+                    ? 907f
+                    : (recipe == AutomaticObjectSourceRecipe.ContactSemiArc ? 809f : 701f));
 
             float length;
             float width;
@@ -1003,6 +1063,7 @@ namespace ProgrammaticStylized3D.Rivers
             float breakupScale;
             float breakupStrength;
             float patternFormationSpeedMultiplier;
+            float lopsidedness = 0f;
             if (recipe == AutomaticObjectSourceRecipe.ContactFleck)
             {
                 length = Mathf.Lerp(
@@ -1029,6 +1090,38 @@ namespace ProgrammaticStylized3D.Rivers
                 patternFormationSpeedMultiplier =
                     river.FoamObjectContactFleckFormationSpeedMultiplier;
                 amount = Mathf.Lerp(0.82f, 0.97f, eventScale);
+            }
+            else if (recipe == AutomaticObjectSourceRecipe.ContactSemiArc)
+            {
+                length = Mathf.Lerp(
+                    river.FoamObjectContactSemiArcLengthMinMetres,
+                    river.FoamObjectContactSemiArcLengthMaxMetres,
+                    eventScale);
+                width = Mathf.Lerp(
+                    river.FoamObjectContactSemiArcWidthMinMetres,
+                    river.FoamObjectContactSemiArcWidthMaxMetres,
+                    eventScale) * widthJitter;
+                offset = Mathf.Lerp(
+                    river.FoamObjectContactSemiArcOffsetMinMetres,
+                    river.FoamObjectContactSemiArcOffsetMaxMetres,
+                    eventScale) * offsetJitter;
+                remainingLife = Mathf.Lerp(
+                    river.FoamObjectContactSemiArcInitialLifeMin,
+                    river.FoamObjectContactSemiArcInitialLifeMax,
+                    eventScale);
+                breakupScale = Mathf.Lerp(0.12f, 0.38f, Hash01(seed + 9.5f));
+                breakupStrength = Mathf.Lerp(
+                    river.FoamObjectContactSemiArcBreakupStrengthMin,
+                    river.FoamObjectContactSemiArcBreakupStrengthMax,
+                    Hash01(seed + 10.1f));
+                patternFormationSpeedMultiplier =
+                    river.FoamObjectContactSemiArcFormationSpeedMultiplier;
+                amount = Mathf.Lerp(0.84f, 0.98f, eventScale);
+                float side = Hash01(seed + 13.9f) < 0.5f ? -1f : 1f;
+                lopsidedness = side * Mathf.Lerp(
+                    river.FoamObjectContactSemiArcLopsidednessMin,
+                    river.FoamObjectContactSemiArcLopsidednessMax,
+                    Hash01(seed + 14.7f));
             }
             else
             {
@@ -1123,7 +1216,8 @@ namespace ProgrammaticStylized3D.Rivers
                 remainingLife,
                 sourceKey,
                 breakupScale,
-                breakupStrength);
+                breakupStrength,
+                lopsidedness);
         }
 
         private bool BeginAutomaticObjectFoamSourceEvent(
@@ -1141,7 +1235,8 @@ namespace ProgrammaticStylized3D.Rivers
             float remainingLife,
             float sourceKey,
             float breakupScaleMetres,
-            float breakupStrength)
+            float breakupStrength,
+            float lopsidedness)
         {
             if (river == null || !river.FoamEnabled ||
                 river.FreezeAmount >= 0.999f || !river.Domain.IsValid)
@@ -1158,10 +1253,19 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             int eventId = ++foamCompositionSequence;
-            AutomaticFoamSourceEventType sourceType = recipe ==
-                AutomaticObjectSourceRecipe.ContactFleck
-                    ? AutomaticFoamSourceEventType.ObjectContactFleck
-                    : AutomaticFoamSourceEventType.ObjectContactArc;
+            AutomaticFoamSourceEventType sourceType;
+            switch (recipe)
+            {
+                case AutomaticObjectSourceRecipe.ContactFleck:
+                    sourceType = AutomaticFoamSourceEventType.ObjectContactFleck;
+                    break;
+                case AutomaticObjectSourceRecipe.ContactSemiArc:
+                    sourceType = AutomaticFoamSourceEventType.ObjectContactSemiArc;
+                    break;
+                default:
+                    sourceType = AutomaticFoamSourceEventType.ObjectContactArc;
+                    break;
+            }
 
             automaticFoamSourceEvents[slotIndex] = new AutomaticFoamSourceEvent
             {
@@ -1194,7 +1298,7 @@ namespace ProgrammaticStylized3D.Rivers
                 ShapeSeed = sourceKey + AutomaticObjectBirthShapeSeedSalt,
                 BreakupScaleMetres = Mathf.Max(0.05f, breakupScaleMetres),
                 BreakupStrength = Mathf.Clamp01(breakupStrength),
-                Curvature = 0f,
+                Curvature = Mathf.Clamp(lopsidedness, -1f, 1f),
                 ObjectCentreAcrossMetres = source.AcrossMetres,
                 ObjectAlongHalfLengthMetres = Mathf.Max(
                     0.05f,
@@ -1247,6 +1351,662 @@ namespace ProgrammaticStylized3D.Rivers
                     sourceCount),
                 sourceCount);
             return PositiveModulo(offset + scanIndex * stride, sourceCount);
+        }
+
+        private bool AdvanceAutomaticFreeWaterBirthSources(
+            float deltaTime,
+            float now)
+        {
+            automaticFreeWaterBirthSubmittedLastUpdate = 0;
+            automaticFreeWaterBirthRejectedLastUpdate = 0;
+
+            if (!ResolveAutomaticFreeWaterSourceProfile(
+                    out AutomaticFreeWaterSourceProfile freeWaterProfile,
+                    out string inactiveStatus))
+            {
+                automaticFreeWaterBirthAccumulator = 0f;
+                automaticFreeWaterBirthStatus = inactiveStatus;
+                return false;
+            }
+
+            automaticFreeWaterBirthAccumulator += Mathf.Max(0f, deltaTime) *
+                freeWaterProfile.EventsPerSecond;
+            if (automaticFreeWaterBirthAccumulator < 1f)
+            {
+                float secondsUntilNext =
+                    (1f - automaticFreeWaterBirthAccumulator) /
+                    Mathf.Max(0.01f, freeWaterProfile.EventsPerSecond);
+                automaticFreeWaterBirthStatus =
+                    $"Armed / next free-water source event in {secondsUntilNext:0.00}s";
+                return false;
+            }
+
+            int startsThisUpdate = 0;
+            int skippedThisUpdate = 0;
+            while (automaticFreeWaterBirthAccumulator >= 1f &&
+                   startsThisUpdate < AutomaticFreeWaterSourceMaximumStartsPerUpdate)
+            {
+                if (TryStartAutomaticFreeWaterSourceEvent(
+                        freeWaterProfile,
+                        out int skippedSlots))
+                {
+                    automaticFreeWaterBirthAccumulator -= 1f;
+                    startsThisUpdate++;
+                    skippedThisUpdate += skippedSlots;
+                    continue;
+                }
+
+                automaticFreeWaterBirthAccumulator = Mathf.Min(
+                    automaticFreeWaterBirthAccumulator,
+                    0.999f);
+                skippedThisUpdate += skippedSlots;
+                break;
+            }
+
+            automaticFreeWaterBirthSubmittedLastUpdate = startsThisUpdate;
+            automaticFreeWaterBirthRejectedLastUpdate = skippedThisUpdate;
+            automaticFreeWaterBirthSubmittedTotal += startsThisUpdate;
+            automaticFreeWaterBirthStatus = startsThisUpdate > 0
+                ? $"Started {startsThisUpdate} deterministic free-water source event(s), skipped {skippedThisUpdate} slot(s)"
+                : $"Scanned deterministic free-water source slots, started 0, skipped {skippedThisUpdate}";
+            return startsThisUpdate > 0;
+        }
+
+        private bool ResolveAutomaticFreeWaterSourceProfile(
+            out AutomaticFreeWaterSourceProfile profile,
+            out string inactiveStatus)
+        {
+            profile = default;
+            if (river == null || !river.FoamEnabled)
+            {
+                inactiveStatus = "Foam disabled";
+                return false;
+            }
+
+            if (!river.FoamAutomaticBirthEnabled)
+            {
+                inactiveStatus = "Automatic source population disabled";
+                return false;
+            }
+
+            if (river.FreezeAmount >= 0.999f || !river.Domain.IsValid)
+            {
+                inactiveStatus = "Waiting for active river domain";
+                return false;
+            }
+
+            if (fieldWidth <= 0 || fieldHeight <= 0 ||
+                fieldLength <= 0.0001f || validFieldLength <= 0.0001f)
+            {
+                inactiveStatus = "Waiting for Foam field resources";
+                return false;
+            }
+
+            if (river.FoamSourcePopulationPreset ==
+                StylizedRiverFoamSourcePopulationPreset.Off)
+            {
+                inactiveStatus = "Source population preset Off";
+                return false;
+            }
+
+            if (!river.FoamAutomaticFreeWaterBirthActive)
+            {
+                inactiveStatus = "Free Water source class disabled";
+                return false;
+            }
+
+            float coverage = river.FoamFreeWaterFoamCoverage;
+            float activity = river.FoamFreeWaterFoamActivity;
+            if (coverage <= 0.0001f)
+            {
+                inactiveStatus = "Free Water foam coverage is zero";
+                return false;
+            }
+
+            if (activity <= 0.0001f)
+            {
+                inactiveStatus = "Free Water foam activity is zero";
+                return false;
+            }
+
+            profile = new AutomaticFreeWaterSourceProfile(
+                true,
+                coverage,
+                activity,
+                river.FoamFreeWaterFoamFormationSpeedMetresPerSecond,
+                river.FoamFreeWaterFoamPattern);
+            inactiveStatus = string.Empty;
+            return profile.Enabled;
+        }
+
+        private bool TryStartAutomaticFreeWaterSourceEvent(
+            AutomaticFreeWaterSourceProfile profile,
+            out int skippedSlots)
+        {
+            skippedSlots = 0;
+            if (river == null || !river.Domain.IsValid || validFieldLength <= 0.0001f)
+            {
+                return false;
+            }
+
+            float spacing = Mathf.Max(0.25f, profile.SlotSpacingMetres);
+            int longitudinalSlotCount = Mathf.Max(
+                1,
+                Mathf.FloorToInt(validFieldLength / spacing));
+            int totalSlotCount = Mathf.Max(
+                1,
+                longitudinalSlotCount * AutomaticFreeWaterSourceLateralLaneCount);
+            int scanBudget = Mathf.Min(
+                totalSlotCount,
+                AutomaticFreeWaterSourceMaximumScansPerUpdate);
+
+            disturbanceRuntime ??= GetComponent<StylizedRiverDisturbanceRuntime>();
+            if (disturbanceRuntime != null)
+            {
+                automaticObjectFoamSources.Clear();
+                disturbanceRuntime.CopyStaticObjectFoamSourcesTo(
+                    automaticObjectFoamSources);
+            }
+
+            for (int scan = 0; scan < scanBudget; scan++)
+            {
+                int cursor = automaticFreeWaterBirthCursor++;
+                int cycleIndex = cursor / totalSlotCount;
+                int scanIndex = PositiveModulo(cursor, totalSlotCount);
+                int wrappedSlot = ResolvePermutedAutomaticFreeWaterSlot(
+                    scanIndex,
+                    totalSlotCount,
+                    cycleIndex);
+                int longitudinalIndex =
+                    wrappedSlot / AutomaticFreeWaterSourceLateralLaneCount;
+                int lateralIndex =
+                    wrappedSlot % AutomaticFreeWaterSourceLateralLaneCount;
+                float slotSeed = river.VisualSeed * 0.257f +
+                    wrappedSlot * 23.719f +
+                    cycleIndex * 41.137f;
+
+                if (Hash01(slotSeed + 1.7f) > profile.Coverage)
+                {
+                    skippedSlots++;
+                    continue;
+                }
+
+                float alongJitter = (Hash01(slotSeed + 2.9f) - 0.5f) * 0.55f;
+                float candidateT = (longitudinalIndex + 0.5f + alongJitter) /
+                    Mathf.Max(1, longitudinalSlotCount);
+                float globalDistance = Mathf.Lerp(
+                    river.Domain.GlobalDistanceMinimum,
+                    river.Domain.GlobalDistanceMinimum + validFieldLength,
+                    Mathf.Clamp01(candidateT));
+
+                float laneT = AutomaticFreeWaterSourceLateralLaneCount <= 1
+                    ? 0.5f
+                    : lateralIndex /
+                        (float)(AutomaticFreeWaterSourceLateralLaneCount - 1);
+                float acrossNormalized = Mathf.Lerp(-0.70f, 0.70f, laneT) +
+                    (Hash01(slotSeed + 3.7f) - 0.5f) * 0.20f;
+                acrossNormalized = Mathf.Clamp(acrossNormalized, -0.76f, 0.76f);
+
+                StylizedRiverSplineSample sample =
+                    river.Domain.SampleAtGlobalDistance(globalDistance);
+                float visibleHalfWidth = sample.GetVisibleHalfWidth(
+                    acrossNormalized < 0f ? -1f : 1f);
+                if (visibleHalfWidth <= 0.20f)
+                {
+                    skippedSlots++;
+                    continue;
+                }
+
+                float centreAcrossMetres = acrossNormalized * visibleHalfWidth;
+                AutomaticFreeWaterSourceRecipe recipe =
+                    ResolveAutomaticFreeWaterRecipe(profile.Pattern, slotSeed);
+                if (TryBeginAutomaticFreeWaterSourceEvent(
+                        profile,
+                        recipe,
+                        slotSeed,
+                        globalDistance,
+                        acrossNormalized,
+                        centreAcrossMetres,
+                        visibleHalfWidth))
+                {
+                    idleSince = 0.0;
+                    return true;
+                }
+
+                skippedSlots++;
+            }
+
+            return false;
+        }
+
+        private AutomaticFreeWaterSourceRecipe ResolveAutomaticFreeWaterRecipe(
+            StylizedRiverFoamFreeWaterPattern pattern,
+            float seed)
+        {
+            switch (pattern)
+            {
+                case StylizedRiverFoamFreeWaterPattern.LaceConnectors:
+                    return AutomaticFreeWaterSourceRecipe.LaceConnector;
+                case StylizedRiverFoamFreeWaterPattern.CrossLaceConnectors:
+                    return AutomaticFreeWaterSourceRecipe.CrossLaceConnector;
+                case StylizedRiverFoamFreeWaterPattern.TornFragments:
+                    return AutomaticFreeWaterSourceRecipe.TornFragment;
+            }
+
+            float laceWeight = river != null
+                ? river.FoamFreeWaterLaceConnectorPatternWeight
+                : 0.30f;
+            float crossLaceWeight = river != null
+                ? river.FoamFreeWaterCrossLaceConnectorPatternWeight
+                : 0.45f;
+            float fragmentWeight = river != null
+                ? river.FoamFreeWaterTornFragmentPatternWeight
+                : 0.25f;
+            float totalWeight = Mathf.Max(0f, laceWeight) +
+                Mathf.Max(0f, crossLaceWeight) +
+                Mathf.Max(0f, fragmentWeight);
+            if (totalWeight <= 0.0001f)
+            {
+                return AutomaticFreeWaterSourceRecipe.CrossLaceConnector;
+            }
+
+            float roll = Hash01(seed + 4.1f) * totalWeight;
+            float positiveLaceWeight = Mathf.Max(0f, laceWeight);
+            if (roll < positiveLaceWeight)
+            {
+                return AutomaticFreeWaterSourceRecipe.LaceConnector;
+            }
+
+            roll -= positiveLaceWeight;
+            return roll < Mathf.Max(0f, crossLaceWeight)
+                ? AutomaticFreeWaterSourceRecipe.CrossLaceConnector
+                : AutomaticFreeWaterSourceRecipe.TornFragment;
+        }
+
+        private bool TryBeginAutomaticFreeWaterSourceEvent(
+            AutomaticFreeWaterSourceProfile profile,
+            AutomaticFreeWaterSourceRecipe recipe,
+            float seed,
+            float globalDistance,
+            float acrossNormalized,
+            float centreAcrossMetres,
+            float visibleHalfWidth)
+        {
+            float flowDirection = river.FlowDirection >= 0f ? 1f : -1f;
+            float eventScale = Mathf.Clamp01(Mathf.Lerp(0.72f, 1.16f, Hash01(seed + 6.5f)));
+            float widthJitter = Mathf.Lerp(0.88f, 1.12f, Hash01(seed + 7.1f));
+            float sourceKey = river.VisualSeed * 0.457f +
+                globalDistance * 7.731f +
+                centreAcrossMetres * 17.137f +
+                seed * 0.053f +
+                (recipe == AutomaticFreeWaterSourceRecipe.TornFragment
+                    ? 1207f
+                    : (recipe == AutomaticFreeWaterSourceRecipe.CrossLaceConnector ? 1321f : 1009f));
+
+            float length;
+            float width;
+            float amount;
+            float remainingLife;
+            float breakupScale;
+            float breakupStrength;
+            float curvature;
+            float patternFormationSpeedMultiplier;
+
+            if (recipe == AutomaticFreeWaterSourceRecipe.TornFragment)
+            {
+                length = Mathf.Lerp(
+                    river.FoamFreeWaterFragmentLengthMinMetres,
+                    river.FoamFreeWaterFragmentLengthMaxMetres,
+                    eventScale);
+                width = Mathf.Lerp(
+                    river.FoamFreeWaterFragmentWidthMinMetres,
+                    river.FoamFreeWaterFragmentWidthMaxMetres,
+                    eventScale) * widthJitter;
+                remainingLife = Mathf.Lerp(
+                    river.FoamFreeWaterFragmentInitialLifeMin,
+                    river.FoamFreeWaterFragmentInitialLifeMax,
+                    eventScale);
+                breakupScale = Mathf.Lerp(0.10f, 0.42f, Hash01(seed + 9.5f));
+                breakupStrength = Mathf.Lerp(
+                    river.FoamFreeWaterFragmentBreakupStrengthMin,
+                    river.FoamFreeWaterFragmentBreakupStrengthMax,
+                    Hash01(seed + 10.1f));
+                patternFormationSpeedMultiplier =
+                    river.FoamFreeWaterFragmentFormationSpeedMultiplier;
+                curvature = Mathf.Lerp(-1.0f, 1.0f, Hash01(seed + 11.7f));
+                amount = Mathf.Lerp(0.76f, 0.94f, eventScale);
+            }
+            else if (recipe == AutomaticFreeWaterSourceRecipe.CrossLaceConnector)
+            {
+                length = Mathf.Lerp(
+                    river.FoamFreeWaterCrossLaceLengthMinMetres,
+                    river.FoamFreeWaterCrossLaceLengthMaxMetres,
+                    eventScale);
+                width = Mathf.Lerp(
+                    river.FoamFreeWaterCrossLaceWidthMinMetres,
+                    river.FoamFreeWaterCrossLaceWidthMaxMetres,
+                    eventScale) * widthJitter;
+                remainingLife = Mathf.Lerp(
+                    river.FoamFreeWaterCrossLaceInitialLifeMin,
+                    river.FoamFreeWaterCrossLaceInitialLifeMax,
+                    eventScale);
+                breakupScale = Mathf.Lerp(0.20f, 0.68f, Hash01(seed + 9.5f));
+                breakupStrength = Mathf.Lerp(
+                    river.FoamFreeWaterCrossLaceBreakupStrengthMin,
+                    river.FoamFreeWaterCrossLaceBreakupStrengthMax,
+                    Hash01(seed + 10.1f));
+                patternFormationSpeedMultiplier =
+                    river.FoamFreeWaterCrossLaceFormationSpeedMultiplier;
+                curvature = Mathf.Lerp(-1.0f, 1.0f, Hash01(seed + 11.7f));
+                amount = Mathf.Lerp(0.78f, 0.96f, eventScale);
+            }
+            else
+            {
+                length = Mathf.Lerp(
+                    river.FoamFreeWaterLaceLengthMinMetres,
+                    river.FoamFreeWaterLaceLengthMaxMetres,
+                    eventScale);
+                width = Mathf.Lerp(
+                    river.FoamFreeWaterLaceWidthMinMetres,
+                    river.FoamFreeWaterLaceWidthMaxMetres,
+                    eventScale) * widthJitter;
+                remainingLife = Mathf.Lerp(
+                    river.FoamFreeWaterLaceInitialLifeMin,
+                    river.FoamFreeWaterLaceInitialLifeMax,
+                    eventScale);
+                breakupScale = Mathf.Lerp(0.20f, 0.70f, Hash01(seed + 9.5f));
+                breakupStrength = Mathf.Lerp(
+                    river.FoamFreeWaterLaceBreakupStrengthMin,
+                    river.FoamFreeWaterLaceBreakupStrengthMax,
+                    Hash01(seed + 10.1f));
+                patternFormationSpeedMultiplier =
+                    river.FoamFreeWaterLaceFormationSpeedMultiplier;
+                float side = Hash01(seed + 11.7f) < 0.5f ? -1f : 1f;
+                curvature = side * Mathf.Lerp(
+                    river.FoamFreeWaterLaceCurvatureMin,
+                    river.FoamFreeWaterLaceCurvatureMax,
+                    Hash01(seed + 12.9f));
+                amount = Mathf.Lerp(0.78f, 0.96f, eventScale);
+            }
+
+            length = Mathf.Clamp(length, 0.05f, Mathf.Max(0.05f, validFieldLength * 0.38f));
+            width = Mathf.Clamp(width, 0.006f, Mathf.Max(0.015f, visibleHalfWidth * 0.22f));
+            if (Mathf.Abs(centreAcrossMetres) + width * 2.5f > visibleHalfWidth * 0.92f)
+            {
+                return false;
+            }
+
+            float feather = Mathf.Clamp(
+                Mathf.Max(width * 0.60f, visibleHalfWidth * 0.010f),
+                0.012f,
+                recipe == AutomaticFreeWaterSourceRecipe.TornFragment ? 0.090f : 0.070f);
+            float shapeHalfLength = length * 0.5f;
+            float objectContactOffset = 0f;
+            float startGlobalDistance;
+            float endGlobalDistance;
+            float formationDistance;
+
+            if (recipe == AutomaticFreeWaterSourceRecipe.CrossLaceConnector)
+            {
+                float allowedHalfLength = Mathf.Max(
+                    0.08f,
+                    visibleHalfWidth * 0.92f - Mathf.Abs(centreAcrossMetres) - width * 2.0f);
+                shapeHalfLength = Mathf.Min(shapeHalfLength, allowedHalfLength);
+                if (shapeHalfLength <= 0.08f)
+                {
+                    return false;
+                }
+
+                objectContactOffset = Hash01(seed + 14.7f) < 0.5f ? -1f : 1f;
+                formationDistance = shapeHalfLength * 2.0f;
+                float xPad = width * 3.0f + feather * 2.0f + 0.06f;
+                startGlobalDistance = Mathf.Clamp(
+                    globalDistance - xPad,
+                    river.Domain.GlobalDistanceMinimum,
+                    river.Domain.GlobalDistanceMaximum);
+                endGlobalDistance = Mathf.Clamp(
+                    globalDistance + xPad,
+                    river.Domain.GlobalDistanceMinimum,
+                    river.Domain.GlobalDistanceMaximum);
+            }
+            else
+            {
+                float halfLength = length * 0.5f;
+                startGlobalDistance = Mathf.Clamp(
+                    globalDistance - flowDirection * halfLength,
+                    river.Domain.GlobalDistanceMinimum,
+                    river.Domain.GlobalDistanceMaximum);
+                endGlobalDistance = Mathf.Clamp(
+                    globalDistance + flowDirection * halfLength,
+                    river.Domain.GlobalDistanceMinimum,
+                    river.Domain.GlobalDistanceMaximum);
+                formationDistance = Mathf.Abs(endGlobalDistance - startGlobalDistance);
+                shapeHalfLength = Mathf.Max(0.025f, formationDistance * 0.5f);
+            }
+
+            if (formationDistance <= 0.05f ||
+                Mathf.Abs(endGlobalDistance - startGlobalDistance) <= 0.01f)
+            {
+                foamCompositionRejectedCount++;
+                return false;
+            }
+
+            float objectProximityLength = recipe == AutomaticFreeWaterSourceRecipe.CrossLaceConnector
+                ? width * 6.0f + feather * 2.0f
+                : length;
+            if (IsFreeWaterSourceTooCloseToObjectSource(
+                    globalDistance,
+                    centreAcrossMetres,
+                    objectProximityLength,
+                    width))
+            {
+                return false;
+            }
+
+            float formationSpeed = Mathf.Max(
+                0.05f,
+                profile.FormationSpeedMetresPerSecond *
+                Mathf.Clamp(patternFormationSpeedMultiplier, 0.10f, 3.00f) *
+                Mathf.Lerp(0.90f, 1.10f, Hash01(seed + 13.5f)));
+            float duration = recipe == AutomaticFreeWaterSourceRecipe.TornFragment
+                ? Mathf.Clamp(
+                    0.35f + formationDistance / formationSpeed * 0.35f,
+                    AutomaticFreeWaterSourceMinimumDuration,
+                    1.35f)
+                : Mathf.Clamp(
+                    formationDistance / formationSpeed,
+                    recipe == AutomaticFreeWaterSourceRecipe.CrossLaceConnector ? 0.55f : 0.75f,
+                    recipe == AutomaticFreeWaterSourceRecipe.CrossLaceConnector ? 3.50f : AutomaticFreeWaterSourceMaximumDuration);
+            float materialStepDuration = 1f / Mathf.Max(1f, ResolveUpdateRate());
+            float headTrailMetres = recipe == AutomaticFreeWaterSourceRecipe.TornFragment
+                ? 0f
+                : Mathf.Clamp(
+                    Mathf.Max(width * 4.0f, formationSpeed * materialStepDuration * 1.50f),
+                    AutomaticFreeWaterSourceMinimumHeadTrailMetres,
+                    Mathf.Min(
+                        AutomaticFreeWaterSourceMaximumHeadTrailMetres,
+                        Mathf.Max(AutomaticFreeWaterSourceMinimumHeadTrailMetres, formationDistance * 0.22f)));
+            float lateralPadding = recipe == AutomaticFreeWaterSourceRecipe.TornFragment
+                ? width * 2.8f + feather * 2f
+                : (recipe == AutomaticFreeWaterSourceRecipe.CrossLaceConnector
+                    ? shapeHalfLength + width * 2.8f + feather * 2f
+                    : Mathf.Abs(curvature) * width * 5.2f + width * 2.6f + feather * 2f);
+
+            return BeginAutomaticFreeWaterFoamSourceEvent(
+                recipe,
+                startGlobalDistance,
+                endGlobalDistance,
+                acrossNormalized,
+                centreAcrossMetres,
+                duration,
+                formationSpeed,
+                headTrailMetres,
+                width,
+                feather,
+                amount,
+                remainingLife,
+                sourceKey,
+                breakupScale,
+                breakupStrength,
+                curvature,
+                lateralPadding,
+                shapeHalfLength,
+                objectContactOffset);
+        }
+
+        private bool IsFreeWaterSourceTooCloseToObjectSource(
+            float globalDistance,
+            float centreAcrossMetres,
+            float lengthMetres,
+            float widthMetres)
+        {
+            if (automaticObjectFoamSources == null || automaticObjectFoamSources.Count <= 0)
+            {
+                return false;
+            }
+
+            float halfLength = Mathf.Max(0.05f, lengthMetres * 0.5f);
+            float halfWidth = Mathf.Max(0.02f, widthMetres);
+            for (int index = 0; index < automaticObjectFoamSources.Count; index++)
+            {
+                RiverFoamStaticObjectSource source = automaticObjectFoamSources[index];
+                float alongDelta = Mathf.Abs(globalDistance - source.GlobalDistance);
+                float acrossDelta = Mathf.Abs(centreAcrossMetres - source.AcrossMetres);
+                if (alongDelta < source.StaticPressureAlongHalfLength + halfLength * 0.65f &&
+                    acrossDelta < source.StaticPressureAcrossHalfWidth + halfWidth * 3.0f)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool BeginAutomaticFreeWaterFoamSourceEvent(
+            AutomaticFreeWaterSourceRecipe recipe,
+            float startGlobalDistance,
+            float endGlobalDistance,
+            float centreAcrossNormalized,
+            float centreAcrossMetres,
+            float duration,
+            float formationSpeedMetresPerSecond,
+            float headTrailMetres,
+            float widthMetres,
+            float featherMetres,
+            float amount,
+            float remainingLife,
+            float sourceKey,
+            float breakupScaleMetres,
+            float breakupStrength,
+            float curvature,
+            float lateralPaddingMetres,
+            float shapeHalfLengthMetres,
+            float objectContactOffsetMetres)
+        {
+            if (river == null || !river.FoamEnabled ||
+                river.FreezeAmount >= 0.999f || !river.Domain.IsValid)
+            {
+                foamCompositionRejectedCount++;
+                return false;
+            }
+
+            int slotIndex = FindFreeAutomaticFoamSourceSlot();
+            if (slotIndex < 0)
+            {
+                foamCompositionRejectedCount++;
+                return false;
+            }
+
+            int eventId = ++foamCompositionSequence;
+            AutomaticFoamSourceEventType sourceType = recipe ==
+                AutomaticFreeWaterSourceRecipe.TornFragment
+                    ? AutomaticFoamSourceEventType.FreeWaterTornFragment
+                    : (recipe == AutomaticFreeWaterSourceRecipe.CrossLaceConnector
+                        ? AutomaticFoamSourceEventType.FreeWaterCrossLaceConnector
+                        : AutomaticFoamSourceEventType.FreeWaterLaceConnector);
+            float halfLength = Mathf.Max(0.025f, shapeHalfLengthMetres);
+            float halfWidth = Mathf.Max(0.005f, widthMetres);
+
+            automaticFoamSourceEvents[slotIndex] = new AutomaticFoamSourceEvent
+            {
+                Active = true,
+                EventId = eventId,
+                Type = sourceType,
+                SideSign = 0f,
+                StartGlobalDistance = startGlobalDistance,
+                EndGlobalDistance = endGlobalDistance,
+                Duration = Mathf.Max(AutomaticFreeWaterSourceMinimumDuration, duration),
+                Elapsed = 0f,
+                FormationSpeedMetresPerSecond = Mathf.Max(0.01f, formationSpeedMetresPerSecond),
+                HeadTrailMetres = Mathf.Clamp(
+                    headTrailMetres,
+                    0f,
+                    AutomaticFreeWaterSourceMaximumHeadTrailMetres),
+                ShoreInsetMetres = 0f,
+                WidthMetres = Mathf.Max(0.006f, widthMetres),
+                InwardReachMetres = 0f,
+                FeatherMetres = Mathf.Max(0.006f, featherMetres),
+                SourceAmount = Mathf.Clamp01(amount),
+                RemainingLife = Mathf.Clamp01(remainingLife),
+                PatternSeed = sourceKey + AutomaticFreeWaterBirthPatternSeedSalt,
+                SourceFillSeed = sourceKey + AutomaticFreeWaterBirthSourceFillSeedSalt,
+                SourceFillFeatureSize = Mathf.Max(
+                    SourceFillMinimumFeatureSizeMetres * 0.50f,
+                    Mathf.Max(widthMetres * 2.0f, featherMetres * 1.25f)),
+                ShapeSeed = sourceKey + AutomaticFreeWaterBirthShapeSeedSalt,
+                BreakupScaleMetres = Mathf.Max(0.05f, breakupScaleMetres),
+                BreakupStrength = Mathf.Clamp01(breakupStrength),
+                Curvature = Mathf.Clamp(curvature, -1f, 1f),
+                ObjectCentreAcrossMetres = centreAcrossMetres,
+                ObjectAlongHalfLengthMetres = halfLength,
+                ObjectAcrossHalfWidthMetres = halfWidth,
+                ObjectContactOffsetMetres = objectContactOffsetMetres,
+                CentreAcrossNormalized = Mathf.Clamp(centreAcrossNormalized, -1f, 1f),
+                LateralPaddingMetres = Mathf.Max(widthMetres * 2f, lateralPaddingMetres)
+            };
+
+            activeAutomaticFoamSourceEventCount++;
+            foamCompositionStartedCount++;
+            latestFoamCompositionEventId = eventId;
+            latestFoamCompositionProgress = 0f;
+            latestFoamCompositionHeadDistanceNormalized =
+                GlobalDistanceToNormalized(startGlobalDistance);
+            latestFoamCompositionPreviousDistanceNormalized =
+                latestFoamCompositionHeadDistanceNormalized;
+            latestFoamCompositionHeadAcrossNormalized = centreAcrossNormalized;
+            latestFoamCompositionPreviousAcrossNormalized = centreAcrossNormalized;
+            lastFoamCompositionSegmentLength = 0f;
+            materialLifetimeAuthorityActive = true;
+            materialLifetimeEmptyMetricReadbacks = 0;
+            lifetimeAuthorityStatus =
+                "Remaining Life / automatic free-water source-event rasterizer";
+            RecordMaterialBirthCommand();
+            simulationAccumulator = Mathf.Max(
+                simulationAccumulator,
+                1f / Mathf.Max(1f, ResolveUpdateRate()));
+            idleSince = 0.0;
+            return true;
+        }
+
+        private int ResolvePermutedAutomaticFreeWaterSlot(
+            int scanIndex,
+            int slotCount,
+            int cycleIndex)
+        {
+            if (slotCount <= 1)
+            {
+                return 0;
+            }
+
+            int stride = ResolveCoprimeAutomaticSourceStride(
+                slotCount,
+                cycleIndex + 149);
+            int offset = PositiveModulo(
+                Mathf.RoundToInt(Hash01(
+                    river.VisualSeed * 0.293f + cycleIndex * 29.731f) *
+                    slotCount),
+                slotCount);
+            return PositiveModulo(offset + scanIndex * stride, slotCount);
         }
 
         private bool TryStartAutomaticShoreSourceEvent(

@@ -1968,3 +1968,18 @@ If Object Foam is enabled and automatic birth is on, object source population sh
 Object Foam now has a GPU Object Contact Edge Field. The 5.15A/5.15A.1 object event scheduler remains unchanged and CPU-bounded; only the object-contact source shape authority changed. The contact field is built from the exact obstacle exclusion field and static pressure/contact evidence. Contact Arc/Fleck masks sample the field and shape in contact normal/tangent space, so they should be less box-like than the earlier object half-extent bands.
 
 Validate in Material Remaining Life with Shore Foam off/low and Object Foam on. If contact foam is still poor, inspect the contact field construction/gating before changing scheduling.
+
+## 4.11C.5.15A.4 handoff note
+
+Object Foam now includes `Contact Semi-Arcs` in addition to full Contact Arcs and Contact Flecks. This was added because the stable full-arc evaluator is symmetric in contact tangent space, while the visual target needs object-contact foam that sometimes appears on one shoulder/side only. Semi-Arcs reuse the existing object-contact field and source-event rasterizer; deterministic signed lopsidedness is carried through `Curvature` / GPU `variation.w`, so no new texture/buffer/resource binding was introduced.
+
+Validation should stay in `Material Remaining Life`: test Debug Pattern Mode `Contact Arcs`, `Contact Semi-Arcs`, `Contact Flecks`, then `Mixed`. If Semi-Arcs still look too symmetric, inspect the signed tangent-window evaluator before changing object-contact resource semantics. Do not restart the failed edge-distance contact-field correction in the same patch as pattern tuning.
+
+## River Foam State After 4.11C.5.15B
+
+Free Water Foam birth is now implemented. The active free-water source patterns are Lace Connectors and Torn Fragments. Lace Connectors use a moving head+stroke path; Torn Fragments use a timed sweep reveal over an asymmetric local patch. Both write persistent FoamState material and remain subject to valid-fluid/obstacle clipping. Rind strokes and shader glints are not implemented in this patch. Validate with Material Remaining Life and isolate Free Water Foam by disabling Shore/Object birth first.
+
+### River Foam State After 4.11C.5.15B.2
+
+Free Water Foam now has three source patterns: Lace Connectors, Cross-Lace Connectors, and Torn Fragments. Cross-Lace Connectors are the newest addition and are intended to address the missing horizontal/cross-current ribbons. They use a moving head+stroke across the river, pack lateral half-length/width/sign into existing source event object data, and use the existing rasterizer/valid-fluid clipping path. No density, Coverage, Activity, or glint-rendering changes were made in this patch.
+

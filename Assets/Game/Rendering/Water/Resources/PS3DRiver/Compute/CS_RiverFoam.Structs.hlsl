@@ -12,7 +12,7 @@ struct FoamSourceEventData
     // w = source fill feature size.
     float4 material;
     // x = source fill seed, y = breakup scale,
-    // z = breakup strength, w = curvature.
+    // z = breakup strength, w = curvature / signed object semi-arc lopsidedness.
     float4 variation;
     // x = formation speed metres/second, y = moving-head trail metres,
     // z = source path length metres, w reserved.

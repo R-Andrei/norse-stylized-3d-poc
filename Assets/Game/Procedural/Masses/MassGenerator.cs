@@ -604,14 +604,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             MassRecipe recipe,
             MassSurfaceFeatureSettings? surfaceFeatures)
         {
-            if (!surfaceFeatures.HasValue || faces.Count < 4)
+            if (!surfaceFeatures.HasValue || faces == null || faces.Count < 4)
             {
                 return;
             }
 
             MassSurfaceFeatureSettings settings = surfaceFeatures.Value;
             float amount01 = Mathf.Clamp01(settings.EdgeWearAmount * 0.5f);
-            if (amount01 <= 0.001f)
+            if (amount01 <= 0.0001f)
             {
                 return;
             }
@@ -619,23 +619,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Bounds bounds = CalculateFaceBounds(faces);
             float maximumDimension = Mathf.Max(
                 0.0001f,
-                Mathf.Max(
-                    bounds.size.x,
-                    Mathf.Max(bounds.size.y, bounds.size.z)));
-
-            // EW-B3 keeps the EW-4A.1 control contract: Width owns physical
-            // bevel depth, Amount owns generated material strength, and
-            // Softness is reserved for material/normal response. The active
-            // construction route emits source-owned local bevel geometry from
-            // the final source graph before triangulation. It does not apply
-            // per-edge global half-space cuts, sampled ribbons, or open-cycle
-            // closure.
-            float width01 = Mathf.InverseLerp(0.25f, 2f, settings.EdgeWearWidth);
-            float bevelDepth = maximumDimension * Mathf.Lerp(0.0035f, 0.0115f, width01);
-            bevelDepth = Mathf.Clamp(
-                bevelDepth,
-                maximumDimension * 0.0025f,
-                maximumDimension * 0.016f);
+                Mathf.Max(bounds.size.x, Mathf.Max(bounds.size.y, bounds.size.z)));
 
             List<EdgeWearBevelCandidate> candidates =
                 BuildEdgeWearBevelCandidates(
@@ -647,117 +631,83 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     amount01);
             if (candidates.Count == 0)
             {
-                WarnEdgeWearBevelFailure(new EdgeWearBevelBuildStats(0, 0));
+                LogChamferReadiness(
+                    new ChamferReadinessStats(0, 0),
+                    false,
+                    "no convex edge-wear candidates");
                 return;
             }
 
             candidates.Sort((left, right) => right.Score.CompareTo(left.Score));
 
             float coverage01 = Mathf.Clamp01(settings.EdgeWearCoverage * 0.5f);
-            float coverageFraction = Mathf.Lerp(0.0f, 1.0f, coverage01);
             int selectedCount = Mathf.Clamp(
-                Mathf.CeilToInt(candidates.Count * coverageFraction),
+                Mathf.CeilToInt(candidates.Count * coverage01),
                 0,
                 candidates.Count);
-
             if (selectedCount <= 0)
             {
                 return;
             }
 
-            float minimumStableFaceArea = Mathf.Max(
-                TinyFaceAreaEpsilon * 12f,
-                maximumDimension * maximumDimension * 0.0000007f);
             float minimumStableEdgeLength = maximumDimension * 0.0012f;
-
-            EdgeWearBevelBuildStats stats = new EdgeWearBevelBuildStats(
+            ChamferReadinessStats stats = new ChamferReadinessStats(
                 candidates.Count,
                 selectedCount);
 
-            if (!TryBuildDeterministicSelectedEdgeBevelKernelFaces(
+            bool ready = TryBuildChamferTopologyContext(
+                faces,
+                candidates,
+                selectedCount,
+                minimumStableEdgeLength,
+                ref stats,
+                out ChamferTopologyContext context,
+                out string blocker);
+
+            LogChamferReadiness(stats, ready, blocker);
+
+            if (ready)
+            {
+                float requestedWidth = maximumDimension * Mathf.Lerp(
+                    0.006f,
+                    0.028f,
+                    Mathf.InverseLerp(0.25f, 2f, settings.EdgeWearWidth));
+                ChamferCornerStats cornerStats = new ChamferCornerStats();
+                bool cornersReady = AuditExplicitChamferCornerSolution(
                     faces,
-                    candidates,
-                    selectedCount,
-                    bevelDepth,
-                    minimumStableFaceArea,
+                    context,
+                    requestedWidth,
                     minimumStableEdgeLength,
-                    out List<PolygonFace> rebuiltFaces,
-                    ref stats))
-            {
-                // EW-B3 fail-closed: source-owned local bevel emission did
-                // not pass its validation gates.
-                WarnEdgeWearBevelFailure(stats);
-                return;
+                    maximumDimension * maximumDimension * 0.000001f,
+                    ref cornerStats,
+                    out ChamferCornerSolution cornerSolution,
+                    out string cornerBlocker);
+                LogChamferCornerAudit(
+                    cornerStats,
+                    cornersReady,
+                    cornerBlocker);
+
+                if (cornersReady)
+                {
+                    ChamferEmissionStats emissionStats = new ChamferEmissionStats();
+                    bool emissionReady = AuditProvisionalChamferEmission(
+                        faces,
+                        context,
+                        cornerSolution,
+                        minimumStableEdgeLength,
+                        maximumDimension * maximumDimension * 0.000001f,
+                        ref emissionStats,
+                        out string emissionBlocker);
+                    LogChamferEmissionAudit(
+                        emissionStats,
+                        emissionReady,
+                        emissionBlocker);
+                }
             }
 
-            EdgeWearTopologyStats finalTopology = AuditEdgeWearTopology(
-                rebuiltFaces,
-                minimumStableEdgeLength);
-            stats.TopologyOpenEdges = finalTopology.OpenEdgeCount;
-            stats.TopologyNonManifoldEdges = finalTopology.NonManifoldEdgeCount;
-            stats.TopologyTJunctions = finalTopology.TJunctionCount;
-
-            if (finalTopology.OpenEdgeCount != 0 ||
-                finalTopology.NonManifoldEdgeCount != 0 ||
-                finalTopology.TJunctionCount != 0)
-            {
-                if (finalTopology.OpenEdgeCount != 0)
-                {
-                    stats.RegisterReject(EdgeWearBevelRejectReason.ValidationOpenEdge);
-                }
-
-                if (finalTopology.NonManifoldEdgeCount != 0)
-                {
-                    stats.RegisterReject(EdgeWearBevelRejectReason.ValidationNonManifoldEdge);
-                }
-
-                if (finalTopology.TJunctionCount != 0)
-                {
-                    stats.RegisterReject(EdgeWearBevelRejectReason.ValidationTJunction);
-                }
-
-                WarnEdgeWearBevelFailure(stats);
-                return;
-            }
-
-            stats.ProducedBevelFaceCount = CountFeatureFaces(
-                rebuiltFaces,
-                PolygonFaceFeature.ConvexEdgeWear);
-            stats.CommittedConvexEdgeWearFaceCount = stats.ProducedBevelFaceCount;
-            stats.CommittedConvexEdgeWearTriangleEstimateCount =
-                EstimateTriangulatedTriangleCount(
-                    rebuiltFaces,
-                    PolygonFaceFeature.ConvexEdgeWear);
-            stats.CommittedConvexEdgeWearRenderedVertexEstimateCount =
-                stats.CommittedConvexEdgeWearTriangleEstimateCount * 3;
-            CollectCommittedConvexEdgeWearFaceShapeStats(
-                rebuiltFaces,
-                ref stats);
-
-            TriangleEmissionPreviewStats previewStats =
-                PreviewTriangulatedTriangleEmission(
-                    rebuiltFaces,
-                    recipe.SurfaceFacetDensity,
-                    recipe.EdgeCharacter,
-                    recipe.SurfaceSeed);
-            stats.ApplyTriangleEmissionPreviewStats(previewStats);
-
-            if (stats.CommittedConvexEdgeWearNgonFaceCount != 0 ||
-                stats.TriangulationPreviewSkippedConvexEdgeWearTriangleCount != 0)
-            {
-                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationCapFace);
-                WarnEdgeWearBevelFailure(stats);
-                return;
-            }
-
-            faces.Clear();
-            faces.AddRange(ClonePolygonFaces(rebuiltFaces));
-
-            stats.AcceptedCount = stats.DeterministicKernelLocalBevelFaceBuiltCount > 0
-                ? stats.DeterministicKernelLocalBevelFaceBuiltCount
-                : selectedCount;
-
-            LogEdgeWearBevelCommit(stats);
+            // EW-C2 builds and audits provisional replacement faces and one-strip
+            // bevel quads, then discards them. The original PolygonFace list
+            // remains the rendered geometry until vertex patches are proven.
         }
 
         private static List<EdgeWearBevelCandidate> BuildEdgeWearBevelCandidates(
@@ -907,32 +857,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return candidates;
         }
 
-        private static bool TryBuildDeterministicSelectedEdgeBevelKernelFaces(
-            List<PolygonFace> faces,
+        private static bool TryBuildChamferTopologyContext(
+            List<PolygonFace> sourceFaces,
             List<EdgeWearBevelCandidate> candidates,
             int selectedCount,
-            float bevelDepth,
-            float minimumStableFaceArea,
             float minimumStableEdgeLength,
-            out List<PolygonFace> rebuiltFaces,
-            ref EdgeWearBevelBuildStats stats)
+            ref ChamferReadinessStats stats,
+            out ChamferTopologyContext context,
+            out string blocker)
         {
-            rebuiltFaces = null;
-
-            // EW-B3R: source-owned local bevel network emission with
-            // deterministic source-vertex cap closure. The final generated
-            // source polyhedron owns every output face: source faces emit local
-            // replacement polygons, selected source edges emit local bevel faces
-            // between adjacent face rails, and affected source vertices emit
-            // cap triangles ordered from the source vertex star. No per-edge
-            // global half-space cuts are used for edge wear.
+            context = null;
+            blocker = string.Empty;
             if (!TryBuildEdgeWearTopologyGraph(
-                    faces,
+                    sourceFaces,
                     out EdgeWearTopologyGraph graph,
                     out EdgeWearGraphBuildStats graphStats))
             {
                 stats.ApplyGraphStats(graphStats);
-                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationGlobal);
+                stats.Blocked = 1;
+                blocker = "source topology graph failed validation";
                 return false;
             }
 
@@ -944,1665 +887,1871 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     ref graphStats))
             {
                 stats.ApplyGraphStats(graphStats);
-                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationGlobal);
+                stats.Blocked = 1;
+                blocker = "selected candidates did not map cleanly to source graph edges";
                 return false;
             }
-
-            List<DeterministicBevelEdgeRecord> edgeRecords =
-                BuildDeterministicBevelEdgeRecords(
-                    graph,
-                    selectedEdges,
-                    ref stats);
-            List<DeterministicBevelVertexRecord> vertexRecords =
-                BuildDeterministicBevelVertexRecords(
-                    graph,
-                    edgeRecords,
-                    ref stats);
 
             stats.ApplyGraphStats(graphStats);
-            ApplyDeterministicKernelSourceStats(
-                graph,
-                selectedEdges,
-                edgeRecords,
-                vertexRecords,
-                ref stats);
-            stats.DeterministicKernelGeometryPendingCount = 0;
-            stats.DeterministicKernelGlobalCutAppliedCount = 0;
-
-            if (edgeRecords.Count == 0)
-            {
-                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationGlobal);
-                return false;
-            }
-
-            if (!TryBuildSourceOwnedLocalBevelNetwork(
-                    graph,
-                    edgeRecords,
-                    vertexRecords,
-                    bevelDepth,
-                    minimumStableFaceArea,
-                    minimumStableEdgeLength,
-                    out rebuiltFaces,
-                    ref stats))
-            {
-                return false;
-            }
-
-            TriangulateConvexEdgeWearPolygons(
-                rebuiltFaces,
-                minimumStableFaceArea,
-                minimumStableEdgeLength,
-                ref stats);
-
-            WeldSharedVertices(rebuiltFaces);
-            SanitizeAllFaces(rebuiltFaces);
-
-            EdgeWearTopologyStats kernelTopology = AuditEdgeWearTopology(
-                rebuiltFaces,
-                minimumStableEdgeLength);
-            stats.DeterministicKernelOpenEdgesAfterBuildCount =
-                kernelTopology.OpenEdgeCount;
-            stats.DeterministicKernelNonManifoldEdgesAfterBuildCount =
-                kernelTopology.NonManifoldEdgeCount;
-            stats.DeterministicKernelTJunctionsAfterBuildCount =
-                kernelTopology.TJunctionCount;
-
-            if (kernelTopology.OpenEdgeCount != 0)
-            {
-                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationOpenEdge);
-                return false;
-            }
-
-            if (kernelTopology.NonManifoldEdgeCount != 0)
-            {
-                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationNonManifoldEdge);
-                return false;
-            }
-
-            if (kernelTopology.TJunctionCount != 0)
-            {
-                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationTJunction);
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool TryBuildSourceOwnedLocalBevelNetwork(
-            EdgeWearTopologyGraph graph,
-            List<DeterministicBevelEdgeRecord> edgeRecords,
-            List<DeterministicBevelVertexRecord> vertexRecords,
-            float bevelDepth,
-            float minimumStableFaceArea,
-            float minimumStableEdgeLength,
-            out List<PolygonFace> rebuiltFaces,
-            ref EdgeWearBevelBuildStats stats)
-        {
-            rebuiltFaces = new List<PolygonFace>();
-
-            HashSet<int> selectedEdgeIndices = new HashSet<int>();
-            for (int i = 0; i < edgeRecords.Count; i++)
-            {
-                selectedEdgeIndices.Add(edgeRecords[i].GraphEdgeIndex);
-            }
-
-            HashSet<int> affectedFaces = new HashSet<int>();
-            HashSet<int> affectedVertices = new HashSet<int>();
-            for (int i = 0; i < edgeRecords.Count; i++)
-            {
-                if (edgeRecords[i].FaceA >= 0)
-                {
-                    affectedFaces.Add(edgeRecords[i].FaceA);
-                }
-
-                if (edgeRecords[i].FaceB >= 0)
-                {
-                    affectedFaces.Add(edgeRecords[i].FaceB);
-                }
-
-                affectedVertices.Add(edgeRecords[i].StartVertexIndex);
-                affectedVertices.Add(edgeRecords[i].EndVertexIndex);
-            }
-
-            Dictionary<DeterministicBevelRailKey, DeterministicBevelRailRecord> rails =
-                new Dictionary<DeterministicBevelRailKey, DeterministicBevelRailRecord>();
-            Dictionary<int, List<DeterministicBevelVertexCapPoint>> vertexCapPoints =
-                new Dictionary<int, List<DeterministicBevelVertexCapPoint>>();
-
-            for (int graphFaceIndex = 0;
-                 graphFaceIndex < graph.Faces.Count;
-                 graphFaceIndex++)
-            {
-                EdgeWearGraphFace graphFace = graph.Faces[graphFaceIndex];
-                bool affectedFace = affectedFaces.Contains(graphFace.SourceFaceIndex);
-                if (!affectedFace)
-                {
-                    rebuiltFaces.Add(
-                        new PolygonFace(
-                            new List<Vector3>(graphFace.SourceFace.Vertices),
-                            graphFace.SourceFace.Normal,
-                            graphFace.SourceFace.Feature,
-                            graphFace.SourceFace.FeatureStrength));
-                    continue;
-                }
-
-                stats.DeterministicKernelFaceOffsetPolygonAttemptCount++;
-                if (!TryBuildDeterministicFaceOffsetPolygon(
-                        graph,
-                        graphFace,
-                        selectedEdgeIndices,
-                        affectedVertices,
-                        bevelDepth,
-                        minimumStableFaceArea,
-                        minimumStableEdgeLength,
-                        out PolygonFace replacementFace,
-                        rails,
-                        vertexCapPoints))
-                {
-                    stats.DeterministicKernelFaceOffsetPolygonFailedCount++;
-                    stats.RegisterReject(EdgeWearBevelRejectReason.ValidationBaseFace);
-                    rebuiltFaces = null;
-                    return false;
-                }
-
-                rebuiltFaces.Add(replacementFace);
-                stats.DeterministicKernelFaceOffsetPolygonBuiltCount++;
-            }
-
-            int expectedRails = 0;
-            for (int i = 0; i < graph.Faces.Count; i++)
-            {
-                expectedRails += graph.Faces[i].EdgeIndices.Count;
-            }
-
-            stats.DeterministicKernelRailsExpectedCount = expectedRails;
-            stats.DeterministicKernelRailsBuiltCount = rails.Count;
-
-            for (int graphEdgeIndex = 0;
-                 graphEdgeIndex < graph.Edges.Count;
-                 graphEdgeIndex++)
-            {
-                EdgeWearGraphEdge edge = graph.Edges[graphEdgeIndex];
-                if (edge.FaceA < 0 || edge.FaceB < 0)
-                {
-                    continue;
-                }
-
-                bool selected = selectedEdgeIndices.Contains(graphEdgeIndex);
-                if (selected)
-                {
-                    stats.DeterministicKernelLocalBevelFaceAttemptCount++;
-                }
-
-                if (!TryGetRail(
-                        rails,
-                        edge.FaceA,
-                        graphEdgeIndex,
-                        out DeterministicBevelRailRecord railA) ||
-                    !TryGetRail(
-                        rails,
-                        edge.FaceB,
-                        graphEdgeIndex,
-                        out DeterministicBevelRailRecord railB))
-                {
-                    if (selected)
-                    {
-                        stats.DeterministicKernelRailsMissingCount++;
-                        stats.DeterministicKernelLocalBevelFaceFailedCount++;
-                    }
-
-                    continue;
-                }
-
-                if (selected)
-                {
-                    if (!TryBuildDeterministicEdgeBridgeFace(
-                            railA,
-                            railB,
-                            PolygonFaceFeature.ConvexEdgeWear,
-                            ResolveSelectedEdgeFeatureStrength(
-                                edgeRecords,
-                                graphEdgeIndex),
-                            ResolveSelectedEdgeNormal(
-                                edgeRecords,
-                                graphEdgeIndex,
-                                railA,
-                                railB),
-                            minimumStableFaceArea,
-                            minimumStableEdgeLength,
-                            out PolygonFace bevelFace))
-                    {
-                        stats.DeterministicKernelLocalBevelFaceFailedCount++;
-                        continue;
-                    }
-
-                    rebuiltFaces.Add(bevelFace);
-                    stats.DeterministicKernelLocalBevelFaceBuiltCount++;
-                    stats.DeterministicKernelBevelFacesBuiltCount++;
-                    continue;
-                }
-
-                if (RailsCoincide(railA, railB, minimumStableEdgeLength))
-                {
-                    continue;
-                }
-
-                if (TryBuildDeterministicEdgeBridgeFace(
-                        railA,
-                        railB,
-                        PolygonFaceFeature.Base,
-                        0f,
-                        Vector3.zero,
-                        minimumStableFaceArea,
-                        minimumStableEdgeLength,
-                        out PolygonFace transitionFace))
-                {
-                    rebuiltFaces.Add(transitionFace);
-                    stats.DeterministicKernelTransitionFacesBuiltCount++;
-                }
-            }
-
-            stats.DeterministicKernelSupportedEdgeCount =
-                stats.DeterministicKernelLocalBevelFaceBuiltCount;
-            stats.DeterministicKernelDeferredEdgeCount = Mathf.Max(
-                0,
-                edgeRecords.Count - stats.DeterministicKernelLocalBevelFaceBuiltCount);
-
-            for (int i = 0; i < vertexRecords.Count; i++)
-            {
-                DeterministicBevelVertexRecord vertex = vertexRecords[i];
-                if (!affectedVertices.Contains(vertex.VertexIndex))
-                {
-                    continue;
-                }
-
-                stats.DeterministicKernelVertexCapAttemptCount++;
-                RegisterDeterministicVertexCapAttempt(vertex.Case, ref stats);
-                if (!vertexCapPoints.TryGetValue(
-                        vertex.VertexIndex,
-                        out List<DeterministicBevelVertexCapPoint> points))
-                {
-                    stats.DeterministicKernelVertexCapFailedCount++;
-                    RegisterDeterministicVertexCapFailure(vertex.Case, ref stats);
-                    stats.DeterministicKernelVertexCapDuplicatePointFailureCount++;
-                    continue;
-                }
-
-                if (!TryBuildDeterministicVertexCapFaces(
-                        graph,
-                        vertex,
-                        points,
-                        minimumStableFaceArea,
-                        minimumStableEdgeLength,
-                        out List<PolygonFace> capFaces,
-                        ref stats))
-                {
-                    stats.DeterministicKernelVertexCapFailedCount++;
-                    RegisterDeterministicVertexCapFailure(vertex.Case, ref stats);
-                    continue;
-                }
-
-                rebuiltFaces.AddRange(capFaces);
-                stats.DeterministicKernelVertexCapBuiltCount++;
-                RegisterDeterministicVertexCapBuilt(vertex.Case, ref stats);
-            }
-
-            if (stats.DeterministicKernelFaceOffsetPolygonBuiltCount == 0 ||
-                stats.DeterministicKernelLocalBevelFaceBuiltCount == 0)
-            {
-                stats.RegisterReject(EdgeWearBevelRejectReason.ValidationBevelFace);
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool TryBuildDeterministicFaceOffsetPolygon(
-            EdgeWearTopologyGraph graph,
-            EdgeWearGraphFace graphFace,
-            HashSet<int> selectedEdgeIndices,
-            HashSet<int> affectedVertices,
-            float bevelDepth,
-            float minimumStableFaceArea,
-            float minimumStableEdgeLength,
-            out PolygonFace replacementFace,
-            Dictionary<DeterministicBevelRailKey, DeterministicBevelRailRecord> rails,
-            Dictionary<int, List<DeterministicBevelVertexCapPoint>> vertexCapPoints)
-        {
-            replacementFace = null;
-            PolygonFace sourceFace = graphFace.SourceFace;
-            int vertexCount = graphFace.VertexIndices.Count;
-            if (vertexCount < 3 || graphFace.EdgeIndices.Count != vertexCount)
-            {
-                return false;
-            }
-
-            List<DeterministicFaceOffsetLine> lines =
-                new List<DeterministicFaceOffsetLine>(vertexCount);
-            float minimumFaceEdgeLength = float.PositiveInfinity;
-            for (int i = 0; i < vertexCount; i++)
-            {
-                Vector3 start = graph.Vertices[graphFace.VertexIndices[i]].Position;
-                Vector3 end = graph.Vertices[graphFace.VertexIndices[(i + 1) % vertexCount]].Position;
-                minimumFaceEdgeLength = Mathf.Min(
-                    minimumFaceEdgeLength,
-                    (end - start).magnitude);
-            }
-
-            float localWidth = Mathf.Min(
-                bevelDepth,
-                Mathf.Max(minimumStableEdgeLength * 2f, minimumFaceEdgeLength * 0.22f));
-
-            for (int i = 0; i < vertexCount; i++)
-            {
-                int edgeIndex = graphFace.EdgeIndices[i];
-                Vector3 start = graph.Vertices[graphFace.VertexIndices[i]].Position;
-                Vector3 end = graph.Vertices[graphFace.VertexIndices[(i + 1) % vertexCount]].Position;
-                Vector3 edgeVector = end - start;
-                if (edgeVector.sqrMagnitude <= MinimumEdgeLengthSqr)
-                {
-                    return false;
-                }
-
-                Vector3 direction = edgeVector.normalized;
-                Vector3 inward = Vector3.Cross(sourceFace.Normal, direction);
-                if (inward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(inward))
-                {
-                    return false;
-                }
-
-                inward.Normalize();
-                bool selected = selectedEdgeIndices.Contains(edgeIndex);
-                Vector3 point = selected
-                    ? start + inward * localWidth
-                    : start;
-
-                lines.Add(
-                    new DeterministicFaceOffsetLine(
-                        edgeIndex,
-                        graphFace.VertexIndices[i],
-                        graphFace.VertexIndices[(i + 1) % vertexCount],
-                        selected,
-                        start,
-                        point,
-                        direction,
-                        inward));
-            }
-
-            List<Vector3> replacementPoints = new List<Vector3>(vertexCount);
-            for (int i = 0; i < vertexCount; i++)
-            {
-                DeterministicFaceOffsetLine previous =
-                    lines[(i - 1 + vertexCount) % vertexCount];
-                DeterministicFaceOffsetLine current = lines[i];
-                int vertexIndex = graphFace.VertexIndices[i];
-                Vector3 original = graph.Vertices[vertexIndex].Position;
-
-                Vector3 corner;
-                if (!TryIntersectFaceOffsetLines(
-                        previous,
-                        current,
-                        sourceFace.Normal,
-                        out corner))
-                {
-                    Vector3 offset = Vector3.zero;
-                    if (previous.Selected)
-                    {
-                        offset += previous.Inward;
-                    }
-
-                    if (current.Selected)
-                    {
-                        offset += current.Inward;
-                    }
-
-                    corner = offset.sqrMagnitude > MinimumEdgeLengthSqr
-                        ? original + offset.normalized * localWidth
-                        : original;
-                }
-
-                replacementPoints.Add(corner);
-                if (affectedVertices.Contains(vertexIndex))
-                {
-                    AddVertexCapPoint(
-                        vertexCapPoints,
-                        vertexIndex,
-                        graphFace.SourceFaceIndex,
-                        previous.GraphEdgeIndex,
-                        current.GraphEdgeIndex,
-                        corner);
-                }
-            }
-
-            List<Vector3> cleaned = SanitizePolygon(
-                replacementPoints,
-                sourceFace.Normal);
-            if (cleaned.Count != replacementPoints.Count ||
-                cleaned.Count < 3 ||
-                CalculatePolygonArea(cleaned) <= minimumStableFaceArea ||
-                !FaceEdgesAreStable(cleaned, minimumStableEdgeLength))
-            {
-                return false;
-            }
-
-            replacementFace = new PolygonFace(
-                cleaned,
-                sourceFace.Normal,
-                PolygonFaceFeature.Base,
-                0f);
-
-            for (int i = 0; i < vertexCount; i++)
-            {
-                DeterministicBevelRailKey key =
-                    new DeterministicBevelRailKey(
-                        graphFace.SourceFaceIndex,
-                        graphFace.EdgeIndices[i]);
-                rails[key] =
-                    new DeterministicBevelRailRecord(
-                        graphFace.SourceFaceIndex,
-                        graphFace.EdgeIndices[i],
-                        graphFace.VertexIndices[i],
-                        graphFace.VertexIndices[(i + 1) % vertexCount],
-                        replacementPoints[i],
-                        replacementPoints[(i + 1) % vertexCount]);
-            }
-
-            return true;
-        }
-
-        private static bool TryIntersectFaceOffsetLines(
-            DeterministicFaceOffsetLine first,
-            DeterministicFaceOffsetLine second,
-            Vector3 normal,
-            out Vector3 point)
-        {
-            point = Vector3.zero;
-            Vector3 tangent = first.Direction;
-            if (tangent.sqrMagnitude <= MinimumEdgeLengthSqr)
-            {
-                return false;
-            }
-
-            tangent.Normalize();
-            Vector3 bitangent = Vector3.Cross(normal, tangent);
-            if (bitangent.sqrMagnitude <= MinimumEdgeLengthSqr)
-            {
-                return false;
-            }
-
-            bitangent.Normalize();
-
-            Vector2 p = new Vector2(
-                Vector3.Dot(first.Point, tangent),
-                Vector3.Dot(first.Point, bitangent));
-            Vector2 r = new Vector2(
-                Vector3.Dot(first.Direction, tangent),
-                Vector3.Dot(first.Direction, bitangent));
-            Vector2 q = new Vector2(
-                Vector3.Dot(second.Point, tangent),
-                Vector3.Dot(second.Point, bitangent));
-            Vector2 s = new Vector2(
-                Vector3.Dot(second.Direction, tangent),
-                Vector3.Dot(second.Direction, bitangent));
-
-            float denominator = Cross2D(r, s);
-            if (Mathf.Abs(denominator) <= PlaneEpsilon)
-            {
-                return false;
-            }
-
-            Vector2 delta = q - p;
-            float t = Cross2D(delta, s) / denominator;
-            point = first.Point + first.Direction * t;
-            return IsFinite(point);
-        }
-
-        private static bool TryGetRail(
-            Dictionary<DeterministicBevelRailKey, DeterministicBevelRailRecord> rails,
-            int faceIndex,
-            int graphEdgeIndex,
-            out DeterministicBevelRailRecord rail)
-        {
-            return rails.TryGetValue(
-                new DeterministicBevelRailKey(faceIndex, graphEdgeIndex),
-                out rail);
-        }
-
-        private static bool TryBuildDeterministicEdgeBridgeFace(
-            DeterministicBevelRailRecord first,
-            DeterministicBevelRailRecord second,
-            PolygonFaceFeature feature,
-            float featureStrength,
-            Vector3 preferredNormal,
-            float minimumStableFaceArea,
-            float minimumStableEdgeLength,
-            out PolygonFace face)
-        {
-            face = null;
-            Vector3 firstStart = first.StartPoint;
-            Vector3 firstEnd = first.EndPoint;
-            Vector3 secondStart = GetRailPointForVertex(second, first.StartVertexIndex);
-            Vector3 secondEnd = GetRailPointForVertex(second, first.EndVertexIndex);
-
-            if (!IsFinite(secondStart) || !IsFinite(secondEnd))
-            {
-                return false;
-            }
-
-            List<Vector3> points = new List<Vector3>
-            {
-                firstStart,
-                firstEnd,
-                secondEnd,
-                secondStart
-            };
-
-            Vector3 normal = preferredNormal.sqrMagnitude > MinimumEdgeLengthSqr
-                ? preferredNormal.normalized
-                : CalculatePolygonNormal(points);
-            if (normal.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(normal))
-            {
-                return false;
-            }
-
-            points = SanitizePolygon(points, normal);
-            if (points.Count < 3 ||
-                CalculatePolygonArea(points) <= minimumStableFaceArea ||
-                !FaceEdgesAreStable(points, minimumStableEdgeLength))
-            {
-                return false;
-            }
-
-            face = new PolygonFace(
-                points,
-                normal,
-                feature,
-                featureStrength);
-            return true;
-        }
-
-        private static bool TryBuildDeterministicVertexCapFaces(
-            EdgeWearTopologyGraph graph,
-            DeterministicBevelVertexRecord vertex,
-            List<DeterministicBevelVertexCapPoint> rawPoints,
-            float minimumStableFaceArea,
-            float minimumStableEdgeLength,
-            out List<PolygonFace> capFaces,
-            ref EdgeWearBevelBuildStats stats)
-        {
-            if (vertex.Case == DeterministicBevelVertexCase.IsolatedEndpoint)
-            {
-                return TryBuildLowValenceDeterministicVertexCapFaces(
-                    graph,
-                    vertex,
-                    rawPoints,
-                    out capFaces,
-                    ref stats);
-            }
-
-            if (vertex.Case == DeterministicBevelVertexCase.TwoEdgeCorner)
-            {
-                return TryBuildTwoEdgeCornerDeterministicVertexCapFaces(
-                    graph,
-                    vertex,
-                    rawPoints,
-                    out capFaces,
-                    ref stats);
-            }
-
-            capFaces = null;
-            if (!TryBuildOrderedVertexCapBoundary(
-                    graph,
-                    vertex,
-                    rawPoints,
-                    out List<Vector3> boundary,
-                    out Vector3 outward,
-                    ref stats))
-            {
-                return false;
-            }
-
-            if (boundary.Count < 3)
-            {
-                stats.DeterministicKernelVertexCapTooSmallFailureCount++;
-                return false;
-            }
-
-            Vector3 centre = CalculateAverage(boundary);
-            if (!IsFinite(centre))
-            {
-                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
-                return false;
-            }
-
-            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
-            {
-                outward = graph.Vertices[vertex.VertexIndex].Position - centre;
-            }
-
-            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
-            {
-                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
-                return false;
-            }
-
-            outward.Normalize();
-            capFaces = new List<PolygonFace>(boundary.Count);
-            for (int i = 0; i < boundary.Count; i++)
-            {
-                Vector3 a = centre;
-                Vector3 b = boundary[i];
-                Vector3 c = boundary[(i + 1) % boundary.Count];
-                if (PreviewTriangleEmission(
-                        a,
-                        b,
-                        c,
-                        outward,
-                        0f) != TriangleEmissionPreviewResult.Emitted)
-                {
-                    stats.DeterministicKernelVertexCapAreaFailureCount++;
-                    return false;
-                }
-
-                Vector3 triangleNormal = Vector3.Cross(b - a, c - a);
-                if (triangleNormal.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(triangleNormal))
-                {
-                    stats.DeterministicKernelVertexCapAreaFailureCount++;
-                    return false;
-                }
-
-                if (Vector3.Dot(triangleNormal, outward) < 0f)
-                {
-                    Vector3 temporary = b;
-                    b = c;
-                    c = temporary;
-                    triangleNormal = -triangleNormal;
-                }
-
-                List<Vector3> triangle = new List<Vector3> { a, b, c };
-                if (CalculatePolygonArea(triangle) <= minimumStableFaceArea ||
-                    !FaceEdgesAreStable(triangle, minimumStableEdgeLength))
-                {
-                    stats.DeterministicKernelVertexCapAreaFailureCount++;
-                    return false;
-                }
-
-                capFaces.Add(
-                    new PolygonFace(
-                        triangle,
-                        triangleNormal.normalized,
-                        PolygonFaceFeature.ConvexEdgeWear,
-                        1f));
-            }
-
-            if (capFaces.Count != boundary.Count)
-            {
-                stats.DeterministicKernelVertexCapTooSmallFailureCount++;
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool TryBuildLowValenceDeterministicVertexCapFaces(
-            EdgeWearTopologyGraph graph,
-            DeterministicBevelVertexRecord vertex,
-            List<DeterministicBevelVertexCapPoint> rawPoints,
-            out List<PolygonFace> capFaces,
-            ref EdgeWearBevelBuildStats stats)
-        {
-            capFaces = null;
-            stats.DeterministicKernelVertexCapLowValenceAttemptCount++;
-
-            if (vertex.VertexIndex < 0 || vertex.VertexIndex >= graph.Vertices.Count)
-            {
-                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
-                stats.DeterministicKernelVertexCapLowValenceFailedCount++;
-                return false;
-            }
-
-            Vector3 apex = graph.Vertices[vertex.VertexIndex].Position;
-            if (!IsFinite(apex))
-            {
-                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
-                stats.DeterministicKernelVertexCapLowValenceFailedCount++;
-                return false;
-            }
-
-            Vector3 outward = CalculateVertexStarNormal(graph, vertex.VertexIndex);
-            List<Vector3> boundary = CollectUniqueVertexCapPoints(rawPoints, apex);
-            if (boundary.Count < 2)
-            {
-                stats.DeterministicKernelVertexCapLowValenceInsufficientBoundaryFailureCount++;
-                stats.DeterministicKernelVertexCapLowValenceFailedCount++;
-                return false;
-            }
-
-            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
-            {
-                Vector3 average = CalculateAverage(boundary);
-                outward = apex - average;
-            }
-
-            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
-            {
-                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
-                stats.DeterministicKernelVertexCapLowValenceFailedCount++;
-                return false;
-            }
-
-            outward.Normalize();
-            SortVertexCapBoundaryByAngle(boundary, apex, outward);
-            capFaces = new List<PolygonFace>(Mathf.Max(1, boundary.Count));
-            int triangleCount = boundary.Count == 2 ? 1 : boundary.Count;
-            for (int i = 0; i < triangleCount; i++)
-            {
-                Vector3 a = apex;
-                Vector3 b = boundary[i];
-                Vector3 c = boundary[(i + 1) % boundary.Count];
-                if (!TryCreateDeterministicVertexCapTriangle(
-                        a,
-                        b,
-                        c,
-                        outward,
-                        out PolygonFace triangleFace))
-                {
-                    stats.DeterministicKernelVertexCapAreaFailureCount++;
-                    stats.DeterministicKernelVertexCapLowValenceFailedCount++;
-                    return false;
-                }
-
-                capFaces.Add(triangleFace);
-                stats.DeterministicKernelVertexCapLowValenceApexTriangleBuiltCount++;
-            }
-
-            if (capFaces.Count == 0)
-            {
-                stats.DeterministicKernelVertexCapTooSmallFailureCount++;
-                stats.DeterministicKernelVertexCapLowValenceFailedCount++;
-                return false;
-            }
-
-            stats.DeterministicKernelVertexCapLowValenceBuiltCount++;
-            return true;
-        }
-
-        private static bool TryBuildTwoEdgeCornerDeterministicVertexCapFaces(
-            EdgeWearTopologyGraph graph,
-            DeterministicBevelVertexRecord vertex,
-            List<DeterministicBevelVertexCapPoint> rawPoints,
-            out List<PolygonFace> capFaces,
-            ref EdgeWearBevelBuildStats stats)
-        {
-            capFaces = null;
-            stats.DeterministicKernelVertexCapTwoEdgeCornerPatchAttemptCount++;
-
-            if (vertex.VertexIndex < 0 || vertex.VertexIndex >= graph.Vertices.Count)
-            {
-                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
-                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
-                return false;
-            }
-
-            Vector3 origin = graph.Vertices[vertex.VertexIndex].Position;
-            if (!IsFinite(origin))
-            {
-                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
-                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
-                return false;
-            }
-
-            List<Vector3> boundary = CollectUniqueVertexCapPoints(rawPoints, origin);
-            if (boundary.Count < 3)
-            {
-                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchInsufficientBoundaryFailureCount++;
-                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
-                return false;
-            }
-
-            Vector3 outward = CalculateVertexStarNormal(graph, vertex.VertexIndex);
-            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
-            {
-                Vector3 average = CalculateAverage(boundary);
-                outward = origin - average;
-            }
-
-            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
-            {
-                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
-                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
-                return false;
-            }
-
-            outward.Normalize();
-            SortVertexCapBoundaryByAngle(boundary, origin, outward);
-
-            if (!TryCalculateRawPolygonNormal(
-                    boundary,
-                    PointMergeDistance,
-                    out Vector3 boundaryNormal))
-            {
-                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchAreaFailureCount++;
-                stats.DeterministicKernelVertexCapAreaFailureCount++;
-                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
-                return false;
-            }
-
-            if (Vector3.Dot(boundaryNormal, outward) < 0f)
-            {
-                boundary.Reverse();
-            }
-
-            capFaces = new List<PolygonFace>(boundary.Count);
-            if (boundary.Count == 3)
-            {
-                if (!TryCreateDeterministicVertexCapTriangle(
-                        boundary[0],
-                        boundary[1],
-                        boundary[2],
-                        outward,
-                        out PolygonFace triangleFace))
-                {
-                    stats.DeterministicKernelVertexCapTwoEdgeCornerPatchAreaFailureCount++;
-                    stats.DeterministicKernelVertexCapAreaFailureCount++;
-                    stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
-                    return false;
-                }
-
-                capFaces.Add(triangleFace);
-                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchTriangleBuiltCount++;
-            }
-            else
-            {
-                Vector3 centre = CalculateAverage(boundary);
-                if (!IsFinite(centre))
-                {
-                    stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
-                    stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
-                    return false;
-                }
-
-                for (int i = 0; i < boundary.Count; i++)
-                {
-                    if (!TryCreateDeterministicVertexCapTriangle(
-                            centre,
-                            boundary[i],
-                            boundary[(i + 1) % boundary.Count],
-                            outward,
-                            out PolygonFace triangleFace))
-                    {
-                        stats.DeterministicKernelVertexCapTwoEdgeCornerPatchAreaFailureCount++;
-                        stats.DeterministicKernelVertexCapAreaFailureCount++;
-                        stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
-                        return false;
-                    }
-
-                    capFaces.Add(triangleFace);
-                    stats.DeterministicKernelVertexCapTwoEdgeCornerPatchTriangleBuiltCount++;
-                }
-            }
-
-            if (capFaces.Count == 0)
-            {
-                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchAreaFailureCount++;
-                stats.DeterministicKernelVertexCapAreaFailureCount++;
-                stats.DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount++;
-                return false;
-            }
-
-            stats.DeterministicKernelVertexCapTwoEdgeCornerPatchBuiltCount++;
-            return true;
-        }
-
-        private static bool TryCreateDeterministicVertexCapTriangle(
-            Vector3 a,
-            Vector3 b,
-            Vector3 c,
-            Vector3 outward,
-            out PolygonFace face)
-        {
-            face = null;
-            if (PreviewTriangleEmission(
-                    a,
-                    b,
-                    c,
-                    outward,
-                    0f) != TriangleEmissionPreviewResult.Emitted)
-            {
-                return false;
-            }
-
-            Vector3 triangleNormal = Vector3.Cross(b - a, c - a);
-            if (triangleNormal.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(triangleNormal))
-            {
-                return false;
-            }
-
-            if (Vector3.Dot(triangleNormal, outward) < 0f)
-            {
-                Vector3 temporary = b;
-                b = c;
-                c = temporary;
-                triangleNormal = -triangleNormal;
-            }
-
-            face = new PolygonFace(
-                new List<Vector3> { a, b, c },
-                triangleNormal.normalized,
-                PolygonFaceFeature.ConvexEdgeWear,
-                1f);
-            return true;
-        }
-
-        private static List<Vector3> CollectUniqueVertexCapPoints(
-            List<DeterministicBevelVertexCapPoint> rawPoints,
-            Vector3 apex)
-        {
-            List<Vector3> unique = new List<Vector3>();
-            for (int i = 0; i < rawPoints.Count; i++)
-            {
-                Vector3 point = rawPoints[i].Point;
-                if (!IsFinite(point) ||
-                    (point - apex).sqrMagnitude <= PointMergeDistanceSqr)
-                {
-                    continue;
-                }
-
-                bool duplicate = false;
-                for (int j = 0; j < unique.Count; j++)
-                {
-                    if ((point - unique[j]).sqrMagnitude <= PointMergeDistanceSqr)
-                    {
-                        duplicate = true;
-                        break;
-                    }
-                }
-
-                if (!duplicate)
-                {
-                    unique.Add(point);
-                }
-            }
-
-            return unique;
-        }
-
-        private static void SortVertexCapBoundaryByAngle(
-            List<Vector3> boundary,
-            Vector3 origin,
-            Vector3 outward)
-        {
-            if (boundary.Count <= 2)
-            {
-                return;
-            }
-
-            Vector3 tangent = Mathf.Abs(outward.y) < 0.9f
-                ? Vector3.Cross(outward, Vector3.up)
-                : Vector3.Cross(outward, Vector3.right);
-            if (tangent.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(tangent))
-            {
-                return;
-            }
-
-            tangent.Normalize();
-            Vector3 bitangent = Vector3.Cross(outward, tangent);
-            if (bitangent.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(bitangent))
-            {
-                return;
-            }
-
-            bitangent.Normalize();
-            boundary.Sort((left, right) =>
-            {
-                Vector3 leftOffset = left - origin;
-                Vector3 rightOffset = right - origin;
-                float leftAngle = Mathf.Atan2(
-                    Vector3.Dot(leftOffset, bitangent),
-                    Vector3.Dot(leftOffset, tangent));
-                float rightAngle = Mathf.Atan2(
-                    Vector3.Dot(rightOffset, bitangent),
-                    Vector3.Dot(rightOffset, tangent));
-                return leftAngle.CompareTo(rightAngle);
-            });
-        }
-
-        private static bool TryBuildOrderedVertexCapBoundary(
-            EdgeWearTopologyGraph graph,
-            DeterministicBevelVertexRecord vertex,
-            List<DeterministicBevelVertexCapPoint> rawPoints,
-            out List<Vector3> boundary,
-            out Vector3 outward,
-            ref EdgeWearBevelBuildStats stats)
-        {
-            boundary = new List<Vector3>();
-            outward = Vector3.zero;
-            if (vertex.VertexIndex < 0 || vertex.VertexIndex >= graph.Vertices.Count)
-            {
-                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
-                return false;
-            }
-
-            EdgeWearGraphVertex graphVertex = graph.Vertices[vertex.VertexIndex];
-            Dictionary<int, Vector3> pointByFace = new Dictionary<int, Vector3>();
-            for (int i = 0; i < rawPoints.Count; i++)
-            {
-                DeterministicBevelVertexCapPoint capPoint = rawPoints[i];
-                if (!IsFinite(capPoint.Point))
-                {
-                    stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
-                    continue;
-                }
-
-                if (!pointByFace.ContainsKey(capPoint.FaceIndex))
-                {
-                    pointByFace.Add(capPoint.FaceIndex, capPoint.Point);
-                }
-            }
-
-            if (pointByFace.Count < 3)
-            {
-                stats.DeterministicKernelVertexCapDuplicatePointFailureCount++;
-                return false;
-            }
-
-            outward = CalculateVertexStarNormal(graph, vertex.VertexIndex);
-            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
-            {
-                Vector3 average = Vector3.zero;
-                foreach (Vector3 point in pointByFace.Values)
-                {
-                    average += point;
-                }
-
-                average /= pointByFace.Count;
-                outward = graphVertex.Position - average;
-            }
-
-            if (outward.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(outward))
-            {
-                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
-                return false;
-            }
-
-            outward.Normalize();
-            Vector3 tangent = Mathf.Abs(outward.y) < 0.9f
-                ? Vector3.Cross(outward, Vector3.up)
-                : Vector3.Cross(outward, Vector3.right);
-            if (tangent.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(tangent))
-            {
-                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
-                return false;
-            }
-
-            tangent.Normalize();
-            Vector3 bitangent = Vector3.Cross(outward, tangent);
-            if (bitangent.sqrMagnitude <= MinimumEdgeLengthSqr || !IsFinite(bitangent))
-            {
-                stats.DeterministicKernelVertexCapNonFiniteFailureCount++;
-                return false;
-            }
-
-            bitangent.Normalize();
-            List<DeterministicBevelVertexCapPoint> ordered =
-                new List<DeterministicBevelVertexCapPoint>(pointByFace.Count);
-            foreach (KeyValuePair<int, Vector3> pair in pointByFace)
-            {
-                ordered.Add(new DeterministicBevelVertexCapPoint(pair.Key, pair.Value));
-            }
-
-            Vector3 origin = graphVertex.Position;
-            ordered.Sort((left, right) =>
-            {
-                Vector3 leftOffset = left.Point - origin;
-                Vector3 rightOffset = right.Point - origin;
-                float leftAngle = Mathf.Atan2(
-                    Vector3.Dot(leftOffset, bitangent),
-                    Vector3.Dot(leftOffset, tangent));
-                float rightAngle = Mathf.Atan2(
-                    Vector3.Dot(rightOffset, bitangent),
-                    Vector3.Dot(rightOffset, tangent));
-                return leftAngle.CompareTo(rightAngle);
-            });
-
-            for (int i = 0; i < ordered.Count; i++)
-            {
-                Vector3 point = ordered[i].Point;
-                bool duplicate = false;
-                for (int j = 0; j < boundary.Count; j++)
-                {
-                    if ((point - boundary[j]).sqrMagnitude <= PointMergeDistanceSqr)
-                    {
-                        duplicate = true;
-                        break;
-                    }
-                }
-
-                if (!duplicate)
-                {
-                    boundary.Add(point);
-                }
-            }
-
-            if (boundary.Count < 3)
-            {
-                stats.DeterministicKernelVertexCapDuplicatePointFailureCount++;
-                return false;
-            }
-
-            if (!TryCalculateRawPolygonNormal(
-                    boundary,
-                    PointMergeDistance,
-                    out Vector3 boundaryNormal))
-            {
-                stats.DeterministicKernelVertexCapAreaFailureCount++;
-                return false;
-            }
-
-            if (Vector3.Dot(boundaryNormal, outward) < 0f)
-            {
-                boundary.Reverse();
-            }
-
-            return true;
-        }
-
-        private static Vector3 CalculateVertexStarNormal(
-            EdgeWearTopologyGraph graph,
-            int vertexIndex)
-        {
-            Vector3 normal = Vector3.zero;
-            if (vertexIndex < 0 || vertexIndex >= graph.Vertices.Count)
-            {
-                return normal;
-            }
-
-            EdgeWearGraphVertex vertex = graph.Vertices[vertexIndex];
-            for (int i = 0; i < vertex.FaceIndices.Count; i++)
-            {
-                int faceIndex = vertex.FaceIndices[i];
-                if (faceIndex < 0 || faceIndex >= graph.Faces.Count)
-                {
-                    continue;
-                }
-
-                Vector3 faceNormal = graph.Faces[faceIndex].SourceFace.Normal;
-                if (faceNormal.sqrMagnitude > MinimumEdgeLengthSqr && IsFinite(faceNormal))
-                {
-                    normal += faceNormal.normalized;
-                }
-            }
-
-            return normal.sqrMagnitude > MinimumEdgeLengthSqr && IsFinite(normal)
-                ? normal.normalized
-                : Vector3.zero;
-        }
-
-        private static Vector3 GetRailPointForVertex(
-            DeterministicBevelRailRecord rail,
-            int vertexIndex)
-        {
-            if (rail.StartVertexIndex == vertexIndex)
-            {
-                return rail.StartPoint;
-            }
-
-            if (rail.EndVertexIndex == vertexIndex)
-            {
-                return rail.EndPoint;
-            }
-
-            return new Vector3(float.NaN, float.NaN, float.NaN);
-        }
-
-        private static bool RailsCoincide(
-            DeterministicBevelRailRecord first,
-            DeterministicBevelRailRecord second,
-            float minimumStableEdgeLength)
-        {
-            float tolerance = Mathf.Max(PointMergeDistance, minimumStableEdgeLength * 0.35f);
-            return
-                (AreWithinDistance(first.StartPoint, second.StartPoint, tolerance) &&
-                 AreWithinDistance(first.EndPoint, second.EndPoint, tolerance)) ||
-                (AreWithinDistance(first.StartPoint, second.EndPoint, tolerance) &&
-                 AreWithinDistance(first.EndPoint, second.StartPoint, tolerance));
-        }
-
-        private static Vector3 ResolveSelectedEdgeNormal(
-            List<DeterministicBevelEdgeRecord> edgeRecords,
-            int graphEdgeIndex,
-            DeterministicBevelRailRecord first,
-            DeterministicBevelRailRecord second)
-        {
-            for (int i = 0; i < edgeRecords.Count; i++)
-            {
-                if (edgeRecords[i].GraphEdgeIndex == graphEdgeIndex &&
-                    edgeRecords[i].Candidate.BevelNormal.sqrMagnitude > MinimumEdgeLengthSqr)
-                {
-                    return edgeRecords[i].Candidate.BevelNormal.normalized;
-                }
-            }
-
-            List<Vector3> points = new List<Vector3>
-            {
-                first.StartPoint,
-                first.EndPoint,
-                second.EndPoint,
-                second.StartPoint
-            };
-            return CalculatePolygonNormal(points);
-        }
-
-        private static float ResolveSelectedEdgeFeatureStrength(
-            List<DeterministicBevelEdgeRecord> edgeRecords,
-            int graphEdgeIndex)
-        {
-            for (int i = 0; i < edgeRecords.Count; i++)
-            {
-                if (edgeRecords[i].GraphEdgeIndex == graphEdgeIndex)
-                {
-                    return edgeRecords[i].Candidate.Strength;
-                }
-            }
-
-            return 1f;
-        }
-
-        private static void AddVertexCapPoint(
-            Dictionary<int, List<DeterministicBevelVertexCapPoint>> capPoints,
-            int vertexIndex,
-            int faceIndex,
-            int previousEdgeIndex,
-            int nextEdgeIndex,
-            Vector3 point)
-        {
-            if (!capPoints.TryGetValue(
-                    vertexIndex,
-                    out List<DeterministicBevelVertexCapPoint> points))
-            {
-                points = new List<DeterministicBevelVertexCapPoint>();
-                capPoints.Add(vertexIndex, points);
-            }
-
-            for (int i = 0; i < points.Count; i++)
-            {
-                DeterministicBevelVertexCapPoint existing = points[i];
-                if (existing.FaceIndex == faceIndex &&
-                    existing.PreviousEdgeIndex == previousEdgeIndex &&
-                    existing.NextEdgeIndex == nextEdgeIndex &&
-                    (existing.Point - point).sqrMagnitude <= PointMergeDistanceSqr)
-                {
-                    return;
-                }
-            }
-
-            points.Add(
-                new DeterministicBevelVertexCapPoint(
-                    faceIndex,
-                    previousEdgeIndex,
-                    nextEdgeIndex,
-                    point));
-        }
-
-        private static void RegisterDeterministicVertexCapAttempt(
-            DeterministicBevelVertexCase vertexCase,
-            ref EdgeWearBevelBuildStats stats)
-        {
-            switch (vertexCase)
-            {
-                case DeterministicBevelVertexCase.IsolatedEndpoint:
-                    stats.DeterministicKernelVertexCapIsolatedAttemptCount++;
-                    break;
-                case DeterministicBevelVertexCase.TwoEdgeCorner:
-                    stats.DeterministicKernelVertexCapTwoEdgeAttemptCount++;
-                    break;
-                case DeterministicBevelVertexCase.MultiEdgeStar:
-                    stats.DeterministicKernelVertexCapMultiStarAttemptCount++;
-                    break;
-            }
-        }
-
-        private static void RegisterDeterministicVertexCapBuilt(
-            DeterministicBevelVertexCase vertexCase,
-            ref EdgeWearBevelBuildStats stats)
-        {
-            switch (vertexCase)
-            {
-                case DeterministicBevelVertexCase.IsolatedEndpoint:
-                    stats.DeterministicKernelVertexCapIsolatedBuiltCount++;
-                    break;
-                case DeterministicBevelVertexCase.TwoEdgeCorner:
-                    stats.DeterministicKernelVertexCapTwoEdgeBuiltCount++;
-                    break;
-                case DeterministicBevelVertexCase.MultiEdgeStar:
-                    stats.DeterministicKernelVertexCapMultiStarBuiltCount++;
-                    break;
-            }
-        }
-
-        private static void RegisterDeterministicVertexCapFailure(
-            DeterministicBevelVertexCase vertexCase,
-            ref EdgeWearBevelBuildStats stats)
-        {
-            switch (vertexCase)
-            {
-                case DeterministicBevelVertexCase.IsolatedEndpoint:
-                    stats.DeterministicKernelVertexCapIsolatedFailedCount++;
-                    break;
-                case DeterministicBevelVertexCase.TwoEdgeCorner:
-                    stats.DeterministicKernelVertexCapTwoEdgeFailedCount++;
-                    break;
-                case DeterministicBevelVertexCase.MultiEdgeStar:
-                    stats.DeterministicKernelVertexCapMultiStarFailedCount++;
-                    break;
-            }
-        }
-
-        private static bool FaceEdgesAreStable(
-            List<Vector3> points,
-            float minimumStableEdgeLength)
-        {
-            float minimumStableEdgeLengthSqr =
-                minimumStableEdgeLength * minimumStableEdgeLength;
-            for (int i = 0; i < points.Count; i++)
-            {
-                if ((points[(i + 1) % points.Count] - points[i]).sqrMagnitude <=
-                    minimumStableEdgeLengthSqr)
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static float Cross2D(Vector2 left, Vector2 right)
-        {
-            return left.x * right.y - left.y * right.x;
-        }
-
-        private static void ApplyDeterministicKernelSourceStats(
-            EdgeWearTopologyGraph graph,
-            List<EdgeWearSelectedGraphEdge> selectedEdges,
-            List<DeterministicBevelEdgeRecord> edgeRecords,
-            List<DeterministicBevelVertexRecord> vertexRecords,
-            ref EdgeWearBevelBuildStats stats)
-        {
-            stats.DeterministicKernelMappedSelectedEdgeCount = selectedEdges.Count;
-            stats.DeterministicKernelSourceFaceCount = graph.Faces.Count;
-            stats.DeterministicKernelSourceEdgeCount = graph.Edges.Count;
-            stats.DeterministicKernelSourceVertexCount = graph.Vertices.Count;
-            stats.DeterministicKernelSelectedEdgeCount = edgeRecords.Count;
-            stats.DeterministicKernelAffectedVertexCount = vertexRecords.Count;
-
-            HashSet<int> affectedFaces = new HashSet<int>();
-            for (int i = 0; i < edgeRecords.Count; i++)
-            {
-                if (edgeRecords[i].FaceA >= 0)
-                {
-                    affectedFaces.Add(edgeRecords[i].FaceA);
-                }
-
-                if (edgeRecords[i].FaceB >= 0)
-                {
-                    affectedFaces.Add(edgeRecords[i].FaceB);
-                }
-            }
-
-            stats.DeterministicKernelAffectedFaceCount = affectedFaces.Count;
-            stats.DeterministicKernelUnaffectedFacePreservedCount = Mathf.Max(
-                0,
-                graph.Faces.Count - affectedFaces.Count);
-        }
-
-        private static void TriangulateConvexEdgeWearPolygons(
-            List<PolygonFace> faces,
-            float minimumStableFaceArea,
-            float minimumStableEdgeLength,
-            ref EdgeWearBevelBuildStats stats)
-        {
-            List<PolygonFace> rebuilt = new List<PolygonFace>(faces.Count);
-            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
-            {
-                PolygonFace face = faces[faceIndex];
-                if (face.Feature != PolygonFaceFeature.ConvexEdgeWear ||
-                    face.Vertices.Count <= 3)
-                {
-                    rebuilt.Add(face);
-                    continue;
-                }
-
-                List<Vector3> clean = SanitizePolygon(face.Vertices, face.Normal);
-                if (clean.Count < 3 ||
-                    CalculatePolygonArea(clean) <= minimumStableFaceArea)
-                {
-                    stats.DeterministicKernelConvexWearTriangulationFailedCount++;
-                    continue;
-                }
-
-                int builtTriangles = 0;
-                for (int i = 1; i < clean.Count - 1; i++)
-                {
-                    List<Vector3> triangle = new List<Vector3>
-                    {
-                        clean[0],
-                        clean[i],
-                        clean[i + 1]
-                    };
-
-                    triangle = SanitizePolygon(triangle, face.Normal);
-                    if (triangle.Count != 3 ||
-                        PreviewTriangleEmission(
-                            triangle[0],
-                            triangle[1],
-                            triangle[2],
-                            face.Normal,
-                            0f) != TriangleEmissionPreviewResult.Emitted)
-                    {
-                        stats.DeterministicKernelConvexWearTriangulationFailedCount++;
-                        continue;
-                    }
-
-                    rebuilt.Add(
-                        new PolygonFace(
-                            triangle,
-                            face.Normal,
-                            PolygonFaceFeature.ConvexEdgeWear,
-                            face.FeatureStrength));
-                    builtTriangles++;
-                }
-
-                if (builtTriangles > 0)
-                {
-                    stats.DeterministicKernelConvexWearPolygonsTriangulatedCount++;
-                    stats.DeterministicKernelConvexWearTrianglesBuiltCount +=
-                        builtTriangles;
-                }
-            }
-
-            faces.Clear();
-            faces.AddRange(rebuilt);
-        }
-
-        private static List<DeterministicBevelEdgeRecord> BuildDeterministicBevelEdgeRecords(
-            EdgeWearTopologyGraph graph,
-            List<EdgeWearSelectedGraphEdge> selectedEdges,
-            ref EdgeWearBevelBuildStats stats)
-        {
-            List<DeterministicBevelEdgeRecord> records =
-                new List<DeterministicBevelEdgeRecord>(selectedEdges.Count);
+            stats.SourceHalfEdgeCount = 0;
+            stats.SelectedManifoldEdgeCount = 0;
+            stats.SelectedBoundaryEdgeCount = 0;
+            stats.SelectedNonManifoldEdgeCount = 0;
+
+            List<ChamferHalfEdge> halfEdges = BuildChamferHalfEdges(graph);
+            stats.SourceHalfEdgeCount = halfEdges.Count;
 
             for (int i = 0; i < selectedEdges.Count; i++)
             {
-                EdgeWearSelectedGraphEdge selected = selectedEdges[i];
-                if (selected.GraphEdgeIndex < 0 ||
-                    selected.GraphEdgeIndex >= graph.Edges.Count)
+                EdgeWearGraphEdge edge = graph.Edges[selectedEdges[i].GraphEdgeIndex];
+                if (edge.ExtraFaceCount > 0)
                 {
-                    stats.DeterministicKernelInvalidAdjacencyEdgeCount++;
-                    continue;
+                    stats.SelectedNonManifoldEdgeCount++;
                 }
-
-                EdgeWearGraphEdge graphEdge = graph.Edges[selected.GraphEdgeIndex];
-                if (graphEdge.VertexA < 0 ||
-                    graphEdge.VertexA >= graph.Vertices.Count ||
-                    graphEdge.VertexB < 0 ||
-                    graphEdge.VertexB >= graph.Vertices.Count ||
-                    graphEdge.FaceA < 0 ||
-                    graphEdge.FaceB < 0 ||
-                    graphEdge.ExtraFaceCount > 0)
+                else if (edge.FaceA < 0 || edge.FaceB < 0)
                 {
-                    stats.DeterministicKernelInvalidAdjacencyEdgeCount++;
-                    continue;
+                    stats.SelectedBoundaryEdgeCount++;
                 }
-
-                EdgeWearGraphVertex start = graph.Vertices[graphEdge.VertexA];
-                EdgeWearGraphVertex end = graph.Vertices[graphEdge.VertexB];
-                DeterministicBevelEdgeRecord record =
-                    new DeterministicBevelEdgeRecord(
-                        selected.GraphEdgeIndex,
-                        selected.Candidate,
-                        graphEdge.VertexA,
-                        graphEdge.VertexB,
-                        start.Position,
-                        end.Position,
-                        graphEdge.FaceA,
-                        graphEdge.FaceB);
-                records.Add(record);
+                else
+                {
+                    stats.SelectedManifoldEdgeCount++;
+                }
             }
 
-            return records;
+            TraceChamferBoundaryLoops(
+                graph,
+                halfEdges,
+                ref stats);
+            AuditChamferVertexFans(
+                graph,
+                halfEdges,
+                ref stats);
+
+            EdgeWearTopologyStats sourceTopology = AuditEdgeWearTopology(
+                sourceFaces,
+                minimumStableEdgeLength);
+            stats.SourceOpenEdgeCount = sourceTopology.OpenEdgeCount;
+            stats.SourceNonManifoldEdgeCount = sourceTopology.NonManifoldEdgeCount;
+            stats.SourceTJunctionCount = sourceTopology.TJunctionCount;
+
+            bool ready =
+                graphStats.InvalidFaceCount == 0 &&
+                graphStats.InvalidEdgeCount == 0 &&
+                graphStats.MissingSelectedGraphEdgeCount == 0 &&
+                graphStats.MismatchedSelectedGraphFaceCount == 0 &&
+                graphStats.DuplicateSelectedGraphEdgeCount == 0 &&
+                stats.SourceNonManifoldEdgeCount == 0 &&
+                stats.SourceTJunctionCount == 0 &&
+                stats.SelectedBoundaryEdgeCount == 0 &&
+                stats.SelectedNonManifoldEdgeCount == 0 &&
+                stats.BoundaryTraceFailureCount == 0 &&
+                stats.DisconnectedVertexFanCount == 0;
+
+            stats.Ready = ready ? 1 : 0;
+            stats.Blocked = ready ? 0 : 1;
+            if (!ready && string.IsNullOrEmpty(blocker))
+            {
+                blocker = "one or more EW-C topology readiness invariants failed";
+            }
+
+            if (ready)
+            {
+                context = new ChamferTopologyContext(
+                    graph,
+                    selectedEdges,
+                    halfEdges);
+            }
+
+            return ready;
         }
 
-        private static List<DeterministicBevelVertexRecord> BuildDeterministicBevelVertexRecords(
+        private static List<ChamferHalfEdge> BuildChamferHalfEdges(
+            EdgeWearTopologyGraph graph)
+        {
+            List<ChamferHalfEdge> halfEdges = new List<ChamferHalfEdge>();
+            Dictionary<long, int> directedByPair = new Dictionary<long, int>();
+
+            for (int faceIndex = 0; faceIndex < graph.Faces.Count; faceIndex++)
+            {
+                EdgeWearGraphFace face = graph.Faces[faceIndex];
+                int count = face.VertexIndices.Count;
+                int firstHalfEdge = halfEdges.Count;
+                for (int i = 0; i < count; i++)
+                {
+                    int origin = face.VertexIndices[i];
+                    int destination = face.VertexIndices[(i + 1) % count];
+                    ChamferHalfEdge halfEdge = new ChamferHalfEdge
+                    {
+                        Index = halfEdges.Count,
+                        OriginVertex = origin,
+                        DestinationVertex = destination,
+                        FaceIndex = faceIndex,
+                        SourceEdgeIndex = face.EdgeIndices[i],
+                        Next = firstHalfEdge + ((i + 1) % count),
+                        Previous = firstHalfEdge + ((i + count - 1) % count),
+                        Opposite = -1,
+                        IsSelected = graph.Edges[face.EdgeIndices[i]].Selected
+                    };
+                    halfEdges.Add(halfEdge);
+                    directedByPair[PackDirectedVertexPair(origin, destination)] = halfEdge.Index;
+                }
+            }
+
+            for (int i = 0; i < halfEdges.Count; i++)
+            {
+                ChamferHalfEdge halfEdge = halfEdges[i];
+                if (directedByPair.TryGetValue(
+                        PackDirectedVertexPair(
+                            halfEdge.DestinationVertex,
+                            halfEdge.OriginVertex),
+                        out int opposite))
+                {
+                    halfEdge.Opposite = opposite;
+                }
+            }
+
+            return halfEdges;
+        }
+
+        private static long PackDirectedVertexPair(int origin, int destination)
+        {
+            return ((long)origin << 32) | (uint)destination;
+        }
+
+        private static void TraceChamferBoundaryLoops(
             EdgeWearTopologyGraph graph,
-            List<DeterministicBevelEdgeRecord> edgeRecords,
-            ref EdgeWearBevelBuildStats stats)
+            List<ChamferHalfEdge> halfEdges,
+            ref ChamferReadinessStats stats)
         {
-            Dictionary<int, int> selectedIncidentCounts =
-                new Dictionary<int, int>();
-
-            for (int i = 0; i < edgeRecords.Count; i++)
+            Dictionary<int, List<int>> outgoingBoundaryByVertex =
+                new Dictionary<int, List<int>>();
+            for (int i = 0; i < halfEdges.Count; i++)
             {
-                AddIncidentSelectedBevelVertex(
-                    selectedIncidentCounts,
-                    edgeRecords[i].StartVertexIndex);
-                AddIncidentSelectedBevelVertex(
-                    selectedIncidentCounts,
-                    edgeRecords[i].EndVertexIndex);
-            }
-
-            List<DeterministicBevelVertexRecord> records =
-                new List<DeterministicBevelVertexRecord>(selectedIncidentCounts.Count);
-
-            foreach (KeyValuePair<int, int> pair in selectedIncidentCounts)
-            {
-                int vertexIndex = pair.Key;
-                int selectedIncidentCount = pair.Value;
-                if (vertexIndex < 0 || vertexIndex >= graph.Vertices.Count)
+                ChamferHalfEdge halfEdge = halfEdges[i];
+                if (halfEdge.Opposite >= 0)
                 {
-                    stats.DeterministicKernelBoundaryOrInvalidVertexCount++;
                     continue;
                 }
 
-                EdgeWearGraphVertex vertex = graph.Vertices[vertexIndex];
-                DeterministicBevelVertexCase vertexCase;
-                if (selectedIncidentCount <= 0)
+                if (!outgoingBoundaryByVertex.TryGetValue(
+                        halfEdge.OriginVertex,
+                        out List<int> outgoing))
                 {
-                    vertexCase = DeterministicBevelVertexCase.None;
+                    outgoing = new List<int>();
+                    outgoingBoundaryByVertex.Add(halfEdge.OriginVertex, outgoing);
                 }
-                else if (vertex.EdgeIndices.Count <= 0 || vertex.FaceIndices.Count <= 0)
-                {
-                    vertexCase = DeterministicBevelVertexCase.BoundaryOrInvalid;
-                    stats.DeterministicKernelBoundaryOrInvalidVertexCount++;
-                }
-                else if (selectedIncidentCount == 1)
-                {
-                    vertexCase = DeterministicBevelVertexCase.IsolatedEndpoint;
-                    stats.DeterministicKernelIsolatedEndpointVertexCount++;
-                }
-                else if (selectedIncidentCount == 2)
-                {
-                    vertexCase = DeterministicBevelVertexCase.TwoEdgeCorner;
-                    stats.DeterministicKernelTwoEdgeCornerVertexCount++;
-                }
-                else
-                {
-                    vertexCase = DeterministicBevelVertexCase.MultiEdgeStar;
-                    stats.DeterministicKernelMultiEdgeStarVertexCount++;
-                }
-
-                records.Add(
-                    new DeterministicBevelVertexRecord(
-                        vertexIndex,
-                        vertex.Key,
-                        vertex.Position,
-                        selectedIncidentCount,
-                        vertex.FaceIndices.Count,
-                        vertexCase));
+                outgoing.Add(i);
             }
 
-            for (int i = 0; i < edgeRecords.Count; i++)
+            HashSet<int> visited = new HashSet<int>();
+            for (int i = 0; i < halfEdges.Count; i++)
             {
-                DeterministicBevelEdgeRecord record = edgeRecords[i];
-                if (TryResolveDeterministicBevelVertexCase(
-                        records,
-                        record.StartVertexIndex,
-                        out DeterministicBevelVertexCase startCase) &&
-                    TryResolveDeterministicBevelVertexCase(
-                        records,
-                        record.EndVertexIndex,
-                        out DeterministicBevelVertexCase endCase) &&
-                    startCase == DeterministicBevelVertexCase.IsolatedEndpoint &&
-                    endCase == DeterministicBevelVertexCase.IsolatedEndpoint)
+                if (halfEdges[i].Opposite >= 0 || visited.Contains(i))
                 {
-                    stats.DeterministicKernelSupportedEdgeCount++;
+                    continue;
                 }
-                else
+
+                stats.SourceBoundaryLoopCount++;
+                int current = i;
+                int guard = 0;
+                while (guard++ <= halfEdges.Count)
                 {
-                    stats.DeterministicKernelDeferredEdgeCount++;
+                    if (!visited.Add(current))
+                    {
+                        if (current != i)
+                        {
+                            stats.BoundaryTraceFailureCount++;
+                        }
+                        break;
+                    }
+
+                    int destination = halfEdges[current].DestinationVertex;
+                    if (!outgoingBoundaryByVertex.TryGetValue(
+                            destination,
+                            out List<int> nextCandidates) ||
+                        nextCandidates.Count != 1)
+                    {
+                        stats.BoundaryTraceFailureCount++;
+                        break;
+                    }
+
+                    current = nextCandidates[0];
+                    if (current == i)
+                    {
+                        break;
+                    }
                 }
-            }
 
-            return records;
-        }
-
-        private static void AddIncidentSelectedBevelVertex(
-            Dictionary<int, int> counts,
-            int vertexIndex)
-        {
-            if (counts.TryGetValue(vertexIndex, out int count))
-            {
-                counts[vertexIndex] = count + 1;
-            }
-            else
-            {
-                counts.Add(vertexIndex, 1);
+                if (guard > halfEdges.Count)
+                {
+                    stats.BoundaryTraceFailureCount++;
+                }
             }
         }
 
-        private static bool TryResolveDeterministicBevelVertexCase(
-            List<DeterministicBevelVertexRecord> records,
-            int vertexIndex,
-            out DeterministicBevelVertexCase vertexCase)
+        private static void AuditChamferVertexFans(
+            EdgeWearTopologyGraph graph,
+            List<ChamferHalfEdge> halfEdges,
+            ref ChamferReadinessStats stats)
         {
-            for (int i = 0; i < records.Count; i++)
+            List<List<int>> outgoingByVertex = new List<List<int>>(graph.Vertices.Count);
+            for (int i = 0; i < graph.Vertices.Count; i++)
             {
-                if (records[i].VertexIndex == vertexIndex)
+                outgoingByVertex.Add(new List<int>());
+            }
+            for (int i = 0; i < halfEdges.Count; i++)
+            {
+                outgoingByVertex[halfEdges[i].OriginVertex].Add(i);
+            }
+
+            for (int vertexIndex = 0; vertexIndex < graph.Vertices.Count; vertexIndex++)
+            {
+                List<int> outgoing = outgoingByVertex[vertexIndex];
+                if (outgoing.Count == 0)
                 {
-                    vertexCase = records[i].Case;
+                    continue;
+                }
+
+                bool affected = false;
+                for (int i = 0; i < outgoing.Count; i++)
+                {
+                    affected |= halfEdges[outgoing[i]].IsSelected;
+                }
+                if (!affected)
+                {
+                    continue;
+                }
+
+                stats.AffectedVertexCount++;
+
+                int start = -1;
+                bool openFan = false;
+                for (int i = 0; i < outgoing.Count; i++)
+                {
+                    ChamferHalfEdge candidate = halfEdges[outgoing[i]];
+                    int previousOpposite = halfEdges[candidate.Previous].Opposite;
+                    if (previousOpposite < 0)
+                    {
+                        start = candidate.Index;
+                        openFan = true;
+                        break;
+                    }
+                }
+                if (start < 0)
+                {
+                    start = outgoing[0];
+                }
+
+                List<int> ordered = new List<int>(outgoing.Count);
+                HashSet<int> visited = new HashSet<int>();
+                int current = start;
+                int guard = 0;
+                while (current >= 0 && guard++ <= outgoing.Count)
+                {
+                    if (!visited.Add(current))
+                    {
+                        break;
+                    }
+                    ordered.Add(current);
+
+                    ChamferHalfEdge currentHalfEdge = halfEdges[current];
+                    int next = currentHalfEdge.Opposite >= 0
+                        ? halfEdges[currentHalfEdge.Opposite].Next
+                        : -1;
+                    if (next < 0 || next == start)
+                    {
+                        break;
+                    }
+                    if (halfEdges[next].OriginVertex != vertexIndex)
+                    {
+                        stats.DisconnectedVertexFanCount++;
+                        break;
+                    }
+                    current = next;
+                }
+
+                if (ordered.Count != outgoing.Count)
+                {
+                    stats.DisconnectedVertexFanCount++;
+                    continue;
+                }
+
+                if (openFan)
+                {
+                    stats.OpenVertexFanCount++;
+                }
+                else
+                {
+                    stats.ClosedVertexFanCount++;
+                }
+
+                int selectedRunCount = CountChamferSelectedRuns(
+                    ordered,
+                    halfEdges,
+                    openFan);
+                stats.SelectedRunCount += selectedRunCount;
+                if (selectedRunCount > 1)
+                {
+                    stats.MultipleSelectedRunVertexCount++;
+                }
+            }
+        }
+
+        private static int CountChamferSelectedRuns(
+            List<int> orderedHalfEdges,
+            List<ChamferHalfEdge> halfEdges,
+            bool openFan)
+        {
+            if (orderedHalfEdges == null || orderedHalfEdges.Count == 0)
+            {
+                return 0;
+            }
+
+            int selectedCount = 0;
+            int runCount = 0;
+            bool previousSelected = openFan
+                ? false
+                : halfEdges[orderedHalfEdges[orderedHalfEdges.Count - 1]].IsSelected;
+
+            for (int i = 0; i < orderedHalfEdges.Count; i++)
+            {
+                bool selected = halfEdges[orderedHalfEdges[i]].IsSelected;
+                if (selected)
+                {
+                    selectedCount++;
+                    if (!previousSelected)
+                    {
+                        runCount++;
+                    }
+                }
+                previousSelected = selected;
+            }
+
+            if (!openFan && selectedCount == orderedHalfEdges.Count)
+            {
+                return 1;
+            }
+
+            return runCount;
+        }
+
+
+        private static bool AuditExplicitChamferCornerSolution(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            float requestedWidth,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            ref ChamferCornerStats stats,
+            out ChamferCornerSolution solution,
+            out string blocker)
+        {
+            solution = null;
+            blocker = string.Empty;
+            stats.SourceFaceCount = context.Graph.Faces.Count;
+            stats.ExpectedCornerCount = context.HalfEdges.Count;
+            stats.SelectedEdgeCount = context.SelectedSourceEdges.Count;
+            stats.RequestedWidth = requestedWidth;
+
+            Dictionary<int, float> widthByEdge =
+                new Dictionary<int, float>(context.SelectedSourceEdges.Count);
+            foreach (int edgeIndex in context.SelectedSourceEdges)
+            {
+                float solvedWidth = CalculateChamferEdgeWidth(
+                    context.Graph,
+                    edgeIndex,
+                    requestedWidth,
+                    minimumStableEdgeLength,
+                    out bool clamped);
+                if (solvedWidth < minimumStableEdgeLength ||
+                    float.IsNaN(solvedWidth) ||
+                    float.IsInfinity(solvedWidth))
+                {
+                    stats.WidthSolveFailures++;
+                    blocker = "one or more selected edges have no stable chamfer width";
+                    return false;
+                }
+
+                widthByEdge.Add(edgeIndex, solvedWidth);
+                if (clamped)
+                {
+                    stats.WidthClampedEdges++;
+                }
+            }
+
+            if (!TrySolveCornerAwareChamferWidths(
+                    sourceFaces,
+                    context,
+                    requestedWidth,
+                    minimumStableEdgeLength,
+                    widthByEdge,
+                    ref stats,
+                    out blocker))
+            {
+                return false;
+            }
+
+            stats.MinimumSolvedWidth = float.PositiveInfinity;
+            stats.MaximumSolvedWidth = 0f;
+            foreach (KeyValuePair<int, float> pair in widthByEdge)
+            {
+                if (pair.Value <= PointMergeDistance)
+                {
+                    stats.DeferredSelectedEdgeCount++;
+                    continue;
+                }
+
+                stats.ActiveSelectedEdgeCount++;
+                stats.MinimumSolvedWidth = Mathf.Min(
+                    stats.MinimumSolvedWidth,
+                    pair.Value);
+                stats.MaximumSolvedWidth = Mathf.Max(
+                    stats.MaximumSolvedWidth,
+                    pair.Value);
+            }
+
+            Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners =
+                new Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner>(
+                    stats.ExpectedCornerCount);
+
+            for (int faceIndex = 0;
+                 faceIndex < context.Graph.Faces.Count;
+                 faceIndex++)
+            {
+                EdgeWearGraphFace graphFace = context.Graph.Faces[faceIndex];
+                PolygonFace sourceFace = sourceFaces[graphFace.SourceFaceIndex];
+                Vector3 faceCentre = CalculateAverage(sourceFace.Vertices);
+                int count = graphFace.VertexIndices.Count;
+
+                for (int localIndex = 0; localIndex < count; localIndex++)
+                {
+                    int sourceVertexIndex = graphFace.VertexIndices[localIndex];
+                    int previousEdgeIndex = graphFace.EdgeIndices[
+                        (localIndex + count - 1) % count];
+                    int nextEdgeIndex = graphFace.EdgeIndices[localIndex];
+                    float previousWidthValue = 0f;
+                    float nextWidthValue = 0f;
+                    bool previousSelected =
+                        context.SelectedSourceEdges.Contains(previousEdgeIndex) &&
+                        widthByEdge.TryGetValue(previousEdgeIndex, out previousWidthValue) &&
+                        previousWidthValue > PointMergeDistance;
+                    bool nextSelected =
+                        context.SelectedSourceEdges.Contains(nextEdgeIndex) &&
+                        widthByEdge.TryGetValue(nextEdgeIndex, out nextWidthValue) &&
+                        nextWidthValue > PointMergeDistance;
+                    float previousWidth = previousSelected
+                        ? previousWidthValue
+                        : 0f;
+                    float nextWidth = nextSelected
+                        ? nextWidthValue
+                        : 0f;
+
+                    if (!TryBuildChamferFaceLine(
+                            context.Graph,
+                            previousEdgeIndex,
+                            sourceFace.Normal,
+                            faceCentre,
+                            previousWidth,
+                            out ChamferFaceLine previousLine) ||
+                        !TryBuildChamferFaceLine(
+                            context.Graph,
+                            nextEdgeIndex,
+                            sourceFace.Normal,
+                            faceCentre,
+                            nextWidth,
+                            out ChamferFaceLine nextLine))
+                    {
+                        stats.CornerSolveFailures++;
+                        blocker = "failed to build a stable face-edge support line";
+                        return false;
+                    }
+
+                    Vector3 sourceVertex =
+                        context.Graph.Vertices[sourceVertexIndex].Position;
+                    if (!TrySolveChamferFaceCorner(
+                            sourceVertex,
+                            previousLine,
+                            nextLine,
+                            sourceFace.Normal,
+                            minimumStableEdgeLength * 0.001f,
+                            out Vector3 solved))
+                    {
+                        stats.CornerSolveFailures++;
+                        blocker = "one or more face corners have parallel or unstable offset lines";
+                        return false;
+                    }
+
+                    if (!IsFinite(solved))
+                    {
+                        stats.NonFiniteCornerCount++;
+                        blocker = "one or more solved face corners are non-finite";
+                        return false;
+                    }
+
+                    float previousLength = GetGraphEdgeLength(
+                        context.Graph,
+                        previousEdgeIndex);
+                    float nextLength = GetGraphEdgeLength(
+                        context.Graph,
+                        nextEdgeIndex);
+                    float localLimit = CalculateChamferCornerDisplacementLimit(
+                        requestedWidth,
+                        minimumStableEdgeLength,
+                        previousLength,
+                        nextLength);
+                    float displacement = (solved - sourceVertex).magnitude;
+                    UpdateChamferFinalWorstCorner(
+                        faceIndex,
+                        sourceVertexIndex,
+                        previousEdgeIndex,
+                        nextEdgeIndex,
+                        displacement,
+                        localLimit,
+                        ref stats);
+                    if (displacement > localLimit + PointMergeDistance)
+                    {
+                        stats.ExcessiveDisplacementCornerCount++;
+                        blocker = "one or more solved corners still exceed the conservative local displacement limit after width solving";
+                        return false;
+                    }
+
+                    if (!previousSelected && !nextSelected)
+                    {
+                        stats.PreservedCornerCount++;
+                    }
+                    else if (previousSelected && nextSelected)
+                    {
+                        stats.DoubleSelectedCornerCount++;
+                    }
+                    else
+                    {
+                        stats.SingleSelectedCornerCount++;
+                    }
+
+                    corners.Add(
+                        new ChamferFaceCornerKey(faceIndex, sourceVertexIndex),
+                        new ChamferSolvedCorner(
+                            solved,
+                            faceIndex,
+                            sourceVertexIndex,
+                            previousEdgeIndex,
+                            nextEdgeIndex,
+                            previousSelected,
+                            nextSelected));
+                    stats.SolvedCornerCount++;
+                }
+            }
+
+            if (!TryReconcileChamferUnselectedInternalEdges(
+                    context,
+                    corners,
+                    widthByEdge,
+                    minimumStableEdgeLength,
+                    ref stats,
+                    out blocker))
+            {
+                return false;
+            }
+
+            if (!AuditChamferReplacementFaces(
+                    sourceFaces,
+                    context,
+                    corners,
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    ref stats,
+                    out blocker))
+            {
+                return false;
+            }
+
+            if (!AuditChamferSelectedRails(
+                    context,
+                    corners,
+                    widthByEdge,
+                    minimumStableEdgeLength,
+                    ref stats,
+                    out blocker))
+            {
+                return false;
+            }
+
+            if (!AuditChamferSolvedBoundary(
+                    context,
+                    corners,
+                    minimumStableEdgeLength,
+                    ref stats,
+                    out blocker))
+            {
+                return false;
+            }
+
+            if (float.IsPositiveInfinity(stats.MinimumSolvedWidth))
+            {
+                stats.MinimumSolvedWidth = 0f;
+            }
+            solution = new ChamferCornerSolution(corners, widthByEdge);
+            stats.ReadyForEmission = 1;
+            return true;
+        }
+
+        private static bool TrySolveCornerAwareChamferWidths(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            float requestedWidth,
+            float minimumStableEdgeLength,
+            Dictionary<int, float> widthByEdge,
+            ref ChamferCornerStats stats,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            const int MaximumPasses = 12;
+            const float SafetyScale = 0.95f;
+            HashSet<int> cornerClampedEdges = new HashSet<int>();
+            HashSet<int> sharedEdgeClampedEdges = new HashSet<int>();
+            stats.MinimumCornerWidthScale = 1f;
+            stats.MinimumSharedEdgeWidthScale = 1f;
+
+            for (int pass = 0; pass < MaximumPasses; pass++)
+            {
+                if (!TryBuildChamferCornerTable(
+                        sourceFaces,
+                        context,
+                        widthByEdge,
+                        minimumStableEdgeLength,
+                        out Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> passCorners,
+                        out blocker))
+                {
+                    stats.CornerWidthConvergenceFailures++;
+                    return false;
+                }
+
+                bool changed = false;
+                foreach (ChamferSolvedCorner corner in passCorners.Values)
+                {
+                    EdgeWearGraphFace graphFace = context.Graph.Faces[corner.FaceIndex];
+                    PolygonFace sourceFace = sourceFaces[graphFace.SourceFaceIndex];
+                    Vector3 sourceVertex =
+                        context.Graph.Vertices[corner.SourceVertexIndex].Position;
+                    float previousLength = GetGraphEdgeLength(
+                        context.Graph,
+                        corner.PreviousSourceEdgeIndex);
+                    float nextLength = GetGraphEdgeLength(
+                        context.Graph,
+                        corner.NextSourceEdgeIndex);
+                    float localLimit = CalculateChamferCornerDisplacementLimit(
+                        requestedWidth,
+                        minimumStableEdgeLength,
+                        previousLength,
+                        nextLength);
+                    float displacement = (corner.Position - sourceVertex).magnitude;
+
+                    if (pass == 0)
+                    {
+                        UpdateChamferInitialWorstCorner(
+                            corner.FaceIndex,
+                            corner.SourceVertexIndex,
+                            corner.PreviousSourceEdgeIndex,
+                            corner.NextSourceEdgeIndex,
+                            displacement,
+                            localLimit,
+                            ref stats);
+                    }
+
+                    if (displacement <= localLimit + PointMergeDistance)
+                    {
+                        continue;
+                    }
+
+                    float scale = Mathf.Clamp01(
+                        SafetyScale * localLimit / displacement);
+                    bool cornerChanged = false;
+                    if (corner.PreviousSelected &&
+                        TryClampChamferEdgeWidth(
+                            corner.PreviousSourceEdgeIndex,
+                            scale,
+                            requestedWidth,
+                            minimumStableEdgeLength,
+                            widthByEdge,
+                            cornerClampedEdges,
+                            ref stats))
+                    {
+                        cornerChanged = true;
+                    }
+                    if (corner.NextSelected &&
+                        corner.NextSourceEdgeIndex != corner.PreviousSourceEdgeIndex &&
+                        TryClampChamferEdgeWidth(
+                            corner.NextSourceEdgeIndex,
+                            scale,
+                            requestedWidth,
+                            minimumStableEdgeLength,
+                            widthByEdge,
+                            cornerClampedEdges,
+                            ref stats))
+                    {
+                        cornerChanged = true;
+                    }
+
+                    if (!cornerChanged)
+                    {
+                        stats.CornerWidthBelowMinimumFailures++;
+                        blocker = "a corner remains over its displacement limit at the minimum stable chamfer width";
+                        return false;
+                    }
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    stats.CornerWidthSolvePasses = pass + 1;
+                    continue;
+                }
+
+                for (int edgeIndex = 0;
+                     edgeIndex < context.Graph.Edges.Count;
+                     edgeIndex++)
+                {
+                    EdgeWearGraphEdge edge = context.Graph.Edges[edgeIndex];
+                    bool activeSelected = edge.Selected &&
+                        widthByEdge.TryGetValue(edgeIndex, out float activeWidth) &&
+                        activeWidth > PointMergeDistance;
+                    if (activeSelected || edge.FaceA < 0 || edge.FaceB < 0)
+                    {
+                        continue;
+                    }
+
+                    if (HasStableChamferSharedInterval(
+                            context,
+                            edgeIndex,
+                            passCorners,
+                            minimumStableEdgeLength))
+                    {
+                        continue;
+                    }
+
+                    HashSet<int> participatingEdges =
+                        CollectChamferSharedEdgeParticipatingSelectedEdges(
+                            edge,
+                            passCorners);
+                    if (participatingEdges.Count == 0 ||
+                        !TryFindChamferSharedEdgeWidthScale(
+                            sourceFaces,
+                            context,
+                            edgeIndex,
+                            participatingEdges,
+                            widthByEdge,
+                            minimumStableEdgeLength,
+                            out float solvedScale,
+                            out blocker))
+                    {
+                        stats.SharedEdgeWidthConvergenceFailures++;
+                        if (string.IsNullOrEmpty(blocker))
+                        {
+                            blocker = "an unselected internal edge has no stable common interval even at zero adjacent chamfer width";
+                        }
+                        return false;
+                    }
+
+                    bool edgeChanged = false;
+                    foreach (int selectedEdgeIndex in participatingEdges)
+                    {
+                        float oldWidth = widthByEdge[selectedEdgeIndex];
+                        float scaledWidth = oldWidth * solvedScale;
+                        float newWidth = scaledWidth < minimumStableEdgeLength
+                            ? 0f
+                            : scaledWidth;
+                        if (newWidth >= oldWidth - PointMergeDistance)
+                        {
+                            continue;
+                        }
+
+                        widthByEdge[selectedEdgeIndex] = newWidth;
+                        if (newWidth <= PointMergeDistance)
+                        {
+                            stats.SharedEdgeWidthDeferredEdges++;
+                        }
+                        sharedEdgeClampedEdges.Add(selectedEdgeIndex);
+                        stats.SharedEdgeWidthClampApplications++;
+                        float relativeScale = requestedWidth > PointMergeDistance
+                            ? newWidth / requestedWidth
+                            : 1f;
+                        stats.MinimumSharedEdgeWidthScale = Mathf.Min(
+                            stats.MinimumSharedEdgeWidthScale,
+                            relativeScale);
+                        edgeChanged = true;
+                    }
+
+                    if (!edgeChanged)
+                    {
+                        bool deferredAny = false;
+                        foreach (int selectedEdgeIndex in participatingEdges)
+                        {
+                            if (!widthByEdge.TryGetValue(selectedEdgeIndex, out float currentWidth) ||
+                                currentWidth <= PointMergeDistance)
+                            {
+                                continue;
+                            }
+
+                            widthByEdge[selectedEdgeIndex] = 0f;
+                            sharedEdgeClampedEdges.Add(selectedEdgeIndex);
+                            stats.SharedEdgeWidthDeferredEdges++;
+                            deferredAny = true;
+                        }
+
+                        if (!deferredAny)
+                        {
+                            stats.SharedEdgeWidthBelowMinimumFailures++;
+                            blocker = "an unselected internal edge remains unstable after all participating chamfers were deferred";
+                            return false;
+                        }
+                    }
+                    changed = true;
+                }
+
+                stats.CornerWidthSolvePasses = pass + 1;
+                stats.CornerWidthClampedEdges = cornerClampedEdges.Count;
+                stats.SharedEdgeWidthClampedEdges = sharedEdgeClampedEdges.Count;
+                if (!changed)
+                {
                     return true;
                 }
             }
 
-            vertexCase = DeterministicBevelVertexCase.None;
+            stats.CornerWidthClampedEdges = cornerClampedEdges.Count;
+            stats.SharedEdgeWidthClampedEdges = sharedEdgeClampedEdges.Count;
+            stats.CornerWidthConvergenceFailures++;
+            blocker = "unified corner and shared-edge width solving did not converge";
             return false;
         }
 
+        private static bool TryBuildChamferCornerTable(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            Dictionary<int, float> widthByEdge,
+            float minimumStableEdgeLength,
+            out Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            corners = new Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner>(
+                context.HalfEdges.Count);
 
-        // EW-B shared source-topology graph builder. This is active kernel
-        // infrastructure: it maps final generated source faces to vertices,
-        // edges, face ownership, and selected convex graph edges before any
-        // bevel geometry is emitted.
+            for (int faceIndex = 0;
+                 faceIndex < context.Graph.Faces.Count;
+                 faceIndex++)
+            {
+                EdgeWearGraphFace graphFace = context.Graph.Faces[faceIndex];
+                PolygonFace sourceFace = sourceFaces[graphFace.SourceFaceIndex];
+                Vector3 faceCentre = CalculateAverage(sourceFace.Vertices);
+                int count = graphFace.VertexIndices.Count;
+
+                for (int localIndex = 0; localIndex < count; localIndex++)
+                {
+                    int sourceVertexIndex = graphFace.VertexIndices[localIndex];
+                    int previousEdgeIndex = graphFace.EdgeIndices[
+                        (localIndex + count - 1) % count];
+                    int nextEdgeIndex = graphFace.EdgeIndices[localIndex];
+                    float previousWidthValue = 0f;
+                    float nextWidthValue = 0f;
+                    bool previousSelected =
+                        context.SelectedSourceEdges.Contains(previousEdgeIndex) &&
+                        widthByEdge.TryGetValue(previousEdgeIndex, out previousWidthValue) &&
+                        previousWidthValue > PointMergeDistance;
+                    bool nextSelected =
+                        context.SelectedSourceEdges.Contains(nextEdgeIndex) &&
+                        widthByEdge.TryGetValue(nextEdgeIndex, out nextWidthValue) &&
+                        nextWidthValue > PointMergeDistance;
+                    float previousWidth = previousSelected
+                        ? previousWidthValue
+                        : 0f;
+                    float nextWidth = nextSelected
+                        ? nextWidthValue
+                        : 0f;
+
+                    if (!TryBuildChamferFaceLine(
+                            context.Graph,
+                            previousEdgeIndex,
+                            sourceFace.Normal,
+                            faceCentre,
+                            previousWidth,
+                            out ChamferFaceLine previousLine) ||
+                        !TryBuildChamferFaceLine(
+                            context.Graph,
+                            nextEdgeIndex,
+                            sourceFace.Normal,
+                            faceCentre,
+                            nextWidth,
+                            out ChamferFaceLine nextLine))
+                    {
+                        blocker = "failed to build a stable support line during chamfer width solving";
+                        return false;
+                    }
+
+                    Vector3 sourceVertex =
+                        context.Graph.Vertices[sourceVertexIndex].Position;
+                    if (!TrySolveChamferFaceCorner(
+                            sourceVertex,
+                            previousLine,
+                            nextLine,
+                            sourceFace.Normal,
+                            minimumStableEdgeLength * 0.001f,
+                            out Vector3 solved) ||
+                        !IsFinite(solved))
+                    {
+                        blocker = "failed to solve a finite corner during chamfer width solving";
+                        return false;
+                    }
+
+                    corners.Add(
+                        new ChamferFaceCornerKey(faceIndex, sourceVertexIndex),
+                        new ChamferSolvedCorner(
+                            solved,
+                            faceIndex,
+                            sourceVertexIndex,
+                            previousEdgeIndex,
+                            nextEdgeIndex,
+                            previousSelected,
+                            nextSelected));
+                }
+            }
+
+            return true;
+        }
+
+        private static bool HasStableChamferSharedInterval(
+            ChamferTopologyContext context,
+            int edgeIndex,
+            Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners,
+            float minimumStableEdgeLength)
+        {
+            EdgeWearGraphEdge edge = context.Graph.Edges[edgeIndex];
+            if (edge.FaceA < 0 || edge.FaceB < 0)
+            {
+                return true;
+            }
+
+            Vector3 sourceA = context.Graph.Vertices[edge.VertexA].Position;
+            Vector3 sourceB = context.Graph.Vertices[edge.VertexB].Position;
+            Vector3 edgeVector = sourceB - sourceA;
+            float edgeLength = edgeVector.magnitude;
+            if (edgeLength <= PointMergeDistance)
+            {
+                return false;
+            }
+            Vector3 direction = edgeVector / edgeLength;
+
+            ChamferSolvedCorner aA = corners[
+                new ChamferFaceCornerKey(edge.FaceA, edge.VertexA)];
+            ChamferSolvedCorner aB = corners[
+                new ChamferFaceCornerKey(edge.FaceA, edge.VertexB)];
+            ChamferSolvedCorner bA = corners[
+                new ChamferFaceCornerKey(edge.FaceB, edge.VertexA)];
+            ChamferSolvedCorner bB = corners[
+                new ChamferFaceCornerKey(edge.FaceB, edge.VertexB)];
+
+            float a0 = Vector3.Dot(aA.Position - sourceA, direction);
+            float a1 = Vector3.Dot(aB.Position - sourceA, direction);
+            float b0 = Vector3.Dot(bA.Position - sourceA, direction);
+            float b1 = Vector3.Dot(bB.Position - sourceA, direction);
+            float sharedStart = Mathf.Max(Mathf.Min(a0, a1), Mathf.Min(b0, b1));
+            float sharedEnd = Mathf.Min(Mathf.Max(a0, a1), Mathf.Max(b0, b1));
+            float requiredSharedLength = Mathf.Min(
+                minimumStableEdgeLength,
+                edgeLength);
+            return sharedEnd - sharedStart + PointMergeDistance >=
+                requiredSharedLength;
+        }
+
+        private static HashSet<int> CollectChamferSharedEdgeParticipatingSelectedEdges(
+            EdgeWearGraphEdge edge,
+            Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners)
+        {
+            HashSet<int> selectedEdges = new HashSet<int>();
+            ChamferSolvedCorner[] relatedCorners =
+            {
+                corners[new ChamferFaceCornerKey(edge.FaceA, edge.VertexA)],
+                corners[new ChamferFaceCornerKey(edge.FaceA, edge.VertexB)],
+                corners[new ChamferFaceCornerKey(edge.FaceB, edge.VertexA)],
+                corners[new ChamferFaceCornerKey(edge.FaceB, edge.VertexB)]
+            };
+
+            for (int i = 0; i < relatedCorners.Length; i++)
+            {
+                ChamferSolvedCorner corner = relatedCorners[i];
+                if (corner.PreviousSelected)
+                {
+                    selectedEdges.Add(corner.PreviousSourceEdgeIndex);
+                }
+                if (corner.NextSelected)
+                {
+                    selectedEdges.Add(corner.NextSourceEdgeIndex);
+                }
+            }
+            return selectedEdges;
+        }
+
+        private static bool TryFindChamferSharedEdgeWidthScale(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            int unselectedEdgeIndex,
+            HashSet<int> participatingEdges,
+            Dictionary<int, float> widthByEdge,
+            float minimumStableEdgeLength,
+            out float solvedScale,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            solvedScale = 0f;
+            Dictionary<int, float> testWidths =
+                new Dictionary<int, float>(widthByEdge);
+
+            foreach (int edgeIndex in participatingEdges)
+            {
+                testWidths[edgeIndex] = 0f;
+            }
+            if (!TryBuildChamferCornerTable(
+                    sourceFaces,
+                    context,
+                    testWidths,
+                    minimumStableEdgeLength,
+                    out Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> zeroCorners,
+                    out blocker) ||
+                !HasStableChamferSharedInterval(
+                    context,
+                    unselectedEdgeIndex,
+                    zeroCorners,
+                    minimumStableEdgeLength))
+            {
+                return false;
+            }
+
+            float low = 0f;
+            float high = 1f;
+            for (int iteration = 0; iteration < 12; iteration++)
+            {
+                float middle = (low + high) * 0.5f;
+                testWidths.Clear();
+                foreach (KeyValuePair<int, float> pair in widthByEdge)
+                {
+                    testWidths.Add(pair.Key, pair.Value);
+                }
+                foreach (int edgeIndex in participatingEdges)
+                {
+                    testWidths[edgeIndex] = widthByEdge[edgeIndex] * middle;
+                }
+
+                if (!TryBuildChamferCornerTable(
+                        sourceFaces,
+                        context,
+                        testWidths,
+                        minimumStableEdgeLength,
+                        out Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> testCorners,
+                        out blocker))
+                {
+                    return false;
+                }
+
+                if (HasStableChamferSharedInterval(
+                        context,
+                        unselectedEdgeIndex,
+                        testCorners,
+                        minimumStableEdgeLength))
+                {
+                    low = middle;
+                }
+                else
+                {
+                    high = middle;
+                }
+            }
+
+            solvedScale = low * 0.95f;
+            return solvedScale > 0f;
+        }
+
+        private static void UpdateChamferInitialWorstCorner(
+            int faceIndex,
+            int sourceVertexIndex,
+            int previousEdgeIndex,
+            int nextEdgeIndex,
+            float displacement,
+            float limit,
+            ref ChamferCornerStats stats)
+        {
+            if (displacement <= stats.InitialMaximumCornerDisplacement)
+            {
+                return;
+            }
+
+            stats.InitialMaximumCornerDisplacement = displacement;
+            stats.InitialMaximumCornerDisplacementLimit = limit;
+            stats.InitialWorstCornerFace = faceIndex;
+            stats.InitialWorstCornerVertex = sourceVertexIndex;
+            stats.InitialWorstCornerPreviousEdge = previousEdgeIndex;
+            stats.InitialWorstCornerNextEdge = nextEdgeIndex;
+        }
+
+        private static bool TryClampChamferEdgeWidth(
+            int edgeIndex,
+            float scale,
+            float requestedWidth,
+            float minimumStableEdgeLength,
+            Dictionary<int, float> widthByEdge,
+            HashSet<int> clampedEdges,
+            ref ChamferCornerStats stats)
+        {
+            float oldWidth = widthByEdge[edgeIndex];
+            float newWidth = Mathf.Max(
+                minimumStableEdgeLength,
+                oldWidth * scale);
+            if (newWidth >= oldWidth - PointMergeDistance)
+            {
+                return false;
+            }
+
+            widthByEdge[edgeIndex] = newWidth;
+            clampedEdges.Add(edgeIndex);
+            stats.CornerWidthClampApplications++;
+            float relativeScale = requestedWidth > PointMergeDistance
+                ? newWidth / requestedWidth
+                : 1f;
+            stats.MinimumCornerWidthScale = Mathf.Min(
+                stats.MinimumCornerWidthScale,
+                relativeScale);
+            return true;
+        }
+
+        private static float CalculateChamferCornerDisplacementLimit(
+            float requestedWidth,
+            float minimumStableEdgeLength,
+            float previousLength,
+            float nextLength)
+        {
+            return Mathf.Max(
+                requestedWidth * 4f,
+                Mathf.Max(
+                    minimumStableEdgeLength,
+                    Mathf.Min(previousLength, nextLength) * 0.45f));
+        }
+
+        private static void UpdateChamferFinalWorstCorner(
+            int faceIndex,
+            int sourceVertexIndex,
+            int previousEdgeIndex,
+            int nextEdgeIndex,
+            float displacement,
+            float limit,
+            ref ChamferCornerStats stats)
+        {
+            if (displacement <= stats.FinalMaximumCornerDisplacement)
+            {
+                return;
+            }
+
+            stats.FinalMaximumCornerDisplacement = displacement;
+            stats.FinalMaximumCornerDisplacementLimit = limit;
+            stats.FinalWorstCornerFace = faceIndex;
+            stats.FinalWorstCornerVertex = sourceVertexIndex;
+            stats.FinalWorstCornerPreviousEdge = previousEdgeIndex;
+            stats.FinalWorstCornerNextEdge = nextEdgeIndex;
+        }
+
+        private static float CalculateChamferEdgeWidth(
+            EdgeWearTopologyGraph graph,
+            int edgeIndex,
+            float requestedWidth,
+            float minimumStableEdgeLength,
+            out bool clamped)
+        {
+            EdgeWearGraphEdge edge = graph.Edges[edgeIndex];
+            float maximumWidth = requestedWidth;
+            AccumulateChamferEndpointWidthLimit(
+                graph,
+                edge.FaceA,
+                edge.VertexA,
+                edgeIndex,
+                ref maximumWidth);
+            AccumulateChamferEndpointWidthLimit(
+                graph,
+                edge.FaceA,
+                edge.VertexB,
+                edgeIndex,
+                ref maximumWidth);
+            AccumulateChamferEndpointWidthLimit(
+                graph,
+                edge.FaceB,
+                edge.VertexA,
+                edgeIndex,
+                ref maximumWidth);
+            AccumulateChamferEndpointWidthLimit(
+                graph,
+                edge.FaceB,
+                edge.VertexB,
+                edgeIndex,
+                ref maximumWidth);
+
+            clamped = maximumWidth < requestedWidth - PointMergeDistance;
+            return Mathf.Max(minimumStableEdgeLength, maximumWidth);
+        }
+
+        private static void AccumulateChamferEndpointWidthLimit(
+            EdgeWearTopologyGraph graph,
+            int faceIndex,
+            int vertexIndex,
+            int selectedEdgeIndex,
+            ref float maximumWidth)
+        {
+            if (faceIndex < 0 || faceIndex >= graph.Faces.Count)
+            {
+                return;
+            }
+
+            EdgeWearGraphFace face = graph.Faces[faceIndex];
+            int localIndex = face.VertexIndices.IndexOf(vertexIndex);
+            if (localIndex < 0)
+            {
+                return;
+            }
+
+            int count = face.VertexIndices.Count;
+            int previousEdge = face.EdgeIndices[(localIndex + count - 1) % count];
+            int nextEdge = face.EdgeIndices[localIndex];
+            int adjacentEdge = previousEdge == selectedEdgeIndex
+                ? nextEdge
+                : previousEdge;
+            maximumWidth = Mathf.Min(
+                maximumWidth,
+                GetGraphEdgeLength(graph, adjacentEdge) * 0.25f);
+        }
+
+        private static float GetGraphEdgeLength(
+            EdgeWearTopologyGraph graph,
+            int edgeIndex)
+        {
+            EdgeWearGraphEdge edge = graph.Edges[edgeIndex];
+            return Vector3.Distance(
+                graph.Vertices[edge.VertexA].Position,
+                graph.Vertices[edge.VertexB].Position);
+        }
+
+        private static bool TryBuildChamferFaceLine(
+            EdgeWearTopologyGraph graph,
+            int edgeIndex,
+            Vector3 faceNormal,
+            Vector3 faceCentre,
+            float offset,
+            out ChamferFaceLine line)
+        {
+            EdgeWearGraphEdge edge = graph.Edges[edgeIndex];
+            Vector3 start = graph.Vertices[edge.VertexA].Position;
+            Vector3 end = graph.Vertices[edge.VertexB].Position;
+            Vector3 edgeVector = end - start;
+            float length = edgeVector.magnitude;
+            if (length <= PointMergeDistance || !IsFinite(edgeVector))
+            {
+                line = default;
+                return false;
+            }
+
+            Vector3 direction = edgeVector / length;
+            Vector3 inward = Vector3.Cross(faceNormal, direction).normalized;
+            Vector3 midpoint = (start + end) * 0.5f;
+            if (Vector3.Dot(faceCentre - midpoint, inward) < 0f)
+            {
+                inward = -inward;
+            }
+
+            line = new ChamferFaceLine(
+                start + inward * offset,
+                direction,
+                edgeIndex,
+                offset);
+            return IsFinite(line.Point) && IsFinite(line.Direction);
+        }
+
+        private static bool TrySolveChamferFaceCorner(
+            Vector3 sourceVertex,
+            ChamferFaceLine previousLine,
+            ChamferFaceLine nextLine,
+            Vector3 faceNormal,
+            float parallelTolerance,
+            out Vector3 solved)
+        {
+            if (previousLine.Offset <= 0f && nextLine.Offset <= 0f)
+            {
+                solved = sourceVertex;
+                return true;
+            }
+
+            float denominator = Vector3.Dot(
+                Vector3.Cross(previousLine.Direction, nextLine.Direction),
+                faceNormal);
+            if (Mathf.Abs(denominator) <= parallelTolerance)
+            {
+                solved = Vector3.zero;
+                return false;
+            }
+
+            float t = Vector3.Dot(
+                Vector3.Cross(
+                    nextLine.Point - previousLine.Point,
+                    nextLine.Direction),
+                faceNormal) / denominator;
+            solved = previousLine.Point + previousLine.Direction * t;
+            return IsFinite(solved);
+        }
+
+        private static bool TryReconcileChamferUnselectedInternalEdges(
+            ChamferTopologyContext context,
+            Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners,
+            Dictionary<int, float> widthByEdge,
+            float minimumStableEdgeLength,
+            ref ChamferCornerStats stats,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            for (int edgeIndex = 0;
+                 edgeIndex < context.Graph.Edges.Count;
+                 edgeIndex++)
+            {
+                EdgeWearGraphEdge edge = context.Graph.Edges[edgeIndex];
+                bool activeSelected = edge.Selected &&
+                    widthByEdge.TryGetValue(edgeIndex, out float activeWidth) &&
+                    activeWidth > PointMergeDistance;
+                if (activeSelected || edge.FaceA < 0 || edge.FaceB < 0)
+                {
+                    continue;
+                }
+
+                stats.UnselectedInternalEdgeCount++;
+                Vector3 sourceA = context.Graph.Vertices[edge.VertexA].Position;
+                Vector3 sourceB = context.Graph.Vertices[edge.VertexB].Position;
+                Vector3 edgeVector = sourceB - sourceA;
+                float edgeLength = edgeVector.magnitude;
+                if (edgeLength <= PointMergeDistance)
+                {
+                    stats.SharedUnselectedEndpointFailureCount++;
+                    blocker = "an unselected internal source edge is degenerate";
+                    return false;
+                }
+                Vector3 direction = edgeVector / edgeLength;
+
+                ChamferSolvedCorner aA = corners[
+                    new ChamferFaceCornerKey(edge.FaceA, edge.VertexA)];
+                ChamferSolvedCorner aB = corners[
+                    new ChamferFaceCornerKey(edge.FaceA, edge.VertexB)];
+                ChamferSolvedCorner bA = corners[
+                    new ChamferFaceCornerKey(edge.FaceB, edge.VertexA)];
+                ChamferSolvedCorner bB = corners[
+                    new ChamferFaceCornerKey(edge.FaceB, edge.VertexB)];
+
+                stats.SharedUnselectedEndpointsChecked += 2;
+                bool exactA = new VertexKey(aA.Position).Equals(new VertexKey(bA.Position));
+                bool exactB = new VertexKey(aB.Position).Equals(new VertexKey(bB.Position));
+                if (exactA && exactB)
+                {
+                    stats.SharedUnselectedEndpointsExact += 2;
+                    continue;
+                }
+
+                float a0 = Vector3.Dot(aA.Position - sourceA, direction);
+                float a1 = Vector3.Dot(aB.Position - sourceA, direction);
+                float b0 = Vector3.Dot(bA.Position - sourceA, direction);
+                float b1 = Vector3.Dot(bB.Position - sourceA, direction);
+                float sharedStart = Mathf.Max(Mathf.Min(a0, a1), Mathf.Min(b0, b1));
+                float sharedEnd = Mathf.Min(Mathf.Max(a0, a1), Mathf.Max(b0, b1));
+                float requiredSharedLength = Mathf.Min(
+                    minimumStableEdgeLength,
+                    edgeLength);
+                if (sharedEnd - sharedStart + PointMergeDistance <
+                    requiredSharedLength)
+                {
+                    stats.SharedUnselectedEndpointFailureCount++;
+                    blocker = "incident faces have no stable common interval on an unselected edge";
+                    return false;
+                }
+
+                Vector3 pointA = sourceA + direction * sharedStart;
+                Vector3 pointB = sourceA + direction * sharedEnd;
+                aA.Position = pointA;
+                bA.Position = pointA;
+                aB.Position = pointB;
+                bB.Position = pointB;
+                stats.SharedUnselectedEndpointsReconciled += 2;
+            }
+            return true;
+        }
+
+        private static bool AuditChamferReplacementFaces(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            ref ChamferCornerStats stats,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            for (int faceIndex = 0;
+                 faceIndex < context.Graph.Faces.Count;
+                 faceIndex++)
+            {
+                EdgeWearGraphFace graphFace = context.Graph.Faces[faceIndex];
+                PolygonFace sourceFace = sourceFaces[graphFace.SourceFaceIndex];
+                List<Vector3> solvedFace = new List<Vector3>(
+                    graphFace.VertexIndices.Count);
+                for (int i = 0; i < graphFace.VertexIndices.Count; i++)
+                {
+                    solvedFace.Add(corners[
+                        new ChamferFaceCornerKey(
+                            faceIndex,
+                            graphFace.VertexIndices[i])].Position);
+                }
+
+                if (CalculatePolygonArea(solvedFace) <= minimumStableFaceArea)
+                {
+                    stats.ReplacementFaceAreaFailureCount++;
+                    blocker = "one or more hypothetical replacement faces have insufficient area";
+                    return false;
+                }
+                Vector3 normal = CalculatePolygonNormal(solvedFace);
+                if (!IsFinite(normal) || Vector3.Dot(normal, sourceFace.Normal) <= 0.25f)
+                {
+                    stats.ReplacementFaceWindingFailureCount++;
+                    blocker = "one or more hypothetical replacement faces invert or lose stable winding";
+                    return false;
+                }
+                for (int i = 0; i < solvedFace.Count; i++)
+                {
+                    Vector3 start = solvedFace[i];
+                    Vector3 end = solvedFace[(i + 1) % solvedFace.Count];
+                    int sourceEdgeIndex = graphFace.EdgeIndices[i];
+                    float sourceLength = GetGraphEdgeLength(
+                        context.Graph,
+                        sourceEdgeIndex);
+                    if ((end - start).magnitude < minimumStableEdgeLength &&
+                        sourceLength >= minimumStableEdgeLength)
+                    {
+                        stats.ReplacementEdgeCollapseFailureCount++;
+                        blocker = "a previously stable source edge collapses in a replacement face";
+                        return false;
+                    }
+                }
+                stats.ReplacementFacesValid++;
+            }
+            return true;
+        }
+
+        private static bool AuditChamferSelectedRails(
+            ChamferTopologyContext context,
+            Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners,
+            Dictionary<int, float> widthByEdge,
+            float minimumStableEdgeLength,
+            ref ChamferCornerStats stats,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            foreach (int edgeIndex in context.SelectedSourceEdges)
+            {
+                if (!widthByEdge.TryGetValue(edgeIndex, out float activeWidth) ||
+                    activeWidth <= PointMergeDistance)
+                {
+                    continue;
+                }
+
+                EdgeWearGraphEdge edge = context.Graph.Edges[edgeIndex];
+                stats.SelectedRailsChecked++;
+                Vector3 a0 = corners[
+                    new ChamferFaceCornerKey(edge.FaceA, edge.VertexA)].Position;
+                Vector3 b0 = corners[
+                    new ChamferFaceCornerKey(edge.FaceA, edge.VertexB)].Position;
+                Vector3 a1 = corners[
+                    new ChamferFaceCornerKey(edge.FaceB, edge.VertexA)].Position;
+                Vector3 b1 = corners[
+                    new ChamferFaceCornerKey(edge.FaceB, edge.VertexB)].Position;
+
+                if (Vector3.Distance(a0, a1) < minimumStableEdgeLength ||
+                    Vector3.Distance(b0, b1) < minimumStableEdgeLength)
+                {
+                    stats.SelectedRailSpanFailureCount++;
+                    blocker = "one or more selected edge strips have insufficient endpoint span";
+                    return false;
+                }
+                if (Vector3.Distance(a0, b0) < minimumStableEdgeLength ||
+                    Vector3.Distance(a1, b1) < minimumStableEdgeLength)
+                {
+                    stats.SelectedRailLengthFailureCount++;
+                    blocker = "one or more selected edge strips have insufficient rail length";
+                    return false;
+                }
+                stats.SelectedRailsValid++;
+            }
+            return true;
+        }
+
+        private static bool AuditChamferSolvedBoundary(
+            ChamferTopologyContext context,
+            Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners,
+            float minimumStableEdgeLength,
+            ref ChamferCornerStats stats,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            for (int edgeIndex = 0;
+                 edgeIndex < context.Graph.Edges.Count;
+                 edgeIndex++)
+            {
+                EdgeWearGraphEdge edge = context.Graph.Edges[edgeIndex];
+                if (edge.FaceA >= 0 && edge.FaceB >= 0)
+                {
+                    continue;
+                }
+                int faceIndex = edge.FaceA >= 0 ? edge.FaceA : edge.FaceB;
+                stats.SourceBoundaryEdgeCount++;
+                Vector3 a = corners[
+                    new ChamferFaceCornerKey(faceIndex, edge.VertexA)].Position;
+                Vector3 b = corners[
+                    new ChamferFaceCornerKey(faceIndex, edge.VertexB)].Position;
+                float sourceLength = GetGraphEdgeLength(
+                    context.Graph,
+                    edgeIndex);
+                if (Vector3.Distance(a, b) < minimumStableEdgeLength &&
+                    sourceLength >= minimumStableEdgeLength)
+                {
+                    stats.SolvedBoundaryLoopFailureCount++;
+                    blocker = "one or more preserved source-boundary edges collapse after corner solving";
+                    return false;
+                }
+                stats.SolvedBoundaryEdgeCount++;
+            }
+            return true;
+        }
+
+        private static bool AuditProvisionalChamferEmission(
+            List<PolygonFace> sourceFaces,
+            ChamferTopologyContext context,
+            ChamferCornerSolution solution,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            ref ChamferEmissionStats stats,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            stats.SourceFaceCount = context.Graph.Faces.Count;
+            stats.CandidateSelectedEdgeCount = context.SelectedSourceEdges.Count;
+            List<PolygonFace> provisionalFaces = new List<PolygonFace>(
+                context.Graph.Faces.Count + context.SelectedSourceEdges.Count);
+            HashSet<TopologyEdgeKey> expectedSourceBoundaryEdges =
+                new HashSet<TopologyEdgeKey>();
+            HashSet<TopologyEdgeKey> expectedVertexBoundaryEdges =
+                new HashSet<TopologyEdgeKey>();
+
+            for (int faceIndex = 0;
+                 faceIndex < context.Graph.Faces.Count;
+                 faceIndex++)
+            {
+                stats.ReplacementFacesAttempted++;
+                EdgeWearGraphFace graphFace = context.Graph.Faces[faceIndex];
+                PolygonFace sourceFace = sourceFaces[graphFace.SourceFaceIndex];
+                List<Vector3> vertices = new List<Vector3>(
+                    graphFace.VertexIndices.Count);
+                for (int i = 0; i < graphFace.VertexIndices.Count; i++)
+                {
+                    ChamferFaceCornerKey key = new ChamferFaceCornerKey(
+                        faceIndex,
+                        graphFace.VertexIndices[i]);
+                    if (!solution.Corners.TryGetValue(
+                            key,
+                            out ChamferSolvedCorner corner))
+                    {
+                        stats.ReplacementFaceFailureCount++;
+                        blocker = "a replacement face is missing a solved corner";
+                        return false;
+                    }
+                    vertices.Add(corner.Position);
+                }
+
+                if (CalculatePolygonArea(vertices) <= minimumStableFaceArea ||
+                    !IsFinite(CalculatePolygonNormal(vertices)))
+                {
+                    stats.ReplacementFaceFailureCount++;
+                    blocker = "a provisional replacement face is geometrically invalid";
+                    return false;
+                }
+
+                Vector3 replacementNormal = CalculatePolygonNormal(vertices);
+                if (Vector3.Dot(replacementNormal, sourceFace.Normal) <= 0.25f)
+                {
+                    stats.ReplacementFaceFailureCount++;
+                    blocker = "a provisional replacement face has invalid winding";
+                    return false;
+                }
+
+                provisionalFaces.Add(new PolygonFace(
+                    vertices,
+                    sourceFace.Normal,
+                    sourceFace.Feature,
+                    sourceFace.FeatureStrength));
+                stats.ReplacementFacesBuilt++;
+            }
+
+            Dictionary<int, EdgeWearSelectedGraphEdge> selectedByGraphEdge =
+                new Dictionary<int, EdgeWearSelectedGraphEdge>();
+            for (int i = 0; i < context.SelectedEdges.Count; i++)
+            {
+                selectedByGraphEdge[context.SelectedEdges[i].GraphEdgeIndex] =
+                    context.SelectedEdges[i];
+            }
+
+            foreach (int edgeIndex in context.SelectedSourceEdges)
+            {
+                if (!solution.WidthByEdge.TryGetValue(edgeIndex, out float width) ||
+                    width <= PointMergeDistance)
+                {
+                    stats.DeferredSelectedEdgeCount++;
+                    continue;
+                }
+
+                stats.ActiveSelectedEdgeCount++;
+                stats.BevelStripsAttempted++;
+                EdgeWearGraphEdge edge = context.Graph.Edges[edgeIndex];
+                if (edge.FaceA < 0 || edge.FaceB < 0 ||
+                    !selectedByGraphEdge.TryGetValue(
+                        edgeIndex,
+                        out EdgeWearSelectedGraphEdge selected))
+                {
+                    stats.BevelStripFailureCount++;
+                    blocker = "an active selected edge lacks two incident faces or candidate provenance";
+                    return false;
+                }
+
+                Vector3 a0 = solution.Corners[
+                    new ChamferFaceCornerKey(edge.FaceA, edge.VertexA)].Position;
+                Vector3 b0 = solution.Corners[
+                    new ChamferFaceCornerKey(edge.FaceA, edge.VertexB)].Position;
+                Vector3 a1 = solution.Corners[
+                    new ChamferFaceCornerKey(edge.FaceB, edge.VertexA)].Position;
+                Vector3 b1 = solution.Corners[
+                    new ChamferFaceCornerKey(edge.FaceB, edge.VertexB)].Position;
+
+                List<Vector3> strip = new List<Vector3> { a0, b0, b1, a1 };
+                Vector3 expectedNormal = selected.Candidate.BevelNormal;
+                Vector3 stripNormal = CalculatePolygonNormal(strip);
+                if (!IsFinite(stripNormal) || stripNormal.sqrMagnitude <= 0.00000001f)
+                {
+                    stats.BevelStripFailureCount++;
+                    blocker = "an active selected edge produces an invalid bevel strip normal";
+                    return false;
+                }
+                if (Vector3.Dot(stripNormal, expectedNormal) < 0f)
+                {
+                    strip.Reverse();
+                    stripNormal = -stripNormal;
+                }
+                if (CalculatePolygonArea(strip) <= minimumStableFaceArea)
+                {
+                    stats.BevelStripFailureCount++;
+                    blocker = "an active selected edge produces an insufficient bevel-strip area";
+                    return false;
+                }
+
+                provisionalFaces.Add(new PolygonFace(
+                    strip,
+                    stripNormal,
+                    PolygonFaceFeature.ConvexEdgeWear,
+                    selected.Candidate.Strength));
+                stats.BevelStripsBuilt++;
+                stats.BevelStripQuadFaceCount++;
+                stats.BevelStripTriangleEstimate += 2;
+
+                expectedVertexBoundaryEdges.Add(new TopologyEdgeKey(
+                    new VertexKey(a0),
+                    new VertexKey(a1)));
+                expectedVertexBoundaryEdges.Add(new TopologyEdgeKey(
+                    new VertexKey(b0),
+                    new VertexKey(b1)));
+            }
+
+            for (int edgeIndex = 0;
+                 edgeIndex < context.Graph.Edges.Count;
+                 edgeIndex++)
+            {
+                EdgeWearGraphEdge edge = context.Graph.Edges[edgeIndex];
+                if (edge.FaceA >= 0 && edge.FaceB >= 0)
+                {
+                    continue;
+                }
+                int faceIndex = edge.FaceA >= 0 ? edge.FaceA : edge.FaceB;
+                Vector3 a = solution.Corners[
+                    new ChamferFaceCornerKey(faceIndex, edge.VertexA)].Position;
+                Vector3 b = solution.Corners[
+                    new ChamferFaceCornerKey(faceIndex, edge.VertexB)].Position;
+                expectedSourceBoundaryEdges.Add(new TopologyEdgeKey(
+                    new VertexKey(a),
+                    new VertexKey(b)));
+            }
+
+            stats.ExpectedSourceBoundaryEdgeCount =
+                expectedSourceBoundaryEdges.Count;
+            stats.ExpectedVertexBoundaryEdgeCount =
+                expectedVertexBoundaryEdges.Count;
+
+            Dictionary<TopologyEdgeKey, int> useCounts =
+                new Dictionary<TopologyEdgeKey, int>();
+            for (int faceIndex = 0; faceIndex < provisionalFaces.Count; faceIndex++)
+            {
+                List<Vector3> vertices = provisionalFaces[faceIndex].Vertices;
+                for (int i = 0; i < vertices.Count; i++)
+                {
+                    TopologyEdgeKey key = new TopologyEdgeKey(
+                        new VertexKey(vertices[i]),
+                        new VertexKey(vertices[(i + 1) % vertices.Count]));
+                    useCounts.TryGetValue(key, out int useCount);
+                    useCounts[key] = useCount + 1;
+                }
+            }
+
+            HashSet<TopologyEdgeKey> actualOpenEdges =
+                new HashSet<TopologyEdgeKey>();
+            foreach (KeyValuePair<TopologyEdgeKey, int> pair in useCounts)
+            {
+                if (pair.Value == 1)
+                {
+                    actualOpenEdges.Add(pair.Key);
+                }
+                else if (pair.Value > 2)
+                {
+                    stats.ProvisionalNonManifoldEdgeCount++;
+                }
+            }
+            stats.ProvisionalOpenEdgeCount = actualOpenEdges.Count;
+
+            foreach (TopologyEdgeKey key in expectedSourceBoundaryEdges)
+            {
+                if (actualOpenEdges.Contains(key))
+                {
+                    stats.MatchedSourceBoundaryEdgeCount++;
+                }
+            }
+            foreach (TopologyEdgeKey key in expectedVertexBoundaryEdges)
+            {
+                if (actualOpenEdges.Contains(key))
+                {
+                    stats.MatchedVertexBoundaryEdgeCount++;
+                }
+                else
+                {
+                    stats.MissingExpectedVertexBoundaryEdgeCount++;
+                }
+            }
+            foreach (TopologyEdgeKey key in actualOpenEdges)
+            {
+                if (!expectedSourceBoundaryEdges.Contains(key) &&
+                    !expectedVertexBoundaryEdges.Contains(key))
+                {
+                    stats.UnexpectedProvisionalOpenEdgeCount++;
+                }
+            }
+
+            EdgeWearTopologyStats topology = AuditEdgeWearTopology(
+                provisionalFaces,
+                minimumStableEdgeLength);
+            stats.ProvisionalTJunctionCount = topology.TJunctionCount;
+            stats.ProvisionalNonManifoldEdgeCount = Mathf.Max(
+                stats.ProvisionalNonManifoldEdgeCount,
+                topology.NonManifoldEdgeCount);
+
+            if (stats.MatchedSourceBoundaryEdgeCount !=
+                    stats.ExpectedSourceBoundaryEdgeCount ||
+                stats.MissingExpectedVertexBoundaryEdgeCount > 0 ||
+                stats.UnexpectedProvisionalOpenEdgeCount > 0 ||
+                stats.ProvisionalNonManifoldEdgeCount > 0 ||
+                stats.ProvisionalTJunctionCount > 0)
+            {
+                blocker = "provisional chamfer topology does not match the explicit source-boundary and vertex-patch boundary contract";
+                return false;
+            }
+
+            stats.ReadyForVertexPatches = 1;
+            return true;
+        }
+
+        private static void LogChamferEmissionAudit(
+            ChamferEmissionStats stats,
+            bool ready,
+            string blocker)
+        {
+#if UNITY_EDITOR
+            string message =
+                "GeneratedMass edge wear provisional chamfer emission audit complete. " +
+                stats.ToSummaryString() +
+                ", geometryEmission=provisional, geometryCommit=disabled";
+            if (!string.IsNullOrEmpty(blocker))
+            {
+                message += ", blocker=" + blocker;
+            }
+            if (ready)
+            {
+                Debug.Log(message);
+            }
+            else
+            {
+                Debug.LogWarning(message);
+            }
+#endif
+        }
+
+        private static void LogChamferCornerAudit(
+            ChamferCornerStats stats,
+            bool ready,
+            string blocker)
+        {
+#if UNITY_EDITOR
+            string message =
+                "GeneratedMass edge wear chamfer corner audit complete. " +
+                stats.ToSummaryString() +
+                ", geometryEmission=disabled";
+            if (!string.IsNullOrEmpty(blocker))
+            {
+                message += ", blocker=" + blocker;
+            }
+            if (ready)
+            {
+                Debug.Log(message);
+            }
+            else
+            {
+                Debug.LogWarning(message);
+            }
+#endif
+        }
+
+private static void LogChamferReadiness(
+            ChamferReadinessStats stats,
+            bool ready,
+            string blocker)
+        {
+#if UNITY_EDITOR
+            string message =
+                "GeneratedMass edge wear chamfer readiness audit complete. " +
+                stats.ToSummaryString() +
+                ", geometryEmission=disabled";
+            if (!string.IsNullOrEmpty(blocker))
+            {
+                message += ", blocker=" + blocker;
+            }
+
+            if (ready)
+            {
+                Debug.Log(message);
+            }
+            else
+            {
+                Debug.LogWarning(message);
+            }
+#endif
+        }
+
         private static bool TryBuildEdgeWearTopologyGraph(
             List<PolygonFace> faces,
             out EdgeWearTopologyGraph graph,
@@ -2858,25 +3007,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 float.IsInfinity(value.y) ||
                 float.IsInfinity(value.z));
         }
-        private static void WarnEdgeWearBevelFailure(EdgeWearBevelBuildStats stats)
-        {
-#if UNITY_EDITOR
-            Debug.LogWarning(
-                "GeneratedMass edge wear generated no deterministic bevel-kernel result. " +
-                stats.ToSummaryString());
-#endif
-        }
-
-        private static void LogEdgeWearBevelCommit(EdgeWearBevelBuildStats stats)
-        {
-#if UNITY_EDITOR
-            Debug.Log(
-                "GeneratedMass edge wear deterministic bevel kernel committed. " +
-                stats.ToSummaryString());
-#endif
-        }
-
-        private static EdgeWearTopologyStats AuditEdgeWearTopology(
+private static EdgeWearTopologyStats AuditEdgeWearTopology(
             List<PolygonFace> faces,
             float minimumStableEdgeLength)
         {
@@ -3241,24 +3372,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return count;
         }
 
-        private static int EstimateTriangulatedTriangleCount(
-            List<PolygonFace> faces,
-            PolygonFaceFeature feature)
-        {
-            int count = 0;
-            for (int i = 0; i < faces.Count; i++)
-            {
-                PolygonFace face = faces[i];
-                if (face.Feature == feature)
-                {
-                    count += Mathf.Max(0, face.Vertices.Count - 2);
-                }
-            }
-
-            return count;
-        }
-
-        private static bool ValidatePolyhedronFaces(
+private static bool ValidatePolyhedronFaces(
             List<PolygonFace> faces,
             float minimumStableFaceArea,
             float minimumStableEdgeLength)
@@ -3523,245 +3637,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return soup;
         }
 
-        private static TriangleEmissionPreviewStats PreviewTriangulatedTriangleEmission(
-            List<PolygonFace> faces,
-            SurfaceFacetDensity density,
-            EdgeCharacter edgeCharacter,
-            int surfaceSeed)
-        {
-            TriangleEmissionPreviewStats stats = new TriangleEmissionPreviewStats();
-            int edgeSegments = GetBoundarySegments(density);
-
-            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
-            {
-                PolygonFace sourceFace = faces[faceIndex];
-                List<Vector3> cleanFaceVertices = SanitizePolygon(
-                    sourceFace.Vertices,
-                    sourceFace.Normal);
-
-                if (cleanFaceVertices.Count < 3 ||
-                    CalculatePolygonArea(cleanFaceVertices) <= TinyFaceAreaEpsilon)
-                {
-                    continue;
-                }
-
-                PolygonFace face = new PolygonFace(
-                    cleanFaceVertices,
-                    sourceFace.Normal,
-                    sourceFace.Feature,
-                    sourceFace.FeatureStrength);
-
-                if (density == SurfaceFacetDensity.Sparse ||
-                    face.Feature == PolygonFaceFeature.ConvexEdgeWear)
-                {
-                    for (int i = 1; i < face.Vertices.Count - 1; i++)
-                    {
-                        RegisterTriangleEmissionPreview(
-                            ref stats,
-                            face.Vertices[0],
-                            face.Vertices[i],
-                            face.Vertices[i + 1],
-                            face.Normal,
-                            face.Feature);
-                    }
-
-                    continue;
-                }
-
-                List<Vector3> boundary = BuildSegmentedBoundary(
-                    face.Vertices,
-                    edgeSegments);
-
-                Vector3 centre = CalculateAverage(boundary);
-                float faceRadius = CalculateAverageRadius(boundary, centre);
-
-                float relief = GetSurfaceRelief(density) * faceRadius;
-                relief *= GetReliefMultiplier(edgeCharacter);
-
-                float signedVariation =
-                    HashSigned(surfaceSeed, faceIndex);
-
-                centre += face.Normal * relief * signedVariation;
-
-                for (int i = 0; i < boundary.Count; i++)
-                {
-                    Vector3 current = boundary[i];
-                    Vector3 next = boundary[(i + 1) % boundary.Count];
-
-                    RegisterTriangleEmissionPreview(
-                        ref stats,
-                        centre,
-                        current,
-                        next,
-                        face.Normal,
-                        face.Feature);
-                }
-            }
-
-            return stats;
-        }
-
-        private static void RegisterTriangleEmissionPreview(
-            ref TriangleEmissionPreviewStats stats,
-            Vector3 a,
-            Vector3 b,
-            Vector3 c,
-            Vector3 expectedNormal,
-            PolygonFaceFeature feature)
-        {
-            TriangleEmissionPreviewResult result = PreviewTriangleEmission(
-                a,
-                b,
-                c,
-                expectedNormal,
-                0f);
-
-            bool isConvexEdgeWear = feature == PolygonFaceFeature.ConvexEdgeWear;
-            if (isConvexEdgeWear)
-            {
-                stats.ConvexEdgeWearTriangleAttemptCount++;
-            }
-            else
-            {
-                stats.BaseTriangleAttemptCount++;
-            }
-
-            if (result == TriangleEmissionPreviewResult.Emitted)
-            {
-                if (isConvexEdgeWear)
-                {
-                    stats.ConvexEdgeWearTriangleEmitCount++;
-                }
-                else
-                {
-                    stats.BaseTriangleEmitCount++;
-                }
-
-                return;
-            }
-
-            if (isConvexEdgeWear)
-            {
-                stats.SkippedConvexEdgeWearTriangleCount++;
-                if (result == TriangleEmissionPreviewResult.DegenerateEdge)
-                {
-                    stats.SkippedConvexEdgeWearDegenerateEdgeCount++;
-                }
-                else if (result == TriangleEmissionPreviewResult.DegenerateArea)
-                {
-                    stats.SkippedConvexEdgeWearDegenerateAreaCount++;
-                }
-                else if (result == TriangleEmissionPreviewResult.NonFinite)
-                {
-                    stats.SkippedConvexEdgeWearNonFiniteCount++;
-                }
-            }
-            else
-            {
-                stats.SkippedBaseTriangleCount++;
-                if (result == TriangleEmissionPreviewResult.DegenerateEdge)
-                {
-                    stats.SkippedBaseDegenerateEdgeCount++;
-                }
-                else if (result == TriangleEmissionPreviewResult.DegenerateArea)
-                {
-                    stats.SkippedBaseDegenerateAreaCount++;
-                }
-                else if (result == TriangleEmissionPreviewResult.NonFinite)
-                {
-                    stats.SkippedBaseNonFiniteCount++;
-                }
-            }
-        }
-
-        private static TriangleEmissionPreviewResult PreviewTriangleEmission(
-            Vector3 a,
-            Vector3 b,
-            Vector3 c,
-            Vector3 expectedNormal,
-            float minimumEdgeLength)
-        {
-            if (!IsFinite(a) ||
-                !IsFinite(b) ||
-                !IsFinite(c) ||
-                !IsFinite(expectedNormal))
-            {
-                return TriangleEmissionPreviewResult.NonFinite;
-            }
-
-            Vector3 ab = b - a;
-            Vector3 ac = c - a;
-            Vector3 bc = c - b;
-
-            float minimumEdgeLengthSqr = minimumEdgeLength > 0f
-                ? minimumEdgeLength * minimumEdgeLength
-                : MinimumEdgeLengthSqr;
-            float maximumEdgeLengthSqr = Mathf.Max(
-                ab.sqrMagnitude,
-                Mathf.Max(ac.sqrMagnitude, bc.sqrMagnitude));
-
-            if (minimumEdgeLength > 0f)
-            {
-                if (ab.sqrMagnitude <= minimumEdgeLengthSqr ||
-                    ac.sqrMagnitude <= minimumEdgeLengthSqr ||
-                    bc.sqrMagnitude <= minimumEdgeLengthSqr)
-                {
-                    return TriangleEmissionPreviewResult.DegenerateEdge;
-                }
-            }
-            else if (maximumEdgeLengthSqr <= minimumEdgeLengthSqr)
-            {
-                return TriangleEmissionPreviewResult.DegenerateEdge;
-            }
-
-            Vector3 normal = Vector3.Cross(ab, ac);
-            float relativeAreaThreshold =
-                maximumEdgeLengthSqr *
-                maximumEdgeLengthSqr *
-                RelativeTriangleAreaEpsilon;
-
-            if (normal.sqrMagnitude <= relativeAreaThreshold)
-            {
-                return TriangleEmissionPreviewResult.DegenerateArea;
-            }
-
-            return TriangleEmissionPreviewResult.Emitted;
-        }
-
-        private static void CollectCommittedConvexEdgeWearFaceShapeStats(
-            List<PolygonFace> faces,
-            ref EdgeWearBevelBuildStats stats)
-        {
-            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
-            {
-                PolygonFace face = faces[faceIndex];
-                if (face.Feature != PolygonFaceFeature.ConvexEdgeWear)
-                {
-                    continue;
-                }
-
-                int vertexCount = face.Vertices.Count;
-                if (vertexCount == 3)
-                {
-                    stats.CommittedConvexEdgeWearTriangleFaceCount++;
-                }
-                else if (vertexCount == 4)
-                {
-                    stats.CommittedConvexEdgeWearQuadFaceCount++;
-                }
-                else if (vertexCount > 4)
-                {
-                    stats.CommittedConvexEdgeWearNgonFaceCount++;
-                }
-
-                if (vertexCount > stats.CommittedConvexEdgeWearMaxVerticesPerFaceCount)
-                {
-                    stats.CommittedConvexEdgeWearMaxVerticesPerFaceCount = vertexCount;
-                }
-            }
-        }
-
-        private static List<Vector3> BuildSegmentedBoundary(
+private static List<Vector3> BuildSegmentedBoundary(
             List<Vector3> vertices,
             int segmentsPerEdge)
         {
@@ -5647,18 +5523,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
-        private enum EdgeWearBevelRejectReason
-        {
-            None,
-            ValidationBaseFace,
-            ValidationBevelFace,
-            ValidationCapFace,
-            ValidationOpenEdge,
-            ValidationNonManifoldEdge,
-            ValidationTJunction,
-            ValidationGlobal
-        }
-        private readonly struct EdgeWearTopologyStats
+private readonly struct EdgeWearTopologyStats
         {
             public static readonly EdgeWearTopologyStats Empty =
                 new EdgeWearTopologyStats(0, 0, 0);
@@ -5737,6 +5602,402 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EndKey = endKey;
             }
         }
+        private sealed class ChamferTopologyContext
+        {
+            public readonly EdgeWearTopologyGraph Graph;
+            public readonly List<EdgeWearSelectedGraphEdge> SelectedEdges;
+            public readonly List<ChamferHalfEdge> HalfEdges;
+            public readonly HashSet<int> SelectedSourceEdges;
+
+            public ChamferTopologyContext(
+                EdgeWearTopologyGraph graph,
+                List<EdgeWearSelectedGraphEdge> selectedEdges,
+                List<ChamferHalfEdge> halfEdges)
+            {
+                Graph = graph;
+                SelectedEdges = selectedEdges;
+                HalfEdges = halfEdges;
+                SelectedSourceEdges = new HashSet<int>();
+                for (int i = 0; i < selectedEdges.Count; i++)
+                {
+                    SelectedSourceEdges.Add(selectedEdges[i].GraphEdgeIndex);
+                }
+            }
+        }
+
+        private readonly struct ChamferFaceCornerKey :
+            IEquatable<ChamferFaceCornerKey>
+        {
+            public readonly int FaceIndex;
+            public readonly int SourceVertexIndex;
+
+            public ChamferFaceCornerKey(int faceIndex, int sourceVertexIndex)
+            {
+                FaceIndex = faceIndex;
+                SourceVertexIndex = sourceVertexIndex;
+            }
+
+            public bool Equals(ChamferFaceCornerKey other)
+            {
+                return FaceIndex == other.FaceIndex &&
+                    SourceVertexIndex == other.SourceVertexIndex;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is ChamferFaceCornerKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return (FaceIndex * 397) ^ SourceVertexIndex;
+                }
+            }
+        }
+
+        private sealed class ChamferSolvedCorner
+        {
+            public Vector3 Position;
+            public readonly int FaceIndex;
+            public readonly int SourceVertexIndex;
+            public readonly int PreviousSourceEdgeIndex;
+            public readonly int NextSourceEdgeIndex;
+            public readonly bool PreviousSelected;
+            public readonly bool NextSelected;
+
+            public ChamferSolvedCorner(
+                Vector3 position,
+                int faceIndex,
+                int sourceVertexIndex,
+                int previousSourceEdgeIndex,
+                int nextSourceEdgeIndex,
+                bool previousSelected,
+                bool nextSelected)
+            {
+                Position = position;
+                FaceIndex = faceIndex;
+                SourceVertexIndex = sourceVertexIndex;
+                PreviousSourceEdgeIndex = previousSourceEdgeIndex;
+                NextSourceEdgeIndex = nextSourceEdgeIndex;
+                PreviousSelected = previousSelected;
+                NextSelected = nextSelected;
+            }
+        }
+
+        private sealed class ChamferCornerSolution
+        {
+            public readonly Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> Corners;
+            public readonly Dictionary<int, float> WidthByEdge;
+
+            public ChamferCornerSolution(
+                Dictionary<ChamferFaceCornerKey, ChamferSolvedCorner> corners,
+                Dictionary<int, float> widthByEdge)
+            {
+                Corners = corners;
+                WidthByEdge = widthByEdge;
+            }
+        }
+
+        private readonly struct ChamferFaceLine
+        {
+            public readonly Vector3 Point;
+            public readonly Vector3 Direction;
+            public readonly int SourceEdgeIndex;
+            public readonly float Offset;
+
+            public ChamferFaceLine(
+                Vector3 point,
+                Vector3 direction,
+                int sourceEdgeIndex,
+                float offset)
+            {
+                Point = point;
+                Direction = direction;
+                SourceEdgeIndex = sourceEdgeIndex;
+                Offset = offset;
+            }
+        }
+
+        private struct ChamferEmissionStats
+        {
+            public int SourceFaceCount;
+            public int ReplacementFacesAttempted;
+            public int ReplacementFacesBuilt;
+            public int ReplacementFaceFailureCount;
+            public int CandidateSelectedEdgeCount;
+            public int ActiveSelectedEdgeCount;
+            public int DeferredSelectedEdgeCount;
+            public int BevelStripsAttempted;
+            public int BevelStripsBuilt;
+            public int BevelStripFailureCount;
+            public int BevelStripQuadFaceCount;
+            public int BevelStripTriangleEstimate;
+            public int ExpectedSourceBoundaryEdgeCount;
+            public int MatchedSourceBoundaryEdgeCount;
+            public int ExpectedVertexBoundaryEdgeCount;
+            public int MatchedVertexBoundaryEdgeCount;
+            public int ProvisionalOpenEdgeCount;
+            public int UnexpectedProvisionalOpenEdgeCount;
+            public int MissingExpectedVertexBoundaryEdgeCount;
+            public int ProvisionalNonManifoldEdgeCount;
+            public int ProvisionalTJunctionCount;
+            public int ReadyForVertexPatches;
+
+            public string ToSummaryString()
+            {
+                return
+                    "sourceFaces=" + SourceFaceCount +
+                    ", replacementFacesAttempted=" + ReplacementFacesAttempted +
+                    ", replacementFacesBuilt=" + ReplacementFacesBuilt +
+                    ", replacementFaceFailures=" + ReplacementFaceFailureCount +
+                    ", candidateSelectedEdges=" + CandidateSelectedEdgeCount +
+                    ", activeSelectedEdges=" + ActiveSelectedEdgeCount +
+                    ", deferredSelectedEdges=" + DeferredSelectedEdgeCount +
+                    ", bevelStripsAttempted=" + BevelStripsAttempted +
+                    ", bevelStripsBuilt=" + BevelStripsBuilt +
+                    ", bevelStripFailures=" + BevelStripFailureCount +
+                    ", bevelStripQuadFaces=" + BevelStripQuadFaceCount +
+                    ", bevelStripTriangleEstimate=" + BevelStripTriangleEstimate +
+                    ", expectedSourceBoundaryEdges=" + ExpectedSourceBoundaryEdgeCount +
+                    ", matchedSourceBoundaryEdges=" + MatchedSourceBoundaryEdgeCount +
+                    ", expectedVertexBoundaryEdges=" + ExpectedVertexBoundaryEdgeCount +
+                    ", matchedVertexBoundaryEdges=" + MatchedVertexBoundaryEdgeCount +
+                    ", provisionalOpenEdges=" + ProvisionalOpenEdgeCount +
+                    ", unexpectedProvisionalOpenEdges=" + UnexpectedProvisionalOpenEdgeCount +
+                    ", missingExpectedVertexBoundaryEdges=" + MissingExpectedVertexBoundaryEdgeCount +
+                    ", provisionalNonManifoldEdges=" + ProvisionalNonManifoldEdgeCount +
+                    ", provisionalTJunctions=" + ProvisionalTJunctionCount +
+                    ", readyForVertexPatches=" + ReadyForVertexPatches;
+            }
+        }
+
+        private struct ChamferCornerStats
+        {
+            public int SourceFaceCount;
+            public int ExpectedCornerCount;
+            public int SolvedCornerCount;
+            public int PreservedCornerCount;
+            public int SingleSelectedCornerCount;
+            public int DoubleSelectedCornerCount;
+            public int SelectedEdgeCount;
+            public int ActiveSelectedEdgeCount;
+            public int DeferredSelectedEdgeCount;
+            public float RequestedWidth;
+            public float MinimumSolvedWidth;
+            public float MaximumSolvedWidth;
+            public int WidthClampedEdges;
+            public int WidthSolveFailures;
+            public int CornerSolveFailures;
+            public int NonFiniteCornerCount;
+            public int ExcessiveDisplacementCornerCount;
+            public int CornerWidthSolvePasses;
+            public int CornerWidthClampApplications;
+            public int CornerWidthClampedEdges;
+            public float MinimumCornerWidthScale;
+            public float InitialMaximumCornerDisplacement;
+            public float InitialMaximumCornerDisplacementLimit;
+            public int InitialWorstCornerFace;
+            public int InitialWorstCornerVertex;
+            public int InitialWorstCornerPreviousEdge;
+            public int InitialWorstCornerNextEdge;
+            public float FinalMaximumCornerDisplacement;
+            public float FinalMaximumCornerDisplacementLimit;
+            public int FinalWorstCornerFace;
+            public int FinalWorstCornerVertex;
+            public int FinalWorstCornerPreviousEdge;
+            public int FinalWorstCornerNextEdge;
+            public int CornerWidthConvergenceFailures;
+            public int CornerWidthBelowMinimumFailures;
+            public int SharedEdgeWidthClampApplications;
+            public int SharedEdgeWidthClampedEdges;
+            public float MinimumSharedEdgeWidthScale;
+            public int SharedEdgeWidthConvergenceFailures;
+            public int SharedEdgeWidthBelowMinimumFailures;
+            public int SharedEdgeWidthDeferredEdges;
+            public int ReplacementFacesValid;
+            public int ReplacementFaceAreaFailureCount;
+            public int ReplacementFaceWindingFailureCount;
+            public int ReplacementEdgeCollapseFailureCount;
+            public int UnselectedInternalEdgeCount;
+            public int SharedUnselectedEndpointsChecked;
+            public int SharedUnselectedEndpointsExact;
+            public int SharedUnselectedEndpointsReconciled;
+            public int SharedUnselectedEndpointFailureCount;
+            public int SelectedRailsChecked;
+            public int SelectedRailsValid;
+            public int SelectedRailSpanFailureCount;
+            public int SelectedRailLengthFailureCount;
+            public int SourceBoundaryEdgeCount;
+            public int SolvedBoundaryEdgeCount;
+            public int SolvedBoundaryLoopFailureCount;
+            public int ReadyForEmission;
+
+            public string ToSummaryString()
+            {
+                return
+                    "sourceFaces=" + SourceFaceCount +
+                    ", expectedCorners=" + ExpectedCornerCount +
+                    ", solvedCorners=" + SolvedCornerCount +
+                    ", preservedCorners=" + PreservedCornerCount +
+                    ", singleSelectedCorners=" + SingleSelectedCornerCount +
+                    ", doubleSelectedCorners=" + DoubleSelectedCornerCount +
+                    ", selectedEdges=" + SelectedEdgeCount +
+                    ", activeSelectedEdges=" + ActiveSelectedEdgeCount +
+                    ", deferredSelectedEdges=" + DeferredSelectedEdgeCount +
+                    ", requestedWidth=" + RequestedWidth.ToString("F6") +
+                    ", minimumSolvedWidth=" + MinimumSolvedWidth.ToString("F6") +
+                    ", maximumSolvedWidth=" + MaximumSolvedWidth.ToString("F6") +
+                    ", widthClampedEdges=" + WidthClampedEdges +
+                    ", widthSolveFailures=" + WidthSolveFailures +
+                    ", cornerSolveFailures=" + CornerSolveFailures +
+                    ", nonFiniteCorners=" + NonFiniteCornerCount +
+                    ", excessiveDisplacementCorners=" + ExcessiveDisplacementCornerCount +
+                    ", cornerWidthSolvePasses=" + CornerWidthSolvePasses +
+                    ", cornerWidthClampApplications=" + CornerWidthClampApplications +
+                    ", cornerWidthClampedEdges=" + CornerWidthClampedEdges +
+                    ", minimumCornerWidthScale=" + MinimumCornerWidthScale.ToString("F6") +
+                    ", initialMaximumCornerDisplacement=" + InitialMaximumCornerDisplacement.ToString("F6") +
+                    ", initialMaximumCornerDisplacementLimit=" + InitialMaximumCornerDisplacementLimit.ToString("F6") +
+                    ", initialWorstCornerFace=" + InitialWorstCornerFace +
+                    ", initialWorstCornerVertex=" + InitialWorstCornerVertex +
+                    ", initialWorstCornerPreviousEdge=" + InitialWorstCornerPreviousEdge +
+                    ", initialWorstCornerNextEdge=" + InitialWorstCornerNextEdge +
+                    ", finalMaximumCornerDisplacement=" + FinalMaximumCornerDisplacement.ToString("F6") +
+                    ", finalMaximumCornerDisplacementLimit=" + FinalMaximumCornerDisplacementLimit.ToString("F6") +
+                    ", finalWorstCornerFace=" + FinalWorstCornerFace +
+                    ", finalWorstCornerVertex=" + FinalWorstCornerVertex +
+                    ", finalWorstCornerPreviousEdge=" + FinalWorstCornerPreviousEdge +
+                    ", finalWorstCornerNextEdge=" + FinalWorstCornerNextEdge +
+                    ", cornerWidthConvergenceFailures=" + CornerWidthConvergenceFailures +
+                    ", cornerWidthBelowMinimumFailures=" + CornerWidthBelowMinimumFailures +
+                    ", sharedEdgeWidthClampApplications=" + SharedEdgeWidthClampApplications +
+                    ", sharedEdgeWidthClampedEdges=" + SharedEdgeWidthClampedEdges +
+                    ", minimumSharedEdgeWidthScale=" + MinimumSharedEdgeWidthScale.ToString("F6") +
+                    ", sharedEdgeWidthConvergenceFailures=" + SharedEdgeWidthConvergenceFailures +
+                    ", sharedEdgeWidthBelowMinimumFailures=" + SharedEdgeWidthBelowMinimumFailures +
+                    ", sharedEdgeWidthDeferredEdges=" + SharedEdgeWidthDeferredEdges +
+                    ", replacementFacesValid=" + ReplacementFacesValid +
+                    ", replacementFaceAreaFailures=" + ReplacementFaceAreaFailureCount +
+                    ", replacementFaceWindingFailures=" + ReplacementFaceWindingFailureCount +
+                    ", replacementEdgeCollapseFailures=" + ReplacementEdgeCollapseFailureCount +
+                    ", unselectedInternalEdges=" + UnselectedInternalEdgeCount +
+                    ", sharedUnselectedEndpointsChecked=" + SharedUnselectedEndpointsChecked +
+                    ", sharedUnselectedEndpointsExact=" + SharedUnselectedEndpointsExact +
+                    ", sharedUnselectedEndpointsReconciled=" + SharedUnselectedEndpointsReconciled +
+                    ", sharedUnselectedEndpointFailures=" + SharedUnselectedEndpointFailureCount +
+                    ", selectedRailsChecked=" + SelectedRailsChecked +
+                    ", selectedRailsValid=" + SelectedRailsValid +
+                    ", selectedRailSpanFailures=" + SelectedRailSpanFailureCount +
+                    ", selectedRailLengthFailures=" + SelectedRailLengthFailureCount +
+                    ", sourceBoundaryEdges=" + SourceBoundaryEdgeCount +
+                    ", solvedBoundaryEdges=" + SolvedBoundaryEdgeCount +
+                    ", solvedBoundaryLoopFailures=" + SolvedBoundaryLoopFailureCount +
+                    ", readyForChamferEmission=" + ReadyForEmission;
+            }
+        }
+
+        private sealed class ChamferHalfEdge
+        {
+            public int Index;
+            public int OriginVertex;
+            public int DestinationVertex;
+            public int FaceIndex;
+            public int SourceEdgeIndex;
+            public int Next = -1;
+            public int Previous = -1;
+            public int Opposite = -1;
+            public bool IsSelected;
+        }
+
+        private struct ChamferReadinessStats
+        {
+            public int CandidateCount;
+            public int SelectedCount;
+            public int SourceFaceCount;
+            public int SourceVertexCount;
+            public int SourceEdgeCount;
+            public int SourceHalfEdgeCount;
+            public int SourceOpenEdgeCount;
+            public int SourceBoundaryLoopCount;
+            public int SourceNonManifoldEdgeCount;
+            public int SourceTJunctionCount;
+            public int BoundaryTraceFailureCount;
+            public int SelectedGraphEdgeCount;
+            public int SelectedManifoldEdgeCount;
+            public int SelectedBoundaryEdgeCount;
+            public int SelectedNonManifoldEdgeCount;
+            public int MissingSelectedGraphEdgeCount;
+            public int MismatchedSelectedGraphFaceCount;
+            public int DuplicateSelectedGraphEdgeCount;
+            public int InvalidGraphFaceCount;
+            public int InvalidGraphEdgeCount;
+            public int AffectedVertexCount;
+            public int ClosedVertexFanCount;
+            public int OpenVertexFanCount;
+            public int DisconnectedVertexFanCount;
+            public int SelectedRunCount;
+            public int MultipleSelectedRunVertexCount;
+            public int Ready;
+            public int Blocked;
+
+            public ChamferReadinessStats(int candidateCount, int selectedCount)
+            {
+                this = default;
+                CandidateCount = candidateCount;
+                SelectedCount = selectedCount;
+            }
+
+            public void ApplyGraphStats(EdgeWearGraphBuildStats stats)
+            {
+                SourceFaceCount = stats.GraphFaceCount;
+                SourceVertexCount = stats.GraphVertexCount;
+                SourceEdgeCount = stats.GraphEdgeCount;
+                SourceOpenEdgeCount = stats.GraphBoundaryEdgeCount;
+                SourceNonManifoldEdgeCount = stats.GraphNonManifoldEdgeCount;
+                SelectedGraphEdgeCount = stats.SelectedGraphEdgeCount;
+                MissingSelectedGraphEdgeCount = stats.MissingSelectedGraphEdgeCount;
+                MismatchedSelectedGraphFaceCount = stats.MismatchedSelectedGraphFaceCount;
+                DuplicateSelectedGraphEdgeCount = stats.DuplicateSelectedGraphEdgeCount;
+                InvalidGraphFaceCount = stats.InvalidFaceCount;
+                InvalidGraphEdgeCount = stats.InvalidEdgeCount;
+            }
+
+            public string ToSummaryString()
+            {
+                return
+                    "candidates=" + CandidateCount +
+                    ", selected=" + SelectedCount +
+                    ", sourceFaces=" + SourceFaceCount +
+                    ", sourceVertices=" + SourceVertexCount +
+                    ", sourceEdges=" + SourceEdgeCount +
+                    ", halfEdges=" + SourceHalfEdgeCount +
+                    ", sourceBoundaryEdges=" + SourceOpenEdgeCount +
+                    ", sourceBoundaryLoops=" + SourceBoundaryLoopCount +
+                    ", boundaryTraceFailures=" + BoundaryTraceFailureCount +
+                    ", sourceNonManifoldEdges=" + SourceNonManifoldEdgeCount +
+                    ", sourceTJunctions=" + SourceTJunctionCount +
+                    ", selectedGraphEdges=" + SelectedGraphEdgeCount +
+                    ", selectedManifoldEdges=" + SelectedManifoldEdgeCount +
+                    ", selectedBoundaryEdges=" + SelectedBoundaryEdgeCount +
+                    ", selectedNonManifoldEdges=" + SelectedNonManifoldEdgeCount +
+                    ", missingSelectedGraphEdges=" + MissingSelectedGraphEdgeCount +
+                    ", mismatchedSelectedGraphFaces=" + MismatchedSelectedGraphFaceCount +
+                    ", duplicateSelectedGraphEdges=" + DuplicateSelectedGraphEdgeCount +
+                    ", invalidGraphFaces=" + InvalidGraphFaceCount +
+                    ", invalidGraphEdges=" + InvalidGraphEdgeCount +
+                    ", affectedVertices=" + AffectedVertexCount +
+                    ", closedVertexFans=" + ClosedVertexFanCount +
+                    ", openVertexFans=" + OpenVertexFanCount +
+                    ", disconnectedVertexFans=" + DisconnectedVertexFanCount +
+                    ", selectedRuns=" + SelectedRunCount +
+                    ", multipleSelectedRunVertices=" + MultipleSelectedRunVertexCount +
+                    ", readyForChamferKernel=" + Ready +
+                    ", blocked=" + Blocked;
+            }
+        }
+
         private sealed class EdgeWearTopologyGraph
         {
             public readonly List<EdgeWearGraphVertex> Vertices =
@@ -5840,188 +6101,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
-        private enum DeterministicBevelVertexCase
-        {
-            None,
-            IsolatedEndpoint,
-            TwoEdgeCorner,
-            MultiEdgeStar,
-            BoundaryOrInvalid
-        }
-
-        private readonly struct DeterministicBevelVertexCapPoint
-        {
-            public readonly int FaceIndex;
-            public readonly int PreviousEdgeIndex;
-            public readonly int NextEdgeIndex;
-            public readonly Vector3 Point;
-
-            public DeterministicBevelVertexCapPoint(int faceIndex, Vector3 point)
-                : this(faceIndex, -1, -1, point)
-            {
-            }
-
-            public DeterministicBevelVertexCapPoint(
-                int faceIndex,
-                int previousEdgeIndex,
-                int nextEdgeIndex,
-                Vector3 point)
-            {
-                FaceIndex = faceIndex;
-                PreviousEdgeIndex = previousEdgeIndex;
-                NextEdgeIndex = nextEdgeIndex;
-                Point = point;
-            }
-        }
-
-        private readonly struct DeterministicBevelRailKey : IEquatable<DeterministicBevelRailKey>
-        {
-            public readonly int FaceIndex;
-            public readonly int GraphEdgeIndex;
-
-            public DeterministicBevelRailKey(int faceIndex, int graphEdgeIndex)
-            {
-                FaceIndex = faceIndex;
-                GraphEdgeIndex = graphEdgeIndex;
-            }
-
-            public bool Equals(DeterministicBevelRailKey other)
-            {
-                return FaceIndex == other.FaceIndex &&
-                    GraphEdgeIndex == other.GraphEdgeIndex;
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is DeterministicBevelRailKey other && Equals(other);
-            }
-
-            public override int GetHashCode()
-            {
-                unchecked
-                {
-                    return (FaceIndex * 397) ^ GraphEdgeIndex;
-                }
-            }
-        }
-
-        private readonly struct DeterministicBevelRailRecord
-        {
-            public readonly int FaceIndex;
-            public readonly int GraphEdgeIndex;
-            public readonly int StartVertexIndex;
-            public readonly int EndVertexIndex;
-            public readonly Vector3 StartPoint;
-            public readonly Vector3 EndPoint;
-
-            public DeterministicBevelRailRecord(
-                int faceIndex,
-                int graphEdgeIndex,
-                int startVertexIndex,
-                int endVertexIndex,
-                Vector3 startPoint,
-                Vector3 endPoint)
-            {
-                FaceIndex = faceIndex;
-                GraphEdgeIndex = graphEdgeIndex;
-                StartVertexIndex = startVertexIndex;
-                EndVertexIndex = endVertexIndex;
-                StartPoint = startPoint;
-                EndPoint = endPoint;
-            }
-        }
-
-        private readonly struct DeterministicFaceOffsetLine
-        {
-            public readonly int GraphEdgeIndex;
-            public readonly int StartVertexIndex;
-            public readonly int EndVertexIndex;
-            public readonly bool Selected;
-            public readonly Vector3 OriginalStart;
-            public readonly Vector3 Point;
-            public readonly Vector3 Direction;
-            public readonly Vector3 Inward;
-
-            public DeterministicFaceOffsetLine(
-                int graphEdgeIndex,
-                int startVertexIndex,
-                int endVertexIndex,
-                bool selected,
-                Vector3 originalStart,
-                Vector3 point,
-                Vector3 direction,
-                Vector3 inward)
-            {
-                GraphEdgeIndex = graphEdgeIndex;
-                StartVertexIndex = startVertexIndex;
-                EndVertexIndex = endVertexIndex;
-                Selected = selected;
-                OriginalStart = originalStart;
-                Point = point;
-                Direction = direction;
-                Inward = inward;
-            }
-        }
-
-        private readonly struct DeterministicBevelEdgeRecord
-        {
-            public readonly int GraphEdgeIndex;
-            public readonly EdgeWearBevelCandidate Candidate;
-            public readonly int StartVertexIndex;
-            public readonly int EndVertexIndex;
-            public readonly Vector3 Start;
-            public readonly Vector3 End;
-            public readonly int FaceA;
-            public readonly int FaceB;
-
-            public DeterministicBevelEdgeRecord(
-                int graphEdgeIndex,
-                EdgeWearBevelCandidate candidate,
-                int startVertexIndex,
-                int endVertexIndex,
-                Vector3 start,
-                Vector3 end,
-                int faceA,
-                int faceB)
-            {
-                GraphEdgeIndex = graphEdgeIndex;
-                Candidate = candidate;
-                StartVertexIndex = startVertexIndex;
-                EndVertexIndex = endVertexIndex;
-                Start = start;
-                End = end;
-                FaceA = faceA;
-                FaceB = faceB;
-            }
-        }
-
-        private readonly struct DeterministicBevelVertexRecord
-        {
-            public readonly int VertexIndex;
-            public readonly VertexKey Key;
-            public readonly Vector3 Position;
-            public readonly int IncidentSelectedEdgeCount;
-            public readonly int IncidentSourceFaceCount;
-            public readonly DeterministicBevelVertexCase Case;
-
-            public DeterministicBevelVertexRecord(
-                int vertexIndex,
-                VertexKey key,
-                Vector3 position,
-                int incidentSelectedEdgeCount,
-                int incidentSourceFaceCount,
-                DeterministicBevelVertexCase vertexCase)
-            {
-                VertexIndex = vertexIndex;
-                Key = key;
-                Position = position;
-                IncidentSelectedEdgeCount = incidentSelectedEdgeCount;
-                IncidentSourceFaceCount = incidentSourceFaceCount;
-                Case = vertexCase;
-            }
-        }
-
-        private readonly struct EdgeWearSelectedGraphEdge
+private readonly struct EdgeWearSelectedGraphEdge
         {
             public readonly int GraphEdgeIndex;
             public readonly int CandidateIndex;
@@ -6037,31 +6117,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Candidate = candidate;
             }
         }
-        private enum TriangleEmissionPreviewResult
-        {
-            Emitted,
-            DegenerateEdge,
-            DegenerateArea,
-            NonFinite
-        }
-
-        private struct TriangleEmissionPreviewStats
-        {
-            public int ConvexEdgeWearTriangleAttemptCount;
-            public int ConvexEdgeWearTriangleEmitCount;
-            public int SkippedConvexEdgeWearTriangleCount;
-            public int SkippedConvexEdgeWearDegenerateEdgeCount;
-            public int SkippedConvexEdgeWearDegenerateAreaCount;
-            public int SkippedConvexEdgeWearNonFiniteCount;
-            public int BaseTriangleAttemptCount;
-            public int BaseTriangleEmitCount;
-            public int SkippedBaseTriangleCount;
-            public int SkippedBaseDegenerateEdgeCount;
-            public int SkippedBaseDegenerateAreaCount;
-            public int SkippedBaseNonFiniteCount;
-        }
-
-        private struct EdgeWearGraphBuildStats
+private struct EdgeWearGraphBuildStats
         {
             public int GraphVertexCount;
             public int GraphEdgeCount;
@@ -6076,418 +6132,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int InvalidEdgeCount;
         }
 
-        private struct EdgeWearBevelBuildStats
-        {
-            public readonly int CandidateCount;
-            public readonly int SelectedCount;
-            public int AcceptedCount;
-            public int RejectedValidationBaseFace;
-            public int RejectedValidationBevelFace;
-            public int RejectedValidationCapFace;
-            public int RejectedValidationOpenEdge;
-            public int RejectedValidationNonManifoldEdge;
-            public int RejectedValidationTJunction;
-            public int RejectedValidationGlobal;
-            public int ProducedBevelFaceCount;
-            public int CommittedConvexEdgeWearFaceCount;
-            public int CommittedConvexEdgeWearTriangleEstimateCount;
-            public int CommittedConvexEdgeWearRenderedVertexEstimateCount;
-            public int CommittedConvexEdgeWearTriangleFaceCount;
-            public int CommittedConvexEdgeWearQuadFaceCount;
-            public int CommittedConvexEdgeWearNgonFaceCount;
-            public int CommittedConvexEdgeWearMaxVerticesPerFaceCount;
-            public int TriangulationPreviewConvexEdgeWearTriangleAttemptCount;
-            public int TriangulationPreviewConvexEdgeWearTriangleEmitCount;
-            public int TriangulationPreviewSkippedConvexEdgeWearTriangleCount;
-            public int TriangulationPreviewSkippedConvexEdgeWearDegenerateEdgeCount;
-            public int TriangulationPreviewSkippedConvexEdgeWearDegenerateAreaCount;
-            public int TriangulationPreviewSkippedConvexEdgeWearNonFiniteCount;
-            public int TriangulationPreviewBaseTriangleAttemptCount;
-            public int TriangulationPreviewBaseTriangleEmitCount;
-            public int TriangulationPreviewSkippedBaseTriangleCount;
-            public int TriangulationPreviewSkippedBaseDegenerateEdgeCount;
-            public int TriangulationPreviewSkippedBaseDegenerateAreaCount;
-            public int TriangulationPreviewSkippedBaseNonFiniteCount;
-            public int GraphVertexCount;
-            public int GraphEdgeCount;
-            public int GraphFaceCount;
-            public int GraphBoundaryEdgeCount;
-            public int GraphNonManifoldEdgeCount;
-            public int SelectedGraphEdgeCount;
-            public int MissingSelectedGraphEdgeCount;
-            public int MismatchedSelectedGraphFaceCount;
-            public int DuplicateSelectedGraphEdgeCount;
-            public int InvalidGraphFaceCount;
-            public int InvalidGraphEdgeCount;
-            public int TopologyOpenEdges;
-            public int TopologyNonManifoldEdges;
-            public int TopologyTJunctions;
-            public int DeterministicKernelGeometryPendingCount;
-            public int DeterministicKernelMappedSelectedEdgeCount;
-            public int DeterministicKernelSourceFaceCount;
-            public int DeterministicKernelSourceEdgeCount;
-            public int DeterministicKernelSourceVertexCount;
-            public int DeterministicKernelAffectedFaceCount;
-            public int DeterministicKernelUnaffectedFacePreservedCount;
-            public int DeterministicKernelSelectedEdgeCount;
-            public int DeterministicKernelAffectedVertexCount;
-            public int DeterministicKernelIsolatedEndpointVertexCount;
-            public int DeterministicKernelTwoEdgeCornerVertexCount;
-            public int DeterministicKernelMultiEdgeStarVertexCount;
-            public int DeterministicKernelBoundaryOrInvalidVertexCount;
-            public int DeterministicKernelInvalidAdjacencyEdgeCount;
-            public int DeterministicKernelSupportedEdgeCount;
-            public int DeterministicKernelDeferredEdgeCount;
-            public int DeterministicKernelBevelFacesBuiltCount;
-            public int DeterministicKernelConvexWearPolygonsTriangulatedCount;
-            public int DeterministicKernelConvexWearTrianglesBuiltCount;
-            public int DeterministicKernelConvexWearTriangulationFailedCount;
-            public int DeterministicKernelOpenEdgesAfterBuildCount;
-            public int DeterministicKernelNonManifoldEdgesAfterBuildCount;
-            public int DeterministicKernelTJunctionsAfterBuildCount;
-            public int DeterministicKernelGlobalCutAppliedCount;
-            public int DeterministicKernelFaceOffsetPolygonAttemptCount;
-            public int DeterministicKernelFaceOffsetPolygonBuiltCount;
-            public int DeterministicKernelFaceOffsetPolygonFailedCount;
-            public int DeterministicKernelRailsExpectedCount;
-            public int DeterministicKernelRailsBuiltCount;
-            public int DeterministicKernelRailsMissingCount;
-            public int DeterministicKernelLocalBevelFaceAttemptCount;
-            public int DeterministicKernelLocalBevelFaceBuiltCount;
-            public int DeterministicKernelLocalBevelFaceFailedCount;
-            public int DeterministicKernelTransitionFacesBuiltCount;
-            public int DeterministicKernelVertexCapAttemptCount;
-            public int DeterministicKernelVertexCapBuiltCount;
-            public int DeterministicKernelVertexCapFailedCount;
-            public int DeterministicKernelVertexCapIsolatedAttemptCount;
-            public int DeterministicKernelVertexCapIsolatedBuiltCount;
-            public int DeterministicKernelVertexCapIsolatedFailedCount;
-            public int DeterministicKernelVertexCapTwoEdgeAttemptCount;
-            public int DeterministicKernelVertexCapTwoEdgeBuiltCount;
-            public int DeterministicKernelVertexCapTwoEdgeFailedCount;
-            public int DeterministicKernelVertexCapMultiStarAttemptCount;
-            public int DeterministicKernelVertexCapMultiStarBuiltCount;
-            public int DeterministicKernelVertexCapMultiStarFailedCount;
-            public int DeterministicKernelVertexCapOrderingFailureCount;
-            public int DeterministicKernelVertexCapDuplicatePointFailureCount;
-            public int DeterministicKernelVertexCapAreaFailureCount;
-            public int DeterministicKernelVertexCapLowValenceAttemptCount;
-            public int DeterministicKernelVertexCapLowValenceBuiltCount;
-            public int DeterministicKernelVertexCapLowValenceFailedCount;
-            public int DeterministicKernelVertexCapLowValenceApexTriangleBuiltCount;
-            public int DeterministicKernelVertexCapLowValenceInsufficientBoundaryFailureCount;
-            public int DeterministicKernelVertexCapTwoEdgeCornerPatchAttemptCount;
-            public int DeterministicKernelVertexCapTwoEdgeCornerPatchBuiltCount;
-            public int DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount;
-            public int DeterministicKernelVertexCapTwoEdgeCornerPatchTriangleBuiltCount;
-            public int DeterministicKernelVertexCapTwoEdgeCornerPatchInsufficientBoundaryFailureCount;
-            public int DeterministicKernelVertexCapTwoEdgeCornerPatchAreaFailureCount;
-            public int DeterministicKernelVertexCapNonFiniteFailureCount;
-            public int DeterministicKernelVertexCapTooSmallFailureCount;
-            public int RejectedUnknown;
-
-            public EdgeWearBevelBuildStats(int candidateCount, int selectedCount)
-            {
-                CandidateCount = candidateCount;
-                SelectedCount = selectedCount;
-                AcceptedCount = 0;
-                RejectedValidationBaseFace = 0;
-                RejectedValidationBevelFace = 0;
-                RejectedValidationCapFace = 0;
-                RejectedValidationOpenEdge = 0;
-                RejectedValidationNonManifoldEdge = 0;
-                RejectedValidationTJunction = 0;
-                RejectedValidationGlobal = 0;
-                ProducedBevelFaceCount = 0;
-                CommittedConvexEdgeWearFaceCount = 0;
-                CommittedConvexEdgeWearTriangleEstimateCount = 0;
-                CommittedConvexEdgeWearRenderedVertexEstimateCount = 0;
-                CommittedConvexEdgeWearTriangleFaceCount = 0;
-                CommittedConvexEdgeWearQuadFaceCount = 0;
-                CommittedConvexEdgeWearNgonFaceCount = 0;
-                CommittedConvexEdgeWearMaxVerticesPerFaceCount = 0;
-                TriangulationPreviewConvexEdgeWearTriangleAttemptCount = 0;
-                TriangulationPreviewConvexEdgeWearTriangleEmitCount = 0;
-                TriangulationPreviewSkippedConvexEdgeWearTriangleCount = 0;
-                TriangulationPreviewSkippedConvexEdgeWearDegenerateEdgeCount = 0;
-                TriangulationPreviewSkippedConvexEdgeWearDegenerateAreaCount = 0;
-                TriangulationPreviewSkippedConvexEdgeWearNonFiniteCount = 0;
-                TriangulationPreviewBaseTriangleAttemptCount = 0;
-                TriangulationPreviewBaseTriangleEmitCount = 0;
-                TriangulationPreviewSkippedBaseTriangleCount = 0;
-                TriangulationPreviewSkippedBaseDegenerateEdgeCount = 0;
-                TriangulationPreviewSkippedBaseDegenerateAreaCount = 0;
-                TriangulationPreviewSkippedBaseNonFiniteCount = 0;
-                GraphVertexCount = 0;
-                GraphEdgeCount = 0;
-                GraphFaceCount = 0;
-                GraphBoundaryEdgeCount = 0;
-                GraphNonManifoldEdgeCount = 0;
-                SelectedGraphEdgeCount = 0;
-                MissingSelectedGraphEdgeCount = 0;
-                MismatchedSelectedGraphFaceCount = 0;
-                DuplicateSelectedGraphEdgeCount = 0;
-                InvalidGraphFaceCount = 0;
-                InvalidGraphEdgeCount = 0;
-                TopologyOpenEdges = 0;
-                TopologyNonManifoldEdges = 0;
-                TopologyTJunctions = 0;
-                DeterministicKernelGeometryPendingCount = 0;
-                DeterministicKernelMappedSelectedEdgeCount = 0;
-                DeterministicKernelSourceFaceCount = 0;
-                DeterministicKernelSourceEdgeCount = 0;
-                DeterministicKernelSourceVertexCount = 0;
-                DeterministicKernelAffectedFaceCount = 0;
-                DeterministicKernelUnaffectedFacePreservedCount = 0;
-                DeterministicKernelSelectedEdgeCount = 0;
-                DeterministicKernelAffectedVertexCount = 0;
-                DeterministicKernelIsolatedEndpointVertexCount = 0;
-                DeterministicKernelTwoEdgeCornerVertexCount = 0;
-                DeterministicKernelMultiEdgeStarVertexCount = 0;
-                DeterministicKernelBoundaryOrInvalidVertexCount = 0;
-                DeterministicKernelInvalidAdjacencyEdgeCount = 0;
-                DeterministicKernelSupportedEdgeCount = 0;
-                DeterministicKernelDeferredEdgeCount = 0;
-                DeterministicKernelBevelFacesBuiltCount = 0;
-                DeterministicKernelConvexWearPolygonsTriangulatedCount = 0;
-                DeterministicKernelConvexWearTrianglesBuiltCount = 0;
-                DeterministicKernelConvexWearTriangulationFailedCount = 0;
-                DeterministicKernelOpenEdgesAfterBuildCount = 0;
-                DeterministicKernelNonManifoldEdgesAfterBuildCount = 0;
-                DeterministicKernelTJunctionsAfterBuildCount = 0;
-                DeterministicKernelGlobalCutAppliedCount = 0;
-                DeterministicKernelFaceOffsetPolygonAttemptCount = 0;
-                DeterministicKernelFaceOffsetPolygonBuiltCount = 0;
-                DeterministicKernelFaceOffsetPolygonFailedCount = 0;
-                DeterministicKernelRailsExpectedCount = 0;
-                DeterministicKernelRailsBuiltCount = 0;
-                DeterministicKernelRailsMissingCount = 0;
-                DeterministicKernelLocalBevelFaceAttemptCount = 0;
-                DeterministicKernelLocalBevelFaceBuiltCount = 0;
-                DeterministicKernelLocalBevelFaceFailedCount = 0;
-                DeterministicKernelTransitionFacesBuiltCount = 0;
-                DeterministicKernelVertexCapAttemptCount = 0;
-                DeterministicKernelVertexCapBuiltCount = 0;
-                DeterministicKernelVertexCapFailedCount = 0;
-                DeterministicKernelVertexCapIsolatedAttemptCount = 0;
-                DeterministicKernelVertexCapIsolatedBuiltCount = 0;
-                DeterministicKernelVertexCapIsolatedFailedCount = 0;
-                DeterministicKernelVertexCapTwoEdgeAttemptCount = 0;
-                DeterministicKernelVertexCapTwoEdgeBuiltCount = 0;
-                DeterministicKernelVertexCapTwoEdgeFailedCount = 0;
-                DeterministicKernelVertexCapMultiStarAttemptCount = 0;
-                DeterministicKernelVertexCapMultiStarBuiltCount = 0;
-                DeterministicKernelVertexCapMultiStarFailedCount = 0;
-                DeterministicKernelVertexCapOrderingFailureCount = 0;
-                DeterministicKernelVertexCapDuplicatePointFailureCount = 0;
-                DeterministicKernelVertexCapAreaFailureCount = 0;
-                DeterministicKernelVertexCapLowValenceAttemptCount = 0;
-                DeterministicKernelVertexCapLowValenceBuiltCount = 0;
-                DeterministicKernelVertexCapLowValenceFailedCount = 0;
-                DeterministicKernelVertexCapLowValenceApexTriangleBuiltCount = 0;
-                DeterministicKernelVertexCapLowValenceInsufficientBoundaryFailureCount = 0;
-                DeterministicKernelVertexCapTwoEdgeCornerPatchAttemptCount = 0;
-                DeterministicKernelVertexCapTwoEdgeCornerPatchBuiltCount = 0;
-                DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount = 0;
-                DeterministicKernelVertexCapTwoEdgeCornerPatchTriangleBuiltCount = 0;
-                DeterministicKernelVertexCapTwoEdgeCornerPatchInsufficientBoundaryFailureCount = 0;
-                DeterministicKernelVertexCapTwoEdgeCornerPatchAreaFailureCount = 0;
-                DeterministicKernelVertexCapNonFiniteFailureCount = 0;
-                DeterministicKernelVertexCapTooSmallFailureCount = 0;
-                RejectedUnknown = 0;
-            }
-
-            public void ApplyGraphStats(EdgeWearGraphBuildStats graphStats)
-            {
-                GraphVertexCount = graphStats.GraphVertexCount;
-                GraphEdgeCount = graphStats.GraphEdgeCount;
-                GraphFaceCount = graphStats.GraphFaceCount;
-                GraphBoundaryEdgeCount = graphStats.GraphBoundaryEdgeCount;
-                GraphNonManifoldEdgeCount = graphStats.GraphNonManifoldEdgeCount;
-                SelectedGraphEdgeCount = graphStats.SelectedGraphEdgeCount;
-                MissingSelectedGraphEdgeCount = graphStats.MissingSelectedGraphEdgeCount;
-                MismatchedSelectedGraphFaceCount = graphStats.MismatchedSelectedGraphFaceCount;
-                DuplicateSelectedGraphEdgeCount = graphStats.DuplicateSelectedGraphEdgeCount;
-                InvalidGraphFaceCount = graphStats.InvalidFaceCount;
-                InvalidGraphEdgeCount = graphStats.InvalidEdgeCount;
-            }
-
-            public void ApplyTriangleEmissionPreviewStats(
-                TriangleEmissionPreviewStats previewStats)
-            {
-                TriangulationPreviewConvexEdgeWearTriangleAttemptCount =
-                    previewStats.ConvexEdgeWearTriangleAttemptCount;
-                TriangulationPreviewConvexEdgeWearTriangleEmitCount =
-                    previewStats.ConvexEdgeWearTriangleEmitCount;
-                TriangulationPreviewSkippedConvexEdgeWearTriangleCount =
-                    previewStats.SkippedConvexEdgeWearTriangleCount;
-                TriangulationPreviewSkippedConvexEdgeWearDegenerateEdgeCount =
-                    previewStats.SkippedConvexEdgeWearDegenerateEdgeCount;
-                TriangulationPreviewSkippedConvexEdgeWearDegenerateAreaCount =
-                    previewStats.SkippedConvexEdgeWearDegenerateAreaCount;
-                TriangulationPreviewSkippedConvexEdgeWearNonFiniteCount =
-                    previewStats.SkippedConvexEdgeWearNonFiniteCount;
-                TriangulationPreviewBaseTriangleAttemptCount =
-                    previewStats.BaseTriangleAttemptCount;
-                TriangulationPreviewBaseTriangleEmitCount =
-                    previewStats.BaseTriangleEmitCount;
-                TriangulationPreviewSkippedBaseTriangleCount =
-                    previewStats.SkippedBaseTriangleCount;
-                TriangulationPreviewSkippedBaseDegenerateEdgeCount =
-                    previewStats.SkippedBaseDegenerateEdgeCount;
-                TriangulationPreviewSkippedBaseDegenerateAreaCount =
-                    previewStats.SkippedBaseDegenerateAreaCount;
-                TriangulationPreviewSkippedBaseNonFiniteCount =
-                    previewStats.SkippedBaseNonFiniteCount;
-            }
-
-            public void RegisterReject(EdgeWearBevelRejectReason reason)
-            {
-                switch (reason)
-                {
-                    case EdgeWearBevelRejectReason.ValidationBaseFace:
-                        RejectedValidationBaseFace++;
-                        break;
-                    case EdgeWearBevelRejectReason.ValidationBevelFace:
-                        RejectedValidationBevelFace++;
-                        break;
-                    case EdgeWearBevelRejectReason.ValidationCapFace:
-                        RejectedValidationCapFace++;
-                        break;
-                    case EdgeWearBevelRejectReason.ValidationOpenEdge:
-                        RejectedValidationOpenEdge++;
-                        break;
-                    case EdgeWearBevelRejectReason.ValidationNonManifoldEdge:
-                        RejectedValidationNonManifoldEdge++;
-                        break;
-                    case EdgeWearBevelRejectReason.ValidationTJunction:
-                        RejectedValidationTJunction++;
-                        break;
-                    case EdgeWearBevelRejectReason.ValidationGlobal:
-                        RejectedValidationGlobal++;
-                        break;
-                    default:
-                        RejectedUnknown++;
-                        break;
-                }
-            }
-
-            public bool HasTopologyRejects =>
-                RejectedValidationOpenEdge > 0 ||
-                RejectedValidationNonManifoldEdge > 0 ||
-                RejectedValidationTJunction > 0;
-
-            public string ToSummaryString()
-            {
-                return
-                    $"candidates={CandidateCount}, selected={SelectedCount}, accepted={AcceptedCount}, " +
-                    $"committedConvexEdgeWearFaces={CommittedConvexEdgeWearFaceCount}, " +
-                    $"committedConvexEdgeWearTrianglesEstimate={CommittedConvexEdgeWearTriangleEstimateCount}, " +
-                    $"committedConvexEdgeWearRenderedVerticesEstimate={CommittedConvexEdgeWearRenderedVertexEstimateCount}, " +
-                    $"committedConvexEdgeWearTriangleFaces={CommittedConvexEdgeWearTriangleFaceCount}, " +
-                    $"committedConvexEdgeWearQuadFaces={CommittedConvexEdgeWearQuadFaceCount}, " +
-                    $"committedConvexEdgeWearNgonFaces={CommittedConvexEdgeWearNgonFaceCount}, " +
-                    $"committedConvexEdgeWearMaxVerticesPerFace={CommittedConvexEdgeWearMaxVerticesPerFaceCount}, " +
-                    $"triangulationPreviewConvexEdgeWearTriangles={TriangulationPreviewConvexEdgeWearTriangleEmitCount}, " +
-                    $"triangulationPreviewConvexEdgeWearTriangleAttempts={TriangulationPreviewConvexEdgeWearTriangleAttemptCount}, " +
-                    $"triangulationPreviewSkippedConvexEdgeWearTriangles={TriangulationPreviewSkippedConvexEdgeWearTriangleCount}, " +
-                    $"triangulationPreviewSkippedConvexEdgeWearDegenerateEdges={TriangulationPreviewSkippedConvexEdgeWearDegenerateEdgeCount}, " +
-                    $"triangulationPreviewSkippedConvexEdgeWearDegenerateArea={TriangulationPreviewSkippedConvexEdgeWearDegenerateAreaCount}, " +
-                    $"triangulationPreviewSkippedConvexEdgeWearNonFinite={TriangulationPreviewSkippedConvexEdgeWearNonFiniteCount}, " +
-                    $"triangulationPreviewBaseTriangles={TriangulationPreviewBaseTriangleEmitCount}, " +
-                    $"triangulationPreviewBaseTriangleAttempts={TriangulationPreviewBaseTriangleAttemptCount}, " +
-                    $"triangulationPreviewSkippedBaseTriangles={TriangulationPreviewSkippedBaseTriangleCount}, " +
-                    $"triangulationPreviewSkippedBaseDegenerateEdges={TriangulationPreviewSkippedBaseDegenerateEdgeCount}, " +
-                    $"triangulationPreviewSkippedBaseDegenerateArea={TriangulationPreviewSkippedBaseDegenerateAreaCount}, " +
-                    $"triangulationPreviewSkippedBaseNonFinite={TriangulationPreviewSkippedBaseNonFiniteCount}, " +
-                    $"graphVertices={GraphVertexCount}, " +
-                    $"graphEdges={GraphEdgeCount}, " +
-                    $"graphFaces={GraphFaceCount}, " +
-                    $"graphBoundaryEdges={GraphBoundaryEdgeCount}, " +
-                    $"graphNonManifoldEdges={GraphNonManifoldEdgeCount}, " +
-                    $"selectedGraphEdges={SelectedGraphEdgeCount}, " +
-                    $"missingSelectedGraphEdges={MissingSelectedGraphEdgeCount}, " +
-                    $"mismatchedSelectedGraphFaces={MismatchedSelectedGraphFaceCount}, " +
-                    $"duplicateSelectedGraphEdges={DuplicateSelectedGraphEdgeCount}, " +
-                    $"invalidGraphFaces={InvalidGraphFaceCount}, " +
-                    $"invalidGraphEdges={InvalidGraphEdgeCount}, " +
-                    $"topologyOpenEdges={TopologyOpenEdges}, " +
-                    $"topologyNonManifoldEdges={TopologyNonManifoldEdges}, " +
-                    $"topologyTJunctions={TopologyTJunctions}, " +
-                    $"deterministicKernelGeometryPending={DeterministicKernelGeometryPendingCount}, " +
-                    $"deterministicKernelMappedSelectedEdges={DeterministicKernelMappedSelectedEdgeCount}, " +
-                    $"deterministicKernelSourceFaces={DeterministicKernelSourceFaceCount}, " +
-                    $"deterministicKernelSourceEdges={DeterministicKernelSourceEdgeCount}, " +
-                    $"deterministicKernelSourceVertices={DeterministicKernelSourceVertexCount}, " +
-                    $"deterministicKernelAffectedFaces={DeterministicKernelAffectedFaceCount}, " +
-                    $"deterministicKernelUnaffectedFacesPreserved={DeterministicKernelUnaffectedFacePreservedCount}, " +
-                    $"deterministicKernelSelectedEdges={DeterministicKernelSelectedEdgeCount}, " +
-                    $"deterministicKernelAffectedVertices={DeterministicKernelAffectedVertexCount}, " +
-                    $"deterministicKernelIsolatedEndpointVertices={DeterministicKernelIsolatedEndpointVertexCount}, " +
-                    $"deterministicKernelTwoEdgeCornerVertices={DeterministicKernelTwoEdgeCornerVertexCount}, " +
-                    $"deterministicKernelMultiEdgeStarVertices={DeterministicKernelMultiEdgeStarVertexCount}, " +
-                    $"deterministicKernelBoundaryOrInvalidVertices={DeterministicKernelBoundaryOrInvalidVertexCount}, " +
-                    $"deterministicKernelInvalidAdjacencyEdges={DeterministicKernelInvalidAdjacencyEdgeCount}, " +
-                    $"deterministicKernelSupportedEdges={DeterministicKernelSupportedEdgeCount}, " +
-                    $"deterministicKernelDeferredEdges={DeterministicKernelDeferredEdgeCount}, " +
-                    $"deterministicKernelBevelFacesBuilt={DeterministicKernelBevelFacesBuiltCount}, " +
-                    $"deterministicKernelConvexWearPolygonsTriangulated={DeterministicKernelConvexWearPolygonsTriangulatedCount}, " +
-                    $"deterministicKernelConvexWearTrianglesBuilt={DeterministicKernelConvexWearTrianglesBuiltCount}, " +
-                    $"deterministicKernelConvexWearTriangulationFailures={DeterministicKernelConvexWearTriangulationFailedCount}, " +
-                    $"deterministicKernelOpenEdgesAfterBuild={DeterministicKernelOpenEdgesAfterBuildCount}, " +
-                    $"deterministicKernelNonManifoldEdgesAfterBuild={DeterministicKernelNonManifoldEdgesAfterBuildCount}, " +
-                    $"deterministicKernelTJunctionsAfterBuild={DeterministicKernelTJunctionsAfterBuildCount}, " +
-                    $"deterministicKernelGlobalCutsApplied={DeterministicKernelGlobalCutAppliedCount}, " +
-                    $"deterministicKernelFaceOffsetPolygonsAttempted={DeterministicKernelFaceOffsetPolygonAttemptCount}, " +
-                    $"deterministicKernelFaceOffsetPolygonsBuilt={DeterministicKernelFaceOffsetPolygonBuiltCount}, " +
-                    $"deterministicKernelFaceOffsetPolygonFailures={DeterministicKernelFaceOffsetPolygonFailedCount}, " +
-                    $"deterministicKernelRailsExpected={DeterministicKernelRailsExpectedCount}, " +
-                    $"deterministicKernelRailsBuilt={DeterministicKernelRailsBuiltCount}, " +
-                    $"deterministicKernelRailsMissing={DeterministicKernelRailsMissingCount}, " +
-                    $"deterministicKernelLocalBevelFacesAttempted={DeterministicKernelLocalBevelFaceAttemptCount}, " +
-                    $"deterministicKernelLocalBevelFacesBuilt={DeterministicKernelLocalBevelFaceBuiltCount}, " +
-                    $"deterministicKernelLocalBevelFaceFailures={DeterministicKernelLocalBevelFaceFailedCount}, " +
-                    $"deterministicKernelTransitionFacesBuilt={DeterministicKernelTransitionFacesBuiltCount}, " +
-                    $"deterministicKernelVertexCapsAttempted={DeterministicKernelVertexCapAttemptCount}, " +
-                    $"deterministicKernelVertexCapsBuilt={DeterministicKernelVertexCapBuiltCount}, " +
-                    $"deterministicKernelVertexCapFailures={DeterministicKernelVertexCapFailedCount}, " +
-                    $"deterministicKernelVertexCapIsolatedAttempted={DeterministicKernelVertexCapIsolatedAttemptCount}, " +
-                    $"deterministicKernelVertexCapIsolatedBuilt={DeterministicKernelVertexCapIsolatedBuiltCount}, " +
-                    $"deterministicKernelVertexCapIsolatedFailed={DeterministicKernelVertexCapIsolatedFailedCount}, " +
-                    $"deterministicKernelVertexCapTwoEdgeAttempted={DeterministicKernelVertexCapTwoEdgeAttemptCount}, " +
-                    $"deterministicKernelVertexCapTwoEdgeBuilt={DeterministicKernelVertexCapTwoEdgeBuiltCount}, " +
-                    $"deterministicKernelVertexCapTwoEdgeFailed={DeterministicKernelVertexCapTwoEdgeFailedCount}, " +
-                    $"deterministicKernelVertexCapMultiStarAttempted={DeterministicKernelVertexCapMultiStarAttemptCount}, " +
-                    $"deterministicKernelVertexCapMultiStarBuilt={DeterministicKernelVertexCapMultiStarBuiltCount}, " +
-                    $"deterministicKernelVertexCapMultiStarFailed={DeterministicKernelVertexCapMultiStarFailedCount}, " +
-                    $"deterministicKernelVertexCapOrderingFailures={DeterministicKernelVertexCapOrderingFailureCount}, " +
-                    $"deterministicKernelVertexCapDuplicatePointFailures={DeterministicKernelVertexCapDuplicatePointFailureCount}, " +
-                    $"deterministicKernelVertexCapAreaFailures={DeterministicKernelVertexCapAreaFailureCount}, " +
-                    $"deterministicKernelVertexCapLowValenceAttempted={DeterministicKernelVertexCapLowValenceAttemptCount}, " +
-                    $"deterministicKernelVertexCapLowValenceBuilt={DeterministicKernelVertexCapLowValenceBuiltCount}, " +
-                    $"deterministicKernelVertexCapLowValenceFailed={DeterministicKernelVertexCapLowValenceFailedCount}, " +
-                    $"deterministicKernelVertexCapLowValenceApexTrianglesBuilt={DeterministicKernelVertexCapLowValenceApexTriangleBuiltCount}, " +
-                    $"deterministicKernelVertexCapLowValenceInsufficientBoundaryFailures={DeterministicKernelVertexCapLowValenceInsufficientBoundaryFailureCount}, " +
-                    $"deterministicKernelVertexCapTwoEdgeCornerPatchAttempted={DeterministicKernelVertexCapTwoEdgeCornerPatchAttemptCount}, " +
-                    $"deterministicKernelVertexCapTwoEdgeCornerPatchBuilt={DeterministicKernelVertexCapTwoEdgeCornerPatchBuiltCount}, " +
-                    $"deterministicKernelVertexCapTwoEdgeCornerPatchFailed={DeterministicKernelVertexCapTwoEdgeCornerPatchFailedCount}, " +
-                    $"deterministicKernelVertexCapTwoEdgeCornerPatchTrianglesBuilt={DeterministicKernelVertexCapTwoEdgeCornerPatchTriangleBuiltCount}, " +
-                    $"deterministicKernelVertexCapTwoEdgeCornerPatchInsufficientBoundaryFailures={DeterministicKernelVertexCapTwoEdgeCornerPatchInsufficientBoundaryFailureCount}, " +
-                    $"deterministicKernelVertexCapTwoEdgeCornerPatchAreaFailures={DeterministicKernelVertexCapTwoEdgeCornerPatchAreaFailureCount}, " +
-                    $"deterministicKernelVertexCapNonFiniteFailures={DeterministicKernelVertexCapNonFiniteFailureCount}, " +
-                    $"deterministicKernelVertexCapTooSmallFailures={DeterministicKernelVertexCapTooSmallFailureCount}, " +
-                    $"rejectedValidationBaseFace={RejectedValidationBaseFace}, " +
-                    $"rejectedValidationBevelFace={RejectedValidationBevelFace}, " +
-                    $"rejectedValidationCapFace={RejectedValidationCapFace}, " +
-                    $"rejectedValidationOpenEdge={RejectedValidationOpenEdge}, " +
-                    $"rejectedValidationNonManifoldEdge={RejectedValidationNonManifoldEdge}, " +
-                    $"rejectedValidationTJunction={RejectedValidationTJunction}, " +
-                    $"rejectedValidationGlobal={RejectedValidationGlobal}, " +
-                    $"rejectedUnknown={RejectedUnknown}.";
-            }
-        }
-
-        private readonly struct EdgeWearBevelCandidate
+private readonly struct EdgeWearBevelCandidate
         {
             public readonly int CandidateIndex;
             public readonly Vector3 Start;

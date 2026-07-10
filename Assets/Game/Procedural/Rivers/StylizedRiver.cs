@@ -59,9 +59,18 @@ namespace ProgrammaticStylized3D.Rivers
 
     public enum StylizedRiverFoamObjectPattern
     {
-        Mixed,
-        ContactArcs,
-        ContactFlecks
+        Mixed = 0,
+        ContactArcs = 1,
+        ContactSemiArcs = 3,
+        ContactFlecks = 2
+    }
+
+    public enum StylizedRiverFoamFreeWaterPattern
+    {
+        Mixed = 0,
+        LaceConnectors = 1,
+        CrossLaceConnectors = 3,
+        TornFragments = 2
     }
 
     public enum StylizedRiverFoamBirthShapeMode
@@ -974,17 +983,21 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamObjectFoamFormationSpeedMetresPerSecond =
             DefaultShoreFoamFormationSpeedMetresPerSecond;
 
-        [Tooltip("Chooses the deterministic object-contact source recipe. Mixed uses the normalized Contact Arc / Contact Fleck pattern weights below; the pure modes force one pattern for debugging.")]
+        [Tooltip("Chooses the deterministic object-contact source recipe. Mixed uses the normalized Contact Arc / Contact Semi-Arc / Contact Fleck pattern weights below; the pure modes force one pattern for debugging.")]
         [SerializeField] private StylizedRiverFoamObjectPattern foamObjectFoamPattern =
             StylizedRiverFoamObjectPattern.Mixed;
 
-        [Tooltip("Normalized Object Foam mix share for contact-arc sources when Pattern is Mixed. The editor keeps this and Contact Fleck Weight summing to one.")]
+        [Tooltip("Normalized Object Foam mix share for contact-arc sources when Pattern is Mixed. The editor keeps object pattern weights summing to one.")]
         [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactArcPatternWeight = 0.75f;
+        [SerializeField] private float foamObjectContactArcPatternWeight = 0.45f;
 
-        [Tooltip("Normalized Object Foam mix share for contact-fleck sources when Pattern is Mixed. The editor keeps this and Contact Arc Weight summing to one.")]
+        [Tooltip("Normalized Object Foam mix share for lopsided contact semi-arc sources when Pattern is Mixed. The editor keeps object pattern weights summing to one.")]
         [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactFleckPatternWeight = 0.25f;
+        [SerializeField] private float foamObjectContactSemiArcPatternWeight = 0.35f;
+
+        [Tooltip("Normalized Object Foam mix share for contact-fleck sources when Pattern is Mixed. The editor keeps object pattern weights summing to one.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactFleckPatternWeight = 0.20f;
 
         [Tooltip("Per-pattern multiplier for how fast Object Contact Arc sources reveal along their path.")]
         [Range(0.10f, 3.00f)]
@@ -1030,6 +1043,58 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcBreakupStrengthMax = 0.28f;
 
+        [Tooltip("Per-pattern multiplier for how fast Object Contact Semi-Arc sources reveal along their one-sided path.")]
+        [Range(0.10f, 3.00f)]
+        [SerializeField] private float foamObjectContactSemiArcFormationSpeedMultiplier = 1.00f;
+
+        [Tooltip("Minimum authored Object Contact Semi-Arc length in metres before deterministic variation is applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamObjectContactSemiArcLengthMinMetres = 0.35f;
+
+        [Tooltip("Maximum authored Object Contact Semi-Arc length in metres before deterministic variation is applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamObjectContactSemiArcLengthMaxMetres = 1.35f;
+
+        [Tooltip("Minimum authored Object Contact Semi-Arc width in metres before deterministic variation is applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamObjectContactSemiArcWidthMinMetres = 0.030f;
+
+        [Tooltip("Maximum authored Object Contact Semi-Arc width in metres before deterministic variation is applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamObjectContactSemiArcWidthMaxMetres = 0.105f;
+
+        [Tooltip("Minimum offset from the obstacle pressure/contact edge for Object Contact Semi-Arc sources.")]
+        [Min(0f)]
+        [SerializeField] private float foamObjectContactSemiArcOffsetMinMetres = 0.020f;
+
+        [Tooltip("Maximum offset from the obstacle pressure/contact edge for Object Contact Semi-Arc sources.")]
+        [Min(0f)]
+        [SerializeField] private float foamObjectContactSemiArcOffsetMaxMetres = 0.140f;
+
+        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Object Contact Semi-Arc material.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactSemiArcInitialLifeMin = 0.65f;
+
+        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Object Contact Semi-Arc material.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactSemiArcInitialLifeMax = 1.00f;
+
+        [Tooltip("Minimum deterministic breakup strength for Object Contact Semi-Arc sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactSemiArcBreakupStrengthMin = 0.08f;
+
+        [Tooltip("Maximum deterministic breakup strength for Object Contact Semi-Arc sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactSemiArcBreakupStrengthMax = 0.32f;
+
+        [Tooltip("Minimum one-sided bias for Object Contact Semi-Arcs. Higher values push the source farther onto one shoulder of the object contact edge.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactSemiArcLopsidednessMin = 0.45f;
+
+        [Tooltip("Maximum one-sided bias for Object Contact Semi-Arcs. Higher values produce more visibly lopsided contact arcs.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamObjectContactSemiArcLopsidednessMax = 1.00f;
+
         [Tooltip("Per-pattern multiplier for how fast Object Contact Fleck sources reveal along their path.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamObjectContactFleckFormationSpeedMultiplier = 1.00f;
@@ -1073,6 +1138,157 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Maximum deterministic breakup strength for Object Contact Fleck sources.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactFleckBreakupStrengthMax = 0.45f;
+
+        [Tooltip("Enables deterministic open-water Layer C material birth when Automatic Foam Birth is on and Spawn Preset is not Off.")]
+        [SerializeField] private bool foamAutomaticFreeWaterBirthEnabled = true;
+
+        [Tooltip("How much of the open-water deterministic source lattice can participate in Free Water Foam source events over time. This controls slot eligibility, not opacity or patch size.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterFoamCoverage = 0.25f;
+
+        [Tooltip("How often new open-water source events start. Higher values start more lace connectors or torn fragments per second.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterFoamActivity = 0.25f;
+
+        [Tooltip("Base source reveal speed in metres per second for Free Water Foam. Per-pattern Formation Speed multipliers can make individual open-water patterns reveal faster or slower.")]
+        [Range(
+            MinimumShoreFoamFormationSpeedMetresPerSecond,
+            MaximumShoreFoamFormationSpeedMetresPerSecond)]
+        [SerializeField]
+        private float foamFreeWaterFoamFormationSpeedMetresPerSecond =
+            DefaultShoreFoamFormationSpeedMetresPerSecond;
+
+        [Tooltip("Chooses the deterministic open-water source recipe. Mixed uses the normalized Lace Connector / Cross-Lace Connector / Torn Fragment pattern weights below; the pure modes force one pattern for debugging.")]
+        [SerializeField] private StylizedRiverFoamFreeWaterPattern foamFreeWaterFoamPattern =
+            StylizedRiverFoamFreeWaterPattern.Mixed;
+
+        [Tooltip("Normalized Free Water Foam mix share for with-flow lace connector sources when Pattern is Mixed. The editor keeps free-water pattern weights summing to one.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterLaceConnectorPatternWeight = 0.30f;
+
+        [Tooltip("Normalized Free Water Foam mix share for cross-current lace connector sources when Pattern is Mixed. The editor keeps free-water pattern weights summing to one.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterCrossLaceConnectorPatternWeight = 0.45f;
+
+        [Tooltip("Normalized Free Water Foam mix share for progressive torn fragment sources when Pattern is Mixed. The editor keeps free-water pattern weights summing to one.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterTornFragmentPatternWeight = 0.25f;
+
+        [Tooltip("Per-pattern multiplier for how fast Free Water Lace Connector sources reveal along their curving stroke.")]
+        [Range(0.10f, 3.00f)]
+        [SerializeField] private float foamFreeWaterLaceFormationSpeedMultiplier = 1.00f;
+
+        [Tooltip("Minimum authored Free Water Lace Connector length in metres before deterministic variation is applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamFreeWaterLaceLengthMinMetres = 1.40f;
+
+        [Tooltip("Maximum authored Free Water Lace Connector length in metres before deterministic variation is applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamFreeWaterLaceLengthMaxMetres = 5.80f;
+
+        [Tooltip("Minimum authored Free Water Lace Connector width in metres before deterministic variation is applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamFreeWaterLaceWidthMinMetres = 0.025f;
+
+        [Tooltip("Maximum authored Free Water Lace Connector width in metres before deterministic variation is applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamFreeWaterLaceWidthMaxMetres = 0.115f;
+
+        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Free Water Lace Connector material.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterLaceInitialLifeMin = 0.35f;
+
+        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Free Water Lace Connector material.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterLaceInitialLifeMax = 0.80f;
+
+        [Tooltip("Minimum deterministic breakup strength for Free Water Lace Connector sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterLaceBreakupStrengthMin = 0.22f;
+
+        [Tooltip("Maximum deterministic breakup strength for Free Water Lace Connector sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterLaceBreakupStrengthMax = 0.55f;
+
+        [Tooltip("Minimum signed curvature magnitude for Free Water Lace Connector sources. The sign is chosen deterministically per event.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterLaceCurvatureMin = 0.00f;
+
+        [Tooltip("Maximum signed curvature magnitude for Free Water Lace Connector sources. The sign is chosen deterministically per event.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterLaceCurvatureMax = 1.00f;
+
+        [Tooltip("Per-pattern multiplier for how fast Free Water Cross-Lace Connector sources reveal across the river.")]
+        [Range(0.10f, 3.00f)]
+        [SerializeField] private float foamFreeWaterCrossLaceFormationSpeedMultiplier = 1.00f;
+
+        [Tooltip("Minimum authored Free Water Cross-Lace Connector lateral length in metres before deterministic variation is applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamFreeWaterCrossLaceLengthMinMetres = 0.70f;
+
+        [Tooltip("Maximum authored Free Water Cross-Lace Connector lateral length in metres before deterministic variation is applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamFreeWaterCrossLaceLengthMaxMetres = 2.40f;
+
+        [Tooltip("Minimum authored Free Water Cross-Lace Connector width in metres before deterministic variation is applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamFreeWaterCrossLaceWidthMinMetres = 0.030f;
+
+        [Tooltip("Maximum authored Free Water Cross-Lace Connector width in metres before deterministic variation is applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamFreeWaterCrossLaceWidthMaxMetres = 0.120f;
+
+        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Free Water Cross-Lace Connector material.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterCrossLaceInitialLifeMin = 0.45f;
+
+        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Free Water Cross-Lace Connector material.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterCrossLaceInitialLifeMax = 0.90f;
+
+        [Tooltip("Minimum deterministic breakup strength for Free Water Cross-Lace Connector sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterCrossLaceBreakupStrengthMin = 0.20f;
+
+        [Tooltip("Maximum deterministic breakup strength for Free Water Cross-Lace Connector sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterCrossLaceBreakupStrengthMax = 0.55f;
+
+        [Tooltip("Per-pattern multiplier for how fast Free Water Torn Fragment sources reveal across their local patch.")]
+        [Range(0.10f, 3.00f)]
+        [SerializeField] private float foamFreeWaterFragmentFormationSpeedMultiplier = 1.00f;
+
+        [Tooltip("Minimum authored Free Water Torn Fragment length in metres before deterministic variation is applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamFreeWaterFragmentLengthMinMetres = 0.35f;
+
+        [Tooltip("Maximum authored Free Water Torn Fragment length in metres before deterministic variation is applied.")]
+        [Min(0.05f)]
+        [SerializeField] private float foamFreeWaterFragmentLengthMaxMetres = 1.35f;
+
+        [Tooltip("Minimum authored Free Water Torn Fragment width in metres before deterministic variation is applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamFreeWaterFragmentWidthMinMetres = 0.055f;
+
+        [Tooltip("Maximum authored Free Water Torn Fragment width in metres before deterministic variation is applied.")]
+        [Min(0.005f)]
+        [SerializeField] private float foamFreeWaterFragmentWidthMaxMetres = 0.280f;
+
+        [Tooltip("Minimum initial normalized Remaining Life assigned to spawned Free Water Torn Fragment material.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterFragmentInitialLifeMin = 0.25f;
+
+        [Tooltip("Maximum initial normalized Remaining Life assigned to spawned Free Water Torn Fragment material.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterFragmentInitialLifeMax = 0.65f;
+
+        [Tooltip("Minimum deterministic breakup strength for Free Water Torn Fragment sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterFragmentBreakupStrengthMin = 0.30f;
+
+        [Tooltip("Maximum deterministic breakup strength for Free Water Torn Fragment sources.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFreeWaterFragmentBreakupStrengthMax = 0.70f;
 
         [SerializeField, HideInInspector] private float foamShoreFoamStrength = 0.35f;
         [SerializeField, HideInInspector] private float foamShoreFoamPersistence = 0.30f;
@@ -1673,9 +1889,17 @@ namespace ProgrammaticStylized3D.Rivers
             FoamAutomaticBirthEnabled &&
             FoamAutomaticObjectBirthEnabled &&
             FoamSourcePopulationPreset != StylizedRiverFoamSourcePopulationPreset.Off;
+        public bool FoamAutomaticFreeWaterBirthEnabled =>
+            foamAutomaticFreeWaterBirthEnabled;
+        public bool FoamAutomaticFreeWaterBirthActive =>
+            FoamAutomaticBirthEnabled &&
+            FoamAutomaticFreeWaterBirthEnabled &&
+            FoamSourcePopulationPreset != StylizedRiverFoamSourcePopulationPreset.Off;
         public bool FoamSourcePopulationPresetImplemented =>
             FoamSourcePopulationPreset ==
                 StylizedRiverFoamSourcePopulationPreset.ShoreContactTest ||
+            FoamSourcePopulationPreset ==
+                StylizedRiverFoamSourcePopulationPreset.RiverBodyTest ||
             FoamSourcePopulationPreset ==
                 StylizedRiverFoamSourcePopulationPreset.ObstacleContactTest ||
             FoamSourcePopulationPreset ==
@@ -1833,6 +2057,52 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(Mathf.Max(
                 foamObjectContactArcBreakupStrengthMin,
                 foamObjectContactArcBreakupStrengthMax));
+        public float FoamObjectContactSemiArcPatternWeight =>
+            Mathf.Clamp01(foamObjectContactSemiArcPatternWeight);
+        public float FoamObjectContactSemiArcFormationSpeedMultiplier =>
+            Mathf.Clamp(foamObjectContactSemiArcFormationSpeedMultiplier, 0.10f, 3.00f);
+        public float FoamObjectContactSemiArcLengthMinMetres =>
+            Mathf.Max(0.05f, Mathf.Min(
+                foamObjectContactSemiArcLengthMinMetres,
+                foamObjectContactSemiArcLengthMaxMetres));
+        public float FoamObjectContactSemiArcLengthMaxMetres =>
+            Mathf.Max(FoamObjectContactSemiArcLengthMinMetres, foamObjectContactSemiArcLengthMaxMetres);
+        public float FoamObjectContactSemiArcWidthMinMetres =>
+            Mathf.Max(0.005f, Mathf.Min(
+                foamObjectContactSemiArcWidthMinMetres,
+                foamObjectContactSemiArcWidthMaxMetres));
+        public float FoamObjectContactSemiArcWidthMaxMetres =>
+            Mathf.Max(FoamObjectContactSemiArcWidthMinMetres, foamObjectContactSemiArcWidthMaxMetres);
+        public float FoamObjectContactSemiArcOffsetMinMetres =>
+            Mathf.Max(0f, Mathf.Min(
+                foamObjectContactSemiArcOffsetMinMetres,
+                foamObjectContactSemiArcOffsetMaxMetres));
+        public float FoamObjectContactSemiArcOffsetMaxMetres =>
+            Mathf.Max(FoamObjectContactSemiArcOffsetMinMetres, foamObjectContactSemiArcOffsetMaxMetres);
+        public float FoamObjectContactSemiArcInitialLifeMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamObjectContactSemiArcInitialLifeMin,
+                foamObjectContactSemiArcInitialLifeMax));
+        public float FoamObjectContactSemiArcInitialLifeMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamObjectContactSemiArcInitialLifeMin,
+                foamObjectContactSemiArcInitialLifeMax));
+        public float FoamObjectContactSemiArcBreakupStrengthMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamObjectContactSemiArcBreakupStrengthMin,
+                foamObjectContactSemiArcBreakupStrengthMax));
+        public float FoamObjectContactSemiArcBreakupStrengthMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamObjectContactSemiArcBreakupStrengthMin,
+                foamObjectContactSemiArcBreakupStrengthMax));
+        public float FoamObjectContactSemiArcLopsidednessMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamObjectContactSemiArcLopsidednessMin,
+                foamObjectContactSemiArcLopsidednessMax));
+        public float FoamObjectContactSemiArcLopsidednessMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamObjectContactSemiArcLopsidednessMin,
+                foamObjectContactSemiArcLopsidednessMax));
         public float FoamObjectContactFleckFormationSpeedMultiplier =>
             Mathf.Clamp(foamObjectContactFleckFormationSpeedMultiplier, 0.10f, 3.00f);
         public float FoamObjectContactFleckLengthMinMetres =>
@@ -1869,6 +2139,122 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(Mathf.Max(
                 foamObjectContactFleckBreakupStrengthMin,
                 foamObjectContactFleckBreakupStrengthMax));
+
+        public float FoamFreeWaterFoamCoverage =>
+            Mathf.Clamp01(foamFreeWaterFoamCoverage);
+        public float FoamFreeWaterFoamActivity =>
+            Mathf.Clamp01(foamFreeWaterFoamActivity);
+        public float FoamFreeWaterFoamFormationSpeedMetresPerSecond =>
+            Mathf.Clamp(
+                foamFreeWaterFoamFormationSpeedMetresPerSecond,
+                MinimumShoreFoamFormationSpeedMetresPerSecond,
+                MaximumShoreFoamFormationSpeedMetresPerSecond);
+        public StylizedRiverFoamFreeWaterPattern FoamFreeWaterFoamPattern =>
+            foamFreeWaterFoamPattern;
+        public float FoamFreeWaterLaceConnectorPatternWeight =>
+            Mathf.Clamp01(foamFreeWaterLaceConnectorPatternWeight);
+        public float FoamFreeWaterCrossLaceConnectorPatternWeight =>
+            Mathf.Clamp01(foamFreeWaterCrossLaceConnectorPatternWeight);
+        public float FoamFreeWaterTornFragmentPatternWeight =>
+            Mathf.Clamp01(foamFreeWaterTornFragmentPatternWeight);
+        public float FoamFreeWaterLaceFormationSpeedMultiplier =>
+            Mathf.Clamp(foamFreeWaterLaceFormationSpeedMultiplier, 0.10f, 3.00f);
+        public float FoamFreeWaterLaceLengthMinMetres =>
+            Mathf.Max(0.05f, Mathf.Min(
+                foamFreeWaterLaceLengthMinMetres,
+                foamFreeWaterLaceLengthMaxMetres));
+        public float FoamFreeWaterLaceLengthMaxMetres =>
+            Mathf.Max(FoamFreeWaterLaceLengthMinMetres, foamFreeWaterLaceLengthMaxMetres);
+        public float FoamFreeWaterLaceWidthMinMetres =>
+            Mathf.Max(0.005f, Mathf.Min(
+                foamFreeWaterLaceWidthMinMetres,
+                foamFreeWaterLaceWidthMaxMetres));
+        public float FoamFreeWaterLaceWidthMaxMetres =>
+            Mathf.Max(FoamFreeWaterLaceWidthMinMetres, foamFreeWaterLaceWidthMaxMetres);
+        public float FoamFreeWaterLaceInitialLifeMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamFreeWaterLaceInitialLifeMin,
+                foamFreeWaterLaceInitialLifeMax));
+        public float FoamFreeWaterLaceInitialLifeMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamFreeWaterLaceInitialLifeMin,
+                foamFreeWaterLaceInitialLifeMax));
+        public float FoamFreeWaterLaceBreakupStrengthMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamFreeWaterLaceBreakupStrengthMin,
+                foamFreeWaterLaceBreakupStrengthMax));
+        public float FoamFreeWaterLaceBreakupStrengthMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamFreeWaterLaceBreakupStrengthMin,
+                foamFreeWaterLaceBreakupStrengthMax));
+        public float FoamFreeWaterLaceCurvatureMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamFreeWaterLaceCurvatureMin,
+                foamFreeWaterLaceCurvatureMax));
+        public float FoamFreeWaterLaceCurvatureMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamFreeWaterLaceCurvatureMin,
+                foamFreeWaterLaceCurvatureMax));
+        public float FoamFreeWaterCrossLaceFormationSpeedMultiplier =>
+            Mathf.Clamp(foamFreeWaterCrossLaceFormationSpeedMultiplier, 0.10f, 3.00f);
+        public float FoamFreeWaterCrossLaceLengthMinMetres =>
+            Mathf.Max(0.05f, Mathf.Min(
+                foamFreeWaterCrossLaceLengthMinMetres,
+                foamFreeWaterCrossLaceLengthMaxMetres));
+        public float FoamFreeWaterCrossLaceLengthMaxMetres =>
+            Mathf.Max(FoamFreeWaterCrossLaceLengthMinMetres, foamFreeWaterCrossLaceLengthMaxMetres);
+        public float FoamFreeWaterCrossLaceWidthMinMetres =>
+            Mathf.Max(0.005f, Mathf.Min(
+                foamFreeWaterCrossLaceWidthMinMetres,
+                foamFreeWaterCrossLaceWidthMaxMetres));
+        public float FoamFreeWaterCrossLaceWidthMaxMetres =>
+            Mathf.Max(FoamFreeWaterCrossLaceWidthMinMetres, foamFreeWaterCrossLaceWidthMaxMetres);
+        public float FoamFreeWaterCrossLaceInitialLifeMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamFreeWaterCrossLaceInitialLifeMin,
+                foamFreeWaterCrossLaceInitialLifeMax));
+        public float FoamFreeWaterCrossLaceInitialLifeMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamFreeWaterCrossLaceInitialLifeMin,
+                foamFreeWaterCrossLaceInitialLifeMax));
+        public float FoamFreeWaterCrossLaceBreakupStrengthMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamFreeWaterCrossLaceBreakupStrengthMin,
+                foamFreeWaterCrossLaceBreakupStrengthMax));
+        public float FoamFreeWaterCrossLaceBreakupStrengthMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamFreeWaterCrossLaceBreakupStrengthMin,
+                foamFreeWaterCrossLaceBreakupStrengthMax));
+        public float FoamFreeWaterFragmentFormationSpeedMultiplier =>
+            Mathf.Clamp(foamFreeWaterFragmentFormationSpeedMultiplier, 0.10f, 3.00f);
+        public float FoamFreeWaterFragmentLengthMinMetres =>
+            Mathf.Max(0.05f, Mathf.Min(
+                foamFreeWaterFragmentLengthMinMetres,
+                foamFreeWaterFragmentLengthMaxMetres));
+        public float FoamFreeWaterFragmentLengthMaxMetres =>
+            Mathf.Max(FoamFreeWaterFragmentLengthMinMetres, foamFreeWaterFragmentLengthMaxMetres);
+        public float FoamFreeWaterFragmentWidthMinMetres =>
+            Mathf.Max(0.005f, Mathf.Min(
+                foamFreeWaterFragmentWidthMinMetres,
+                foamFreeWaterFragmentWidthMaxMetres));
+        public float FoamFreeWaterFragmentWidthMaxMetres =>
+            Mathf.Max(FoamFreeWaterFragmentWidthMinMetres, foamFreeWaterFragmentWidthMaxMetres);
+        public float FoamFreeWaterFragmentInitialLifeMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamFreeWaterFragmentInitialLifeMin,
+                foamFreeWaterFragmentInitialLifeMax));
+        public float FoamFreeWaterFragmentInitialLifeMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamFreeWaterFragmentInitialLifeMin,
+                foamFreeWaterFragmentInitialLifeMax));
+        public float FoamFreeWaterFragmentBreakupStrengthMin =>
+            Mathf.Clamp01(Mathf.Min(
+                foamFreeWaterFragmentBreakupStrengthMin,
+                foamFreeWaterFragmentBreakupStrengthMax));
+        public float FoamFreeWaterFragmentBreakupStrengthMax =>
+            Mathf.Clamp01(Mathf.Max(
+                foamFreeWaterFragmentBreakupStrengthMin,
+                foamFreeWaterFragmentBreakupStrengthMax));
         public float FoamShoreFoamStrength =>
             Mathf.Clamp01(foamShoreFoamStrength);
         public float FoamShoreFoamPersistence =>
@@ -2053,19 +2439,48 @@ namespace ProgrammaticStylized3D.Rivers
         {
             foamObjectContactArcPatternWeight = Mathf.Clamp01(
                 foamObjectContactArcPatternWeight);
+            foamObjectContactSemiArcPatternWeight = Mathf.Clamp01(
+                foamObjectContactSemiArcPatternWeight);
             foamObjectContactFleckPatternWeight = Mathf.Clamp01(
                 foamObjectContactFleckPatternWeight);
             float total = foamObjectContactArcPatternWeight +
+                foamObjectContactSemiArcPatternWeight +
                 foamObjectContactFleckPatternWeight;
             if (total <= 0.0001f)
             {
-                foamObjectContactArcPatternWeight = 0.75f;
-                foamObjectContactFleckPatternWeight = 0.25f;
+                foamObjectContactArcPatternWeight = 0.45f;
+                foamObjectContactSemiArcPatternWeight = 0.35f;
+                foamObjectContactFleckPatternWeight = 0.20f;
                 return;
             }
 
             foamObjectContactArcPatternWeight /= total;
+            foamObjectContactSemiArcPatternWeight /= total;
             foamObjectContactFleckPatternWeight /= total;
+        }
+
+        private void NormalizeFreeWaterPatternWeights()
+        {
+            foamFreeWaterLaceConnectorPatternWeight = Mathf.Clamp01(
+                foamFreeWaterLaceConnectorPatternWeight);
+            foamFreeWaterCrossLaceConnectorPatternWeight = Mathf.Clamp01(
+                foamFreeWaterCrossLaceConnectorPatternWeight);
+            foamFreeWaterTornFragmentPatternWeight = Mathf.Clamp01(
+                foamFreeWaterTornFragmentPatternWeight);
+            float total = foamFreeWaterLaceConnectorPatternWeight +
+                foamFreeWaterCrossLaceConnectorPatternWeight +
+                foamFreeWaterTornFragmentPatternWeight;
+            if (total <= 0.0001f)
+            {
+                foamFreeWaterLaceConnectorPatternWeight = 0.30f;
+                foamFreeWaterCrossLaceConnectorPatternWeight = 0.45f;
+                foamFreeWaterTornFragmentPatternWeight = 0.25f;
+                return;
+            }
+
+            foamFreeWaterLaceConnectorPatternWeight /= total;
+            foamFreeWaterCrossLaceConnectorPatternWeight /= total;
+            foamFreeWaterTornFragmentPatternWeight /= total;
         }
 
         private void SanitizeShoreFoamPatternControls()
@@ -2153,6 +2568,32 @@ namespace ProgrammaticStylized3D.Rivers
                 ref foamObjectContactArcBreakupStrengthMin,
                 ref foamObjectContactArcBreakupStrengthMax);
 
+            foamObjectContactSemiArcFormationSpeedMultiplier = Mathf.Clamp(
+                foamObjectContactSemiArcFormationSpeedMultiplier,
+                0.10f,
+                3.00f);
+            SanitizePositiveRange(
+                ref foamObjectContactSemiArcLengthMinMetres,
+                ref foamObjectContactSemiArcLengthMaxMetres,
+                0.05f);
+            SanitizePositiveRange(
+                ref foamObjectContactSemiArcWidthMinMetres,
+                ref foamObjectContactSemiArcWidthMaxMetres,
+                0.005f);
+            SanitizePositiveRange(
+                ref foamObjectContactSemiArcOffsetMinMetres,
+                ref foamObjectContactSemiArcOffsetMaxMetres,
+                0f);
+            SanitizeUnitRange(
+                ref foamObjectContactSemiArcInitialLifeMin,
+                ref foamObjectContactSemiArcInitialLifeMax);
+            SanitizeUnitRange(
+                ref foamObjectContactSemiArcBreakupStrengthMin,
+                ref foamObjectContactSemiArcBreakupStrengthMax);
+            SanitizeUnitRange(
+                ref foamObjectContactSemiArcLopsidednessMin,
+                ref foamObjectContactSemiArcLopsidednessMax);
+
             foamObjectContactFleckFormationSpeedMultiplier = Mathf.Clamp(
                 foamObjectContactFleckFormationSpeedMultiplier,
                 0.10f,
@@ -2175,6 +2616,77 @@ namespace ProgrammaticStylized3D.Rivers
             SanitizeUnitRange(
                 ref foamObjectContactFleckBreakupStrengthMin,
                 ref foamObjectContactFleckBreakupStrengthMax);
+        }
+
+        private void SanitizeFreeWaterFoamPatternControls()
+        {
+            foamFreeWaterFoamCoverage = Mathf.Clamp01(foamFreeWaterFoamCoverage);
+            foamFreeWaterFoamActivity = Mathf.Clamp01(foamFreeWaterFoamActivity);
+            foamFreeWaterFoamFormationSpeedMetresPerSecond = Mathf.Clamp(
+                foamFreeWaterFoamFormationSpeedMetresPerSecond,
+                MinimumShoreFoamFormationSpeedMetresPerSecond,
+                MaximumShoreFoamFormationSpeedMetresPerSecond);
+            NormalizeFreeWaterPatternWeights();
+
+            foamFreeWaterLaceFormationSpeedMultiplier = Mathf.Clamp(
+                foamFreeWaterLaceFormationSpeedMultiplier,
+                0.10f,
+                3.00f);
+            SanitizePositiveRange(
+                ref foamFreeWaterLaceLengthMinMetres,
+                ref foamFreeWaterLaceLengthMaxMetres,
+                0.05f);
+            SanitizePositiveRange(
+                ref foamFreeWaterLaceWidthMinMetres,
+                ref foamFreeWaterLaceWidthMaxMetres,
+                0.005f);
+            SanitizeUnitRange(
+                ref foamFreeWaterLaceInitialLifeMin,
+                ref foamFreeWaterLaceInitialLifeMax);
+            SanitizeUnitRange(
+                ref foamFreeWaterLaceBreakupStrengthMin,
+                ref foamFreeWaterLaceBreakupStrengthMax);
+            SanitizeUnitRange(
+                ref foamFreeWaterLaceCurvatureMin,
+                ref foamFreeWaterLaceCurvatureMax);
+
+            foamFreeWaterCrossLaceFormationSpeedMultiplier = Mathf.Clamp(
+                foamFreeWaterCrossLaceFormationSpeedMultiplier,
+                0.10f,
+                3.00f);
+            SanitizePositiveRange(
+                ref foamFreeWaterCrossLaceLengthMinMetres,
+                ref foamFreeWaterCrossLaceLengthMaxMetres,
+                0.05f);
+            SanitizePositiveRange(
+                ref foamFreeWaterCrossLaceWidthMinMetres,
+                ref foamFreeWaterCrossLaceWidthMaxMetres,
+                0.005f);
+            SanitizeUnitRange(
+                ref foamFreeWaterCrossLaceInitialLifeMin,
+                ref foamFreeWaterCrossLaceInitialLifeMax);
+            SanitizeUnitRange(
+                ref foamFreeWaterCrossLaceBreakupStrengthMin,
+                ref foamFreeWaterCrossLaceBreakupStrengthMax);
+
+            foamFreeWaterFragmentFormationSpeedMultiplier = Mathf.Clamp(
+                foamFreeWaterFragmentFormationSpeedMultiplier,
+                0.10f,
+                3.00f);
+            SanitizePositiveRange(
+                ref foamFreeWaterFragmentLengthMinMetres,
+                ref foamFreeWaterFragmentLengthMaxMetres,
+                0.05f);
+            SanitizePositiveRange(
+                ref foamFreeWaterFragmentWidthMinMetres,
+                ref foamFreeWaterFragmentWidthMaxMetres,
+                0.005f);
+            SanitizeUnitRange(
+                ref foamFreeWaterFragmentInitialLifeMin,
+                ref foamFreeWaterFragmentInitialLifeMax);
+            SanitizeUnitRange(
+                ref foamFreeWaterFragmentBreakupStrengthMin,
+                ref foamFreeWaterFragmentBreakupStrengthMax);
         }
 
         private static void SanitizePositiveRange(
@@ -3703,6 +4215,7 @@ namespace ProgrammaticStylized3D.Rivers
             NormalizeShorePatternWeights();
             SanitizeShoreFoamPatternControls();
             SanitizeObjectFoamPatternControls();
+            SanitizeFreeWaterFoamPatternControls();
             foamShoreFoamStrength = Mathf.Clamp01(
                 foamShoreFoamStrength);
             foamShoreFoamPersistence = Mathf.Clamp01(
