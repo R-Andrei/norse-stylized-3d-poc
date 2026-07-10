@@ -1631,11 +1631,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Negative Aging Rate",
                     "Aging-rate multiplier at full Negative Aging Pressure. Values above one shorten life. Negative pressure first suppresses support preservation, then applies this faster aging response."));
             EditorGUILayout.PropertyField(
-                Find("foamMaterialFlowSpeedMultiplier"),
-                new GUIContent(
-                    "Material Flow Speed",
-                    "Multiplier for persistent Foam transport relative to the river Flow Speed. One follows the water, higher values move existing Foam downstream faster, and zero freezes ordinary downstream material drift without changing birth Amount or Remaining Life."));
-            EditorGUILayout.PropertyField(
                 Find("foamColour"),
                 new GUIContent(
                     "Foam Colour",
@@ -1670,7 +1665,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam Debug",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Compact workflow: Overview for status, View for display mode, Material Motion for persistent downstream travel, Lifetime + Topology for aging/support, Material Probe for isolated lifetime checks, Manual Birth Source for explicit tests, Source Population for automatic Layer C birth, Material Shape for stored/visible footprint diagnostics, Runtime for resources, and Advanced Internals only for low-level failures.",
+                "Compact workflow: Overview for status, View for display mode, Foam Velocity for the unified downstream/lateral motion contract, Lifetime + Topology for aging/support, Material Probe for isolated lifetime checks, Manual Birth Source for explicit tests, Source Population for automatic Layer C birth, Material Shape for stored/visible footprint diagnostics, Runtime for resources, and Advanced Internals only for low-level failures.",
                 MessageType.None);
 
             DrawFoamValidationOverview(river, runtime);
@@ -1804,7 +1799,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             int selectedDebugIndex = EditorGUILayout.Popup(
                 new GUIContent(
                     "Debug View",
-                    "Final Foam is the normal render. Foam Motion Field views show external routing/deformation intent and raw stored Foam Presence overlay; Foam Evaluated Shape and Shape Difference show the Layer D visual product; Shader Detail probes show Layer E pixel-scale detail over that product."),
+                    "Final Foam is the normal render. Foam Motion Field views show the unified physical velocity contract and raw stored Foam Presence overlay; Foam Evaluated Shape and Shape Difference show the Layer D visual product; Shader Detail probes show Layer E pixel-scale detail over that product."),
                 currentDebugIndex,
                 foamDebugLabels);
             if (EditorGUI.EndChangeCheck())
@@ -1828,7 +1823,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         {
             showFoamTransportDiagnostics = EditorGUILayout.Foldout(
                 showFoamTransportDiagnostics,
-                "Material Motion",
+                "Foam Velocity",
                 true);
             if (!showFoamTransportDiagnostics)
             {
@@ -1840,28 +1835,38 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.PropertyField(
                 Find("foamMaterialFlowSpeedMultiplier"),
                 new GUIContent(
-                    "Material Flow Speed",
-                    "Multiplier for persistent Foam downstream travel."));
+                    "Downstream Speed Ratio",
+                    "Base persistent-Foam speed relative to the authored river Flow Speed. This remains the current global downstream phase speed and is also the base speed for the unified velocity contract."));
             EditorGUILayout.PropertyField(
                 Find("foamMotionFieldStrength"),
                 new GUIContent(
-                    "Motion Field Strength",
-                    "Strength of the generated dense Foam Motion Field intent/debug texture. The field is currently used for visualization and future routing/deformation work; it does not currently move persistent Foam material."));
+                    "Maximum Lateral Speed Ratio",
+                    "Maximum signed lateral speed relative to base downstream Foam speed. The current patch validates this physical velocity contract; conservative 2D material transport will consume it in the next movement patch."));
             EditorGUILayout.PropertyField(
                 Find("foamMotionFieldScrollHz"),
                 new GUIContent(
-                    "Motion Field Scroll Hz",
-                    "Complete downstream wraps per second for the generated intent/debug lane field. This is a sample-coordinate phase scroll only, not active persistent Foam material motion and not a field rebuild rate."));
+                    "Lane Advection Ratio",
+                    "Downstream speed of the generated lane pattern relative to base Foam speed. Zero fixes routes in river space; one advects them at the base Foam speed. This is physical sample-phase motion, not wraps per second."));
             EditorGUILayout.PropertyField(
                 Find("foamMotionFieldNeutralCoverage"),
                 new GUIContent(
-                    "Motion Field Neutral Coverage",
-                    "Approximate fraction of the generated intent/debug lane field that resolves to neutral/no lateral direction. Changing it regenerates the lane texture only; it does not activate lateral material transport."));
+                    "Low Lateral Motion Coverage",
+                    "Approximate fraction of the generated route field compressed toward very low lateral intent. These regions still have downstream velocity and are not true stagnant water."));
             EditorGUILayout.PropertyField(
                 Find("foamMotionFieldLaneScale"),
                 new GUIContent(
-                    "Motion Field Lane Scale",
-                    "Broadness of the generated intent/debug lane pattern. Lower values produce larger lanes; higher values produce finer lanes. Changing it regenerates the lane texture only; it does not activate lateral material transport."));
+                    "Lateral Route Scale",
+                    "Broadness of coherent left/right routing regions. Lower values produce larger routes; higher values produce finer routes."));
+            EditorGUILayout.PropertyField(
+                Find("foamObstacleSlowdownStrength"),
+                new GUIContent(
+                    "Obstacle Slowdown Strength",
+                    "How strongly fixed obstacle-routing influence reduces local downstream Foam speed."));
+            EditorGUILayout.PropertyField(
+                Find("foamObstacleMinimumDownstreamFactor"),
+                new GUIContent(
+                    "Obstacle Minimum Downstream Factor",
+                    "Minimum local downstream-speed factor at maximum obstacle influence. Zero permits temporary stagnation; downstream speed never becomes negative."));
 
             if (runtime == null)
             {
@@ -1872,10 +1877,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUILayout.LabelField(
                 "Transport Mode",
-                "Downstream phase + integer commit; lateral field debug/future only");
+                "Current material: global downstream phase; unified 2D velocity contract is validated but not yet the material authority");
             EditorGUILayout.LabelField(
-                "Motion Field",
-                $"scroll {runtime.FoamMotionLaneScrollCells:0.00} cells / lane sig {runtime.FoamMotionLaneSignature} / obstacle sig {runtime.FoamObstacleRoutingSignature}");
+                "Resolved Speed",
+                $"downstream {runtime.FoamBaseDownstreamSpeedMetresPerSecond:0.000} m/s / max lateral {runtime.FoamMaximumLateralSpeedMetresPerSecond:0.000} m/s");
+            EditorGUILayout.LabelField(
+                "Lane Phase",
+                $"{runtime.FoamMotionLaneScrollMetres:0.000} m / {runtime.FoamMotionLaneScrollCells:0.00} cells / lane sig {runtime.FoamMotionLaneSignature} / obstacle sig {runtime.FoamObstacleRoutingSignature}");
             EditorGUILayout.LabelField(
                 "Phase",
                 $"{runtime.FoamPhaseCellFraction:0.00} cell / {runtime.FoamPhaseTransportMetres:0.000} m");
@@ -3786,11 +3794,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.FoamMotionField:
                     return
-                        "Dense Foam Motion Field intent/debug texture. Blue/cyan means leftward routing intent, red/orange means rightward routing intent, black means intentional neutral/calm field, green/yellow marks obstacle override influence, and semi-transparent white overlays raw stored Foam Presence rather than the final render mask. This view does not mean lateral material transport is currently active.";
+                        "Unified resolved Foam velocity contract. Bright neutral gray is straight full-speed downstream motion, red is rightward lateral velocity, blue is leftward lateral velocity, darker values are downstream slowdown/stagnation, and yellow marks obstacle-routing influence. Semi-transparent white overlays raw stored Foam Presence. This view validates velocity only; conservative 2D material transport is not active yet.";
 
                 case StylizedRiverFoamDebugView.FoamMotionFieldCellGrid:
                     return
-                        "Dense Foam Motion Field intent/debug texture plus the persistent Foam simulation cell grid. The white overlay is raw stored Foam Presence, not the final render mask. Fine dark lines show individual Foam cells; brighter pale lines show eight-cell blocks. This view does not mean lateral material transport is currently active.";
+                        "Unified resolved Foam velocity contract plus the persistent simulation-cell grid. Brightness shows downstream speed factor, red/blue show signed lateral velocity, yellow shows obstacle routing, and white overlays raw stored Foam Presence. Fine dark lines show individual Foam cells; pale lines show eight-cell blocks. This validates velocity only; conservative 2D material transport is not active yet.";
 
                 case StylizedRiverFoamDebugView.FoamEvaluatedShape:
                     return

@@ -3,7 +3,7 @@
 ## Status
 
 - **Active edge-wear architecture:** EW-C — Explicit Single-Segment Chamfer Kernel
-- **Current implementation step:** EW-C2S4 — Preserved-boundary subdivision and compact diagnostics
+- **Current implementation step:** EW-C2S5R1 — Two-face internal boundary cancellation
 - **Geometry emission:** provisional build and audit only; final geometry commit remains disabled
 
 ## Feature goal
@@ -86,7 +86,7 @@ The next geometry patch may proceed only when the unified corner/shared-edge sol
 
 
 
-## EW-C2S4 preserved-boundary segmented provisional baseline
+## EW-C2S5R1 face-local normalized provisional baseline
 
 EW-C2S replaces the rejected EW-C2R conflict-deferral loop. The validated EW-C1R3 network remains authoritative: only candidates that genuinely require sub-stable width are deferred, while duplicate endpoint symptoms no longer trigger broad candidate removal.
 
@@ -116,23 +116,32 @@ Every allowed provisional opening is registered before topology audit. The only 
 - endpoint edges of active bevel strips that are reserved for EW-C3 vertex patches.
 
 
-A mixed validation sample of 23 distinct generated masses produced 12 valid and 11 invalid provisional results. The passing objects prove the shared-span face construction and one-strip bevel ownership are viable. The failing objects exposed that EW-C2S2 normalized boundary registrations before segmentation and required source ownership to be present at the containing edge endpoints. The splitter therefore fired zero times across the full sample and could not repair either T-junction-only failures or multi-owner segment failures.
+The first mixed EW-C2S2 validation sample contained 23 distinct generated topologies: 12 passed and 11 failed. EW-C2S3 then moved T-junction segmentation ahead of boundary normalization and preserved raw provisional provenance. EW-C2S4 added guarded preserved-source-boundary subdivision and compact diagnostics.
 
-EW-C2S3 preserves provisional face and segment provenance before any normalization. Replacement faces retain their graph-face owner; bevel strips retain their selected source-edge owner; every emitted segment records face kind, local edge, role, and source owner. Raw strip/tail boundary points are tested against complete source ownership: an ordinary replacement segment is compatible with any source vertex in its graph-face one-ring, while a bevel segment is compatible with either endpoint of its source edge. EW-C2S4 adds the explicit preserved-boundary rule: an existing provisional chamfer vertex with raw source-vertex provenance may subdivide a segment classified as `PreservedSourceBoundary` without belonging to the containing replacement face's original one-ring.
+The complete EW-C2S4 placed-object validation contained 24 unique objects, each logged twice through `OnValidate` and `OnEnable`. Thirteen objects reached `readyForVertexPatches=1`; eleven remained blocked. Every object reported `provisionalTJunctions=0` and `tJunctionRecordsIncompatible=0`, proving the EW-C2S3/S4 segmentation defect is solved. The remaining failures split cleanly into eight objects with repeated face-local topology edges producing non-manifold/multi-owner results, and three objects with a separate preserved-source-boundary descendant mismatch.
+
+EW-C2S5 addresses only the first remaining class. Before a replacement face or bevel strip participates in topology counting, its cyclic vertex walk is reduced by exact inverse-edge cancellation. A sequence `A -> B -> A` contributes no polygon boundary and is removed without moving any surviving point. Consecutive duplicate topology vertices are also removed. The same reduction runs after raw T-junction segmentation because split insertion can expose retraces on replacement tails or bevel endpoints. Any remaining repeated undirected edge inside one face is a hard failure rather than an inferred repair.
 
 Processing order is now:
 
 ```text
-provisional faces + raw boundary registrations
+provisional faces + face-local raw boundary registrations
+-> exact initial face-walk retrace normalization
 -> source-compatible fixed-point segmentation
 -> preserved source-boundary subdivision
 -> split matching expected vertex-boundary registrations
+-> exact post-segmentation face-walk retrace normalization
 -> rebuild edge-use counts
+-> reconcile registrations against normalized topology
 -> normalize boundary ownership
 -> audit components and final topology
 ```
 
-Expected vertex boundaries may be split into ordered child segments while preserving source-vertex, source-edge, source-face, and boundary-kind provenance. Preserved source-boundary parents are replaced by the same ordered child chain whenever a strict-interior provisional vertex subdivides them. This changes only segmentation, not boundary position, winding, ownership, or shape. The split requires raw source-vertex provenance, an actual provisional mesh vertex, a stable non-zero containing segment, strict interior placement outside endpoint tolerance, and point-to-segment distance within topology tolerance. Single-owner segments remain patch boundaries. Exactly two distinct owners with provisional use count two cancel as an internal edge. Same-owner duplicates and more complex ownership remain hard failures.
+Expected vertex boundaries may be split into ordered child segments while preserving source-vertex, source-edge, source-face, and boundary-kind provenance. Preserved source-boundary parents are replaced by the same ordered child chain whenever a strict-interior provisional vertex subdivides them. This changes only segmentation, not boundary position, winding, ownership, or shape. The split requires raw source-vertex provenance, an actual provisional mesh vertex, a stable non-zero containing segment, strict interior placement outside endpoint tolerance, and point-to-segment distance within topology tolerance.
+
+EW-C2S5 builds replacement-face boundary registrations locally, reduces the face walk, and publishes only registrations whose topology edges survive. After segmentation, registrations removed by an exact retrace are discarded only when their edge has zero remaining provisional uses. EW-C2S5 validation proved all 24 placed objects now have zero non-manifold edges, zero T-junctions, zero face-local duplicate-edge failures, and zero stale boundary registrations. Sixteen of 24 objects reached `readyForVertexPatches=1`; five additional objects were blocked only because a clean two-face internal edge used the same encoded direction in both face records, while three objects retained the separate preserved-source-boundary mismatch.
+
+EW-C2S5R1 classifies openness from incidence rather than winding direction. A registered edge with exactly two actual provisional uses on two distinct face records is already internally closed and all registrations for that key are cancelled. Opposite-direction pairs remain the expected orientation; same-direction pairs increment `sameDirectionClosedInternalEdges` as a non-blocking diagnostic. A one-use edge keeps one compatible source owner. Zero-use stale registrations, two uses from the same face record, or more than two uses remain hard failures. This does not weaken final non-manifold, T-junction, winding, or face-local duplicate-edge validation.
 
 The provisional topology must contain no unexpected openings, no missing expected vertex-patch boundaries, no non-manifold edges, and no T-junctions. Normal operation emits one readiness summary, one corner summary, and one provisional-emission summary. Intermediate per-pair segmentation logs are suppressed; a failed final topology audit emits one deduplicated warning containing at most three actionable records. The face list is discarded after audit and the original source mass remains the rendered geometry.
 
@@ -196,8 +205,8 @@ Chamfer topology is generated before gameplay and cached with the generated mass
 
 ## Next work items
 
-1. Compile and validate EW-C2S4 on the known source-boundary test rock.
-2. Confirm preserved-boundary subdivision produces exact descendant matching, zero T-junctions, and `readyForVertexPatches=1` without additional active-edge deferral.
-3. Regenerate every representative placed mass and require zero same-owner/multi-owner failures, zero missing or unexpected openings, zero non-manifold edges, and zero T-junctions.
-4. Inspect the single compact final warning only for objects that still fail.
-5. Implement EW-C3 crude vertex-run patches only after every representative topology reports `readyForVertexPatches=1`.
+1. Compile and validate EW-C2S5R1 across all 24 placed masses.
+2. Confirm the five ownership-only blockers now report `readyForVertexPatches=1` and non-zero `sameDirectionClosedInternalEdges` where applicable.
+3. Require zero face-local normalization, duplicate-edge, multi-owner, non-manifold, and T-junction failures.
+4. Isolate the expected three preserved-source-boundary descendant mismatches for EW-C2S6.
+5. Begin EW-C3 only after all representative provisional meshes report `readyForVertexPatches=1`.

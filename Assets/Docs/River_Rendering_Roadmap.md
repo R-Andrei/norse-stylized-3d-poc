@@ -287,7 +287,9 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 
 ### Current status after architecture lock
 
-Stage 6 is in the `4.11C` persistent material recovery phase. Manual/progressive birth is implemented. `4.11C.5.14A` added the first disabled-by-default automatic Layer C shore/contact source path, `4.11C.5.14B` established source-class-specific spawning, and `4.11C.5.14C` simplifies the shore birth Inspector to four intent controls: Coverage, Size, Strength, and Persistence. The code already has persistent `FoamState`, external Motion Field / obstacle-routing inputs, `_FoamShapeMask`, `Foam Evaluated Shape`, and `Foam Shape Difference` debug views. The 5.9z coherent coordinate-warp prototype proved the Layer D product slot and C# binding path, and 5.10 validation proved it produced nonzero signed differences, but it was visually ineffective because tiny inverse-sampled coordinate displacement cannot create broad sheet/bridge/pinch behavior from solid masks. 5.10B retired that warp and reset Layer D to a clean pass-through baseline. 5.11 then proved that Layer D local breakup is also the wrong place for fine detail because it exposes foam-field cell/ribbon artifacts; 5.11B retires that probe and restores the clean pass-through baseline again.
+Stage 6 has completed the provisional Layer C spawning prerequisite. Shore, static-object/contact, and free-water lace/cross-lace/fragment source families now create real persistent `FoamState` material. Their visuals remain imperfect, and cross-lace longitudinal blockiness is parked, but spawning is sufficiently varied to resume evolution work.
+
+The active work now proceeds from motion authority toward final rendering. `4.11C.5.16A` establishes one unified physical Foam velocity contract from separate scrolling lane intent, fixed obstacle routing, base Foam speed, and local obstacle slowdown. It exposes nonnegative downstream speed plus signed lateral speed in metres/second, converts lane phase from river-length-dependent wraps/second to physical speed-relative advection, and updates the existing Motion Field diagnostics. It adds no velocity texture, no material movement, and no steady compute dispatch. The next patch is conservative unified 2D Layer C material advection; Layer D phase/history work follows only after real material transport is accepted.
 
 Therefore the active direction is no longer “tune coherent deformation harder.” The active direction is the corrected acyclic layer architecture:
 
@@ -579,3 +581,39 @@ Free Water Foam birth is implemented as persistent material skeletons, not final
 
 Added Cross-Lace Connectors to Free Water Foam. This is a horizontal/cross-current moving head+stroke pattern that complements the original with-flow Lace Connector and Torn Fragment patterns. The patch intentionally does not change Coverage/Activity or introduce shader glints; it only adds the missing source shape class needed for cross-river pale ribbons.
 
+
+
+## River Foam movement foundation — `4.11C.5.16A`
+
+`4.11C.5.16A — Unified Foam Velocity Contract` is implemented.
+
+Canonical inputs:
+
+```text
+scrolling lateral lane intent;
+fixed obstacle route direction/influence;
+river Flow Speed × Liquid Factor × Downstream Speed Ratio;
+Maximum Lateral Speed Ratio;
+Obstacle Slowdown Strength;
+Obstacle Minimum Downstream Factor.
+```
+
+Canonical output:
+
+```text
+float2 velocityMetresPerSecond
+  x = nonnegative downstream speed magnitude
+  y = signed lateral speed
+```
+
+The same pure HLSL contract is used by compute-side field resolution and the existing Motion Field debug branch. The lane and obstacle textures remain separate because their coordinate rules differ. The current global phase transport is temporarily retained, so this patch is a velocity proof rather than stored-material movement.
+
+Next implementation order:
+
+```text
+5.16B conservative unified 2D Layer C material advection;
+5.16C Layer D temporal occupancy/phase state using the same velocity;
+5.16D persistent visual damage and macro fracture;
+5.16E Final Foam consumes the accepted evaluated shape;
+5.16F shader-local sub-cell cracking, edge chipping, glints, and lighting polish.
+```

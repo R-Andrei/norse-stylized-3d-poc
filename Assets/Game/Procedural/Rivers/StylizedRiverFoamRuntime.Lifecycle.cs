@@ -244,12 +244,8 @@ namespace ProgrammaticStylized3D.Rivers
             float updateRate = ResolveUpdateRate();
             float stepDuration = 1f / Mathf.Max(1f, updateRate);
             lastMaterialStepDuration = stepDuration;
-            float signedDownstreamSpeed = river != null
-                ? river.FlowSpeedMetresPerSecond *
-                  river.LiquidFactor *
-                  river.FoamMaterialFlowSpeedMultiplier *
-                  river.FlowDirection
-                : 0f;
+            float signedDownstreamSpeed =
+                ResolveSignedBaseFoamDownstreamSpeedMetresPerSecond();
             float downstreamSpeed = Mathf.Abs(signedDownstreamSpeed);
             lastEstimatedTransportCellsPerStep =
                 minimumTransportLongitudinalSpacing > 0.0001f

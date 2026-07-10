@@ -465,6 +465,14 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamObstacleRouting");
         private static readonly int FoamMotionLaneScrollCellsId =
             Shader.PropertyToID("_FoamMotionLaneScrollCells");
+        private static readonly int FoamBaseDownstreamSpeedId =
+            Shader.PropertyToID("_FoamBaseDownstreamSpeed");
+        private static readonly int FoamMaximumLateralSpeedRatioId =
+            Shader.PropertyToID("_FoamMaximumLateralSpeedRatio");
+        private static readonly int FoamObstacleSlowdownStrengthId =
+            Shader.PropertyToID("_FoamObstacleSlowdownStrength");
+        private static readonly int FoamObstacleMinimumDownstreamFactorId =
+            Shader.PropertyToID("_FoamObstacleMinimumDownstreamFactor");
         private static readonly int FoamInterpolationId =
             Shader.PropertyToID("_FoamInterpolation");
         private static readonly int FoamRenderTravelMetresId =

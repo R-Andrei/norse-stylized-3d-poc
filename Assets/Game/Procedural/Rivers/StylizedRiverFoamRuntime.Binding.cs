@@ -52,6 +52,12 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(FoamMotionLaneId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamObstacleRoutingId, Texture2D.blackTexture);
             propertyBlock.SetFloat(FoamMotionLaneScrollCellsId, 0f);
+            propertyBlock.SetFloat(FoamBaseDownstreamSpeedId, 0f);
+            propertyBlock.SetFloat(FoamMaximumLateralSpeedRatioId, 0f);
+            propertyBlock.SetFloat(FoamObstacleSlowdownStrengthId, 0f);
+            propertyBlock.SetFloat(
+                FoamObstacleMinimumDownstreamFactorId,
+                1f);
             propertyBlock.SetFloat(
                 FoamInterpolationId,
                 snapshot.Interpolation);
@@ -118,6 +124,18 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(
                 FoamMotionLaneScrollCellsId,
                 motionLaneScrollCells);
+            propertyBlock.SetFloat(
+                FoamBaseDownstreamSpeedId,
+                ResolveBaseFoamDownstreamSpeedMetresPerSecond());
+            propertyBlock.SetFloat(
+                FoamMaximumLateralSpeedRatioId,
+                river.FoamMaximumLateralSpeedRatio);
+            propertyBlock.SetFloat(
+                FoamObstacleSlowdownStrengthId,
+                river.FoamObstacleSlowdownStrength);
+            propertyBlock.SetFloat(
+                FoamObstacleMinimumDownstreamFactorId,
+                river.FoamObstacleMinimumDownstreamFactor);
             propertyBlock.SetFloat(FoamInterpolationId, simulationInterpolation);
             propertyBlock.SetFloat(FoamRenderTravelMetresId, foamRenderTravelMetres);
             propertyBlock.SetFloat(FoamGlobalStartId, allocatedGlobalStart);
@@ -161,6 +179,12 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(FoamMotionLaneId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamObstacleRoutingId, Texture2D.blackTexture);
             propertyBlock.SetFloat(FoamMotionLaneScrollCellsId, 0f);
+            propertyBlock.SetFloat(FoamBaseDownstreamSpeedId, 0f);
+            propertyBlock.SetFloat(FoamMaximumLateralSpeedRatioId, 0f);
+            propertyBlock.SetFloat(FoamObstacleSlowdownStrengthId, 0f);
+            propertyBlock.SetFloat(
+                FoamObstacleMinimumDownstreamFactorId,
+                1f);
             propertyBlock.SetFloat(FoamInterpolationId, 1f);
             propertyBlock.SetFloat(FoamRenderTravelMetresId, 0f);
             propertyBlock.SetFloat(FoamGlobalStartId, 0f);

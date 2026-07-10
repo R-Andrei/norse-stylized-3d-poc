@@ -12,6 +12,14 @@ namespace ProgrammaticStylized3D.Rivers
         public int TopologyHeight => topologyTexture != null ? topologyTexture.height : 0;
         public bool MajorTopologyAvailable => majorTopology != null;
         public float FoamMotionLaneScrollCells => lastMotionLaneScrollCells;
+        public float FoamMotionLaneScrollMetres =>
+            lastMotionLaneScrollCells *
+            Mathf.Max(0f, minimumTransportLongitudinalSpacing);
+        public float FoamBaseDownstreamSpeedMetresPerSecond =>
+            ResolveBaseFoamDownstreamSpeedMetresPerSecond();
+        public float FoamMaximumLateralSpeedMetresPerSecond =>
+            ResolveBaseFoamDownstreamSpeedMetresPerSecond() *
+            (river != null ? river.FoamMaximumLateralSpeedRatio : 0f);
         public int FoamMotionLaneSignature => lastMotionLaneSignature;
         public int FoamObstacleRoutingSignature => lastObstacleRoutingSignature;
         public int MajorOpportunityCount => majorTopology != null

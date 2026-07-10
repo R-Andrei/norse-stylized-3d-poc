@@ -1983,3 +1983,99 @@ Free Water Foam birth is now implemented. The active free-water source patterns 
 
 Free Water Foam now has three source patterns: Lace Connectors, Cross-Lace Connectors, and Torn Fragments. Cross-Lace Connectors are the newest addition and are intended to address the missing horizontal/cross-current ribbons. They use a moving head+stroke across the river, pack lateral half-length/width/sign into existing source event object data, and use the existing rasterizer/valid-fluid clipping path. No density, Coverage, Activity, or glint-rendering changes were made in this patch.
 
+
+
+## River Foam Handoff — after `4.11C.5.16A`
+
+### Current strategic state
+
+Spawning is parked as provisionally sufficient. The river can create persistent material at shores, static objects, and open water using multiple source grammars. Cross-Lace remains visibly blocky because the persistent grid has anisotropic physical cells; the expensive high-longitudinal-resolution redesign is deferred and Cross-Lace should remain a minority pattern.
+
+The active sequence now begins at motion authority and proceeds in layer order.
+
+### Implemented velocity foundation
+
+Raw Layer B inputs remain:
+
+```text
+Motion Lane RHalf — signed lateral intent, scrolling sample coordinate.
+Obstacle Routing RGHalf — signed route direction + influence, fixed to obstacles.
+```
+
+They are resolved through one shared physical contract in:
+
+```text
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoamVelocity.hlsl
+```
+
+Output:
+
+```text
+velocityMetresPerSecond.x = nonnegative downstream speed magnitude
+velocityMetresPerSecond.y = signed lateral speed
+lateralIntent
+downstreamSpeedFactor
+obstacleInfluence
+laneIntent
+obstacleIntent
+```
+
+New/renamed Inspector meanings:
+
+```text
+Downstream Speed Ratio
+Maximum Lateral Speed Ratio
+Lane Advection Ratio
+Low Lateral Motion Coverage
+Lateral Route Scale
+Obstacle Slowdown Strength
+Obstacle Minimum Downstream Factor
+```
+
+Important: old serialized field names remain internally to avoid scene/prefab churn. A one-time tuning migration converts the accepted legacy defaults to the new physical units.
+
+### Current movement truth
+
+```text
+The resolved velocity contract exists and is debug-visible.
+The old global downstream phase commit still moves FoamState.
+No local slowdown or lateral velocity changes FoamState yet.
+```
+
+The existing Motion Field debug views now show resolved physical behavior, not raw intent:
+
+```text
+bright neutral gray = straight full-speed downstream
+red = positive/right lateral velocity
+blue = negative/left lateral velocity
+dark = downstream slowdown/stagnation
+yellow = obstacle influence
+white overlay = raw persistent Presence
+```
+
+### Exact next patch
+
+`4.11C.5.16B — Conservative Unified 2D Material Advection`.
+
+The patch must replace the final global-only transport authority with a conservative finite-volume/TVD path for packed material:
+
+```text
+R = Presence
+G = Presence × Remaining Life
+B = Presence × Material Pattern
+```
+
+Required invariants:
+
+```text
+no upstream downstream velocity;
+no per-cell stochastic lateral row choice;
+no neighbour-resampling morphology;
+material-weighted life/pattern transport;
+valid-fluid and obstacle face-flux rejection;
+bounded CFL/substeps;
+measured material conservation error;
+coherent broad left/right movement.
+```
+
+Do not begin Layer D visual history or fracture until this transport path is accepted. Layer D must later consume the same velocity contract.

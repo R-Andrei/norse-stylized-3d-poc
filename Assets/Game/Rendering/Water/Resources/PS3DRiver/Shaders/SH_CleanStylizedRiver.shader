@@ -95,6 +95,10 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamMotionLane("Foam Motion Lane", 2D) = "black" {}
         [HideInInspector] _FoamObstacleRouting("Foam Obstacle Routing", 2D) = "black" {}
         [HideInInspector] _FoamMotionLaneScrollCells("Foam Motion Lane Scroll Cells", Float) = 0
+        [HideInInspector] _FoamBaseDownstreamSpeed("Foam Base Downstream Speed", Float) = 0
+        [HideInInspector] _FoamMaximumLateralSpeedRatio("Foam Maximum Lateral Speed Ratio", Float) = 0.22
+        [HideInInspector] _FoamObstacleSlowdownStrength("Foam Obstacle Slowdown Strength", Float) = 0.85
+        [HideInInspector] _FoamObstacleMinimumDownstreamFactor("Foam Obstacle Minimum Downstream Factor", Float) = 0.12
         [HideInInspector] _FoamInterpolation("Foam Interpolation", Range(0, 1)) = 1
         [HideInInspector] _FoamRenderTravelMetres("Foam Render Travel Metres", Float) = 0
         [HideInInspector] _FoamGlobalStart("Foam Global Start", Float) = 0
@@ -162,6 +166,7 @@ Shader "PS3D/Stylized River Water"
             #include "Includes/RiverWaterMotion.hlsl"
             #include "Includes/RiverWaterDisturbance.hlsl"
             #include "Includes/RiverWaterFoam.hlsl"
+            #include "Includes/RiverWaterFoamVelocity.hlsl"
             #include "Includes/RiverWaterRefraction.hlsl"
             #include "Includes/RiverWaterBody.hlsl"
 
@@ -251,6 +256,10 @@ Shader "PS3D/Stylized River Water"
                 float _FoamSharpness;
                 float _FoamDebugView;
                 float _FoamMotionLaneScrollCells;
+                float _FoamBaseDownstreamSpeed;
+                float _FoamMaximumLateralSpeedRatio;
+                float _FoamObstacleSlowdownStrength;
+                float _FoamObstacleMinimumDownstreamFactor;
                 float4 _FoamCurrent_TexelSize;
                 float4 _FoamBirthDebug_TexelSize;
                 float4 _FoamObstacleExclusion_TexelSize;
@@ -855,20 +864,59 @@ Shader "PS3D/Stylized River Water"
                         int3(routingCoordinate, 0)).rg;
                     obstacleRouting.x = clamp(obstacleRouting.x, -1.0, 1.0);
                     obstacleRouting.y = saturate(obstacleRouting.y);
-                    float lateral = lerp(
-                        lane,
-                        obstacleRouting.x,
-                        obstacleRouting.y);
+                    int2 obstacleDimensions = int2(
+                        max(1.0, _FoamObstacleExclusion_TexelSize.z),
+                        max(1.0, _FoamObstacleExclusion_TexelSize.w));
+                    int2 obstacleCoordinate = clamp(
+                        (int2)floor(
+                            foam.fieldUV * (float2)obstacleDimensions),
+                        int2(0, 0),
+                        obstacleDimensions - 1);
+                    float obstacleFootprint = saturate(
+                        _FoamObstacleExclusion.Load(
+                            int3(obstacleCoordinate, 0)).r);
+                    RiverWaterFoamResolvedVelocity resolvedVelocity =
+                        RiverWaterResolveFoamVelocityContract(
+                            lane,
+                            obstacleRouting.x,
+                            obstacleRouting.y,
+                            _FoamBaseDownstreamSpeed,
+                            _FoamMaximumLateralSpeedRatio,
+                            _FoamObstacleSlowdownStrength,
+                            _FoamObstacleMinimumDownstreamFactor,
+                            1.0 - obstacleFootprint);
 
-                    float3 fieldColour = float3(0.0, 0.0, 0.0);
-                    fieldColour.r = saturate(lateral) * 0.95;
-                    fieldColour.g = obstacleRouting.y * 0.72;
-                    fieldColour.b = saturate(-lateral) * 0.95;
-                    fieldColour += abs(lateral) * float3(0.08, 0.04, 0.10);
+                    float maximumLateralSpeed =
+                        max(0.0, _FoamBaseDownstreamSpeed) *
+                        max(0.0, _FoamMaximumLateralSpeedRatio);
+                    float resolvedLateral = maximumLateralSpeed > 0.0001
+                        ? clamp(
+                            resolvedVelocity.velocityMetresPerSecond.y /
+                            maximumLateralSpeed,
+                            -1.0,
+                            1.0)
+                        : 0.0;
+                    float lateralMagnitude = abs(resolvedLateral);
+                    float3 neutralColour = float3(0.72, 0.72, 0.72);
+                    float3 lateralColour = resolvedLateral >= 0.0
+                        ? float3(0.96, 0.20, 0.07)
+                        : float3(0.08, 0.30, 0.96);
+                    float3 fieldColour = lerp(
+                        neutralColour,
+                        lateralColour,
+                        lateralMagnitude);
+                    fieldColour *= lerp(
+                        0.06,
+                        1.0,
+                        resolvedVelocity.downstreamSpeedFactor);
                     fieldColour = lerp(
                         fieldColour,
-                        float3(1.0, 0.85, 0.10),
-                        obstacleRouting.y * 0.35);
+                        float3(1.0, 0.82, 0.10) *
+                            lerp(
+                                0.35,
+                                1.0,
+                                resolvedVelocity.downstreamSpeedFactor),
+                        resolvedVelocity.obstacleInfluence * 0.48);
 
                     // 5.9u: Foam Motion Field diagnostics must show raw stored
                     // material ownership, not the final/evaluated render mask.

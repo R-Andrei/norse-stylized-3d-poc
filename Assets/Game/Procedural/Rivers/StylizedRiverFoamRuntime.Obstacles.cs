@@ -288,8 +288,18 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
-            float scrollCells = river.FoamMotionFieldScrollHz *
-                Mathf.Max(0f, deltaTime) * fieldWidth * river.FlowDirection;
+            float longitudinalSpacing =
+                minimumTransportLongitudinalSpacing > 0.0001f
+                    ? minimumTransportLongitudinalSpacing
+                    : fieldLength / Mathf.Max(1, fieldWidth);
+            float baseFoamSpeed =
+                ResolveBaseFoamDownstreamSpeedMetresPerSecond();
+            float scrollMetres = baseFoamSpeed *
+                river.FoamLaneAdvectionRatio *
+                Mathf.Max(0f, deltaTime) *
+                river.FlowDirection;
+            float scrollCells = scrollMetres /
+                Mathf.Max(0.0001f, longitudinalSpacing);
             motionLaneScrollCells = RepeatSigned(
                 motionLaneScrollCells + scrollCells,
                 fieldWidth);
@@ -306,12 +316,12 @@ namespace ProgrammaticStylized3D.Rivers
             hash = AccumulateHash(
                 hash,
                 Mathf.RoundToInt((river != null
-                    ? river.FoamMotionFieldNeutralCoverage
+                    ? river.FoamLowLateralMotionCoverage
                     : 0.10f) * 10000f));
             hash = AccumulateHash(
                 hash,
                 Mathf.RoundToInt((river != null
-                    ? river.FoamMotionFieldLaneScale
+                    ? river.FoamLateralRouteScale
                     : 1f) * 1000f));
             return hash;
         }
@@ -351,7 +361,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             float laneScale = river != null
-                ? river.FoamMotionFieldLaneScale
+                ? river.FoamLateralRouteScale
                 : 1f;
             float seed = river != null
                 ? river.VisualSeed * 0.01371f
@@ -383,7 +393,7 @@ namespace ProgrammaticStylized3D.Rivers
                 fieldHeight);
 
             float neutralCoverage = river != null
-                ? river.FoamMotionFieldNeutralCoverage
+                ? river.FoamLowLateralMotionCoverage
                 : 0.10f;
             float neutralThreshold = ResolveNeutralThreshold(
                 motionLaneRawValues,

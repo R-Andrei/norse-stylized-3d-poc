@@ -45,6 +45,26 @@ namespace ProgrammaticStylized3D.Rivers
             return qualityRate;
         }
 
+        private float ResolveBaseFoamDownstreamSpeedMetresPerSecond()
+        {
+            if (river == null)
+            {
+                return 0f;
+            }
+
+            return Mathf.Max(
+                0f,
+                Mathf.Abs(river.FlowSpeedMetresPerSecond) *
+                river.LiquidFactor *
+                river.FoamDownstreamSpeedRatio);
+        }
+
+        private float ResolveSignedBaseFoamDownstreamSpeedMetresPerSecond()
+        {
+            return ResolveBaseFoamDownstreamSpeedMetresPerSecond() *
+                (river != null ? river.FlowDirection : 1f);
+        }
+
         private int GlobalDistanceToX(float globalDistance)
         {
             float localDistance =

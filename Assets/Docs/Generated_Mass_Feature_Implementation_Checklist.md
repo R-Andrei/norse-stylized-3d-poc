@@ -165,17 +165,63 @@ EW-C — Explicit Single-Segment Chamfer Kernel
 
 ### Exit criteria
 
-- [ ] Unity compiles without errors.
-- [ ] The known test rock retains `activeSelectedEdges=33` and `deferredSelectedEdges=3`.
-- [ ] The known test rock reports `preservedSourceBoundarySplits=3`.
-- [ ] The known test rock reports exact source-boundary descendant matching; expected value is 7 for that topology.
-- [ ] `unexpectedProvisionalOpenEdges=0`.
-- [ ] `missingExpectedVertexBoundaryEdges=0`.
-- [ ] `provisionalNonManifoldEdges=0`.
-- [ ] `provisionalTJunctions=0`.
-- [ ] `readyForVertexPatches=1`.
-- [ ] One regeneration emits only readiness, corner, and provisional-emission summaries unless the final topology fails.
+- [x] Unity compiles and the EW-C2S4 audit runs.
+- [x] The known test rock retains `activeSelectedEdges=33` and `deferredSelectedEdges=3`.
+- [x] The known test rock reports `preservedSourceBoundarySplits=3`.
+- [ ] The known test rock reports exact source-boundary descendant matching; observed EW-C2S4 result remains `expectedSourceBoundaryEdges=5`, `matchedSourceBoundaryEdges=3`.
+- [x] `unexpectedProvisionalOpenEdges=0` on the known test rock.
+- [x] `missingExpectedVertexBoundaryEdges=0` on the known test rock.
+- [x] `provisionalNonManifoldEdges=0` on the known test rock.
+- [x] `provisionalTJunctions=0` across all 24 placed objects.
+- [ ] `readyForVertexPatches=1` on the known boundary rock.
+- [x] Intermediate compatible/incompatible segmentation spam is removed.
 - [ ] Every representative placed mass reports `readyForVertexPatches=1` before EW-C3 begins.
+
+
+## EW-C2S5 — Face-local retrace normalization
+
+- [x] Reduce exact cyclic `A -> B -> A` inverse-edge excursions using existing `VertexKey` identity.
+- [x] Remove consecutive duplicate topology vertices without collinearity simplification.
+- [x] Run the same reducer in hypothetical replacement-face validation.
+- [x] Build replacement-face boundary registrations locally and publish only registrations backed by the reduced face walk.
+- [x] Normalize initial bevel-strip walks before provisional emission.
+- [x] Run a second normalization pass over replacement and bevel face records after raw T-junction segmentation.
+- [x] Reject every remaining repeated undirected edge inside one provisional face.
+- [x] Remove zero-use registrations only when their key was explicitly removed by exact retrace normalization.
+- [x] Cancel registrations for an internally closed edge only when it has exactly two opposite-direction uses on two distinct face records.
+- [x] Keep zero-use stale provenance, same-face duplicate uses, same-direction paired uses, and more-than-two uses as hard failures.
+- [x] Add compact retrace, duplicate-edge, registration-reconciliation, and stale-provenance counters.
+- [x] Keep candidate selection, width solving, active/deferred decisions, source-boundary descendant logic, vertex patches, and geometry commit unchanged.
+
+### Exit criteria
+
+- [x] Unity compiles without errors.
+- [x] All eight EW-C2S4 non-manifold/multi-owner objects report `provisionalNonManifoldEdges=0`.
+- [ ] All placed objects report `vertexBoundaryMultiOwnerFailures=0`.
+- [x] All placed objects report `faceLocalNormalizationFailures=0`, `faceLocalDuplicateEdgeFailures=0`, and `staleBoundaryRegistrationFailures=0`.
+- [x] Previously passing objects remain `readyForVertexPatches=1`.
+- [x] Active/deferred selected-edge counts and built bevel-strip counts remain unchanged per object.
+- [x] `provisionalTJunctions=0` and `tJunctionRecordsIncompatible=0` remain true across the sample.
+- [ ] Only the three isolated preserved-source-boundary descendant mismatches remain blocked for EW-C2S6.
+- [x] Geometry commit remains disabled.
+
+## EW-C2S5R1 — Two-face internal boundary cancellation
+
+- [x] Treat exactly two provisional uses on two distinct face records as an internally closed edge regardless of encoded direction.
+- [x] Keep opposite-direction pairing as the expected orientation.
+- [x] Count same-direction two-face pairs in non-blocking `sameDirectionClosedInternalEdges` diagnostics.
+- [x] Keep zero-use stale provenance, two uses from one face record, more-than-two uses, face-local duplicate edges, non-manifold edges, and T-junctions as hard failures.
+- [x] Keep candidate selection, width solving, active/deferred decisions, source-boundary descendant logic, vertex patches, and geometry commit unchanged.
+
+### Exit criteria
+
+- [ ] Unity compiles without errors.
+- [ ] The five EW-C2S5 ownership-only blockers report `vertexBoundarySameOwnerDuplicateFailures=0` and `vertexBoundaryMultiOwnerFailures=0`.
+- [ ] Those five objects reach `readyForVertexPatches=1`.
+- [ ] All 24 objects retain `provisionalNonManifoldEdges=0`, `provisionalTJunctions=0`, `faceLocalDuplicateEdgeFailures=0`, and `staleBoundaryRegistrationFailures=0`.
+- [ ] Active/deferred selected-edge counts and built bevel-strip counts remain unchanged.
+- [ ] Only the three preserved-source-boundary descendant mismatches remain blocked for EW-C2S6.
+- [ ] Geometry commit remains disabled.
 
 ## EW-C3 — Crude vertex-run patches
 

@@ -2338,7 +2338,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         solvedFace,
                         null);
                 }
-                RemoveClosingDuplicate(solvedFace);
+                stats.ReplacementFaceRetracePairsRemoved +=
+                    ReduceChamferFaceRetraces(solvedFace, null);
+
+                if (solvedFace.Count < 3)
+                {
+                    stats.ReplacementEdgeCollapseFailureCount++;
+                    blocker = "a replacement face collapses below three vertices after exact retrace removal";
+                    return false;
+                }
+                if (!TryFindDuplicateChamferFaceEdge(
+                        solvedFace,
+                        out _,
+                        out _,
+                        out _))
+                {
+                    stats.ReplacementFaceDuplicateEdgeFailureCount++;
+                    blocker = "a replacement face contains a repeated non-retrace topology edge";
+                    return false;
+                }
 
                 if (CalculatePolygonArea(solvedFace) <= minimumStableFaceArea)
                 {
@@ -2539,6 +2557,167 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
+        private static int ReduceChamferFaceRetraces(
+            List<Vector3> points,
+            HashSet<TopologyEdgeKey> removedEdgeKeys)
+        {
+            if (points == null || points.Count < 2)
+            {
+                return 0;
+            }
+
+            Dictionary<TopologyEdgeKey, int> originalEdgeCounts =
+                removedEdgeKeys != null
+                    ? BuildChamferFaceEdgeUseCounts(points)
+                    : null;
+            int retracePairsRemoved = 0;
+            // Only exact topology-key backtracks and duplicate vertices are
+            // removed. Each successful pass shrinks the walk, so termination
+            // is bounded by the original vertex count.
+            bool changed = true;
+            while (changed && points.Count > 1)
+            {
+                changed = false;
+                if (points.Count >= 3)
+                {
+                    for (int i = 0; i < points.Count; i++)
+                    {
+                        int previousIndex = (i - 1 + points.Count) % points.Count;
+                        int nextIndex = (i + 1) % points.Count;
+                        VertexKey previous = new VertexKey(points[previousIndex]);
+                        VertexKey next = new VertexKey(points[nextIndex]);
+                        if (!previous.Equals(next))
+                        {
+                            continue;
+                        }
+
+                        RemoveChamferFaceVertexPair(points, i, nextIndex);
+                        retracePairsRemoved++;
+                        changed = true;
+                        break;
+                    }
+                }
+                if (changed)
+                {
+                    continue;
+                }
+
+                for (int i = 0; i < points.Count; i++)
+                {
+                    int nextIndex = (i + 1) % points.Count;
+                    if (!new VertexKey(points[i]).Equals(
+                            new VertexKey(points[nextIndex])))
+                    {
+                        continue;
+                    }
+
+                    points.RemoveAt(nextIndex);
+                    changed = true;
+                    break;
+                }
+            }
+
+            if (removedEdgeKeys != null && originalEdgeCounts != null)
+            {
+                Dictionary<TopologyEdgeKey, int> reducedEdgeCounts =
+                    BuildChamferFaceEdgeUseCounts(points);
+                foreach (KeyValuePair<TopologyEdgeKey, int> pair
+                         in originalEdgeCounts)
+                {
+                    reducedEdgeCounts.TryGetValue(pair.Key, out int reducedCount);
+                    if (reducedCount < pair.Value)
+                    {
+                        removedEdgeKeys.Add(pair.Key);
+                    }
+                }
+            }
+            return retracePairsRemoved;
+        }
+
+        private static void RemoveChamferFaceVertexPair(
+            List<Vector3> points,
+            int firstIndex,
+            int secondIndex)
+        {
+            int high = Mathf.Max(firstIndex, secondIndex);
+            int low = Mathf.Min(firstIndex, secondIndex);
+            points.RemoveAt(high);
+            points.RemoveAt(low);
+        }
+
+        private static Dictionary<TopologyEdgeKey, int>
+            BuildChamferFaceEdgeUseCounts(List<Vector3> points)
+        {
+            Dictionary<TopologyEdgeKey, int> counts =
+                new Dictionary<TopologyEdgeKey, int>();
+            if (points == null || points.Count < 2)
+            {
+                return counts;
+            }
+
+            for (int i = 0; i < points.Count; i++)
+            {
+                VertexKey start = new VertexKey(points[i]);
+                VertexKey end = new VertexKey(points[(i + 1) % points.Count]);
+                if (start.Equals(end))
+                {
+                    continue;
+                }
+                TopologyEdgeKey key = new TopologyEdgeKey(start, end);
+                counts.TryGetValue(key, out int count);
+                counts[key] = count + 1;
+            }
+            return counts;
+        }
+
+        private static bool TryFindDuplicateChamferFaceEdge(
+            List<Vector3> points,
+            out TopologyEdgeKey duplicateKey,
+            out int firstLocalEdgeIndex,
+            out int secondLocalEdgeIndex)
+        {
+            duplicateKey = default;
+            firstLocalEdgeIndex = -1;
+            secondLocalEdgeIndex = -1;
+            if (points == null || points.Count < 3)
+            {
+                return false;
+            }
+
+            Dictionary<TopologyEdgeKey, int> firstUseByKey =
+                new Dictionary<TopologyEdgeKey, int>();
+            for (int i = 0; i < points.Count; i++)
+            {
+                VertexKey start = new VertexKey(points[i]);
+                VertexKey end = new VertexKey(points[(i + 1) % points.Count]);
+                if (start.Equals(end))
+                {
+                    duplicateKey = new TopologyEdgeKey(start, end);
+                    firstLocalEdgeIndex = i;
+                    secondLocalEdgeIndex = i;
+                    return false;
+                }
+
+                TopologyEdgeKey key = new TopologyEdgeKey(start, end);
+                if (firstUseByKey.TryGetValue(key, out int firstUse))
+                {
+                    duplicateKey = key;
+                    firstLocalEdgeIndex = firstUse;
+                    secondLocalEdgeIndex = i;
+                    return false;
+                }
+                firstUseByKey.Add(key, i);
+            }
+            return true;
+        }
+
+        private static HashSet<TopologyEdgeKey>
+            BuildChamferFaceEdgeKeySet(List<Vector3> points)
+        {
+            return new HashSet<TopologyEdgeKey>(
+                BuildChamferFaceEdgeUseCounts(points).Keys);
+        }
+
         private static void AddExpectedVertexBoundary(
             List<ChamferExpectedVertexBoundary> boundaries,
             int sourceVertexIndex,
@@ -2728,6 +2907,135 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         }
 
 
+        private static bool NormalizeChamferProvisionalFaceWalks(
+            List<ChamferProvisionalFaceRecord> faceRecords,
+            float minimumStableFaceArea,
+            HashSet<TopologyEdgeKey> retraceRemovedEdgeKeys,
+            ref ChamferEmissionStats stats,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            for (int faceRecordIndex = 0;
+                 faceRecordIndex < faceRecords.Count;
+                 faceRecordIndex++)
+            {
+                ChamferProvisionalFaceRecord record =
+                    faceRecords[faceRecordIndex];
+                List<Vector3> normalized = new List<Vector3>(
+                    record.Face.Vertices);
+                int removedPairs = ReduceChamferFaceRetraces(
+                    normalized,
+                    retraceRemovedEdgeKeys);
+                if (record.Kind == ChamferProvisionalFaceKind.ReplacementBase)
+                {
+                    stats.PostSegmentationReplacementRetracePairsRemoved +=
+                        removedPairs;
+                }
+                else
+                {
+                    stats.PostSegmentationBevelRetracePairsRemoved +=
+                        removedPairs;
+                }
+
+                if (normalized.Count < 3 ||
+                    CalculatePolygonArea(normalized) <= minimumStableFaceArea)
+                {
+                    stats.FaceLocalNormalizationFailureCount++;
+                    blocker = "a provisional face collapses after exact face-local retrace removal";
+                    return false;
+                }
+
+                Vector3 normal = CalculatePolygonNormal(normalized);
+                if (!IsFinite(normal) ||
+                    normal.sqrMagnitude <= 0.00000001f ||
+                    Vector3.Dot(normal, record.Face.Normal) <= 0.25f)
+                {
+                    stats.FaceLocalNormalizationFailureCount++;
+                    blocker = "a provisional face loses stable winding after exact face-local retrace removal";
+                    return false;
+                }
+
+                if (!TryFindDuplicateChamferFaceEdge(
+                        normalized,
+                        out TopologyEdgeKey duplicateKey,
+                        out int firstLocalEdgeIndex,
+                        out int secondLocalEdgeIndex))
+                {
+                    bool shouldLog =
+                        stats.FaceLocalDuplicateEdgeFailureCount < 3;
+                    stats.FaceLocalDuplicateEdgeFailureCount++;
+                    if (shouldLog)
+                    {
+                        Vector3 duplicateStart =
+                            normalized[firstLocalEdgeIndex];
+                        Vector3 duplicateEnd = normalized[
+                            (firstLocalEdgeIndex + 1) % normalized.Count];
+                        LogChamferFaceDuplicateEdgeFailure(
+                            faceRecordIndex,
+                            record,
+                            duplicateStart,
+                            duplicateEnd,
+                            firstLocalEdgeIndex,
+                            secondLocalEdgeIndex);
+                    }
+                    blocker = "a provisional face contains a repeated non-retrace topology edge";
+                    return false;
+                }
+
+                if (removedPairs > 0 ||
+                    normalized.Count != record.Face.Vertices.Count)
+                {
+                    record.Face = new PolygonFace(
+                        normalized,
+                        normal,
+                        record.Face.Feature,
+                        record.Face.FeatureStrength);
+                }
+            }
+            return true;
+        }
+
+        private static void LogChamferFaceDuplicateEdgeFailure(
+            int faceRecordIndex,
+            ChamferProvisionalFaceRecord record,
+            Vector3 duplicateStart,
+            Vector3 duplicateEnd,
+            int firstLocalEdgeIndex,
+            int secondLocalEdgeIndex)
+        {
+            Debug.LogWarning(
+                "GeneratedMass edge wear face-local topology failure. " +
+                "faceRecord=" + faceRecordIndex +
+                ", faceKind=" + record.Kind +
+                ", sourceFace=" + record.SourceFaceIndex +
+                ", sourceEdge=" + record.SourceEdgeIndex +
+                ", duplicateEdgeStart=" + duplicateStart.ToString("F4") +
+                ", duplicateEdgeEnd=" + duplicateEnd.ToString("F4") +
+                ", firstLocalEdge=" + firstLocalEdgeIndex +
+                ", secondLocalEdge=" + secondLocalEdgeIndex);
+        }
+
+        private static void RemoveRetraceDeletedChamferBoundaries(
+            List<ChamferExpectedVertexBoundary> boundaries,
+            Dictionary<TopologyEdgeKey, int> useCounts,
+            HashSet<TopologyEdgeKey> retraceRemovedEdgeKeys,
+            ref ChamferEmissionStats stats)
+        {
+            for (int i = boundaries.Count - 1; i >= 0; i--)
+            {
+                ChamferExpectedVertexBoundary boundary = boundaries[i];
+                useCounts.TryGetValue(boundary.Key, out int useCount);
+                if (useCount > 0 ||
+                    !retraceRemovedEdgeKeys.Contains(boundary.Key))
+                {
+                    continue;
+                }
+
+                boundaries.RemoveAt(i);
+                stats.RetraceRemovedBoundaryRegistrationCount++;
+            }
+        }
+
         private static List<ChamferExpectedVertexBoundary>
             NormalizeChamferVertexBoundaries(
                 List<ChamferExpectedVertexBoundary> registrations,
@@ -2750,16 +3058,63 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 group.Add(boundary);
             }
 
+            Dictionary<TopologyEdgeKey, List<ChamferProvisionalSegmentRecord>>
+                segmentUsesByKey =
+                    new Dictionary<TopologyEdgeKey,
+                        List<ChamferProvisionalSegmentRecord>>();
+            for (int i = 0; i < segments.Count; i++)
+            {
+                ChamferProvisionalSegmentRecord segment = segments[i];
+                if (!segmentUsesByKey.TryGetValue(
+                        segment.Key,
+                        out List<ChamferProvisionalSegmentRecord> uses))
+                {
+                    uses = new List<ChamferProvisionalSegmentRecord>();
+                    segmentUsesByKey.Add(segment.Key, uses);
+                }
+                uses.Add(segment);
+            }
+
             List<ChamferExpectedVertexBoundary> normalized =
                 new List<ChamferExpectedVertexBoundary>(groups.Count);
             foreach (KeyValuePair<TopologyEdgeKey, List<ChamferExpectedVertexBoundary>> pair
                      in groups)
             {
                 List<ChamferExpectedVertexBoundary> group = pair.Value;
-                if (group.Count == 1)
+                useCounts.TryGetValue(pair.Key, out int useCount);
+                segmentUsesByKey.TryGetValue(
+                    pair.Key,
+                    out List<ChamferProvisionalSegmentRecord> segmentUses);
+                HashSet<int> faceRecords = new HashSet<int>();
+                if (segmentUses != null)
                 {
-                    normalized.Add(group[0]);
-                    stats.VertexBoundarySingleOwnerEdgeCount++;
+                    for (int i = 0; i < segmentUses.Count; i++)
+                    {
+                        faceRecords.Add(segmentUses[i].FaceRecordIndex);
+                    }
+                }
+                bool oppositeDirections = segmentUses != null &&
+                    segmentUses.Count == 2 &&
+                    new VertexKey(segmentUses[0].Start).Equals(
+                        new VertexKey(segmentUses[1].End)) &&
+                    new VertexKey(segmentUses[0].End).Equals(
+                        new VertexKey(segmentUses[1].Start));
+
+                // Boundary openness is incidence-based. Two uses on two
+                // distinct faces are internally closed even when their stored
+                // segment directions match; preserve that as a diagnostic.
+                if (useCount == 2 &&
+                    segmentUses != null &&
+                    segmentUses.Count == 2 &&
+                    faceRecords.Count == 2)
+                {
+                    stats.VertexBoundaryCancelledInternalEdgeCount++;
+                    stats.ClosedInternalBoundaryRegistrationCount +=
+                        group.Count;
+                    if (!oppositeDirections)
+                    {
+                        stats.SameDirectionClosedInternalEdgeCount++;
+                    }
                     continue;
                 }
 
@@ -2778,17 +3133,27 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     }
                 }
 
-                useCounts.TryGetValue(pair.Key, out int useCount);
-                if (group.Count == 2 && !sameOwner && useCount == 2)
+                if (useCount == 1 && sameOwner)
                 {
-                    stats.VertexBoundaryCancelledInternalEdgeCount++;
+                    normalized.Add(first);
+                    stats.VertexBoundarySingleOwnerEdgeCount++;
+                    if (group.Count > 1)
+                    {
+                        stats.DuplicateBoundaryRegistrationsCollapsed +=
+                            group.Count - 1;
+                    }
                     continue;
                 }
 
                 bool shouldLog =
                     stats.VertexBoundarySameOwnerDuplicateFailureCount +
-                    stats.VertexBoundaryMultiOwnerFailureCount < 3;
-                if (sameOwner)
+                    stats.VertexBoundaryMultiOwnerFailureCount +
+                    stats.StaleBoundaryRegistrationFailureCount < 3;
+                if (useCount == 0)
+                {
+                    stats.StaleBoundaryRegistrationFailureCount++;
+                }
+                else if (sameOwner)
                 {
                     stats.VertexBoundarySameOwnerDuplicateFailureCount++;
                 }
@@ -3909,6 +4274,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 PolygonFace sourceFace = sourceFaces[graphFace.SourceFaceIndex];
                 List<Vector3> vertices = new List<Vector3>(
                     graphFace.VertexIndices.Count * 3);
+                List<ChamferExpectedVertexBoundary> localBoundaries =
+                    new List<ChamferExpectedVertexBoundary>(
+                        graphFace.VertexIndices.Count * 2);
                 for (int i = 0; i < graphFace.VertexIndices.Count; i++)
                 {
                     int startVertex = graphFace.VertexIndices[i];
@@ -3923,9 +4291,58 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         solution.Corners,
                         solution.SharedSpans,
                         vertices,
-                        vertexBoundaries);
+                        localBoundaries);
                 }
-                RemoveClosingDuplicate(vertices);
+                HashSet<TopologyEdgeKey> initialRetraceRemovedKeys =
+                    new HashSet<TopologyEdgeKey>();
+                stats.InitialReplacementRetracePairsRemoved +=
+                    ReduceChamferFaceRetraces(
+                        vertices,
+                        initialRetraceRemovedKeys);
+
+                if (vertices.Count < 3)
+                {
+                    stats.FaceLocalNormalizationFailureCount++;
+                    stats.ReplacementFaceFailureCount++;
+                    blocker = "a shared-span replacement face collapses during exact retrace normalization";
+                    return false;
+                }
+                if (!TryFindDuplicateChamferFaceEdge(
+                        vertices,
+                        out _,
+                        out _,
+                        out _))
+                {
+                    stats.FaceLocalDuplicateEdgeFailureCount++;
+                    stats.ReplacementFaceFailureCount++;
+                    blocker = "a shared-span replacement face contains a repeated topology edge";
+                    return false;
+                }
+
+                HashSet<TopologyEdgeKey> emittedFaceEdgeKeys =
+                    BuildChamferFaceEdgeKeySet(vertices);
+                for (int boundaryIndex = 0;
+                     boundaryIndex < localBoundaries.Count;
+                     boundaryIndex++)
+                {
+                    ChamferExpectedVertexBoundary boundary =
+                        localBoundaries[boundaryIndex];
+                    if (emittedFaceEdgeKeys.Contains(boundary.Key))
+                    {
+                        vertexBoundaries.Add(boundary);
+                    }
+                    else if (initialRetraceRemovedKeys.Contains(boundary.Key))
+                    {
+                        stats.RetraceRemovedBoundaryRegistrationCount++;
+                    }
+                    else
+                    {
+                        stats.StaleBoundaryRegistrationFailureCount++;
+                        stats.ReplacementFaceFailureCount++;
+                        blocker = "a replacement-face boundary registration has no emitted topology edge";
+                        return false;
+                    }
+                }
 
                 if (CalculatePolygonArea(vertices) <= minimumStableFaceArea ||
                     !IsFinite(CalculatePolygonNormal(vertices)))
@@ -3996,6 +4413,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     new ChamferFaceCornerKey(edge.FaceB, edge.VertexB)].Position;
 
                 List<Vector3> strip = new List<Vector3> { a0, b0, b1, a1 };
+                stats.InitialBevelRetracePairsRemoved +=
+                    ReduceChamferFaceRetraces(strip, null);
+                if (strip.Count < 3)
+                {
+                    stats.FaceLocalNormalizationFailureCount++;
+                    stats.BevelStripFailureCount++;
+                    blocker = "an active selected edge collapses during exact bevel retrace normalization";
+                    return false;
+                }
+                if (!TryFindDuplicateChamferFaceEdge(
+                        strip,
+                        out _,
+                        out _,
+                        out _))
+                {
+                    stats.FaceLocalDuplicateEdgeFailureCount++;
+                    stats.BevelStripFailureCount++;
+                    blocker = "an active selected edge produces a repeated bevel topology edge";
+                    return false;
+                }
                 Vector3 expectedNormal = selected.Candidate.BevelNormal;
                 Vector3 stripNormal = CalculatePolygonNormal(strip);
                 if (!IsFinite(stripNormal) ||
@@ -4094,15 +4531,33 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 minimumStableEdgeLength,
                 ref stats);
 
-            stats.PostSegmentationBoundaryRegistrationCount =
-                vertexBoundaries.Count;
-            stats.ExpectedSourceBoundaryEdgeCount =
-                expectedSourceBoundaryEdges.Count;
+            HashSet<TopologyEdgeKey> postSegmentationRetraceRemovedKeys =
+                new HashSet<TopologyEdgeKey>();
+            if (!NormalizeChamferProvisionalFaceWalks(
+                    provisionalFaceRecords,
+                    minimumStableFaceArea,
+                    postSegmentationRetraceRemovedKeys,
+                    ref stats,
+                    out blocker))
+            {
+                return false;
+            }
 
             List<PolygonFace> provisionalFaces =
                 ExtractChamferProvisionalFaces(provisionalFaceRecords);
             Dictionary<TopologyEdgeKey, int> useCounts =
                 BuildTopologyEdgeUseCounts(provisionalFaces);
+            RemoveRetraceDeletedChamferBoundaries(
+                vertexBoundaries,
+                useCounts,
+                postSegmentationRetraceRemovedKeys,
+                ref stats);
+
+            stats.PostSegmentationBoundaryRegistrationCount =
+                vertexBoundaries.Count;
+            stats.ExpectedSourceBoundaryEdgeCount =
+                expectedSourceBoundaryEdges.Count;
+
             List<ChamferProvisionalSegmentRecord> finalSegments =
                 BuildChamferProvisionalSegmentRecords(
                     provisionalFaceRecords,
@@ -4197,6 +4652,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 stats.ProvisionalTJunctionCount > 0 ||
                 stats.VertexBoundarySameOwnerDuplicateFailureCount > 0 ||
                 stats.VertexBoundaryMultiOwnerFailureCount > 0 ||
+                stats.StaleBoundaryRegistrationFailureCount > 0 ||
+                stats.FaceLocalNormalizationFailureCount > 0 ||
+                stats.FaceLocalDuplicateEdgeFailureCount > 0 ||
                 stats.VertexBoundaryBranchFailureCount > 0 ||
                 stats.VertexBoundaryDuplicateFailureCount > 0)
             {
@@ -7319,6 +7777,8 @@ private readonly struct EdgeWearTopologyStats
             public int ReplacementFaceAreaFailureCount;
             public int ReplacementFaceWindingFailureCount;
             public int ReplacementEdgeCollapseFailureCount;
+            public int ReplacementFaceRetracePairsRemoved;
+            public int ReplacementFaceDuplicateEdgeFailureCount;
             public int UnselectedInternalEdgeCount;
             public int SharedUnselectedEndpointsChecked;
             public int SharedUnselectedEndpointsExact;
@@ -7381,6 +7841,8 @@ private readonly struct EdgeWearTopologyStats
                     ", replacementFaceAreaFailures=" + ReplacementFaceAreaFailureCount +
                     ", replacementFaceWindingFailures=" + ReplacementFaceWindingFailureCount +
                     ", replacementEdgeCollapseFailures=" + ReplacementEdgeCollapseFailureCount +
+                    ", replacementFaceRetracePairsRemoved=" + ReplacementFaceRetracePairsRemoved +
+                    ", replacementFaceDuplicateEdgeFailures=" + ReplacementFaceDuplicateEdgeFailureCount +
                     ", unselectedInternalEdges=" + UnselectedInternalEdgeCount +
                     ", sharedUnselectedEndpointsChecked=" + SharedUnselectedEndpointsChecked +
                     ", sharedUnselectedEndpointsExact=" + SharedUnselectedEndpointsExact +
@@ -7782,6 +8244,17 @@ private readonly struct EdgeWearTopologyStats
             public int VertexBoundaryCancelledInternalEdgeCount;
             public int VertexBoundarySameOwnerDuplicateFailureCount;
             public int VertexBoundaryMultiOwnerFailureCount;
+            public int InitialReplacementRetracePairsRemoved;
+            public int InitialBevelRetracePairsRemoved;
+            public int PostSegmentationReplacementRetracePairsRemoved;
+            public int PostSegmentationBevelRetracePairsRemoved;
+            public int FaceLocalNormalizationFailureCount;
+            public int FaceLocalDuplicateEdgeFailureCount;
+            public int RetraceRemovedBoundaryRegistrationCount;
+            public int ClosedInternalBoundaryRegistrationCount;
+            public int SameDirectionClosedInternalEdgeCount;
+            public int DuplicateBoundaryRegistrationsCollapsed;
+            public int StaleBoundaryRegistrationFailureCount;
             public int ProvenanceCompatibleTJunctionSplits;
             public int TJunctionSegmentationPasses;
             public int TJunctionRecordsFound;
@@ -7841,6 +8314,17 @@ private readonly struct EdgeWearTopologyStats
                     ", vertexBoundaryCancelledInternalEdges=" + VertexBoundaryCancelledInternalEdgeCount +
                     ", vertexBoundarySameOwnerDuplicateFailures=" + VertexBoundarySameOwnerDuplicateFailureCount +
                     ", vertexBoundaryMultiOwnerFailures=" + VertexBoundaryMultiOwnerFailureCount +
+                    ", initialReplacementRetracePairsRemoved=" + InitialReplacementRetracePairsRemoved +
+                    ", initialBevelRetracePairsRemoved=" + InitialBevelRetracePairsRemoved +
+                    ", postSegmentationReplacementRetracePairsRemoved=" + PostSegmentationReplacementRetracePairsRemoved +
+                    ", postSegmentationBevelRetracePairsRemoved=" + PostSegmentationBevelRetracePairsRemoved +
+                    ", faceLocalNormalizationFailures=" + FaceLocalNormalizationFailureCount +
+                    ", faceLocalDuplicateEdgeFailures=" + FaceLocalDuplicateEdgeFailureCount +
+                    ", retraceRemovedBoundaryRegistrations=" + RetraceRemovedBoundaryRegistrationCount +
+                    ", closedInternalBoundaryRegistrationsCancelled=" + ClosedInternalBoundaryRegistrationCount +
+                    ", sameDirectionClosedInternalEdges=" + SameDirectionClosedInternalEdgeCount +
+                    ", duplicateBoundaryRegistrationsCollapsed=" + DuplicateBoundaryRegistrationsCollapsed +
+                    ", staleBoundaryRegistrationFailures=" + StaleBoundaryRegistrationFailureCount +
                     ", provenanceCompatibleTJunctionSplits=" + ProvenanceCompatibleTJunctionSplits +
                     ", tJunctionSegmentationPasses=" + TJunctionSegmentationPasses +
                     ", tJunctionRecordsFound=" + TJunctionRecordsFound +

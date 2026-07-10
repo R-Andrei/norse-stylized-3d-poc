@@ -39,6 +39,66 @@ Layer D may read Layer C, but must never write Layer C.
 Layer E must never feed back into compute/simulation.
 ```
 
+## Active state after `4.11C.5.16A — Unified Foam Velocity Contract`
+
+Source spawning is provisionally sufficient and no longer the active blocker:
+
+```text
+shore material exists;
+static object/contact material exists;
+free-water lace, cross-lace, and fragment material exists;
+known cross-lace resolution/blockiness is parked;
+Cross-Lace should remain a minority Mixed pattern until a later resolution strategy is justified.
+```
+
+The canonical motion input is now one physical resolved-velocity contract, not an independent new texture and not the old lateral-cells scalar:
+
+```text
+velocity.x = nonnegative downstream metres/second
+velocity.y = signed lateral metres/second
+```
+
+Raw lane intent remains a scrolling RHalf field. Raw obstacle routing remains a fixed RGHalf field. The pure resolver marries them with base Foam speed and obstacle slowdown. No new runtime texture or dispatch was added.
+
+The old control meanings are retired in the Inspector:
+
+```text
+Material Flow Speed      -> Downstream Speed Ratio
+Motion Field Strength    -> Maximum Lateral Speed Ratio
+Motion Field Scroll Hz   -> Lane Advection Ratio
+Neutral Coverage         -> Low Lateral Motion Coverage
+Lane Scale               -> Lateral Route Scale
+```
+
+Added:
+
+```text
+Obstacle Slowdown Strength
+Obstacle Minimum Downstream Factor
+```
+
+The existing Motion Field view now displays the resolved velocity rather than raw lateral intent. This patch deliberately does not move stored material laterally.
+
+### Immediate next patch
+
+```text
+4.11C.5.16B — Conservative Unified 2D Material Advection
+```
+
+Required outcome:
+
+```text
+replace the global-only final transport authority with local 2D velocity consumption;
+transport packed Presence / Presence×Life / Presence×Pattern conservatively;
+permit coherent left/right routing and obstacle slowdown;
+permit downstream zero but never downstream negative;
+avoid per-cell stochastic row decisions and neighbour-resampling smear;
+retain strict valid-fluid/obstacle flux gates;
+prove mass error and boundary behavior in Material Presence before Layer D evolution.
+```
+
+Do not begin Layer D history, damage, final mask integration, or shader cracking until this transport authority is accepted. Layer D must later consume the same resolved velocity contract rather than inventing a second motion interpretation.
+
 ## Active and trusted foundations
 
 Trusted foundations:
@@ -49,7 +109,7 @@ Manual/source birth creates durable material.
 Downstream phase transport moves durable material downstream.
 Lifecycle aging and valid-fluid clipping remain Layer C-owned.
 Topology/support/negative aging influences Layer C where implemented.
-Motion Field, obstacle routing, topology, pressure/wake/ripple fields are Layer B-style inputs, not foam movers by themselves.
+Motion Lane and Obstacle Routing remain raw Layer B inputs. Their canonical resolved physical velocity is now implemented and debug-visible, but it does not move FoamState until 5.16B.
 _FoamShapeMask exists as the Layer D product slot.
 Foam Evaluated Shape debug can display _FoamShapeMask.
 Foam Shape Difference debug compares _FoamShapeMask against raw persistent Presence.
@@ -1163,3 +1223,40 @@ Implementation notes:
 
 Validation target: pure `Cross-Lace Connectors` should produce horizontal/cross-current torn ribbons in `Material Remaining Life`, not rectangles, dots, slabs, or specular glints.
 
+
+
+---
+
+# `4.11C.5.16A` implementation record
+
+Implemented files and responsibilities:
+
+```text
+StylizedRiver.cs
+  physical velocity controls, one-time legacy tuning migration, new public contract values
+
+StylizedRiverFoamRuntime.RuntimeUpdates.cs
+  single CPU authority for base signed/unsigned Foam downstream speed
+
+StylizedRiverFoamRuntime.Obstacles.cs
+  physical lane-phase advection independent of total river length
+
+StylizedRiverFoamRuntime.Compute.cs / CS_RiverFoam.Resources.hlsl
+  shared velocity scalar binding for future compute consumers
+
+RiverWaterFoamVelocity.hlsl
+  canonical pure resolved-velocity math shared by compute and shader debug
+
+CS_RiverFoam.Motion.hlsl
+  raw lane/obstacle sampling plus canonical resolver call
+
+SH_CleanStylizedRiver.shader
+  existing Motion Field views display resolved downstream/lateral velocity, slowdown, and obstacle influence
+```
+
+Current limitation intentionally retained:
+
+```text
+CommitPhaseTransport still performs one global downstream column shift and preserves Y.
+No compute kernel currently changes FoamState according to local resolved velocity.
+```

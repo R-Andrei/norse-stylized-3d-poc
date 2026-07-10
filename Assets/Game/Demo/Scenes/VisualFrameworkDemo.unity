@@ -9297,14 +9297,14 @@ MonoBehaviour:
   foamFreeWaterEventAmount: 0.409
   foamAutomaticBirthEnabled: 1
   foamSourcePopulationPreset: 0
-  foamAutomaticShoreBirthEnabled: 0
-  foamShoreFoamCoverage: 0.821
-  foamShoreFoamActivity: 0.91
-  foamShoreFoamPatchSize: 0.679
-  foamShoreFoamFormationSpeedMetresPerSecond: 0.77
+  foamAutomaticShoreBirthEnabled: 1
+  foamShoreFoamCoverage: 0.628
+  foamShoreFoamActivity: 0.71
+  foamShoreFoamPatchSize: 0.576
+  foamShoreFoamFormationSpeedMetresPerSecond: 0.924
   foamShoreFoamPattern: 0
-  foamShoreRibbonPatternWeight: 0.689
-  foamInwardWashPatternWeight: 0.311
+  foamShoreRibbonPatternWeight: 0.692
+  foamInwardWashPatternWeight: 0.30800003
   foamShoreRibbonFormationSpeedMultiplier: 1
   foamShoreRibbonLengthMinMetres: 4
   foamShoreRibbonLengthMaxMetres: 12
@@ -9329,9 +9329,9 @@ MonoBehaviour:
   foamInwardWashInitialLifeMax: 1
   foamInwardWashBreakupStrengthMin: 0.04
   foamInwardWashBreakupStrengthMax: 0.14
-  foamAutomaticObjectBirthEnabled: 0
-  foamObjectFoamCoverage: 0.931
-  foamObjectFoamActivity: 0.923
+  foamAutomaticObjectBirthEnabled: 1
+  foamObjectFoamCoverage: 0.587
+  foamObjectFoamActivity: 0.661
   foamObjectFoamFormationSpeedMetresPerSecond: 0.71
   foamObjectFoamPattern: 0
   foamObjectContactArcPatternWeight: 0.14502627
@@ -9355,7 +9355,7 @@ MonoBehaviour:
   foamObjectContactSemiArcWidthMaxMetres: 0.105
   foamObjectContactSemiArcOffsetMinMetres: 0.02
   foamObjectContactSemiArcOffsetMaxMetres: 0.14
-  foamObjectContactSemiArcInitialLifeMin: 0.65
+  foamObjectContactSemiArcInitialLifeMin: 0.809
   foamObjectContactSemiArcInitialLifeMax: 1
   foamObjectContactSemiArcBreakupStrengthMin: 0.08
   foamObjectContactSemiArcBreakupStrengthMax: 0.32
@@ -9368,18 +9368,18 @@ MonoBehaviour:
   foamObjectContactFleckWidthMaxMetres: 0.08
   foamObjectContactFleckOffsetMinMetres: 0.02
   foamObjectContactFleckOffsetMaxMetres: 0.16
-  foamObjectContactFleckInitialLifeMin: 0.55
-  foamObjectContactFleckInitialLifeMax: 0.9
+  foamObjectContactFleckInitialLifeMin: 0.798
+  foamObjectContactFleckInitialLifeMax: 0.948
   foamObjectContactFleckBreakupStrengthMin: 0.18
   foamObjectContactFleckBreakupStrengthMax: 0.45
   foamAutomaticFreeWaterBirthEnabled: 1
-  foamFreeWaterFoamCoverage: 0.964
-  foamFreeWaterFoamActivity: 0.924
-  foamFreeWaterFoamFormationSpeedMetresPerSecond: 0.88
+  foamFreeWaterFoamCoverage: 0.685
+  foamFreeWaterFoamActivity: 0.648
+  foamFreeWaterFoamFormationSpeedMetresPerSecond: 0.969
   foamFreeWaterFoamPattern: 0
-  foamFreeWaterLaceConnectorPatternWeight: 0.34689656
-  foamFreeWaterCrossLaceConnectorPatternWeight: 0.31034482
-  foamFreeWaterTornFragmentPatternWeight: 0.34275863
+  foamFreeWaterLaceConnectorPatternWeight: 0.628
+  foamFreeWaterCrossLaceConnectorPatternWeight: 0.079191834
+  foamFreeWaterTornFragmentPatternWeight: 0.29280812
   foamFreeWaterLaceFormationSpeedMultiplier: 1
   foamFreeWaterLaceLengthMinMetres: 1.4
   foamFreeWaterLaceLengthMaxMetres: 5.8
@@ -9389,7 +9389,7 @@ MonoBehaviour:
   foamFreeWaterLaceInitialLifeMax: 1
   foamFreeWaterLaceBreakupStrengthMin: 0.22
   foamFreeWaterLaceBreakupStrengthMax: 0.55
-  foamFreeWaterLaceCurvatureMin: 0
+  foamFreeWaterLaceCurvatureMin: 0.538
   foamFreeWaterLaceCurvatureMax: 1
   foamFreeWaterCrossLaceFormationSpeedMultiplier: 1
   foamFreeWaterCrossLaceLengthMinMetres: 0.7
@@ -9417,13 +9417,16 @@ MonoBehaviour:
   foamMaterialFlowSpeedMultiplier: 0.77
   foamSurfaceMorphStrength: 2.53
   foamSurfaceMorphCalibrationVersion: 1
-  foamMotionFieldStrength: 1
-  foamMotionFieldScrollHz: 0.01
+  foamMotionFieldStrength: 0.297
+  foamMotionFieldScrollHz: 0.6
   foamMotionFieldNeutralCoverage: 0.1
   foamMotionFieldLaneScale: 1
+  foamObstacleSlowdownStrength: 0.85
+  foamObstacleMinimumDownstreamFactor: 0.12
   foamMaterialLifecycleTuningVersion: 1
+  foamVelocityTuningVersion: 1
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}
-  foamDebugView: 4
+  foamDebugView: 5
   foamSpawnDistanceNormalized: 0.634
   foamSpawnAcrossNormalized: -0.27
   foamSpawnScale: 0.538

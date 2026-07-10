@@ -10,6 +10,49 @@ The goal is to reproduce the broad behavior of the visual inspiration river: sty
 
 The target is not a physically exact fluid solver and not a foam entity database. The target is a fixed-grid mathematical field system with strict ownership boundaries and no circular dependencies.
 
+## Current implementation status — `4.11C.5.16A`
+
+The Layer C source-population prerequisite is provisionally complete enough for evolution work:
+
+```text
+Shore birth: implemented and accepted provisionally.
+Static object/contact birth: implemented and accepted provisionally.
+Free-water lace, cross-lace, and fragment birth: implemented and accepted provisionally.
+Cross-lace longitudinal blockiness: known parked structural-resolution limitation.
+```
+
+The active architecture block is now movement/evolution, beginning at the upstream motion authority rather than at final rendering.
+
+`4.11C.5.16A — Unified Foam Velocity Contract` establishes one canonical physical velocity resolver shared by compute and the existing Motion Field debug view:
+
+```text
+raw scrolling lane intent       ─┐
+fixed obstacle-routing intent    ├─> resolved Foam velocity
+base downstream Foam speed       ┤
+obstacle slowdown controls       ┘
+```
+
+The resolved contract contains:
+
+```text
+nonnegative downstream speed magnitude in metres/second;
+signed lateral speed in metres/second;
+lateral intent;
+downstream speed factor;
+obstacle influence;
+raw lane and obstacle intent for diagnostics/future strain work.
+```
+
+The raw lane and obstacle textures remain separate because they have different coordinate rules: lane intent scrolls through sample space, while obstacle routing must stay fixed to world/river obstacles. They are married logically through one pure resolver, not packed into one misleading texture.
+
+This patch does **not** move stored material laterally. The current global downstream phase transport remains temporarily active. The next movement patch must replace that final authority with conservative unified 2D Layer C advection so local slowdown and stagnation can become real material behavior.
+
+Exact next patch:
+
+```text
+4.11C.5.16B — Conservative Unified 2D Material Advection
+```
+
 ---
 
 # 0. Non-negotiable design goals
@@ -414,7 +457,7 @@ Canonical resolved outputs should eventually include explicit meanings such as:
 birthSupport
 lifetimeSupport
 exclusion
-motionIntent
+resolvedFoamVelocity
 visualContactSupport
 breakupAgitation
 ```
@@ -442,6 +485,70 @@ The visual sheet field caused Stage 1 material to merge.
 ```
 
 Only Layer C can move persistent material. Only Layer D can create visual-only broad film shape.
+
+## 3.9 Unified Foam velocity contract
+
+Patch `4.11C.5.16A` makes resolved Foam velocity the canonical Layer B motion output.
+
+Current raw inputs:
+
+```text
+Motion Lane texture: signed lateral route preference; sampled at a physically advected X phase.
+Obstacle Routing texture R: signed route-around-obstacle preference; fixed in river space.
+Obstacle Routing texture G: obstacle influence / collision-shadow strength; fixed in river space.
+River Flow Speed × Liquid Factor × Downstream Speed Ratio: base Foam speed.
+```
+
+Canonical pure resolver:
+
+```hlsl
+lateralIntent = clamp(
+    lerp(laneIntent, obstacleIntent, obstacleInfluence),
+    -1,
+    1);
+
+slowdown = saturate(
+    obstacleInfluence * ObstacleSlowdownStrength);
+
+downstreamFactor = lerp(
+    1,
+    ObstacleMinimumDownstreamFactor,
+    slowdown);
+
+vDownstream = max(0, baseFoamSpeed * downstreamFactor);
+vLateral = lateralIntent * baseFoamSpeed * MaximumLateralSpeedRatio;
+```
+
+Invariant:
+
+```text
+vDownstream >= 0
+```
+
+Therefore the final movement system may move material left or right, slow it, or temporarily stop downstream movement, but it may never move material upstream.
+
+The shared implementation lives in:
+
+```text
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoamVelocity.hlsl
+```
+
+Compute raw-field sampling lives in:
+
+```text
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Motion.hlsl
+```
+
+The existing Motion Field debug modes use the same pure contract. Bright neutral gray means straight full-speed downstream motion; red/blue encode signed lateral velocity; darkness encodes downstream slowdown/stagnation; yellow encodes obstacle influence; white overlays raw stored material Presence.
+
+Lane phase is now advanced in physical metres:
+
+```text
+laneScrollMetres = baseFoamSpeed × LaneAdvectionRatio × deltaTime
+laneScrollCells = laneScrollMetres / longitudinalCellSpacing
+```
+
+The old wraps-per-second formula, whose physical speed scaled with total river length, is retired.
 
 ---
 
@@ -628,7 +735,7 @@ Layer B environmental support/contact/wake context
 
 This replaces the earlier temptation to add a separate visual-only environmental film authority. Such a visual-only product is postponed and should not be introduced until source population has been tested and found insufficient.
 
-Patch `4.11C.5.14A` added the first automatic source class: conservative shore/contact birth. Validation proved the plumbing but showed the first control design was too crude. Patch `4.11C.5.14B` correctly moved toward source-class-specific spawning, but exposed too many low-level controls. Patch `4.11C.5.14C` simplified the UI, but its hidden one-shot shore stroke recipe was too sparse and same-shaped. Patch `4.11C.5.14D` attempted deterministic full-strength shore source events, but validation showed it still emitted generic segment/capsule stamps and therefore produced rectangular, same-looking shore bars. Patch `4.11C.5.14E` replaces automatic shore output with a dedicated typed source-event rasterizer that reads live shore edges and writes real Layer C material through analytic shore-local masks. Shore Contact Birth remains the only implemented automatic source class; river-body, obstacle-contact, and lee/wake presets are documented placeholders until shore birth validates.
+Patch `4.11C.5.14A` added the first automatic source class: conservative shore/contact birth. Validation proved the plumbing but showed the first control design was too crude. Patches `5.14B–5.14H` established source-class-specific authoring and a dedicated typed source-event rasterizer. `5.15A–5.15A.4` added static object/contact arcs, semi-arcs, and flecks. `5.15B–5.15B.3.1` added free-water lace connectors, cross-lace connectors, and progressively revealed torn fragments. These source families are not final-quality, but they now provide sufficiently varied real `FoamState` material to unblock evolution work. Spawning is parked unless a concrete regression blocks evolution validation.
 
 ## 4.8 Current status
 
@@ -636,12 +743,15 @@ Active/trusted:
 
 ```text
 manual/source birth
-automatic shore/contact source population when explicitly enabled, now using a dedicated shore-local source-event rasterizer
+automatic shore birth
+automatic static object/contact birth
+automatic free-water lace/cross-lace/fragment birth
 source-to-persistent merge
-downstream phase transport
+global downstream phase transport as a temporary legacy movement authority
 lifecycle aging
 support/negative aging influence
 valid-fluid and obstacle clipping
+unified physical Foam velocity contract for validation and future consumers
 ```
 
 Rejected/superseded:
@@ -1425,7 +1535,7 @@ Foam Evaluated Shape
 Foam Shape Difference
 ```
 
-Needed next debug views:
+Additional existing debug views:
 
 ```text
 Foam Film Source

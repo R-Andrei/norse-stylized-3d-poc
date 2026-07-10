@@ -1,10 +1,4 @@
-struct FoamMotionFieldSample
-{
-    float lateralCells;
-    float obstacleInfluence;
-    float laneValue;
-    float obstacleValue;
-};
+#include "../Shaders/Includes/RiverWaterFoamVelocity.hlsl"
 
 int FoamWrapMotionLaneX(int x)
 {
@@ -64,30 +58,19 @@ float2 FoamLoadObstacleRoutingCell(float2 coordinate)
     return routing;
 }
 
-FoamMotionFieldSample FoamResolveMotionFieldSample(
+RiverWaterFoamResolvedVelocity FoamResolveVelocity(
     float2 motionSampleCoordinate,
     float validFluid)
 {
-    FoamMotionFieldSample sample;
-    sample.lateralCells = 0.0;
-    sample.obstacleInfluence = 0.0;
-    sample.laneValue = 0.0;
-    sample.obstacleValue = 0.0;
-
-    float strength = clamp(_FoamMotionFieldStrength, 0.0, 4.0);
-    if (strength <= 0.0001 || validFluid <= 0.0001)
-    {
-        return sample;
-    }
-
-    float lane = FoamSampleMotionLaneSmooth(motionSampleCoordinate);
+    float laneIntent = FoamSampleMotionLaneSmooth(motionSampleCoordinate);
     float2 obstacle = FoamLoadObstacleRoutingCell(motionSampleCoordinate);
-    float obstacleInfluence = saturate(obstacle.y);
-    float resolved = lerp(lane, obstacle.x, obstacleInfluence);
-
-    sample.laneValue = lane;
-    sample.obstacleValue = obstacle.x;
-    sample.obstacleInfluence = obstacleInfluence;
-    sample.lateralCells = clamp(resolved * strength, -1.25, 1.25);
-    return sample;
+    return RiverWaterResolveFoamVelocityContract(
+        laneIntent,
+        obstacle.x,
+        obstacle.y,
+        _FoamBaseDownstreamSpeed,
+        _FoamMaximumLateralSpeedRatio,
+        _FoamObstacleSlowdownStrength,
+        _FoamObstacleMinimumDownstreamFactor,
+        validFluid);
 }

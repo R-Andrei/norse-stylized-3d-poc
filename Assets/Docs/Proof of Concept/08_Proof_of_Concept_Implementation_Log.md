@@ -1572,3 +1572,47 @@ Implemented Free Water Foam as a real automatic Layer C birth source category. A
 
 Added Cross-Lace Connectors as the third Free Water Foam birth pattern. The existing Lace Connector samples its path along the flow axis, so free-water birth produced mostly vertical/with-flow marks. Cross-Lace uses the same timed head+stroke insertion mechanic but samples along the lateral river axis, producing horizontal/cross-current ribbons while only bending slightly along flow. Coverage/Activity were intentionally left unchanged; any longer survival should be validated through Initial Life / lifetime tuning separately.
 
+
+
+### `4.11C.5.16A — Unified Foam Velocity Contract`
+
+Status: implemented; Unity compile/import and visual validation required.
+
+Reason:
+
+The spawning layer is now provisionally sufficient to resume evolution work, but the existing Motion Field was only a lateral-intent diagnostic while persistent material used one global downstream shift. A separate visual-history motion field would create competing authorities. The correct foundation is one canonical physical velocity consumed later by both Layer C and Layer D.
+
+Implemented:
+
+- retained separate lane and obstacle-routing textures because lane samples scroll while obstacle routing stays fixed;
+- added `RiverWaterFoamVelocity.hlsl`, a pure shared resolver returning physical downstream/lateral velocity plus diagnostic intent/factor data;
+- changed Foam motion authoring semantics to Downstream Speed Ratio, Maximum Lateral Speed Ratio, Lane Advection Ratio, Low Lateral Motion Coverage, and Lateral Route Scale;
+- added Obstacle Slowdown Strength and Obstacle Minimum Downstream Factor;
+- added one-time velocity-tuning migration: legacy Strength `1` becomes lateral ratio `0.22`, and legacy Scroll Hz `0.01` becomes lane-advection ratio `0.60`;
+- converted lane phase motion from `wraps/second × fieldWidth` to `baseFoamSpeed × laneAdvectionRatio / longitudinalSpacing`;
+- centralized CPU base Foam speed resolution so current phase transport, compute bindings, shader diagnostics, and lane scrolling use one formula;
+- updated compute scalar contracts for future material transport without adding a texture or dispatch;
+- updated existing Motion Field views: neutral gray = straight full-speed downstream, red/blue = signed lateral velocity, dark = slowdown/stagnation, yellow = obstacle influence, white = raw stored Presence;
+- removed the duplicated speed control from Material Lifecycle.
+
+Canonical math:
+
+```text
+lateralIntent = lerp(laneIntent, obstacleIntent, obstacleInfluence)
+slowdown = obstacleInfluence × obstacleSlowdownStrength
+downstreamFactor = lerp(1, minimumDownstreamFactor, slowdown)
+vDownstream = max(0, baseFoamSpeed × downstreamFactor)
+vLateral = lateralIntent × baseFoamSpeed × maximumLateralSpeedRatio
+```
+
+Deliberately unchanged:
+
+- no lateral or locally slowed `FoamState` transport;
+- no Layer D history/phase state;
+- no fracture or final-mask integration;
+- no spawning changes;
+- no new steady-state texture memory.
+
+Next patch:
+
+`4.11C.5.16B — Conservative Unified 2D Material Advection`.

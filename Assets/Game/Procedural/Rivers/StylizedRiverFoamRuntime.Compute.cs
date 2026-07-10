@@ -97,8 +97,17 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamPresenceMetricThreshold",
                 PresenceMetricThreshold);
             computeShader.SetFloat(
-                "_FoamMotionFieldStrength",
-                river.FoamMotionFieldStrength);
+                "_FoamBaseDownstreamSpeed",
+                ResolveBaseFoamDownstreamSpeedMetresPerSecond());
+            computeShader.SetFloat(
+                "_FoamMaximumLateralSpeedRatio",
+                river.FoamMaximumLateralSpeedRatio);
+            computeShader.SetFloat(
+                "_FoamObstacleSlowdownStrength",
+                river.FoamObstacleSlowdownStrength);
+            computeShader.SetFloat(
+                "_FoamObstacleMinimumDownstreamFactor",
+                river.FoamObstacleMinimumDownstreamFactor);
             computeShader.SetFloat(
                 "_FoamMotionLaneScrollCells",
                 motionLaneScrollCells);
@@ -391,8 +400,17 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamPhaseTransportMetres",
                 foamPhaseTransportMetres);
             computeShader.SetFloat(
-                "_FoamMotionFieldStrength",
-                river.FoamMotionFieldStrength);
+                "_FoamBaseDownstreamSpeed",
+                ResolveBaseFoamDownstreamSpeedMetresPerSecond());
+            computeShader.SetFloat(
+                "_FoamMaximumLateralSpeedRatio",
+                river.FoamMaximumLateralSpeedRatio);
+            computeShader.SetFloat(
+                "_FoamObstacleSlowdownStrength",
+                river.FoamObstacleSlowdownStrength);
+            computeShader.SetFloat(
+                "_FoamObstacleMinimumDownstreamFactor",
+                river.FoamObstacleMinimumDownstreamFactor);
             computeShader.SetFloat(
                 "_FoamMotionLaneScrollCells",
                 motionLaneScrollCells);

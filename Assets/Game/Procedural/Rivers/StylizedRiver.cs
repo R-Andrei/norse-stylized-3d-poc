@@ -224,6 +224,7 @@ namespace ProgrammaticStylized3D.Rivers
             "PS3DRiver/Textures/T_RiverNormal";
 
         private const int CurrentFoamMaterialLifecycleTuningVersion = 1;
+        private const int CurrentFoamVelocityTuningVersion = 1;
         private const float MinimumFoamNeutralLifetime = 1f;
         private const float MaximumFoamNeutralLifetime = 10f;
         private const float DefaultFoamNeutralLifetime = 4f;
@@ -233,24 +234,32 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamNegativeAgingRate = 1f;
         private const float MaximumFoamNegativeAgingRate = 8f;
         private const float DefaultFoamNegativeAgingRate = 4f;
-        private const float MinimumFoamMaterialFlowSpeedMultiplier = 0f;
-        private const float MaximumFoamMaterialFlowSpeedMultiplier = 6f;
-        private const float DefaultFoamMaterialFlowSpeedMultiplier = 1f;
+        private const float MinimumFoamDownstreamSpeedRatio = 0f;
+        private const float MaximumFoamDownstreamSpeedRatio = 2f;
+        private const float DefaultFoamDownstreamSpeedRatio = 1f;
         private const float MinimumShoreFoamFormationSpeedMetresPerSecond = 0.15f;
         private const float MaximumShoreFoamFormationSpeedMetresPerSecond = 2.5f;
         private const float DefaultShoreFoamFormationSpeedMetresPerSecond = 0.75f;
-        private const float MinimumFoamMotionFieldStrength = 0f;
-        private const float MaximumFoamMotionFieldStrength = 4f;
-        private const float DefaultFoamMotionFieldStrength = 1f;
-        private const float MinimumFoamMotionFieldScrollHz = 0f;
-        private const float MaximumFoamMotionFieldScrollHz = 0.2f;
-        private const float DefaultFoamMotionFieldScrollHz = 0.01f;
-        private const float MinimumFoamMotionFieldNeutralCoverage = 0f;
-        private const float MaximumFoamMotionFieldNeutralCoverage = 0.30f;
-        private const float DefaultFoamMotionFieldNeutralCoverage = 0.10f;
-        private const float MinimumFoamMotionFieldLaneScale = 0.25f;
-        private const float MaximumFoamMotionFieldLaneScale = 4f;
-        private const float DefaultFoamMotionFieldLaneScale = 1f;
+        private const float MinimumFoamMaximumLateralSpeedRatio = 0f;
+        private const float MaximumFoamMaximumLateralSpeedRatio = 1f;
+        private const float DefaultFoamMaximumLateralSpeedRatio = 0.22f;
+        private const float LegacyDefaultFoamMotionFieldStrength = 1f;
+        private const float MinimumFoamLaneAdvectionRatio = 0f;
+        private const float MaximumFoamLaneAdvectionRatio = 1f;
+        private const float DefaultFoamLaneAdvectionRatio = 0.60f;
+        private const float LegacyDefaultFoamMotionFieldScrollHz = 0.01f;
+        private const float MinimumFoamLowLateralMotionCoverage = 0f;
+        private const float MaximumFoamLowLateralMotionCoverage = 0.30f;
+        private const float DefaultFoamLowLateralMotionCoverage = 0.10f;
+        private const float MinimumFoamLateralRouteScale = 0.25f;
+        private const float MaximumFoamLateralRouteScale = 4f;
+        private const float DefaultFoamLateralRouteScale = 1f;
+        private const float MinimumFoamObstacleSlowdownStrength = 0f;
+        private const float MaximumFoamObstacleSlowdownStrength = 1f;
+        private const float DefaultFoamObstacleSlowdownStrength = 0.85f;
+        private const float MinimumFoamObstacleMinimumDownstreamFactor = 0f;
+        private const float MaximumFoamObstacleMinimumDownstreamFactor = 1f;
+        private const float DefaultFoamObstacleMinimumDownstreamFactor = 0.12f;
         private const float MinimumFoamProgressiveRibbonDuration = 0.5f;
         private const float MaximumFoamProgressiveRibbonDuration = 5f;
         private const float DefaultFoamProgressiveRibbonDuration = 2.4f;
@@ -1312,13 +1321,13 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField]
         private float foamNegativeAgingRate = DefaultFoamNegativeAgingRate;
 
-        [Tooltip("Multiplier for persistent Foam material transport speed relative to the authored river Flow Speed. One follows the visible water speed, values above one make existing Foam travel faster downstream, and zero freezes ordinary downstream material drift while still allowing explicit source birth and valid-fluid clipping.")]
+        [Tooltip("Downstream speed ratio for persistent Foam relative to the authored river Flow Speed. One follows the liquid surface speed, zero removes ordinary downstream Foam travel, and values above one make Foam respond faster than the visible water. This is the base speed input for the unified Foam velocity contract.")]
         [Range(
-            MinimumFoamMaterialFlowSpeedMultiplier,
-            MaximumFoamMaterialFlowSpeedMultiplier)]
+            MinimumFoamDownstreamSpeedRatio,
+            MaximumFoamDownstreamSpeedRatio)]
         [SerializeField]
         private float foamMaterialFlowSpeedMultiplier =
-            DefaultFoamMaterialFlowSpeedMultiplier;
+            DefaultFoamDownstreamSpeedRatio;
 
         // Legacy serialized fields retained only to avoid scene/prefab
         // serialization churn. Persistent stored-state surface morphing was
@@ -1330,40 +1339,63 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField, HideInInspector]
         private int foamSurfaceMorphCalibrationVersion;
 
-        [Tooltip("Strength of the generated dense Foam Motion Field intent/debug texture. The field is currently used for visualization and future routing/deformation work; it does not currently move persistent Foam material.")]
+        // The legacy serialized field names below are retained to avoid scene
+        // and prefab churn. Patch 4.11C.5.16A changes their authored meaning
+        // from arbitrary lateral cells / field wraps into physical velocity
+        // ratios used by one canonical Foam velocity contract.
+        [Tooltip("Maximum signed lateral Foam speed as a ratio of the base downstream Foam speed. A value of 0.22 permits left/right motion up to 22% of the base downstream speed. This contract is validated by the Motion Field view but does not move stored material until conservative 2D transport is implemented.")]
         [Range(
-            MinimumFoamMotionFieldStrength,
-            MaximumFoamMotionFieldStrength)]
+            MinimumFoamMaximumLateralSpeedRatio,
+            MaximumFoamMaximumLateralSpeedRatio)]
         [SerializeField]
         private float foamMotionFieldStrength =
-            DefaultFoamMotionFieldStrength;
+            LegacyDefaultFoamMotionFieldStrength;
 
-        [Tooltip("Scroll rate for the generated dense Foam Motion Field intent/debug texture in complete downstream wraps per second. This is a UV/sample phase offset for the field texture, not active persistent Foam material motion and not a field rebuild rate. The default 0.01 means one full wrap every 100 seconds.")]
+        [Tooltip("Downstream advection speed of the generated lateral route pattern relative to the base downstream Foam speed. Zero keeps routes fixed in river space; one moves the lane pattern downstream at the base Foam speed. This is a sample-coordinate phase motion, not a field rebuild and not stored-material transport.")]
         [Range(
-            MinimumFoamMotionFieldScrollHz,
-            MaximumFoamMotionFieldScrollHz)]
+            MinimumFoamLaneAdvectionRatio,
+            MaximumFoamLaneAdvectionRatio)]
         [SerializeField]
         private float foamMotionFieldScrollHz =
-            DefaultFoamMotionFieldScrollHz;
+            LegacyDefaultFoamMotionFieldScrollHz;
 
-        [Tooltip("Approximate fraction of the generated dense Foam Motion Field intent/debug texture that resolves to neutral/no lateral direction. Changing this regenerates the lane texture only; it does not add per-frame cost or activate lateral material transport.")]
+        [Tooltip("Approximate fraction of the generated lateral route field compressed toward very low lateral intent. These regions still move downstream and are not true stagnant water. Changing this regenerates the lane texture only.")]
         [Range(
-            MinimumFoamMotionFieldNeutralCoverage,
-            MaximumFoamMotionFieldNeutralCoverage)]
+            MinimumFoamLowLateralMotionCoverage,
+            MaximumFoamLowLateralMotionCoverage)]
         [SerializeField]
         private float foamMotionFieldNeutralCoverage =
-            DefaultFoamMotionFieldNeutralCoverage;
+            DefaultFoamLowLateralMotionCoverage;
 
-        [Tooltip("Feature scale for the generated dense Foam Motion Field intent/debug lanes. Lower values produce broader lanes; higher values produce finer lanes. Changing this regenerates the lane texture only; it does not add per-frame cost or activate lateral material transport.")]
+        [Tooltip("Feature scale of coherent left/right routing regions. Lower values produce broader routes; higher values produce finer routes. Changing this regenerates the lane texture only.")]
         [Range(
-            MinimumFoamMotionFieldLaneScale,
-            MaximumFoamMotionFieldLaneScale)]
+            MinimumFoamLateralRouteScale,
+            MaximumFoamLateralRouteScale)]
         [SerializeField]
         private float foamMotionFieldLaneScale =
-            DefaultFoamMotionFieldLaneScale;
+            DefaultFoamLateralRouteScale;
+
+        [Tooltip("How strongly obstacle-routing influence reduces local downstream Foam speed. Zero preserves full downstream speed around obstacles; one permits the strongest authored slowdown.")]
+        [Range(
+            MinimumFoamObstacleSlowdownStrength,
+            MaximumFoamObstacleSlowdownStrength)]
+        [SerializeField]
+        private float foamObstacleSlowdownStrength =
+            DefaultFoamObstacleSlowdownStrength;
+
+        [Tooltip("Minimum downstream-speed factor at maximum obstacle slowdown. Zero permits temporary local stagnation; one disables downstream slowdown. Downstream speed is always clamped nonnegative.")]
+        [Range(
+            MinimumFoamObstacleMinimumDownstreamFactor,
+            MaximumFoamObstacleMinimumDownstreamFactor)]
+        [SerializeField]
+        private float foamObstacleMinimumDownstreamFactor =
+            DefaultFoamObstacleMinimumDownstreamFactor;
 
         [SerializeField, HideInInspector]
         private int foamMaterialLifecycleTuningVersion;
+
+        [SerializeField, HideInInspector]
+        private int foamVelocityTuningVersion;
 
         [Tooltip("Lit, non-emissive Foam tint. The alpha channel controls maximum Foam opacity, so no separate opacity control is required.")]
         [SerializeField] private Color foamColour =
@@ -2274,31 +2306,41 @@ namespace ProgrammaticStylized3D.Rivers
                 foamNegativeAgingRate,
                 MinimumFoamNegativeAgingRate,
                 MaximumFoamNegativeAgingRate);
-        public float FoamMaterialFlowSpeedMultiplier =>
+        public float FoamDownstreamSpeedRatio =>
             Mathf.Clamp(
                 foamMaterialFlowSpeedMultiplier,
-                MinimumFoamMaterialFlowSpeedMultiplier,
-                MaximumFoamMaterialFlowSpeedMultiplier);
-        public float FoamMotionFieldStrength =>
+                MinimumFoamDownstreamSpeedRatio,
+                MaximumFoamDownstreamSpeedRatio);
+        public float FoamMaximumLateralSpeedRatio =>
             Mathf.Clamp(
                 foamMotionFieldStrength,
-                MinimumFoamMotionFieldStrength,
-                MaximumFoamMotionFieldStrength);
-        public float FoamMotionFieldScrollHz =>
+                MinimumFoamMaximumLateralSpeedRatio,
+                MaximumFoamMaximumLateralSpeedRatio);
+        public float FoamLaneAdvectionRatio =>
             Mathf.Clamp(
                 foamMotionFieldScrollHz,
-                MinimumFoamMotionFieldScrollHz,
-                MaximumFoamMotionFieldScrollHz);
-        public float FoamMotionFieldNeutralCoverage =>
+                MinimumFoamLaneAdvectionRatio,
+                MaximumFoamLaneAdvectionRatio);
+        public float FoamLowLateralMotionCoverage =>
             Mathf.Clamp(
                 foamMotionFieldNeutralCoverage,
-                MinimumFoamMotionFieldNeutralCoverage,
-                MaximumFoamMotionFieldNeutralCoverage);
-        public float FoamMotionFieldLaneScale =>
+                MinimumFoamLowLateralMotionCoverage,
+                MaximumFoamLowLateralMotionCoverage);
+        public float FoamLateralRouteScale =>
             Mathf.Clamp(
                 foamMotionFieldLaneScale,
-                MinimumFoamMotionFieldLaneScale,
-                MaximumFoamMotionFieldLaneScale);
+                MinimumFoamLateralRouteScale,
+                MaximumFoamLateralRouteScale);
+        public float FoamObstacleSlowdownStrength =>
+            Mathf.Clamp(
+                foamObstacleSlowdownStrength,
+                MinimumFoamObstacleSlowdownStrength,
+                MaximumFoamObstacleSlowdownStrength);
+        public float FoamObstacleMinimumDownstreamFactor =>
+            Mathf.Clamp(
+                foamObstacleMinimumDownstreamFactor,
+                MinimumFoamObstacleMinimumDownstreamFactor,
+                MaximumFoamObstacleMinimumDownstreamFactor);
         public Color FoamColour => foamColour;
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
         public float FoamSpawnDistanceNormalized =>
@@ -2823,6 +2865,7 @@ namespace ProgrammaticStylized3D.Rivers
         private void OnEnable()
         {
             MigrateFoamMaterialLifecycleTuningIfRequired();
+            MigrateFoamVelocityTuningIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -2946,14 +2989,52 @@ namespace ProgrammaticStylized3D.Rivers
             foamSupportedAgingRate = DefaultFoamSupportedAgingRate;
             foamNegativeAgingRate = DefaultFoamNegativeAgingRate;
             foamMaterialFlowSpeedMultiplier =
-                DefaultFoamMaterialFlowSpeedMultiplier;
+                DefaultFoamDownstreamSpeedRatio;
             foamMaterialLifecycleTuningVersion =
                 CurrentFoamMaterialLifecycleTuningVersion;
+        }
+
+        private void MigrateFoamVelocityTuningIfRequired()
+        {
+            if (foamVelocityTuningVersion >= CurrentFoamVelocityTuningVersion)
+            {
+                return;
+            }
+
+            // Legacy Motion Field Strength was an arbitrary cell displacement
+            // scalar whose accepted baseline was one. Preserve authored relative
+            // strength while converting that baseline to a physical speed ratio.
+            float legacyStrength = Mathf.Max(0f, foamMotionFieldStrength);
+            foamMotionFieldStrength = Mathf.Clamp(
+                legacyStrength *
+                (DefaultFoamMaximumLateralSpeedRatio /
+                 LegacyDefaultFoamMotionFieldStrength),
+                MinimumFoamMaximumLateralSpeedRatio,
+                MaximumFoamMaximumLateralSpeedRatio);
+
+            // Legacy scroll was expressed in full-field wraps per second and
+            // therefore changed physical speed with river length. Preserve the
+            // accepted 0.01 baseline as a 0.60 advection ratio; all future
+            // scrolling is resolved from physical Foam speed and cell spacing.
+            float legacyScrollHz = Mathf.Max(0f, foamMotionFieldScrollHz);
+            foamMotionFieldScrollHz = Mathf.Clamp(
+                legacyScrollHz *
+                (DefaultFoamLaneAdvectionRatio /
+                 LegacyDefaultFoamMotionFieldScrollHz),
+                MinimumFoamLaneAdvectionRatio,
+                MaximumFoamLaneAdvectionRatio);
+
+            foamObstacleSlowdownStrength =
+                DefaultFoamObstacleSlowdownStrength;
+            foamObstacleMinimumDownstreamFactor =
+                DefaultFoamObstacleMinimumDownstreamFactor;
+            foamVelocityTuningVersion = CurrentFoamVelocityTuningVersion;
         }
 
         private void OnValidate()
         {
             MigrateFoamMaterialLifecycleTuningIfRequired();
+            MigrateFoamVelocityTuningIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
@@ -4234,24 +4315,32 @@ namespace ProgrammaticStylized3D.Rivers
                 MaximumFoamNegativeAgingRate);
             foamMaterialFlowSpeedMultiplier = Mathf.Clamp(
                 foamMaterialFlowSpeedMultiplier,
-                MinimumFoamMaterialFlowSpeedMultiplier,
-                MaximumFoamMaterialFlowSpeedMultiplier);
+                MinimumFoamDownstreamSpeedRatio,
+                MaximumFoamDownstreamSpeedRatio);
             foamMotionFieldStrength = Mathf.Clamp(
                 foamMotionFieldStrength,
-                MinimumFoamMotionFieldStrength,
-                MaximumFoamMotionFieldStrength);
+                MinimumFoamMaximumLateralSpeedRatio,
+                MaximumFoamMaximumLateralSpeedRatio);
             foamMotionFieldScrollHz = Mathf.Clamp(
                 foamMotionFieldScrollHz,
-                MinimumFoamMotionFieldScrollHz,
-                MaximumFoamMotionFieldScrollHz);
+                MinimumFoamLaneAdvectionRatio,
+                MaximumFoamLaneAdvectionRatio);
             foamMotionFieldNeutralCoverage = Mathf.Clamp(
                 foamMotionFieldNeutralCoverage,
-                MinimumFoamMotionFieldNeutralCoverage,
-                MaximumFoamMotionFieldNeutralCoverage);
+                MinimumFoamLowLateralMotionCoverage,
+                MaximumFoamLowLateralMotionCoverage);
             foamMotionFieldLaneScale = Mathf.Clamp(
                 foamMotionFieldLaneScale,
-                MinimumFoamMotionFieldLaneScale,
-                MaximumFoamMotionFieldLaneScale);
+                MinimumFoamLateralRouteScale,
+                MaximumFoamLateralRouteScale);
+            foamObstacleSlowdownStrength = Mathf.Clamp(
+                foamObstacleSlowdownStrength,
+                MinimumFoamObstacleSlowdownStrength,
+                MaximumFoamObstacleSlowdownStrength);
+            foamObstacleMinimumDownstreamFactor = Mathf.Clamp(
+                foamObstacleMinimumDownstreamFactor,
+                MinimumFoamObstacleMinimumDownstreamFactor,
+                MaximumFoamObstacleMinimumDownstreamFactor);
             foamColour.a = Mathf.Clamp01(foamColour.a);
             foamSpawnDistanceNormalized = Mathf.Clamp01(
                 foamSpawnDistanceNormalized);
