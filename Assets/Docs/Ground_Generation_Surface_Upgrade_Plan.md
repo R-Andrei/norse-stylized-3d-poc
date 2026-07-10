@@ -1,6 +1,48 @@
 # Ground Generation Surface Upgrade Plan
 
 
+### 2026-07-11 — Patch V3J.3C1: Ridge Readability Calibration Candidate
+
+V3J.3C removed the rejected broad apron and stayed within budget, but its gameplay-camera validation failed: default and increased Fold Height settings still read mainly as flat dark scratches. V3J.3C1 is the current **unvalidated implementation candidate** used to decide whether narrow secondary geometry remains viable.
+
+Implemented calibration scope:
+
+```text
+descriptor generation:
+  unchanged
+
+projected/debug texture rasterization:
+  unchanged
+
+ridge longitudinal samples:
+  minimum 7, locally interpolated from the existing descriptor
+
+ridge cross samples:
+  5
+
+proof Fold Height range:
+  0–0.15 m; no serialized default or style-asset change
+
+proof material:
+  neutral mid-value URP lit material
+  shadow casting remains disabled
+
+controlled test heights:
+  0.02 m
+  0.06 m
+  0.12 m
+```
+
+For the current 36 strokes with five descriptor points, topology remains exactly 1,260 vertices and 1,728 triangles. The expanded diagnostic reports actual generated height/width ranges, longitudinal resolution, material state, topology, memory, and timing.
+
+Decision gate:
+
+- pass only if a restrained height is clearly raised from the normal gameplay camera without reading as a root, wall, blade, or obstacle;
+- fail if useful readability appears only at `0.12 m` or similarly intrusive dimensions;
+- on failure, stop increasing geometric complexity and return to descriptor-driven projected rendering.
+
+Do not promote this candidate or begin V3J.3D descriptor/texture separation until the user validates the controlled height test.
+
 ### 2026-07-10 — Patch V3J.3C: Narrow Static Secondary Ridge Reconciliation
 
 V3J.3C is the active implementation patch. It keeps the validated V3J.3A4 stroke distribution and orientation unchanged and replaces only the V3J.3B broad visible fold footprint.

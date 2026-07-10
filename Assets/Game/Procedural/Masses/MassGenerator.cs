@@ -3440,6 +3440,198 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
+
+        private static void NormalizeChamferSourceBoundaryLoops(
+            List<ChamferSourceBoundaryRecord> records,
+            Dictionary<TopologyEdgeKey, int> useCounts,
+            HashSet<TopologyEdgeKey> expectedVertexBoundaryEdges,
+            List<ChamferProvisionalSegmentRecord> segments,
+            ref ChamferEmissionStats stats)
+        {
+            Dictionary<int, List<ChamferSourceBoundaryRecord>> recordsByLoop =
+                new Dictionary<int, List<ChamferSourceBoundaryRecord>>();
+            for (int i = 0; i < records.Count; i++)
+            {
+                ChamferSourceBoundaryRecord record = records[i];
+                stats.RawSourceBoundaryDescendantCount +=
+                    record.Children.Count;
+                if (!recordsByLoop.TryGetValue(
+                        record.BoundaryLoopIndex,
+                        out List<ChamferSourceBoundaryRecord> loopRecords))
+                {
+                    loopRecords = new List<ChamferSourceBoundaryRecord>();
+                    recordsByLoop.Add(
+                        record.BoundaryLoopIndex,
+                        loopRecords);
+                }
+                loopRecords.Add(record);
+            }
+
+            List<int> loopIndices =
+                new List<int>(recordsByLoop.Keys);
+            loopIndices.Sort();
+            for (int loopIndex = 0;
+                 loopIndex < loopIndices.Count;
+                 loopIndex++)
+            {
+                int boundaryLoopIndex = loopIndices[loopIndex];
+                List<ChamferSourceBoundaryRecord> loopRecords =
+                    recordsByLoop[boundaryLoopIndex];
+                loopRecords.Sort((left, right) =>
+                    left.BoundaryOrder.CompareTo(right.BoundaryOrder));
+                bool validOrder = true;
+                for (int i = 0; i < loopRecords.Count; i++)
+                {
+                    if (loopRecords[i].BoundaryOrder == i)
+                    {
+                        continue;
+                    }
+                    validOrder = false;
+                    stats.SourceBoundaryLoopNormalizationFailureCount++;
+                    Debug.LogWarning(
+                        "GeneratedMass edge wear source-boundary loop " +
+                        "normalization found invalid boundary order. loop=" +
+                        boundaryLoopIndex +
+                        ", expectedOrder=" + i +
+                        ", actualOrder=" +
+                        loopRecords[i].BoundaryOrder);
+                    break;
+                }
+                if (!validOrder)
+                {
+                    continue;
+                }
+
+                while (true)
+                {
+                    List<ChamferSourceBoundaryChildLocation> children =
+                        new List<ChamferSourceBoundaryChildLocation>();
+                    for (int recordIndex = 0;
+                         recordIndex < loopRecords.Count;
+                         recordIndex++)
+                    {
+                        ChamferSourceBoundaryRecord record =
+                            loopRecords[recordIndex];
+                        for (int childIndex = 0;
+                             childIndex < record.Children.Count;
+                             childIndex++)
+                        {
+                            children.Add(
+                                new ChamferSourceBoundaryChildLocation(
+                                    record,
+                                    childIndex,
+                                    record.Children[childIndex]));
+                        }
+                    }
+                    if (children.Count < 2)
+                    {
+                        break;
+                    }
+
+                    bool removedPair = false;
+                    bool rejectedPair = false;
+                    for (int i = 0; i < children.Count; i++)
+                    {
+                        ChamferSourceBoundaryChildLocation first =
+                            children[i];
+                        ChamferSourceBoundaryChildLocation second =
+                            children[(i + 1) % children.Count];
+                        VertexKey firstStart =
+                            new VertexKey(first.Child.Start);
+                        VertexKey firstEnd =
+                            new VertexKey(first.Child.End);
+                        VertexKey secondStart =
+                            new VertexKey(second.Child.Start);
+                        VertexKey secondEnd =
+                            new VertexKey(second.Child.End);
+                        bool exactInverse =
+                            firstStart.Equals(secondEnd) &&
+                            firstEnd.Equals(secondStart) &&
+                            first.Child.Key.Equals(second.Child.Key);
+                        if (!exactInverse)
+                        {
+                            continue;
+                        }
+
+                        int useCount = useCounts.TryGetValue(
+                            first.Child.Key,
+                            out int count)
+                            ? count
+                            : 0;
+                        int distinctFaceRecords =
+                            CountDistinctChamferFaceRecords(
+                                segments,
+                                first.Child.Key);
+                        bool vertexOwned =
+                            expectedVertexBoundaryEdges.Contains(
+                                first.Child.Key);
+                        if (useCount != 2 ||
+                            distinctFaceRecords != 2 ||
+                            vertexOwned)
+                        {
+                            stats.SourceBoundaryLoopNormalizationFailureCount++;
+                            Debug.LogWarning(
+                                "GeneratedMass edge wear source-boundary loop " +
+                                "normalization rejected inverse pair. loop=" +
+                                boundaryLoopIndex +
+                                ", firstOrder=" +
+                                first.Record.BoundaryOrder +
+                                ", firstChild=" + first.ChildIndex +
+                                ", secondOrder=" +
+                                second.Record.BoundaryOrder +
+                                ", secondChild=" + second.ChildIndex +
+                                ", start=" +
+                                first.Child.Start.ToString("F4") +
+                                ", end=" +
+                                first.Child.End.ToString("F4") +
+                                ", uses=" + useCount +
+                                ", distinctFaceRecords=" +
+                                distinctFaceRecords +
+                                ", vertexOwned=" +
+                                (vertexOwned ? 1 : 0));
+                            rejectedPair = true;
+                            break;
+                        }
+
+                        if (object.ReferenceEquals(
+                                first.Record,
+                                second.Record))
+                        {
+                            int highIndex = Mathf.Max(
+                                first.ChildIndex,
+                                second.ChildIndex);
+                            int lowIndex = Mathf.Min(
+                                first.ChildIndex,
+                                second.ChildIndex);
+                            first.Record.Children.RemoveAt(highIndex);
+                            first.Record.Children.RemoveAt(lowIndex);
+                        }
+                        else
+                        {
+                            first.Record.Children.RemoveAt(
+                                first.ChildIndex);
+                            second.Record.Children.RemoveAt(
+                                second.ChildIndex);
+                        }
+                        stats.SourceBoundaryLoopRetracePairCount++;
+                        stats.SourceBoundaryLoopRetraceChildCount += 2;
+                        removedPair = true;
+                        break;
+                    }
+                    if (!removedPair || rejectedPair)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            for (int i = 0; i < records.Count; i++)
+            {
+                stats.NormalizedSourceBoundaryDescendantCount +=
+                    records[i].Children.Count;
+            }
+        }
+
         private static HashSet<TopologyEdgeKey>
             AuditChamferSourceBoundaryOwnership(
                 List<ChamferSourceBoundaryRecord> records,
@@ -4866,6 +5058,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             stats.ExpectedVertexBoundaryEdgeCount =
                 expectedVertexBoundaryEdges.Count;
 
+            NormalizeChamferSourceBoundaryLoops(
+                sourceBoundaryRecords,
+                useCounts,
+                expectedVertexBoundaryEdges,
+                finalSegments,
+                ref stats);
+
             HashSet<TopologyEdgeKey> expectedSourceBoundaryEdges =
                 AuditChamferSourceBoundaryOwnership(
                     sourceBoundaryRecords,
@@ -4947,6 +5146,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 stats.SourceBoundaryTerminalTransferFailureCount > 0 ||
                 stats.SourceBoundaryChildIncidenceFailureCount > 0 ||
                 stats.SourceBoundaryDuplicateChildKeyFailureCount > 0 ||
+                stats.SourceBoundaryLoopNormalizationFailureCount > 0 ||
                 stats.VertexBoundaryBranchFailureCount > 0 ||
                 stats.VertexBoundaryDuplicateFailureCount > 0)
             {
@@ -8312,6 +8512,23 @@ private readonly struct EdgeWearTopologyStats
             }
         }
 
+        private readonly struct ChamferSourceBoundaryChildLocation
+        {
+            public readonly ChamferSourceBoundaryRecord Record;
+            public readonly int ChildIndex;
+            public readonly ChamferSourceBoundaryChild Child;
+
+            public ChamferSourceBoundaryChildLocation(
+                ChamferSourceBoundaryRecord record,
+                int childIndex,
+                ChamferSourceBoundaryChild child)
+            {
+                Record = record;
+                ChildIndex = childIndex;
+                Child = child;
+            }
+        }
+
         private sealed class ChamferSourceBoundaryRecord
         {
             public readonly int SourceEdgeIndex;
@@ -8581,6 +8798,11 @@ private readonly struct EdgeWearTopologyStats
             public int BevelStripTriangleEstimate;
             public int SharedInternalEdgeSpanCount;
             public int SourceBoundaryRecordCount;
+            public int RawSourceBoundaryDescendantCount;
+            public int SourceBoundaryLoopRetracePairCount;
+            public int SourceBoundaryLoopRetraceChildCount;
+            public int NormalizedSourceBoundaryDescendantCount;
+            public int SourceBoundaryLoopNormalizationFailureCount;
             public int SourceBoundaryDescendantCount;
             public int SourceBoundaryTerminalChildTransferCount;
             public int SourceBoundaryTerminalChildTransferredCount;
@@ -8660,6 +8882,11 @@ private readonly struct EdgeWearTopologyStats
                     ", bevelStripTriangleEstimate=" + BevelStripTriangleEstimate +
                     ", sharedInternalEdgeSpans=" + SharedInternalEdgeSpanCount +
                     ", sourceBoundaryRecords=" + SourceBoundaryRecordCount +
+                    ", rawSourceBoundaryDescendants=" + RawSourceBoundaryDescendantCount +
+                    ", sourceBoundaryLoopRetracePairsRemoved=" + SourceBoundaryLoopRetracePairCount +
+                    ", sourceBoundaryLoopRetraceChildrenRemoved=" + SourceBoundaryLoopRetraceChildCount +
+                    ", normalizedSourceBoundaryDescendants=" + NormalizedSourceBoundaryDescendantCount +
+                    ", sourceBoundaryLoopNormalizationFailures=" + SourceBoundaryLoopNormalizationFailureCount +
                     ", sourceBoundaryDescendants=" + SourceBoundaryDescendantCount +
                     ", sourceBoundaryTerminalChildren=" + SourceBoundaryTerminalChildTransferCount +
                     ", sourceBoundaryTerminalChildrenTransferred=" + SourceBoundaryTerminalChildTransferredCount +

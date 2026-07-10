@@ -248,6 +248,33 @@ EW-C — Explicit Single-Segment Chamfer Kernel
 - [ ] `provisionalNonManifoldEdges=0`, `provisionalTJunctions=0`, and `tJunctionRecordsIncompatible=0` remain true.
 - [ ] Geometry commit remains disabled.
 
+## EW-C2S6R1 — Source-boundary loop retrace normalization
+
+- [x] Group explicit source-boundary records by boundary-loop identity.
+- [x] Order every loop by boundary order and child index.
+- [x] Detect exact adjacent inverse children by existing `VertexKey` identity and equal `TopologyEdgeKey`.
+- [x] Include the cyclic last/first loop seam.
+- [x] Require exactly two provisional uses on two distinct face records.
+- [x] Reject cancellation when the key has expected vertex-boundary ownership.
+- [x] Repeat only while a strictly guarded inverse pair is removed.
+- [x] Add raw, removed-pair, removed-child, normalized, and normalization-failure counters.
+- [x] Keep invalid loop order and rejected inverse-pair guards as hard failures.
+- [x] Keep candidate selection, width solving, face geometry, bevel strips, T-junction segmentation, vertex patches, and geometry commit unchanged.
+
+### Exit criteria
+
+- [ ] Unity compiles without errors.
+- [ ] All objects report `sourceBoundaryLoopNormalizationFailures=0`.
+- [ ] The three previously blocked objects report guarded retrace removals.
+- [ ] All objects report `sourceBoundaryChildIncidenceFailures=0`.
+- [ ] All objects report `sourceBoundaryDuplicateChildKeyFailures=0`.
+- [ ] All objects report `sourceBoundaryTerminalTransferFailures=0`.
+- [ ] All objects report `expectedSourceBoundaryEdges=matchedSourceBoundaryEdges`.
+- [ ] Candidate, active/deferred, replacement-face, and bevel-strip counts remain unchanged per object.
+- [ ] `provisionalNonManifoldEdges=0`, `provisionalTJunctions=0`, and `tJunctionRecordsIncompatible=0` remain true.
+- [ ] All 24 representative masses report `readyForVertexPatches=1`.
+- [ ] Geometry commit remains disabled.
+
 ## EW-C3 — Crude vertex-run patches
 
 - [ ] Emit a centre fan for a closed selected run.

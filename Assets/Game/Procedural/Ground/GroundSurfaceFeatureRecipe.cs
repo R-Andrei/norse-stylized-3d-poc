@@ -81,7 +81,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private float paintedAccentStrokeAngleJitterDegrees = 18f;
 
         [Tooltip("Painted Accent Lines only. Maximum raised height in metres for the narrow secondary ridge. Height is applied along the sampled ground normal and tapers into the ground at both side boundaries and both ends.")]
-        [Range(0f, 0.05f)]
+        [Range(0f, 0.15f)]
         [SerializeField]
         private float paintedAccentFoldHeight = 0.018f;
 
@@ -156,7 +156,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Mathf.Clamp(paintedAccentStrokeAngleJitterDegrees, 0f, 30f);
 
         public float PaintedAccentFoldHeight =>
-            Mathf.Clamp(paintedAccentFoldHeight, 0f, 0.05f);
+            Mathf.Clamp(paintedAccentFoldHeight, 0f, 0.15f);
 
         public float PaintedAccentFoldIrregularity =>
             Mathf.Clamp01(paintedAccentFoldIrregularity);

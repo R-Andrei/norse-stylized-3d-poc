@@ -2,7 +2,7 @@
 
 ## Status
 
-EW-C is the active recovery architecture. EW-B is rejected and removed from active code. EW-C0 topology readiness and EW-C1 solved-corner/rail readiness are validated. EW-C2S6 keeps the validated positive-width network, shared-span face construction, guarded segmentation, exact face-local retrace normalization, and incidence-based internal closure, then replaces spatial-key-only source-boundary ownership with explicit ordered source-edge descendant records. Geometry remains provisional and uncommitted.
+EW-C is the active recovery architecture. EW-B is rejected and removed from active code. EW-C0 topology readiness and EW-C1 solved-corner/rail readiness are validated. EW-C2S6R1 keeps the validated positive-width network, shared-span face construction, guarded segmentation, exact face-local retrace normalization, incidence-based internal closure, and explicit ordered source-edge descendant records, then removes strictly guarded zero-boundary retraces from each ordered source-boundary loop before ownership audit. Geometry remains provisional and uncommitted.
 
 The target is a **crude, single-segment physical chamfer**, not a general-purpose smooth bevel modifier.
 
@@ -313,6 +313,14 @@ subdivided source edge:    first and last children are source-vertex transitions
 
 A terminal transition candidate with exactly two provisional uses on two distinct face records transfers to source-vertex ownership and is excluded from the expected open set. A terminal candidate with exactly one use and no vertex-boundary registration remains source-boundary-owned. Every non-terminal or unsplit expected source-boundary child must likewise have exactly one use and no vertex-boundary ownership overlap. Duplicate child keys, bad terminal incidence, source/vertex ownership overlap, or non-unit open-child incidence fail the gate. Diagnostics identify source edge, loop, boundary order, child index, endpoints, use count, and terminal flags.
 
+### EW-C2S6R1 — Source-boundary loop retrace normalization
+
+EW-C2S6 validation reached 21 of 24 objects ready for vertex patches. The three blocked objects had exact open-edge accounting and zero generic topology failures, but adjacent ordered source-boundary children described the same topology edge in opposite directions. Sequential EW-C2S6 auditing classified the first child as a two-use incidence failure and the inverse child as a duplicate key.
+
+After final edge-use reconstruction and vertex-boundary normalization, EW-C2S6R1 flattens each loop in `(BoundaryOrder, child index)` order and reduces exact adjacent inverse pairs, including the cyclic last/first seam. Cancellation requires exact reversed `VertexKey` endpoints, an identical `TopologyEdgeKey`, exactly two provisional uses, two distinct provisional face records, and no expected vertex-boundary ownership. The reducer repeats only while a guarded pair is removed.
+
+The reducer changes only source-boundary ownership records. It does not move vertices, alter provisional faces, change width solving, defer candidates, modify replacement faces or bevel strips, weaken T-junction or non-manifold audits, emit vertex patches, or enable geometry commit. Invalid loop ordering and inverse pairs that fail any guard increment `sourceBoundaryLoopNormalizationFailures` and remain hard blockers.
+
 ### EW-C3 — Crude vertex-run patches
 
 Close each selected run with a centre fan or source-apex fan. Preserve the source boundary set and reject new boundaries, non-manifold edges, or T-junctions.
@@ -368,8 +376,9 @@ The provisional geometry is discarded after audit. EW-C3 is the first stage allo
 
 ## Next work items
 
-1. Compile and validate EW-C2S6 across all 24 placed masses.
-2. Confirm every terminal source-boundary child is classified only as one-use open or two-distinct-face transferred.
-3. Confirm every expected open descendant has one use and no vertex-boundary ownership overlap.
+1. Compile and validate EW-C2S6R1 across all 24 placed masses.
+2. Confirm raw and normalized descendant counters explain every guarded inverse-pair removal.
+3. Confirm `sourceBoundaryLoopNormalizationFailures=0` and all existing source-boundary ownership failures are zero.
 4. Require all 24 objects to report exact source-boundary matching and `readyForVertexPatches=1`.
-5. Begin EW-C3 only after that complete EW-C2 validation passes.
+5. Confirm the selected-edge network and emitted replacement/strip counts are unchanged.
+6. Begin EW-C3 only after that complete EW-C2 validation passes.
