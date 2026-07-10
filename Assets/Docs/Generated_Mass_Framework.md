@@ -3,7 +3,7 @@
 ## Status
 
 - **Active edge-wear architecture:** EW-C — Explicit Single-Segment Chamfer Kernel
-- **Current implementation step:** EW-C2S6 — Explicit source-boundary descendant ownership
+- **Current implementation step:** EW-C2S6R1 — Source-boundary loop retrace normalization
 - **Geometry emission:** provisional build and audit only; final geometry commit remains disabled
 
 ## Feature goal
@@ -151,6 +151,19 @@ A subdivided source-boundary edge has two terminal transition children touching 
 
 The provisional topology must contain no unexpected openings, no missing expected vertex-patch boundaries, no non-manifold edges, and no T-junctions. Normal operation emits one readiness summary, one corner summary, and one provisional-emission summary. Intermediate per-pair segmentation logs are suppressed; a failed final topology audit emits one deduplicated warning containing at most three actionable records. The face list is discarded after audit and the original source mass remains the rendered geometry.
 
+## EW-C2S6R1 source-boundary loop retrace normalization
+
+EW-C2S6 validation executed across all 24 placed masses and reached `readyForVertexPatches=1` on 21 objects. The three remaining source-boundary objects retained zero non-manifold edges, zero T-junctions, zero unexpected provisional openings, and zero missing vertex boundaries, but reported paired source-child incidence and duplicate-child-key failures. Their warnings contain adjacent children in the same ordered source-boundary loop with exact inverse `VertexKey` endpoints:
+
+```text
+A -> B
+B -> A
+```
+
+These two children describe a zero-boundary excursion, not two open source-boundary descendants. EW-C2S6R1 normalizes each boundary loop after split application, final provisional edge-use reconstruction, and vertex-boundary normalization. Records are ordered by `BoundaryLoopIndex`, then `BoundaryOrder`, then child index. Adjacent exact inverse children, including the cyclic last/first pair, are removed from the source-boundary ownership walk only when their shared topology key has exactly two provisional uses on two distinct face records and has no expected vertex-boundary ownership.
+
+The pass moves no coordinates, changes no candidate or width decisions, and modifies no provisional face geometry. A malformed loop order or an inverse pair that fails its incidence, face-provenance, or ownership guards remains a hard failure. Diagnostics report raw descendants, removed retrace pairs and children, normalized descendants, and normalization failures. Geometry remains provisional and final commit remains disabled.
+
 ## Validation invariant
 
 Let `B_source` be the preserved source-boundary edge set and `B_output` the output-boundary set.
@@ -211,8 +224,10 @@ Chamfer topology is generated before gameplay and cached with the generated mass
 
 ## Next work items
 
-1. Compile and validate EW-C2S6 across all 24 placed masses.
-2. Confirm the three boundary-loop objects report exact explicit descendant ownership with zero terminal-transfer or child-incidence failures.
-3. Require all 24 objects to report `expectedSourceBoundaryEdges=matchedSourceBoundaryEdges` and `readyForVertexPatches=1`.
-4. Keep geometry provisional and commit disabled during this validation.
-5. Begin EW-C3 only after the complete representative sample passes the final EW-C2 gate.
+1. Compile and validate EW-C2S6R1 across all 24 placed masses.
+2. Confirm the three boundary-loop objects report non-zero guarded retrace removals and `sourceBoundaryLoopNormalizationFailures=0`.
+3. Require every object to report zero source-boundary incidence, duplicate-key, and terminal-transfer failures.
+4. Require all 24 objects to report `expectedSourceBoundaryEdges=matchedSourceBoundaryEdges` and `readyForVertexPatches=1`.
+5. Confirm candidate, active/deferred, replacement-face, and bevel-strip counts remain unchanged.
+6. Keep geometry provisional and commit disabled during validation.
+7. Begin EW-C3 only after the complete representative sample passes the final EW-C2 gate.
