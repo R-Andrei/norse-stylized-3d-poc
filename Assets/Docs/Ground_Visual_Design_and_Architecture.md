@@ -10,6 +10,84 @@ implementation_documents:
   - Ground_Generation_Surface_Upgrade_Plan.md
 ---
 
+### 2026-07-10 — Patch V3J.3C: Narrow Static Secondary Ridge Reconciliation
+
+V3J.3C resolves the V3J.3B decision gate. The active Painted Accent representation candidate is now a **separate, visual-only, narrow open ridge mesh** generated from the validated deterministic 3D surface-stroke descriptors. The existing `GeneratedGround` mesh and `MeshCollider` are immutable for this feature.
+
+Canonical ownership and lifecycle:
+
+```text
+base GeneratedGround mesh:
+  never displaced, retopologized, or replaced by Painted Accent work
+
+base ground collider:
+  never modified by Painted Accent work
+
+secondary Painted Accent ridge mesh:
+  one combined child mesh per ground chunk
+  visual only
+  no collider
+  no end caps or underside
+  shadow casting disabled
+  one shared material
+  generated only during editor authoring or camp/run loading
+  static during gameplay
+
+projected fold-field texture/shader path:
+  retained as debug/support and as fallback only
+  must become optional if secondary geometry is accepted
+```
+
+The visible ridge footprint comes only from `Painted Accent Stroke Width`. `GroundPaintedAccentSurfaceStroke.BodyWidth` remains available for the optional projected/debug fold-field texture, but it does not widen the secondary mesh. The obsolete `Fold Broadness` field/control is removed entirely because the audit found no remaining texture/debug consumer and its only active effect was to widen the rejected preview footprint.
+
+The ridge uses seven generic samples across `u = -1..1`. Its stochastic Gaussian-basis profile, asymmetric cross-section, slow along-stroke variation, and height end taper remain intact. V3J.3C additionally tapers width at both ends, keeps a small non-zero terminal width to avoid degenerate rings, and embeds the side boundaries plus start/end rings slightly below the sampled ground surface. This creates a narrow open surface rather than a broad terrain apron, closed tube, root, wire, or worm.
+
+The proof renderer contract is:
+
+```text
+child name:
+  __PaintedAccentRidgePreview_Debug
+
+renderer count:
+  one per chunk
+
+material:
+  shared neutral/dark lit debug material
+
+shadows:
+  casts none
+  receives ground/world shadows for form readability
+
+motion vectors:
+  camera-only; no per-object motion tracking
+```
+
+V3J.3C emits one compact explicit-build diagnostic containing stroke count, vertex count, triangle count, estimated vertex/index/raw mesh bytes, and build time. The estimate matches the proof layout: position + normal + UV0, with 16-bit indices unless the mesh exceeds 65,535 vertices. Preview meshes remain CPU-readable because editor rebuild/inspection still needs them; production camp/loading meshes may call `UploadMeshData(true)` after final upload.
+
+V3J.3C deliberately leaves one cleanup boundary: descriptor generation and projected texture rasterization are still coupled inside the current fold-field generator call. V3J.3D must split those paths before production adoption so the secondary-mesh mode can generate descriptors/geometry without allocating or retaining the fallback texture.
+
+Provisional budget:
+
+```text
+per chunk target:
+  <= 1,500 vertices
+  <= 2,000 triangles
+  1 renderer
+  1 shared material
+  0 colliders
+  0 runtime generation
+  0 shadow-caster draw
+
+visibility model:
+  usually 1 visible chunk
+  sometimes 2
+  rarely 3
+  almost never 4
+  never 100 simultaneously visible
+```
+
+A full closed tube is not the default because it adds hidden lower-shell geometry, cylindrical lighting, cap/intersection problems, and root/wire/worm silhouette risk. Projection remains the fallback only if the narrow open ridge fails the gameplay-camera visual test or measured cost becomes unjustifiable.
+
 ### 2026-07-10 — Patch V3J.3B: Stochastic 3D Fold Surface Preview
 
 Patch V3J.3B is the first height/form proof for the accepted 3D-stroke source model. The validated V3J.3A4 layout remains unchanged: strokes are distributed across the whole chunk, their length/density/width are explicit controls, and each stroke is perpendicular to `Facing Direction Degrees` plus a deterministic signed `Angle Jitter Degrees` roll.
@@ -30,18 +108,11 @@ surface(t, u) =
 
 The resulting profile can naturally form one broad rise, an offset rise, a shallow plateau, overlapping low rises, uneven slopes, or a locally flatter section. No code concept such as “left shoulder,” “crest count,” or “right shoulder” exists. Mesh vertices are generic samples of the same formula.
 
-V3J.3B adds four explicit authoring controls:
-
-```text
-Fold Height        -> maximum normal-space height in metres
-Fold Irregularity  -> strength/complexity of smooth stochastic profile variation
-Fold Broadness     -> fold footprint/profile-width multiplier
-Fold End Taper     -> amount of stroke length used to return height to the ground
-```
+V3J.3B originally added four proof controls. V3J.3C retains `Fold Height`, `Fold Irregularity`, and `Fold End Taper`; it removes `Fold Broadness` from author-facing ridge controls because broad-body footprint scaling contradicts the narrow-ridge target. The obsolete broadness field is removed entirely because no remaining generator or shader path consumes it.
 
 The preview uses 11 evenly spaced cross-stroke samples per existing ground-following stroke point, re-samples the base ground height/normal at every lateral vertex, recalculates mesh normals/tangents, and uses a lit debug material so the 3D form can be judged from lighting rather than read as a flat color strip. It remains editor/debug-only: it does not alter the production ground mesh, collision, or gameplay surface.
 
-Patch V3J.3B deliberately does not add lateral stroke deviation, family-specific presets, final material integration, or production geometry ownership. The next decision is visual: if the generated raised surfaces are convincing, V3K decides whether they become final geometry, a baked shader representation, or a hybrid.
+Patch V3J.3B deliberately did not add lateral stroke deviation, family-specific material integration, or production ownership. V3J.3C resolves that historical decision gate: narrow secondary geometry is the active candidate and projection is fallback only.
 
 ### 2026-07-10 — Patch V3J.3A4: Perpendicular Facing-Direction Contract
 
@@ -309,53 +380,34 @@ They are short, broken, Hades-1-like dark/value-shifted surface strokes. They sh
 
 They are visual only. They do not require terrain deformation.
 
-#### Chosen Implementation Direction - Generated 3D Surface Strokes
+#### Chosen Implementation Direction - Generated 3D Surface Strokes and Narrow Secondary Ridge
 
-Patch V3J.3R changes the Painted Accent source of truth.
-
-The active source model is no longer:
+Patch V3J.3R established deterministic short 3D surface strokes as the source of truth. Patch V3J.3C establishes the active representation candidate built from those descriptors:
 
 ```text
-generate anonymous scalar/noise body field
-  -> threshold or contour the body
-  -> infer a representative line
+generate short deterministic 3D surface-stroke descriptors
+  -> sample them against GroundHeightFieldSnapshot
+  -> build one combined narrow open ridge mesh per chunk
+  -> render that static visual-only mesh during gameplay
 ```
 
-Validation retired that model. It produced either broad value-noise continents, embossed contour soup, or fat selected ribbons. The selected line is the visual feature we actually care about, so it should not be rediscovered from a noisy body field after the fact.
+The base ground mesh and collider are never modified. The secondary ridge has finite width and very small height so it can carry real normals, lighting, parallax, and grazing-angle silhouette, but it has no underside, end caps, collider, per-line GameObjects, or per-line renderers.
 
-The active source model is now:
+The stroke descriptor retains:
 
 ```text
-generate short 3D surface stroke descriptors
-  -> walk/sample those strokes on the generated ground surface
-  -> sweep a sampled stochastic 3D fold surface around each stroke
-  -> preview the actual raised geometry
-  -> optionally bake cheap R/G/B/A texture channels from the strokes for shader use
+local 3D points on the ground
+sampled render normals
+tangent and across-line directions
+Stroke Width
+BodyWidth for optional texture/debug support only
+strength
+seed
 ```
 
-The stroke is a local-space 3D curve on the generated terrain surface. For each sampled point, the generator knows:
+`Stroke Width` is the sole visible width source for secondary geometry. `BodyWidth` must never widen the ridge mesh. The stochastic profile provides cross-section asymmetry and along-stroke variation; no lateral centerline squiggle is introduced.
 
-```text
-local 3D position on the ground
-surface/render normal from GroundHeightFieldSnapshot
-tangent along the stroke
-across-line direction on the surface
-stroke width, body width, strength, seed
-```
-
-This keeps the feature 3D at source while still allowing cheap shader rendering later. The texture is a baked representation of 3D surface strokes; it is not the authored source and must not be treated as a flat 2D decal system.
-
-The feature remains visual-only unless explicitly promoted later:
-
-```text
-no collision change
-no gameplay terrain deformation
-no runtime footprint/wetness simulation
-no new layers or tags
-no production mesh modification during normal generation
-```
-
-The immediate validation target is the raised stochastic 3D fold-surface preview, not final material response. If those surfaces look good enough, later patches can decide whether to keep them as actual geometry, bake them into the shader fold-field texture, or use both.
+Generation is permitted only during editor authoring or camp/run loading. During gameplay the mesh is static and only participates in ordinary rendering and chunk culling. Shader projection remains available as a fallback/debug representation, not an equally active direction.
 
 #### Retired Painted Accent Experiments
 
@@ -426,48 +478,47 @@ Ground Painted Accent Final Prototype
 
 Runtime shader policy is strict: the shader samples baked channels and shades them. It does not perform connected-component labeling, contour extraction, body-field thresholding, or line discovery.
 
-#### Stochastic 3D Fold-Surface Preview Policy
+#### Narrow Static Secondary Ridge Policy
 
-The old `Build Height Preview` / `Clear Height Preview` G-grid workflow and the temporary flat `Build 3D Line Preview` ribbon workflow are retired from the active validation path. The first focused on the rejected noise/body field; the second only established stroke placement and orientation.
-
-The active preview is:
+The active explicit preview controls are:
 
 ```text
 GeneratedGround inspector:
-  stroke layout controls
+  Stroke Width
+  Stroke Density
+  Stroke Length Min / Max
+  Facing Direction Degrees
+  Angle Jitter Degrees
   Fold Height
   Fold Irregularity
-  Fold Broadness
   Fold End Taper
-  Build 3D Fold Preview
-  Clear 3D Fold Preview
+  Build 3D Ridge Preview
+  Clear 3D Ridge Preview
 
 GeneratedGround child object:
-  __PaintedAccentFoldSurfacePreview_Debug
+  __PaintedAccentRidgePreview_Debug
 ```
 
-The preview mesh is a parametric surface sampled around each accepted stroke. For each point along the stroke, the code resolves the sampled ground normal, projects the stroke tangent onto that surface plane, derives the across direction, then creates 11 evenly spaced `u` samples across the fold. The height function is:
+`Fold Broadness` is no longer author-facing and does not affect ridge geometry. The ridge uses seven evenly spaced generic `u` samples across the exact visible `Stroke Width`:
 
 ```text
 height(t, u) =
     FoldHeight
-  * GaussianMixture(strokeSeed, t, u)
-  * EdgeEnvelope(u)
+  * StochasticProfile(strokeSeed, t, u)
+  * EdgeEnvelope(strokeSeed, u)
   * AlongStrokeVariation(strokeSeed, t)
   * EndEnvelope(strokeSeed, t)
+
+halfWidth(t) =
+    StrokeWidth * 0.5
+  * lerp(nonZeroTerminalScale, 1, EndEnvelope(strokeSeed, t))
 ```
 
-The Gaussian mixture is deliberately generic mathematical basis data, not a semantic mesh recipe. The number of bases and their parameters vary by stroke seed and `Fold Irregularity`. `EdgeEnvelope` guarantees the two fold sides meet the ground. `EndEnvelope` guarantees the start/end return to the ground. Slow variation in basis amplitude, center, and width changes the profile along the stroke without changing the established centerline layout.
+Every lateral vertex re-samples ground height and render normal. The two side boundaries and both terminal rings are embedded slightly below the sampled ground. The interior rises along the sampled ground normal. There are no end caps and no lower shell.
 
-The preview uses a lit debug material and recalculated normals/tangents so height is readable as actual 3D form. It remains editor/debug-only geometry:
+The preview is one combined child mesh per chunk. It uses one shared neutral/dark lit material, casts no shadows, receives shadows, has motion vectors disabled, and has no collider. It does not modify the generated ground mesh or collider.
 
-```text
-it does not modify the generated ground mesh
-it does not modify collision
-it does not yet imply production displacement or final geometry ownership
-it does not require a new layer/tag/component
-it clears legacy __FoldFieldLinePreview_Debug children when rebuilding
-```
+The current proof remains editor/debug generated. Production adoption must move the same build to camp/run loading and keep gameplay free of generation, rebuilding, polling, and texture-field regeneration. Production static meshes may discard CPU data after upload; editor previews must retain it for rebuild/inspection.
 
 #### Chunk-Library and Runtime Policy
 

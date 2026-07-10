@@ -1985,7 +1985,7 @@ Free Water Foam now has three source patterns: Lace Connectors, Cross-Lace Conne
 
 
 
-## River Foam Handoff — after `4.11C.5.16A`
+## River Foam Handoff — after `4.11C.5.16A.1` implementation
 
 ### Current strategic state
 
@@ -2020,14 +2020,15 @@ laneIntent
 obstacleIntent
 ```
 
-New/renamed Inspector meanings:
+Current Inspector meanings:
 
 ```text
 Downstream Speed Ratio
 Maximum Lateral Speed Ratio
 Lane Advection Ratio
+Direction Change Frequency
+Across-River Coherence
 Low Lateral Motion Coverage
-Lateral Route Scale
 Obstacle Slowdown Strength
 Obstacle Minimum Downstream Factor
 ```
@@ -2042,18 +2043,50 @@ The old global downstream phase commit still moves FoamState.
 No local slowdown or lateral velocity changes FoamState yet.
 ```
 
-The existing Motion Field debug views now show resolved physical behavior, not raw intent:
+`5.16A` validation confirmed the shared velocity contract, signed lateral response, flow reversal, physical lane advection, and no premature persistent-material movement. It exposed three issues that must be corrected before transport:
 
 ```text
-bright neutral gray = straight full-speed downstream
-red = positive/right lateral velocity
-blue = negative/left lateral velocity
-dark = downstream slowdown/stagnation
-yellow = obstacle influence
-white overlay = raw persistent Presence
+runtime warning HelpBoxes repeatedly inserted/removed rows and shifted the Inspector;
+obstacle yellow was blended after speed darkening and could obscure stagnation proof;
+lateral route sign regions were too broad downstream, while the same scale also changed across-river variation.
 ```
 
-### Exact next patch
+`5.16A.1` implementation:
+
+```text
+Inspector runtime transport diagnostics now use fixed-height labels only;
+Motion Field composes route/obstacle hue first and applies downstream-speed brightness once;
+Direction Change Frequency controls downstream sign changes independently;
+Across-River Coherence controls lateral row grouping independently;
+all main, breaker, cross-cut, and warp frequencies use the split controls;
+two-pass across-width smoothing remains unchanged;
+Motion Lane signature is version 3 and hashes both controls;
+Obstacle Routing signature remains independent.
+```
+
+The existing Motion Field debug views should now read:
+
+```text
+bright neutral gray = straight full-speed downstream;
+bright red/blue = full-speed signed lateral velocity;
+dark red/blue = signed lateral route with downstream slowdown;
+dark yellow = obstacle-influenced and slow;
+near black = near-stagnation;
+white overlay = raw persistent Presence.
+```
+
+### Active validation
+
+```text
+leave Foam Velocity open in Play Mode for 20–30 seconds and confirm no vertical movement;
+set obstacle slowdown to 1 / minimum downstream factor to 0 and confirm strong regions darken;
+compare Direction Change Frequency 1 against 2.0–2.5;
+compare Across-River Coherence 1 against 1.5–2.0;
+reject checkerboard or regular stripe results;
+confirm Material Presence is still unchanged.
+```
+
+### Exact next major patch after validation
 
 `4.11C.5.16B — Conservative Unified 2D Material Advection`.
 

@@ -289,7 +289,7 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 
 Stage 6 has completed the provisional Layer C spawning prerequisite. Shore, static-object/contact, and free-water lace/cross-lace/fragment source families now create real persistent `FoamState` material. Their visuals remain imperfect, and cross-lace longitudinal blockiness is parked, but spawning is sufficiently varied to resume evolution work.
 
-The active work now proceeds from motion authority toward final rendering. `4.11C.5.16A` establishes one unified physical Foam velocity contract from separate scrolling lane intent, fixed obstacle routing, base Foam speed, and local obstacle slowdown. It exposes nonnegative downstream speed plus signed lateral speed in metres/second, converts lane phase from river-length-dependent wraps/second to physical speed-relative advection, and updates the existing Motion Field diagnostics. It adds no velocity texture, no material movement, and no steady compute dispatch. The next patch is conservative unified 2D Layer C material advection; Layer D phase/history work follows only after real material transport is accepted.
+The active work now proceeds from motion authority toward final rendering. `4.11C.5.16A` established one unified physical Foam velocity contract from separate scrolling lane intent, fixed obstacle routing, base Foam speed, and local obstacle slowdown. Validation confirmed nonnegative downstream speed, signed lateral response, flow reversal, physical lane phase, and no premature material movement. `4.11C.5.16A.1` is the required pre-transport correction: fixed-height Inspector diagnostics, Motion Field brightness controlled only by downstream speed, and independent Direction Change Frequency / Across-River Coherence controls. It adds no velocity texture, material movement, or steady compute dispatch. Conservative unified 2D Layer C material advection follows only after this corrected field is accepted; Layer D phase/history work follows only after real material transport is accepted.
 
 Therefore the active direction is no longer “tune coherent deformation harder.” The active direction is the corrected acyclic layer architecture:
 
@@ -583,9 +583,9 @@ Added Cross-Lace Connectors to Free Water Foam. This is a horizontal/cross-curre
 
 
 
-## River Foam movement foundation — `4.11C.5.16A`
+## River Foam movement foundation — `4.11C.5.16A` / `5.16A.1`
 
-`4.11C.5.16A — Unified Foam Velocity Contract` is implemented.
+`4.11C.5.16A — Unified Foam Velocity Contract` is implemented and validated at the contract level. `4.11C.5.16A.1 — Velocity Diagnostics Stability + Route Frequency` is implemented and awaiting Unity validation.
 
 Canonical inputs:
 
@@ -606,11 +606,14 @@ float2 velocityMetresPerSecond
   y = signed lateral speed
 ```
 
-The same pure HLSL contract is used by compute-side field resolution and the existing Motion Field debug branch. The lane and obstacle textures remain separate because their coordinate rules differ. The current global phase transport is temporarily retained, so this patch is a velocity proof rather than stored-material movement.
+The same pure HLSL contract is used by compute-side field resolution and the existing Motion Field debug branch. The lane and obstacle textures remain separate because their coordinate rules differ. The current global phase transport is temporarily retained, so this remains a velocity proof rather than stored-material movement.
+
+`5.16A.1` adds no new motion authority. It stabilizes the existing Inspector geometry, makes debug brightness a direct downstream-speed proof, and splits route shaping into independent downstream sign-change frequency and across-river coherence. The Motion Lane field rebuild signature includes both controls; obstacle routing remains fixed to its own signature.
 
 Next implementation order:
 
 ```text
+validate 5.16A.1 field diagnostics and route shape;
 5.16B conservative unified 2D Layer C material advection;
 5.16C Layer D temporal occupancy/phase state using the same velocity;
 5.16D persistent visual damage and macro fracture;

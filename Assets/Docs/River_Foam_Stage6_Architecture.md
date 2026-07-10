@@ -10,7 +10,7 @@ The goal is to reproduce the broad behavior of the visual inspiration river: sty
 
 The target is not a physically exact fluid solver and not a foam entity database. The target is a fixed-grid mathematical field system with strict ownership boundaries and no circular dependencies.
 
-## Current implementation status — `4.11C.5.16A`
+## Current implementation status — `4.11C.5.16A.1`
 
 The Layer C source-population prerequisite is provisionally complete enough for evolution work:
 
@@ -45,9 +45,28 @@ raw lane and obstacle intent for diagnostics/future strain work.
 
 The raw lane and obstacle textures remain separate because they have different coordinate rules: lane intent scrolls through sample space, while obstacle routing must stay fixed to world/river obstacles. They are married logically through one pure resolver, not packed into one misleading texture.
 
-This patch does **not** move stored material laterally. The current global downstream phase transport remains temporarily active. The next movement patch must replace that final authority with conservative unified 2D Layer C advection so local slowdown and stagnation can become real material behavior.
+`4.11C.5.16A` validation confirmed physical lane advection, signed lateral velocity, flow reversal, no premature material movement, and the shared velocity authority. It also exposed three pre-transport corrections:
 
-Exact next patch:
+```text
+runtime Inspector HelpBoxes changed layout height from frame to frame;
+obstacle-yellow debug composition could brighten a slowed region after speed darkening;
+one generic lane scale changed downstream sign frequency and across-river variation together.
+```
+
+`4.11C.5.16A.1 — Velocity Diagnostics Stability + Route Frequency` corrects those issues without adding resources or changing material state:
+
+```text
+runtime transport diagnostics use fixed-height rows only;
+Motion Field hue carries lateral/obstacle meaning and brightness carries downstream speed only;
+Direction Change Frequency controls downstream sign-change frequency;
+Across-River Coherence independently controls how broadly neighbouring rows share intent;
+the Motion Lane signature is versioned and includes both route-shape controls;
+Obstacle Routing remains independent and does not rebuild for lane-only changes.
+```
+
+This patch still does **not** move stored material laterally. The current global downstream phase transport remains temporarily active. After `5.16A.1` is validated, the next movement patch must replace that final authority with conservative unified 2D Layer C advection so local slowdown and stagnation can become real material behavior.
+
+Exact next major patch after validation:
 
 ```text
 4.11C.5.16B — Conservative Unified 2D Material Advection
@@ -539,7 +558,25 @@ Compute raw-field sampling lives in:
 Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Motion.hlsl
 ```
 
-The existing Motion Field debug modes use the same pure contract. Bright neutral gray means straight full-speed downstream motion; red/blue encode signed lateral velocity; darkness encodes downstream slowdown/stagnation; yellow encodes obstacle influence; white overlays raw stored material Presence.
+The existing Motion Field debug modes use the same pure contract. Hue encodes route meaning: neutral gray is straight motion, red/blue encode signed lateral velocity, and yellow indicates obstacle influence. Brightness is applied only after hue composition and represents `downstreamSpeedFactor`: bright is full-speed, dark is slowed, and near-black is near-stagnation. White overlays raw stored material Presence.
+
+Motion Lane authoring now has independent shape controls:
+
+```text
+Direction Change Frequency:
+  controls how often left/right intent changes sign downstream;
+
+Across-River Coherence:
+  controls how broadly neighbouring lateral rows share an instruction;
+
+Low Lateral Motion Coverage:
+  compresses a selected fraction of the field toward low lateral magnitude;
+
+Lane Advection Ratio:
+  controls how quickly the authored route pattern moves downstream in sample space.
+```
+
+At defaults `Direction Change Frequency = 1` and `Across-River Coherence = 1`, the generated field preserves the pre-split baseline. Higher direction frequency changes every downstream octave, breaker, cross-cut, and warp frequency without increasing across-river frequency. Higher coherence lowers across-river noise frequency while the existing two-pass across-width smoothing remains the final anti-checkerboard guarantee.
 
 Lane phase is now advanced in physical metres:
 

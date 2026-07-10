@@ -599,8 +599,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentFoldHeight");
             SerializedProperty foldIrregularity =
                 feature.FindPropertyRelative("paintedAccentFoldIrregularity");
-            SerializedProperty foldBroadness =
-                feature.FindPropertyRelative("paintedAccentFoldBroadness");
             SerializedProperty foldEndTaper =
                 feature.FindPropertyRelative("paintedAccentFoldEndTaper");
             if (strokeWidth == null ||
@@ -611,7 +609,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 strokeAngleJitterDegrees == null ||
                 foldHeight == null ||
                 foldIrregularity == null ||
-                foldBroadness == null ||
                 foldEndTaper == null)
             {
                 return;
@@ -622,7 +619,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 "Painted Accent 3D Strokes",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Edits the selected surface variant's Painted Accent 3D stroke layout and stochastic fold-surface controls. Rebuild the 3D Fold Preview after changes. The preview is debug geometry only and does not modify ground collision or production terrain geometry.",
+                "Edits the selected surface variant's Painted Accent stroke layout and narrow stochastic ridge controls. Rebuild the 3D Ridge Preview after changes. The preview is one visual-only child mesh and never modifies the base ground mesh or collider.",
                 MessageType.None);
 
             EditorGUI.BeginChangeCheck();
@@ -632,7 +629,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 0.35f,
                 new GUIContent(
                     "Stroke Width",
-                    "Source-line/core width in metres. It controls baked line coverage and contributes to the derived 3D fold footprint."));
+                    "Visible width in metres for the narrow secondary ridge. Legacy BodyWidth is not used by the ridge mesh."));
             EditorGUILayout.Slider(
                 strokeDensity,
                 0f,
@@ -670,15 +667,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     "Maximum signed angle offset in degrees around the perpendicular stroke angle derived from Facing Direction Degrees. Each stroke rolls independently between -value and +value."));
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
-                "Stochastic 3D Fold Surface",
+                "Narrow Stochastic 3D Ridge",
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.Slider(
                 foldHeight,
                 0f,
-                0.40f,
+                0.05f,
                 new GUIContent(
                     "Fold Height",
-                    "Maximum raised height in metres, applied along the sampled ground normal."));
+                    "Maximum raised ridge height in metres, applied along the sampled ground normal. Tiny accent marks should normally remain in the 0.006-0.025 metre range."));
             EditorGUILayout.Slider(
                 foldIrregularity,
                 0f,
@@ -686,13 +683,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 new GUIContent(
                     "Fold Irregularity",
                     "Strength of deterministic smooth profile variation across and along each stroke. This does not add lateral centerline squiggle."));
-            EditorGUILayout.Slider(
-                foldBroadness,
-                0.50f,
-                1.80f,
-                new GUIContent(
-                    "Fold Broadness",
-                    "Multiplier for the 3D fold footprint width and the broadness of its smooth stochastic profile."));
             EditorGUILayout.Slider(
                 foldEndTaper,
                 0f,
@@ -714,7 +704,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             styleObject.ApplyModifiedProperties();
             EditorUtility.SetDirty(style);
             ApplyToTargets(
-                "Tune Painted Accent 3D Fold Surface",
+                "Tune Painted Accent 3D Ridge",
                 ground => ground.RefreshSurfaceMaterialProperties());
         }
 
@@ -1350,17 +1340,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             EditorGUILayout.BeginHorizontal();
 
-            if (GUILayout.Button("Build 3D Fold Preview"))
+            if (GUILayout.Button("Build 3D Ridge Preview"))
             {
                 ApplyToTargets(
-                    "Build Painted Accent 3D Fold Preview",
+                    "Build Painted Accent 3D Ridge Preview",
                     ground => ground.BuildPaintedAccentFoldSurfacePreview());
             }
 
-            if (GUILayout.Button("Clear 3D Fold Preview"))
+            if (GUILayout.Button("Clear 3D Ridge Preview"))
             {
                 ApplyToTargets(
-                    "Clear Painted Accent 3D Fold Preview",
+                    "Clear Painted Accent 3D Ridge Preview",
                     ground => ground.ClearPaintedAccentFoldSurfacePreview());
             }
 

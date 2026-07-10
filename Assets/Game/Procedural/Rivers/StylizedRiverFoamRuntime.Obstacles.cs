@@ -311,7 +311,7 @@ namespace ProgrammaticStylized3D.Rivers
             int hash = 17;
             hash = AccumulateHash(hash, fieldWidth);
             hash = AccumulateHash(hash, fieldHeight);
-            hash = AccumulateHash(hash, 2); // 4.11C.5.9l lane anisotropy algorithm version.
+            hash = AccumulateHash(hash, 3); // 4.11C.5.16A.1 independent downstream/across-river frequency algorithm.
             hash = AccumulateHash(hash, river != null ? river.VisualSeed : 0);
             hash = AccumulateHash(
                 hash,
@@ -321,7 +321,12 @@ namespace ProgrammaticStylized3D.Rivers
             hash = AccumulateHash(
                 hash,
                 Mathf.RoundToInt((river != null
-                    ? river.FoamLateralRouteScale
+                    ? river.FoamDirectionChangeFrequency
+                    : 1f) * 1000f));
+            hash = AccumulateHash(
+                hash,
+                Mathf.RoundToInt((river != null
+                    ? river.FoamAcrossRiverCoherence
                     : 1f) * 1000f));
             return hash;
         }
@@ -360,13 +365,15 @@ namespace ProgrammaticStylized3D.Rivers
                 motionLaneRawValues = new float[cellCount];
             }
 
-            float laneScale = river != null
-                ? river.FoamLateralRouteScale
+            float directionChangeFrequency = river != null
+                ? river.FoamDirectionChangeFrequency
+                : 1f;
+            float acrossRiverCoherence = river != null
+                ? river.FoamAcrossRiverCoherence
                 : 1f;
             float seed = river != null
                 ? river.VisualSeed * 0.01371f
                 : 23.17f;
-            float frequency = Mathf.Clamp(laneScale, 0.25f, 4f);
             float aspect = fieldHeight > 0
                 ? Mathf.Max(1f, (float)fieldWidth / fieldHeight)
                 : 1f;
@@ -381,7 +388,8 @@ namespace ProgrammaticStylized3D.Rivers
                         u,
                         v,
                         aspect,
-                        frequency,
+                        directionChangeFrequency,
+                        acrossRiverCoherence,
                         seed);
                     motionLaneRawValues[y * fieldWidth + x] = Mathf.Clamp(raw, -1f, 1f);
                 }
@@ -1043,14 +1051,27 @@ namespace ProgrammaticStylized3D.Rivers
             float u,
             float v,
             float aspect,
-            float frequency,
+            float directionChangeFrequency,
+            float acrossRiverCoherence,
             float seed)
         {
             float aspectSafe = Mathf.Max(1f, aspect);
-            float acrossWarpFrequency = Mathf.Max(1.0f, 1.85f * frequency);
+            float downstreamScale = Mathf.Clamp(
+                directionChangeFrequency,
+                0.25f,
+                4f);
+            float coherence = Mathf.Clamp(
+                acrossRiverCoherence,
+                0.5f,
+                4f);
+            float lateralFrequencyScale = 1f / coherence;
+            float acrossWarpFrequency = Mathf.Max(
+                0.25f,
+                1.85f * lateralFrequencyScale);
             int warpPeriodX = Mathf.Max(
                 6,
-                Mathf.RoundToInt(10.0f * frequency * aspectSafe));
+                Mathf.RoundToInt(
+                    10.0f * downstreamScale * aspectSafe));
             float warpX = MotionValueNoiseTiledX(
                 u * warpPeriodX + seed * 1.37f,
                 v * acrossWarpFrequency - seed * 0.61f,
@@ -1065,45 +1086,45 @@ namespace ProgrammaticStylized3D.Rivers
             float sum = 0f;
             float weightSum = 0f;
 
-            // Patch 4.11C.5.9l: source-owned transport needs the field to give
-            // a coherent lateral instruction across a foam body's width, then
-            // change as that body travels downstream.  The lane texture therefore
-            // uses anisotropic octaves: higher frequency along downstream X and
-            // deliberately lower frequency across lateral Y.  Runtime still reads
-            // the baked texture only.
+            // Patch 4.11C.5.16A.1: downstream sign-change frequency and
+            // across-river coherence are independent authoring dimensions.
+            // Higher downstreamScale creates more frequent irregular left/right
+            // changes along X. Higher coherence lowers Y frequency so neighbouring
+            // rows remain grouped. The existing two-pass Y smoothing remains the
+            // final anti-checkerboard coherence guarantee.
             sum += MotionLaneAnisotropicSignedNoise(
                 warpedU,
                 warpedV,
-                8.50f * frequency * aspectSafe,
-                1.15f * frequency,
+                8.50f * downstreamScale * aspectSafe,
+                1.15f * lateralFrequencyScale,
                 seed + 3.17f) * 0.22f;
             weightSum += 0.22f;
             sum += MotionLaneAnisotropicSignedNoise(
                 warpedU + warpedV * 0.045f,
                 warpedV - warpedU * 0.006f,
-                15.50f * frequency * aspectSafe,
-                1.65f * frequency,
+                15.50f * downstreamScale * aspectSafe,
+                1.65f * lateralFrequencyScale,
                 seed - 11.73f) * 0.24f;
             weightSum += 0.24f;
             sum += MotionLaneAnisotropicSignedNoise(
                 warpedU - warpedV * 0.060f,
                 warpedV + warpedU * 0.010f,
-                25.00f * frequency * aspectSafe,
-                2.25f * frequency,
+                25.00f * downstreamScale * aspectSafe,
+                2.25f * lateralFrequencyScale,
                 seed + 29.41f) * 0.22f;
             weightSum += 0.22f;
             sum += MotionLaneAnisotropicSignedNoise(
                 warpedU + warpedV * 0.090f,
                 warpedV - warpedU * 0.014f,
-                40.00f * frequency * aspectSafe,
-                3.15f * frequency,
+                40.00f * downstreamScale * aspectSafe,
+                3.15f * lateralFrequencyScale,
                 seed - 43.09f) * 0.17f;
             weightSum += 0.17f;
             sum += MotionLaneAnisotropicSignedNoise(
                 warpedU - warpedV * 0.130f,
                 warpedV + warpedU * 0.020f,
-                64.00f * frequency * aspectSafe,
-                4.30f * frequency,
+                64.00f * downstreamScale * aspectSafe,
+                4.30f * lateralFrequencyScale,
                 seed + 61.83f) * 0.10f;
             weightSum += 0.10f;
 
@@ -1114,27 +1135,27 @@ namespace ProgrammaticStylized3D.Rivers
             float breaker = MotionLaneAnisotropicSignedNoise(
                 warpedU + warpedV * 0.050f,
                 warpedV - warpedU * 0.010f,
-                34.00f * frequency * aspectSafe,
-                1.80f * frequency,
+                34.00f * downstreamScale * aspectSafe,
+                1.80f * lateralFrequencyScale,
                 seed + 101.9f) * 0.18f;
             breaker += MotionLaneAnisotropicSignedNoise(
                 warpedU - warpedV * 0.070f,
                 warpedV + warpedU * 0.016f,
-                58.00f * frequency * aspectSafe,
-                2.55f * frequency,
+                58.00f * downstreamScale * aspectSafe,
+                2.55f * lateralFrequencyScale,
                 seed - 137.6f) * 0.12f;
 
             float crossCut = MotionLaneAnisotropicSignedNoise(
                 warpedU + warpedV * 0.035f,
                 warpedV - warpedU * 0.008f,
-                72.00f * frequency * aspectSafe,
-                1.60f * frequency,
+                72.00f * downstreamScale * aspectSafe,
+                1.60f * lateralFrequencyScale,
                 seed + 211.4f) * 0.12f;
             crossCut += MotionLaneAnisotropicSignedNoise(
                 warpedU - warpedV * 0.050f,
                 warpedV + warpedU * 0.012f,
-                105.00f * frequency * aspectSafe,
-                2.10f * frequency,
+                105.00f * downstreamScale * aspectSafe,
+                2.10f * lateralFrequencyScale,
                 seed - 257.8f) * 0.08f;
 
             raw = Mathf.Clamp(

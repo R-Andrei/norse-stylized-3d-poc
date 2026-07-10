@@ -74,7 +74,6 @@ MonoBehaviour:
       paintedAccentStrokeAngleJitterDegrees: 18
       paintedAccentFoldHeight: 0.12
       paintedAccentFoldIrregularity: 0.55
-      paintedAccentFoldBroadness: 1
       paintedAccentFoldEndTaper: 0.65
     - kind: 20
       enabled: 1
@@ -91,9 +90,8 @@ MonoBehaviour:
       paintedAccentStrokeLengthMax: 2.08
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 14.4
-      paintedAccentFoldHeight: 0.223
+      paintedAccentFoldHeight: 0.0386
       paintedAccentFoldIrregularity: 0.778
-      paintedAccentFoldBroadness: 0.749
       paintedAccentFoldEndTaper: 0.65
   - id: snowfield.patchy
     displayName: Patchy
@@ -154,7 +152,6 @@ MonoBehaviour:
       paintedAccentStrokeAngleJitterDegrees: 18
       paintedAccentFoldHeight: 0.12
       paintedAccentFoldIrregularity: 0.55
-      paintedAccentFoldBroadness: 1
       paintedAccentFoldEndTaper: 0.65
     - kind: 20
       enabled: 1
@@ -171,9 +168,8 @@ MonoBehaviour:
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
-      paintedAccentFoldHeight: 0.12
+      paintedAccentFoldHeight: 0.018
       paintedAccentFoldIrregularity: 0.55
-      paintedAccentFoldBroadness: 1
       paintedAccentFoldEndTaper: 0.65
   - id: snowfield.dirty_thawing
     displayName: Dirty Thawing
@@ -232,9 +228,8 @@ MonoBehaviour:
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
-      paintedAccentFoldHeight: 0.12
+      paintedAccentFoldHeight: 0.018
       paintedAccentFoldIrregularity: 0.55
-      paintedAccentFoldBroadness: 1
       paintedAccentFoldEndTaper: 0.65
   - id: snowfield.wind_scoured
     displayName: Wind-Scoured
@@ -295,7 +290,6 @@ MonoBehaviour:
       paintedAccentStrokeAngleJitterDegrees: 18
       paintedAccentFoldHeight: 0.12
       paintedAccentFoldIrregularity: 0.55
-      paintedAccentFoldBroadness: 1
       paintedAccentFoldEndTaper: 0.65
     - kind: 20
       enabled: 1
@@ -312,7 +306,6 @@ MonoBehaviour:
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
-      paintedAccentFoldHeight: 0.12
+      paintedAccentFoldHeight: 0.018
       paintedAccentFoldIrregularity: 0.55
-      paintedAccentFoldBroadness: 1
       paintedAccentFoldEndTaper: 0.65

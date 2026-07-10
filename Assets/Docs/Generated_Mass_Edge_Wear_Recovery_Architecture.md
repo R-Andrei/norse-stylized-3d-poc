@@ -2,7 +2,7 @@
 
 ## Status
 
-EW-C is the active recovery architecture. EW-B is rejected and removed from active code. EW-C0 topology readiness and EW-C1 solved-corner/rail readiness are validated. EW-C2S5R1 keeps the validated positive-width network, shared-span face construction, guarded preserved-boundary segmentation, and exact face-local retrace normalization, then classifies two-face internal boundary closure from incidence rather than encoded segment direction. Geometry remains provisional and uncommitted.
+EW-C is the active recovery architecture. EW-B is rejected and removed from active code. EW-C0 topology readiness and EW-C1 solved-corner/rail readiness are validated. EW-C2S6 keeps the validated positive-width network, shared-span face construction, guarded segmentation, exact face-local retrace normalization, and incidence-based internal closure, then replaces spatial-key-only source-boundary ownership with explicit ordered source-edge descendant records. Geometry remains provisional and uncommitted.
 
 The target is a **crude, single-segment physical chamfer**, not a general-purpose smooth bevel modifier.
 
@@ -295,6 +295,24 @@ source topology
 
 Only after fixed-point segmentation and post-segmentation face-walk normalization does ownership normalization run. Subdividing a preserved source boundary replaces one parent key with an ordered child chain and does not move or seal the boundary. A registered topology edge remains a source-vertex patch boundary only when it has one actual provisional use and one compatible owner. EW-C2S5 validation proved that some clean internal edges have exactly two uses on two distinct face records but carry the same encoded direction; direction is therefore diagnostic, not the definition of openness. EW-C2S5R1 cancels every registered edge with exactly two actual uses on two distinct face records. Opposite directions remain expected; same-direction pairs increment `sameDirectionClosedInternalEdges` without blocking the vertex-patch gate. A zero-use registration not explicitly removed by retrace normalization is stale provenance and fails. Same-face duplicate uses, more than two uses, and unrecognized repeated face-local edges remain hard failures. Intermediate compatible/incompatible pair logs are not emitted. Geometry remains provisional and uncommitted, and success still requires zero T-junctions and zero non-manifold edges.
 
+EW-C2S5R1 validation produced 21 of 24 objects ready for vertex patches. The five ownership-only failures were removed without changing active/deferred edge counts, and all 24 objects retained zero non-manifold edges and zero T-junctions. Three objects remain blocked solely by the source-boundary key contract.
+
+### EW-C2S6 — Explicit source-boundary descendant ownership
+
+The authoritative source-boundary representation is one `ChamferSourceBoundaryRecord` per original boundary half-edge. The record stores source-edge identity, boundary loop and order, original source vertices, solved parent endpoints, and an ordered child chain. The topology-key sets used by provisional segment classification are derived caches, never the ownership source of truth.
+
+When a raw-provenance split point subdivides a boundary child, the record is split in the same geometric parameter order as every provisional face use. `preservedSourceBoundarySplits` counts unique accepted record subdivisions. Parent identity and child order therefore survive repeated fixed-point segmentation passes.
+
+Ownership after subdivision is deterministic:
+
+```text
+unsplit source edge:       its single child remains source-boundary-owned
+subdivided source edge:    first and last children are source-vertex transitions
+                           non-terminal middle children remain source-boundary-owned
+```
+
+A terminal transition candidate with exactly two provisional uses on two distinct face records transfers to source-vertex ownership and is excluded from the expected open set. A terminal candidate with exactly one use and no vertex-boundary registration remains source-boundary-owned. Every non-terminal or unsplit expected source-boundary child must likewise have exactly one use and no vertex-boundary ownership overlap. Duplicate child keys, bad terminal incidence, source/vertex ownership overlap, or non-unit open-child incidence fail the gate. Diagnostics identify source edge, loop, boundary order, child index, endpoints, use count, and terminal flags.
+
 ### EW-C3 — Crude vertex-run patches
 
 Close each selected run with a centre fan or source-apex fan. Preserve the source boundary set and reject new boundaries, non-manifold edges, or T-junctions.
@@ -350,8 +368,8 @@ The provisional geometry is discarded after audit. EW-C3 is the first stage allo
 
 ## Next work items
 
-1. Compile and validate EW-C2S5R1 across all 24 placed masses.
-2. Confirm the five ownership-only objects move to `readyForVertexPatches=1`; same-direction paired uses may appear only in the non-blocking diagnostic counter.
-3. Require zero face-local normalization, duplicate-edge, multi-owner, non-manifold, and T-junction failures.
-4. Implement EW-C2S6 explicit ordered source-boundary descendant records for only the remaining boundary-loop mismatch class.
-5. Begin EW-C3 only after all representative provisional meshes report `readyForVertexPatches=1`.
+1. Compile and validate EW-C2S6 across all 24 placed masses.
+2. Confirm every terminal source-boundary child is classified only as one-use open or two-distinct-face transferred.
+3. Confirm every expected open descendant has one use and no vertex-boundary ownership overlap.
+4. Require all 24 objects to report exact source-boundary matching and `readyForVertexPatches=1`.
+5. Begin EW-C3 only after that complete EW-C2 validation passes.

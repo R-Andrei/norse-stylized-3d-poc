@@ -49,7 +49,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private int seedOffset;
 
-        [Tooltip("Painted Accent Lines only. Source-line/core width in metres for generated 3D surface strokes. It controls baked R coverage and contributes to the derived 3D fold footprint; Fold Broadness scales the raised preview surface separately.")]
+        [Tooltip("Painted Accent Lines only. Visible width in metres for the narrow secondary ridge. The generated ridge footprint uses this value directly; legacy BodyWidth remains texture/debug support only.")]
         [Range(0.04f, 0.35f)]
         [SerializeField]
         private float paintedAccentStrokeWidth = 0.12f;
@@ -80,20 +80,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float paintedAccentStrokeAngleJitterDegrees = 18f;
 
-        [Tooltip("Painted Accent Lines only. Maximum raised height in metres for the generated 3D fold-surface preview. Height is applied along the sampled ground normal and tapers back to the ground at the fold edges and ends.")]
-        [Range(0f, 0.40f)]
+        [Tooltip("Painted Accent Lines only. Maximum raised height in metres for the narrow secondary ridge. Height is applied along the sampled ground normal and tapers into the ground at both side boundaries and both ends.")]
+        [Range(0f, 0.05f)]
         [SerializeField]
-        private float paintedAccentFoldHeight = 0.12f;
+        private float paintedAccentFoldHeight = 0.018f;
 
         [Tooltip("Painted Accent Lines only. Controls deterministic stochastic variation in the 3D fold profile. Zero approaches one clean broad profile; one allows several overlapping smooth basis functions and stronger slow height variation along the stroke.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float paintedAccentFoldIrregularity = 0.55f;
-
-        [Tooltip("Painted Accent Lines only. Multiplies the generated 3D fold footprint width and broadens or narrows the smooth stochastic profile. One preserves the generated body width.")]
-        [Range(0.50f, 1.80f)]
-        [SerializeField]
-        private float paintedAccentFoldBroadness = 1.0f;
 
         [Tooltip("Painted Accent Lines only. Controls how much of each stroke length is used to blend the raised fold back into the ground. Zero keeps only a minimal anti-clipping fade; one uses long soft end tapers.")]
         [Range(0f, 1f)]
@@ -161,13 +156,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Mathf.Clamp(paintedAccentStrokeAngleJitterDegrees, 0f, 30f);
 
         public float PaintedAccentFoldHeight =>
-            Mathf.Clamp(paintedAccentFoldHeight, 0f, 0.40f);
+            Mathf.Clamp(paintedAccentFoldHeight, 0f, 0.05f);
 
         public float PaintedAccentFoldIrregularity =>
             Mathf.Clamp01(paintedAccentFoldIrregularity);
-
-        public float PaintedAccentFoldBroadness =>
-            Mathf.Clamp(paintedAccentFoldBroadness, 0.50f, 1.80f);
 
         public float PaintedAccentFoldEndTaper =>
             Mathf.Clamp01(paintedAccentFoldEndTaper);

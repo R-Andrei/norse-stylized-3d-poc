@@ -197,12 +197,12 @@ EW-C — Explicit Single-Segment Chamfer Kernel
 
 - [x] Unity compiles without errors.
 - [x] All eight EW-C2S4 non-manifold/multi-owner objects report `provisionalNonManifoldEdges=0`.
-- [ ] All placed objects report `vertexBoundaryMultiOwnerFailures=0`.
+- [x] All placed objects report `vertexBoundaryMultiOwnerFailures=0`.
 - [x] All placed objects report `faceLocalNormalizationFailures=0`, `faceLocalDuplicateEdgeFailures=0`, and `staleBoundaryRegistrationFailures=0`.
 - [x] Previously passing objects remain `readyForVertexPatches=1`.
 - [x] Active/deferred selected-edge counts and built bevel-strip counts remain unchanged per object.
 - [x] `provisionalTJunctions=0` and `tJunctionRecordsIncompatible=0` remain true across the sample.
-- [ ] Only the three isolated preserved-source-boundary descendant mismatches remain blocked for EW-C2S6.
+- [x] Only the three isolated preserved-source-boundary descendant mismatches remain blocked for EW-C2S6.
 - [x] Geometry commit remains disabled.
 
 ## EW-C2S5R1 — Two-face internal boundary cancellation
@@ -215,12 +215,37 @@ EW-C — Explicit Single-Segment Chamfer Kernel
 
 ### Exit criteria
 
+- [x] Unity compiles without errors.
+- [x] The five EW-C2S5 ownership-only blockers report `vertexBoundarySameOwnerDuplicateFailures=0` and `vertexBoundaryMultiOwnerFailures=0`.
+- [x] Those five objects reach `readyForVertexPatches=1`.
+- [x] All 24 objects retain `provisionalNonManifoldEdges=0`, `provisionalTJunctions=0`, `faceLocalDuplicateEdgeFailures=0`, and `staleBoundaryRegistrationFailures=0`.
+- [x] Active/deferred selected-edge counts and built bevel-strip counts remain unchanged.
+- [x] Only the three preserved-source-boundary descendant mismatches remain blocked for EW-C2S6.
+- [x] Geometry commit remains disabled.
+
+## EW-C2S6 — Explicit source-boundary descendant ownership
+
+- [x] Build one ordered source-boundary record per original boundary half-edge.
+- [x] Preserve source-edge identity, boundary-loop index/order, source endpoints, solved parent endpoints, and ordered child segments.
+- [x] Apply raw split plans directly to matching child records in stable parameter order.
+- [x] Count `preservedSourceBoundarySplits` from unique source-owned child subdivisions rather than provisional-face occurrences.
+- [x] Derive provisional source-boundary segment-role lookup keys from the explicit record children.
+- [x] Classify the first and last child of a subdivided source edge as terminal source-vertex transitions.
+- [x] Classify terminal children as either one-use source-boundary openings or two-distinct-face source-vertex transitions.
+- [x] Keep unsplit, non-terminal, and one-use terminal descendants in the expected open source-boundary set.
+- [x] Require each expected open descendant to have exactly one use and no vertex-boundary ownership overlap.
+- [x] Reject duplicate descendant keys, invalid terminal incidence, invalid open-child incidence, and source/vertex ownership overlap.
+- [x] Add compact source-edge/loop/order/child diagnostics and summary counters.
+- [x] Keep candidate selection, width solving, retrace normalization, T-junction segmentation, vertex patches, and geometry commit unchanged.
+
+### Exit criteria
+
 - [ ] Unity compiles without errors.
-- [ ] The five EW-C2S5 ownership-only blockers report `vertexBoundarySameOwnerDuplicateFailures=0` and `vertexBoundaryMultiOwnerFailures=0`.
-- [ ] Those five objects reach `readyForVertexPatches=1`.
-- [ ] All 24 objects retain `provisionalNonManifoldEdges=0`, `provisionalTJunctions=0`, `faceLocalDuplicateEdgeFailures=0`, and `staleBoundaryRegistrationFailures=0`.
-- [ ] Active/deferred selected-edge counts and built bevel-strip counts remain unchanged.
-- [ ] Only the three preserved-source-boundary descendant mismatches remain blocked for EW-C2S6.
+- [ ] All three previously blocked boundary-loop objects report `sourceBoundaryTerminalTransferFailures=0`, with terminal children classified only as open or transferred.
+- [ ] All objects report `sourceBoundaryChildIncidenceFailures=0` and `sourceBoundaryDuplicateChildKeyFailures=0`.
+- [ ] All objects report `expectedSourceBoundaryEdges=matchedSourceBoundaryEdges`.
+- [ ] All 24 representative masses report `readyForVertexPatches=1`.
+- [ ] `provisionalNonManifoldEdges=0`, `provisionalTJunctions=0`, and `tJunctionRecordsIncompatible=0` remain true.
 - [ ] Geometry commit remains disabled.
 
 ## EW-C3 — Crude vertex-run patches

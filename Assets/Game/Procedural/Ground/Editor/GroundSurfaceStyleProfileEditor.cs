@@ -321,8 +321,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentFoldHeight");
             SerializedProperty paintedAccentFoldIrregularity =
                 feature.FindPropertyRelative("paintedAccentFoldIrregularity");
-            SerializedProperty paintedAccentFoldBroadness =
-                feature.FindPropertyRelative("paintedAccentFoldBroadness");
             SerializedProperty paintedAccentFoldEndTaper =
                 feature.FindPropertyRelative("paintedAccentFoldEndTaper");
 
@@ -385,7 +383,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         0.35f,
                         new GUIContent(
                             "Stroke Width",
-                            "Source-line/core width in metres. It controls baked line coverage and contributes to the derived 3D fold footprint; Fold Broadness scales the raised preview separately."));
+                            "Visible width in metres for the narrow secondary ridge. Legacy BodyWidth is not used by the ridge mesh."));
                     EditorGUILayout.Slider(
                         paintedAccentStrokeDensity,
                         0f,
@@ -423,15 +421,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                             "Maximum signed angle offset in degrees around the perpendicular stroke angle derived from Facing Direction Degrees. Each stroke rolls independently between -value and +value."));
                     EditorGUILayout.Space(4f);
                     EditorGUILayout.LabelField(
-                        "Stochastic 3D Fold Surface",
+                        "Narrow Stochastic 3D Ridge",
                         EditorStyles.miniBoldLabel);
                     EditorGUILayout.Slider(
                         paintedAccentFoldHeight,
                         0f,
-                        0.40f,
+                        0.05f,
                         new GUIContent(
                             "Fold Height",
-                            "Maximum raised height in metres, applied along the sampled ground normal."));
+                            "Maximum raised ridge height in metres, applied along the sampled ground normal. Tiny accent marks should normally remain in the 0.006-0.025 metre range."));
                     EditorGUILayout.Slider(
                         paintedAccentFoldIrregularity,
                         0f,
@@ -439,13 +437,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         new GUIContent(
                             "Fold Irregularity",
                             "Strength of deterministic smooth profile variation across and along each stroke. This does not add lateral centerline squiggle."));
-                    EditorGUILayout.Slider(
-                        paintedAccentFoldBroadness,
-                        0.50f,
-                        1.80f,
-                        new GUIContent(
-                            "Fold Broadness",
-                            "Multiplier for the 3D fold footprint width and the broadness of its smooth stochastic profile."));
                     EditorGUILayout.Slider(
                         paintedAccentFoldEndTaper,
                         0f,
@@ -717,8 +708,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentFoldHeight");
             SerializedProperty foldIrregularity =
                 feature.FindPropertyRelative("paintedAccentFoldIrregularity");
-            SerializedProperty foldBroadness =
-                feature.FindPropertyRelative("paintedAccentFoldBroadness");
             SerializedProperty foldEndTaper =
                 feature.FindPropertyRelative("paintedAccentFoldEndTaper");
 
@@ -754,17 +743,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             if (foldHeight != null)
             {
-                foldHeight.floatValue = 0.12f;
+                foldHeight.floatValue = 0.018f;
             }
 
             if (foldIrregularity != null)
             {
                 foldIrregularity.floatValue = 0.55f;
-            }
-
-            if (foldBroadness != null)
-            {
-                foldBroadness.floatValue = 1f;
             }
 
             if (foldEndTaper != null)

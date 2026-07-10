@@ -39,7 +39,7 @@ Layer D may read Layer C, but must never write Layer C.
 Layer E must never feed back into compute/simulation.
 ```
 
-## Active state after `4.11C.5.16A — Unified Foam Velocity Contract`
+## Active state after `4.11C.5.16A.1 — Velocity Diagnostics Stability + Route Frequency`
 
 Source spawning is provisionally sufficient and no longer the active blocker:
 
@@ -60,26 +60,56 @@ velocity.y = signed lateral metres/second
 
 Raw lane intent remains a scrolling RHalf field. Raw obstacle routing remains a fixed RGHalf field. The pure resolver marries them with base Foam speed and obstacle slowdown. No new runtime texture or dispatch was added.
 
-The old control meanings are retired in the Inspector:
+The velocity controls now have one responsibility each:
 
 ```text
-Material Flow Speed      -> Downstream Speed Ratio
-Motion Field Strength    -> Maximum Lateral Speed Ratio
-Motion Field Scroll Hz   -> Lane Advection Ratio
-Neutral Coverage         -> Low Lateral Motion Coverage
-Lane Scale               -> Lateral Route Scale
+Downstream Speed Ratio:
+  base persistent-Foam speed relative to river speed;
+
+Maximum Lateral Speed Ratio:
+  maximum signed lateral speed;
+
+Lane Advection Ratio:
+  physical downstream speed of the route pattern itself;
+
+Direction Change Frequency:
+  how often route intent changes sign downstream;
+
+Across-River Coherence:
+  how broadly neighbouring rows share route intent;
+
+Low Lateral Motion Coverage:
+  fraction compressed toward low lateral magnitude;
+
+Obstacle Slowdown Strength / Obstacle Minimum Downstream Factor:
+  local nonnegative downstream slowdown contract.
 ```
 
-Added:
+`4.11C.5.16A` validation confirmed the shared velocity authority, physical lane advection, lateral sign response, flow reversal, and no premature FoamState movement. It exposed three blockers before material transport: transient Inspector HelpBoxes shifted controls, obstacle yellow could obscure slowdown darkness, and one route scale controlled both downstream and across-river frequency.
+
+`4.11C.5.16A.1` is implemented to correct those blockers:
 
 ```text
-Obstacle Slowdown Strength
-Obstacle Minimum Downstream Factor
+no runtime-changing diagnostic inserts or removes Inspector rows;
+Motion Field brightness is downstream speed only after all hue composition;
+Direction Change Frequency and Across-River Coherence are independent;
+all main, breaker, cross-cut, and warp frequencies use the split controls;
+the existing two-pass across-width smoothing remains in place;
+Motion Lane signature version 3 includes both route-shape controls;
+Obstacle Routing signature and rebuild authority remain unchanged.
 ```
 
-The existing Motion Field view now displays the resolved velocity rather than raw lateral intent. This patch deliberately does not move stored material laterally.
+This patch deliberately does not move stored material laterally or apply local slowdown to FoamState.
 
-### Immediate next patch
+### Active validation patch
+
+```text
+4.11C.5.16A.1 — Velocity Diagnostics Stability + Route Frequency
+```
+
+Validation must prove fixed Inspector geometry, unambiguous obstacle slowdown darkness, more frequent irregular downstream sign changes at `Direction Change Frequency = 2.0–2.5`, retained broad row grouping at `Across-River Coherence = 1.5–2.0`, no checkerboard/regular stripe result, and no stored-material movement regression.
+
+### Next major patch after validation
 
 ```text
 4.11C.5.16B — Conservative Unified 2D Material Advection
@@ -1259,4 +1289,44 @@ Current limitation intentionally retained:
 ```text
 CommitPhaseTransport still performs one global downstream column shift and preserves Y.
 No compute kernel currently changes FoamState according to local resolved velocity.
+```
+
+# `4.11C.5.16A.1` implementation record
+
+Status: implemented; Unity compile/import and visual validation required.
+
+Changed responsibilities:
+
+```text
+StylizedRiver.cs
+  preserves serialized foamMotionFieldLaneScale but changes its authored meaning to Direction Change Frequency;
+  adds foamMotionFieldAcrossRiverCoherence with a 0.5–4.0 range and default 1.0;
+  exposes independent runtime properties and clamps both controls.
+
+StylizedRiverEditor.cs
+  removes both calls to the transient DrawFoamTransportWarnings helper and removes the helper;
+  retains fixed-height Motion, Next Debug Section, Material Tick, and Status rows;
+  exposes Direction Change Frequency and Across-River Coherence separately.
+
+StylizedRiverFoamRuntime.Obstacles.cs
+  separates downstream and lateral noise-frequency scales across warps, all main octaves, breakers, and cross-cuts;
+  keeps SmoothMotionLaneAcrossWidth unchanged;
+  increments the lane algorithm signature from 2 to 3 and hashes both controls;
+  does not alter ResolveObstacleRoutingFieldSignature.
+
+SH_CleanStylizedRiver.shader
+  composes neutral/lateral/obstacle hue first, then multiplies by downstream-speed brightness;
+  prevents obstacle yellow from independently re-brightening slowed or stagnant regions.
+```
+
+Resource and ownership proof:
+
+```text
+no new texture;
+no new buffer;
+no new kernel;
+no new dispatch;
+no material-state write;
+no spawning change;
+no lifetime-rule change.
 ```

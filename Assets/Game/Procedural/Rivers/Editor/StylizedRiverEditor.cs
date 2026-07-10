@@ -1737,7 +1737,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         : "OK"
                     : "Runtime unavailable");
 
-            DrawFoamTransportWarnings(runtime);
             EditorGUI.indentLevel--;
         }
 
@@ -1848,15 +1847,20 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Lane Advection Ratio",
                     "Downstream speed of the generated lane pattern relative to base Foam speed. Zero fixes routes in river space; one advects them at the base Foam speed. This is physical sample-phase motion, not wraps per second."));
             EditorGUILayout.PropertyField(
+                Find("foamMotionFieldLaneScale"),
+                new GUIContent(
+                    "Direction Change Frequency",
+                    "Controls how often lateral route intent changes sign downstream. Higher values create more frequent but still irregular left/right changes; lower values create longer persistent route regions. This does not directly change across-river coherence."));
+            EditorGUILayout.PropertyField(
+                Find("foamMotionFieldAcrossRiverCoherence"),
+                new GUIContent(
+                    "Across-River Coherence",
+                    "Controls how broadly lateral route intent is shared across the river width. Higher values keep neighbouring rows coherent over larger areas; lower values permit finer across-river variation. This does not directly change downstream sign-change frequency."));
+            EditorGUILayout.PropertyField(
                 Find("foamMotionFieldNeutralCoverage"),
                 new GUIContent(
                     "Low Lateral Motion Coverage",
                     "Approximate fraction of the generated route field compressed toward very low lateral intent. These regions still have downstream velocity and are not true stagnant water."));
-            EditorGUILayout.PropertyField(
-                Find("foamMotionFieldLaneScale"),
-                new GUIContent(
-                    "Lateral Route Scale",
-                    "Broadness of coherent left/right routing regions. Lower values produce larger routes; higher values produce finer routes."));
             EditorGUILayout.PropertyField(
                 Find("foamObstacleSlowdownStrength"),
                 new GUIContent(
@@ -1897,7 +1901,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Status",
                 ResolveFoamTransportSmoothnessStatus(runtime));
 
-            DrawFoamTransportWarnings(runtime);
             EditorGUI.indentLevel--;
         }
 
@@ -3154,36 +3157,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 return "Open Material Shape";
             }
             return "No obvious diagnostic failure";
-        }
-
-        private static void DrawFoamTransportWarnings(
-            StylizedRiverFoamRuntime runtime)
-        {
-            if (runtime == null)
-            {
-                return;
-            }
-
-            if (runtime.MaterialStepsLastFrame > 1)
-            {
-                EditorGUILayout.HelpBox(
-                    "Material simulation steps are arriving in bursts. Foam may pause and jump.",
-                    MessageType.Warning);
-            }
-            if (runtime.EstimatedTransportCellsPerStep > 1.25f)
-            {
-                EditorGUILayout.HelpBox(
-                    "Estimated phase cells per material step is high. Base motion should still be committed by integer shifts, but very fast authored flow may move through several cells between material lifecycle ticks.",
-                    MessageType.Warning);
-            }
-            if (runtime.IntegratedPresenceArea > 0.0001f &&
-                runtime.FoamPhaseCellFraction <= 0.0001f &&
-                runtime.PhaseCommitCellsLastFrame == 0)
-            {
-                EditorGUILayout.HelpBox(
-                    "Live Foam exists but the residual phase is currently zero. This is healthy immediately after an integer commit, but Foam Phase / Cell should ramp upward during visible downstream movement.",
-                    MessageType.Info);
-            }
         }
 
         private void DrawMajorCandidatePreview()

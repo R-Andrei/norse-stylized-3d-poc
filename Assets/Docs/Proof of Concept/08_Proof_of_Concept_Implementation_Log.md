@@ -1576,7 +1576,7 @@ Added Cross-Lace Connectors as the third Free Water Foam birth pattern. The exis
 
 ### `4.11C.5.16A — Unified Foam Velocity Contract`
 
-Status: implemented; Unity compile/import and visual validation required.
+Status: implemented and validated at the velocity-contract level.
 
 Reason:
 
@@ -1586,7 +1586,7 @@ Implemented:
 
 - retained separate lane and obstacle-routing textures because lane samples scroll while obstacle routing stays fixed;
 - added `RiverWaterFoamVelocity.hlsl`, a pure shared resolver returning physical downstream/lateral velocity plus diagnostic intent/factor data;
-- changed Foam motion authoring semantics to Downstream Speed Ratio, Maximum Lateral Speed Ratio, Lane Advection Ratio, Low Lateral Motion Coverage, and Lateral Route Scale;
+- changed Foam motion authoring semantics to Downstream Speed Ratio, Maximum Lateral Speed Ratio, Lane Advection Ratio, Low Lateral Motion Coverage, and the original combined route-scale control;
 - added Obstacle Slowdown Strength and Obstacle Minimum Downstream Factor;
 - added one-time velocity-tuning migration: legacy Strength `1` becomes lateral ratio `0.22`, and legacy Scroll Hz `0.01` becomes lane-advection ratio `0.60`;
 - converted lane phase motion from `wraps/second × fieldWidth` to `baseFoamSpeed × laneAdvectionRatio / longitudinalSpacing`;
@@ -1613,6 +1613,50 @@ Deliberately unchanged:
 - no spawning changes;
 - no new steady-state texture memory.
 
+Validation confirmed:
+
+```text
+Maximum Lateral Speed Ratio = 0 removes lateral colour response;
+raising the ratio produces signed red/blue routes;
+river flow reversal behaves correctly;
+lane phase is no longer tied incorrectly to total river length;
+Material Presence remains unchanged because the contract is not yet FoamState authority.
+```
+
+Validation also exposed three pre-transport corrections: runtime warning HelpBoxes repeatedly changed Inspector height, obstacle-yellow debug composition obscured exact slowdown darkness, and the combined route-scale control produced downstream regions that were too broad while also controlling across-river variation.
+
 Next patch:
+
+`4.11C.5.16A.1 — Velocity Diagnostics Stability + Route Frequency`.
+
+### `4.11C.5.16A.1 — Velocity Diagnostics Stability + Route Frequency`
+
+Status: implemented; Unity compile/import and visual validation required.
+
+Implemented:
+
+- removed both runtime calls to `DrawFoamTransportWarnings` and removed the helper, so frame-local diagnostics no longer insert/remove Inspector rows;
+- retained fixed-height `Motion`, `Next Debug Section`, `Material Tick`, and `Status` labels;
+- changed Motion Field composition to build lateral/obstacle hue first and multiply it once by downstream-speed brightness;
+- preserved serialized `foamMotionFieldLaneScale` while changing its authored label/meaning to `Direction Change Frequency`;
+- added `foamMotionFieldAcrossRiverCoherence`, range `0.5–4.0`, default `1.0`;
+- separated downstream and lateral frequency scales in both warp coordinates, every main octave, breaker octave, and cross-cut octave;
+- retained the existing two-pass across-width smoother as the anti-checkerboard coherence guarantee;
+- incremented Motion Lane algorithm signature `2 -> 3` and included both route-shape controls;
+- left obstacle-routing signature/rebuild logic unchanged;
+- added no texture, buffer, kernel, dispatch, material-state write, spawning change, or lifetime change.
+
+Validation target:
+
+```text
+Inspector controls remain vertically stable for 20–30 seconds in Play Mode;
+Obstacle Slowdown Strength = 1 and Minimum Downstream Factor = 0 produce dark/near-black strong influence regions without losing route hue;
+Direction Change Frequency = 2.0–2.5 creates more frequent irregular downstream red/blue changes;
+Across-River Coherence = 1.5–2.0 keeps neighbouring rows grouped;
+result is neither checkerboard nor regular stripes;
+Material Presence remains unchanged.
+```
+
+Next major patch after acceptance:
 
 `4.11C.5.16B — Conservative Unified 2D Material Advection`.

@@ -3,7 +3,7 @@
 ## Status
 
 - **Active edge-wear architecture:** EW-C — Explicit Single-Segment Chamfer Kernel
-- **Current implementation step:** EW-C2S5R1 — Two-face internal boundary cancellation
+- **Current implementation step:** EW-C2S6 — Explicit source-boundary descendant ownership
 - **Geometry emission:** provisional build and audit only; final geometry commit remains disabled
 
 ## Feature goal
@@ -143,6 +143,12 @@ EW-C2S5 builds replacement-face boundary registrations locally, reduces the face
 
 EW-C2S5R1 classifies openness from incidence rather than winding direction. A registered edge with exactly two actual provisional uses on two distinct face records is already internally closed and all registrations for that key are cancelled. Opposite-direction pairs remain the expected orientation; same-direction pairs increment `sameDirectionClosedInternalEdges` as a non-blocking diagnostic. A one-use edge keeps one compatible source owner. Zero-use stale registrations, two uses from the same face record, or more than two uses remain hard failures. This does not weaken final non-manifold, T-junction, winding, or face-local duplicate-edge validation.
 
+EW-C2S5R1 validation reached the predicted gate: 21 of 24 placed objects report `readyForVertexPatches=1`. All 24 report zero non-manifold edges, zero T-junctions, zero face-local duplicate edges, zero stale registrations, and zero ownership failures. The only remaining blockers are three source-boundary objects: two with `expectedSourceBoundaryEdges=4, matchedSourceBoundaryEdges=2`, and the 36-edge boundary rock with `expectedSourceBoundaryEdges=5, matchedSourceBoundaryEdges=3`.
+
+EW-C2S6 replaces the source-boundary `HashSet<TopologyEdgeKey>` as the authoritative model with one ordered `ChamferSourceBoundaryRecord` per original boundary half-edge. Each record retains source-edge identity, boundary-loop index/order, original source endpoints, parent segment, and an ordered child list. Split plans subdivide the matching child record directly, so split counts are unique source-owned subdivisions rather than provisional-face occurrences.
+
+A subdivided source-boundary edge has two terminal transition children touching its original source vertices. Those terminal children are explicit source-vertex transition candidates. A terminal child with exactly two uses on two distinct provisional faces transfers to the source-vertex transition and is not expected open; a terminal child with exactly one use and no vertex-boundary registration remains a valid source-boundary opening. Non-terminal middle descendants and unsplit source-boundary children must remain one-use source-boundary openings. The expected topology-key set is derived from these records only after segmentation and vertex-boundary normalization. Duplicate descendant keys, incorrect terminal incidence, source/vertex ownership overlap, and non-unit incidence on expected open descendants remain hard failures with compact source-edge/loop/child diagnostics.
+
 The provisional topology must contain no unexpected openings, no missing expected vertex-patch boundaries, no non-manifold edges, and no T-junctions. Normal operation emits one readiness summary, one corner summary, and one provisional-emission summary. Intermediate per-pair segmentation logs are suppressed; a failed final topology audit emits one deduplicated warning containing at most three actionable records. The face list is discarded after audit and the original source mass remains the rendered geometry.
 
 ## Validation invariant
@@ -205,8 +211,8 @@ Chamfer topology is generated before gameplay and cached with the generated mass
 
 ## Next work items
 
-1. Compile and validate EW-C2S5R1 across all 24 placed masses.
-2. Confirm the five ownership-only blockers now report `readyForVertexPatches=1` and non-zero `sameDirectionClosedInternalEdges` where applicable.
-3. Require zero face-local normalization, duplicate-edge, multi-owner, non-manifold, and T-junction failures.
-4. Isolate the expected three preserved-source-boundary descendant mismatches for EW-C2S6.
-5. Begin EW-C3 only after all representative provisional meshes report `readyForVertexPatches=1`.
+1. Compile and validate EW-C2S6 across all 24 placed masses.
+2. Confirm the three boundary-loop objects report exact explicit descendant ownership with zero terminal-transfer or child-incidence failures.
+3. Require all 24 objects to report `expectedSourceBoundaryEdges=matchedSourceBoundaryEdges` and `readyForVertexPatches=1`.
+4. Keep geometry provisional and commit disabled during this validation.
+5. Begin EW-C3 only after the complete representative sample passes the final EW-C2 gate.

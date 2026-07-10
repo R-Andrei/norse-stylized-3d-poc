@@ -1,6 +1,87 @@
 # Ground Generation Surface Upgrade Plan
 
 
+### 2026-07-10 — Patch V3J.3C: Narrow Static Secondary Ridge Reconciliation
+
+V3J.3C is the active implementation patch. It keeps the validated V3J.3A4 stroke distribution and orientation unchanged and replaces only the V3J.3B broad visible fold footprint.
+
+Implemented geometry contract:
+
+```text
+visible half width:
+  stroke.Width * 0.5
+
+visible BodyWidth contribution:
+  none
+
+cross-section samples:
+  7
+
+surface:
+  narrow open ridge
+  no underside
+  no end caps
+
+boundary treatment:
+  side boundaries embedded 0.002 m below sampled ground
+  start/end rings embedded 0.002 m below sampled ground
+  width tapers toward a small non-zero terminal scale
+  height tapers to zero through the existing deterministic end envelope
+```
+
+The existing stochastic profile is retained but is evaluated only inside the narrow visible width. `Fold Broadness` is removed from author-facing controls, ridge calculations, signatures, serialized recipe data, and current style assets because the audit found no remaining consumer.
+
+Renderer and mesh contract:
+
+```text
+one child per GeneratedGround:
+  __PaintedAccentRidgePreview_Debug
+
+one MeshFilter
+one MeshRenderer
+one combined mesh containing every accepted stroke
+one shared neutral/dark lit material
+no collider
+ShadowCastingMode.Off
+receiveShadows = true
+motion vectors set to camera-only
+```
+
+The proof vertex layout is position + normal + UV0, with no tangents or vertex colours. The mesh uses 16-bit indices unless vertex count exceeds 65,535. Every explicit build logs actual stroke, vertex, triangle, estimated vertex-buffer, estimated index-buffer, total raw mesh bytes, and elapsed milliseconds.
+
+The base `GeneratedGround` mesh and `MeshCollider` are never changed by this feature. The editor preview remains CPU-readable. Production integration is deferred to the camp/run-loading phase, where static meshes may call `UploadMeshData(true)` after upload. There must be no calls from `Update`, `LateUpdate`, `FixedUpdate`, render callbacks, or other gameplay-time polling paths.
+
+Known V3J.3C limitation: the explicit ridge build still obtains stroke descriptors through `EnsurePaintedAccentFoldFieldCurrent()`, whose current generator also allocates/bakes the projected fold-field texture. V3J.3C does not perform a risky generator split. V3J.3D must separate descriptor generation from optional texture rasterization before production camp/loading integration so geometry-only chunks do not retain an unnecessary production texture.
+
+Current decision:
+
+```text
+active candidate:
+  narrow static secondary ridge geometry
+
+fallback:
+  projected/baked shader response from the same stroke descriptors
+
+rejected default:
+  broad ground apron
+  full closed tube
+  per-line GameObjects/renderers
+  gameplay-time generation
+```
+
+Focused validation:
+
+1. Unity compiles.
+2. `Build 3D Ridge Preview` creates exactly one separate visual child.
+3. The base mesh and collider remain unchanged.
+4. The broad `BodyWidth` apron is gone.
+5. Width responds only to `Stroke Width`.
+6. Height and irregularity still change real 3D form.
+7. Side and end boundaries disappear into the ground without caps.
+8. Distribution, length, facing direction, signed jitter, and seed determinism are unchanged.
+9. Console diagnostics report actual geometry and build cost.
+10. From the gameplay camera, marks read as tiny terrain accents rather than miniature hills, roots, wires, worms, or pipes.
+
 ### 2026-07-10 — Patch V3J.3B: Stochastic 3D Fold Surface Preview
 
 Patch V3J.3B converts the validated flat 3D stroke preview into the first actual raised-form proof. Stroke placement, density, length, facing-direction perpendicularity, and signed angle jitter remain unchanged from V3J.3A4. The patch changes only the preview surface and its explicit profile controls.
@@ -26,25 +107,27 @@ EndEnvelope(t)            -> blends both ends back to ground height
 Fold Height               -> normal-space height scale in metres
 ```
 
-No basis is named or treated as a crest or shoulder. The same formula can yield one broad offset rise, a flatter plateau, overlapping low rises, uneven slopes, or subtle local dips. `Fold Irregularity` controls basis count and parameter variation; `Fold Broadness` controls footprint/profile spread; `Fold End Taper` controls the length of the start/end blend.
+No basis is named or treated as a crest or shoulder. The same formula can yield one broad offset rise, a flatter plateau, overlapping low rises, uneven slopes, or subtle local dips. `Fold Irregularity` controls basis count and parameter variation; `Fold End Taper` controls the length of the start/end blend. V3J.3C removes `Fold Broadness` from ridge authoring and ridge calculations because the broad-body footprint was the failure being corrected.
 
 Code changes:
 
 ```text
 GroundSurfaceFeatureRecipe
-  adds Fold Height, Fold Irregularity, Fold Broadness, Fold End Taper
+  historically added Fold Height, Fold Irregularity, Fold Broadness, Fold End Taper
+  V3J.3C retains Height/Irregularity/End Taper and retires Broadness from ridge authoring
   corrects the generic Direction tooltip: Painted Accent orientation uses Facing Direction Degrees
 
 GeneratedGround
-  replaces the flat two-vertex ribbon preview with an 11-sample cross-stroke surface
+  replaced the flat two-vertex ribbon preview with an 11-sample broad proof surface
+  V3J.3C replaces that with a 7-sample narrow open ridge
   projects stroke tangents onto the sampled ground-normal plane
   generates per-stroke deterministic Gaussian profile bases
   re-samples ground height/normal at every lateral profile vertex
   samples stochastic height across and along every stroke
   recalculates mesh normals/tangents
   uses a lit debug material for readable 3D form
-  replaces __FoldFieldLinePreview_Debug with __PaintedAccentFoldSurfacePreview_Debug
-  clears legacy line-preview children during rebuild/cleanup
+  replaced __FoldFieldLinePreview_Debug with __PaintedAccentFoldSurfacePreview_Debug at the V3J.3B stage
+  V3J.3C now uses __PaintedAccentRidgePreview_Debug and clears both legacy preview names
 
 GeneratedGroundEditor / GroundSurfaceStyleProfileEditor
   expose the four profile controls
@@ -54,7 +137,7 @@ GeneratedGround signature
   includes all four profile controls so editor changes invalidate the generated Painted Accent data deterministically
 ```
 
-V3J.3B remains editor/debug-only. It does not alter the production ground mesh, collider, gameplay height, shader final-render activation, or family presets. Validation should judge only whether the raised surfaces read as useful irregular ground folds. V3K is the decision patch for final geometry versus baked shader response versus a hybrid.
+V3J.3B remains historical editor/debug proof context. V3J.3C resolves its decision gate: the base mesh/collider remain immutable, narrow secondary geometry is the active candidate, and baked projection is fallback only.
 
 ### 2026-07-10 — Patch V3J.3A4: Perpendicular Facing-Direction Fix
 
@@ -113,7 +196,7 @@ Painted Accent Stroke Angle Jitter Degrees
 
 The fold-field signature includes the layout controls, so changing density, length, facing direction, or angle jitter invalidates and rebuilds the generated stroke/fold-field data. The generator no longer relies on `Strength` for approximate count or generic `Scale` for stroke length. Density is an approximate target count per 40x40 patch and length min/max are direct metre controls. V3J.3A's preferred-direction wording is historical; V3J.3A4 established the active facing-direction-plus-perpendicular angle contract.
 
-Generation also uses an expanded deterministic placement-attempt grid. This keeps placement stratified while making density more reliable after support-based rejection. At the V3J.3A stage the validation target was the temporary `Build 3D Line Preview`; V3J.3B has now superseded it with `Build 3D Fold Preview`.
+Generation also uses an expanded deterministic placement-attempt grid. This keeps placement stratified while making density more reliable after support-based rejection. At the V3J.3A stage the validation target was the temporary `Build 3D Line Preview`; V3J.3B historically superseded it with `Build 3D Fold Preview`, and V3J.3C now supersedes that broad proof with `Build 3D Ridge Preview`.
 
 ### 2026-07-10 — Patch V3J.3R: Painted Accent 3D Stroke Baseline Reconciliation
 
@@ -1072,18 +1155,18 @@ stratified stroke placement over the local ground bounds
 
 The removed active code includes the continuous fractal body field, percentile body shaping, thresholded peak mask, connected-component labeling, boundary-distance crest scoring, and soft crest rasterizer. Those ideas remain documented as failed experiments only.
 
-The old height-preview workflow was retired in V3J.3R. Its temporary flat line-ribbon preview was then used through V3J.3A4 to validate placement, distribution, length, and orientation. V3J.3B supersedes that temporary preview with:
+The old height-preview workflow was retired in V3J.3R. Its temporary flat line-ribbon preview was then used through V3J.3A4 to validate placement, distribution, length, and orientation. V3J.3B introduced a broad raised proof surface; V3J.3C supersedes it with:
 
 ```text
 GeneratedGround Inspector:
-  Build 3D Fold Preview
-  Clear 3D Fold Preview
+  Build 3D Ridge Preview
+  Clear 3D Ridge Preview
 
 Preview child object:
-  __PaintedAccentFoldSurfacePreview_Debug
+  __PaintedAccentRidgePreview_Debug
 ```
 
-The active preview is now a raised stochastic surface sampled around the accepted 3D strokes. Field/noise-first line discovery remains retired.
+The active preview is a narrow open stochastic ridge sampled around the accepted 3D strokes. Field/noise-first line discovery remains retired, and `BodyWidth` no longer contributes to visible secondary geometry.
 
 ### 2026-07-10 — Patch V3J.2: Precomputed Peak-Region Crest Lines
 

@@ -9421,6 +9421,7 @@ MonoBehaviour:
   foamMotionFieldScrollHz: 0.6
   foamMotionFieldNeutralCoverage: 0.1
   foamMotionFieldLaneScale: 1
+  foamMotionFieldAcrossRiverCoherence: 1
   foamObstacleSlowdownStrength: 0.85
   foamObstacleMinimumDownstreamFactor: 0.12
   foamMaterialLifecycleTuningVersion: 1

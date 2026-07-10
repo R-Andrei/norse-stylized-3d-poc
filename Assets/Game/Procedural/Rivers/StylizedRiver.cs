@@ -251,9 +251,12 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamLowLateralMotionCoverage = 0f;
         private const float MaximumFoamLowLateralMotionCoverage = 0.30f;
         private const float DefaultFoamLowLateralMotionCoverage = 0.10f;
-        private const float MinimumFoamLateralRouteScale = 0.25f;
-        private const float MaximumFoamLateralRouteScale = 4f;
-        private const float DefaultFoamLateralRouteScale = 1f;
+        private const float MinimumFoamDirectionChangeFrequency = 0.25f;
+        private const float MaximumFoamDirectionChangeFrequency = 4f;
+        private const float DefaultFoamDirectionChangeFrequency = 1f;
+        private const float MinimumFoamAcrossRiverCoherence = 0.5f;
+        private const float MaximumFoamAcrossRiverCoherence = 4f;
+        private const float DefaultFoamAcrossRiverCoherence = 1f;
         private const float MinimumFoamObstacleSlowdownStrength = 0f;
         private const float MaximumFoamObstacleSlowdownStrength = 1f;
         private const float DefaultFoamObstacleSlowdownStrength = 0.85f;
@@ -1367,13 +1370,21 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamMotionFieldNeutralCoverage =
             DefaultFoamLowLateralMotionCoverage;
 
-        [Tooltip("Feature scale of coherent left/right routing regions. Lower values produce broader routes; higher values produce finer routes. Changing this regenerates the lane texture only.")]
+        [Tooltip("Controls how often generated left/right route intent changes sign downstream. Higher values create more frequent but still irregular downstream route changes; lower values create longer persistent route regions. This does not directly change across-river coherence. Changing this regenerates the lane texture only.")]
         [Range(
-            MinimumFoamLateralRouteScale,
-            MaximumFoamLateralRouteScale)]
+            MinimumFoamDirectionChangeFrequency,
+            MaximumFoamDirectionChangeFrequency)]
         [SerializeField]
         private float foamMotionFieldLaneScale =
-            DefaultFoamLateralRouteScale;
+            DefaultFoamDirectionChangeFrequency;
+
+        [Tooltip("Controls how broadly lateral route intent is shared across the river width. Higher values keep neighbouring rows coherent over larger areas; lower values permit finer across-river variation. This does not directly change how often routes switch downstream. Changing this regenerates the lane texture only.")]
+        [Range(
+            MinimumFoamAcrossRiverCoherence,
+            MaximumFoamAcrossRiverCoherence)]
+        [SerializeField]
+        private float foamMotionFieldAcrossRiverCoherence =
+            DefaultFoamAcrossRiverCoherence;
 
         [Tooltip("How strongly obstacle-routing influence reduces local downstream Foam speed. Zero preserves full downstream speed around obstacles; one permits the strongest authored slowdown.")]
         [Range(
@@ -2326,11 +2337,16 @@ namespace ProgrammaticStylized3D.Rivers
                 foamMotionFieldNeutralCoverage,
                 MinimumFoamLowLateralMotionCoverage,
                 MaximumFoamLowLateralMotionCoverage);
-        public float FoamLateralRouteScale =>
+        public float FoamDirectionChangeFrequency =>
             Mathf.Clamp(
                 foamMotionFieldLaneScale,
-                MinimumFoamLateralRouteScale,
-                MaximumFoamLateralRouteScale);
+                MinimumFoamDirectionChangeFrequency,
+                MaximumFoamDirectionChangeFrequency);
+        public float FoamAcrossRiverCoherence =>
+            Mathf.Clamp(
+                foamMotionFieldAcrossRiverCoherence,
+                MinimumFoamAcrossRiverCoherence,
+                MaximumFoamAcrossRiverCoherence);
         public float FoamObstacleSlowdownStrength =>
             Mathf.Clamp(
                 foamObstacleSlowdownStrength,
@@ -4331,8 +4347,12 @@ namespace ProgrammaticStylized3D.Rivers
                 MaximumFoamLowLateralMotionCoverage);
             foamMotionFieldLaneScale = Mathf.Clamp(
                 foamMotionFieldLaneScale,
-                MinimumFoamLateralRouteScale,
-                MaximumFoamLateralRouteScale);
+                MinimumFoamDirectionChangeFrequency,
+                MaximumFoamDirectionChangeFrequency);
+            foamMotionFieldAcrossRiverCoherence = Mathf.Clamp(
+                foamMotionFieldAcrossRiverCoherence,
+                MinimumFoamAcrossRiverCoherence,
+                MaximumFoamAcrossRiverCoherence);
             foamObstacleSlowdownStrength = Mathf.Clamp(
                 foamObstacleSlowdownStrength,
                 MinimumFoamObstacleSlowdownStrength,

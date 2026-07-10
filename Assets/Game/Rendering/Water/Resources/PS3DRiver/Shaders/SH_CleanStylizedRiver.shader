@@ -901,22 +901,19 @@ Shader "PS3D/Stylized River Water"
                     float3 lateralColour = resolvedLateral >= 0.0
                         ? float3(0.96, 0.20, 0.07)
                         : float3(0.08, 0.30, 0.96);
-                    float3 fieldColour = lerp(
+                    float3 fieldHue = lerp(
                         neutralColour,
                         lateralColour,
                         lateralMagnitude);
-                    fieldColour *= lerp(
+                    fieldHue = lerp(
+                        fieldHue,
+                        float3(1.0, 0.82, 0.10),
+                        resolvedVelocity.obstacleInfluence * 0.48);
+                    float downstreamBrightness = lerp(
                         0.06,
                         1.0,
                         resolvedVelocity.downstreamSpeedFactor);
-                    fieldColour = lerp(
-                        fieldColour,
-                        float3(1.0, 0.82, 0.10) *
-                            lerp(
-                                0.35,
-                                1.0,
-                                resolvedVelocity.downstreamSpeedFactor),
-                        resolvedVelocity.obstacleInfluence * 0.48);
+                    float3 fieldColour = fieldHue * downstreamBrightness;
 
                     // 5.9u: Foam Motion Field diagnostics must show raw stored
                     // material ownership, not the final/evaluated render mask.
