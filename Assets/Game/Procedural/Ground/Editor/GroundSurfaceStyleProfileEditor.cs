@@ -383,7 +383,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         0.35f,
                         new GUIContent(
                             "Stroke Width",
-                            "Visible width in metres for the narrow secondary ridge. Legacy BodyWidth is not used by the ridge mesh."));
+                            "Visible width in metres for the open crest ribbon. Legacy BodyWidth is not used by the ribbon mesh."));
                     EditorGUILayout.Slider(
                         paintedAccentStrokeDensity,
                         0f,
@@ -421,22 +421,22 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                             "Maximum signed angle offset in degrees around the perpendicular stroke angle derived from Facing Direction Degrees. Each stroke rolls independently between -value and +value."));
                     EditorGUILayout.Space(4f);
                     EditorGUILayout.LabelField(
-                        "Narrow Stochastic 3D Ridge",
+                        "Grounded Open Crest Ribbon",
                         EditorStyles.miniBoldLabel);
                     EditorGUILayout.Slider(
                         paintedAccentFoldHeight,
                         0f,
-                        0.15f,
+                        0.25f,
                         new GUIContent(
                             "Fold Height",
-                            "Calibration-only maximum raised ridge height in metres. Test 0.02, 0.06, and 0.12 from the same gameplay camera; this extended range is not an accepted production default."));
+                            "Calibration-only maximum open-ribbon height in metres. Validate 0.12, 0.18, and 0.24 from the same gameplay camera; this extended range is not an accepted production default."));
                     EditorGUILayout.Slider(
                         paintedAccentFoldIrregularity,
                         0f,
                         1f,
                         new GUIContent(
                             "Fold Irregularity",
-                            "Strength of deterministic smooth profile variation across and along each stroke. This does not add lateral centerline squiggle."));
+                            "Strength of the deterministic profile search that sets crest height along each stroke. This does not add lateral centerline squiggle."));
                     EditorGUILayout.Slider(
                         paintedAccentFoldEndTaper,
                         0f,

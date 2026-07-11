@@ -1,47 +1,62 @@
 # Ground Generation Surface Upgrade Plan
 
 
-### 2026-07-11 — Patch V3J.3C1: Ridge Readability Calibration Candidate
+### 2026-07-11 — Patch V3J.3C2: Grounded Open Crest Ribbon Proof
 
-V3J.3C removed the rejected broad apron and stayed within budget, but its gameplay-camera validation failed: default and increased Fold Height settings still read mainly as flat dark scratches. V3J.3C1 is the current **unvalidated implementation candidate** used to decide whether narrow secondary geometry remains viable.
+V3J.3C2 is implemented as the final unvalidated secondary-geometry proof before returning to projection. The patch changes only the preview representation and its authoring/documentation contract. Descriptor generation, projected/debug rasterization, the style asset, shaders, base ground mesh, base collider, scenes, and unrelated systems remain unchanged.
 
-Implemented calibration scope:
+Implemented geometry contract:
 
 ```text
-descriptor generation:
-  unchanged
+crest source:
+  evaluate the existing stochastic profile at 5 cross positions
+  keep the maximum normalized height for each longitudinal row
 
-projected/debug texture rasterization:
-  unchanged
+visible ribbon:
+  2 vertices across
+  width remains stroke.Width
+  each side independently samples ground height and render normal
+  both sides receive the same row crest height
 
-ridge longitudinal samples:
-  minimum 7, locally interpolated from the existing descriptor
+longitudinal resolution:
+  minimum 13 rows
 
-ridge cross samples:
-  5
+ground connection:
+  existing deterministic end envelope retained
+  width retains the non-zero terminal scale
+  only first and final vertex pairs embed by 0.002 m
 
-proof Fold Height range:
-  0–0.15 m; no serialized default or style-asset change
-
-proof material:
-  neutral mid-value URP lit material
-  shadow casting remains disabled
-
-controlled test heights:
-  0.02 m
-  0.06 m
-  0.12 m
+removed filled representation:
+  no cross-width surface grid
+  no side-boundary embedding
+  no underside
+  no collider
 ```
 
-For the current 36 strokes with five descriptor points, topology remains exactly 1,260 vertices and 1,728 triangles. The expanded diagnostic reports actual generated height/width ranges, longitudinal resolution, material state, topology, memory, and timing.
+For 36 accepted strokes at thirteen rows, the proof must report 936 vertices and 864 triangles. Estimated raw mesh storage is 35,136 bytes using the existing 32-byte vertex estimate and 16-bit indices. The diagnostic fields are `crestSearchSamples=5`, `ribbonVerticesAcross=2`, `longitudinalSamplesMin/Mean/Max`, `crestPeakHeightMin/Mean/Max`, effective width, material state, topology, memory, and build time.
 
-Decision gate:
+The Fold Height authoring range is temporarily `0–0.25 m`; serialized defaults and `GSSP_Snowfield.asset` are unchanged. Controlled validation heights are:
 
-- pass only if a restrained height is clearly raised from the normal gameplay camera without reading as a root, wall, blade, or obstacle;
-- fail if useful readability appears only at `0.12 m` or similarly intrusive dimensions;
-- on failure, stop increasing geometric complexity and return to descriptor-driven projected rendering.
+```text
+0.12 m
+0.18 m
+0.24 m
+```
 
-Do not promote this candidate or begin V3J.3D descriptor/texture separation until the user validates the controlled height test.
+Validation gate:
+
+- confirm the same stroke placement, length, facing, signed jitter, and width semantics;
+- confirm each mark starts on the ground, rises through intermediate rows, and returns to the ground;
+- confirm there is no Painted Accent surface filling the area underneath;
+- confirm one child mesh, one renderer, no collider, and no base-ground/collider mutation;
+- accept only if gameplay and low-angle views read as grounded raised accents rather than floating tape, roots, wires, blades, walls, or obstacles;
+- if the representation fails, stop increasing geometry complexity and return to descriptor-driven projection.
+
+V3J.3D descriptor/texture separation remains deferred until the representation decision is made.
+
+### 2026-07-11 — Patch V3J.3C1: Ridge Readability Calibration Result
+
+C1 validation proved monotonic height response and stable topology but rejected the filled five-wide surface. Requested heights `0.02`, `0.06`, and `0.12 m` produced mean generated peaks `0.0184`, `0.0552`, and `0.1105 m` while remaining at 36 strokes, 1,260 vertices, 1,728 triangles, and stable effective width. At `0.12 m` the height was clearly visible, but the fully triangulated cross-width surface read as a hill. The open crest ribbon in V3J.3C2 addresses that exact representation failure rather than adding more height or changing descriptor generation.
 
 ### 2026-07-10 — Patch V3J.3C: Narrow Static Secondary Ridge Reconciliation
 

@@ -241,8 +241,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             "__FoldFieldLinePreview_Debug";
         private const float PaintedAccentRidgeBoundaryEmbedDepth = 0.002f;
         private const float PaintedAccentRidgeMinimumEndWidthScale = 0.12f;
-        private const int PaintedAccentFoldCrossSectionSampleCount = 5;
-        private const int PaintedAccentRidgeMinimumLongitudinalSampleCount = 7;
+        private const int PaintedAccentCrestSearchSampleCount = 5;
+        private const int PaintedAccentRibbonVertexCountAcross = 2;
+        private const int PaintedAccentRibbonMinimumLongitudinalSampleCount = 13;
 
         // Position (12) + normal (12) + UV0 (8). The proof mesh has no
         // tangents, vertex colours, collider data, or secondary streams.
@@ -1724,9 +1725,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             int minimumLongitudinalSampleCount = int.MaxValue;
             int maximumLongitudinalSampleCount = 0;
             long totalLongitudinalSampleCount = 0;
-            float minimumStrokePeakHeight = float.PositiveInfinity;
-            float maximumStrokePeakHeight = 0f;
-            double totalStrokePeakHeight = 0d;
+            float minimumCrestPeakHeight = float.PositiveInfinity;
+            float maximumCrestPeakHeight = 0f;
+            double totalCrestPeakHeight = 0d;
             float minimumEffectiveWidth = float.PositiveInfinity;
             float maximumEffectiveWidth = 0f;
             double totalEffectiveWidth = 0d;
@@ -1747,7 +1748,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 Vector3[] normals = stroke.LocalNormals;
                 int longitudinalSampleCount =
                     Mathf.Max(
-                        PaintedAccentRidgeMinimumLongitudinalSampleCount,
+                        PaintedAccentRibbonMinimumLongitudinalSampleCount,
                         points.Length);
                 PaintedAccentFoldProfileBasis[] profileBases =
                     BuildPaintedAccentFoldProfileBases(
@@ -1759,7 +1760,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 float strokeHeight =
                     foldHeight *
                     Mathf.Lerp(0.82f, 1f, stroke.Strength);
-                float strokePeakHeight = 0f;
+                float crestPeakHeightForStroke = 0f;
 
                 for (int pointIndex = 0;
                      pointIndex < longitudinalSampleCount;
@@ -1817,28 +1818,44 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
                     across.Normalize();
 
-                    for (int crossIndex = 0;
-                         crossIndex < PaintedAccentFoldCrossSectionSampleCount;
-                         crossIndex++)
+                    float normalizedCrestHeight = 0f;
+                    for (int sampleIndex = 0;
+                         sampleIndex < PaintedAccentCrestSearchSampleCount;
+                         sampleIndex++)
                     {
-                        float cross01 =
-                            crossIndex /
-                            (float)(PaintedAccentFoldCrossSectionSampleCount - 1);
-                        float u = cross01 * 2f - 1f;
-                        float normalizedHeight =
-                            ResolvePaintedAccentFoldProfileHeight(
-                                t,
-                                u,
-                                stroke.Seed,
-                                profileBases,
-                                profileNormalization,
-                                foldIrregularity,
-                                endEnvelope);
-                        float height = strokeHeight * normalizedHeight;
-                        strokePeakHeight = Mathf.Max(strokePeakHeight, height);
+                        float sample01 =
+                            sampleIndex /
+                            (float)(PaintedAccentCrestSearchSampleCount - 1);
+                        float u = sample01 * 2f - 1f;
+                        normalizedCrestHeight =
+                            Mathf.Max(
+                                normalizedCrestHeight,
+                                ResolvePaintedAccentFoldProfileHeight(
+                                    t,
+                                    u,
+                                    stroke.Seed,
+                                    profileBases,
+                                    profileNormalization,
+                                    foldIrregularity,
+                                    endEnvelope));
+                    }
+
+                    float crestHeight =
+                        strokeHeight * normalizedCrestHeight;
+                    crestPeakHeightForStroke =
+                        Mathf.Max(crestPeakHeightForStroke, crestHeight);
+
+                    for (int sideIndex = 0;
+                         sideIndex < PaintedAccentRibbonVertexCountAcross;
+                         sideIndex++)
+                    {
+                        float side01 =
+                            sideIndex /
+                            (float)(PaintedAccentRibbonVertexCountAcross - 1);
+                        float sideSign = side01 * 2f - 1f;
                         Vector3 lateralPosition =
                             centerlinePoint +
-                            across * (u * effectiveHalfWidth);
+                            across * (sideSign * effectiveHalfWidth);
                         Vector3 groundPosition = lateralPosition;
                         Vector3 liftNormal = normal;
                         Vector2 lateralXZ =
@@ -1860,20 +1877,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             }
                         }
 
-                        bool isSideBoundary =
-                            crossIndex == 0 ||
-                            crossIndex ==
-                                PaintedAccentFoldCrossSectionSampleCount - 1;
                         float boundaryEmbed =
-                            isEndBoundary || isSideBoundary
+                            isEndBoundary
                                 ? PaintedAccentRidgeBoundaryEmbedDepth
                                 : 0f;
                         Vector3 surfacePosition =
                             groundPosition +
-                            liftNormal * (height - boundaryEmbed);
+                            liftNormal * (crestHeight - boundaryEmbed);
 
                         vertices.Add(surfacePosition);
-                        uvs.Add(new Vector2(t, cross01));
+                        uvs.Add(new Vector2(t, side01));
                     }
                 }
 
@@ -1881,25 +1894,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                      pointIndex < longitudinalSampleCount - 1;
                      pointIndex++)
                 {
-                    for (int crossIndex = 0;
-                         crossIndex < PaintedAccentFoldCrossSectionSampleCount - 1;
-                         crossIndex++)
-                    {
-                        int a =
-                            baseVertex +
-                            pointIndex * PaintedAccentFoldCrossSectionSampleCount +
-                            crossIndex;
-                        int b = a + 1;
-                        int c = a + PaintedAccentFoldCrossSectionSampleCount;
-                        int d = c + 1;
+                    int a =
+                        baseVertex +
+                        pointIndex * PaintedAccentRibbonVertexCountAcross;
+                    int b = a + 1;
+                    int c = a + PaintedAccentRibbonVertexCountAcross;
+                    int d = c + 1;
 
-                        triangles.Add(a);
-                        triangles.Add(c);
-                        triangles.Add(b);
-                        triangles.Add(b);
-                        triangles.Add(c);
-                        triangles.Add(d);
-                    }
+                    triangles.Add(a);
+                    triangles.Add(c);
+                    triangles.Add(b);
+                    triangles.Add(b);
+                    triangles.Add(c);
+                    triangles.Add(d);
                 }
 
                 minimumLongitudinalSampleCount =
@@ -1911,15 +1918,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                         maximumLongitudinalSampleCount,
                         longitudinalSampleCount);
                 totalLongitudinalSampleCount += longitudinalSampleCount;
-                minimumStrokePeakHeight =
-                    Mathf.Min(minimumStrokePeakHeight, strokePeakHeight);
-                maximumStrokePeakHeight =
-                    Mathf.Max(maximumStrokePeakHeight, strokePeakHeight);
-                totalStrokePeakHeight += strokePeakHeight;
+                minimumCrestPeakHeight =
+                    Mathf.Min(minimumCrestPeakHeight, crestPeakHeightForStroke);
+                maximumCrestPeakHeight =
+                    Mathf.Max(maximumCrestPeakHeight, crestPeakHeightForStroke);
+                totalCrestPeakHeight += crestPeakHeightForStroke;
                 builtStrokeCount++;
             }
 
-            if (vertices.Count < PaintedAccentFoldCrossSectionSampleCount * 2 ||
+            if (vertices.Count < PaintedAccentRibbonVertexCountAcross * 2 ||
                 triangles.Count < 6)
             {
                 return;
@@ -1978,9 +1985,9 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 builtStrokeCount > 0
                     ? totalLongitudinalSampleCount / (float)builtStrokeCount
                     : 0f;
-            float meanStrokePeakHeight =
+            float meanCrestPeakHeight =
                 builtStrokeCount > 0
-                    ? (float)(totalStrokePeakHeight / builtStrokeCount)
+                    ? (float)(totalCrestPeakHeight / builtStrokeCount)
                     : 0f;
             float meanEffectiveWidth =
                 effectiveWidthSampleCount > 0
@@ -2006,16 +2013,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
 
             Debug.Log(
-                $"GeneratedGround Painted Accent ridge built: " +
+                $"GeneratedGround Painted Accent open crest ribbon built: " +
                 $"strokes={builtStrokeCount}, " +
                 $"requestedFoldHeight={foldHeight:F4}, " +
-                $"crossSamples={PaintedAccentFoldCrossSectionSampleCount}, " +
+                $"crestSearchSamples={PaintedAccentCrestSearchSampleCount}, " +
+                $"ribbonVerticesAcross={PaintedAccentRibbonVertexCountAcross}, " +
                 $"longitudinalSamplesMin={minimumLongitudinalSampleCount}, " +
                 $"longitudinalSamplesMean={meanLongitudinalSampleCount:F2}, " +
                 $"longitudinalSamplesMax={maximumLongitudinalSampleCount}, " +
-                $"strokePeakHeightMin={minimumStrokePeakHeight:F4}, " +
-                $"strokePeakHeightMean={meanStrokePeakHeight:F4}, " +
-                $"strokePeakHeightMax={maximumStrokePeakHeight:F4}, " +
+                $"crestPeakHeightMin={minimumCrestPeakHeight:F4}, " +
+                $"crestPeakHeightMean={meanCrestPeakHeight:F4}, " +
+                $"crestPeakHeightMax={maximumCrestPeakHeight:F4}, " +
                 $"effectiveWidthMin={minimumEffectiveWidth:F4}, " +
                 $"effectiveWidthMean={meanEffectiveWidth:F4}, " +
                 $"effectiveWidthMax={maximumEffectiveWidth:F4}, " +

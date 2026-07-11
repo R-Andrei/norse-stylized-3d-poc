@@ -225,10 +225,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -476,10 +476,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -916,10 +916,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -1132,10 +1132,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -1348,10 +1348,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -1738,10 +1738,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -2588,10 +2588,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -4120,10 +4120,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -5687,10 +5687,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -5903,10 +5903,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -6162,10 +6162,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -6651,10 +6651,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -6991,10 +6991,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -7683,10 +7683,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -10219,10 +10219,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -10435,10 +10435,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -11055,10 +11055,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0
@@ -11303,10 +11303,10 @@ MonoBehaviour:
   creaseLength: 1
   creaseBranching: 1
   creaseSoftness: 0.35
-  coldGreyStoneMaterial: {fileID: 0}
-  darkWetRiverStoneMaterial: {fileID: 0}
-  paleFrostStoneMaterial: {fileID: 0}
-  blackSacredStoneMaterial: {fileID: 0}
+  coldGreyStoneMaterial: {fileID: 2100000, guid: adf0a0ddcceb42778e785f055259e671, type: 2}
+  darkWetRiverStoneMaterial: {fileID: 2100000, guid: e477b0a17b534e548e4e7d9ebecdc1a2, type: 2}
+  paleFrostStoneMaterial: {fileID: 2100000, guid: ef559f81a4c94d2dbd3b434670a1d111, type: 2}
+  blackSacredStoneMaterial: {fileID: 2100000, guid: 09d2a7e253fa49b2955d01f76f807d50, type: 2}
   riverInteraction:
     participation: 0
     staticPressureMode: 0

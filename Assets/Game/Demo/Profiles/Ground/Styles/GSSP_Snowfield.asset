@@ -90,7 +90,7 @@ MonoBehaviour:
       paintedAccentStrokeLengthMax: 2.08
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 14.4
-      paintedAccentFoldHeight: 0.0386
+      paintedAccentFoldHeight: 0.12
       paintedAccentFoldIrregularity: 0.778
       paintedAccentFoldEndTaper: 0.65
   - id: snowfield.patchy

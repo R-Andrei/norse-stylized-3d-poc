@@ -10,20 +10,34 @@ implementation_documents:
   - Ground_Generation_Surface_Upgrade_Plan.md
 ---
 
-### 2026-07-11 — Patch V3J.3C1: Ridge Readability Calibration Candidate
+### 2026-07-11 — Patch V3J.3C2: Grounded Open Crest Ribbon Candidate
 
-V3J.3C passed its topology and cost gates but failed the gameplay-camera readability gate: the narrow geometry read primarily as flat dark scratches, and increasing the persisted Clean Fold Height to `0.0386 m` did not expose a convincing raised form. V3J.3C1 is an **unvalidated calibration candidate**, not an accepted production representation.
+V3J.3C2 is the current **implemented but unvalidated representation candidate**. It preserves the validated deterministic `GroundPaintedAccentSurfaceStroke` descriptors, their whole-chunk placement, facing rule, signed jitter, visible `Stroke Width`, and the optional projected/debug field. Only the visual-only secondary mesh representation changes.
 
-The candidate preserves the validated generated stroke descriptors and projected/debug rasterization. It does not change `GroundPaintedAccentFoldFieldGenerator`. The secondary ridge builder alone resamples every existing descriptor to at least seven longitudinal rows and reduces its cross-section from seven to five samples. For the demonstrated 36-stroke/five-source-point case this retains exactly 1,260 vertices and 1,728 triangles:
+At each longitudinal row, the existing stochastic fold profile is still evaluated at five cross positions (`u = -1, -0.5, 0, 0.5, 1`). The maximum normalized result becomes one crest height. The mesh then generates exactly two vertices across the stroke at `±Stroke Width / 2`, with both vertices lifted to that crest height from independently sampled ground positions and normals. Consecutive rows form one quad. There are no cross-width triangles descending from the crest to the ground, no underside, and no collider.
+
+Ground connection is longitudinal only: the existing deterministic end envelope drives height and width toward the first and final row, and only those terminal pairs receive the `0.002 m` embed. Side-edge embedding is removed because every generated vertex is now a ribbon edge. The minimum longitudinal resolution is thirteen rows so the start and finish ramps contain enough intermediate segments to read as rising from and returning to the terrain rather than abruptly appearing above it.
+
+For the demonstrated 36-stroke case, the expected proof topology is:
 
 ```text
-36 strokes × 7 longitudinal samples × 5 cross samples = 1,260 vertices
-36 strokes × 6 longitudinal spans × 4 cross spans × 2 = 1,728 triangles
+36 strokes × 13 longitudinal rows × 2 ribbon vertices = 936 vertices
+36 strokes × 12 longitudinal spans × 2 triangles = 864 triangles
+
+estimated vertex buffer: 29,952 bytes
+estimated index buffer:   5,184 bytes
+estimated raw mesh:      35,136 bytes
 ```
 
-The proof-only Fold Height authoring range is temporarily extended from `0–0.05 m` to `0–0.15 m` without changing serialized defaults or style assets. The proof material changes from near-black to a neutral mid-value lit colour so geometry can be judged through lighting and silhouette rather than dark-line contrast. The build diagnostic now records requested height, longitudinal and cross sample counts, actual generated per-stroke peak heights, effective widths, material identity/colour, shadow mode, topology, memory estimate, and build time.
+The calibration-only Fold Height range is extended to `0–0.25 m` without changing the serialized default or `GSSP_Snowfield.asset`. Validation uses the same seed, layout, gameplay camera, and material at `0.12 m`, `0.18 m`, and `0.24 m`. Geometry is accepted only if the marks read as raised, grounded terrain accents with visibly empty space beneath the crest and without becoming roots, wires, tape, walls, or gameplay obstacles. Projection remains the fallback if this final geometry proof fails.
 
-Validation must use the same seed and gameplay camera at `0.02 m`, `0.06 m`, and `0.12 m`. Continue with secondary geometry only if a restrained height reads clearly. If only root-like or obstacle-like dimensions become readable, reject this representation and retain the validated descriptors for projected rendering.
+The explicit build diagnostic now reports `crestSearchSamples=5`, `ribbonVerticesAcross=2`, longitudinal sample counts, generated crest-peak heights, effective widths, material state, topology, memory estimate, and build time. The descriptor/texture generation coupling remains deferred to V3J.3D and must not be widened into this visual proof.
+
+### 2026-07-11 — Patch V3J.3C1: Ridge Readability Calibration Result
+
+V3J.3C1 was validated at requested Fold Heights `0.02 m`, `0.06 m`, and `0.12 m` using the same 36-stroke layout. The generated mean peak response was nearly linear (`0.0184 m`, `0.0552 m`, and `0.1105 m` respectively), while topology and width remained fixed at 1,260 vertices, 1,728 triangles, and approximately `0.0051–0.0590 m` effective width. This proved that Fold Height was functioning correctly.
+
+The representation nevertheless failed visually. `0.02 m` was effectively invisible, `0.06 m` only became observable, and `0.12 m` was clearly raised but read as a hill because every interval across the five-sample profile was triangulated into one opaque continuous upper surface. The failure was therefore not insufficient height, hidden width change, or unstable topology; it was the filled cross-width representation itself. V3J.3C2 supersedes that representation while preserving its validated profile and descriptor inputs.
 
 ### 2026-07-10 — Patch V3J.3C: Narrow Static Secondary Ridge Reconciliation
 

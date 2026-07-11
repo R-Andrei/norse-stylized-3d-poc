@@ -49,7 +49,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private int seedOffset;
 
-        [Tooltip("Painted Accent Lines only. Visible width in metres for the narrow secondary ridge. The generated ridge footprint uses this value directly; legacy BodyWidth remains texture/debug support only.")]
+        [Tooltip("Painted Accent Lines only. Visible width in metres for the open crest ribbon. The generated ribbon footprint uses this value directly; legacy BodyWidth remains texture/debug support only.")]
         [Range(0.04f, 0.35f)]
         [SerializeField]
         private float paintedAccentStrokeWidth = 0.12f;
@@ -80,12 +80,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float paintedAccentStrokeAngleJitterDegrees = 18f;
 
-        [Tooltip("Painted Accent Lines only. Maximum raised height in metres for the narrow secondary ridge. Height is applied along the sampled ground normal and tapers into the ground at both side boundaries and both ends.")]
-        [Range(0f, 0.15f)]
+        [Tooltip("Painted Accent Lines only. Maximum raised height in metres for the open crest ribbon. Height is applied along independently sampled ground normals. The ribbon rises from the ground at its start and returns to the ground at its finish; its underside remains empty.")]
+        [Range(0f, 0.25f)]
         [SerializeField]
         private float paintedAccentFoldHeight = 0.018f;
 
-        [Tooltip("Painted Accent Lines only. Controls deterministic stochastic variation in the 3D fold profile. Zero approaches one clean broad profile; one allows several overlapping smooth basis functions and stronger slow height variation along the stroke.")]
+        [Tooltip("Painted Accent Lines only. Controls deterministic stochastic variation in the profile search used to derive crest height. Zero approaches one clean profile; one allows several overlapping smooth basis functions and stronger slow height variation along the stroke.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float paintedAccentFoldIrregularity = 0.55f;
@@ -156,7 +156,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Mathf.Clamp(paintedAccentStrokeAngleJitterDegrees, 0f, 30f);
 
         public float PaintedAccentFoldHeight =>
-            Mathf.Clamp(paintedAccentFoldHeight, 0f, 0.15f);
+            Mathf.Clamp(paintedAccentFoldHeight, 0f, 0.25f);
 
         public float PaintedAccentFoldIrregularity =>
             Mathf.Clamp01(paintedAccentFoldIrregularity);
