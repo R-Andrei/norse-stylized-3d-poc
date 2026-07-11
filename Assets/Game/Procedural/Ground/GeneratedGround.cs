@@ -239,6 +239,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             "__PaintedAccentFoldSurfacePreview_Debug";
         private const string LegacyPaintedAccentFoldLinePreviewName =
             "__FoldFieldLinePreview_Debug";
+        private const string PaintedAccentRidgePreviewShaderName =
+            "PS3D/Ground Painted Accent Ink";
         private const float PaintedAccentRidgeBoundaryEmbedDepth = 0.002f;
         private const float PaintedAccentRidgeMinimumEndWidthScale = 0.12f;
         private const int PaintedAccentCrestSearchSampleCount = 5;
@@ -250,11 +252,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private const float PaintedAccentShoulderCrownFraction = 0.50f;
         private const float PaintedAccentLegCrownSupport = 0.45f;
         private const float PaintedAccentCrownEndRampFraction = 0.12f;
-
-        // Position (12) + normal (12) + UV0 (8). The proof mesh has no
-        // tangents, vertex colours, collider data, or secondary streams.
+        // Position (12) + normal (12) + UV0 (8). The flat-ink mesh has
+        // no tangents, vertex colours, UV1, collider data, or extra streams.
         private const int PaintedAccentRidgeVertexStrideBytes = 32;
 
+        private static readonly Color PaintedAccentDefaultInkColor =
+            new Color(0.12f, 0.10f, 0.08f, 1f);
+        private static readonly int PaintedAccentInkColorId =
+            Shader.PropertyToID("_InkColor");
+        private static readonly int PaintedAccentFallbackColorId =
+            Shader.PropertyToID("_Color");
         private static Material paintedAccentRidgePreviewMaterial;
 
         [SerializeField]
@@ -1725,6 +1732,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 feature != null
                     ? feature.PaintedAccentFoldEndTaper
                     : 0.65f;
+            Color inkColor =
+                feature != null
+                    ? feature.PaintedAccentInkColor
+                    : PaintedAccentDefaultInkColor;
 
             ClearPaintedAccentFoldSurfacePreview();
 
@@ -2058,12 +2069,26 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 previewObject.AddComponent<MeshRenderer>();
             previewFilter.sharedMesh = previewMesh;
             previewRenderer.shadowCastingMode = ShadowCastingMode.Off;
-            previewRenderer.receiveShadows = true;
+            previewRenderer.receiveShadows = false;
+            previewRenderer.lightProbeUsage = LightProbeUsage.Off;
+            previewRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
             previewRenderer.motionVectorGenerationMode =
                 MotionVectorGenerationMode.Camera;
             Material previewMaterial =
                 ResolvePaintedAccentRidgePreviewMaterial();
             previewRenderer.sharedMaterial = previewMaterial;
+            MaterialPropertyBlock previewProperties =
+                new MaterialPropertyBlock();
+            previewProperties.SetColor(
+                PaintedAccentInkColorId,
+                inkColor);
+            previewProperties.SetColor(
+                BaseColorId,
+                inkColor);
+            previewProperties.SetColor(
+                PaintedAccentFallbackColorId,
+                inkColor);
+            previewRenderer.SetPropertyBlock(previewProperties);
 
             buildStopwatch.Stop();
             int triangleCount = triangles.Count / 3;
@@ -2098,23 +2123,22 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 previewMaterial != null && previewMaterial.shader != null
                     ? previewMaterial.shader.name
                     : "None";
-            Color materialBaseColor = Color.clear;
+            string materialCullMode = "Unavailable";
+            bool materialDoubleSidedGi = false;
             if (previewMaterial != null)
             {
-                if (previewMaterial.HasProperty("_BaseColor"))
+                if (previewMaterial.HasProperty("_Cull"))
                 {
-                    materialBaseColor =
-                        previewMaterial.GetColor("_BaseColor");
+                    materialCullMode =
+                        ((CullMode)Mathf.RoundToInt(
+                            previewMaterial.GetFloat("_Cull"))).ToString();
                 }
-                else if (previewMaterial.HasProperty("_Color"))
-                {
-                    materialBaseColor =
-                        previewMaterial.GetColor("_Color");
-                }
+
+                materialDoubleSidedGi = previewMaterial.doubleSidedGI;
             }
 
             Debug.Log(
-                $"GeneratedGround Painted Accent valley-suppressed crowned ribbon built: " +
+                $"GeneratedGround Painted Accent flat-ink crowned ribbon built: " +
                 $"strokes={builtStrokeCount}, " +
                 $"requestedFoldHeight={foldHeight:F4}, " +
                 $"requestedCrownHeight={crestCrownHeight:F4}, " +
@@ -2146,12 +2170,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 $"effectiveWidthMean={meanEffectiveWidth:F4}, " +
                 $"effectiveWidthMax={maximumEffectiveWidth:F4}, " +
                 $"materialShader={materialShaderName}, " +
-                $"materialBaseColor=" +
-                $"({materialBaseColor.r:F3}," +
-                $"{materialBaseColor.g:F3}," +
-                $"{materialBaseColor.b:F3}," +
-                $"{materialBaseColor.a:F3}), " +
+                $"inkColor=" +
+                $"({inkColor.r:F3}," +
+                $"{inkColor.g:F3}," +
+                $"{inkColor.b:F3}," +
+                $"{inkColor.a:F3}), " +
+                $"surfaceMode=FlatUnlitInk, " +
+                $"materialCull={materialCullMode}, " +
+                $"doubleSidedGI={materialDoubleSidedGi}, " +
                 $"shadowCasting={previewRenderer.shadowCastingMode}, " +
+                $"receiveShadows={previewRenderer.receiveShadows}, " +
+                $"lightProbes={previewRenderer.lightProbeUsage}, " +
+                $"reflectionProbes={previewRenderer.reflectionProbeUsage}, " +
                 $"vertices={vertices.Count}, " +
                 $"triangles={triangleCount}, " +
                 $"estimatedVertexBufferBytes={estimatedVertexBufferBytes}, " +
@@ -2775,19 +2805,23 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         private static Material ResolvePaintedAccentRidgePreviewMaterial()
         {
+            Shader dedicatedShader =
+                Shader.Find(PaintedAccentRidgePreviewShaderName);
+
             if (paintedAccentRidgePreviewMaterial != null)
             {
+                if (dedicatedShader != null &&
+                    paintedAccentRidgePreviewMaterial.shader != dedicatedShader)
+                {
+                    paintedAccentRidgePreviewMaterial.shader = dedicatedShader;
+                }
+
+                ConfigurePaintedAccentRidgePreviewMaterial(
+                    paintedAccentRidgePreviewMaterial);
                 return paintedAccentRidgePreviewMaterial;
             }
 
-            Shader shader =
-                Shader.Find("Universal Render Pipeline/Lit");
-
-            if (shader == null)
-            {
-                shader = Shader.Find("Universal Render Pipeline/Simple Lit");
-            }
-
+            Shader shader = dedicatedShader;
             if (shader == null)
             {
                 shader = Shader.Find("Universal Render Pipeline/Unlit");
@@ -2815,39 +2849,48 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     hideFlags = HideFlags.DontSave
                 };
 
-            Color previewColor = new Color(0.50f, 0.46f, 0.40f, 1f);
-            if (paintedAccentRidgePreviewMaterial.HasProperty("_BaseColor"))
-            {
-                paintedAccentRidgePreviewMaterial.SetColor(
-                    "_BaseColor",
-                    previewColor);
-            }
-
-            if (paintedAccentRidgePreviewMaterial.HasProperty("_Color"))
-            {
-                paintedAccentRidgePreviewMaterial.SetColor(
-                    "_Color",
-                    previewColor);
-            }
-
-            if (paintedAccentRidgePreviewMaterial.HasProperty("_Metallic"))
-            {
-                paintedAccentRidgePreviewMaterial.SetFloat("_Metallic", 0f);
-            }
-
-            if (paintedAccentRidgePreviewMaterial.HasProperty("_Smoothness"))
-            {
-                paintedAccentRidgePreviewMaterial.SetFloat("_Smoothness", 0.08f);
-            }
-
-            if (paintedAccentRidgePreviewMaterial.HasProperty("_SpecularHighlights"))
-            {
-                paintedAccentRidgePreviewMaterial.SetFloat(
-                    "_SpecularHighlights",
-                    0f);
-            }
-
+            ConfigurePaintedAccentRidgePreviewMaterial(
+                paintedAccentRidgePreviewMaterial);
             return paintedAccentRidgePreviewMaterial;
+        }
+
+        private static void ConfigurePaintedAccentRidgePreviewMaterial(
+            Material material)
+        {
+            if (material == null)
+            {
+                return;
+            }
+
+            if (material.HasProperty("_InkColor"))
+            {
+                material.SetColor(
+                    "_InkColor",
+                    PaintedAccentDefaultInkColor);
+            }
+
+            if (material.HasProperty("_BaseColor"))
+            {
+                material.SetColor(
+                    "_BaseColor",
+                    PaintedAccentDefaultInkColor);
+            }
+
+            if (material.HasProperty("_Color"))
+            {
+                material.SetColor(
+                    "_Color",
+                    PaintedAccentDefaultInkColor);
+            }
+
+            if (material.HasProperty("_Cull"))
+            {
+                material.SetFloat(
+                    "_Cull",
+                    (float)CullMode.Off);
+            }
+
+            material.doubleSidedGI = false;
         }
 
         private static void DestroyPaintedAccentFoldSurfacePreviewObject(

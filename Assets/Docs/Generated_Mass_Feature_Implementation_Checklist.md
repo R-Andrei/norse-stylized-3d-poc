@@ -357,15 +357,71 @@ EW-C — Explicit Single-Segment Chamfer Kernel
 
 ### EW-C3A exit criteria
 
-- [ ] Unity compiles without errors.
-- [ ] `patchBoundaryRecords=patchBoundaryRecordsAssigned` and every normalized boundary record appears in exactly one ordered component.
-- [ ] `patchComponentOrderingFailures=0`.
-- [ ] `patchComponentProvenanceFailures=0`.
+- [x] Unity compiles without errors.
+- [x] `patchBoundaryRecords=patchBoundaryRecordsAssigned` and every normalized boundary record appears in exactly one ordered component.
+- [x] `patchComponentOrderingFailures=0`.
+- [x] `patchComponentProvenanceFailures=0`.
 - [ ] `patchUnresolvedOpenChains=0` across all 24 physical masses.
-- [ ] Component branch and duplicate failures remain zero.
-- [ ] Existing EW-C2 candidate, width, replacement-face, bevel-strip, source-boundary, and topology counters remain unchanged.
+- [x] Component branch and duplicate failures remain zero.
+- [x] Existing EW-C2 candidate, width, replacement-face, bevel-strip, source-boundary, and topology counters remain unchanged.
 - [ ] `readyForVertexPatches=1` remains true and `readyForVertexPatchComponents=1` across all 24 masses.
-- [ ] No patch faces are emitted and geometry commit remains disabled.
+- [x] No patch faces are emitted and geometry commit remains disabled.
+
+Validation note: component extraction and ordering pass across all 24 masses, but 20 open components on eight masses remain unresolved. Therefore `patchUnresolvedOpenChains=0` and full-set `readyForVertexPatchComponents=1` remain open.
+
+## EW-C3A1 — Direct closure-edge census
+
+- [x] Build one directed direct-closure claim from chain end to chain start for every open component.
+- [x] Group claims by undirected `TopologyEdgeKey`.
+- [x] Retain all claimants for a reported key while limiting counters and warnings to groups containing an unresolved component.
+- [x] Record existing uses, distinct face records, segment roles, and segment direction.
+- [x] Record planned uses and every claiming component's source vertex, index, source-fan state, chain size, closure class, and direction.
+- [x] Detect strict existing-complement candidates.
+- [x] Detect strict two-patch shared-connector candidates.
+- [x] Enumerate incident surviving source-boundary children and endpoint relationships.
+- [x] Detect diagnostic source-boundary replacement candidates without modifying ownership.
+- [x] Report overused, underused, ownership-conflict, and unresolved direct-closure keys.
+- [x] Add all eight direct-closure summary counters.
+- [x] Leave EW-C3A closure classification and readiness unchanged.
+- [x] Emit no patch faces and perform no source-boundary or mesh mutation.
+
+### EW-C3A1 exit criteria
+
+- [x] Unity compiles without errors.
+- [x] All 24 physical masses retain the validated EW-C2 counters and `readyForVertexPatches=1`.
+- [x] Every unresolved open component is represented by a direct-closure group warning.
+- [x] Existing-complement census completed; zero qualifying candidates were found.
+- [x] Shared-patch census completed; zero qualifying candidates were found.
+- [x] Source-boundary diagnostics enumerate all incident surviving children and expose terminal/outer endpoint matching.
+- [x] All sixteen unresolved keys were classified: eight overused, one underused, and seven ownership-conflicted.
+- [x] No patch faces are emitted and geometry commit remains disabled.
+
+## EW-C3A2 — Global patch-cluster stitching and boundary completion census
+
+- [x] Collect provenance-valid unresolved closed-source component arcs.
+- [x] Build exact endpoint adjacency across local source-vertex ownership.
+- [x] Require degree two at every cluster endpoint.
+- [x] Deterministically order each cluster from the smallest endpoint and stable component provenance.
+- [x] Reverse local arc orientation only when required for continuous traversal.
+- [x] Reject repeated expected vertex-boundary keys, component reuse, disconnected walks, and failure to close.
+- [x] Materialize ordered cluster records without emitting faces.
+- [x] Classify passing arcs as `OpenChainClosedSourceClusterResolved`.
+- [x] Group unresolved source-fan components by original source-boundary loop.
+- [x] Combine surviving source-boundary descendants with candidate component edges for diagnostics.
+- [x] Report degree, connectivity, duplicate, use-count, and ownership evidence per loop.
+- [x] Leave source-boundary ownership and children unchanged.
+- [x] Keep patch geometry and final geometry commitment disabled.
+
+### EW-C3A2 exit criteria
+
+- [ ] Unity compiles without errors.
+- [ ] All 24 masses retain `readyForVertexPatches=1` and all validated EW-C2 counters.
+- [ ] `patchClosedSourceClusters=6` and `patchClosedSourceClusterComponents=16` for the validated physical set.
+- [ ] `patchClosedSourceClusterFailures=0`.
+- [ ] The five previously failing closed-source masses now report `readyForVertexPatchComponents=1`.
+- [ ] Every remaining unresolved source-fan component appears in a boundary-completion census.
+- [ ] Boundary-completion diagnostics expose exact degree, connectivity, duplicate, one-use, and ownership status.
+- [ ] No patch faces or ownership transfers occur and geometry commit remains disabled.
 
 ## EW-C3B — Provisional source-vertex patch emission
 

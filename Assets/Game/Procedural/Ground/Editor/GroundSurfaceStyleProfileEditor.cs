@@ -325,6 +325,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentFoldIrregularity");
             SerializedProperty paintedAccentFoldEndTaper =
                 feature.FindPropertyRelative("paintedAccentFoldEndTaper");
+            SerializedProperty paintedAccentInkColor =
+                feature.FindPropertyRelative("paintedAccentInkColor");
 
             string featureKey = $"feature_{features.propertyPath}_{index}";
             bool expanded = GetFoldout(featureKey, false);
@@ -438,7 +440,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         0.05f,
                         new GUIContent(
                             "Crest Crown Height",
-                            "Additional centreline height above the two ribbon shoulders. Test 0.01, 0.02, and 0.03 m at Stroke Width 0.02 m and Fold Height 0.25 m."));
+                            "Additional centreline height above the two ribbon shoulders. This controls cross-sectional silhouette only; the flat-ink shader does not light or shade the crown differently."));
                     EditorGUILayout.Slider(
                         paintedAccentFoldIrregularity,
                         0f,
@@ -453,6 +455,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         new GUIContent(
                             "Fold End Taper",
                             "How much of the stroke length blends the raised profile back into the ground at each end."));
+                    EditorGUILayout.Space(4f);
+                    EditorGUILayout.LabelField(
+                        "Flat Ink Surface",
+                        EditorStyles.miniBoldLabel);
+                    EditorGUILayout.PropertyField(
+                        paintedAccentInkColor,
+                        new GUIContent(
+                            "Ink Color",
+                            "One opaque unlit colour across the entire double-sided stroke. It does not vary with lights, shadows, crown position, endpoints, stroke seed, or viewing side."));
 
                     if (paintedAccentStrokeLengthMax.floatValue <
                         paintedAccentStrokeLengthMin.floatValue + 0.05f)
@@ -721,6 +732,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentFoldIrregularity");
             SerializedProperty foldEndTaper =
                 feature.FindPropertyRelative("paintedAccentFoldEndTaper");
+            SerializedProperty inkColor =
+                feature.FindPropertyRelative("paintedAccentInkColor");
 
             if (strokeWidth != null)
             {
@@ -770,6 +783,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             if (foldEndTaper != null)
             {
                 foldEndTaper.floatValue = 0.65f;
+            }
+
+            if (inkColor != null)
+            {
+                inkColor.colorValue =
+                    new Color(0.12f, 0.10f, 0.08f, 1f);
             }
         }
 

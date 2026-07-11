@@ -76,6 +76,7 @@ MonoBehaviour:
       paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
       paintedAccentFoldEndTaper: 0.65
+      paintedAccentInkColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
     - kind: 20
       enabled: 1
       costClass: 0
@@ -85,16 +86,17 @@ MonoBehaviour:
       maskInfluence: 0.56
       direction: {x: 0.82, y: 0.36}
       seedOffset: 301
-      paintedAccentStrokeWidth: 0.03
+      paintedAccentStrokeWidth: 0.02
       paintedAccentStrokeDensity: 80
-      paintedAccentStrokeLengthMin: 0.55
-      paintedAccentStrokeLengthMax: 2
+      paintedAccentStrokeLengthMin: 0.5
+      paintedAccentStrokeLengthMax: 1.4
       paintedAccentStrokeFacingDirectionDegrees: 90
-      paintedAccentStrokeAngleJitterDegrees: 15
-      paintedAccentFoldHeight: 0.3
+      paintedAccentStrokeAngleJitterDegrees: 25
+      paintedAccentFoldHeight: 0.16
       paintedAccentCrestCrownHeight: 0.02
-      paintedAccentFoldIrregularity: 0.888
+      paintedAccentFoldIrregularity: 0.85
       paintedAccentFoldEndTaper: 0.4
+      paintedAccentInkColor: {r: 0.122641504, g: 0.11606767, b: 0.10817906, a: 1}
   - id: snowfield.patchy
     displayName: Patchy
     materialControls:
@@ -156,6 +158,7 @@ MonoBehaviour:
       paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
       paintedAccentFoldEndTaper: 0.65
+      paintedAccentInkColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
     - kind: 20
       enabled: 1
       costClass: 0
@@ -175,6 +178,7 @@ MonoBehaviour:
       paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
       paintedAccentFoldEndTaper: 0.65
+      paintedAccentInkColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
   - id: snowfield.dirty_thawing
     displayName: Dirty Thawing
     materialControls:
@@ -236,6 +240,7 @@ MonoBehaviour:
       paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
       paintedAccentFoldEndTaper: 0.65
+      paintedAccentInkColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
   - id: snowfield.wind_scoured
     displayName: Wind-Scoured
     materialControls:
@@ -297,6 +302,7 @@ MonoBehaviour:
       paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
       paintedAccentFoldEndTaper: 0.65
+      paintedAccentInkColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
     - kind: 20
       enabled: 1
       costClass: 0
@@ -316,3 +322,4 @@ MonoBehaviour:
       paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
       paintedAccentFoldEndTaper: 0.65
+      paintedAccentInkColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}

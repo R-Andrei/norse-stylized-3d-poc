@@ -316,6 +316,19 @@ Shader "PS3D/Stylized River Water"
                     0.0);
             }
 
+            float ResolveCommittedFoamPresenceVisibility(
+                float committedPresence)
+            {
+                // Comparative diagnostics share one meaningful-material gate.
+                // Raw Material Presence remains amplitude-faithful, while
+                // overlays and normalized moment views suppress tiny donor-cell
+                // tails that would otherwise look like full-strength coverage.
+                return smoothstep(
+                    0.02,
+                    0.16,
+                    saturate(committedPresence));
+            }
+
             RiverWaterFoamResolvedVelocity ResolveRenderedFoamVelocity(
                 float2 fieldUV)
             {
@@ -1016,8 +1029,11 @@ Shader "PS3D/Stylized River Water"
                     // the white ownership overlay or its simulation-cell grid.
                     float committedPresence = saturate(
                         SampleCommittedFoamState(foam.fieldUV).r);
+                    float committedPresenceVisibility =
+                        ResolveCommittedFoamPresenceVisibility(
+                            committedPresence);
                     float foamOverlay = saturate(
-                        smoothstep(0.08, 0.46, committedPresence) * 0.58);
+                        committedPresenceVisibility * 0.58);
                     fieldColour = lerp(
                         saturate(fieldColour),
                         float3(1.0, 1.0, 0.95),
@@ -1211,8 +1227,15 @@ Shader "PS3D/Stylized River Water"
                                 committedState.y /
                                 committedPresence)
                             : 0.0;
-                    float life = saturate(committedRemainingLife) *
-                        step(0.001, committedPresence);
+                    float committedPresenceVisibility =
+                        ResolveCommittedFoamPresenceVisibility(
+                            committedPresence);
+                    float lifeBrightness = lerp(
+                        0.12,
+                        1.0,
+                        saturate(committedRemainingLife));
+                    float life =
+                        lifeBrightness * committedPresenceVisibility;
                     return half4(life.xxx, 1.0);
                 }
 

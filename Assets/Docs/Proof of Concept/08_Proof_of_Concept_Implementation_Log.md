@@ -21,6 +21,33 @@ This is a chronological log. Older entries record what was implemented or believ
 
 ---
 
+## 2026-07-11 — River Foam `4.11C.5.16C.1` Debug Footprint Consistency
+
+Status: implemented in source; Unity validation is pending together with the remaining `5.16C` temporal convergence checks.
+
+Unity screenshots showed Temporal Difference and Temporal Occupancy behaving plausibly, but Material Presence, Motion Field ownership, Remaining Life, Evaluated Shape, and Temporal Occupancy appeared to have inconsistent silhouettes. Code inspection proved that all relevant views sample the same `foam.fieldUV`; the mismatch came from display semantics:
+
+```text
+Material Presence = raw Presence amplitude;
+Motion Field = independently thresholded, partial-opacity ownership overlay;
+Remaining Life = normalized life shown whenever Presence exceeded 0.001;
+Evaluated Shape = committed Presence plus temporal visual occupancy;
+Temporal Occupancy = half-resolution visual history.
+```
+
+The normalized Remaining Life view was the largest source of confusion because a tiny donor-cell tail such as `Presence = 0.005` with full life decoded to `1.0` and appeared solid white. The correction adds one shader helper:
+
+```text
+ResolveCommittedFoamPresenceVisibility(Presence)
+  = smoothstep(0.02, 0.16, Presence)
+```
+
+Motion Field ownership uses that shared gate at the existing 58% overlay opacity. Remaining Life multiplies normalized life by the same gate and maps life to a `0.12–1.00` brightness range inside meaningful material, preserving dying-material readability without turning numerical tails into full-strength coverage. Material Presence remains raw amplitude. Inspector descriptions now explicitly explain raw amplitude, gated comparison views, and intentional half-resolution Layer D expansion.
+
+No compute kernel, transport, lifecycle, occupancy texture, scheduling, control, or Final Foam path changed.
+
+---
+
 ## 2026-07-11 — River Foam `4.11C.5.16C` Advected Layer D Temporal Occupancy
 
 Status: implemented in source; Unity import/compile and runtime validation remain pending.

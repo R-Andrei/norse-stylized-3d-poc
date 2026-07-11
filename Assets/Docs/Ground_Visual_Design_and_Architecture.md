@@ -10,11 +10,140 @@ implementation_documents:
   - Ground_Generation_Surface_Upgrade_Plan.md
 ---
 
+### 2026-07-11 — Patch V3J.3C8: Flat Ink Surface Baseline
+
+C7 validation confirmed that the accepted C5 geometry plus C6 double-sided rasterization renders the entire crowned ribbon consistently from all tested viewpoints. Geometry is therefore locked for the current Painted Accent milestone. The C7 lit response was rejected as a final visual direction: normal lighting, crown lift, edge darkening, endpoint softening, per-stroke brightness variation, saturation changes, and shadow reception made the marks read as small physical brown ridges rather than graphic outline strokes.
+
+V3J.3C8 replaces that material model with one opaque, uniform, double-sided ink colour. The geometry supplies only silhouette, overlap, perspective, and parallax; the shader supplies no geometric or environmental shading.
+
+Asset replacement:
+
+```text
+remove:
+  Assets/Game/Rendering/PixelSurface/Shaders/SH_GroundPaintedAccentLit.shader
+  Assets/Game/Rendering/PixelSurface/Shaders/SH_GroundPaintedAccentLit.shader.meta
+
+add:
+  Assets/Game/Rendering/PixelSurface/Shaders/SH_GroundPaintedAccentInk.shader
+  Assets/Game/Rendering/PixelSurface/Shaders/SH_GroundPaintedAccentInk.shader.meta
+
+shader name:
+  PS3D/Ground Painted Accent Ink
+```
+
+Final flat-ink contract:
+
+```text
+rendering: opaque unlit
+colour: one uniform artist-authored Ink Color
+culling: off / both sides visible
+ZWrite: on
+ZTest: LEqual
+scene lights: ignored
+main/additional-light shadows: ignored
+ambient and baked GI: ignored
+screen-space ambient occlusion: ignored
+reflection probes: disabled
+light probes: disabled
+fog: omitted from this baseline
+metallic/specular/smoothness/emission: not present
+textures/noise maps: not present
+cast shadows: off
+receive shadows: off
+```
+
+`GroundSurfaceFeatureRecipe` now owns one `PaintedAccentInkColor` value, exposed as **Ink Color** in both Painted Accent authoring surfaces. The default is a dark warm neutral `(0.12, 0.10, 0.08, 1)`. Alpha is not authored because the shader is intentionally opaque. A renderer property block supplies the colour per GeneratedGround preview while retaining one shared material and one combined mesh, so different style variants are not forced to share one static colour.
+
+C8 removes the C7 UV1 seed stream and all corresponding generation, statistics, constants, and diagnostics. UV0 remains available but the flat shader does not consume it. With position, normal, and UV0 retained, estimated stride returns from 40 to 32 bytes. For the demonstrated 36-stroke topology:
+
+```text
+vertices:               1,404
+triangles:              1,728
+estimated vertex bytes: 44,928
+estimated index bytes:  10,368
+estimated raw mesh:     55,296
+```
+
+The accepted C5 shape constants, C6 `Cull Off` visibility, 13-row minimum, three vertices across, endpoint embed, open underside, no collider, one-child/one-renderer architecture, descriptor generation, placement, orientation, and immutable base ground remain unchanged.
+
+C8 acceptance requires every point and both sides of a stroke to render the same authored ink colour under different scene-light positions and intensities. There must be no crown highlight, edge darkening, endpoint fade, stroke-seed brightness change, shadow band, probe response, specular response, or saturation shift. After this baseline passes, individual-line appearance is locked and work moves to distribution and placement rather than further geometry or material complexity.
+
+### 2026-07-11 — Patch V3J.3C7: Painted Accent Surface-Response Proof
+
+C6 validation closed the Painted Accent geometry and visibility gate. With culling disabled, the same open crowned ribbon remained visible from both exterior and interior viewpoints; the apparent disappearing-leg defect was therefore back-face culling, not insufficient leg height, missing side-shell geometry, or unstable longitudinal generation. The retained baseline is now C5 geometry plus permanent double-sided rendering. Do not resume crest, shoulder, Fold Height, end-envelope, or topology tuning unless later evidence identifies a new geometric defect.
+
+V3J.3C7 was implemented and validated as a rendering experiment, but its lit/materially shaded direction was rejected in favour of the C8 flat-ink baseline. It replaces the generic URP Lit proof material with a dedicated lightweight shader:
+
+```text
+Assets/Game/Rendering/PixelSurface/Shaders/SH_GroundPaintedAccentLit.shader
+shader name: PS3D/Ground Painted Accent Lit
+```
+
+The shader remains opaque, rough, non-metallic, non-emissive, double-sided, and shadow-receiving while the preview renderer continues to cast no shadows. Back-facing fragments flip the interpolated world normal before lighting, so interior and exterior views retain comparable diffuse response instead of rendering the reverse side with an inverted normal.
+
+The accepted geometry already writes:
+
+```text
+UV0.x = normalized position along the stroke
+UV0.y = normalized position across the three-vertex crown
+```
+
+C7 adds one deterministic secondary channel:
+
+```text
+UV1.x = one 0–1 seed value shared by every vertex in one stroke
+UV1.y = reserved / zero
+```
+
+The dedicated shader uses those channels for a restrained no-texture finish:
+
+```text
+base colour:                 (0.50, 0.46, 0.40, 1)
+crown brightness lift:       0.10
+outer-edge darkening:        0.08
+endpoint softening span:     0.12 of each end
+endpoint contrast scale:     0.55
+per-stroke brightness range: ±0.05
+smoothness:                  0.08
+```
+
+`UV0.y` produces a smooth centre-crown lift and outer-edge darkening rather than three hard bands. `UV0.x` reduces cross-sectional contrast and slightly desaturates only the terminal span; it does not use alpha, transparency, clipping, or sorting-dependent fading. `UV1.x` creates a small stable brightness difference between strokes without adding along-stroke noise, textures, atlases, per-frame state, per-stroke objects, or extra materials.
+
+The material resolver requests the dedicated shader first and retains the previous URP Lit/Simple Lit/Unlit chain only as a compile/import fallback. Cached proof materials are upgraded to the dedicated shader when it becomes available. The existing `_Cull = Off` and `doubleSidedGI = true` state remains permanent.
+
+Topology remains 1,404 vertices and 1,728 triangles for the demonstrated 36-stroke case. Adding UV1 changes the estimated vertex stride from 32 to 40 bytes:
+
+```text
+estimated vertex buffer: 1,404 × 40 = 56,160 bytes
+estimated index buffer:  1,728 × 3 × 2 = 10,368 bytes
+estimated raw mesh:                    66,528 bytes
+```
+
+The build diagnostic now reports the dedicated shader, UV1 seed range, and all proof response values. C7 does not change descriptors, distribution, width, Fold Height, Crown Height, C5 shaping, C6 visibility, normals, winding, collider behavior, base ground, recipes, inspectors, style assets, scenes, River, Generated Mass, or GroundModifier systems.
+
+Acceptance requires the normal gameplay camera to retain the accepted silhouette while gaining a restrained readable crown, slightly darker outer edges, softer grounded terminals, stable two-sided lighting, and subtle stroke-to-stroke material variation. Reject emission, glow, Fresnel outlines, obvious bands, transparent tips, noisy texturing, metallic/specular emphasis, rope/rail/root readings, or any response that competes with characters and gameplay. Distribution remains deferred until individual-line surface response is accepted.
+
+### 2026-07-11 — Patch V3J.3C6: Double-Sided Interior-Face Visibility Validation Result
+
+C6 was validated successfully. The same asymmetric stroke was inspected from exterior, profile, and interior-facing viewpoints. With `_Cull = CullMode.Off`, the previously missing interior side remained rendered and the leg stopped appearing/disappearing as the camera crossed the ribbon. This proves the unresolved C5 leg defect was ordinary back-face culling on the open crown surfaces rather than insufficient Fold Height, Crown Height, shoulder support, longitudinal sampling, or missing physical shell depth.
+
+The accepted representation baseline is therefore:
+
+```text
+C5 valley-suppressed three-vertex crowned ribbon
++ C6 double-sided rasterization
++ Material.doubleSidedGI = true
+```
+
+The open underside, 13-row minimum, three vertices across, endpoint embed, no-collider contract, one combined child mesh, and immutable base ground remain accepted. A shallow side shell is not required. Geometry/topology shaping is now locked while individual-line surface response is developed.
+
+For 36 strokes, the accepted pre-C7 topology remains 1,404 vertices and 1,728 triangles. C6 itself adds no mesh channels or storage. The successful diagnostic log reports `materialCull=Off` and `doubleSidedGI=True`.
+
 ### 2026-07-11 — Patch V3J.3C5: Valley-Suppressed Crowned Ribbon Refinement
 
 V3J.3C4 validation confirmed that strict single-crest shaping removed the repeated `M` silhouette, but it overcorrected the longitudinal character: a `0.70` guide blend plus hard monotonic rise/fall guards made most marks read as simple `^` profiles with too little seeded variation. C4 also raised the shoulder crown factor to `0.35`, but the entire crown still used the longer Fold End Taper envelope. Crown body therefore remained near zero along the first and final interior rows, so side-biased views could still lose the legs.
 
-V3J.3C5 is the current **implemented but unvalidated refinement candidate**. It preserves the accepted three-vertex open crowned ribbon, five-position stochastic crest search, thirteen-row minimum, descriptor generation, whole-chunk placement, facing rule, signed jitter, authoring controls, endpoint embed, one combined preview mesh, no-collider contract, material, and immutable base ground. It changes only longitudinal profile correction and crown support near the stroke ends.
+V3J.3C5 is the retained longitudinal-shape baseline validated before the C6 material diagnostic. It preserves the accepted three-vertex open crowned ribbon, five-position stochastic crest search, thirteen-row minimum, descriptor generation, whole-chunk placement, facing rule, signed jitter, authoring controls, endpoint embed, one combined preview mesh, no-collider contract, material, and immutable base ground. It changes only longitudinal profile correction and crown support near the stroke ends.
 
 Longitudinal shaping now uses restrained guidance rather than a hard unimodal constraint:
 

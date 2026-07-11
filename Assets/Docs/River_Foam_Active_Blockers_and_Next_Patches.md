@@ -39,7 +39,7 @@ Layer D may read Layer C, but must never write Layer C.
 Layer E must never feed back into compute/simulation.
 ```
 
-## Active state after `4.11C.5.16C — Advected Layer D Temporal Occupancy`
+## Active state after `4.11C.5.16C.1 — Debug Footprint Consistency`
 
 Source spawning remains provisionally sufficient and parked. `4.11C.5.16A.1`, `4.11C.5.16B`, and `4.11C.5.16B.1` are accepted for progression after the user reported that the Unity result looked good and approved moving forward; no remaining velocity, transport-warning, or obstacle-residual problem was reported.
 
@@ -93,13 +93,27 @@ Foam Shape Difference
 
 `Foam Temporal Difference` uses green for occupancy retained beyond the current target and magenta for target coverage not yet acquired.
 
+Unity screenshots showed the temporal field behaving plausibly, but comparative debug silhouettes were misleading: Motion Field used a strong independent threshold, Remaining Life normalized tiny Presence tails into bright coverage, Material Presence remained raw amplitude, and Layer D views were intentionally broader. Inspection found no coordinate mismatch; every relevant view samples the same `foam.fieldUV`. `4.11C.5.16C.1` therefore changes debug presentation only:
+
+```text
+shared meaningful-Presence gate = smoothstep(0.02, 0.16, committed Presence);
+Motion Field ownership uses the shared gate at 58% opacity;
+Remaining Life uses normalized life × shared gate;
+low-life material retains a 0.12 readability floor inside the gate;
+Material Presence stays raw amplitude;
+Evaluated Shape and Temporal Occupancy stay intentionally broader.
+```
+
+No Layer C state, lifecycle, advection, Layer D occupancy, texture resolution, or Final Foam path changes in `5.16C.1`.
+
 ### Active validation patch
 
 ```text
 4.11C.5.16C — Advected Layer D Temporal Occupancy
+4.11C.5.16C.1 — Debug Footprint Consistency
 ```
 
-Validation must prove that the temporal sheet moves with the same route and reverse-flow direction as Layer C, does not enter banks or obstacle footprints, builds and releases smoothly without pulsing, preserves short-lived sheet continuity, remains distinct from committed Material Presence, clears cleanly when diagnostics are re-entered, and leaves Final Foam unchanged.
+Validation must prove that the temporal sheet moves with the same route and reverse-flow direction as Layer C, does not enter banks or obstacle footprints, builds and releases smoothly without pulsing, preserves short-lived sheet continuity, clears cleanly when diagnostics are re-entered, and leaves Final Foam unchanged. The stationary Temporal Difference test must converge toward black. Motion Field and Remaining Life must now show the same meaningful committed-material footprint while Material Presence remains a raw-amplitude reference and Layer D views remain intentionally broader.
 
 ### Next major patch after explicit acceptance
 
@@ -107,7 +121,7 @@ Validation must prove that the temporal sheet moves with the same route and reve
 4.11C.5.16D — Persistent Visual Damage + Macro Fracture
 ```
 
-`5.16D` will use temporal occupancy as the editable moving sheet on which pinches, persistent tears, split/rejoin behavior, and macro fracture can exist. Do not start damage/fracture, Final Foam integration, or shader cracking until `5.16C` passes Unity validation.
+`5.16D` will use temporal occupancy as the editable moving sheet on which pinches, persistent tears, split/rejoin behavior, and macro fracture can exist. Do not start damage/fracture, Final Foam integration, or shader cracking until `5.16C/5.16C.1` pass Unity validation.
 
 ## Active and trusted foundations
 
@@ -145,7 +159,7 @@ shader-side wide-neighbour structural foam search.
 
 # Superseded implementation and blocker history
 
-The sections below preserve implementation history only. They are not the active queue and must not override the `5.16C` validation gate above.
+The sections below preserve implementation history only. They are not the active queue and must not override the `5.16C/5.16C.1` validation gate above.
 
 ## 5.9z validation conclusion
 

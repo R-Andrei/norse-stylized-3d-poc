@@ -4,11 +4,11 @@
 >
 > This handoff is historical for earlier rock/river refactor context. Any river Foam architecture, static-foam, morphing, lateral motion, or rendering responsibility statement in this document is superseded by `Docs/River_Foam_Stage6_Architecture.md` and `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`. Use those documents as the active Foam source of truth.
 
-## Current River Foam continuation — `4.11C.5.16C` source implementation
+## Current River Foam continuation — `4.11C.5.16C.1` source implementation
 
 This section supersedes later historical River Foam movement/history statements wherever they conflict.
 
-`4.11C.5.16A.1`, `4.11C.5.16B`, and `4.11C.5.16B.1` are accepted for progression. The active source now contains `4.11C.5.16C — Advected Layer D Temporal Occupancy`, awaiting Unity import/compile and runtime validation.
+`4.11C.5.16A.1`, `4.11C.5.16B`, and `4.11C.5.16B.1` are accepted for progression. The active source now contains `4.11C.5.16C — Advected Layer D Temporal Occupancy` plus `4.11C.5.16C.1 — Debug Footprint Consistency`. Unity screenshots provide provisional runtime evidence, but the stationary Temporal Difference convergence test and final acceptance remain pending.
 
 Current Layer C movement truth remains:
 
@@ -39,6 +39,17 @@ Final Foam remains disconnected and unchanged.
 
 The temporal field is visual-only. It does not create or move durable material, change Remaining Life, alter Material Pattern, feed Layer B/C, or extend source lifetime. Its purpose is to provide the persistent moving visual sheet that `5.16D` can pinch, tear, split, rejoin, and fracture.
 
+Current debug-footprint truth:
+
+```text
+all relevant views use the same foam.fieldUV;
+Material Presence remains raw stored amplitude;
+Motion Field ownership uses smoothstep(0.02, 0.16, Presence) at partial opacity;
+Remaining Life is normalized life multiplied by the same meaningful-Presence gate;
+Evaluated Shape and Temporal Occupancy are intentionally broader Layer D products;
+5.16C.1 changes diagnostics only and does not alter simulation or Final Foam.
+```
+
 Primary `5.16C` files:
 
 ```text
@@ -63,7 +74,7 @@ Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoamV
 Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Motion.hlsl
 ```
 
-Required next action is Unity validation of `5.16C`. Do not begin `5.16D` damage/fracture or `5.16E` Final Foam integration until temporal occupancy is proven stable, correctly advected, clipped, reversible, and visually useful.
+Required next action is combined Unity validation of `5.16C/5.16C.1`, including stationary Temporal Difference convergence and footprint comparison. Do not begin `5.16D` damage/fracture or `5.16E` Final Foam integration until temporal occupancy is proven stable, correctly advected, clipped, reversible, convergent, visually useful, and diagnostically comparable.
 
 
 ## Purpose

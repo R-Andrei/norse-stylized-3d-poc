@@ -603,6 +603,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentFoldIrregularity");
             SerializedProperty foldEndTaper =
                 feature.FindPropertyRelative("paintedAccentFoldEndTaper");
+            SerializedProperty inkColor =
+                feature.FindPropertyRelative("paintedAccentInkColor");
             if (strokeWidth == null ||
                 strokeDensity == null ||
                 strokeLengthMin == null ||
@@ -612,7 +614,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 foldHeight == null ||
                 crestCrownHeight == null ||
                 foldIrregularity == null ||
-                foldEndTaper == null)
+                foldEndTaper == null ||
+                inkColor == null)
             {
                 return;
             }
@@ -622,7 +625,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 "Painted Accent 3D Strokes",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Edits the selected surface variant's Painted Accent stroke layout and grounded crowned crest-ribbon controls. Rebuild the 3D Ridge Preview after changes. The preview is one visual-only child mesh and never modifies the base ground mesh or collider.",
+                "Edits the selected surface variant's Painted Accent stroke layout, grounded crowned crest-ribbon geometry, and uniform flat-ink colour. Rebuild the 3D Ridge Preview after changes. The preview is one visual-only child mesh and never modifies the base ground mesh or collider.",
                 MessageType.None);
 
             EditorGUI.BeginChangeCheck();
@@ -685,7 +688,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 0.05f,
                 new GUIContent(
                     "Crest Crown Height",
-                    "Additional centreline height above the two ribbon shoulders. Test 0.01, 0.02, and 0.03 m at Stroke Width 0.02 m and Fold Height 0.25 m."));
+                    "Additional centreline height above the two ribbon shoulders. This controls cross-sectional silhouette only; the flat-ink shader does not light or shade the crown differently."));
             EditorGUILayout.Slider(
                 foldIrregularity,
                 0f,
@@ -700,6 +703,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 new GUIContent(
                     "Fold End Taper",
                     "How much of the stroke length blends the raised profile back into the ground at each end."));
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Flat Ink Surface",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                inkColor,
+                new GUIContent(
+                    "Ink Color",
+                    "One opaque unlit colour across the entire double-sided stroke. It does not vary with lights, shadows, crown position, endpoints, stroke seed, or viewing side."));
 
             if (strokeLengthMax.floatValue < strokeLengthMin.floatValue + 0.05f)
             {
@@ -714,7 +726,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             styleObject.ApplyModifiedProperties();
             EditorUtility.SetDirty(style);
             ApplyToTargets(
-                "Tune Painted Accent Crowned Crest Ribbon",
+                "Tune Painted Accent Crowned Ribbon and Ink",
                 ground => ground.RefreshSurfaceMaterialProperties());
         }
 

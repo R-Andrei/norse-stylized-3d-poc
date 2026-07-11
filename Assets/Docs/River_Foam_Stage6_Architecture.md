@@ -10,7 +10,7 @@ The goal is to reproduce the broad behavior of the visual inspiration river: sty
 
 The target is not a physically exact fluid solver and not a foam entity database. The target is a fixed-grid mathematical field system with strict ownership boundaries and no circular dependencies.
 
-## Current implementation status — `4.11C.5.16C`
+## Current implementation status — `4.11C.5.16C.1`
 
 `4.11C.5.16A.1 — Velocity Diagnostics Stability + Route Frequency` is accepted. `4.11C.5.16B — Conservative Unified 2D Material Advection` and corrective `4.11C.5.16B.1 — Obstacle Residual Stability + Raw Material Diagnostics` are also accepted for progression after the user reported that the Unity result looked good and approved moving forward; no remaining transport warning or obstacle snap-back was reported.
 
@@ -26,7 +26,7 @@ canonical local 2D velocity
 
 The packed state remains `Presence`, `Presence × Remaining Life`, and `Presence × Material Pattern`. Banks, obstacle footprints, and invalid cells are closed faces; the physical downstream endpoint is the only one-way outlet and swaps under reverse flow. The old global phase commit and global render-travel authority are removed. Open-water residual presentation uses the same local velocity and fades out before strong obstacle routing.
 
-`4.11C.5.16C — Advected Layer D Temporal Occupancy` is implemented in source and awaits Unity import/compile/runtime validation. It adds two half-resolution `RHalf` ping-pong textures owned exclusively by Layer D:
+`4.11C.5.16C — Advected Layer D Temporal Occupancy` is implemented and has provisional Unity runtime evidence. The user reported that Temporal Difference and Temporal Occupancy behaved as expected in the performed tests, but requested one final consistency correction before completing stationary convergence and acceptance validation. It adds two half-resolution `RHalf` ping-pong textures owned exclusively by Layer D:
 
 ```text
 FoamVisualOccupancyA
@@ -63,9 +63,17 @@ Foam Temporal Occupancy        — advected visual sheet memory;
 Foam Temporal Difference       — green retained history, magenta pending acquisition.
 ```
 
+`4.11C.5.16C.1 — Debug Footprint Consistency` is implemented in source as a diagnostic-only correction. Inspection confirmed that Material Presence, Motion Field ownership, Remaining Life, Evaluated Shape, and Temporal Occupancy all use the same `foam.fieldUV`; the apparent footprint mismatch came from different display transfer functions and intentional Layer D expansion rather than a river-domain coordinate mismatch. Comparative committed-material views now share one meaningful-Presence visibility gate:
+
+```text
+presence visibility = smoothstep(0.02, 0.16, committed Presence)
+```
+
+Motion Field ownership uses that gate at partial opacity. Remaining Life still decodes `life moment / Presence`, but multiplies the normalized result by the same gate and retains a small `0.12` low-life floor inside meaningful material so dying material remains readable. Raw Material Presence remains amplitude-faithful. Evaluated Shape and Temporal Occupancy remain intentionally broader because Layer D adds half-resolution visual coverage. No simulation, transport, lifecycle, temporal occupancy, or Final Foam behavior changes in `5.16C.1`.
+
 Layer D history is deliberately debug-gated and cleared when shape diagnostics are re-entered, preventing stale history from silently evolving while Final Foam remains disconnected. The player-facing Final Foam path is unchanged.
 
-The next patch after explicit `5.16C` acceptance is `4.11C.5.16D — Persistent Visual Damage + Macro Fracture`. It will consume and modify the temporal occupancy sheet; it must not be started until the new occupancy transport, build/release response, boundaries, reverse flow, and debug ownership are validated.
+The next patch after explicit `5.16C/5.16C.1` acceptance is `4.11C.5.16D — Persistent Visual Damage + Macro Fracture`. It will consume and modify the temporal occupancy sheet; it must not be started until the new occupancy transport, build/release response, boundaries, reverse flow, and debug ownership are validated.
 
 ---
 
@@ -553,7 +561,7 @@ Compute raw-field sampling lives in:
 Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Motion.hlsl
 ```
 
-The existing Motion Field debug modes use the same pure contract. Hue encodes route meaning: neutral gray is straight motion, red/blue encode signed lateral velocity, and yellow indicates obstacle influence. Brightness is applied only after hue composition and represents `downstreamSpeedFactor`: bright is full-speed, dark is slowed, and near-black is near-stagnation. White overlays raw stored material Presence.
+The existing Motion Field debug modes use the same pure contract. Hue encodes route meaning: neutral gray is straight motion, red/blue encode signed lateral velocity, and yellow indicates obstacle influence. Brightness is applied only after hue composition and represents `downstreamSpeedFactor`: bright is full-speed, dark is slowed, and near-black is near-stagnation. White uses the shared meaningful-Presence visibility gate derived from committed material. Raw Material Presence remains available in its dedicated amplitude-faithful view.
 
 Motion Lane authoring now has independent shape controls:
 

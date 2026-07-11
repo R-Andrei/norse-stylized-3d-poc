@@ -9429,7 +9429,7 @@ MonoBehaviour:
   foamMaterialLifecycleTuningVersion: 1
   foamVelocityTuningVersion: 1
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}
-  foamDebugView: 5
+  foamDebugView: 15
   foamSpawnDistanceNormalized: 0.634
   foamSpawnAcrossNormalized: -0.27
   foamSpawnScale: 0.538

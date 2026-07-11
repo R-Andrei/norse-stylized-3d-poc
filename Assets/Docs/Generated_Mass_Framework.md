@@ -4,7 +4,7 @@
 
 - **Active edge-wear architecture:** EW-C — Explicit Single-Segment Chamfer Kernel
 - **Validated implementation baseline:** EW-C2S6R3 — full EW-C2 provisional topology gate passed across all 24 physical masses
-- **Current implementation step:** EW-C3A — Ordered source-vertex patch-component proof, implemented and awaiting Unity validation
+- **Current implementation step:** EW-C3A2 — Global patch-cluster stitching and source-boundary completion census, implemented and awaiting Unity validation
 - **Geometry emission:** provisional build and audit only; final geometry commit remains disabled
 
 ## Feature goal
@@ -268,6 +268,7 @@ EW-C3A must classify every component as one of:
 ClosedLoop
 OpenChainSourceBoundaryResolved
 OpenChainClosedSourceResolved
+OpenChainClosedSourceClusterResolved
 OpenChainUnresolved
 ```
 
@@ -293,6 +294,124 @@ readyForVertexPatchComponents
 ```
 
 The implemented EW-C3A pass runs only after the validated EW-C2 gate has set `readyForVertexPatches=1`. It materializes and audits components without appending provisional faces. EW-C3A failure therefore leaves the validated EW-C2 result intact while reporting `readyForVertexPatchComponents=0` and a compact warning with up to three unresolved or malformed component records.
+
+Unity validation proved the extraction and ordering layer across all 24 physical masses:
+
+```text
+patchBoundaryRecords = patchBoundaryRecordsAssigned
+patchComponentOrderingFailures = 0
+patchComponentProvenanceFailures = 0
+```
+
+However, the original closure classifier resolved only 16 of 24 masses. Eight masses retained 20 open components because endpoint-to-source-vertex spokes and literal surviving source-boundary endpoint ownership were not a complete closure model. EW-C2 remained healthy across the entire set.
+
+### EW-C3A1 — Direct closure-edge census
+
+EW-C3A1 is diagnostic-only and adds no faces or ownership mutation. For every open component it defines the direct polygon-closing edge:
+
+```text
+direct closure = ordered chain end -> ordered chain start
+```
+
+Claims are grouped by the undirected `TopologyEdgeKey`. Counters and detailed warnings are emitted only for groups containing at least one currently unresolved component, while all other claims sharing that key remain visible to the group analysis.
+
+For each unresolved direct-closure key, EW-C3A1 records:
+
+```text
+existing provisional uses
+existing distinct provisional face records
+planned patch uses across all open components
+predicted final uses
+expected vertex-boundary ownership
+expected source-boundary ownership
+existing segment roles and directed orientation
+claiming source vertices and component indices
+current component closure class
+```
+
+It classifies three evidence candidates without changing component readiness:
+
+```text
+existing complement:
+    one existing inverse provisional use + one planned patch use = two
+
+shared patch connector:
+    zero existing uses + two inverse planned patch uses = two
+
+source-boundary replacement:
+    zero existing uses + one planned patch use = one surviving open edge,
+    with two incident explicit source-boundary children matching the chain
+    endpoint pair at either their terminal or outer endpoints
+```
+
+It also reports overuse, underuse, ownership conflict, and unresolved groups. Source-boundary diagnostics enumerate every incident surviving child, its source edge, loop/order, child endpoints, use count, terminal flags, and endpoint matches. No candidate is accepted as geometry behavior in EW-C3A1; the census exists only to prove the exact connector rule needed by EW-C3B.
+
+Required EW-C3A1 diagnostics are:
+
+```text
+patchDirectClosureKeys
+patchDirectClosureExistingComplementCandidates
+patchDirectClosureSharedPatchCandidates
+patchDirectClosureSourceBoundaryCandidates
+patchDirectClosureOverused
+patchDirectClosureUnderused
+patchDirectClosureOwnershipConflicts
+patchDirectClosureUnresolved
+```
+
+`readyForVertexPatchComponents` remains the unchanged EW-C3A closure result during this diagnostic patch.
+
+Unity validation rejected the direct-closure hypothesis across all 24 physical masses. Sixteen unresolved closed-source components formed six exact endpoint-stitched cycles, while no unresolved direct key qualified as an existing complement, shared patch connector, or source-boundary replacement. The remaining four unresolved components belonged to source-boundary fans and required complete boundary-loop reconstruction rather than a guessed connector.
+
+### EW-C3A2 — Global patch-cluster stitching and source-boundary completion census
+
+EW-C3A2 retains source-local components as provenance arcs but introduces a global patch-cluster layer for unresolved closed-source chains. Candidate arcs are connected only by exact endpoint-key identity. Every connected cluster must satisfy:
+
+```text
+at least two local component arcs
+every cluster endpoint has degree exactly two
+one deterministic closed walk consumes every component exactly once
+no repeated vertex-boundary topology key
+ordered positions return exactly to the starting endpoint
+```
+
+The deterministic cluster walk starts at the lexicographically smallest endpoint key, chooses its first incident component using the existing component provenance comparator, reverses local arc orientation when required, and appends every oriented boundary record continuously. Passing components are classified `OpenChainClosedSourceClusterResolved`; no connector, spoke, face, or vertex is created.
+
+Required cluster counters are:
+
+```text
+patchClosedSourceClusters
+patchClosedSourceClusterComponents
+patchClosedSourceClusterBoundaryRecords
+patchClosedSourceClusterFailures
+```
+
+The expected validated census is six closed clusters containing the sixteen previously unresolved closed-source components.
+
+EW-C3A2 also adds a diagnostic-only source-boundary completion census for the remaining unresolved open-fan components. For each original source-boundary loop it combines:
+
+```text
+surviving explicit source-boundary descendants
++
+ordered existing vertex-boundary edges from unresolved source-fan components
+```
+
+The combined exact endpoint graph reports source-record count, surviving descendants, candidate components and edges, distinct vertices, vertex degrees, connected components, duplicate topology keys, use-count violations, and ownership conflicts. A candidate completion is considered proven only when the combined graph is one connected closed loop, every vertex has degree two, every edge has exactly one current provisional use, and ownership remains disjoint and explicit. This patch does not transfer ownership.
+
+Required boundary-completion counters are:
+
+```text
+patchBoundaryCompletionLoops
+patchBoundaryCompletionCandidateComponents
+patchBoundaryCompletionCandidateEdges
+patchBoundaryCompletionClosedLoops
+patchBoundaryCompletionDegreeFailures
+patchBoundaryCompletionConnectivityFailures
+patchBoundaryCompletionDuplicateFailures
+patchBoundaryCompletionOwnershipConflicts
+```
+
+`readyForVertexPatchComponents` now accepts exact closed-source clusters but continues to reject unresolved source-fan components until a later approved ownership-transfer patch.
 
 ### EW-C3B — Provisional patch emission
 
@@ -403,8 +522,8 @@ Chamfer topology is generated before gameplay and cached with the generated mass
 
 ## Next work items
 
-1. Compile EW-C3A in Unity and report any compiler error exactly.
-2. Regenerate all 24 physical masses and capture the complete emission summaries.
-3. Require `patchBoundaryRecords=patchBoundaryRecordsAssigned`, zero unresolved open chains, zero ordering failures, zero provenance failures, and `readyForVertexPatchComponents=1`.
-4. Use any unresolved-chain diagnostics to refine only the exact closure proof before EW-C3B.
-5. Keep replacement faces, bevel strips, and future vertex patches provisional; final commit remains disabled.
+1. Compile EW-C3A2 in Unity.
+2. Regenerate all 24 physical masses and verify the sixteen closed-source arcs become six exact clusters with zero cluster failures.
+3. Inspect every source-boundary completion census and prove whether the four remaining components complete their original boundary loops.
+4. Define a separate ownership-transfer patch only if every combined boundary loop passes degree, connectivity, use-count, duplicate, and ownership checks.
+5. Keep patch-face emission and final geometry commitment disabled.

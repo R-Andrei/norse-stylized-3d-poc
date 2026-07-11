@@ -285,15 +285,17 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 
 `4.11C.5.11` tested the first post-baseline Layer D local procedural breakup probe. Validation rejected it as the fine-fragmentation solution: it was active, but the removals were cell/ribbon-shaped because `_FoamShapeMask` is the wrong resolution for atomic detail. `4.11C.5.11B` retires that code and restores the clean pass-through Layer D baseline. Fine breakup now belongs in Layer E shader composition; Layer D should focus on macro sheet/contact/bridge structure.
 
-### Current status after `4.11C.5.16C`
+### Current status after `4.11C.5.16C.1`
 
 Stage 6 has accepted the Layer C movement foundation. `4.11C.5.16A.1` validated the canonical velocity field. `4.11C.5.16B` replaced global phase transport with conservative local 2D packed-state advection, and `4.11C.5.16B.1` removed the D3D11 helper warning, restored committed-state diagnostics, and prevented obstacle-region render prediction from fighting closed transport faces. The user reported that the Unity result looked good and approved progression, so Layer C is parked unless a regression appears.
 
-`4.11C.5.16C — Advected Layer D Temporal Occupancy` is implemented in source and awaits Unity validation. Two half-resolution `RHalf` textures ping-pong a visual-only occupancy sheet. Each fixed material tick rebuilds Film Source and Film Support from committed material, advects prior occupancy through the same canonical velocity and Layer C CFL substeps, then relaxes toward the instantaneous film target with independent build/release times (`0.20 s / 0.80 s` defaults).
+`4.11C.5.16C — Advected Layer D Temporal Occupancy` is implemented and has provisional Unity runtime evidence; final stationary convergence and acceptance validation remain. Two half-resolution `RHalf` textures ping-pong a visual-only occupancy sheet. Each fixed material tick rebuilds Film Source and Film Support from committed material, advects prior occupancy through the same canonical velocity and Layer C CFL substeps, then relaxes toward the instantaneous film target with independent build/release times (`0.20 s / 0.80 s` defaults).
 
 The temporal field is not a smoothing objective. It is the persistent moving canvas required by the next macro feature: pinching, tears, split/rejoin behavior, and fractures that survive more than one stateless shape evaluation. It never writes Layer C, never extends Remaining Life, and is not yet consumed by Final Foam.
 
 New diagnostics expose the current target, temporal occupancy, and their difference. Final Foam remains unchanged. The next stage is gated on proof that occupancy transports, builds, releases, clips, reverses, and resets correctly.
+
+`4.11C.5.16C.1 — Debug Footprint Consistency` corrects only comparative diagnostic transfer functions. Motion Field ownership and Remaining Life now share `smoothstep(0.02, 0.16, committed Presence)` so tiny donor-cell tails no longer appear absent in one view and fully occupied in another. Raw Material Presence remains literal amplitude. Evaluated Shape and Temporal Occupancy remain intentionally broader because they include half-resolution Layer D visual coverage. No simulation or Final Foam behavior changes.
 
 ### Stable foundations
 
@@ -306,7 +308,7 @@ Accepted/stable foundations:
 - conservative local 2D packed-state transport through the canonical velocity;
 - 5.9n persistent morph cleanup in the compute/simulation path;
 - 5.9p lateral commit shredder disable;
-- Motion Field debug corrected to raw stored `Presence`;
+- Motion Field ownership derives from committed `Presence` and uses the shared meaningful-Presence visibility gate;
 - Motion Field + Cell Grid debug implemented;
 - stale Surface Morph Strength UI/control surface quarantined;
 - `_FoamShapeMask` and `Foam Evaluated Shape` debug implemented;
@@ -357,7 +359,7 @@ The modern execution order is:
 4. Layer C source population families — complete provisionally through `5.15B.3.1`.
 5. Canonical velocity diagnostics — accepted in `5.16A.1`.
 6. Conservative local 2D Layer C material transport — accepted through `5.16B.1`.
-7. Advected Layer D temporal occupancy — implemented in `5.16C`, now awaiting validation.
+7. Advected Layer D temporal occupancy plus debug-footprint consistency — implemented in `5.16C/5.16C.1`, now awaiting final validation.
 8. Persistent visual damage and macro fracture — next after `5.16C` acceptance.
 9. Final Foam consumes the accepted Layer D evaluated shape.
 10. Shader-local cracks, edge chips, thin streaks, glints, and lighting polish.
@@ -596,7 +598,7 @@ No new full-resolution texture is introduced. The canonical velocity include and
 Immediate order:
 
 ```text
-validate 5.16C temporal occupancy transport, boundaries, reverse flow, build/release response, and reset behavior;
+validate 5.16C/5.16C.1 temporal occupancy transport, boundaries, reverse flow, build/release response, stationary convergence, reset behavior, and diagnostic footprint consistency;
 5.16D persistent visual damage and macro fracture;
 5.16E Final Foam consumes the accepted evaluated shape;
 5.16F shader-local sub-cell cracking, edge chipping, glints, and lighting polish.

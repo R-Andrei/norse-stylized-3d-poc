@@ -1,6 +1,196 @@
 # Ground Generation Surface Upgrade Plan
 
 
+### 2026-07-11 — Patch V3J.3C8: Flat Ink Surface Baseline
+
+C7 proved full double-sided shape visibility, but its lit response was rejected because it made the accepted geometry read as a physically shaded mound. C8 locks geometry and replaces the entire C7 response with a uniform graphic ink treatment inspired by drawn ground-outline strokes.
+
+Implemented file operations:
+
+```text
+modify:
+  Assets/Game/Procedural/Ground/GeneratedGround.cs
+  Assets/Game/Procedural/Ground/GroundSurfaceFeatureRecipe.cs
+  Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs
+  Assets/Game/Procedural/Ground/Editor/GroundSurfaceStyleProfileEditor.cs
+  Assets/Docs/Ground_Visual_Design_and_Architecture.md
+  Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+
+remove:
+  Assets/Game/Rendering/PixelSurface/Shaders/SH_GroundPaintedAccentLit.shader
+  Assets/Game/Rendering/PixelSurface/Shaders/SH_GroundPaintedAccentLit.shader.meta
+
+add:
+  Assets/Game/Rendering/PixelSurface/Shaders/SH_GroundPaintedAccentInk.shader
+  Assets/Game/Rendering/PixelSurface/Shaders/SH_GroundPaintedAccentInk.shader.meta
+```
+
+Shader contract:
+
+```text
+shader: PS3D/Ground Painted Accent Ink
+pass: SRPDefaultUnlit
+queue/render type: opaque geometry
+Cull: Off
+ZWrite: On
+ZTest: LEqual
+fragment result: opaque _InkColor only
+lighting/shadows/GI/AO/probes/fog/specular/emission/textures: none
+```
+
+Authoring contract:
+
+```text
+control: Ink Color
+serialized field: paintedAccentInkColor
+default: (0.12, 0.10, 0.08, 1)
+alpha: fixed opaque
+scope: one uniform colour across every vertex and both sides of a stroke
+```
+
+`GeneratedGround` resolves the selected Painted Accent recipe colour and applies it through a renderer `MaterialPropertyBlock`. The shared material keeps the default ink colour only as a fallback, allowing multiple generated-ground previews to retain different variant colours without creating per-object materials. The renderer explicitly keeps shadow casting off, shadow receiving off, light probes off, and reflection probes off.
+
+C7 cleanup:
+
+```text
+remove UV1 generation and SetUVs(1)
+remove seed-derived material variation and statistics
+remove crown/edge/endpoint/per-stroke/smoothness constants
+remove lit shader fallback preference
+remove normal-based lighting and back-face normal correction
+remove C7 surface-response diagnostics
+```
+
+UV0 and recalculated normals remain in the mesh for compatibility, although the C8 shader does not consume them. Expected 36-stroke storage returns to the C5/C6 estimate:
+
+```text
+vertices=1404
+triangles=1728
+estimatedVertexBufferBytes=44928
+estimatedIndexBufferBytes=10368
+estimatedRawMeshBytes=55296
+```
+
+Required diagnostic state:
+
+```text
+materialShader=PS3D/Ground Painted Accent Ink
+inkColor=(0.120,0.100,0.080,1.000)  # default, unless authored otherwise
+surfaceMode=FlatUnlitInk
+materialCull=Off
+doubleSidedGI=False
+shadowCasting=Off
+receiveShadows=False
+lightProbes=Off
+reflectionProbes=Off
+```
+
+Validation keeps the accepted geometry settings and compares the same line under different scene-light directions, brightness levels, and both viewing sides. Accept only if the entire stroke remains one visually uniform dark colour with no lighting gradient, crown highlight, edge response, endpoint response, seed variation, cast shadow, received shadow, or probe-driven change. After acceptance, stop individual-line geometry/material work and proceed to distribution.
+
+### 2026-07-11 — Patch V3J.3C7: Painted Accent Surface-Response Proof
+
+C6 validation proved that double-sided rasterization solves the interior-face disappearance. C5 geometry plus C6 visibility is now the locked representation baseline. C7 begins final per-line visual treatment without changing geometry, placement, or authoring controls.
+
+Implemented scope:
+
+```text
+Assets/Game/Procedural/Ground/GeneratedGround.cs
+Assets/Game/Rendering/PixelSurface/Shaders/SH_GroundPaintedAccentLit.shader
+Assets/Game/Rendering/PixelSurface/Shaders/SH_GroundPaintedAccentLit.shader.meta
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+```
+
+Dedicated shader contract:
+
+```text
+shader: PS3D/Ground Painted Accent Lit
+render type: opaque
+culling: off
+back-face lighting: flip world normal for reverse-facing fragments
+metallic: 0
+specular: 0
+smoothness: 0.08
+emission: none
+textures/noise maps: none
+preview shadow casting: off
+shadow receiving: retained
+```
+
+Mesh-channel contract:
+
+```text
+UV0.x: existing normalized position along stroke
+UV0.y: existing normalized crown cross coordinate
+UV1.x: deterministic 0–1 value derived once from stroke.Seed
+UV1.y: zero/reserved
+```
+
+Surface proof values:
+
+```text
+Base Color                 = (0.50, 0.46, 0.40, 1)
+Crown Brightness Lift      = 0.10
+Outer Edge Darken          = 0.08
+Endpoint Softening Span    = 0.12
+Endpoint Contrast Scale    = 0.55
+Per-Stroke Variation       = 0.05
+Smoothness                 = 0.08
+```
+
+Response behavior:
+
+- use `UV0.y` for smooth centre-crown lightening and outer-edge darkening;
+- use `UV0.x` to reduce cross-sectional contrast and slightly desaturate the terminal span;
+- do not use alpha, transparency, clipping, emission, Fresnel, or texture sampling;
+- use `UV1.x` only for restrained stable per-stroke brightness difference;
+- retain one combined mesh, one shared material, and no per-stroke objects;
+- resolve the dedicated shader first, but keep the prior URP fallback chain for import/compile failure;
+- upgrade a cached shared proof material to the dedicated shader when available.
+
+Topology remains 1,404 vertices and 1,728 triangles for 36 strokes. UV1 increases estimated vertex stride to 40 bytes and expected raw storage to 66,528 bytes:
+
+```text
+vertex buffer: 56,160 bytes
+index buffer:  10,368 bytes
+raw total:     66,528 bytes
+```
+
+Required log additions:
+
+```text
+materialShader=PS3D/Ground Painted Accent Lit
+strokeVariationUv1Min/Mean/Max
+surfaceCrownLift=0.100
+surfaceEdgeDarken=0.080
+surfaceEndpointSpan=0.120
+surfaceEndpointContrast=0.550
+surfacePerStrokeVariation=0.050
+surfaceSmoothness=0.080
+materialCull=Off
+doubleSidedGI=True
+```
+
+Focused validation keeps `Stroke Width = 0.02 m`, `Fold Height = 0.25 m`, and `Crest Crown Height = 0.02 m`. Capture normal gameplay, close, low-angle, exterior-side, and interior-side views. Accept only if the silhouette remains unchanged, both sides remain consistently lit, the crown is readable but restrained, edges do not become outlines, terminals feel grounded without transparent fading, and per-stroke variation is subtle. Reject glow, noisy bands, texture soup, obvious stamped colour steps, metallic highlights, or rope/rail/root emphasis.
+
+No recipe, inspector, style asset, descriptor generator, distribution, scene, base mesh, collider, River, Generated Mass, or GroundModifier change is part of C7. Distribution work remains deferred until this surface proof passes.
+
+### 2026-07-11 — Patch V3J.3C6: Double-Sided Interior-Face Visibility Validation Result
+
+C6 was validated successfully. The same leg that previously lost its interior-facing surface remained visible after the shared material changed to `_Cull = CullMode.Off`. The defect was back-face culling on the accepted open crowned ribbon, not a missing shell or deficient height profile.
+
+Retained baseline:
+
+```text
+C5 longitudinal and crown geometry: accepted
+Cull Off: accepted and permanent
+Material.doubleSidedGI: accepted
+shallow open side shell: not required
+further geometry shaping: paused
+```
+
+C6 adds no mesh channels and preserves 1,404 vertices / 1,728 triangles for 36 strokes. Its successful diagnostic state is `materialCull=Off` and `doubleSidedGI=True`. C7 now owns individual-line surface response while preserving this representation exactly.
+
 ### 2026-07-11 — Patch V3J.3C5: Valley-Suppressed Crowned Ribbon Refinement
 
 C4 validation isolated two implementation-level overcorrections. The strict `0.70` single-crest blend plus monotonic guards removed the unwanted `M` profiles but made most strokes read as sterile `^` shapes. Shoulder contribution increased to `0.35`, yet the crown still used the slow macro end envelope, leaving first/last interior rows with too little cross-sectional body. C5 keeps the accepted crowned-ribbon representation and corrects only those two points.

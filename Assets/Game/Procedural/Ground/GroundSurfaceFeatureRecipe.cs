@@ -85,7 +85,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float paintedAccentFoldHeight = 0.018f;
 
-        [Tooltip("Painted Accent Lines only. Additional cross-sectional crown height in metres. The centre vertex rises above the two ribbon shoulders, producing real local thickness and lighting variation without adding an underside or collider. The crown fades through the same end envelope as Fold Height.")]
+        [Tooltip("Painted Accent Lines only. Additional cross-sectional crown height in metres. The centre vertex rises above the two ribbon shoulders, producing real cross-sectional body and a stable silhouette without adding an underside or collider. The crown fades through the same end envelope as Fold Height.")]
         [Range(0f, 0.05f)]
         [SerializeField]
         private float paintedAccentCrestCrownHeight = 0.02f;
@@ -99,6 +99,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [Range(0f, 1f)]
         [SerializeField]
         private float paintedAccentFoldEndTaper = 0.65f;
+
+        [Tooltip("Painted Accent Lines only. Uniform opaque ink colour used across the entire double-sided 3D stroke. It is intentionally unlit and does not vary with crown position, endpoints, stroke seed, scene lights, shadows, probes, or viewing side.")]
+        [ColorUsage(false, false)]
+        [SerializeField]
+        private Color paintedAccentInkColor =
+            new Color(0.12f, 0.10f, 0.08f, 1f);
 
         public GroundSurfaceFeatureKind Kind => kind;
 
@@ -171,6 +177,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         public float PaintedAccentFoldEndTaper =>
             Mathf.Clamp01(paintedAccentFoldEndTaper);
+
+        public Color PaintedAccentInkColor
+        {
+            get
+            {
+                Color value = paintedAccentInkColor;
+                value.r = Mathf.Clamp01(value.r);
+                value.g = Mathf.Clamp01(value.g);
+                value.b = Mathf.Clamp01(value.b);
+                value.a = 1f;
+                return value;
+            }
+        }
 
         public bool CanApplyAsShaderOnly =>
             enabled &&
