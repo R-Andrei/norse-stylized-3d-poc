@@ -2048,7 +2048,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.4115802, y: -1.1981777e-15, z: 5.4110217e-16, w: 0.91137356}
-  m_LocalPosition: {x: 4.79, y: 22.25, z: -30.08}
+  m_LocalPosition: {x: 2.67, y: 22.25, z: -31.64}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -7912,7 +7912,7 @@ Transform:
   m_GameObject: {fileID: 1533091818}
   serializedVersion: 2
   m_LocalRotation: {x: 0.4115802, y: -1.748707e-15, z: 1.7601546e-15, w: 0.91137356}
-  m_LocalPosition: {x: 4.79, y: 22.25, z: -30.08}
+  m_LocalPosition: {x: 2.67, y: 22.25, z: -31.64}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -8529,7 +8529,7 @@ Transform:
   m_GameObject: {fileID: 1611485499}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 4.79, y: 1, z: -10.08}
+  m_LocalPosition: {x: 2.67, y: 1, z: -11.64}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -9298,8 +9298,8 @@ MonoBehaviour:
   foamAutomaticBirthEnabled: 1
   foamSourcePopulationPreset: 0
   foamAutomaticShoreBirthEnabled: 1
-  foamShoreFoamCoverage: 0.628
-  foamShoreFoamActivity: 0.71
+  foamShoreFoamCoverage: 0.64
+  foamShoreFoamActivity: 0.74
   foamShoreFoamPatchSize: 0.576
   foamShoreFoamFormationSpeedMetresPerSecond: 0.924
   foamShoreFoamPattern: 0
@@ -9330,8 +9330,8 @@ MonoBehaviour:
   foamInwardWashBreakupStrengthMin: 0.04
   foamInwardWashBreakupStrengthMax: 0.14
   foamAutomaticObjectBirthEnabled: 1
-  foamObjectFoamCoverage: 0.587
-  foamObjectFoamActivity: 0.661
+  foamObjectFoamCoverage: 0.6
+  foamObjectFoamActivity: 0.7
   foamObjectFoamFormationSpeedMetresPerSecond: 0.71
   foamObjectFoamPattern: 0
   foamObjectContactArcPatternWeight: 0.14502627
@@ -9373,8 +9373,8 @@ MonoBehaviour:
   foamObjectContactFleckBreakupStrengthMin: 0.18
   foamObjectContactFleckBreakupStrengthMax: 0.45
   foamAutomaticFreeWaterBirthEnabled: 1
-  foamFreeWaterFoamCoverage: 0.685
-  foamFreeWaterFoamActivity: 0.648
+  foamFreeWaterFoamCoverage: 0.69
+  foamFreeWaterFoamActivity: 0.67
   foamFreeWaterFoamFormationSpeedMetresPerSecond: 0.969
   foamFreeWaterFoamPattern: 0
   foamFreeWaterLaceConnectorPatternWeight: 0.628
@@ -9414,16 +9414,18 @@ MonoBehaviour:
   foamNeutralLifetime: 8
   foamSupportedAgingRate: 0.12
   foamNegativeAgingRate: 7
-  foamMaterialFlowSpeedMultiplier: 0.77
+  foamMaterialFlowSpeedMultiplier: 0.7
   foamSurfaceMorphStrength: 2.53
   foamSurfaceMorphCalibrationVersion: 1
-  foamMotionFieldStrength: 0.297
-  foamMotionFieldScrollHz: 0.6
+  foamMotionFieldStrength: 0.38
+  foamMotionFieldScrollHz: 0.1
   foamMotionFieldNeutralCoverage: 0.1
-  foamMotionFieldLaneScale: 1
+  foamMotionFieldLaneScale: 1.232
   foamMotionFieldAcrossRiverCoherence: 1
   foamObstacleSlowdownStrength: 0.85
   foamObstacleMinimumDownstreamFactor: 0.12
+  foamVisualOccupancyBuildTime: 0.2
+  foamVisualOccupancyReleaseTime: 0.8
   foamMaterialLifecycleTuningVersion: 1
   foamVelocityTuningVersion: 1
   foamColour: {r: 0.94, g: 0.97, b: 0.94, a: 0.84}

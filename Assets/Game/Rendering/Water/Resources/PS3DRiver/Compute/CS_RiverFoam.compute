@@ -14,10 +14,11 @@
 #pragma kernel BuildFoamObjectContactField
 #pragma kernel ResetTopologyMetrics
 #pragma kernel MeasureTopologyMetrics
-#pragma kernel CommitPhaseTransport
+#pragma kernel ResetTransportMetrics
 #pragma kernel SimulateFoam
 #pragma kernel BuildFoamFilmSource
 #pragma kernel BuildFoamFilmSupport
+#pragma kernel AdvanceFoamVisualOccupancy
 #pragma kernel EvaluateFoamShape
 #pragma kernel ApplyBoundary
 #pragma target 5.0
@@ -194,33 +195,14 @@ float FoamSampleFilmSupportBilinear(float2 uv)
 }
 
 
-float FoamResolveMaterialPhaseOffsetUV()
-{
-    return _FoamFieldLength > 0.0001
-        ? _FoamPhaseTransportMetres / _FoamFieldLength
-        : 0.0;
-}
-
-
-float2 FoamResolveMaterialUVForDomainUV(float2 domainUV)
-{
-    // Layer C stores persistent material in residual-phase material space.
-    // Layer D products are written in stable river/domain space, so any
-    // material contribution must be sampled from the phase-corrected source
-    // coordinate before being mixed with domain-anchored support fields.
-    return float2(
-        saturate(domainUV.x - FoamResolveMaterialPhaseOffsetUV()),
-        saturate(domainUV.y));
-}
-
-
 FoamMaterialState FoamSampleMaterialStateForDomainUV(
     float2 domainUV,
     float validFluid)
 {
-    float2 materialUV = FoamResolveMaterialUVForDomainUV(domainUV);
+    // Persistent material now occupies its actual domain-space cell. Layer D
+    // samples it directly; no global phase coordinate exists after 5.16B.
     float2 materialPixel = FoamUVToTexelCoordinate(
-        materialUV,
+        domainUV,
         _FoamDimensions);
     float4 packed = FoamClipPackedToValidFluid(
         SampleStateBilinear(materialPixel),
@@ -367,6 +349,352 @@ void BuildFoamFilmSupport(uint3 dispatchId : SV_DispatchThreadID)
 }
 
 
+
+float FoamResolveInstantaneousFilmTarget(float source, float support)
+{
+    float supportShape = smoothstep(0.28, 0.74, saturate(support));
+    float sourceShape = smoothstep(0.10, 0.46, saturate(source));
+    return saturate(max(sourceShape * 0.68, supportShape * 0.60));
+}
+
+
+float FoamSampleVisualOccupancyBilinear(float2 uv)
+{
+    int2 baseCoordinate;
+    int2 nextCoordinate;
+    float2 blend;
+    FoamResolveFilmBilinearCoordinates(
+        uv,
+        baseCoordinate,
+        nextCoordinate,
+        blend);
+
+    float a = _FoamVisualOccupancyRead.Load(int3(baseCoordinate, 0));
+    float b = _FoamVisualOccupancyRead.Load(
+        int3(nextCoordinate.x, baseCoordinate.y, 0));
+    float c = _FoamVisualOccupancyRead.Load(
+        int3(baseCoordinate.x, nextCoordinate.y, 0));
+    float d = _FoamVisualOccupancyRead.Load(int3(nextCoordinate, 0));
+    return saturate(lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y));
+}
+
+
+bool FoamVisualOccupancyInsideGrid(int2 coordinate)
+{
+    return coordinate.x >= 0 && coordinate.x < _FoamFilmDimensions.x &&
+        coordinate.y >= 0 && coordinate.y < _FoamFilmDimensions.y;
+}
+
+
+float2 FoamVisualOccupancyDomainUV(int2 coordinate)
+{
+    return ((float2)coordinate + 0.5) /
+        max(float2(1.0, 1.0), (float2)_FoamFilmDimensions);
+}
+
+
+bool FoamVisualOccupancyInsideSimulation(int2 coordinate)
+{
+    if (!FoamVisualOccupancyInsideGrid(coordinate))
+    {
+        return false;
+    }
+
+    float2 domainUV = FoamVisualOccupancyDomainUV(coordinate);
+    return domainUV.x * _FoamFieldLength <=
+        _FoamSimulationLength + 0.0001;
+}
+
+
+int FoamVisualOccupancyMetricRow(int filmX)
+{
+    float domainU = ((float)filmX + 0.5) /
+        max(1.0, (float)_FoamFilmDimensions.x);
+    return clamp(
+        (int)floor(domainU * (float)_FoamDimensions.x),
+        0,
+        max(0, _FoamDimensions.x - 1));
+}
+
+
+float FoamVisualOccupancyLongitudinalSpacing()
+{
+    return max(
+        0.0001,
+        _FoamFieldLength / max(1.0, (float)_FoamFilmDimensions.x));
+}
+
+
+float FoamVisualOccupancyLateralSpacing(int filmX)
+{
+    int metricX = FoamVisualOccupancyMetricRow(filmX);
+    FoamMetricRow metric = _FoamMetricRows[metricX];
+    float totalWidth = max(
+        0.0001,
+        metric.widthsAndSpacing.x + metric.widthsAndSpacing.y);
+    return max(
+        0.0001,
+        totalWidth / max(1.0, (float)_FoamFilmDimensions.y));
+}
+
+
+float FoamVisualOccupancyCellArea(int filmX)
+{
+    return FoamVisualOccupancyLongitudinalSpacing() *
+        FoamVisualOccupancyLateralSpacing(filmX);
+}
+
+
+float FoamVisualOccupancyValidFluidAt(int2 coordinate)
+{
+    if (!FoamVisualOccupancyInsideSimulation(coordinate))
+    {
+        return 0.0;
+    }
+
+    float2 domainUV = FoamVisualOccupancyDomainUV(coordinate);
+    float2 materialPixel = FoamUVToTexelCoordinate(
+        domainUV,
+        _FoamDimensions);
+    float boundaryCoverage = SampleBoundaryCoverageBilinear(materialPixel);
+    float obstacleFootprint = SampleObstacleExclusionBilinear(materialPixel);
+    return saturate(boundaryCoverage * (1.0 - obstacleFootprint));
+}
+
+
+float FoamLoadVisualOccupancy(
+    int2 coordinate,
+    out float validFluid)
+{
+    validFluid = FoamVisualOccupancyValidFluidAt(coordinate);
+    if (validFluid <= FoamMaterialStateEpsilon)
+    {
+        return 0.0;
+    }
+
+    return min(
+        saturate(_FoamVisualOccupancyRead.Load(int3(coordinate, 0))),
+        validFluid);
+}
+
+
+float2 FoamResolveVisualOccupancyGridVelocity(
+    int2 coordinate,
+    float validFluid)
+{
+    float2 domainUV = FoamVisualOccupancyDomainUV(coordinate);
+    float2 materialCoordinate = domainUV * (float2)_FoamDimensions;
+    RiverWaterFoamResolvedVelocity resolved = FoamResolveVelocity(
+        materialCoordinate,
+        validFluid);
+    float flowSign = _FoamFlowDirection >= 0.0 ? 1.0 : -1.0;
+    return float2(
+        resolved.velocityMetresPerSecond.x * flowSign,
+        resolved.velocityMetresPerSecond.y);
+}
+
+
+void FoamResolveVisualLongitudinalFaceFlux(
+    int leftX,
+    int y,
+    out float resolvedFlux)
+{
+    resolvedFlux = 0.0;
+    int2 leftCoordinate = int2(leftX, y);
+    int2 rightCoordinate = int2(leftX + 1, y);
+    bool leftInside = FoamVisualOccupancyInsideSimulation(leftCoordinate);
+    bool rightInside = FoamVisualOccupancyInsideSimulation(rightCoordinate);
+
+    if (leftInside && rightInside)
+    {
+        float leftValid;
+        float rightValid;
+        float leftOccupancy = FoamLoadVisualOccupancy(
+            leftCoordinate,
+            leftValid);
+        float rightOccupancy = FoamLoadVisualOccupancy(
+            rightCoordinate,
+            rightValid);
+        if (leftValid <= FoamMaterialStateEpsilon ||
+            rightValid <= FoamMaterialStateEpsilon)
+        {
+            return;
+        }
+
+        float leftVelocity = FoamResolveVisualOccupancyGridVelocity(
+            leftCoordinate,
+            leftValid).x;
+        float rightVelocity = FoamResolveVisualOccupancyGridVelocity(
+            rightCoordinate,
+            rightValid).x;
+        float faceVelocity = 0.5 * (leftVelocity + rightVelocity);
+        float faceLength = 0.5 * (
+            FoamVisualOccupancyLateralSpacing(leftX) +
+            FoamVisualOccupancyLateralSpacing(leftX + 1));
+        float donor = faceVelocity >= 0.0
+            ? leftOccupancy
+            : rightOccupancy;
+        resolvedFlux = faceVelocity * faceLength * donor;
+        return;
+    }
+
+    // Match Layer C endpoint ownership: no external inflow, one-way outflow
+    // only at the physical downstream endpoint selected by signed grid flow.
+    if (leftInside && !rightInside)
+    {
+        float leftValid;
+        float leftOccupancy = FoamLoadVisualOccupancy(
+            leftCoordinate,
+            leftValid);
+        if (leftValid <= FoamMaterialStateEpsilon)
+        {
+            return;
+        }
+
+        float faceVelocity = FoamResolveVisualOccupancyGridVelocity(
+            leftCoordinate,
+            leftValid).x;
+        if (faceVelocity > 0.0)
+        {
+            resolvedFlux = faceVelocity *
+                FoamVisualOccupancyLateralSpacing(leftX) *
+                leftOccupancy;
+        }
+        return;
+    }
+
+    if (!leftInside && rightInside)
+    {
+        float rightValid;
+        float rightOccupancy = FoamLoadVisualOccupancy(
+            rightCoordinate,
+            rightValid);
+        if (rightValid <= FoamMaterialStateEpsilon)
+        {
+            return;
+        }
+
+        float faceVelocity = FoamResolveVisualOccupancyGridVelocity(
+            rightCoordinate,
+            rightValid).x;
+        if (faceVelocity < 0.0)
+        {
+            resolvedFlux = faceVelocity *
+                FoamVisualOccupancyLateralSpacing(rightCoordinate.x) *
+                rightOccupancy;
+        }
+    }
+}
+
+
+void FoamResolveVisualLateralFaceFlux(
+    int x,
+    int lowerY,
+    out float resolvedFlux)
+{
+    resolvedFlux = 0.0;
+    int2 lowerCoordinate = int2(x, lowerY);
+    int2 upperCoordinate = int2(x, lowerY + 1);
+    if (!FoamVisualOccupancyInsideSimulation(lowerCoordinate) ||
+        !FoamVisualOccupancyInsideSimulation(upperCoordinate))
+    {
+        return;
+    }
+
+    float lowerValid;
+    float upperValid;
+    float lowerOccupancy = FoamLoadVisualOccupancy(
+        lowerCoordinate,
+        lowerValid);
+    float upperOccupancy = FoamLoadVisualOccupancy(
+        upperCoordinate,
+        upperValid);
+    if (lowerValid <= FoamMaterialStateEpsilon ||
+        upperValid <= FoamMaterialStateEpsilon)
+    {
+        return;
+    }
+
+    float lowerVelocity = FoamResolveVisualOccupancyGridVelocity(
+        lowerCoordinate,
+        lowerValid).y;
+    float upperVelocity = FoamResolveVisualOccupancyGridVelocity(
+        upperCoordinate,
+        upperValid).y;
+    float faceVelocity = 0.5 * (lowerVelocity + upperVelocity);
+    float donor = faceVelocity >= 0.0
+        ? lowerOccupancy
+        : upperOccupancy;
+    resolvedFlux = faceVelocity *
+        FoamVisualOccupancyLongitudinalSpacing() * donor;
+}
+
+
+[numthreads(8, 8, 1)]
+void AdvanceFoamVisualOccupancy(uint3 dispatchId : SV_DispatchThreadID)
+{
+    if (dispatchId.x >= (uint)_FoamFilmDimensions.x ||
+        dispatchId.y >= (uint)_FoamFilmDimensions.y)
+    {
+        return;
+    }
+
+    int2 coordinate = int2(dispatchId.xy);
+    float validFluid;
+    float currentOccupancy = FoamLoadVisualOccupancy(
+        coordinate,
+        validFluid);
+    if (validFluid <= FoamMaterialStateEpsilon)
+    {
+        _FoamVisualOccupancyWrite[coordinate] = 0.0;
+        return;
+    }
+
+    float westFlux = 0.0;
+    float eastFlux = 0.0;
+    float southFlux = 0.0;
+    float northFlux = 0.0;
+    FoamResolveVisualLongitudinalFaceFlux(
+        coordinate.x - 1,
+        coordinate.y,
+        westFlux);
+    FoamResolveVisualLongitudinalFaceFlux(
+        coordinate.x,
+        coordinate.y,
+        eastFlux);
+    FoamResolveVisualLateralFaceFlux(
+        coordinate.x,
+        coordinate.y - 1,
+        southFlux);
+    FoamResolveVisualLateralFaceFlux(
+        coordinate.x,
+        coordinate.y,
+        northFlux);
+
+    float area = FoamVisualOccupancyCellArea(coordinate.x);
+    float transportedOccupancy = currentOccupancy -
+        _FoamDeltaTime / max(0.000001, area) *
+        ((eastFlux - westFlux) + (northFlux - southFlux));
+    transportedOccupancy = clamp(transportedOccupancy, 0.0, validFluid);
+
+    float target = FoamResolveInstantaneousFilmTarget(
+        _FoamFilmSourceRead.Load(int3(coordinate, 0)),
+        _FoamFilmSupportRead.Load(int3(coordinate, 0))) * validFluid;
+    float responseTime = target > transportedOccupancy
+        ? max(0.0001, _FoamVisualOccupancyBuildTime)
+        : max(0.0001, _FoamVisualOccupancyReleaseTime);
+    float response = saturate(
+        1.0 - exp(-max(0.0, _FoamDeltaTime) / responseTime));
+    float updatedOccupancy = lerp(
+        transportedOccupancy,
+        target,
+        response);
+
+    _FoamVisualOccupancyWrite[coordinate] =
+        clamp(updatedOccupancy, 0.0, validFluid);
+}
+
+
 [numthreads(8, 8, 1)]
 void EvaluateFoamShape(uint3 dispatchId : SV_DispatchThreadID)
 {
@@ -399,16 +727,12 @@ void EvaluateFoamShape(uint3 dispatchId : SV_DispatchThreadID)
         validFluid);
     float baseShape = FoamEvaluateIntrinsicShapeMask(material, validFluid);
 
-    float filmSource = FoamSampleFilmSourceBilinear(domainUV);
-    float filmSupport = FoamSampleFilmSupportBilinear(domainUV);
+    float visualFilm = FoamSampleVisualOccupancyBilinear(domainUV);
 
-    float supportShape = smoothstep(0.28, 0.74, filmSupport);
-    float sourceShape = smoothstep(0.10, 0.46, filmSource);
-    float visualFilm = max(sourceShape * 0.68, supportShape * 0.60);
-
-    // Layer D now owns broad visual film structure only. It may widen/bridge a
-    // visible sheet through film-source/support fields, but it never writes back
-    // to FoamState. Fine sub-cell fragmentation remains Layer E shader work.
+    // Layer D now owns an advected temporal visual sheet. The occupancy field
+    // relaxes toward instantaneous Film Source / Film Support but never writes
+    // back to FoamState or Remaining Life. Fine sub-cell fragmentation remains
+    // Layer E shader work.
     _FoamShapeMaskWrite[coordinate] = saturate(max(baseShape, visualFilm) *
         validFluid);
 }
@@ -2394,12 +2718,8 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    float phaseU = _FoamFieldLength > 0.0001
-        ? _FoamPhaseTransportMetres / _FoamFieldLength
-        : 0.0;
-    float2 storageUVForVisibleWorld = float2(uv.x - phaseU, uv.y);
     FoamMaterialState visibleMaterial = FoamDecodeMaterialState(
-        SampleStateAtUV(storageUVForVisibleWorld));
+        SampleStateAtUV(uv));
     float presence = visibleMaterial.presence;
     bool visible = presence >= _FoamPresenceMetricThreshold;
     bool major = materialTopology.majorSupport >= 0.15;
@@ -2416,10 +2736,10 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     float2 texel = 1.0 /
         max(float2(2.0, 2.0), (float2)_FoamTopologyDimensions);
     bool perimeter = visible && (
-        SampleStateAtUV(saturate(storageUVForVisibleWorld + float2(texel.x, 0.0))).x < _FoamPresenceMetricThreshold ||
-        SampleStateAtUV(saturate(storageUVForVisibleWorld - float2(texel.x, 0.0))).x < _FoamPresenceMetricThreshold ||
-        SampleStateAtUV(saturate(storageUVForVisibleWorld + float2(0.0, texel.y))).x < _FoamPresenceMetricThreshold ||
-        SampleStateAtUV(saturate(storageUVForVisibleWorld - float2(0.0, texel.y))).x < _FoamPresenceMetricThreshold);
+        SampleStateAtUV(saturate(uv + float2(texel.x, 0.0))).x < _FoamPresenceMetricThreshold ||
+        SampleStateAtUV(saturate(uv - float2(texel.x, 0.0))).x < _FoamPresenceMetricThreshold ||
+        SampleStateAtUV(saturate(uv + float2(0.0, texel.y))).x < _FoamPresenceMetricThreshold ||
+        SampleStateAtUV(saturate(uv - float2(0.0, texel.y))).x < _FoamPresenceMetricThreshold);
 
     uint originalValue;
     _FoamTopologyMetrics.InterlockedAdd(FoamMetricValidFluidOffset, 1u, originalValue);
@@ -2550,85 +2870,15 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     }
 }
 
-float4 FoamResolvePhaseTransportSourceContribution(
-    int sourceX,
-    int sourceY)
+[numthreads(64, 1, 1)]
+void ResetTransportMetrics(uint3 dispatchId : SV_DispatchThreadID)
 {
-    if (sourceY < 0 || sourceY >= _FoamDimensions.y)
-    {
-        return 0.0.xxxx;
-    }
-
-    int2 source = int2(sourceX, sourceY);
-    float sourceValidFluid = FoamValidFluidAt(source);
-    if (sourceValidFluid <= FoamMaterialStateEpsilon)
-    {
-        return 0.0.xxxx;
-    }
-
-    float4 sourcePacked = FoamClampPackedMaterialState(
-        _FoamStateRead.Load(int3(source, 0)));
-    if (sourcePacked.x <= FoamMaterialStateEpsilon)
-    {
-        return 0.0.xxxx;
-    }
-
-    // Patch 4.11C.5.9p: disable the lateral phase-commit shredder.
-    // The previous per-texel source-owned lateral dither made each foam texel
-    // independently choose stay/shift during a phase commit. That prevented
-    // coherent patch motion and tore foam into thin ribbons. Until material-level
-    // lateral transport is redesigned, phase transport only commits downstream
-    // movement and preserves the source row.
-    return sourcePacked;
-}
-
-[numthreads(8, 8, 1)]
-void CommitPhaseTransport(uint3 dispatchId : SV_DispatchThreadID)
-{
-    if (dispatchId.x >= (uint)_FoamRangeCount ||
-        dispatchId.y >= (uint)_FoamDimensions.y)
+    if (dispatchId.x >= FoamTransportMetricCount)
     {
         return;
     }
 
-    int x = _FoamRangeStart + (int)dispatchId.x;
-    int y = (int)dispatchId.y;
-    if (x < 0 || x >= _FoamDimensions.x)
-    {
-        return;
-    }
-
-    int2 destination = int2(x, y);
-    float destinationValidFluid = FoamValidFluidAt(destination);
-    if (destinationValidFluid <= FoamMaterialStateEpsilon ||
-        !IsFoamColumnInsideSimulation(x))
-    {
-        _FoamStateWrite[destination] = 0.0.xxxx;
-        return;
-    }
-
-    int sourceX = x - _FoamPhaseCommitCells;
-    if (sourceX < 0 || sourceX >= _FoamDimensions.x ||
-        !IsFoamColumnInsideSimulation(sourceX))
-    {
-        _FoamStateWrite[destination] = 0.0.xxxx;
-        return;
-    }
-
-    float4 transportedPacked = FoamResolvePhaseTransportSourceContribution(
-        sourceX,
-        y);
-
-    transportedPacked = FoamClampPackedMaterialState(transportedPacked);
-    if (transportedPacked.x <= FoamMaterialStateEpsilon)
-    {
-        _FoamStateWrite[destination] = 0.0.xxxx;
-        return;
-    }
-
-    _FoamStateWrite[destination] = FoamClipPackedToValidFluid(
-        transportedPacked,
-        destinationValidFluid);
+    _FoamTransportMetrics.Store(dispatchId.x * 4u, 0u);
 }
 
 [numthreads(8, 8, 1)]
@@ -2649,25 +2899,72 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
 
     int2 coordinate = int2(x, y);
     float validFluid = FoamValidFluidAt(coordinate);
-    if (validFluid <= 0.0001)
+    if (validFluid <= FoamMaterialStateEpsilon)
     {
         _FoamStateWrite[coordinate] = 0.0.xxxx;
         return;
     }
 
     float4 currentPacked = FoamClipPackedToValidFluid(
-        _FoamStateRead.Load(int3(coordinate, 0)),
+        FoamClampPackedMaterialState(
+            _FoamStateRead.Load(int3(coordinate, 0))),
         validFluid);
+    float cellArea = FoamTransportCellArea(x);
+    FoamAccumulateTransportTriplet(
+        FoamTransportPresenceBeforeOffset,
+        FoamTransportLifeBeforeOffset,
+        FoamTransportPatternBeforeOffset,
+        currentPacked * cellArea);
 
-    // Foam storage is phase-shifted relative to the visible river after
-    // 4.11C.5.2d. Lifetime/topology must sample the world location where this
-    // stored material is currently displayed, otherwise support/negative zones
-    // appear to do nothing while the rendered foam glides across them.
-    float phaseCells = _FoamFieldLength > 0.0001
-        ? _FoamPhaseTransportMetres / _FoamFieldLength *
-          (float)_FoamDimensions.x
-        : 0.0;
-    float2 worldSampleCoordinate = float2((float)x + phaseCells, (float)y);
+    float4 eastFlux = 0.0.xxxx;
+    float4 westFlux = 0.0.xxxx;
+    float4 eastOutflow = 0.0.xxxx;
+    float4 westOutflow = 0.0.xxxx;
+    FoamResolveLongitudinalFaceFlux(
+        x,
+        y,
+        eastFlux,
+        eastOutflow);
+    FoamResolveLongitudinalFaceFlux(
+        x - 1,
+        y,
+        westFlux,
+        westOutflow);
+    float4 northFlux = FoamResolveLateralFaceFlux(x, y);
+    float4 southFlux = FoamResolveLateralFaceFlux(x, y - 1);
+
+    float4 currentMass = currentPacked * cellArea;
+    float4 transportedMass = currentMass - _FoamDeltaTime * (
+        eastFlux - westFlux + northFlux - southFlux);
+    float4 rawTransported = transportedMass / max(0.0001, cellArea);
+    float4 transportedPacked = FoamClipPackedToValidFluid(
+        FoamClampPackedMaterialState(rawTransported),
+        validFluid);
+    float4 clampedMass = transportedPacked * cellArea;
+    float4 clampLoss = max(0.0.xxxx, transportedMass - clampedMass);
+    float4 boundaryOutflow = _FoamDeltaTime * (
+        eastOutflow + westOutflow);
+
+    FoamAccumulateTransportTriplet(
+        FoamTransportPresenceAfterOffset,
+        FoamTransportLifeAfterOffset,
+        FoamTransportPatternAfterOffset,
+        clampedMass);
+    FoamAccumulateTransportTriplet(
+        FoamTransportPresenceOutflowOffset,
+        FoamTransportLifeOutflowOffset,
+        FoamTransportPatternOutflowOffset,
+        boundaryOutflow);
+    FoamAccumulateTransportTriplet(
+        FoamTransportPresenceClampOffset,
+        FoamTransportLifeClampOffset,
+        FoamTransportPatternClampOffset,
+        clampLoss);
+
+    // Stored material occupies this exact cell after conservative transport.
+    // Topology/lifecycle sampling therefore uses the current cell centre with
+    // no phase compensation.
+    float2 worldSampleCoordinate = (float2)coordinate + 0.5;
     float2 topologySampleCoordinate = float2(
         worldSampleCoordinate.x /
             max(1.0, (float)_FoamDimensions.x) *
@@ -2687,10 +2984,7 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
             SampleBoundaryCoverageBilinear(worldSampleCoordinate),
             obstacleFootprint);
 
-    float4 preservedPacked = FoamPreservePersistentMaterialState(
-        currentPacked,
-        validFluid);
-    FoamMaterialState material = FoamDecodeMaterialState(preservedPacked);
+    FoamMaterialState material = FoamDecodeMaterialState(transportedPacked);
     if (material.presence <= FoamMaterialStateEpsilon)
     {
         _FoamStateWrite[coordinate] = 0.0.xxxx;
@@ -2708,11 +3002,9 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         0.0,
         material.remainingLife - ageDelta);
 
-    // Lifecycle authority: this simulation pass does not spatially relocate
-    // material. Removal remains controlled by Remaining Life, whose delta is
-    // derived only from Neutral Lifetime and topology aging influence.
-    float4 persistentPacked = FoamEncodeMaterialState(material);
+    // Only lifecycle aging changes normalized Remaining Life. Transport has
+    // already moved the complete packed vector with shared face fluxes.
     _FoamStateWrite[coordinate] = FoamClipPackedToValidFluid(
-        persistentPacked,
+        FoamEncodeMaterialState(material),
         validFluid);
 }

@@ -161,6 +161,20 @@ namespace ProgrammaticStylized3D.Rivers
                 IsProgressiveBirthSourceDebugActive;
             bool motionFieldDebugActive = IsMotionFieldDebugActive;
             bool shapeProductDebugActive = IsShapeProductDebugActive;
+            bool shapeProductDebugEnteredThisUpdate =
+                shapeProductDebugActive &&
+                !shapeProductDebugActiveLastUpdate;
+            if (shapeProductDebugEnteredThisUpdate)
+            {
+                ClearRenderTexture(shapeMaskTexture);
+                ClearRenderTexture(filmSourceTexture);
+                ClearRenderTexture(filmSupportTexture);
+                ClearRenderTexture(visualOccupancyA);
+                ClearRenderTexture(visualOccupancyB);
+                currentVisualOccupancy = visualOccupancyA;
+                writeVisualOccupancy = visualOccupancyB;
+            }
+            shapeProductDebugActiveLastUpdate = shapeProductDebugActive;
             // Patch 4.11C.5.4d: no liveness scheduler remains. Once the
             // runtime owns allocated material textures, the lifecycle ticks the
             // full field every material step until an explicit ClearFoam,
@@ -244,14 +258,14 @@ namespace ProgrammaticStylized3D.Rivers
             float updateRate = ResolveUpdateRate();
             float stepDuration = 1f / Mathf.Max(1f, updateRate);
             lastMaterialStepDuration = stepDuration;
-            float signedDownstreamSpeed =
-                ResolveSignedBaseFoamDownstreamSpeedMetresPerSecond();
-            float downstreamSpeed = Mathf.Abs(signedDownstreamSpeed);
-            lastEstimatedTransportCellsPerStep =
-                minimumTransportLongitudinalSpacing > 0.0001f
-                    ? downstreamSpeed * stepDuration /
-                      minimumTransportLongitudinalSpacing
-                    : 0f;
+            ResolveTransportSubsteps(
+                stepDuration,
+                out int requiredTransportSubsteps,
+                out int usedTransportSubsteps,
+                out float maximumTransportCfl);
+            lastRequiredTransportSubsteps = requiredTransportSubsteps;
+            lastUsedTransportSubsteps = usedTransportSubsteps;
+            lastMaximumTransportCfl = maximumTransportCfl;
 
             if (manualInjectedThisUpdate)
             {
@@ -260,18 +274,22 @@ namespace ProgrammaticStylized3D.Rivers
                     stepDuration);
             }
 
-            bool phaseMaterialActive = materialWork;
-            AdvanceFoamPhaseTransport(
-                deltaTime,
-                signedDownstreamSpeed,
-                phaseMaterialActive);
-
             simulationAccumulator = Mathf.Min(
                 simulationAccumulator + deltaTime,
                 stepDuration * 2f);
 
+            bool visualShapeEvaluatedThisUpdate = false;
             while (simulationAccumulator >= stepDuration)
             {
+                if (transportSafetyLimitExceeded)
+                {
+                    // Retain the full material tick, all queued births, and all
+                    // persistent state. Running with fewer substeps would make
+                    // the donor-cell solve unstable and silently change the
+                    // accepted canonical velocity contract.
+                    break;
+                }
+
                 simulationAccumulator -= stepDuration;
                 lastMaterialStepsThisFrame++;
                 if (progressiveBirthDebugActive)
@@ -292,11 +310,6 @@ namespace ProgrammaticStylized3D.Rivers
                     IsAutomaticSourcePopulationActive;
 
                 bool measureTopology = false;
-                if (materialStepActive)
-                {
-                    ConfigureSharedComputeParameters(stepDuration);
-                }
-
                 if ((materialStepActive || topologyDebugActive) &&
                     !topologyMaintenanceBlocked)
                 {
@@ -330,7 +343,9 @@ namespace ProgrammaticStylized3D.Rivers
 
                 if (materialStepActive)
                 {
-                    SimulateFullField(stepDuration);
+                    SimulateFullField(
+                        stepDuration,
+                        usedTransportSubsteps);
                     if (measureTopology && !topologyMaintenanceBlocked)
                     {
                         MeasureTopologyMetrics();
@@ -345,6 +360,14 @@ namespace ProgrammaticStylized3D.Rivers
                         1f / TopologyMetricsUpdateRate;
                 }
 
+                if (shapeProductDebugActive)
+                {
+                    visualShapeEvaluatedThisUpdate |=
+                        DispatchAdvanceVisualOccupancy(
+                            stepDuration,
+                            usedTransportSubsteps);
+                }
+
                 if (progressiveBirthDebugActive)
                 {
                     EndProgressiveBirthDebugStep();
@@ -357,21 +380,19 @@ namespace ProgrammaticStylized3D.Rivers
                 MeasureTopologyMetrics(true);
             }
 
-            // Normal Foam rendering presents the latest committed material
-            // state plus the bounded residual phase. The residual resets only
-            // when a whole material cell has been committed into the persistent
-            // texture.
+            // Persistent material advances only on fixed material ticks.
+            // The remaining accumulator time is presentation-only and is
+            // backtraced through the same local canonical 2D velocity in the
+            // river shader. It never writes FoamState or Remaining Life.
             simulationInterpolation = 1f;
-            foamRenderTravelMetres = foamPhaseTransportMetres;
+            foamRenderAdvectionSeconds = transportSafetyLimitExceeded
+                ? 0f
+                : Mathf.Clamp(
+                    simulationAccumulator,
+                    0f,
+                    stepDuration);
             lastRenderInterpolationAlpha = simulationInterpolation;
-            lastFoamPhaseTransportMetres = foamPhaseTransportMetres;
-            lastFoamRenderTravelMetres = foamRenderTravelMetres;
-            lastFoamPhaseCellFraction =
-                minimumTransportLongitudinalSpacing > 0.0001f
-                    ? Mathf.Clamp01(
-                        Mathf.Abs(foamPhaseTransportMetres) /
-                        minimumTransportLongitudinalSpacing)
-                    : 0f;
+            lastFoamRenderAdvectionSeconds = foamRenderAdvectionSeconds;
 
             if (IsSleeping)
             {
@@ -392,8 +413,11 @@ namespace ProgrammaticStylized3D.Rivers
                 idleSince = 0.0;
             }
 
-            if (shapeProductDebugActive)
+            if (shapeProductDebugEnteredThisUpdate &&
+                !visualShapeEvaluatedThisUpdate)
             {
+                // Seed the diagnostic products immediately on entry, then keep
+                // all continuing Layer D work on the fixed material cadence.
                 DispatchEvaluateShape();
             }
 
@@ -401,56 +425,55 @@ namespace ProgrammaticStylized3D.Rivers
             UpdateRecentPeaks();
         }
 
-        private void AdvanceFoamPhaseTransport(
-            float deltaTime,
-            float signedDownstreamSpeed,
-            bool materialActive)
+        private void ResolveTransportSubsteps(
+            float materialStepDuration,
+            out int requiredSubsteps,
+            out int usedSubsteps,
+            out float maximumCfl)
         {
-            lastPhaseCommitCellsThisFrame = 0;
-            phaseCommitCounterAccumulator += deltaTime;
-            if (phaseCommitCounterAccumulator >= 1f)
-            {
-                lastPhaseCommitCellsThisSecond = phaseCommitCellsInCurrentSecond;
-                phaseCommitCellsInCurrentSecond = 0;
-                phaseCommitCounterAccumulator %= 1f;
-            }
-
-            if (!materialActive || minimumTransportLongitudinalSpacing <= 0.0001f ||
-                Mathf.Abs(signedDownstreamSpeed) <= 0.0001f)
-            {
-                if (!materialActive)
-                {
-                    foamPhaseTransportMetres = 0f;
-                }
-
-                return;
-            }
-
-            foamPhaseTransportMetres += signedDownstreamSpeed * deltaTime;
-            float cellLength = Mathf.Max(
+            float baseSpeed =
+                ResolveBaseFoamDownstreamSpeedMetresPerSecond();
+            float longitudinalSpacing = Mathf.Max(
                 0.0001f,
                 minimumTransportLongitudinalSpacing);
-            int committedMagnitude = Mathf.FloorToInt(
-                Mathf.Abs(foamPhaseTransportMetres) / cellLength);
-            if (committedMagnitude <= 0)
+            float lateralSpacing = Mathf.Max(
+                0.0001f,
+                minimumTransportLateralSpacing);
+            float lateralSpeed = baseSpeed * Mathf.Max(
+                0f,
+                river != null ? river.FoamMaximumLateralSpeedRatio : 0f);
+
+            lastEstimatedTransportCellsPerStep =
+                baseSpeed * materialStepDuration / longitudinalSpacing;
+            lastEstimatedLateralTransportCellsPerStep =
+                lateralSpeed * materialStepDuration / lateralSpacing;
+            maximumCfl = lastEstimatedTransportCellsPerStep +
+                lastEstimatedLateralTransportCellsPerStep;
+            requiredSubsteps = Mathf.Max(
+                1,
+                Mathf.CeilToInt(maximumCfl / TransportTargetCfl));
+
+            transportSafetyLimitExceeded =
+                requiredSubsteps > MaximumTransportSubsteps;
+            usedSubsteps = transportSafetyLimitExceeded
+                ? 0
+                : requiredSubsteps;
+
+            if (transportSafetyLimitExceeded)
             {
+                transportSafetyStatus =
+                    $"Blocked: CFL {maximumCfl:0.000} requires " +
+                    $"{requiredSubsteps} substeps (limit " +
+                    $"{MaximumTransportSubsteps})";
                 return;
             }
 
-            committedMagnitude = Mathf.Min(
-                committedMagnitude,
-                Mathf.Max(1, fieldWidth));
-            int committedCells = foamPhaseTransportMetres >= 0f
-                ? committedMagnitude
-                : -committedMagnitude;
-            if (!DispatchPhaseCommit(committedCells))
-            {
-                return;
-            }
-
-            foamPhaseTransportMetres -= committedCells * cellLength;
-            lastPhaseCommitCellsThisFrame = Mathf.Abs(committedCells);
-            phaseCommitCellsInCurrentSecond += lastPhaseCommitCellsThisFrame;
+            float cflPerSubstep = maximumCfl /
+                Mathf.Max(1, usedSubsteps);
+            transportSafetyStatus =
+                $"CFL {cflPerSubstep:0.000} / " +
+                $"{usedSubsteps} substep" +
+                (usedSubsteps == 1 ? string.Empty : "s");
         }
 
 
@@ -597,15 +620,18 @@ namespace ProgrammaticStylized3D.Rivers
             lastInjectionBoundaryCoverage = -1f;
             lastInjectionStateSynchronized = false;
             simulationAccumulator = 0f;
-            foamPhaseTransportMetres = 0f;
-            foamRenderTravelMetres = 0f;
-            lastFoamPhaseTransportMetres = 0f;
-            lastFoamPhaseCellFraction = 0f;
-            lastPhaseCommitCellsThisFrame = 0;
-            lastPhaseCommitCellsThisSecond = 0;
-            phaseCommitCellsInCurrentSecond = 0;
-            phaseCommitCounterAccumulator = 0f;
-            lastFoamRenderTravelMetres = 0f;
+            foamRenderAdvectionSeconds = 0f;
+            lastFoamRenderAdvectionSeconds = 0f;
+            lastEstimatedTransportCellsPerStep = 0f;
+            lastEstimatedLateralTransportCellsPerStep = 0f;
+            lastMaximumTransportCfl = 0f;
+            lastRequiredTransportSubsteps = 1;
+            lastUsedTransportSubsteps = 1;
+            transportSafetyLimitExceeded = false;
+            transportSafetyStatus = "CFL transport ready";
+            transportMetricsAccumulator = 0f;
+            ResetTransportMetricValues();
+            transportMetricsAvailable = false;
             topologyMetricsAccumulator = 0f;
             integratedPresenceArea = 0f;
             visiblePresenceCoreArea = 0f;
@@ -640,6 +666,14 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 DispatchClear(stateB, 0, fieldWidth);
             }
+
+            ClearRenderTexture(shapeMaskTexture);
+            ClearRenderTexture(filmSourceTexture);
+            ClearRenderTexture(filmSupportTexture);
+            ClearRenderTexture(visualOccupancyA);
+            ClearRenderTexture(visualOccupancyB);
+            currentVisualOccupancy = visualOccupancyA;
+            writeVisualOccupancy = visualOccupancyB;
         }
 
         public void ResetRecentPeaks()

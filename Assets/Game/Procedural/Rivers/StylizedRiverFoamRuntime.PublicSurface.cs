@@ -746,22 +746,75 @@ namespace ProgrammaticStylized3D.Rivers
         public float MaterialStepDuration => lastMaterialStepDuration;
         public int MaterialStepsLastFrame => lastMaterialStepsThisFrame;
         public float RenderInterpolationAlpha => lastRenderInterpolationAlpha;
-        public float RenderTravelMetres => lastFoamRenderTravelMetres;
-        public float FoamPhaseTransportMetres => lastFoamPhaseTransportMetres;
-        public float FoamPhaseCellFraction => lastFoamPhaseCellFraction;
-        public int PhaseCommitCellsLastFrame => lastPhaseCommitCellsThisFrame;
-        public int PhaseCommitCellsLastSecond => Mathf.Max(
-            lastPhaseCommitCellsThisSecond,
-            phaseCommitCellsInCurrentSecond);
+        public float RenderAdvectionSeconds =>
+            lastFoamRenderAdvectionSeconds;
         public float EstimatedTransportCellsPerStep =>
             lastEstimatedTransportCellsPerStep;
-        public int TransportSubstepsUsed => 0;
+        public float EstimatedLateralTransportCellsPerStep =>
+            lastEstimatedLateralTransportCellsPerStep;
+        public float TransportStepCfl => lastMaximumTransportCfl;
+        public float MaximumTransportCfl =>
+            lastMaximumTransportCfl /
+            Mathf.Max(1, lastUsedTransportSubsteps);
+        public int TransportSubstepsRequired =>
+            lastRequiredTransportSubsteps;
+        public int TransportSubstepsUsed => lastUsedTransportSubsteps;
+        public int TransportSubstepLimit => MaximumTransportSubsteps;
+        public float TransportCflTarget => TransportTargetCfl;
+        public float TransportConservationErrorGateRatio =>
+            TransportConservationErrorGate;
+        public float TransportClampLossGateRatio =>
+            TransportClampLossGate;
+        public bool TransportSafetyLimitExceeded =>
+            transportSafetyLimitExceeded;
+        public string TransportSafetyStatus => transportSafetyStatus;
+        public bool TransportMetricsSupported =>
+            SystemInfo.supportsAsyncGPUReadback;
+        public bool TransportMetricsAvailable => transportMetricsAvailable;
+        public float TransportPresenceBefore => transportPresenceBefore;
+        public float TransportPresenceAfter => transportPresenceAfter;
+        public float TransportLifeMomentBefore => transportLifeMomentBefore;
+        public float TransportLifeMomentAfter => transportLifeMomentAfter;
+        public float TransportPatternMomentBefore =>
+            transportPatternMomentBefore;
+        public float TransportPatternMomentAfter =>
+            transportPatternMomentAfter;
+        public float TransportPresenceBoundaryOutflow =>
+            transportPresenceBoundaryOutflow;
+        public float TransportLifeBoundaryOutflow =>
+            transportLifeBoundaryOutflow;
+        public float TransportPatternBoundaryOutflow =>
+            transportPatternBoundaryOutflow;
+        public float TransportPresenceUnaccountedError =>
+            transportPresenceUnaccountedError;
+        public float TransportLifeUnaccountedError =>
+            transportLifeUnaccountedError;
+        public float TransportPatternUnaccountedError =>
+            transportPatternUnaccountedError;
+        public float TransportPresenceUnaccountedErrorRatio =>
+            transportPresenceUnaccountedErrorRatio;
+        public float TransportLifeUnaccountedErrorRatio =>
+            transportLifeUnaccountedErrorRatio;
+        public float TransportPatternUnaccountedErrorRatio =>
+            transportPatternUnaccountedErrorRatio;
+        public float TransportPresenceClampLoss =>
+            transportPresenceClampLoss;
+        public float TransportLifeClampLoss => transportLifeClampLoss;
+        public float TransportPatternClampLoss => transportPatternClampLoss;
+        public float TransportPresenceClampLossRatio =>
+            transportPresenceClampLossRatio;
         public bool InitializationComplete =>
             initializationPhase == InitializationPhase.Ready;
         public bool ResourcesAllocated =>
             InitializationComplete && currentState != null &&
-            shapeMaskTexture != null;
-        public bool ConservativeTransportActive => false;
+            shapeMaskTexture != null && currentVisualOccupancy != null;
+        public bool VisualOccupancyAvailable =>
+            ResourcesAllocated && visualOccupancyA != null &&
+            visualOccupancyB != null && advanceVisualOccupancyKernel >= 0;
+        public bool ConservativeTransportActive =>
+            ResourcesAllocated && simulateKernel >= 0 &&
+            resetTransportMetricsKernel >= 0 &&
+            transportMetricsBuffer != null;
         public bool IsSleeping =>
             currentState == null &&
             !TopologyReplacementInProgress &&
@@ -780,6 +833,10 @@ namespace ProgrammaticStylized3D.Rivers
             EstimateTextureBytes(stateA) +
             EstimateTextureBytes(stateB) +
             EstimateTextureBytes(shapeMaskTexture) +
+            EstimateTextureBytes(filmSourceTexture) +
+            EstimateTextureBytes(filmSupportTexture) +
+            EstimateTextureBytes(visualOccupancyA) +
+            EstimateTextureBytes(visualOccupancyB) +
             EstimateTextureBytes(progressiveBirthDebugTexture) +
             EstimateTextureBytes(topologyTexture) +
             EstimateTextureBytes(topologySourcesTexture) +
@@ -822,6 +879,9 @@ namespace ProgrammaticStylized3D.Rivers
                 : 0L) +
             (topologyMetricsBuffer != null
                 ? (long)topologyMetricsBuffer.count * topologyMetricsBuffer.stride
+                : 0L) +
+            (transportMetricsBuffer != null
+                ? (long)transportMetricsBuffer.count * transportMetricsBuffer.stride
                 : 0L) +
             (majorEvolutionBuffer != null
                 ? (long)majorEvolutionBuffer.count * majorEvolutionBuffer.stride
@@ -913,7 +973,13 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamDebugView ==
                         StylizedRiverFoamDebugView.FoamFilmSource ||
                     river.FoamDebugView ==
-                        StylizedRiverFoamDebugView.FoamFilmSupport;
+                        StylizedRiverFoamDebugView.FoamFilmSupport ||
+                    river.FoamDebugView ==
+                        StylizedRiverFoamDebugView.FoamFilmTarget ||
+                    river.FoamDebugView ==
+                        StylizedRiverFoamDebugView.FoamTemporalOccupancy ||
+                    river.FoamDebugView ==
+                        StylizedRiverFoamDebugView.FoamTemporalDifference;
             }
         }
 

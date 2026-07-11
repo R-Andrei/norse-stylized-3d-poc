@@ -2907,6 +2907,1139 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         }
 
 
+        private static void AuditChamferVertexPatchComponents(
+            List<ChamferExpectedVertexBoundary> boundaries,
+            ChamferTopologyContext context,
+            Dictionary<int, float> widthByEdge,
+            List<ChamferSourceBoundaryRecord> sourceBoundaryRecords,
+            Dictionary<TopologyEdgeKey, int> useCounts,
+            HashSet<TopologyEdgeKey> expectedVertexBoundaryEdges,
+            HashSet<TopologyEdgeKey> expectedSourceBoundaryEdges,
+            List<ChamferProvisionalSegmentRecord> segments,
+            ref ChamferEmissionStats stats)
+        {
+            stats.PatchBoundaryRecordCount = boundaries.Count;
+            List<string> failures = new List<string>();
+            Dictionary<int, ChamferVertexPatchSourceContext> sourceContexts =
+                BuildChamferVertexPatchSourceContexts(
+                    context,
+                    widthByEdge,
+                    sourceBoundaryRecords,
+                    ref stats,
+                    failures);
+            Dictionary<int, List<ChamferExpectedVertexBoundary>> byVertex =
+                new Dictionary<int, List<ChamferExpectedVertexBoundary>>();
+            for (int i = 0; i < boundaries.Count; i++)
+            {
+                ChamferExpectedVertexBoundary boundary = boundaries[i];
+                if (!byVertex.TryGetValue(
+                        boundary.SourceVertexIndex,
+                        out List<ChamferExpectedVertexBoundary> list))
+                {
+                    list = new List<ChamferExpectedVertexBoundary>();
+                    byVertex.Add(boundary.SourceVertexIndex, list);
+                }
+                list.Add(boundary);
+            }
+
+            List<int> sourceVertices = new List<int>(byVertex.Keys);
+            sourceVertices.Sort();
+            List<ChamferVertexPatchComponent> components =
+                new List<ChamferVertexPatchComponent>();
+            for (int vertexListIndex = 0;
+                 vertexListIndex < sourceVertices.Count;
+                 vertexListIndex++)
+            {
+                int sourceVertexIndex = sourceVertices[vertexListIndex];
+                stats.PatchSourceVertexCount++;
+                List<ChamferExpectedVertexBoundary> vertexBoundaries =
+                    byVertex[sourceVertexIndex];
+                vertexBoundaries.Sort(
+                    CompareChamferExpectedVertexBoundaryProvenance);
+                if (!sourceContexts.TryGetValue(
+                        sourceVertexIndex,
+                        out ChamferVertexPatchSourceContext sourceContext))
+                {
+                    stats.PatchComponentProvenanceFailureCount++;
+                    AddChamferVertexPatchFailure(
+                        failures,
+                        "missing-source-context/vertex:" +
+                            sourceVertexIndex);
+                    continue;
+                }
+
+                List<ChamferVertexPatchComponent> vertexComponents =
+                    BuildOrderedChamferVertexPatchComponents(
+                        sourceVertexIndex,
+                        vertexBoundaries,
+                        sourceContext,
+                        context,
+                        widthByEdge,
+                        ref stats,
+                        failures);
+                if (vertexComponents.Count > 1)
+                {
+                    stats.PatchMultipleComponentVertexCount++;
+                }
+                components.AddRange(vertexComponents);
+            }
+
+            foreach (KeyValuePair<int, ChamferVertexPatchSourceContext> pair
+                     in sourceContexts)
+            {
+                if (pair.Value.ActiveSourceEdges.Count > 0 &&
+                    !byVertex.ContainsKey(pair.Key))
+                {
+                    stats.PatchZeroBoundaryActiveVertexCount++;
+                }
+            }
+
+            stats.PatchBoundaryComponentCount = components.Count;
+            int assignedBoundaryRecords = 0;
+            for (int i = 0; i < components.Count; i++)
+            {
+                assignedBoundaryRecords +=
+                    components[i].OrderedBoundaries.Count;
+                if (components[i].IsClosed)
+                {
+                    components[i].Closure =
+                        ChamferVertexPatchClosure.ClosedLoop;
+                    stats.PatchClosedLoopComponentCount++;
+                }
+                else
+                {
+                    stats.PatchOpenChainComponentCount++;
+                    if (components[i].ProvenanceValid)
+                    {
+                        ResolveChamferSourceBoundaryPatchClosure(
+                            components[i],
+                            expectedSourceBoundaryEdges);
+                    }
+                }
+            }
+            stats.PatchBoundaryRecordAssignedCount = assignedBoundaryRecords;
+            if (assignedBoundaryRecords != boundaries.Count)
+            {
+                stats.PatchComponentProvenanceFailureCount++;
+                AddChamferVertexPatchFailure(
+                    failures,
+                    "boundary-assignment-mismatch/expected:" +
+                        boundaries.Count +
+                    "/assigned:" + assignedBoundaryRecords);
+            }
+
+            Dictionary<TopologyEdgeKey, int> plannedClosedSpokeUses =
+                new Dictionary<TopologyEdgeKey, int>();
+            for (int i = 0; i < components.Count; i++)
+            {
+                ChamferVertexPatchComponent component = components[i];
+                if (component.IsClosed ||
+                    !component.ProvenanceValid ||
+                    component.SourceFanOpen ||
+                    !component.HasEndpointSpokes)
+                {
+                    continue;
+                }
+                IncrementChamferTopologyKeyCount(
+                    plannedClosedSpokeUses,
+                    component.StartSpokeKey);
+                IncrementChamferTopologyKeyCount(
+                    plannedClosedSpokeUses,
+                    component.EndSpokeKey);
+            }
+
+            for (int i = 0; i < components.Count; i++)
+            {
+                ChamferVertexPatchComponent component = components[i];
+                if (component.Closure ==
+                    ChamferVertexPatchClosure.ClosedLoop)
+                {
+                    continue;
+                }
+                if (component.Closure ==
+                    ChamferVertexPatchClosure.OpenChainSourceBoundaryResolved)
+                {
+                    stats.PatchSourceBoundaryResolvedChainCount++;
+                    continue;
+                }
+
+                if (component.ProvenanceValid &&
+                    !component.SourceFanOpen &&
+                    TryResolveChamferClosedSourcePatchClosure(
+                        component,
+                        plannedClosedSpokeUses,
+                        useCounts,
+                        expectedVertexBoundaryEdges,
+                        expectedSourceBoundaryEdges,
+                        segments))
+                {
+                    component.Closure =
+                        ChamferVertexPatchClosure.OpenChainClosedSourceResolved;
+                    stats.PatchClosedSourceResolvedChainCount++;
+                    continue;
+                }
+
+                component.Closure =
+                    ChamferVertexPatchClosure.OpenChainUnresolved;
+                stats.PatchUnresolvedOpenChainCount++;
+                AddChamferVertexPatchFailure(
+                    failures,
+                    BuildChamferVertexPatchComponentDiagnostic(component));
+            }
+
+            bool ready =
+                stats.PatchComponentOrderingFailureCount == 0 &&
+                stats.PatchComponentProvenanceFailureCount == 0 &&
+                stats.PatchUnresolvedOpenChainCount == 0 &&
+                assignedBoundaryRecords == boundaries.Count;
+            stats.ReadyForVertexPatchComponents = ready ? 1 : 0;
+            if (!ready)
+            {
+                string message =
+                    "GeneratedMass edge wear vertex-patch component audit " +
+                    "incomplete. patchBoundaryRecords=" +
+                    stats.PatchBoundaryRecordCount +
+                    ", patchBoundaryRecordsAssigned=" +
+                    stats.PatchBoundaryRecordAssignedCount +
+                    ", patchComponents=" +
+                    stats.PatchBoundaryComponentCount +
+                    ", orderingFailures=" +
+                    stats.PatchComponentOrderingFailureCount +
+                    ", provenanceFailures=" +
+                    stats.PatchComponentProvenanceFailureCount +
+                    ", unresolvedOpenChains=" +
+                    stats.PatchUnresolvedOpenChainCount +
+                    ", failuresLogged=" + failures.Count;
+                for (int i = 0; i < failures.Count; i++)
+                {
+                    message += ", failure[" + i + "]=" + failures[i];
+                }
+                Debug.LogWarning(message);
+            }
+        }
+
+        private static Dictionary<int, ChamferVertexPatchSourceContext>
+            BuildChamferVertexPatchSourceContexts(
+                ChamferTopologyContext context,
+                Dictionary<int, float> widthByEdge,
+                List<ChamferSourceBoundaryRecord> sourceBoundaryRecords,
+                ref ChamferEmissionStats stats,
+                List<string> failures)
+        {
+            Dictionary<int, List<ChamferSourceBoundaryRecord>>
+                sourceBoundaryRecordsByVertex =
+                    new Dictionary<int,
+                        List<ChamferSourceBoundaryRecord>>();
+            for (int i = 0; i < sourceBoundaryRecords.Count; i++)
+            {
+                ChamferSourceBoundaryRecord record = sourceBoundaryRecords[i];
+                AddChamferSourceBoundaryRecordAtVertex(
+                    sourceBoundaryRecordsByVertex,
+                    record.SourceVertexStart,
+                    record);
+                if (record.SourceVertexEnd != record.SourceVertexStart)
+                {
+                    AddChamferSourceBoundaryRecordAtVertex(
+                        sourceBoundaryRecordsByVertex,
+                        record.SourceVertexEnd,
+                        record);
+                }
+            }
+
+            List<List<int>> outgoingByVertex =
+                new List<List<int>>(context.Graph.Vertices.Count);
+            for (int i = 0; i < context.Graph.Vertices.Count; i++)
+            {
+                outgoingByVertex.Add(new List<int>());
+            }
+            for (int i = 0; i < context.HalfEdges.Count; i++)
+            {
+                outgoingByVertex[context.HalfEdges[i].OriginVertex].Add(i);
+            }
+
+            Dictionary<int, ChamferVertexPatchSourceContext> contexts =
+                new Dictionary<int, ChamferVertexPatchSourceContext>();
+            for (int vertexIndex = 0;
+                 vertexIndex < context.Graph.Vertices.Count;
+                 vertexIndex++)
+            {
+                List<int> activeEdges = new List<int>();
+                List<int> incidentEdges =
+                    context.Graph.Vertices[vertexIndex].EdgeIndices;
+                bool sourceFanOpen = false;
+                for (int i = 0; i < incidentEdges.Count; i++)
+                {
+                    int edgeIndex = incidentEdges[i];
+                    EdgeWearGraphEdge edge = context.Graph.Edges[edgeIndex];
+                    if (edge.FaceA < 0 || edge.FaceB < 0)
+                    {
+                        sourceFanOpen = true;
+                    }
+                    if (IsChamferSourceEdgeActive(widthByEdge, edgeIndex))
+                    {
+                        activeEdges.Add(edgeIndex);
+                    }
+                }
+                activeEdges.Sort();
+
+                int activeRunCount = 0;
+                bool sourceContextValid = true;
+                if (!TryCountActiveChamferRunsAtVertex(
+                        context,
+                        outgoingByVertex[vertexIndex],
+                        widthByEdge,
+                        out int orderedRunCount,
+                        out bool orderedFanOpen))
+                {
+                    sourceContextValid = false;
+                    stats.PatchComponentProvenanceFailureCount++;
+                    AddChamferVertexPatchFailure(
+                        failures,
+                        "source-fan-ordering/vertex:" + vertexIndex);
+                }
+                else
+                {
+                    activeRunCount = orderedRunCount;
+                    if (orderedFanOpen != sourceFanOpen)
+                    {
+                        sourceContextValid = false;
+                        stats.PatchComponentProvenanceFailureCount++;
+                        AddChamferVertexPatchFailure(
+                            failures,
+                            "source-fan-state-mismatch/vertex:" +
+                                vertexIndex +
+                            "/graphOpen:" +
+                                (sourceFanOpen ? 1 : 0) +
+                            "/orderedOpen:" +
+                                (orderedFanOpen ? 1 : 0));
+                    }
+                }
+
+                sourceBoundaryRecordsByVertex.TryGetValue(
+                    vertexIndex,
+                    out List<ChamferSourceBoundaryRecord> incidentRecords);
+                contexts.Add(
+                    vertexIndex,
+                    new ChamferVertexPatchSourceContext(
+                        vertexIndex,
+                        context.Graph.Vertices[vertexIndex].Position,
+                        sourceFanOpen,
+                        sourceContextValid,
+                        activeRunCount,
+                        activeEdges,
+                        incidentRecords != null
+                            ? new List<ChamferSourceBoundaryRecord>(
+                                incidentRecords)
+                            : new List<ChamferSourceBoundaryRecord>()));
+            }
+            return contexts;
+        }
+
+        private static void AddChamferSourceBoundaryRecordAtVertex(
+            Dictionary<int, List<ChamferSourceBoundaryRecord>> recordsByVertex,
+            int sourceVertexIndex,
+            ChamferSourceBoundaryRecord record)
+        {
+            if (!recordsByVertex.TryGetValue(
+                    sourceVertexIndex,
+                    out List<ChamferSourceBoundaryRecord> records))
+            {
+                records = new List<ChamferSourceBoundaryRecord>();
+                recordsByVertex.Add(sourceVertexIndex, records);
+            }
+            records.Add(record);
+        }
+
+        private static bool TryCountActiveChamferRunsAtVertex(
+            ChamferTopologyContext context,
+            List<int> outgoing,
+            Dictionary<int, float> widthByEdge,
+            out int activeRunCount,
+            out bool openFan)
+        {
+            activeRunCount = 0;
+            openFan = false;
+            if (outgoing.Count == 0)
+            {
+                return true;
+            }
+
+            int start = -1;
+            for (int i = 0; i < outgoing.Count; i++)
+            {
+                ChamferHalfEdge candidate = context.HalfEdges[outgoing[i]];
+                int previousOpposite =
+                    context.HalfEdges[candidate.Previous].Opposite;
+                if (previousOpposite < 0)
+                {
+                    start = candidate.Index;
+                    openFan = true;
+                    break;
+                }
+            }
+            if (start < 0)
+            {
+                start = outgoing[0];
+            }
+
+            List<int> ordered = new List<int>(outgoing.Count);
+            HashSet<int> visited = new HashSet<int>();
+            int current = start;
+            int guard = 0;
+            while (current >= 0 && guard++ <= outgoing.Count)
+            {
+                if (!visited.Add(current))
+                {
+                    break;
+                }
+                ordered.Add(current);
+                ChamferHalfEdge halfEdge = context.HalfEdges[current];
+                int next = halfEdge.Opposite >= 0
+                    ? context.HalfEdges[halfEdge.Opposite].Next
+                    : -1;
+                if (next < 0 || next == start)
+                {
+                    break;
+                }
+                current = next;
+            }
+            if (ordered.Count != outgoing.Count)
+            {
+                return false;
+            }
+
+            bool anyActive = false;
+            bool allActive = ordered.Count > 0;
+            List<bool> active = new List<bool>(ordered.Count);
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                bool isActive = IsChamferSourceEdgeActive(
+                    widthByEdge,
+                    context.HalfEdges[ordered[i]].SourceEdgeIndex);
+                active.Add(isActive);
+                anyActive |= isActive;
+                allActive &= isActive;
+            }
+            if (!anyActive)
+            {
+                return true;
+            }
+            if (!openFan && allActive)
+            {
+                activeRunCount = 1;
+                return true;
+            }
+
+            for (int i = 0; i < active.Count; i++)
+            {
+                if (!active[i])
+                {
+                    continue;
+                }
+                bool previousActive = i > 0
+                    ? active[i - 1]
+                    : !openFan && active[active.Count - 1];
+                if (!previousActive)
+                {
+                    activeRunCount++;
+                }
+            }
+            return true;
+        }
+
+        private static bool IsChamferSourceEdgeActive(
+            Dictionary<int, float> widthByEdge,
+            int sourceEdgeIndex)
+        {
+            return widthByEdge.TryGetValue(sourceEdgeIndex, out float width) &&
+                width > PointMergeDistance;
+        }
+
+        private static List<ChamferVertexPatchComponent>
+            BuildOrderedChamferVertexPatchComponents(
+                int sourceVertexIndex,
+                List<ChamferExpectedVertexBoundary> boundaries,
+                ChamferVertexPatchSourceContext sourceContext,
+                ChamferTopologyContext context,
+                Dictionary<int, float> widthByEdge,
+                ref ChamferEmissionStats stats,
+                List<string> failures)
+        {
+            List<ChamferExpectedVertexBoundary> uniqueBoundaries =
+                new List<ChamferExpectedVertexBoundary>(boundaries.Count);
+            HashSet<TopologyEdgeKey> uniqueKeys =
+                new HashSet<TopologyEdgeKey>();
+            for (int i = 0; i < boundaries.Count; i++)
+            {
+                if (!uniqueKeys.Add(boundaries[i].Key))
+                {
+                    stats.PatchComponentOrderingFailureCount++;
+                    AddChamferVertexPatchFailure(
+                        failures,
+                        "duplicate-component-key/vertex:" +
+                            sourceVertexIndex +
+                        "/edge:" + boundaries[i].SourceEdgeIndex +
+                        "/face:" + boundaries[i].FaceIndex);
+                    continue;
+                }
+                uniqueBoundaries.Add(boundaries[i]);
+            }
+
+            Dictionary<VertexKey, List<int>> adjacency =
+                new Dictionary<VertexKey, List<int>>();
+            for (int i = 0; i < uniqueBoundaries.Count; i++)
+            {
+                AddBoundaryAdjacency(
+                    adjacency,
+                    uniqueBoundaries[i].Key.First,
+                    i);
+                AddBoundaryAdjacency(
+                    adjacency,
+                    uniqueBoundaries[i].Key.Second,
+                    i);
+            }
+            foreach (KeyValuePair<VertexKey, List<int>> pair in adjacency)
+            {
+                pair.Value.Sort((left, right) =>
+                    CompareChamferExpectedVertexBoundaryProvenance(
+                        uniqueBoundaries[left],
+                        uniqueBoundaries[right]));
+                if (pair.Value.Count > 2)
+                {
+                    stats.PatchComponentOrderingFailureCount++;
+                    AddChamferVertexPatchFailure(
+                        failures,
+                        "component-branch/vertex:" +
+                            sourceVertexIndex +
+                        "/degree:" + pair.Value.Count);
+                }
+            }
+
+            List<ChamferVertexPatchComponent> components =
+                new List<ChamferVertexPatchComponent>();
+            HashSet<int> visited = new HashSet<int>();
+            for (int edgeIndex = 0;
+                 edgeIndex < uniqueBoundaries.Count;
+                 edgeIndex++)
+            {
+                if (visited.Contains(edgeIndex))
+                {
+                    continue;
+                }
+
+                List<int> componentEdges = new List<int>();
+                Queue<int> queue = new Queue<int>();
+                visited.Add(edgeIndex);
+                queue.Enqueue(edgeIndex);
+                while (queue.Count > 0)
+                {
+                    int current = queue.Dequeue();
+                    componentEdges.Add(current);
+                    TopologyEdgeKey key = uniqueBoundaries[current].Key;
+                    EnqueueAdjacentBoundaryEdges(
+                        key.First,
+                        adjacency,
+                        visited,
+                        queue);
+                    EnqueueAdjacentBoundaryEdges(
+                        key.Second,
+                        adjacency,
+                        visited,
+                        queue);
+                }
+                componentEdges.Sort((left, right) =>
+                    CompareChamferExpectedVertexBoundaryProvenance(
+                        uniqueBoundaries[left],
+                        uniqueBoundaries[right]));
+
+                if (!TryOrderChamferVertexPatchComponent(
+                        sourceVertexIndex,
+                        uniqueBoundaries,
+                        componentEdges,
+                        adjacency,
+                        sourceContext,
+                        out ChamferVertexPatchComponent component))
+                {
+                    stats.PatchComponentOrderingFailureCount++;
+                    AddChamferVertexPatchFailure(
+                        failures,
+                        "component-ordering/vertex:" +
+                            sourceVertexIndex +
+                        "/edges:" + componentEdges.Count);
+                    continue;
+                }
+                component.ProvenanceValid =
+                    ValidateChamferVertexPatchComponentProvenance(
+                        component,
+                        context,
+                        widthByEdge);
+                if (!component.ProvenanceValid)
+                {
+                    stats.PatchComponentProvenanceFailureCount++;
+                    AddChamferVertexPatchFailure(
+                        failures,
+                        "component-provenance/vertex:" +
+                            sourceVertexIndex +
+                        "/edges:" +
+                            component.OrderedBoundaries.Count);
+                }
+                components.Add(component);
+            }
+            return components;
+        }
+
+        private static bool TryOrderChamferVertexPatchComponent(
+            int sourceVertexIndex,
+            List<ChamferExpectedVertexBoundary> boundaries,
+            List<int> componentEdges,
+            Dictionary<VertexKey, List<int>> adjacency,
+            ChamferVertexPatchSourceContext sourceContext,
+            out ChamferVertexPatchComponent component)
+        {
+            component = null;
+            if (componentEdges.Count == 0)
+            {
+                return false;
+            }
+
+            HashSet<int> componentEdgeSet =
+                new HashSet<int>(componentEdges);
+            HashSet<VertexKey> componentVertices =
+                new HashSet<VertexKey>();
+            for (int i = 0; i < componentEdges.Count; i++)
+            {
+                TopologyEdgeKey key = boundaries[componentEdges[i]].Key;
+                componentVertices.Add(key.First);
+                componentVertices.Add(key.Second);
+            }
+
+            List<VertexKey> degreeOne = new List<VertexKey>();
+            foreach (VertexKey vertex in componentVertices)
+            {
+                int degree = CountChamferComponentAdjacency(
+                    adjacency,
+                    componentEdgeSet,
+                    vertex);
+                if (degree == 1)
+                {
+                    degreeOne.Add(vertex);
+                }
+                else if (degree != 2)
+                {
+                    return false;
+                }
+            }
+            bool closed = degreeOne.Count == 0;
+            if (!closed && degreeOne.Count != 2)
+            {
+                return false;
+            }
+
+            VertexKey startKey;
+            if (closed)
+            {
+                startKey = GetMinimumChamferVertexKey(componentVertices);
+            }
+            else
+            {
+                degreeOne.Sort((left, right) => left.CompareTo(right));
+                startKey = degreeOne[0];
+            }
+
+            int firstEdge = -1;
+            List<int> startAdjacent = adjacency[startKey];
+            for (int i = 0; i < startAdjacent.Count; i++)
+            {
+                int candidate = startAdjacent[i];
+                if (!componentEdgeSet.Contains(candidate))
+                {
+                    continue;
+                }
+                if (firstEdge < 0 ||
+                    CompareChamferExpectedVertexBoundaryProvenance(
+                        boundaries[candidate],
+                        boundaries[firstEdge]) < 0)
+                {
+                    firstEdge = candidate;
+                }
+            }
+            if (firstEdge < 0)
+            {
+                return false;
+            }
+
+            List<ChamferOrientedVertexBoundary> ordered =
+                new List<ChamferOrientedVertexBoundary>(
+                    componentEdges.Count);
+            List<Vector3> positions =
+                new List<Vector3>(componentEdges.Count + 1);
+            HashSet<int> used = new HashSet<int>();
+            VertexKey currentKey = startKey;
+            int currentEdge = firstEdge;
+            int guard = 0;
+            while (guard++ <= componentEdges.Count)
+            {
+                if (!componentEdgeSet.Contains(currentEdge) ||
+                    !used.Add(currentEdge))
+                {
+                    return false;
+                }
+                ChamferExpectedVertexBoundary boundary =
+                    boundaries[currentEdge];
+                if (!TryOrientChamferVertexBoundary(
+                        boundary,
+                        currentKey,
+                        out ChamferOrientedVertexBoundary oriented))
+                {
+                    return false;
+                }
+                ordered.Add(oriented);
+                if (positions.Count == 0)
+                {
+                    positions.Add(oriented.Start);
+                }
+                currentKey = oriented.EndKey;
+                if (!(closed &&
+                      used.Count == componentEdges.Count &&
+                      currentKey.Equals(startKey)))
+                {
+                    positions.Add(oriented.End);
+                }
+
+                if (used.Count == componentEdges.Count)
+                {
+                    break;
+                }
+
+                int nextEdge = -1;
+                List<int> adjacent = adjacency[currentKey];
+                for (int i = 0; i < adjacent.Count; i++)
+                {
+                    int candidate = adjacent[i];
+                    if (!componentEdgeSet.Contains(candidate) ||
+                        used.Contains(candidate))
+                    {
+                        continue;
+                    }
+                    if (nextEdge >= 0)
+                    {
+                        return false;
+                    }
+                    nextEdge = candidate;
+                }
+                if (nextEdge < 0)
+                {
+                    return false;
+                }
+                currentEdge = nextEdge;
+            }
+
+            if (used.Count != componentEdges.Count)
+            {
+                return false;
+            }
+            if (closed && !currentKey.Equals(startKey))
+            {
+                return false;
+            }
+            if (!closed &&
+                !currentKey.Equals(degreeOne[1]))
+            {
+                return false;
+            }
+
+            component = new ChamferVertexPatchComponent(
+                sourceVertexIndex,
+                ordered,
+                positions,
+                closed,
+                sourceContext);
+            return true;
+        }
+
+        private static int CountChamferComponentAdjacency(
+            Dictionary<VertexKey, List<int>> adjacency,
+            HashSet<int> componentEdges,
+            VertexKey vertex)
+        {
+            int count = 0;
+            List<int> adjacent = adjacency[vertex];
+            for (int i = 0; i < adjacent.Count; i++)
+            {
+                if (componentEdges.Contains(adjacent[i]))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private static VertexKey GetMinimumChamferVertexKey(
+            HashSet<VertexKey> vertices)
+        {
+            bool hasValue = false;
+            VertexKey minimum = default;
+            foreach (VertexKey vertex in vertices)
+            {
+                if (!hasValue || vertex.CompareTo(minimum) < 0)
+                {
+                    minimum = vertex;
+                    hasValue = true;
+                }
+            }
+            return minimum;
+        }
+
+        private static bool TryOrientChamferVertexBoundary(
+            ChamferExpectedVertexBoundary boundary,
+            VertexKey startKey,
+            out ChamferOrientedVertexBoundary oriented)
+        {
+            VertexKey boundaryStart = new VertexKey(boundary.Start);
+            VertexKey boundaryEnd = new VertexKey(boundary.End);
+            if (startKey.Equals(boundaryStart))
+            {
+                oriented = new ChamferOrientedVertexBoundary(
+                    boundary,
+                    boundary.Start,
+                    boundary.End,
+                    boundaryStart,
+                    boundaryEnd);
+                return true;
+            }
+            if (startKey.Equals(boundaryEnd))
+            {
+                oriented = new ChamferOrientedVertexBoundary(
+                    boundary,
+                    boundary.End,
+                    boundary.Start,
+                    boundaryEnd,
+                    boundaryStart);
+                return true;
+            }
+            oriented = default;
+            return false;
+        }
+
+        private static bool ValidateChamferVertexPatchComponentProvenance(
+            ChamferVertexPatchComponent component,
+            ChamferTopologyContext context,
+            Dictionary<int, float> widthByEdge)
+        {
+            int sourceVertexIndex = component.SourceVertexIndex;
+            if (sourceVertexIndex < 0 ||
+                sourceVertexIndex >= context.Graph.Vertices.Count ||
+                component.OrderedBoundaries.Count == 0 ||
+                component.OrderedPositions.Count == 0 ||
+                !component.SourceContext.IsValid ||
+                component.SourceContext.ActiveSourceEdges.Count == 0)
+            {
+                return false;
+            }
+            if (component.IsClosed &&
+                component.OrderedPositions.Count < 3)
+            {
+                return false;
+            }
+            if (!component.IsClosed &&
+                component.OrderedPositions.Count !=
+                    component.OrderedBoundaries.Count + 1)
+            {
+                return false;
+            }
+
+            for (int i = 0;
+                 i < component.OrderedBoundaries.Count;
+                 i++)
+            {
+                ChamferExpectedVertexBoundary boundary =
+                    component.OrderedBoundaries[i].Boundary;
+                if (boundary.SourceVertexIndex != sourceVertexIndex ||
+                    boundary.SourceEdgeIndex < 0 ||
+                    boundary.SourceEdgeIndex >= context.Graph.Edges.Count ||
+                    boundary.FaceIndex < 0 ||
+                    boundary.FaceIndex >= context.Graph.Faces.Count)
+                {
+                    return false;
+                }
+                EdgeWearGraphEdge edge =
+                    context.Graph.Edges[boundary.SourceEdgeIndex];
+                if (edge.VertexA != sourceVertexIndex &&
+                    edge.VertexB != sourceVertexIndex)
+                {
+                    return false;
+                }
+                EdgeWearGraphFace face =
+                    context.Graph.Faces[boundary.FaceIndex];
+                if (!face.VertexIndices.Contains(sourceVertexIndex) ||
+                    !face.EdgeIndices.Contains(boundary.SourceEdgeIndex))
+                {
+                    return false;
+                }
+                bool active = IsChamferSourceEdgeActive(
+                    widthByEdge,
+                    boundary.SourceEdgeIndex);
+                if (boundary.Kind ==
+                        ChamferVertexBoundaryKind.BevelStripEndpoint &&
+                    !active)
+                {
+                    return false;
+                }
+                if (boundary.Kind ==
+                        ChamferVertexBoundaryKind.UnselectedEdgeTail &&
+                    active)
+                {
+                    return false;
+                }
+                if (!boundary.Key.Equals(
+                        new TopologyEdgeKey(
+                            component.OrderedBoundaries[i].StartKey,
+                            component.OrderedBoundaries[i].EndKey)))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static void ResolveChamferSourceBoundaryPatchClosure(
+            ChamferVertexPatchComponent component,
+            HashSet<TopologyEdgeKey> expectedSourceBoundaryEdges)
+        {
+            if (component.IsClosed ||
+                !component.HasEndpointSpokes ||
+                !component.SourceFanOpen)
+            {
+                return;
+            }
+
+            int startOwnerCount =
+                CountChamferSourceBoundaryEndpointOwners(
+                    component.SourceVertexIndex,
+                    component.StartEndpointKey,
+                    component.SourceContext.SourceBoundaryRecords,
+                    expectedSourceBoundaryEdges,
+                    out ChamferSourceBoundaryEndpointOwnership startOwner);
+            int endOwnerCount =
+                CountChamferSourceBoundaryEndpointOwners(
+                    component.SourceVertexIndex,
+                    component.EndEndpointKey,
+                    component.SourceContext.SourceBoundaryRecords,
+                    expectedSourceBoundaryEdges,
+                    out ChamferSourceBoundaryEndpointOwnership endOwner);
+            component.StartSourceBoundaryOwnerCount = startOwnerCount;
+            component.EndSourceBoundaryOwnerCount = endOwnerCount;
+            if (startOwnerCount == 1 &&
+                endOwnerCount == 1 &&
+                (!object.ReferenceEquals(startOwner.Record, endOwner.Record) ||
+                 startOwner.ChildIndex != endOwner.ChildIndex))
+            {
+                component.Closure =
+                    ChamferVertexPatchClosure.OpenChainSourceBoundaryResolved;
+            }
+        }
+
+        private static int CountChamferSourceBoundaryEndpointOwners(
+            int sourceVertexIndex,
+            VertexKey endpointKey,
+            List<ChamferSourceBoundaryRecord> records,
+            HashSet<TopologyEdgeKey> expectedSourceBoundaryEdges,
+            out ChamferSourceBoundaryEndpointOwnership owner)
+        {
+            int count = 0;
+            owner = default;
+            for (int recordIndex = 0;
+                 recordIndex < records.Count;
+                 recordIndex++)
+            {
+                ChamferSourceBoundaryRecord record = records[recordIndex];
+                for (int childIndex = 0;
+                     childIndex < record.Children.Count;
+                     childIndex++)
+                {
+                    ChamferSourceBoundaryChild child =
+                        record.Children[childIndex];
+                    if (!expectedSourceBoundaryEdges.Contains(child.Key))
+                    {
+                        continue;
+                    }
+                    bool matchesStart =
+                        record.SourceVertexStart == sourceVertexIndex &&
+                        child.TouchesParentStart &&
+                        endpointKey.Equals(new VertexKey(child.Start));
+                    bool matchesEnd =
+                        record.SourceVertexEnd == sourceVertexIndex &&
+                        child.TouchesParentEnd &&
+                        endpointKey.Equals(new VertexKey(child.End));
+                    if (!matchesStart && !matchesEnd)
+                    {
+                        continue;
+                    }
+                    count++;
+                    if (count == 1)
+                    {
+                        owner = new ChamferSourceBoundaryEndpointOwnership(
+                            record,
+                            childIndex);
+                    }
+                }
+            }
+            return count;
+        }
+
+        private static bool TryResolveChamferClosedSourcePatchClosure(
+            ChamferVertexPatchComponent component,
+            Dictionary<TopologyEdgeKey, int> plannedSpokeUses,
+            Dictionary<TopologyEdgeKey, int> existingUseCounts,
+            HashSet<TopologyEdgeKey> expectedVertexBoundaryEdges,
+            HashSet<TopologyEdgeKey> expectedSourceBoundaryEdges,
+            List<ChamferProvisionalSegmentRecord> segments)
+        {
+            if (!component.HasEndpointSpokes ||
+                component.StartSpokeKey.Equals(component.EndSpokeKey))
+            {
+                return false;
+            }
+
+            component.StartExistingSpokeUseCount =
+                existingUseCounts.TryGetValue(
+                    component.StartSpokeKey,
+                    out int startExisting)
+                    ? startExisting
+                    : 0;
+            component.EndExistingSpokeUseCount =
+                existingUseCounts.TryGetValue(
+                    component.EndSpokeKey,
+                    out int endExisting)
+                    ? endExisting
+                    : 0;
+            component.StartPlannedSpokeUseCount =
+                plannedSpokeUses.TryGetValue(
+                    component.StartSpokeKey,
+                    out int startPlanned)
+                    ? startPlanned
+                    : 0;
+            component.EndPlannedSpokeUseCount =
+                plannedSpokeUses.TryGetValue(
+                    component.EndSpokeKey,
+                    out int endPlanned)
+                    ? endPlanned
+                    : 0;
+
+            bool startOwned =
+                expectedVertexBoundaryEdges.Contains(
+                    component.StartSpokeKey) ||
+                expectedSourceBoundaryEdges.Contains(
+                    component.StartSpokeKey);
+            bool endOwned =
+                expectedVertexBoundaryEdges.Contains(
+                    component.EndSpokeKey) ||
+                expectedSourceBoundaryEdges.Contains(
+                    component.EndSpokeKey);
+            if (startOwned || endOwned)
+            {
+                return false;
+            }
+
+            int startDistinctFaces = CountDistinctChamferFaceRecords(
+                segments,
+                component.StartSpokeKey);
+            int endDistinctFaces = CountDistinctChamferFaceRecords(
+                segments,
+                component.EndSpokeKey);
+            bool startProvenanceValid =
+                startDistinctFaces ==
+                    component.StartExistingSpokeUseCount;
+            bool endProvenanceValid =
+                endDistinctFaces ==
+                    component.EndExistingSpokeUseCount;
+            return startProvenanceValid &&
+                endProvenanceValid &&
+                component.StartExistingSpokeUseCount +
+                    component.StartPlannedSpokeUseCount == 2 &&
+                component.EndExistingSpokeUseCount +
+                    component.EndPlannedSpokeUseCount == 2;
+        }
+
+        private static void IncrementChamferTopologyKeyCount(
+            Dictionary<TopologyEdgeKey, int> counts,
+            TopologyEdgeKey key)
+        {
+            counts.TryGetValue(key, out int count);
+            counts[key] = count + 1;
+        }
+
+        private static int CompareChamferExpectedVertexBoundaryProvenance(
+            ChamferExpectedVertexBoundary left,
+            ChamferExpectedVertexBoundary right)
+        {
+            int comparison = left.Kind.CompareTo(right.Kind);
+            if (comparison != 0)
+            {
+                return comparison;
+            }
+            comparison = left.SourceEdgeIndex.CompareTo(
+                right.SourceEdgeIndex);
+            if (comparison != 0)
+            {
+                return comparison;
+            }
+            comparison = left.FaceIndex.CompareTo(right.FaceIndex);
+            if (comparison != 0)
+            {
+                return comparison;
+            }
+            comparison = left.Key.First.CompareTo(right.Key.First);
+            if (comparison != 0)
+            {
+                return comparison;
+            }
+            return left.Key.Second.CompareTo(right.Key.Second);
+        }
+
+        private static string BuildChamferVertexPatchComponentDiagnostic(
+            ChamferVertexPatchComponent component)
+        {
+            return
+                "open-chain/vertex:" + component.SourceVertexIndex +
+                "/edges:" + component.OrderedBoundaries.Count +
+                "/sourceFanOpen:" +
+                    (component.SourceFanOpen ? 1 : 0) +
+                "/activeRuns:" + component.ActiveRunCount +
+                "/activeEdges:" +
+                    component.SourceContext.ActiveSourceEdges.Count +
+                "/sourceBoundaryRecords:" +
+                    component.SourceContext.SourceBoundaryRecords.Count +
+                "/start:" +
+                    component.OrderedPositions[0].ToString("F4") +
+                "/end:" +
+                    component.OrderedPositions[
+                        component.OrderedPositions.Count - 1].ToString("F4") +
+                "/startOwners:" +
+                    component.StartSourceBoundaryOwnerCount +
+                "/endOwners:" +
+                    component.EndSourceBoundaryOwnerCount +
+                "/startExistingSpokeUses:" +
+                    component.StartExistingSpokeUseCount +
+                "/startPlannedSpokeUses:" +
+                    component.StartPlannedSpokeUseCount +
+                "/endExistingSpokeUses:" +
+                    component.EndExistingSpokeUseCount +
+                "/endPlannedSpokeUses:" +
+                    component.EndPlannedSpokeUseCount;
+        }
+
+        private static void AddChamferVertexPatchFailure(
+            List<string> failures,
+            string failure)
+        {
+            if (failures.Count < 3)
+            {
+                failures.Add(failure);
+            }
+        }
+
+
         private static bool NormalizeChamferProvisionalFaceWalks(
             List<ChamferProvisionalFaceRecord> faceRecords,
             float minimumStableFaceArea,
@@ -3632,19 +4765,358 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
+        // Collapse only duplicate source-boundary ownership aliases for one
+        // already-closed terminal transition. Provisional face geometry is
+        // intentionally untouched.
+        private static void CollapseChamferSourceBoundaryTerminalTransferAliases(
+            List<ChamferSourceBoundaryRecord> records,
+            Dictionary<
+                TopologyEdgeKey,
+                List<ChamferSourceBoundaryChildOccurrence>>
+                rawOccurrencesByKey,
+            Dictionary<TopologyEdgeKey, int> useCounts,
+            HashSet<TopologyEdgeKey> expectedVertexBoundaryEdges,
+            List<ChamferProvisionalSegmentRecord> segments,
+            ref ChamferEmissionStats stats)
+        {
+            HashSet<TopologyEdgeKey> rejectedKeys =
+                new HashSet<TopologyEdgeKey>();
+            List<string> failures = new List<string>();
+
+            while (true)
+            {
+                Dictionary<
+                    TopologyEdgeKey,
+                    List<ChamferSourceBoundaryChildOccurrence>>
+                    normalizedOccurrencesByKey =
+                        BuildChamferSourceBoundaryChildOccurrences(records);
+                List<KeyValuePair<
+                    TopologyEdgeKey,
+                    List<ChamferSourceBoundaryChildOccurrence>>> groups =
+                        new List<KeyValuePair<
+                            TopologyEdgeKey,
+                            List<ChamferSourceBoundaryChildOccurrence>>>(
+                                normalizedOccurrencesByKey);
+                groups.Sort((left, right) =>
+                {
+                    ChamferSourceBoundaryChildOccurrence leftFirst =
+                        left.Value[0];
+                    ChamferSourceBoundaryChildOccurrence rightFirst =
+                        right.Value[0];
+                    int comparison = leftFirst.Record.BoundaryLoopIndex
+                        .CompareTo(rightFirst.Record.BoundaryLoopIndex);
+                    if (comparison != 0)
+                    {
+                        return comparison;
+                    }
+                    comparison = leftFirst.Record.BoundaryOrder
+                        .CompareTo(rightFirst.Record.BoundaryOrder);
+                    if (comparison != 0)
+                    {
+                        return comparison;
+                    }
+                    comparison = leftFirst.ChildIndex.CompareTo(
+                        rightFirst.ChildIndex);
+                    if (comparison != 0)
+                    {
+                        return comparison;
+                    }
+                    return leftFirst.Record.SourceEdgeIndex.CompareTo(
+                        rightFirst.Record.SourceEdgeIndex);
+                });
+
+                bool removedPair = false;
+                for (int groupIndex = 0;
+                     groupIndex < groups.Count;
+                     groupIndex++)
+                {
+                    TopologyEdgeKey key = groups[groupIndex].Key;
+                    List<ChamferSourceBoundaryChildOccurrence> occurrences =
+                        groups[groupIndex].Value;
+                    if (rejectedKeys.Contains(key))
+                    {
+                        continue;
+                    }
+
+                    int firstOccurrenceIndex = -1;
+                    int secondOccurrenceIndex = -1;
+                    for (int firstIndex = 0;
+                         firstIndex < occurrences.Count - 1 &&
+                         firstOccurrenceIndex < 0;
+                         firstIndex++)
+                    {
+                        for (int secondIndex = firstIndex + 1;
+                             secondIndex < occurrences.Count;
+                             secondIndex++)
+                        {
+                            if (occurrences[firstIndex].TerminalTransition &&
+                                occurrences[secondIndex].TerminalTransition &&
+                                AreChamferSourceBoundaryOccurrencesExactInverse(
+                                    occurrences[firstIndex],
+                                    occurrences[secondIndex]))
+                            {
+                                firstOccurrenceIndex = firstIndex;
+                                secondOccurrenceIndex = secondIndex;
+                                break;
+                            }
+                        }
+                    }
+                    if (firstOccurrenceIndex < 0)
+                    {
+                        continue;
+                    }
+
+                    ChamferSourceBoundaryChildOccurrence first =
+                        occurrences[firstOccurrenceIndex];
+                    ChamferSourceBoundaryChildOccurrence second =
+                        occurrences[secondOccurrenceIndex];
+                    bool normalizedOccurrenceCountValid =
+                        occurrences.Count == 2;
+
+                    rawOccurrencesByKey.TryGetValue(
+                        key,
+                        out List<ChamferSourceBoundaryChildOccurrence>
+                            rawOccurrences);
+                    bool rawOccurrenceCountValid =
+                        rawOccurrences != null &&
+                        rawOccurrences.Count == 2;
+                    bool sameLoop =
+                        first.Record.BoundaryLoopIndex ==
+                        second.Record.BoundaryLoopIndex;
+                    bool differentRecords = !object.ReferenceEquals(
+                        first.Record,
+                        second.Record);
+                    bool consecutiveRecords =
+                        TryResolveConsecutiveChamferSourceBoundaryRecords(
+                            records,
+                            first.Record,
+                            second.Record,
+                            out int sharedSourceVertex);
+                    bool nonAdjacent =
+                        AreChamferSourceBoundaryOccurrencesNonAdjacent(
+                            first,
+                            second);
+                    int useCount = useCounts.TryGetValue(
+                        key,
+                        out int count)
+                        ? count
+                        : 0;
+                    int distinctFaceRecords =
+                        CountDistinctChamferFaceRecords(segments, key);
+                    bool vertexOwned =
+                        expectedVertexBoundaryEdges.Contains(key);
+
+                    if (!normalizedOccurrenceCountValid ||
+                        !rawOccurrenceCountValid ||
+                        !sameLoop ||
+                        !differentRecords ||
+                        !consecutiveRecords ||
+                        !nonAdjacent ||
+                        useCount != 2 ||
+                        distinctFaceRecords != 2 ||
+                        vertexOwned)
+                    {
+                        stats.SourceBoundaryTerminalAliasNormalizationFailureCount++;
+                        rejectedKeys.Add(key);
+                        if (failures.Count < 3)
+                        {
+                            failures.Add(
+                                "firstSourceEdge:" +
+                                    first.Record.SourceEdgeIndex +
+                                "/firstLoop:" +
+                                    first.Record.BoundaryLoopIndex +
+                                "/firstOrder:" +
+                                    first.Record.BoundaryOrder +
+                                "/firstChild:" + first.ChildIndex +
+                                "/secondSourceEdge:" +
+                                    second.Record.SourceEdgeIndex +
+                                "/secondLoop:" +
+                                    second.Record.BoundaryLoopIndex +
+                                "/secondOrder:" +
+                                    second.Record.BoundaryOrder +
+                                "/secondChild:" + second.ChildIndex +
+                                "/normalizedOccurrences:" +
+                                    occurrences.Count +
+                                "/rawOccurrences:" +
+                                    (rawOccurrences != null
+                                        ? rawOccurrences.Count
+                                        : 0) +
+                                "/sameLoop:" + (sameLoop ? 1 : 0) +
+                                "/differentRecords:" +
+                                    (differentRecords ? 1 : 0) +
+                                "/consecutiveRecords:" +
+                                    (consecutiveRecords ? 1 : 0) +
+                                "/sharedSourceVertex:" +
+                                    sharedSourceVertex +
+                                "/nonAdjacent:" +
+                                    (nonAdjacent ? 1 : 0) +
+                                "/uses:" + useCount +
+                                "/distinctFaceRecords:" +
+                                    distinctFaceRecords +
+                                "/vertexOwned:" +
+                                    (vertexOwned ? 1 : 0));
+                        }
+                        continue;
+                    }
+
+                    first.Record.Children.RemoveAt(first.ChildIndex);
+                    second.Record.Children.RemoveAt(second.ChildIndex);
+                    stats.SourceBoundaryTerminalAliasPairCount++;
+                    stats.SourceBoundaryTerminalAliasChildCount += 2;
+                    removedPair = true;
+                    break;
+                }
+
+                if (!removedPair)
+                {
+                    break;
+                }
+            }
+
+            if (failures.Count > 0)
+            {
+                string message =
+                    "GeneratedMass edge wear source-boundary terminal alias " +
+                    "normalization failures. normalizationFailures=" +
+                    stats.SourceBoundaryTerminalAliasNormalizationFailureCount +
+                    ", failuresLogged=" + failures.Count;
+                for (int i = 0; i < failures.Count; i++)
+                {
+                    message += ", failure[" + i + "]=" + failures[i];
+                }
+                Debug.LogWarning(message);
+            }
+        }
+
+        private static bool
+            AreChamferSourceBoundaryOccurrencesExactInverse(
+                ChamferSourceBoundaryChildOccurrence first,
+                ChamferSourceBoundaryChildOccurrence second)
+        {
+            return
+                new VertexKey(first.Child.Start).Equals(
+                    new VertexKey(second.Child.End)) &&
+                new VertexKey(first.Child.End).Equals(
+                    new VertexKey(second.Child.Start)) &&
+                first.Child.Key.Equals(second.Child.Key);
+        }
+
+        private static bool
+            AreChamferSourceBoundaryOccurrencesNonAdjacent(
+                ChamferSourceBoundaryChildOccurrence first,
+                ChamferSourceBoundaryChildOccurrence second)
+        {
+            if (first.Record.BoundaryLoopIndex !=
+                    second.Record.BoundaryLoopIndex ||
+                first.LoopChildCount <= 0 ||
+                first.LoopChildCount != second.LoopChildCount)
+            {
+                return false;
+            }
+
+            int loopChildCount = first.LoopChildCount;
+            int forwardDistance =
+                (second.FlattenedLoopIndex -
+                 first.FlattenedLoopIndex +
+                 loopChildCount) % loopChildCount;
+            int reverseDistance =
+                (first.FlattenedLoopIndex -
+                 second.FlattenedLoopIndex +
+                 loopChildCount) % loopChildCount;
+            return forwardDistance > 1 && reverseDistance > 1;
+        }
+
+        private static bool
+            TryResolveConsecutiveChamferSourceBoundaryRecords(
+                List<ChamferSourceBoundaryRecord> records,
+                ChamferSourceBoundaryRecord first,
+                ChamferSourceBoundaryRecord second,
+                out int sharedSourceVertex)
+        {
+            sharedSourceVertex = -1;
+            if (first.BoundaryLoopIndex != second.BoundaryLoopIndex)
+            {
+                return false;
+            }
+
+            int loopRecordCount = 0;
+            for (int i = 0; i < records.Count; i++)
+            {
+                if (records[i].BoundaryLoopIndex ==
+                    first.BoundaryLoopIndex)
+                {
+                    loopRecordCount++;
+                }
+            }
+            if (loopRecordCount < 2)
+            {
+                return false;
+            }
+
+            bool[] seenOrders = new bool[loopRecordCount];
+            for (int i = 0; i < records.Count; i++)
+            {
+                ChamferSourceBoundaryRecord record = records[i];
+                if (record.BoundaryLoopIndex != first.BoundaryLoopIndex)
+                {
+                    continue;
+                }
+                if (record.BoundaryOrder < 0 ||
+                    record.BoundaryOrder >= loopRecordCount ||
+                    seenOrders[record.BoundaryOrder])
+                {
+                    return false;
+                }
+                seenOrders[record.BoundaryOrder] = true;
+            }
+
+            bool firstThenSecond =
+                second.BoundaryOrder ==
+                (first.BoundaryOrder + 1) % loopRecordCount;
+            if (firstThenSecond &&
+                first.SourceVertexEnd == second.SourceVertexStart)
+            {
+                sharedSourceVertex = first.SourceVertexEnd;
+                return true;
+            }
+
+            bool secondThenFirst =
+                first.BoundaryOrder ==
+                (second.BoundaryOrder + 1) % loopRecordCount;
+            if (secondThenFirst &&
+                second.SourceVertexEnd == first.SourceVertexStart)
+            {
+                sharedSourceVertex = second.SourceVertexEnd;
+                return true;
+            }
+            return false;
+        }
+
         private static HashSet<TopologyEdgeKey>
             AuditChamferSourceBoundaryOwnership(
                 List<ChamferSourceBoundaryRecord> records,
                 Dictionary<TopologyEdgeKey, int> useCounts,
                 HashSet<TopologyEdgeKey> expectedVertexBoundaryEdges,
                 List<ChamferProvisionalSegmentRecord> segments,
+                Dictionary<
+                    TopologyEdgeKey,
+                    List<ChamferSourceBoundaryChildOccurrence>>
+                    rawOccurrencesByKey,
                 ref ChamferEmissionStats stats)
         {
             HashSet<TopologyEdgeKey> expectedOpen =
                 new HashSet<TopologyEdgeKey>();
             HashSet<TopologyEdgeKey> allChildren =
                 new HashSet<TopologyEdgeKey>();
+            HashSet<TopologyEdgeKey> duplicateGroupsLogged =
+                new HashSet<TopologyEdgeKey>();
+            Dictionary<
+                TopologyEdgeKey,
+                List<ChamferSourceBoundaryChildOccurrence>>
+                normalizedOccurrencesByKey =
+                    BuildChamferSourceBoundaryChildOccurrences(records);
             List<string> failures = new List<string>();
+            List<string> duplicateGroups = new List<string>();
             stats.SourceBoundaryRecordCount = records.Count;
 
             for (int recordIndex = 0;
@@ -3674,6 +5146,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     if (!allChildren.Add(child.Key))
                     {
                         stats.SourceBoundaryDuplicateChildKeyFailureCount++;
+                        AddChamferSourceBoundaryDuplicateGroupDiagnostic(
+                            duplicateGroups,
+                            duplicateGroupsLogged,
+                            child.Key,
+                            rawOccurrencesByKey,
+                            normalizedOccurrencesByKey,
+                            useCounts,
+                            expectedVertexBoundaryEdges,
+                            segments);
                         AddChamferSourceBoundaryFailure(
                             failures,
                             record,
@@ -3723,6 +5204,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     if (!expectedOpen.Add(child.Key))
                     {
                         stats.SourceBoundaryDuplicateChildKeyFailureCount++;
+                        AddChamferSourceBoundaryDuplicateGroupDiagnostic(
+                            duplicateGroups,
+                            duplicateGroupsLogged,
+                            child.Key,
+                            rawOccurrencesByKey,
+                            normalizedOccurrencesByKey,
+                            useCounts,
+                            expectedVertexBoundaryEdges,
+                            segments);
                         AddChamferSourceBoundaryFailure(
                             failures,
                             record,
@@ -3781,7 +5271,319 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
                 Debug.LogWarning(message);
             }
+            if (duplicateGroups.Count > 0)
+            {
+                stats.SourceBoundaryDuplicateGroupDiagnosticsLogged =
+                    duplicateGroups.Count;
+                string message =
+                    "GeneratedMass edge wear source-boundary duplicate group diagnostics. " +
+                    "groups=" + duplicateGroups.Count;
+                for (int i = 0; i < duplicateGroups.Count; i++)
+                {
+                    message += ", group[" + i + "]=" + duplicateGroups[i];
+                }
+                Debug.LogWarning(message);
+            }
             return expectedOpen;
+        }
+
+        private static Dictionary<
+            TopologyEdgeKey,
+            List<ChamferSourceBoundaryChildOccurrence>>
+            BuildChamferSourceBoundaryChildOccurrences(
+                List<ChamferSourceBoundaryRecord> records)
+        {
+            Dictionary<int, List<ChamferSourceBoundaryRecord>> recordsByLoop =
+                new Dictionary<int, List<ChamferSourceBoundaryRecord>>();
+            for (int i = 0; i < records.Count; i++)
+            {
+                ChamferSourceBoundaryRecord record = records[i];
+                if (!recordsByLoop.TryGetValue(
+                        record.BoundaryLoopIndex,
+                        out List<ChamferSourceBoundaryRecord> loopRecords))
+                {
+                    loopRecords = new List<ChamferSourceBoundaryRecord>();
+                    recordsByLoop.Add(
+                        record.BoundaryLoopIndex,
+                        loopRecords);
+                }
+                loopRecords.Add(record);
+            }
+
+            Dictionary<
+                TopologyEdgeKey,
+                List<ChamferSourceBoundaryChildOccurrence>> occurrencesByKey =
+                    new Dictionary<
+                        TopologyEdgeKey,
+                        List<ChamferSourceBoundaryChildOccurrence>>();
+            List<int> loopIndices = new List<int>(recordsByLoop.Keys);
+            loopIndices.Sort();
+            for (int loopIndex = 0;
+                 loopIndex < loopIndices.Count;
+                 loopIndex++)
+            {
+                List<ChamferSourceBoundaryRecord> loopRecords =
+                    recordsByLoop[loopIndices[loopIndex]];
+                loopRecords.Sort((left, right) =>
+                    left.BoundaryOrder.CompareTo(right.BoundaryOrder));
+                int loopChildCount = 0;
+                for (int recordIndex = 0;
+                     recordIndex < loopRecords.Count;
+                     recordIndex++)
+                {
+                    loopChildCount += loopRecords[recordIndex].Children.Count;
+                }
+
+                int flattenedLoopIndex = 0;
+                for (int recordIndex = 0;
+                     recordIndex < loopRecords.Count;
+                     recordIndex++)
+                {
+                    ChamferSourceBoundaryRecord record =
+                        loopRecords[recordIndex];
+                    int recordChildCount = record.Children.Count;
+                    bool subdivided = recordChildCount > 1;
+                    for (int childIndex = 0;
+                         childIndex < recordChildCount;
+                         childIndex++)
+                    {
+                        ChamferSourceBoundaryChild child =
+                            record.Children[childIndex];
+                        ChamferSourceBoundaryChildOccurrence occurrence =
+                            new ChamferSourceBoundaryChildOccurrence(
+                                record,
+                                childIndex,
+                                child,
+                                flattenedLoopIndex,
+                                loopChildCount,
+                                recordChildCount,
+                                subdivided &&
+                                    (child.TouchesParentStart ||
+                                     child.TouchesParentEnd));
+                        if (!occurrencesByKey.TryGetValue(
+                                child.Key,
+                                out List<ChamferSourceBoundaryChildOccurrence>
+                                    occurrences))
+                        {
+                            occurrences =
+                                new List<
+                                    ChamferSourceBoundaryChildOccurrence>();
+                            occurrencesByKey.Add(child.Key, occurrences);
+                        }
+                        occurrences.Add(occurrence);
+                        flattenedLoopIndex++;
+                    }
+                }
+            }
+            return occurrencesByKey;
+        }
+
+        private static void AddChamferSourceBoundaryDuplicateGroupDiagnostic(
+            List<string> diagnostics,
+            HashSet<TopologyEdgeKey> loggedKeys,
+            TopologyEdgeKey key,
+            Dictionary<
+                TopologyEdgeKey,
+                List<ChamferSourceBoundaryChildOccurrence>>
+                rawOccurrencesByKey,
+            Dictionary<
+                TopologyEdgeKey,
+                List<ChamferSourceBoundaryChildOccurrence>>
+                normalizedOccurrencesByKey,
+            Dictionary<TopologyEdgeKey, int> useCounts,
+            HashSet<TopologyEdgeKey> expectedVertexBoundaryEdges,
+            List<ChamferProvisionalSegmentRecord> segments)
+        {
+            if (diagnostics.Count >= 3 || !loggedKeys.Add(key))
+            {
+                return;
+            }
+
+            rawOccurrencesByKey.TryGetValue(
+                key,
+                out List<ChamferSourceBoundaryChildOccurrence> rawOccurrences);
+            normalizedOccurrencesByKey.TryGetValue(
+                key,
+                out List<ChamferSourceBoundaryChildOccurrence>
+                    normalizedOccurrences);
+            int useCount = useCounts.TryGetValue(key, out int count)
+                ? count
+                : 0;
+            int distinctFaceRecords = CountDistinctChamferFaceRecords(
+                segments,
+                key);
+            bool vertexOwned = expectedVertexBoundaryEdges.Contains(key);
+
+            string diagnostic =
+                "rawOccurrences:" +
+                    (rawOccurrences != null ? rawOccurrences.Count : 0) +
+                "/normalizedOccurrences:" +
+                    (normalizedOccurrences != null
+                        ? normalizedOccurrences.Count
+                        : 0) +
+                "/uses:" + useCount +
+                "/distinctFaceRecords:" + distinctFaceRecords +
+                "/vertexOwned:" + (vertexOwned ? 1 : 0) +
+                "/rawPair:" +
+                    BuildChamferSourceBoundaryPairDiagnostic(rawOccurrences) +
+                "/normalizedPair:" +
+                    BuildChamferSourceBoundaryPairDiagnostic(
+                        normalizedOccurrences);
+
+            if (rawOccurrences != null)
+            {
+                for (int i = 0; i < rawOccurrences.Count; i++)
+                {
+                    ChamferSourceBoundaryChildOccurrence occurrence =
+                        rawOccurrences[i];
+                    diagnostic +=
+                        "/rawOccurrence[" + i + "]:" +
+                        BuildChamferSourceBoundaryOccurrenceDiagnostic(
+                            occurrence,
+                            useCount,
+                            distinctFaceRecords,
+                            vertexOwned);
+                }
+            }
+            if (normalizedOccurrences != null)
+            {
+                for (int i = 0; i < normalizedOccurrences.Count; i++)
+                {
+                    ChamferSourceBoundaryChildOccurrence occurrence =
+                        normalizedOccurrences[i];
+                    diagnostic +=
+                        "/occurrence[" + i + "]:" +
+                        BuildChamferSourceBoundaryOccurrenceDiagnostic(
+                            occurrence,
+                            useCount,
+                            distinctFaceRecords,
+                            vertexOwned);
+                }
+            }
+            diagnostics.Add(diagnostic);
+        }
+
+        private static string BuildChamferSourceBoundaryPairDiagnostic(
+            List<ChamferSourceBoundaryChildOccurrence> occurrences)
+        {
+            if (occurrences == null || occurrences.Count < 2)
+            {
+                return "insufficient";
+            }
+
+            ChamferSourceBoundaryChildOccurrence first = occurrences[0];
+            ChamferSourceBoundaryChildOccurrence second = occurrences[1];
+            VertexKey firstStart = new VertexKey(first.Child.Start);
+            VertexKey firstEnd = new VertexKey(first.Child.End);
+            VertexKey secondStart = new VertexKey(second.Child.Start);
+            VertexKey secondEnd = new VertexKey(second.Child.End);
+            string relationship;
+            if (firstStart.Equals(secondStart) &&
+                firstEnd.Equals(secondEnd))
+            {
+                relationship = "same-direction";
+            }
+            else if (firstStart.Equals(secondEnd) &&
+                     firstEnd.Equals(secondStart))
+            {
+                relationship = "inverse-direction";
+            }
+            else
+            {
+                relationship = "directionally-incompatible";
+            }
+
+            bool sameLoop =
+                first.Record.BoundaryLoopIndex ==
+                second.Record.BoundaryLoopIndex;
+            int forwardDistance = -1;
+            int reverseDistance = -1;
+            bool adjacent = false;
+            if (sameLoop &&
+                first.LoopChildCount > 0 &&
+                first.LoopChildCount == second.LoopChildCount)
+            {
+                int loopChildCount = first.LoopChildCount;
+                forwardDistance =
+                    (second.FlattenedLoopIndex -
+                     first.FlattenedLoopIndex +
+                     loopChildCount) % loopChildCount;
+                reverseDistance =
+                    (first.FlattenedLoopIndex -
+                     second.FlattenedLoopIndex +
+                     loopChildCount) % loopChildCount;
+                adjacent = forwardDistance == 1 || reverseDistance == 1;
+            }
+
+            return
+                "relationship:" + relationship +
+                "/sameLoop:" + (sameLoop ? 1 : 0) +
+                "/forwardDistance:" + forwardDistance +
+                "/reverseDistance:" + reverseDistance +
+                "/adjacent:" + (adjacent ? 1 : 0);
+        }
+
+        private static string BuildChamferSourceBoundaryOccurrenceDiagnostic(
+            ChamferSourceBoundaryChildOccurrence occurrence,
+            int useCount,
+            int distinctFaceRecords,
+            bool vertexOwned)
+        {
+            ChamferSourceBoundaryRecord record = occurrence.Record;
+            ChamferSourceBoundaryChild child = occurrence.Child;
+            return
+                "sourceEdge:" + record.SourceEdgeIndex +
+                "/loop:" + record.BoundaryLoopIndex +
+                "/order:" + record.BoundaryOrder +
+                "/child:" + occurrence.ChildIndex +
+                "/flatIndex:" + occurrence.FlattenedLoopIndex +
+                "/loopChildren:" + occurrence.LoopChildCount +
+                "/recordChildren:" + occurrence.RecordChildCount +
+                "/sourceVertices:" + record.SourceVertexStart +
+                    "->" + record.SourceVertexEnd +
+                "/parentStart:" + record.ParentStart.ToString("F4") +
+                "/parentEnd:" + record.ParentEnd.ToString("F4") +
+                "/start:" + child.Start.ToString("F4") +
+                "/end:" + child.End.ToString("F4") +
+                "/touchStart:" +
+                    (child.TouchesParentStart ? 1 : 0) +
+                "/touchEnd:" +
+                    (child.TouchesParentEnd ? 1 : 0) +
+                "/terminalTransition:" +
+                    (occurrence.TerminalTransition ? 1 : 0) +
+                "/disposition:" +
+                    ResolveChamferSourceBoundaryOccurrenceDisposition(
+                        occurrence,
+                        useCount,
+                        distinctFaceRecords,
+                        vertexOwned);
+        }
+
+        private static string ResolveChamferSourceBoundaryOccurrenceDisposition(
+            ChamferSourceBoundaryChildOccurrence occurrence,
+            int useCount,
+            int distinctFaceRecords,
+            bool vertexOwned)
+        {
+            if (occurrence.TerminalTransition)
+            {
+                if (useCount == 2 && distinctFaceRecords == 2)
+                {
+                    return "terminal-transfer";
+                }
+                if (useCount == 1 && !vertexOwned)
+                {
+                    return "terminal-open";
+                }
+                return "invalid-terminal";
+            }
+            if (useCount == 1 && !vertexOwned)
+            {
+                return "expected-open";
+            }
+            return vertexOwned
+                ? "invalid-source-child-vertex-owned"
+                : "invalid-source-child";
         }
 
         private static int CountDistinctChamferFaceRecords(
@@ -5058,8 +6860,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             stats.ExpectedVertexBoundaryEdgeCount =
                 expectedVertexBoundaryEdges.Count;
 
+            Dictionary<
+                TopologyEdgeKey,
+                List<ChamferSourceBoundaryChildOccurrence>>
+                rawSourceBoundaryOccurrences =
+                    BuildChamferSourceBoundaryChildOccurrences(
+                        sourceBoundaryRecords);
             NormalizeChamferSourceBoundaryLoops(
                 sourceBoundaryRecords,
+                useCounts,
+                expectedVertexBoundaryEdges,
+                finalSegments,
+                ref stats);
+            CollapseChamferSourceBoundaryTerminalTransferAliases(
+                sourceBoundaryRecords,
+                rawSourceBoundaryOccurrences,
                 useCounts,
                 expectedVertexBoundaryEdges,
                 finalSegments,
@@ -5071,6 +6886,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     useCounts,
                     expectedVertexBoundaryEdges,
                     finalSegments,
+                    rawSourceBoundaryOccurrences,
                     ref stats);
 
             AuditExpectedVertexBoundaryComponents(
@@ -5147,6 +6963,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 stats.SourceBoundaryChildIncidenceFailureCount > 0 ||
                 stats.SourceBoundaryDuplicateChildKeyFailureCount > 0 ||
                 stats.SourceBoundaryLoopNormalizationFailureCount > 0 ||
+                stats.SourceBoundaryTerminalAliasNormalizationFailureCount > 0 ||
                 stats.VertexBoundaryBranchFailureCount > 0 ||
                 stats.VertexBoundaryDuplicateFailureCount > 0)
             {
@@ -5155,6 +6972,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             stats.ReadyForVertexPatches = 1;
+            AuditChamferVertexPatchComponents(
+                normalizedVertexBoundaries,
+                context,
+                solution.WidthByEdge,
+                sourceBoundaryRecords,
+                useCounts,
+                expectedVertexBoundaryEdges,
+                expectedSourceBoundaryEdges,
+                finalSegments,
+                ref stats);
             return true;
         }
 
@@ -8512,6 +10339,165 @@ private readonly struct EdgeWearTopologyStats
             }
         }
 
+        private enum ChamferVertexPatchClosure
+        {
+            Unclassified,
+            ClosedLoop,
+            OpenChainSourceBoundaryResolved,
+            OpenChainClosedSourceResolved,
+            OpenChainUnresolved
+        }
+
+        private readonly struct ChamferOrientedVertexBoundary
+        {
+            public readonly ChamferExpectedVertexBoundary Boundary;
+            public readonly Vector3 Start;
+            public readonly Vector3 End;
+            public readonly VertexKey StartKey;
+            public readonly VertexKey EndKey;
+
+            public ChamferOrientedVertexBoundary(
+                ChamferExpectedVertexBoundary boundary,
+                Vector3 start,
+                Vector3 end,
+                VertexKey startKey,
+                VertexKey endKey)
+            {
+                Boundary = boundary;
+                Start = start;
+                End = end;
+                StartKey = startKey;
+                EndKey = endKey;
+            }
+        }
+
+        private sealed class ChamferVertexPatchSourceContext
+        {
+            public readonly int SourceVertexIndex;
+            public readonly Vector3 SourcePosition;
+            public readonly bool SourceFanOpen;
+            public readonly bool IsValid;
+            public readonly int ActiveRunCount;
+            public readonly List<int> ActiveSourceEdges;
+            public readonly List<ChamferSourceBoundaryRecord>
+                SourceBoundaryRecords;
+
+            public ChamferVertexPatchSourceContext(
+                int sourceVertexIndex,
+                Vector3 sourcePosition,
+                bool sourceFanOpen,
+                bool isValid,
+                int activeRunCount,
+                List<int> activeSourceEdges,
+                List<ChamferSourceBoundaryRecord> sourceBoundaryRecords)
+            {
+                SourceVertexIndex = sourceVertexIndex;
+                SourcePosition = sourcePosition;
+                SourceFanOpen = sourceFanOpen;
+                IsValid = isValid;
+                ActiveRunCount = activeRunCount;
+                ActiveSourceEdges = activeSourceEdges;
+                SourceBoundaryRecords = sourceBoundaryRecords;
+            }
+        }
+
+        private sealed class ChamferVertexPatchComponent
+        {
+            public readonly int SourceVertexIndex;
+            public readonly List<ChamferOrientedVertexBoundary>
+                OrderedBoundaries;
+            public readonly List<Vector3> OrderedPositions;
+            public readonly bool IsClosed;
+            public readonly ChamferVertexPatchSourceContext SourceContext;
+            public readonly bool SourceFanOpen;
+            public readonly int ActiveRunCount;
+            public readonly bool HasEndpointSpokes;
+            public readonly VertexKey StartEndpointKey;
+            public readonly VertexKey EndEndpointKey;
+            public readonly TopologyEdgeKey StartSpokeKey;
+            public readonly TopologyEdgeKey EndSpokeKey;
+            public bool ProvenanceValid;
+            public ChamferVertexPatchClosure Closure;
+            public int StartSourceBoundaryOwnerCount;
+            public int EndSourceBoundaryOwnerCount;
+            public int StartExistingSpokeUseCount;
+            public int EndExistingSpokeUseCount;
+            public int StartPlannedSpokeUseCount;
+            public int EndPlannedSpokeUseCount;
+
+            public ChamferVertexPatchComponent(
+                int sourceVertexIndex,
+                List<ChamferOrientedVertexBoundary> orderedBoundaries,
+                List<Vector3> orderedPositions,
+                bool isClosed,
+                ChamferVertexPatchSourceContext sourceContext)
+            {
+                SourceVertexIndex = sourceVertexIndex;
+                OrderedBoundaries = orderedBoundaries;
+                OrderedPositions = orderedPositions;
+                IsClosed = isClosed;
+                SourceContext = sourceContext;
+                SourceFanOpen = sourceContext.SourceFanOpen;
+                ActiveRunCount = sourceContext.ActiveRunCount;
+                ProvenanceValid = false;
+                Closure = ChamferVertexPatchClosure.Unclassified;
+                StartSourceBoundaryOwnerCount = 0;
+                EndSourceBoundaryOwnerCount = 0;
+                StartExistingSpokeUseCount = 0;
+                EndExistingSpokeUseCount = 0;
+                StartPlannedSpokeUseCount = 0;
+                EndPlannedSpokeUseCount = 0;
+
+                if (!isClosed && orderedBoundaries.Count > 0)
+                {
+                    StartEndpointKey = orderedBoundaries[0].StartKey;
+                    EndEndpointKey =
+                        orderedBoundaries[orderedBoundaries.Count - 1].EndKey;
+                    VertexKey sourceKey = new VertexKey(
+                        sourceContext.SourcePosition);
+                    HasEndpointSpokes =
+                        !StartEndpointKey.Equals(sourceKey) &&
+                        !EndEndpointKey.Equals(sourceKey);
+                    if (HasEndpointSpokes)
+                    {
+                        StartSpokeKey = new TopologyEdgeKey(
+                            sourceKey,
+                            StartEndpointKey);
+                        EndSpokeKey = new TopologyEdgeKey(
+                            sourceKey,
+                            EndEndpointKey);
+                    }
+                    else
+                    {
+                        StartSpokeKey = default;
+                        EndSpokeKey = default;
+                    }
+                }
+                else
+                {
+                    HasEndpointSpokes = false;
+                    StartEndpointKey = default;
+                    EndEndpointKey = default;
+                    StartSpokeKey = default;
+                    EndSpokeKey = default;
+                }
+            }
+        }
+
+        private readonly struct ChamferSourceBoundaryEndpointOwnership
+        {
+            public readonly ChamferSourceBoundaryRecord Record;
+            public readonly int ChildIndex;
+
+            public ChamferSourceBoundaryEndpointOwnership(
+                ChamferSourceBoundaryRecord record,
+                int childIndex)
+            {
+                Record = record;
+                ChildIndex = childIndex;
+            }
+        }
+
         private readonly struct ChamferSourceBoundaryChildLocation
         {
             public readonly ChamferSourceBoundaryRecord Record;
@@ -8526,6 +10512,35 @@ private readonly struct EdgeWearTopologyStats
                 Record = record;
                 ChildIndex = childIndex;
                 Child = child;
+            }
+        }
+
+        private readonly struct ChamferSourceBoundaryChildOccurrence
+        {
+            public readonly ChamferSourceBoundaryRecord Record;
+            public readonly int ChildIndex;
+            public readonly ChamferSourceBoundaryChild Child;
+            public readonly int FlattenedLoopIndex;
+            public readonly int LoopChildCount;
+            public readonly int RecordChildCount;
+            public readonly bool TerminalTransition;
+
+            public ChamferSourceBoundaryChildOccurrence(
+                ChamferSourceBoundaryRecord record,
+                int childIndex,
+                ChamferSourceBoundaryChild child,
+                int flattenedLoopIndex,
+                int loopChildCount,
+                int recordChildCount,
+                bool terminalTransition)
+            {
+                Record = record;
+                ChildIndex = childIndex;
+                Child = child;
+                FlattenedLoopIndex = flattenedLoopIndex;
+                LoopChildCount = loopChildCount;
+                RecordChildCount = recordChildCount;
+                TerminalTransition = terminalTransition;
             }
         }
 
@@ -8803,6 +10818,9 @@ private readonly struct EdgeWearTopologyStats
             public int SourceBoundaryLoopRetraceChildCount;
             public int NormalizedSourceBoundaryDescendantCount;
             public int SourceBoundaryLoopNormalizationFailureCount;
+            public int SourceBoundaryTerminalAliasPairCount;
+            public int SourceBoundaryTerminalAliasChildCount;
+            public int SourceBoundaryTerminalAliasNormalizationFailureCount;
             public int SourceBoundaryDescendantCount;
             public int SourceBoundaryTerminalChildTransferCount;
             public int SourceBoundaryTerminalChildTransferredCount;
@@ -8811,6 +10829,7 @@ private readonly struct EdgeWearTopologyStats
             public int SourceBoundaryChildIncidenceFailureCount;
             public int SourceBoundaryDuplicateChildKeyFailureCount;
             public int SourceBoundaryDiagnosticsLogged;
+            public int SourceBoundaryDuplicateGroupDiagnosticsLogged;
             public int ExpectedSourceBoundaryEdgeCount;
             public int MatchedSourceBoundaryEdgeCount;
             public int ExpectedVertexBoundaryEdgeCount;
@@ -8863,6 +10882,20 @@ private readonly struct EdgeWearTopologyStats
             public int ActiveOpenRunCount;
             public int ActiveMultipleRunVertexCount;
             public int ActiveIsolatedEdgeRunCount;
+            public int PatchSourceVertexCount;
+            public int PatchBoundaryRecordCount;
+            public int PatchBoundaryRecordAssignedCount;
+            public int PatchBoundaryComponentCount;
+            public int PatchClosedLoopComponentCount;
+            public int PatchOpenChainComponentCount;
+            public int PatchSourceBoundaryResolvedChainCount;
+            public int PatchClosedSourceResolvedChainCount;
+            public int PatchUnresolvedOpenChainCount;
+            public int PatchZeroBoundaryActiveVertexCount;
+            public int PatchMultipleComponentVertexCount;
+            public int PatchComponentOrderingFailureCount;
+            public int PatchComponentProvenanceFailureCount;
+            public int ReadyForVertexPatchComponents;
             public int ReadyForVertexPatches;
 
             public string ToSummaryString()
@@ -8887,6 +10920,9 @@ private readonly struct EdgeWearTopologyStats
                     ", sourceBoundaryLoopRetraceChildrenRemoved=" + SourceBoundaryLoopRetraceChildCount +
                     ", normalizedSourceBoundaryDescendants=" + NormalizedSourceBoundaryDescendantCount +
                     ", sourceBoundaryLoopNormalizationFailures=" + SourceBoundaryLoopNormalizationFailureCount +
+                    ", sourceBoundaryTerminalAliasPairsCollapsed=" + SourceBoundaryTerminalAliasPairCount +
+                    ", sourceBoundaryTerminalAliasChildrenRemoved=" + SourceBoundaryTerminalAliasChildCount +
+                    ", sourceBoundaryTerminalAliasNormalizationFailures=" + SourceBoundaryTerminalAliasNormalizationFailureCount +
                     ", sourceBoundaryDescendants=" + SourceBoundaryDescendantCount +
                     ", sourceBoundaryTerminalChildren=" + SourceBoundaryTerminalChildTransferCount +
                     ", sourceBoundaryTerminalChildrenTransferred=" + SourceBoundaryTerminalChildTransferredCount +
@@ -8895,6 +10931,7 @@ private readonly struct EdgeWearTopologyStats
                     ", sourceBoundaryChildIncidenceFailures=" + SourceBoundaryChildIncidenceFailureCount +
                     ", sourceBoundaryDuplicateChildKeyFailures=" + SourceBoundaryDuplicateChildKeyFailureCount +
                     ", sourceBoundaryDiagnosticsLogged=" + SourceBoundaryDiagnosticsLogged +
+                    ", sourceBoundaryDuplicateGroupDiagnosticsLogged=" + SourceBoundaryDuplicateGroupDiagnosticsLogged +
                     ", expectedSourceBoundaryEdges=" + ExpectedSourceBoundaryEdgeCount +
                     ", matchedSourceBoundaryEdges=" + MatchedSourceBoundaryEdgeCount +
                     ", expectedVertexBoundaryEdges=" + ExpectedVertexBoundaryEdgeCount +
@@ -8947,6 +10984,20 @@ private readonly struct EdgeWearTopologyStats
                     ", activeOpenRuns=" + ActiveOpenRunCount +
                     ", activeMultipleRunVertices=" + ActiveMultipleRunVertexCount +
                     ", activeIsolatedEdgeRuns=" + ActiveIsolatedEdgeRunCount +
+                    ", patchSourceVertices=" + PatchSourceVertexCount +
+                    ", patchBoundaryRecords=" + PatchBoundaryRecordCount +
+                    ", patchBoundaryRecordsAssigned=" + PatchBoundaryRecordAssignedCount +
+                    ", patchBoundaryComponents=" + PatchBoundaryComponentCount +
+                    ", patchClosedLoopComponents=" + PatchClosedLoopComponentCount +
+                    ", patchOpenChainComponents=" + PatchOpenChainComponentCount +
+                    ", patchSourceBoundaryResolvedChains=" + PatchSourceBoundaryResolvedChainCount +
+                    ", patchClosedSourceResolvedChains=" + PatchClosedSourceResolvedChainCount +
+                    ", patchUnresolvedOpenChains=" + PatchUnresolvedOpenChainCount +
+                    ", patchZeroBoundaryActiveVertices=" + PatchZeroBoundaryActiveVertexCount +
+                    ", patchMultipleComponentVertices=" + PatchMultipleComponentVertexCount +
+                    ", patchComponentOrderingFailures=" + PatchComponentOrderingFailureCount +
+                    ", patchComponentProvenanceFailures=" + PatchComponentProvenanceFailureCount +
+                    ", readyForVertexPatchComponents=" + ReadyForVertexPatchComponents +
                     ", readyForVertexPatches=" + ReadyForVertexPatches;
             }
         }

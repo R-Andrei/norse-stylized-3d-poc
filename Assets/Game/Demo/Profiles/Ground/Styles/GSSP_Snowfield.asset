@@ -73,6 +73,7 @@ MonoBehaviour:
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
       paintedAccentFoldHeight: 0.12
+      paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
       paintedAccentFoldEndTaper: 0.65
     - kind: 20
@@ -84,15 +85,16 @@ MonoBehaviour:
       maskInfluence: 0.56
       direction: {x: 0.82, y: 0.36}
       seedOffset: 301
-      paintedAccentStrokeWidth: 0.05
-      paintedAccentStrokeDensity: 36.3
+      paintedAccentStrokeWidth: 0.03
+      paintedAccentStrokeDensity: 80
       paintedAccentStrokeLengthMin: 0.55
-      paintedAccentStrokeLengthMax: 2.08
+      paintedAccentStrokeLengthMax: 2
       paintedAccentStrokeFacingDirectionDegrees: 90
-      paintedAccentStrokeAngleJitterDegrees: 14.4
-      paintedAccentFoldHeight: 0.12
-      paintedAccentFoldIrregularity: 0.778
-      paintedAccentFoldEndTaper: 0.65
+      paintedAccentStrokeAngleJitterDegrees: 15
+      paintedAccentFoldHeight: 0.3
+      paintedAccentCrestCrownHeight: 0.02
+      paintedAccentFoldIrregularity: 0.888
+      paintedAccentFoldEndTaper: 0.4
   - id: snowfield.patchy
     displayName: Patchy
     materialControls:
@@ -151,6 +153,7 @@ MonoBehaviour:
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
       paintedAccentFoldHeight: 0.12
+      paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
       paintedAccentFoldEndTaper: 0.65
     - kind: 20
@@ -169,6 +172,7 @@ MonoBehaviour:
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
       paintedAccentFoldHeight: 0.018
+      paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
       paintedAccentFoldEndTaper: 0.65
   - id: snowfield.dirty_thawing
@@ -229,6 +233,7 @@ MonoBehaviour:
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
       paintedAccentFoldHeight: 0.018
+      paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
       paintedAccentFoldEndTaper: 0.65
   - id: snowfield.wind_scoured
@@ -289,6 +294,7 @@ MonoBehaviour:
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
       paintedAccentFoldHeight: 0.12
+      paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
       paintedAccentFoldEndTaper: 0.65
     - kind: 20
@@ -307,5 +313,6 @@ MonoBehaviour:
       paintedAccentStrokeFacingDirectionDegrees: 90
       paintedAccentStrokeAngleJitterDegrees: 18
       paintedAccentFoldHeight: 0.018
+      paintedAccentCrestCrownHeight: 0.02
       paintedAccentFoldIrregularity: 0.55
       paintedAccentFoldEndTaper: 0.65

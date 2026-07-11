@@ -40,6 +40,9 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(FoamFilmSourceId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamFilmSupportId, Texture2D.blackTexture);
             propertyBlock.SetTexture(
+                FoamVisualOccupancyId,
+                Texture2D.blackTexture);
+            propertyBlock.SetTexture(
                 FoamBirthDebugId,
                 ResolveBoundTexture(progressiveBirthDebugTexture));
             propertyBlock.SetTexture(FoamTopologyId, snapshot.Topology);
@@ -61,7 +64,10 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(
                 FoamInterpolationId,
                 snapshot.Interpolation);
-            propertyBlock.SetFloat(FoamRenderTravelMetresId, 0f);
+            propertyBlock.SetFloat(FoamRenderAdvectionSecondsId, 0f);
+            propertyBlock.SetFloat(
+                FoamFlowDirectionId,
+                river != null ? river.FlowDirection : 1f);
             propertyBlock.SetFloat(FoamGlobalStartId, snapshot.GlobalStart);
             propertyBlock.SetFloat(
                 FoamFieldLengthId,
@@ -104,6 +110,9 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamFilmSupportId,
                 ResolveBoundTexture(filmSupportTexture));
             propertyBlock.SetTexture(
+                FoamVisualOccupancyId,
+                ResolveBoundTexture(currentVisualOccupancy));
+            propertyBlock.SetTexture(
                 FoamBirthDebugId,
                 ResolveBoundTexture(progressiveBirthDebugTexture));
             propertyBlock.SetTexture(
@@ -137,7 +146,10 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamObstacleMinimumDownstreamFactorId,
                 river.FoamObstacleMinimumDownstreamFactor);
             propertyBlock.SetFloat(FoamInterpolationId, simulationInterpolation);
-            propertyBlock.SetFloat(FoamRenderTravelMetresId, foamRenderTravelMetres);
+            propertyBlock.SetFloat(
+                FoamRenderAdvectionSecondsId,
+                foamRenderAdvectionSeconds);
+            propertyBlock.SetFloat(FoamFlowDirectionId, river.FlowDirection);
             propertyBlock.SetFloat(FoamGlobalStartId, allocatedGlobalStart);
             propertyBlock.SetFloat(FoamFieldLengthId, Mathf.Max(0.001f, fieldLength));
             propertyBlock.SetColor(FoamColourId, river.FoamColour);
@@ -168,6 +180,9 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetTexture(FoamShapeMaskId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamFilmSourceId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamFilmSupportId, Texture2D.blackTexture);
+            propertyBlock.SetTexture(
+                FoamVisualOccupancyId,
+                Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamBirthDebugId, Texture2D.blackTexture);
             propertyBlock.SetTexture(FoamTopologyId, Texture2D.blackTexture);
             propertyBlock.SetTexture(
@@ -186,7 +201,8 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamObstacleMinimumDownstreamFactorId,
                 1f);
             propertyBlock.SetFloat(FoamInterpolationId, 1f);
-            propertyBlock.SetFloat(FoamRenderTravelMetresId, 0f);
+            propertyBlock.SetFloat(FoamRenderAdvectionSecondsId, 0f);
+            propertyBlock.SetFloat(FoamFlowDirectionId, 1f);
             propertyBlock.SetFloat(FoamGlobalStartId, 0f);
             propertyBlock.SetFloat(FoamFieldLengthId, 1f);
             propertyBlock.SetColor(FoamColourId, Color.clear);

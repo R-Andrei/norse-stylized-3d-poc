@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace ProgrammaticStylized3D.Rivers
 {
@@ -36,10 +37,13 @@ namespace ProgrammaticStylized3D.Rivers
                 computeShader.FindKernel("ResetTopologyMetrics");
             measureTopologyMetricsKernel =
                 computeShader.FindKernel("MeasureTopologyMetrics");
-            phaseCommitKernel = computeShader.FindKernel("CommitPhaseTransport");
+            resetTransportMetricsKernel =
+                computeShader.FindKernel("ResetTransportMetrics");
             simulateKernel = computeShader.FindKernel("SimulateFoam");
             buildFilmSourceKernel = computeShader.FindKernel("BuildFoamFilmSource");
             buildFilmSupportKernel = computeShader.FindKernel("BuildFoamFilmSupport");
+            advanceVisualOccupancyKernel =
+                computeShader.FindKernel("AdvanceFoamVisualOccupancy");
             evaluateShapeKernel = computeShader.FindKernel("EvaluateFoamShape");
             applyBoundaryKernel = computeShader.FindKernel("ApplyBoundary");
         }
@@ -72,9 +76,6 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamDebugAbsoluteLifeProbeActive",
                 isolatedLifeProbeAbsoluteAgingActive ? 1f : 0f);
-            computeShader.SetFloat(
-                "_FoamPhaseTransportMetres",
-                foamPhaseTransportMetres);
             computeShader.SetFloat(
                 "_FoamGlobalStart",
                 river.Domain.GlobalDistanceMinimum);
@@ -111,6 +112,15 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamMotionLaneScrollCells",
                 motionLaneScrollCells);
+            computeShader.SetFloat(
+                "_FoamTransportMetricFixedPointScale",
+                TransportMetricFixedPointScale);
+            computeShader.SetFloat(
+                "_FoamVisualOccupancyBuildTime",
+                river.FoamVisualOccupancyBuildTime);
+            computeShader.SetFloat(
+                "_FoamVisualOccupancyReleaseTime",
+                river.FoamVisualOccupancyReleaseTime);
 
             disturbanceRuntime ??=
                 GetComponent<StylizedRiverDisturbanceRuntime>();
@@ -241,6 +251,21 @@ namespace ProgrammaticStylized3D.Rivers
                 simulateKernel,
                 "_FoamStateWrite",
                 writeState);
+            if (transportMetricsBuffer != null)
+            {
+                computeShader.SetBuffer(
+                    simulateKernel,
+                    "_FoamTransportMetrics",
+                    transportMetricsBuffer);
+            }
+        }
+
+        private void ConfigureTransportSubstepDiagnostics(
+            bool captureMetrics)
+        {
+            computeShader.SetInt(
+                "_FoamTransportMetricsEnabled",
+                captureMetrics ? 1 : 0);
         }
 
         private void DispatchSimulation(int startX, int countX)
@@ -248,28 +273,29 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetInt("_FoamRangeStart", startX);
             computeShader.SetInt("_FoamRangeCount", countX);
 
-            // Patch 4.11C.5.4c removes the old predictor/corrector and
-            // compression transport path. Persistent material now follows one
-            // direct lifecycle pass across the requested range; base downstream
-            // movement is handled only by phase transport and integer commits.
+            // Patch 4.11C.5.16B combines conservative donor-cell advection and
+            // lifecycle aging in one pass. The caller may repeat this kernel for
+            // CFL-safe substeps; every pass reads one committed packed state and
+            // writes the next ping-pong state.
             Dispatch(simulateKernel, countX, fieldHeight);
         }
 
-        private void DispatchEvaluateShape()
+        private bool CanDispatchVisualShape()
         {
-            if (computeShader == null || currentState == null ||
-                shapeMaskTexture == null || filmSourceTexture == null ||
-                filmSupportTexture == null || boundaryTexture == null ||
-                obstacleExclusionTexture == null || topologyTexture == null ||
-                topologySourcesTexture == null || metricBuffer == null ||
-                buildFilmSourceKernel < 0 || buildFilmSupportKernel < 0 ||
-                evaluateShapeKernel < 0 || fieldWidth <= 0 ||
-                fieldHeight <= 0 || filmFieldWidth <= 0 ||
-                filmFieldHeight <= 0)
-            {
-                return;
-            }
+            return computeShader != null && currentState != null &&
+                shapeMaskTexture != null && filmSourceTexture != null &&
+                filmSupportTexture != null && currentVisualOccupancy != null &&
+                writeVisualOccupancy != null && boundaryTexture != null &&
+                obstacleExclusionTexture != null && topologyTexture != null &&
+                topologySourcesTexture != null && metricBuffer != null &&
+                buildFilmSourceKernel >= 0 && buildFilmSupportKernel >= 0 &&
+                advanceVisualOccupancyKernel >= 0 && evaluateShapeKernel >= 0 &&
+                fieldWidth > 0 && fieldHeight > 0 && filmFieldWidth > 0 &&
+                filmFieldHeight > 0;
+        }
 
+        private void ConfigureVisualShapeParameters(float deltaTime)
+        {
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
             computeShader.SetInts(
                 "_FoamFilmDimensions",
@@ -279,18 +305,40 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamTopologyDimensions",
                 structuralWidth,
                 structuralHeight);
+            computeShader.SetFloat("_FoamDeltaTime", Mathf.Max(0f, deltaTime));
             computeShader.SetFloat("_FoamValidLength", validFieldLength);
             computeShader.SetFloat(
                 "_FoamSimulationLength",
                 simulationFieldLength);
             computeShader.SetFloat("_FoamFieldLength", fieldLength);
-            computeShader.SetFloat(
-                "_FoamPhaseTransportMetres",
-                foamPhaseTransportMetres);
             computeShader.SetFloat("_FoamFlowDirection", river.FlowDirection);
+            computeShader.SetFloat(
+                "_FoamBaseDownstreamSpeed",
+                ResolveBaseFoamDownstreamSpeedMetresPerSecond());
+            computeShader.SetFloat(
+                "_FoamMaximumLateralSpeedRatio",
+                river.FoamMaximumLateralSpeedRatio);
+            computeShader.SetFloat(
+                "_FoamObstacleSlowdownStrength",
+                river.FoamObstacleSlowdownStrength);
+            computeShader.SetFloat(
+                "_FoamObstacleMinimumDownstreamFactor",
+                river.FoamObstacleMinimumDownstreamFactor);
+            computeShader.SetFloat(
+                "_FoamMotionLaneScrollCells",
+                motionLaneScrollCells);
+            computeShader.SetFloat(
+                "_FoamVisualOccupancyBuildTime",
+                river.FoamVisualOccupancyBuildTime);
+            computeShader.SetFloat(
+                "_FoamVisualOccupancyReleaseTime",
+                river.FoamVisualOccupancyReleaseTime);
             computeShader.SetInt("_FoamRangeStart", 0);
             computeShader.SetInt("_FoamRangeCount", fieldWidth);
+        }
 
+        private void DispatchBuildFilmProducts()
+        {
             using (BuildFilmSourceProfilerMarker.Auto())
             {
                 computeShader.SetBuffer(
@@ -346,7 +394,62 @@ namespace ProgrammaticStylized3D.Rivers
 
                 Dispatch(buildFilmSupportKernel, filmFieldWidth, filmFieldHeight);
             }
+        }
 
+        private void DispatchVisualOccupancySubstep(float deltaTime)
+        {
+            ConfigureVisualShapeParameters(deltaTime);
+            computeShader.SetBuffer(
+                advanceVisualOccupancyKernel,
+                "_FoamMetricRows",
+                metricBuffer);
+            computeShader.SetTexture(
+                advanceVisualOccupancyKernel,
+                "_FoamBoundary",
+                boundaryTexture);
+            computeShader.SetTexture(
+                advanceVisualOccupancyKernel,
+                "_FoamObstacleExclusionRead",
+                obstacleExclusionTexture);
+            computeShader.SetTexture(
+                advanceVisualOccupancyKernel,
+                "_FoamMotionLaneRead",
+                motionLaneTexture != null
+                    ? (Texture)motionLaneTexture
+                    : Texture2D.blackTexture);
+            computeShader.SetTexture(
+                advanceVisualOccupancyKernel,
+                "_FoamObstacleRoutingRead",
+                obstacleRoutingTexture != null
+                    ? (Texture)obstacleRoutingTexture
+                    : Texture2D.blackTexture);
+            computeShader.SetTexture(
+                advanceVisualOccupancyKernel,
+                "_FoamFilmSourceRead",
+                filmSourceTexture);
+            computeShader.SetTexture(
+                advanceVisualOccupancyKernel,
+                "_FoamFilmSupportRead",
+                filmSupportTexture);
+            computeShader.SetTexture(
+                advanceVisualOccupancyKernel,
+                "_FoamVisualOccupancyRead",
+                currentVisualOccupancy);
+            computeShader.SetTexture(
+                advanceVisualOccupancyKernel,
+                "_FoamVisualOccupancyWrite",
+                writeVisualOccupancy);
+
+            Dispatch(
+                advanceVisualOccupancyKernel,
+                filmFieldWidth,
+                filmFieldHeight);
+            (currentVisualOccupancy, writeVisualOccupancy) =
+                (writeVisualOccupancy, currentVisualOccupancy);
+        }
+
+        private void DispatchEvaluateShapeMask()
+        {
             using var profilerScope = EvaluateShapeProfilerMarker.Auto();
 
             computeShader.SetTexture(
@@ -363,12 +466,8 @@ namespace ProgrammaticStylized3D.Rivers
                 currentState);
             computeShader.SetTexture(
                 evaluateShapeKernel,
-                "_FoamFilmSourceRead",
-                filmSourceTexture);
-            computeShader.SetTexture(
-                evaluateShapeKernel,
-                "_FoamFilmSupportRead",
-                filmSupportTexture);
+                "_FoamVisualOccupancyRead",
+                currentVisualOccupancy);
             computeShader.SetTexture(
                 evaluateShapeKernel,
                 "_FoamShapeMaskWrite",
@@ -377,76 +476,197 @@ namespace ProgrammaticStylized3D.Rivers
             Dispatch(evaluateShapeKernel, fieldWidth, fieldHeight);
         }
 
-        private bool DispatchPhaseCommit(int committedCells)
+        private bool DispatchAdvanceVisualOccupancy(
+            float materialStepDuration,
+            int transportSubsteps)
         {
-            if (computeShader == null || currentState == null ||
-                writeState == null || boundaryTexture == null ||
-                obstacleExclusionTexture == null || phaseCommitKernel < 0 ||
-                fieldWidth <= 0 || fieldHeight <= 0 || committedCells == 0)
+            if (!CanDispatchVisualShape() || transportSubsteps <= 0)
             {
                 return false;
             }
 
-            computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
-            computeShader.SetFloat("_FoamValidLength", validFieldLength);
-            computeShader.SetFloat(
-                "_FoamSimulationLength",
-                simulationFieldLength);
-            computeShader.SetFloat("_FoamTime", river.MotionTime);
-            computeShader.SetInt("_FoamRangeStart", 0);
-            computeShader.SetInt("_FoamRangeCount", fieldWidth);
-            computeShader.SetInt("_FoamPhaseCommitCells", committedCells);
-            computeShader.SetFloat(
-                "_FoamPhaseTransportMetres",
-                foamPhaseTransportMetres);
-            computeShader.SetFloat(
-                "_FoamBaseDownstreamSpeed",
-                ResolveBaseFoamDownstreamSpeedMetresPerSecond());
-            computeShader.SetFloat(
-                "_FoamMaximumLateralSpeedRatio",
-                river.FoamMaximumLateralSpeedRatio);
-            computeShader.SetFloat(
-                "_FoamObstacleSlowdownStrength",
-                river.FoamObstacleSlowdownStrength);
-            computeShader.SetFloat(
-                "_FoamObstacleMinimumDownstreamFactor",
-                river.FoamObstacleMinimumDownstreamFactor);
-            computeShader.SetFloat(
-                "_FoamMotionLaneScrollCells",
-                motionLaneScrollCells);
-            computeShader.SetTexture(
-                phaseCommitKernel,
-                "_FoamBoundary",
-                boundaryTexture);
-            computeShader.SetTexture(
-                phaseCommitKernel,
-                "_FoamObstacleExclusionRead",
-                obstacleExclusionTexture);
-            computeShader.SetTexture(
-                phaseCommitKernel,
-                "_FoamMotionLaneRead",
-                motionLaneTexture != null
-                    ? (Texture)motionLaneTexture
-                    : Texture2D.blackTexture);
-            computeShader.SetTexture(
-                phaseCommitKernel,
-                "_FoamObstacleRoutingRead",
-                obstacleRoutingTexture != null
-                    ? (Texture)obstacleRoutingTexture
-                    : Texture2D.blackTexture);
-            computeShader.SetTexture(
-                phaseCommitKernel,
-                "_FoamStateRead",
-                currentState);
-            computeShader.SetTexture(
-                phaseCommitKernel,
-                "_FoamStateWrite",
-                writeState);
+            ConfigureVisualShapeParameters(materialStepDuration);
+            DispatchBuildFilmProducts();
 
-            previousState = currentState;
-            Dispatch(phaseCommitKernel, fieldWidth, fieldHeight);
-            (currentState, writeState) = (writeState, currentState);
+            float substepDelta = materialStepDuration /
+                Mathf.Max(1, transportSubsteps);
+            using (AdvanceVisualOccupancyProfilerMarker.Auto())
+            {
+                for (int substep = 0; substep < transportSubsteps; substep++)
+                {
+                    DispatchVisualOccupancySubstep(substepDelta);
+                }
+            }
+
+            DispatchEvaluateShapeMask();
             return true;
+        }
+
+        private void DispatchEvaluateShape()
+        {
+            if (!CanDispatchVisualShape())
+            {
+                return;
+            }
+
+            ConfigureVisualShapeParameters(0f);
+            DispatchBuildFilmProducts();
+            DispatchEvaluateShapeMask();
+        }
+
+        private bool BeginTransportMetricCapture()
+        {
+            if (computeShader == null || transportMetricsBuffer == null ||
+                resetTransportMetricsKernel < 0 ||
+                transportMetricsReadbackPending ||
+                !SystemInfo.supportsAsyncGPUReadback)
+            {
+                return false;
+            }
+
+            computeShader.SetBuffer(
+                resetTransportMetricsKernel,
+                "_FoamTransportMetrics",
+                transportMetricsBuffer);
+            DispatchOneDimensional(
+                resetTransportMetricsKernel,
+                TransportMetricCount,
+                64);
+            return true;
+        }
+
+        private void RequestTransportMetricReadback()
+        {
+            if (transportMetricsBuffer == null ||
+                transportMetricsReadbackPending)
+            {
+                return;
+            }
+
+            if (!SystemInfo.supportsAsyncGPUReadback)
+            {
+                // Diagnostics must never introduce a synchronous GPU wait into
+                // operational material transport. Unsupported platforms simply
+                // omit conservation readback while retaining the same solve.
+                transportMetricsAvailable = false;
+                return;
+            }
+
+            transportMetricsReadbackPending = true;
+            transportMetricsReadbackRequestedAt =
+                Time.realtimeSinceStartupAsDouble;
+            int generation = transportMetricsGeneration;
+            ComputeBuffer requestedBuffer = transportMetricsBuffer;
+            AsyncGPUReadback.Request(
+                requestedBuffer,
+                request =>
+                {
+                    if (this == null || generation != transportMetricsGeneration)
+                    {
+                        requestedBuffer?.Release();
+                        return;
+                    }
+
+                    transportMetricsReadbackPending = false;
+                    transportMetricsReadbackRequestedAt = -1.0;
+                    if (request.hasError)
+                    {
+                        transportMetricsAvailable = false;
+                        return;
+                    }
+
+                    var data = request.GetData<uint>();
+                    int count = Mathf.Min(data.Length, TransportMetricCount);
+                    for (int index = 0; index < count; index++)
+                    {
+                        latestTransportMetrics[index] = data[index];
+                    }
+
+                    if (count == TransportMetricCount)
+                    {
+                        ApplyTransportMetricReadback(latestTransportMetrics);
+                    }
+                });
+        }
+
+        private void ApplyTransportMetricReadback(uint[] values)
+        {
+            if (values == null || values.Length < TransportMetricCount)
+            {
+                transportMetricsAvailable = false;
+                return;
+            }
+
+            float inverseScale = 1f / TransportMetricFixedPointScale;
+            transportPresenceBefore = values[0] * inverseScale;
+            transportLifeMomentBefore = values[1] * inverseScale;
+            transportPatternMomentBefore = values[2] * inverseScale;
+            transportPresenceAfter = values[3] * inverseScale;
+            transportLifeMomentAfter = values[4] * inverseScale;
+            transportPatternMomentAfter = values[5] * inverseScale;
+            transportPresenceBoundaryOutflow = values[6] * inverseScale;
+            transportLifeBoundaryOutflow = values[7] * inverseScale;
+            transportPatternBoundaryOutflow = values[8] * inverseScale;
+            transportPresenceClampLoss = values[9] * inverseScale;
+            transportLifeClampLoss = values[10] * inverseScale;
+            transportPatternClampLoss = values[11] * inverseScale;
+
+            transportPresenceUnaccountedError =
+                transportPresenceBefore - transportPresenceAfter -
+                transportPresenceBoundaryOutflow -
+                transportPresenceClampLoss;
+            transportLifeUnaccountedError =
+                transportLifeMomentBefore - transportLifeMomentAfter -
+                transportLifeBoundaryOutflow - transportLifeClampLoss;
+            transportPatternUnaccountedError =
+                transportPatternMomentBefore - transportPatternMomentAfter -
+                transportPatternBoundaryOutflow - transportPatternClampLoss;
+
+            transportPresenceUnaccountedErrorRatio = ResolveTransportErrorRatio(
+                transportPresenceUnaccountedError,
+                transportPresenceBefore);
+            transportLifeUnaccountedErrorRatio = ResolveTransportErrorRatio(
+                transportLifeUnaccountedError,
+                transportLifeMomentBefore);
+            transportPatternUnaccountedErrorRatio = ResolveTransportErrorRatio(
+                transportPatternUnaccountedError,
+                transportPatternMomentBefore);
+            transportPresenceClampLossRatio = ResolveTransportErrorRatio(
+                transportPresenceClampLoss,
+                transportPresenceBefore);
+            transportMetricsAvailable = true;
+            transportMetricsLastCompletedAt =
+                Time.realtimeSinceStartupAsDouble;
+        }
+
+        private static float ResolveTransportErrorRatio(
+            float error,
+            float reference)
+        {
+            return Mathf.Abs(error) / Mathf.Max(0.000001f, Mathf.Abs(reference));
+        }
+
+        private void ResetTransportMetricValues()
+        {
+            transportPresenceBefore = 0f;
+            transportPresenceAfter = 0f;
+            transportLifeMomentBefore = 0f;
+            transportLifeMomentAfter = 0f;
+            transportPatternMomentBefore = 0f;
+            transportPatternMomentAfter = 0f;
+            transportPresenceBoundaryOutflow = 0f;
+            transportLifeBoundaryOutflow = 0f;
+            transportPatternBoundaryOutflow = 0f;
+            transportPresenceClampLoss = 0f;
+            transportLifeClampLoss = 0f;
+            transportPatternClampLoss = 0f;
+            transportPresenceUnaccountedError = 0f;
+            transportLifeUnaccountedError = 0f;
+            transportPatternUnaccountedError = 0f;
+            transportPresenceUnaccountedErrorRatio = 0f;
+            transportLifeUnaccountedErrorRatio = 0f;
+            transportPatternUnaccountedErrorRatio = 0f;
+            transportPresenceClampLossRatio = 0f;
         }
 
         private void DispatchClear(RenderTexture target, int startX, int countX)

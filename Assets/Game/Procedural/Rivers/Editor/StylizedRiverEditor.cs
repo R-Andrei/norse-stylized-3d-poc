@@ -1768,7 +1768,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam Shader Detail Probe",
                 "Foam Shader Detail Difference",
                 "Foam Film Source",
-                "Foam Film Support"
+                "Foam Film Support",
+                "Foam Instantaneous Film Target",
+                "Foam Temporal Occupancy",
+                "Foam Temporal Difference"
             };
             int[] foamDebugValues =
             {
@@ -1784,7 +1787,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.FoamShaderDetailProbe,
                 (int)StylizedRiverFoamDebugView.FoamShaderDetailDifference,
                 (int)StylizedRiverFoamDebugView.FoamFilmSource,
-                (int)StylizedRiverFoamDebugView.FoamFilmSupport
+                (int)StylizedRiverFoamDebugView.FoamFilmSupport,
+                (int)StylizedRiverFoamDebugView.FoamFilmTarget,
+                (int)StylizedRiverFoamDebugView.FoamTemporalOccupancy,
+                (int)StylizedRiverFoamDebugView.FoamTemporalDifference
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -1835,17 +1841,17 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("foamMaterialFlowSpeedMultiplier"),
                 new GUIContent(
                     "Downstream Speed Ratio",
-                    "Base persistent-Foam speed relative to the authored river Flow Speed. This remains the current global downstream phase speed and is also the base speed for the unified velocity contract."));
+                    "Base persistent-Foam speed relative to the authored river Flow Speed. Conservative Layer C transport resolves this speed locally with obstacle slowdown and the signed lateral route field."));
             EditorGUILayout.PropertyField(
                 Find("foamMotionFieldStrength"),
                 new GUIContent(
                     "Maximum Lateral Speed Ratio",
-                    "Maximum signed lateral speed relative to base downstream Foam speed. The current patch validates this physical velocity contract; conservative 2D material transport will consume it in the next movement patch."));
+                    "Maximum signed lateral speed relative to base downstream Foam speed. Conservative Layer C transport uses this local velocity directly; zero disables persistent lateral relocation."));
             EditorGUILayout.PropertyField(
                 Find("foamMotionFieldScrollHz"),
                 new GUIContent(
                     "Lane Advection Ratio",
-                    "Downstream speed of the generated lane pattern relative to base Foam speed. Zero fixes routes in river space; one advects them at the base Foam speed. This is physical sample-phase motion, not wraps per second."));
+                    "Downstream speed of the generated lane pattern relative to base Foam speed. Zero fixes routes in river space; one advects them at the base Foam speed. This is physical sample-phase motion, not wraps per second or a texture rebuild. Slow values around 0.03-0.08 are recommended; 0.05 is the initial validation target."));
             EditorGUILayout.PropertyField(
                 Find("foamMotionFieldLaneScale"),
                 new GUIContent(
@@ -1881,7 +1887,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUILayout.LabelField(
                 "Transport Mode",
-                "Current material: global downstream phase; unified 2D velocity contract is validated but not yet the material authority");
+                "Conservative local 2D donor-cell advection (packed state)");
             EditorGUILayout.LabelField(
                 "Resolved Speed",
                 $"downstream {runtime.FoamBaseDownstreamSpeedMetresPerSecond:0.000} m/s / max lateral {runtime.FoamMaximumLateralSpeedMetresPerSecond:0.000} m/s");
@@ -1889,14 +1895,52 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Lane Phase",
                 $"{runtime.FoamMotionLaneScrollMetres:0.000} m / {runtime.FoamMotionLaneScrollCells:0.00} cells / lane sig {runtime.FoamMotionLaneSignature} / obstacle sig {runtime.FoamObstacleRoutingSignature}");
             EditorGUILayout.LabelField(
-                "Phase",
-                $"{runtime.FoamPhaseCellFraction:0.00} cell / {runtime.FoamPhaseTransportMetres:0.000} m");
-            EditorGUILayout.LabelField(
-                "Committed Cells",
-                $"{runtime.PhaseCommitCellsLastFrame} last frame / {runtime.PhaseCommitCellsLastSecond} last second");
-            EditorGUILayout.LabelField(
                 "Material Tick",
-                $"{runtime.UpdateRate:0.#} Hz / {runtime.MaterialStepsLastFrame} steps last frame");
+                $"{runtime.UpdateRate:0.#} Hz / {runtime.MaterialStepsLastFrame} steps last frame / residual {runtime.RenderAdvectionSeconds:0.0000} s");
+            EditorGUILayout.LabelField(
+                "CFL",
+                $"step {runtime.TransportStepCfl:0.000} / max substep {runtime.MaximumTransportCfl:0.000} (target {runtime.TransportCflTarget:0.000})");
+            EditorGUILayout.LabelField(
+                "Substeps",
+                $"{runtime.TransportSubstepsUsed} used / {runtime.TransportSubstepsRequired} required / limit {runtime.TransportSubstepLimit}");
+            EditorGUILayout.LabelField(
+                "Cell Travel",
+                $"downstream {runtime.EstimatedTransportCellsPerStep:0.000} / lateral {runtime.EstimatedLateralTransportCellsPerStep:0.000} cells per material step");
+
+            if (runtime.TransportMetricsAvailable)
+            {
+                EditorGUILayout.LabelField(
+                    "Presence Accounting",
+                    $"{runtime.TransportPresenceBefore:0.0000} → {runtime.TransportPresenceAfter:0.0000} / out {runtime.TransportPresenceBoundaryOutflow:0.0000}");
+                EditorGUILayout.LabelField(
+                    "Life Moment Accounting",
+                    $"{runtime.TransportLifeMomentBefore:0.0000} → {runtime.TransportLifeMomentAfter:0.0000} / out {runtime.TransportLifeBoundaryOutflow:0.0000}");
+                EditorGUILayout.LabelField(
+                    "Pattern Moment Accounting",
+                    $"{runtime.TransportPatternMomentBefore:0.0000} → {runtime.TransportPatternMomentAfter:0.0000} / out {runtime.TransportPatternBoundaryOutflow:0.0000}");
+                EditorGUILayout.LabelField(
+                    "Unaccounted Error",
+                    $"P {runtime.TransportPresenceUnaccountedErrorRatio * 100f:0.000}% / Life {runtime.TransportLifeUnaccountedErrorRatio * 100f:0.000}% / Pattern {runtime.TransportPatternUnaccountedErrorRatio * 100f:0.000}%");
+                EditorGUILayout.LabelField(
+                    "Clamp Loss",
+                    $"P {runtime.TransportPresenceClampLoss:0.000000} / Life {runtime.TransportLifeClampLoss:0.000000} / Pattern {runtime.TransportPatternClampLoss:0.000000} ({runtime.TransportPresenceClampLossRatio * 100f:0.000}% P)");
+            }
+            else
+            {
+                EditorGUILayout.LabelField(
+                    "Presence Accounting",
+                    runtime.TransportMetricsSupported
+                        ? "Awaiting asynchronous transport metric readback"
+                        : "Unavailable: asynchronous GPU readback unsupported");
+                EditorGUILayout.LabelField("Life Moment Accounting", "—");
+                EditorGUILayout.LabelField("Pattern Moment Accounting", "—");
+                EditorGUILayout.LabelField("Unaccounted Error", "—");
+                EditorGUILayout.LabelField("Clamp Loss", "—");
+            }
+
+            EditorGUILayout.LabelField(
+                "Safety",
+                runtime.TransportSafetyStatus);
             EditorGUILayout.LabelField(
                 "Status",
                 ResolveFoamTransportSmoothnessStatus(runtime));
@@ -2044,7 +2088,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Foam Shader Detail Probe",
                 "Foam Shader Detail Difference",
                 "Foam Film Source",
-                "Foam Film Support"
+                "Foam Film Support",
+                "Foam Instantaneous Film Target",
+                "Foam Temporal Occupancy",
+                "Foam Temporal Difference"
             };
             int[] foamDebugValues =
             {
@@ -2060,7 +2107,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 (int)StylizedRiverFoamDebugView.FoamShaderDetailProbe,
                 (int)StylizedRiverFoamDebugView.FoamShaderDetailDifference,
                 (int)StylizedRiverFoamDebugView.FoamFilmSource,
-                (int)StylizedRiverFoamDebugView.FoamFilmSupport
+                (int)StylizedRiverFoamDebugView.FoamFilmSupport,
+                (int)StylizedRiverFoamDebugView.FoamFilmTarget,
+                (int)StylizedRiverFoamDebugView.FoamTemporalOccupancy,
+                (int)StylizedRiverFoamDebugView.FoamTemporalDifference
             };
             int currentDebugIndex = System.Array.IndexOf(
                 foamDebugValues,
@@ -2959,6 +3009,17 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             EditorGUI.indentLevel++;
 
+            EditorGUILayout.PropertyField(
+                Find("foamVisualOccupancyBuildTime"),
+                new GUIContent(
+                    "Visual Occupancy Build Time",
+                    "Seconds for the advected Layer D visual sheet to acquire newly supported Film Source / Film Support coverage. This does not create persistent material or change Remaining Life."));
+            EditorGUILayout.PropertyField(
+                Find("foamVisualOccupancyReleaseTime"),
+                new GUIContent(
+                    "Visual Occupancy Release Time",
+                    "Seconds for unsupported Layer D visual occupancy to release toward the current instantaneous film target. This visual persistence does not extend material lifetime."));
+
             if (runtime == null)
             {
                 EditorGUILayout.LabelField("Runtime", "Unavailable");
@@ -2978,8 +3039,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Perimeter Ratio",
                 FormatPercent(runtime.PerimeterRatio));
             EditorGUILayout.LabelField(
+                "Temporal Sheet",
+                runtime.VisualOccupancyAvailable
+                    ? "Half-resolution advected occupancy active in Layer D diagnostics"
+                    : "Unavailable");
+            EditorGUILayout.LabelField(
                 "Known Shape Issue",
-                "Not just a simple line/ribbon now; morphing, breakup, lateral drift, and obstacle interaction remain unsolved");
+                "Temporal sheet is infrastructure only; persistent macro pinching/fracture remains the next Layer D feature");
 
             if (runtime.ManualProofReferenceAvailable &&
                 (runtime.ManualProofPresenceRatio > 1.25f ||
@@ -3106,24 +3172,37 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 return "No Foam material";
             }
+            if (runtime.TransportSafetyLimitExceeded)
+            {
+                return "Transport blocked by CFL safety limit";
+            }
+            if (runtime.MaximumTransportCfl >
+                runtime.TransportCflTarget + 0.0001f)
+            {
+                return "CFL target exceeded";
+            }
+            if (runtime.TransportMetricsAvailable &&
+                (runtime.TransportPresenceUnaccountedErrorRatio >
+                    runtime.TransportConservationErrorGateRatio ||
+                 runtime.TransportLifeUnaccountedErrorRatio >
+                    runtime.TransportConservationErrorGateRatio ||
+                 runtime.TransportPatternUnaccountedErrorRatio >
+                    runtime.TransportConservationErrorGateRatio))
+            {
+                return "Conservation error exceeds 0.25% gate";
+            }
+            if (runtime.TransportMetricsAvailable &&
+                runtime.TransportPresenceClampLossRatio >
+                    runtime.TransportClampLossGateRatio)
+            {
+                return "Clamp loss exceeds 0.10% gate";
+            }
             if (runtime.MaterialStepsLastFrame > 1)
             {
                 return "Simulation burst detected";
             }
-            if (runtime.EstimatedTransportCellsPerStep > 1.25f)
-            {
-                return "Phase cells per material step high";
-            }
-            if (runtime.PhaseCommitCellsLastFrame > 0)
-            {
-                return "Integer phase commit this frame";
-            }
-            if (runtime.FoamPhaseCellFraction > 0.01f)
-            {
-                return "Phase transport active";
-            }
 
-            return "No high-level transport warning";
+            return "Conservative transport within displayed gates";
         }
 
         private static string ResolveFoamLikelyProblem(
@@ -3138,7 +3217,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 return "Open Runtime";
             }
             if (runtime.MaterialStepsLastFrame > 1 ||
-                runtime.EstimatedTransportCellsPerStep > 1.25f)
+                runtime.TransportSafetyLimitExceeded ||
+                runtime.MaximumTransportCfl >
+                    runtime.TransportCflTarget + 0.0001f)
             {
                 return "Open Material Motion";
             }
@@ -3747,7 +3828,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 case StylizedRiverFoamDebugView.Final:
                     return
-                        "The exact normal player-facing Foam result after transport, topology-adjusted Remaining Life, valid-fluid clipping, temporal interpolation, lighting, and the final transported Presence coverage. No diagnostic substitution is active.";
+                        "The exact normal player-facing Foam result after conservative transport, topology-adjusted Remaining Life, valid-fluid clipping, bounded render-only residual prediction, lighting, and final Presence coverage. Residual prediction fades out in obstacle-routing regions where closed transport faces cannot be predicted safely.";
 
                 case StylizedRiverFoamDebugView.FoamAndAgingTopology:
                     return
@@ -3759,23 +3840,23 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.MaterialPresence:
                     return
-                        "Raw persistent material Presence sampled through the same storage coordinate path used by normal Foam rendering. White means stored Foam coverage exists before beauty-mask breakup.";
+                        "Raw committed persistent material Presence sampled directly from the current Layer C texture at the unshifted field coordinate. White means stored Foam coverage exists before render-only residual prediction, surface warp, or beauty-mask breakup.";
 
                 case StylizedRiverFoamDebugView.MaterialRemainingLife:
                     return
-                        "Raw normalized Remaining Life from the persistent material texture. This ignores beauty colour and shows whether cells actually age independently.";
+                        "Raw normalized Remaining Life decoded directly from the committed current Layer C texture. It ignores render-only residual prediction and beauty colour so per-cell aging remains authoritative and readable.";
 
                 case StylizedRiverFoamDebugView.FoamMotionField:
                     return
-                        "Unified resolved Foam velocity contract. Bright neutral gray is straight full-speed downstream motion, red is rightward lateral velocity, blue is leftward lateral velocity, darker values are downstream slowdown/stagnation, and yellow marks obstacle-routing influence. Semi-transparent white overlays raw stored Foam Presence. This view validates velocity only; conservative 2D material transport is not active yet.";
+                        "Unified resolved Foam velocity contract. Bright neutral gray is straight full-speed downstream motion, red is rightward lateral velocity, blue is leftward lateral velocity, darker values are downstream slowdown/stagnation, and yellow marks obstacle-routing influence. Semi-transparent white overlays committed Layer C Presence without render-only residual displacement.";
 
                 case StylizedRiverFoamDebugView.FoamMotionFieldCellGrid:
                     return
-                        "Unified resolved Foam velocity contract plus the persistent simulation-cell grid. Brightness shows downstream speed factor, red/blue show signed lateral velocity, yellow shows obstacle routing, and white overlays raw stored Foam Presence. Fine dark lines show individual Foam cells; pale lines show eight-cell blocks. This validates velocity only; conservative 2D material transport is not active yet.";
+                        "Unified resolved Foam velocity contract plus the committed persistent simulation-cell grid. Brightness shows downstream speed factor, red/blue show signed lateral velocity, yellow shows obstacle routing, and white overlays committed Layer C Presence. Fine dark lines show individual Foam cells; pale lines show eight-cell blocks. Neither overlay nor grid follows render-only residual displacement.";
 
                 case StylizedRiverFoamDebugView.FoamEvaluatedShape:
                     return
-                        "Layer D evaluated Foam Shape product sampled from _FoamShapeMask. After 4.11C.5.11B this is intentionally reset to clipped raw Persistent Presence as a clean baseline; the 5.11 Layer D local-breakup probe was retired because it exposed cell/ribbon artifacts. It is not Final Foam and not a separate material truth.";
+                        "Layer D evaluated Foam Shape sampled from _FoamShapeMask. It combines committed persistent Presence with the advected temporal visual occupancy sheet. It is diagnostic-only, does not mutate FoamState, and is not yet consumed by Final Foam.";
 
                 case StylizedRiverFoamDebugView.FoamShapeDifference:
                     return
@@ -3796,6 +3877,18 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 case StylizedRiverFoamDebugView.FoamFilmSupport:
                     return
                         "Layer D half-resolution Film Support diagnostic after directional spread. It spreads material-derived Film Source; external support/contact fields may bias or suppress spread but cannot seed visual film from zero. It does not mutate persistent material.";
+
+                case StylizedRiverFoamDebugView.FoamFilmTarget:
+                    return
+                        "Instantaneous half-resolution Layer D target derived from Film Source and Film Support before temporal memory. Compare this against Temporal Occupancy to see acquisition and release lag.";
+
+                case StylizedRiverFoamDebugView.FoamTemporalOccupancy:
+                    return
+                        "The advected half-resolution Layer D visual sheet. It moves through the canonical local velocity and closed-face rules, then builds/releases toward the instantaneous film target. It is visual-only and never changes Presence or Remaining Life.";
+
+                case StylizedRiverFoamDebugView.FoamTemporalDifference:
+                    return
+                        "Temporal occupancy difference. Green is visual coverage retained beyond the current instantaneous target; magenta is target coverage not yet acquired. Black means temporal occupancy and the instantaneous target agree.";
 
                 default:
                     return

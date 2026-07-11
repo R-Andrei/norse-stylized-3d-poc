@@ -19,6 +19,7 @@ namespace ProgrammaticStylized3D.Rivers
                     fieldLength,
                     fieldWidth);
             minimumTransportLongitudinalSpacing = longitudinalSpacing;
+            minimumTransportLateralSpacing = float.PositiveInfinity;
             float curvatureSampleDistance = Mathf.Max(
                 0.5f,
                 longitudinalSpacing * 2f);
@@ -44,6 +45,9 @@ namespace ProgrammaticStylized3D.Rivers
                     StylizedRiverFoamTopologyFieldSpace.TexelSpacing(
                         left + right,
                         fieldHeight);
+                minimumTransportLateralSpacing = Mathf.Min(
+                    minimumTransportLateralSpacing,
+                    minimumLateralSpacing);
 
                 float previousGlobal = Mathf.Max(
                     river.Domain.GlobalDistanceMinimum,
@@ -108,6 +112,11 @@ namespace ProgrammaticStylized3D.Rivers
                 Marshal.SizeOf<FoamMetricRow>(),
                 ComputeBufferType.Structured);
             metricBuffer.SetData(metricRows);
+            if (float.IsInfinity(minimumTransportLateralSpacing) ||
+                float.IsNaN(minimumTransportLateralSpacing))
+            {
+                minimumTransportLateralSpacing = 0f;
+            }
         }
 
         private void BuildMajorTopology()
@@ -783,9 +792,6 @@ namespace ProgrammaticStylized3D.Rivers
                 structuralHeight);
             computeShader.SetFloat("_FoamValidLength", validFieldLength);
             computeShader.SetFloat("_FoamFieldLength", fieldLength);
-            computeShader.SetFloat(
-                "_FoamPhaseTransportMetres",
-                foamPhaseTransportMetres);
             computeShader.SetFloat(
                 "_FoamPositiveAgeMultiplier",
                 river != null ? river.FoamSupportedAgingRate : 1f);

@@ -37,11 +37,10 @@ namespace ProgrammaticStylized3D.Rivers
                     _ => MediumMaterialTemporalUpdateRate
                 };
 
-            // Patch 4.11C.5.2d removed base downstream movement from the
-            // fractional transport solve. Material cadence now owns lifecycle,
-            // source transfer, topology aging, and disturbance deformation;
-            // base flow speed is handled by phase transport and whole-cell
-            // commits, so it must not raise the material update rate.
+            // Material cadence remains the accepted Low/Medium/High
+            // 8/12/16 Hz contract. Conservative transport derives CFL-safe
+            // substeps inside each material tick rather than changing the
+            // authored simulation cadence.
             return qualityRate;
         }
 
@@ -57,12 +56,6 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.Abs(river.FlowSpeedMetresPerSecond) *
                 river.LiquidFactor *
                 river.FoamDownstreamSpeedRatio);
-        }
-
-        private float ResolveSignedBaseFoamDownstreamSpeedMetresPerSecond()
-        {
-            return ResolveBaseFoamDownstreamSpeedMetresPerSecond() *
-                (river != null ? river.FlowDirection : 1f);
         }
 
         private int GlobalDistanceToX(float globalDistance)
@@ -86,7 +79,6 @@ namespace ProgrammaticStylized3D.Rivers
             automaticShoreBirthSubmittedLastUpdate = 0;
             automaticShoreBirthRejectedLastUpdate = 0;
             automaticSourceEventsRasterizedLastUpdate = 0;
-            lastPhaseCommitCellsThisFrame = 0;
         }
 
         private void UpdateRecentPeaks()

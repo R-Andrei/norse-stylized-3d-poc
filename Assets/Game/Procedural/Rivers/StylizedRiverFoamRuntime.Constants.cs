@@ -160,9 +160,8 @@ namespace ProgrammaticStylized3D.Rivers
         // Patch 4.11C.5 keeps Foam material work at a deliberate animation
         // cadence. Layer C owns durable persistent material: stored Presence,
         // Remaining Life, Material Pattern, explicit birth/death, and
-        // downstream phase transport. External motion/support fields are
-        // Layer B inputs/debug/future routing data; they do not currently move
-        // persistent material laterally.
+        // conservative local 2D advection driven by the canonical velocity.
+        // Layer B supplies motion/support inputs; Layer D remains visual-only.
         private const float MaterialContourSharpness = 0.78f;
         private const float LowMaterialTemporalUpdateRate = 8f;
         private const float MediumMaterialTemporalUpdateRate = 12f;
@@ -212,6 +211,13 @@ namespace ProgrammaticStylized3D.Rivers
         private const float AutomaticShoreBirthShapeSeedSalt = 521.909f;
         private const float PresenceMetricThreshold = 0.16432f;
         private const float IntegratedAreaFixedPointScale = 4096f;
+        private const int TransportMetricCount = 12;
+        private const float TransportMetricFixedPointScale = 4096f;
+        private const float TransportMetricsUpdateRate = 4f;
+        private const float TransportTargetCfl = 0.90f;
+        private const int MaximumTransportSubsteps = 64;
+        private const float TransportConservationErrorGate = 0.0025f;
+        private const float TransportClampLossGate = 0.0010f;
 
         private enum TopologyCacheStartupResolution
         {
@@ -436,6 +442,8 @@ namespace ProgrammaticStylized3D.Rivers
             new ProfilerMarker("RiverFoam.Shape.BuildFilmSource");
         private static readonly ProfilerMarker BuildFilmSupportProfilerMarker =
             new ProfilerMarker("RiverFoam.Shape.BuildFilmSupport");
+        private static readonly ProfilerMarker AdvanceVisualOccupancyProfilerMarker =
+            new ProfilerMarker("RiverFoam.Shape.AdvanceVisualOccupancy");
         private static readonly ProfilerMarker RasterizeAutomaticSourceProfilerMarker =
             new ProfilerMarker("RiverFoam.Source.RasterizeAutomatic");
 
@@ -451,6 +459,8 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamFilmSource");
         private static readonly int FoamFilmSupportId =
             Shader.PropertyToID("_FoamFilmSupport");
+        private static readonly int FoamVisualOccupancyId =
+            Shader.PropertyToID("_FoamVisualOccupancy");
         private static readonly int FoamBirthDebugId =
             Shader.PropertyToID("_FoamBirthDebug");
         private static readonly int FoamTopologyId =
@@ -475,8 +485,10 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamObstacleMinimumDownstreamFactor");
         private static readonly int FoamInterpolationId =
             Shader.PropertyToID("_FoamInterpolation");
-        private static readonly int FoamRenderTravelMetresId =
-            Shader.PropertyToID("_FoamRenderTravelMetres");
+        private static readonly int FoamRenderAdvectionSecondsId =
+            Shader.PropertyToID("_FoamRenderAdvectionSeconds");
+        private static readonly int FoamFlowDirectionId =
+            Shader.PropertyToID("_FoamFlowDirection");
         private static readonly int FoamGlobalStartId =
             Shader.PropertyToID("_FoamGlobalStart");
         private static readonly int FoamFieldLengthId =

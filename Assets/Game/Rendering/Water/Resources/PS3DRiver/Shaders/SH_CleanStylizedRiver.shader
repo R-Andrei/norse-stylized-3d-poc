@@ -88,6 +88,7 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamShapeMask("Foam Shape Mask", 2D) = "black" {}
         [HideInInspector] _FoamFilmSource("Foam Film Source", 2D) = "black" {}
         [HideInInspector] _FoamFilmSupport("Foam Film Support", 2D) = "black" {}
+        [HideInInspector] _FoamVisualOccupancy("Foam Visual Occupancy", 2D) = "black" {}
         [HideInInspector] _FoamBirthDebug("Foam Progressive Birth Debug", 2D) = "black" {}
         [HideInInspector] _FoamTopology("Foam Topology", 2D) = "black" {}
         [HideInInspector] _FoamTopologySources("Foam Topology Sources", 2D) = "black" {}
@@ -100,7 +101,8 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamObstacleSlowdownStrength("Foam Obstacle Slowdown Strength", Float) = 0.85
         [HideInInspector] _FoamObstacleMinimumDownstreamFactor("Foam Obstacle Minimum Downstream Factor", Float) = 0.12
         [HideInInspector] _FoamInterpolation("Foam Interpolation", Range(0, 1)) = 1
-        [HideInInspector] _FoamRenderTravelMetres("Foam Render Travel Metres", Float) = 0
+        [HideInInspector] _FoamRenderAdvectionSeconds("Foam Render Advection Seconds", Float) = 0
+        [HideInInspector] _FoamFlowDirection("Foam Flow Direction", Float) = 1
         [HideInInspector] _FoamGlobalStart("Foam Global Start", Float) = 0
         [HideInInspector] _FoamFieldLength("Foam Field Length", Float) = 1
         [HideInInspector] _FoamColour("Foam Colour", Color) = (0.94, 0.97, 0.94, 1)
@@ -249,7 +251,8 @@ Shader "PS3D/Stylized River Water"
 
                 float _FoamEnabled;
                 float _FoamInterpolation;
-                float _FoamRenderTravelMetres;
+                float _FoamRenderAdvectionSeconds;
+                float _FoamFlowDirection;
                 float _FoamGlobalStart;
                 float _FoamFieldLength;
                 half4 _FoamColour;
@@ -293,6 +296,7 @@ Shader "PS3D/Stylized River Water"
             TEXTURE2D(_FoamShapeMask);
             TEXTURE2D(_FoamFilmSource);
             TEXTURE2D(_FoamFilmSupport);
+            TEXTURE2D(_FoamVisualOccupancy);
             TEXTURE2D(_FoamBirthDebug);
             // Topology diagnostics reuse sampler_FoamCurrent, which is already
             // allocated by the normal Foam path, so no extra fragment sampler
@@ -302,6 +306,87 @@ Shader "PS3D/Stylized River Water"
             TEXTURE2D(_FoamObstacleExclusion);
             TEXTURE2D(_FoamMotionLane);
             TEXTURE2D(_FoamObstacleRouting);
+
+            float4 SampleCommittedFoamState(float2 fieldUV)
+            {
+                return SAMPLE_TEXTURE2D_LOD(
+                    _FoamCurrent,
+                    sampler_FoamCurrent,
+                    saturate(fieldUV),
+                    0.0);
+            }
+
+            RiverWaterFoamResolvedVelocity ResolveRenderedFoamVelocity(
+                float2 fieldUV)
+            {
+                int2 laneDimensions = int2(
+                    max(1.0, _FoamMotionLane_TexelSize.z),
+                    max(1.0, _FoamMotionLane_TexelSize.w));
+                int2 routingDimensions = int2(
+                    max(1.0, _FoamObstacleRouting_TexelSize.z),
+                    max(1.0, _FoamObstacleRouting_TexelSize.w));
+                float laneX = fieldUV.x * (float)laneDimensions.x -
+                    _FoamMotionLaneScrollCells;
+                laneX = fmod(laneX, (float)laneDimensions.x);
+                if (laneX < 0.0)
+                {
+                    laneX += (float)laneDimensions.x;
+                }
+
+                int laneX0 = clamp(
+                    (int)floor(laneX),
+                    0,
+                    laneDimensions.x - 1);
+                int laneX1 = laneX0 + 1;
+                if (laneX1 >= laneDimensions.x)
+                {
+                    laneX1 = 0;
+                }
+
+                int laneY = clamp(
+                    (int)floor(fieldUV.y * (float)laneDimensions.y),
+                    0,
+                    laneDimensions.y - 1);
+                float laneBlend = frac(laneX);
+                float laneA = _FoamMotionLane.Load(
+                    int3(laneX0, laneY, 0)).r;
+                float laneB = _FoamMotionLane.Load(
+                    int3(laneX1, laneY, 0)).r;
+                float lane = clamp(
+                    lerp(laneA, laneB, laneBlend),
+                    -1.0,
+                    1.0);
+
+                int2 routingCoordinate = clamp(
+                    (int2)floor(fieldUV * (float2)routingDimensions),
+                    int2(0, 0),
+                    routingDimensions - 1);
+                float2 obstacleRouting = _FoamObstacleRouting.Load(
+                    int3(routingCoordinate, 0)).rg;
+                obstacleRouting.x = clamp(obstacleRouting.x, -1.0, 1.0);
+                obstacleRouting.y = saturate(obstacleRouting.y);
+
+                int2 obstacleDimensions = int2(
+                    max(1.0, _FoamObstacleExclusion_TexelSize.z),
+                    max(1.0, _FoamObstacleExclusion_TexelSize.w));
+                int2 obstacleCoordinate = clamp(
+                    (int2)floor(fieldUV * (float2)obstacleDimensions),
+                    int2(0, 0),
+                    obstacleDimensions - 1);
+                float obstacleFootprint = saturate(
+                    _FoamObstacleExclusion.Load(
+                        int3(obstacleCoordinate, 0)).r);
+
+                return RiverWaterResolveFoamVelocityContract(
+                    lane,
+                    obstacleRouting.x,
+                    obstacleRouting.y,
+                    _FoamBaseDownstreamSpeed,
+                    _FoamMaximumLateralSpeedRatio,
+                    _FoamObstacleSlowdownStrength,
+                    _FoamObstacleMinimumDownstreamFactor,
+                    1.0 - obstacleFootprint);
+            }
 
             struct Attributes
             {
@@ -777,6 +862,14 @@ Shader "PS3D/Stylized River Water"
                 foamSurface.wakeDownstreamGradient = wake.downstreamGradient;
                 foamSurface.wakeLateralGradient = wake.lateralGradient;
 
+                float2 foamVelocityFieldUV = float2(
+                    saturate((input.domainData.x - _FoamGlobalStart) /
+                        max(0.001, _FoamFieldLength)),
+                    saturate(input.domainData.y /
+                        max(0.001, input.domainData.w) * 0.5 + 0.5));
+                RiverWaterFoamResolvedVelocity renderedFoamVelocity =
+                    ResolveRenderedFoamVelocity(foamVelocityFieldUV);
+
                 RiverWaterFoamResult foam = RiverWaterEvaluateFoam(
                     TEXTURE2D_ARGS(
                         _FoamPrevious,
@@ -791,7 +884,10 @@ Shader "PS3D/Stylized River Water"
                     _FoamGlobalStart,
                     _FoamFieldLength,
                     _FoamInterpolation,
-                    _FoamRenderTravelMetres,
+                    _FoamRenderAdvectionSeconds,
+                    renderedFoamVelocity.velocityMetresPerSecond,
+                    renderedFoamVelocity.obstacleInfluence,
+                    _FoamFlowDirection,
                     _FoamSharpness,
                     _FreezeAmount,
                     foamSurface);
@@ -915,10 +1011,13 @@ Shader "PS3D/Stylized River Water"
                         resolvedVelocity.downstreamSpeedFactor);
                     float3 fieldColour = fieldHue * downstreamBrightness;
 
-                    // 5.9u: Foam Motion Field diagnostics must show raw stored
-                    // material ownership, not the final/evaluated render mask.
+                    // Motion Field diagnostics show the committed Layer C state
+                    // at fieldUV. Render-only residual prediction must not move
+                    // the white ownership overlay or its simulation-cell grid.
+                    float committedPresence = saturate(
+                        SampleCommittedFoamState(foam.fieldUV).r);
                     float foamOverlay = saturate(
-                        smoothstep(0.08, 0.46, foam.presence) * 0.58);
+                        smoothstep(0.08, 0.46, committedPresence) * 0.58);
                     fieldColour = lerp(
                         saturate(fieldColour),
                         float3(1.0, 1.0, 0.95),
@@ -934,10 +1033,10 @@ Shader "PS3D/Stylized River Water"
                             foamDimensions = laneDimensions;
                         }
 
-                        // 5.9v: draw the persistent material texture cells in the
-                        // same UV space used to sample raw stored Foam Presence.
+                        // Draw persistent material cells in committed field space,
+                        // never in the residual-predicted presentation coordinate.
                         float2 cellCoordinate =
-                            saturate(foam.materialUV) * (float2)foamDimensions;
+                            saturate(foam.fieldUV) * (float2)foamDimensions;
                         float2 cellFraction = frac(cellCoordinate);
                         float2 cellEdgeDistance = min(
                             cellFraction,
@@ -976,7 +1075,9 @@ Shader "PS3D/Stylized River Water"
 
                 if (foamDebug == 7 || foamDebug == 8 ||
                     foamDebug == 9 || foamDebug == 10 ||
-                    foamDebug == 11 || foamDebug == 12)
+                    foamDebug == 11 || foamDebug == 12 ||
+                    foamDebug == 13 || foamDebug == 14 ||
+                    foamDebug == 15)
                 {
                     float evaluatedShape = saturate(
                         SAMPLE_TEXTURE2D(
@@ -1004,9 +1105,54 @@ Shader "PS3D/Stylized River Water"
                         return half4(filmSupport.xxx, 1.0);
                     }
 
+                    float filmSource = saturate(
+                        SAMPLE_TEXTURE2D(
+                            _FoamFilmSource,
+                            sampler_FoamCurrent,
+                            foam.fieldUV).r);
+                    float filmSupport = saturate(
+                        SAMPLE_TEXTURE2D(
+                            _FoamFilmSupport,
+                            sampler_FoamCurrent,
+                            foam.fieldUV).r);
+                    float instantaneousFilmTarget = saturate(max(
+                        smoothstep(0.10, 0.46, filmSource) * 0.68,
+                        smoothstep(0.28, 0.74, filmSupport) * 0.60));
+                    float temporalOccupancy = saturate(
+                        SAMPLE_TEXTURE2D(
+                            _FoamVisualOccupancy,
+                            sampler_FoamCurrent,
+                            foam.fieldUV).r);
+
+                    if (foamDebug == 13)
+                    {
+                        return half4(instantaneousFilmTarget.xxx, 1.0);
+                    }
+
+                    if (foamDebug == 14)
+                    {
+                        return half4(temporalOccupancy.xxx, 1.0);
+                    }
+
+                    if (foamDebug == 15)
+                    {
+                        float retainedOccupancy = saturate(
+                            (temporalOccupancy - instantaneousFilmTarget) * 4.0);
+                        float pendingAcquisition = saturate(
+                            (instantaneousFilmTarget - temporalOccupancy) * 4.0);
+                        float3 temporalDifferenceColour = float3(
+                            pendingAcquisition,
+                            retainedOccupancy,
+                            pendingAcquisition * 0.85);
+                        return half4(
+                            saturate(temporalDifferenceColour),
+                            1.0);
+                    }
+
                     if (foamDebug == 8)
                     {
-                        float materialPresence = saturate(foam.presence);
+                        float materialPresence = saturate(
+                            SampleCommittedFoamState(foam.fieldUV).r);
                         float addedByShape = saturate(
                             (evaluatedShape - materialPresence) * 4.0);
                         float removedByShape = saturate(
@@ -1029,7 +1175,7 @@ Shader "PS3D/Stylized River Water"
                                 foam.fieldUV,
                                 input.domainData.x,
                                 input.domainData.y,
-                                _FoamRenderTravelMetres,
+                                _FoamRenderAdvectionSeconds,
                                 _FoamSharpness,
                                 foam.surfaceEnergy);
 
@@ -1056,14 +1202,24 @@ Shader "PS3D/Stylized River Water"
 
                 if (foamDebug == 4)
                 {
-                    float life = saturate(foam.remainingLife) *
-                        step(0.001, foam.presence);
+                    float4 committedState =
+                        SampleCommittedFoamState(foam.fieldUV);
+                    float committedPresence = saturate(committedState.x);
+                    float committedRemainingLife =
+                        committedPresence > 0.0001
+                            ? saturate(
+                                committedState.y /
+                                committedPresence)
+                            : 0.0;
+                    float life = saturate(committedRemainingLife) *
+                        step(0.001, committedPresence);
                     return half4(life.xxx, 1.0);
                 }
 
                 if (foamDebug == 3)
                 {
-                    float presence = saturate(foam.presence);
+                    float presence = saturate(
+                        SampleCommittedFoamState(foam.fieldUV).r);
                     return half4(presence.xxx, 1.0);
                 }
 

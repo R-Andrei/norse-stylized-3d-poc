@@ -169,7 +169,7 @@ float RiverWaterFoamEvaluateShaderLocalDetailProbe(
     float2 detailUV,
     float globalDistance,
     float lateralMetres,
-    float renderTravelMetres,
+    float renderAdvectionSeconds,
     float sharpness,
     float surfaceEnergy)
 {
@@ -455,7 +455,10 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float globalStart,
     float fieldLength,
     float interpolation,
-    float renderTravelMetres,
+    float renderAdvectionSeconds,
+    float2 resolvedVelocityMetresPerSecond,
+    float obstacleInfluence,
+    float flowDirection,
     float sharpness,
     float freezeAmount,
     RiverWaterFoamSurfaceInfluence surfaceInfluence)
@@ -477,9 +480,26 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float2 fieldUV = float2(
         saturate((globalDistance - globalStart) / fieldLength),
         saturate(lateralMetres / max(0.001, surfaceHalfWidth) * 0.5 + 0.5));
+    float flowSign = flowDirection >= 0.0 ? 1.0 : -1.0;
+    // Point-velocity extrapolation cannot reproduce the conservative solver's
+    // closed obstacle faces. Fade it out before obstacle routing becomes strong
+    // so a material tick cannot invalidate a predicted cross-face displacement
+    // and create a repeated advance/snap-back sawtooth.
+    float renderPredictionConfidence = 1.0 - smoothstep(
+        0.05,
+        0.35,
+        saturate(obstacleInfluence));
+    float2 residualTravelMetres = float2(
+        resolvedVelocityMetresPerSecond.x * flowSign,
+        resolvedVelocityMetresPerSecond.y) *
+        max(0.0, renderAdvectionSeconds) *
+        renderPredictionConfidence;
+    float storedGlobalDistance = globalDistance - residualTravelMetres.x;
+    float storedLateralMetres = lateralMetres - residualTravelMetres.y;
     float2 foamUV = float2(
-        saturate(((globalDistance - renderTravelMetres) - globalStart) / fieldLength),
-        fieldUV.y);
+        saturate((storedGlobalDistance - globalStart) / fieldLength),
+        saturate(storedLateralMetres /
+            max(0.001, surfaceHalfWidth) * 0.5 + 0.5));
 
     float blend = saturate(interpolation);
     float4 storedState = RiverWaterFoamSampleInterpolatedState(
@@ -492,22 +512,21 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         foamUV,
         blend);
 
-    float storedGlobalDistance = globalDistance - renderTravelMetres;
     float storedPresence;
     float storedRemainingLife;
     float storedMaterialPattern;
     float storedMask = RiverWaterFoamResolveStateMask(
         storedState,
         storedGlobalDistance,
-        lateralMetres,
+        storedLateralMetres,
         sharpness,
         storedPresence,
         storedRemainingLife,
         storedMaterialPattern);
 
-    // Material Presence debug must remain the unwarped stored state. Surface
-    // coupling is presentation only: waves, pressure, lee, wakes, and ripples
-    // bend the final mask without changing lifecycle or material ownership.
+    // This is the residual-predicted state used by normal rendering. Raw Layer C
+    // diagnostics sample the committed current texture directly at fieldUV so
+    // presentation extrapolation cannot masquerade as stored material motion.
     result.presence = storedPresence;
     result.remainingLife = storedRemainingLife;
     result.materialPattern = storedMaterialPattern;
@@ -546,7 +565,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float visualMask = RiverWaterFoamResolveStateMask(
         visualState,
         storedGlobalDistance - warpMetres.x,
-        lateralMetres - warpMetres.y,
+        storedLateralMetres - warpMetres.y,
         sharpness,
         visualPresence,
         visualRemainingLife,
@@ -609,7 +628,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         float leadMask = RiverWaterFoamResolveStateMask(
             leadState,
             storedGlobalDistance - warpMetres.x - stretchDirection.x * stretchMetres,
-            lateralMetres - warpMetres.y - stretchDirection.y * stretchMetres,
+            storedLateralMetres - warpMetres.y - stretchDirection.y * stretchMetres,
             sharpness,
             leadPresence,
             leadLife,
@@ -620,7 +639,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         float trailMask = RiverWaterFoamResolveStateMask(
             trailState,
             storedGlobalDistance - warpMetres.x + stretchDirection.x * stretchMetres,
-            lateralMetres - warpMetres.y + stretchDirection.y * stretchMetres,
+            storedLateralMetres - warpMetres.y + stretchDirection.y * stretchMetres,
             sharpness,
             trailPresence,
             trailLife,

@@ -2,7 +2,7 @@
 
 ## Status
 
-EW-C is the active recovery architecture. EW-B is rejected and removed from active code. EW-C0 topology readiness and EW-C1 solved-corner/rail readiness are validated. EW-C2S6R1 keeps the validated positive-width network, shared-span face construction, guarded segmentation, exact face-local retrace normalization, incidence-based internal closure, and explicit ordered source-edge descendant records, then removes strictly guarded zero-boundary retraces from each ordered source-boundary loop before ownership audit. Geometry remains provisional and uncommitted.
+EW-C is the active recovery architecture. EW-B is rejected and removed from active code. EW-C0 topology readiness, EW-C1 solved-corner/rail readiness, and the complete EW-C2 provisional topology gate are validated. EW-C2S6R3 passed across all 24 physical masses with zero source-boundary ownership failures, zero unexpected openings, zero non-manifold edges, and zero T-junctions. EW-C3A deterministic source-vertex boundary-component construction and closure classification is implemented and awaiting Unity validation. Geometry remains provisional and uncommitted.
 
 The target is a **crude, single-segment physical chamfer**, not a general-purpose smooth bevel modifier.
 
@@ -321,9 +321,95 @@ After final edge-use reconstruction and vertex-boundary normalization, EW-C2S6R1
 
 The reducer changes only source-boundary ownership records. It does not move vertices, alter provisional faces, change width solving, defer candidates, modify replacement faces or bevel strips, weaken T-junction or non-manifold audits, emit vertex patches, or enable geometry commit. Invalid loop ordering and inverse pairs that fail any guard increment `sourceBoundaryLoopNormalizationFailures` and remain hard blockers.
 
-### EW-C3 — Crude vertex-run patches
+### EW-C2S6R2 — Duplicate source-boundary pair provenance diagnostics
 
-Close each selected run with a centre fan or source-apex fan. Preserve the source boundary set and reject new boundaries, non-manifold edges, or T-junctions.
+Observed EW-C2S6R1 validation reduced the previous three blocked boundary configurations to one remaining 36-selected signature. Its actual-open equation is exact, all generic topology counters are zero, source-boundary incidence and terminal-transfer counters are zero, and expected source-boundary openings match. The sole blocker is one duplicate descendant key that survives adjacent-inverse normalization.
+
+The ownership audit previously retained only a set of seen topology keys, so the warning could describe the second claimant but not the first. R2 captures an immutable diagnostic snapshot of all source-boundary child occurrences immediately before R1 normalization and builds a second occurrence map after normalization. Both maps use deterministic loop, boundary-order, and child-index traversal.
+
+For a duplicate group, diagnostics include every normalized occurrence and report:
+
+- source edge, source vertices, loop, boundary order, child index, and parent endpoints;
+- directed child endpoints and parent-start/parent-end flags;
+- raw and normalized flattened cyclic positions and loop sizes;
+- same-direction, inverse-direction, or directionally incompatible classification;
+- same-loop status, forward/reverse cyclic distance, and cyclic adjacency;
+- provisional use count, distinct face-record count, and expected vertex ownership;
+- terminal-transition status and the disposition predicted by the existing ownership rules.
+
+The manual inspector regeneration path emits object name and `GetEntityId()` context before generation so the failing physical mass is directly identifiable. R2 does not remove descendants, alter normalization, accept duplicates, change the blocker, mutate geometry, or enable commit.
+
+R2 validation proved the residual group contains exactly two raw and two normalized occurrences. They are exact inverse children on loop `0`, records `1` and `2`, share source vertex `26`, remain non-adjacent at cyclic positions `1/3` before R1 and `0/2` after R1, have exactly two provisional uses on two distinct face records, have no vertex-boundary ownership, and both resolve to `terminal-transfer`.
+
+### EW-C2S6R3 — Shared terminal-transfer alias collapse
+
+After R1, R3 rebuilds the surviving occurrence groups and searches only for exact inverse pairs whose two children are terminal-transition candidates. A pair is removed from the source-boundary ownership model only when all of the following hold:
+
+- exactly two raw occurrences and exactly two surviving occurrences share the key;
+- both occurrences are on the same loop but on different source-boundary records;
+- the source-boundary records are consecutive in cyclic boundary order and share the corresponding source vertex;
+- the two children are non-adjacent in the flattened child walk;
+- the provisional topology key has exactly two uses on two distinct face records;
+- the key is not expected vertex-boundary-owned.
+
+R3 removes both child claims from their source-boundary records, leaving the two provisional face uses untouched as an internally closed edge. It does not perform general non-adjacent retrace cancellation. Rejected inverse terminal alias candidates increment `sourceBoundaryTerminalAliasNormalizationFailures` and remain blocked by the existing duplicate audit. Successful normalization reports `sourceBoundaryTerminalAliasPairsCollapsed` and `sourceBoundaryTerminalAliasChildrenRemoved`.
+
+### Validated EW-C2 gate
+
+EW-C2S6R3 produced 48 complete provisional-emission summaries: matching `OnValidate()` and `OnEnable()` results for all 24 physical masses. Every result reached `readyForVertexPatches=1` while geometry remained provisional and commit-disabled. The full set retained zero replacement-face failures, bevel-strip failures, source-boundary ownership failures, unexpected openings, missing vertex boundaries, non-manifold edges, final T-junctions, and incompatible T-junction records.
+
+The 36-selected boundary mass retained the validated candidate and construction counts `36/33/3`, `replacementFacesBuilt=16`, and `bevelStripsBuilt=33`. R1 removed one adjacent inverse pair, R3 removed one shared terminal-transfer alias pair, and the final contract was exactly `72` expected vertex boundaries plus `3` source-boundary openings equals `75` provisional open edges.
+
+### EW-C3 — Source-vertex boundary-component patches
+
+EW-C3 is component-driven, not run-driven. `NormalizeChamferVertexBoundaries(...)` is authoritative. Its surviving `ChamferExpectedVertexBoundary` records are grouped by `SourceVertexIndex` and connected through exact `VertexKey` endpoints. Active selected runs remain a cross-check, because the validated 24-mass set proves that component counts may be less than, equal to, or greater than active-run counts, and that open chains can occur even when the source has no preserved boundary.
+
+#### EW-C3A — Ordered component proof
+
+EW-C3A adds no faces. It materializes one `ChamferVertexPatchComponent` per connected boundary component and records:
+
+```text
+source vertex
+ordered boundary records
+ordered unique positions
+open chain or closed loop
+source-fan open/closed state
+incident active source edges
+incident source-boundary records
+endpoint-to-source-vertex spoke keys
+closure classification
+```
+
+Exact adjacency must have degree one or two only. An open chain begins at the lexicographically smaller degree-one endpoint. A closed loop begins at the lexicographically smallest endpoint key and chooses its first edge by stable provenance tuple `(Kind, SourceEdgeIndex, FaceIndex, Key)`. Every following edge is oriented continuously from the previous endpoint.
+
+Component classes are:
+
+```text
+ClosedLoop
+OpenChainSourceBoundaryResolved
+OpenChainClosedSourceResolved
+OpenChainUnresolved
+```
+
+A source-boundary-resolved chain requires unique endpoint ownership on surviving explicit source-boundary children incident to the same source vertex. A closed-source-resolved chain requires each endpoint-to-source-vertex spoke key to satisfy `existing provisional uses + planned patch-spoke uses = 2`, while remaining absent from the expected source-boundary and vertex-boundary sets. This supports either one existing use plus one planned spoke, or two matching planned spokes with no existing use. Proximity or approximate collinearity is insufficient. Unresolved chains block geometry emission.
+
+EW-C3A reports expected and assigned boundary-record counts, component, ordering, closure, zero-boundary-active-vertex, multiple-component, and independent readiness counters. It runs after the validated EW-C2 gate and emits no faces. Success requires every normalized boundary record to appear in exactly one ordered component and zero unresolved, branch, duplicate, ordering, or provenance failures across all 24 masses, producing `readyForVertexPatchComponents=1` while preserving `readyForVertexPatches=1`.
+
+#### EW-C3B — Provisional patch emission
+
+Closed loops emit a centre fan. The centre is the arithmetic mean of ordered unique boundary points. Fan orientation is selected against the normalized sum of incident source-face normals. Every triangle must retain finite coordinates, stable positive area, compatible winding, and no repeated topology edge.
+
+Open chains use only the closure class proven by EW-C3A. A source-boundary chain may use the original source vertex as an apex only when its two radial spokes replace the corresponding terminal source-boundary ownership records and become explicit surviving source-boundary descendants. A closed-source chain may use only the exact connector topology proven by EW-C3A. Unresolved chains emit nothing and remain hard failures.
+
+One patch is emitted per resolved component. A source vertex with no surviving component requires no patch. Multiple components at one source vertex are emitted separately only after each component independently resolves.
+
+Patch faces carry `ConvexEdgeWear`; initial strength is the maximum active incident selected-edge strength. No width variation, rounded profile, additional strip, or shader change belongs to EW-C3.
+
+#### EW-C3 final audit
+
+The replacement faces, bevel strips, and patch triangles are audited together. The only allowed output openings are surviving explicit source-boundary descendants. All expected vertex boundaries must become two-use internal edges. Patch fan spokes must have exactly two uses unless they are explicitly registered replacement source-boundary descendants. Non-manifold edges, T-junctions, unowned openings, source-boundary mismatches, degenerate triangles, invalid winding, and repeated patch edges are hard failures.
+
+EW-C3 geometry is still discarded after audit. Commit remains an EW-C4 action.
 
 ### EW-C4 — Commit and visual proof
 
@@ -376,9 +462,8 @@ The provisional geometry is discarded after audit. EW-C3 is the first stage allo
 
 ## Next work items
 
-1. Compile and validate EW-C2S6R1 across all 24 placed masses.
-2. Confirm raw and normalized descendant counters explain every guarded inverse-pair removal.
-3. Confirm `sourceBoundaryLoopNormalizationFailures=0` and all existing source-boundary ownership failures are zero.
-4. Require all 24 objects to report exact source-boundary matching and `readyForVertexPatches=1`.
-5. Confirm the selected-edge network and emitted replacement/strip counts are unchanged.
-6. Begin EW-C3 only after that complete EW-C2 validation passes.
+1. Compile the implemented EW-C3A audit in Unity.
+2. Validate all 24 physical masses and require exact boundary-record assignment, zero unresolved open chains, ordering failures, provenance failures, branches, and duplicates.
+3. Confirm `readyForVertexPatchComponents=1` without changing the validated EW-C2 construction and topology counters.
+4. Use any EW-C3A unresolved-chain evidence to adjust only the exact connector proof before EW-C3B emits patch faces.
+5. Keep all geometry provisional and final commit disabled through the complete EW-C3 topology gate.

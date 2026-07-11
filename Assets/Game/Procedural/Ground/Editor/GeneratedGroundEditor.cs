@@ -597,6 +597,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentStrokeAngleJitterDegrees");
             SerializedProperty foldHeight =
                 feature.FindPropertyRelative("paintedAccentFoldHeight");
+            SerializedProperty crestCrownHeight =
+                feature.FindPropertyRelative("paintedAccentCrestCrownHeight");
             SerializedProperty foldIrregularity =
                 feature.FindPropertyRelative("paintedAccentFoldIrregularity");
             SerializedProperty foldEndTaper =
@@ -608,6 +610,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 strokeFacingDirectionDegrees == null ||
                 strokeAngleJitterDegrees == null ||
                 foldHeight == null ||
+                crestCrownHeight == null ||
                 foldIrregularity == null ||
                 foldEndTaper == null)
             {
@@ -619,17 +622,17 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 "Painted Accent 3D Strokes",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Edits the selected surface variant's Painted Accent stroke layout and grounded open crest-ribbon controls. Rebuild the 3D Ridge Preview after changes. The preview is one visual-only child mesh and never modifies the base ground mesh or collider.",
+                "Edits the selected surface variant's Painted Accent stroke layout and grounded crowned crest-ribbon controls. Rebuild the 3D Ridge Preview after changes. The preview is one visual-only child mesh and never modifies the base ground mesh or collider.",
                 MessageType.None);
 
             EditorGUI.BeginChangeCheck();
             EditorGUILayout.Slider(
                 strokeWidth,
-                0.04f,
+                0.01f,
                 0.35f,
                 new GUIContent(
                     "Stroke Width",
-                    "Visible width in metres for the open crest ribbon. Legacy BodyWidth is not used by the ribbon mesh."));
+                    "Visible shoulder-to-shoulder width in metres for the crowned crest ribbon. Use 0.02 m for the focused shape proof. Legacy BodyWidth is not used by the ribbon mesh."));
             EditorGUILayout.Slider(
                 strokeDensity,
                 0f,
@@ -667,15 +670,22 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     "Maximum signed angle offset in degrees around the perpendicular stroke angle derived from Facing Direction Degrees. Each stroke rolls independently between -value and +value."));
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
-                "Grounded Open Crest Ribbon",
+                "Grounded Crowned Crest Ribbon",
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.Slider(
                 foldHeight,
                 0f,
-                0.25f,
+                0.50f,
                 new GUIContent(
                     "Fold Height",
-                    "Calibration-only maximum open-ribbon height in metres. Validate 0.12, 0.18, and 0.24 from the same gameplay camera; this extended range is not an accepted production default."));
+                    "Maximum longitudinal rise in metres. Use 0.25 m as the focused crowned-ribbon proof baseline; the extended 0.50 m range leaves room above the intended normal value without changing serialized style defaults."));
+            EditorGUILayout.Slider(
+                crestCrownHeight,
+                0f,
+                0.05f,
+                new GUIContent(
+                    "Crest Crown Height",
+                    "Additional centreline height above the two ribbon shoulders. Test 0.01, 0.02, and 0.03 m at Stroke Width 0.02 m and Fold Height 0.25 m."));
             EditorGUILayout.Slider(
                 foldIrregularity,
                 0f,
@@ -704,7 +714,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             styleObject.ApplyModifiedProperties();
             EditorUtility.SetDirty(style);
             ApplyToTargets(
-                "Tune Painted Accent Open Crest Ribbon",
+                "Tune Painted Accent Crowned Crest Ribbon",
                 ground => ground.RefreshSurfaceMaterialProperties());
         }
 
@@ -1332,10 +1342,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
-                "Painted Accent Open Crest Ribbon Preview",
+                "Painted Accent Crowned Crest Ribbon Preview",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Builds one editor/debug-only open crest ribbon from the generated ground-following 3D strokes. Five stochastic profile samples derive each row's crest height, while two visible ribbon vertices leave the area underneath empty. It does not change the generated ground mesh, collision, or gameplay surface.",
+                "Builds one editor/debug-only crowned crest ribbon from the generated ground-following 3D strokes. Five stochastic profile samples derive each row's longitudinal crest height; three visible vertices across form two sloped crown faces while leaving the underside empty. It does not change the generated ground mesh, collision, or gameplay surface.",
                 MessageType.None);
 
             EditorGUILayout.BeginHorizontal();

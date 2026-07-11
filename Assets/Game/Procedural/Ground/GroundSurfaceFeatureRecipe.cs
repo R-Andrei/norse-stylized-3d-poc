@@ -49,8 +49,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private int seedOffset;
 
-        [Tooltip("Painted Accent Lines only. Visible width in metres for the open crest ribbon. The generated ribbon footprint uses this value directly; legacy BodyWidth remains texture/debug support only.")]
-        [Range(0.04f, 0.35f)]
+        [Tooltip("Painted Accent Lines only. Visible shoulder-to-shoulder width in metres for the crowned crest ribbon. The generated ribbon footprint uses this value directly; legacy BodyWidth remains texture/debug support only.")]
+        [Range(0.01f, 0.35f)]
         [SerializeField]
         private float paintedAccentStrokeWidth = 0.12f;
 
@@ -80,10 +80,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float paintedAccentStrokeAngleJitterDegrees = 18f;
 
-        [Tooltip("Painted Accent Lines only. Maximum raised height in metres for the open crest ribbon. Height is applied along independently sampled ground normals. The ribbon rises from the ground at its start and returns to the ground at its finish; its underside remains empty.")]
-        [Range(0f, 0.25f)]
+        [Tooltip("Painted Accent Lines only. Maximum longitudinal rise in metres for the crowned crest ribbon. Height is applied along independently sampled ground normals. The ribbon rises from the ground at its start and returns to the ground at its finish; its underside remains empty.")]
+        [Range(0f, 0.50f)]
         [SerializeField]
         private float paintedAccentFoldHeight = 0.018f;
+
+        [Tooltip("Painted Accent Lines only. Additional cross-sectional crown height in metres. The centre vertex rises above the two ribbon shoulders, producing real local thickness and lighting variation without adding an underside or collider. The crown fades through the same end envelope as Fold Height.")]
+        [Range(0f, 0.05f)]
+        [SerializeField]
+        private float paintedAccentCrestCrownHeight = 0.02f;
 
         [Tooltip("Painted Accent Lines only. Controls deterministic stochastic variation in the profile search used to derive crest height. Zero approaches one clean profile; one allows several overlapping smooth basis functions and stronger slow height variation along the stroke.")]
         [Range(0f, 1f)]
@@ -134,7 +139,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     value = 0.12f;
                 }
 
-                return Mathf.Clamp(value, 0.04f, 0.35f);
+                return Mathf.Clamp(value, 0.01f, 0.35f);
             }
         }
 
@@ -156,7 +161,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Mathf.Clamp(paintedAccentStrokeAngleJitterDegrees, 0f, 30f);
 
         public float PaintedAccentFoldHeight =>
-            Mathf.Clamp(paintedAccentFoldHeight, 0f, 0.25f);
+            Mathf.Clamp(paintedAccentFoldHeight, 0f, 0.50f);
+
+        public float PaintedAccentCrestCrownHeight =>
+            Mathf.Clamp(paintedAccentCrestCrownHeight, 0f, 0.05f);
 
         public float PaintedAccentFoldIrregularity =>
             Mathf.Clamp01(paintedAccentFoldIrregularity);

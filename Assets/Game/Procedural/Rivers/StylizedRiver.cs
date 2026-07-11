@@ -143,7 +143,10 @@ namespace ProgrammaticStylized3D.Rivers
         FoamShaderDetailProbe = 9,
         FoamShaderDetailDifference = 10,
         FoamFilmSource = 11,
-        FoamFilmSupport = 12
+        FoamFilmSupport = 12,
+        FoamFilmTarget = 13,
+        FoamTemporalOccupancy = 14,
+        FoamTemporalDifference = 15
     }
 
 
@@ -263,6 +266,12 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamObstacleMinimumDownstreamFactor = 0f;
         private const float MaximumFoamObstacleMinimumDownstreamFactor = 1f;
         private const float DefaultFoamObstacleMinimumDownstreamFactor = 0.12f;
+        private const float MinimumFoamVisualOccupancyBuildTime = 0.02f;
+        private const float MaximumFoamVisualOccupancyBuildTime = 2f;
+        private const float DefaultFoamVisualOccupancyBuildTime = 0.20f;
+        private const float MinimumFoamVisualOccupancyReleaseTime = 0.05f;
+        private const float MaximumFoamVisualOccupancyReleaseTime = 4f;
+        private const float DefaultFoamVisualOccupancyReleaseTime = 0.80f;
         private const float MinimumFoamProgressiveRibbonDuration = 0.5f;
         private const float MaximumFoamProgressiveRibbonDuration = 5f;
         private const float DefaultFoamProgressiveRibbonDuration = 2.4f;
@@ -1354,7 +1363,7 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamMotionFieldStrength =
             LegacyDefaultFoamMotionFieldStrength;
 
-        [Tooltip("Downstream advection speed of the generated lateral route pattern relative to the base downstream Foam speed. Zero keeps routes fixed in river space; one moves the lane pattern downstream at the base Foam speed. This is a sample-coordinate phase motion, not a field rebuild and not stored-material transport.")]
+        [Tooltip("Downstream advection speed of the generated lateral route pattern relative to the base downstream Foam speed. Zero keeps routes fixed in river space; one moves the lane pattern downstream at the base Foam speed. This is a sample-coordinate phase motion, not a field rebuild and not stored-material transport. Slow values around 0.03-0.08 are recommended when routes should evolve without visibly travelling with the river.")]
         [Range(
             MinimumFoamLaneAdvectionRatio,
             MaximumFoamLaneAdvectionRatio)]
@@ -1401,6 +1410,22 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField]
         private float foamObstacleMinimumDownstreamFactor =
             DefaultFoamObstacleMinimumDownstreamFactor;
+
+        [Tooltip("Seconds for the Layer D temporal visual sheet to acquire newly supported film. This changes visual occupancy only; it never creates persistent material or changes Remaining Life.")]
+        [Range(
+            MinimumFoamVisualOccupancyBuildTime,
+            MaximumFoamVisualOccupancyBuildTime)]
+        [SerializeField]
+        private float foamVisualOccupancyBuildTime =
+            DefaultFoamVisualOccupancyBuildTime;
+
+        [Tooltip("Seconds for unsupported Layer D temporal visual occupancy to release toward the current instantaneous film target. This is visual-only persistence and does not extend material lifetime.")]
+        [Range(
+            MinimumFoamVisualOccupancyReleaseTime,
+            MaximumFoamVisualOccupancyReleaseTime)]
+        [SerializeField]
+        private float foamVisualOccupancyReleaseTime =
+            DefaultFoamVisualOccupancyReleaseTime;
 
         [SerializeField, HideInInspector]
         private int foamMaterialLifecycleTuningVersion;
@@ -2357,6 +2382,16 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObstacleMinimumDownstreamFactor,
                 MinimumFoamObstacleMinimumDownstreamFactor,
                 MaximumFoamObstacleMinimumDownstreamFactor);
+        public float FoamVisualOccupancyBuildTime =>
+            Mathf.Clamp(
+                foamVisualOccupancyBuildTime,
+                MinimumFoamVisualOccupancyBuildTime,
+                MaximumFoamVisualOccupancyBuildTime);
+        public float FoamVisualOccupancyReleaseTime =>
+            Mathf.Clamp(
+                foamVisualOccupancyReleaseTime,
+                MinimumFoamVisualOccupancyReleaseTime,
+                MaximumFoamVisualOccupancyReleaseTime);
         public Color FoamColour => foamColour;
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
         public float FoamSpawnDistanceNormalized =>
@@ -2982,6 +3017,12 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.FoamFilmSource;
                 case (int)StylizedRiverFoamDebugView.FoamFilmSupport:
                     return StylizedRiverFoamDebugView.FoamFilmSupport;
+                case (int)StylizedRiverFoamDebugView.FoamFilmTarget:
+                    return StylizedRiverFoamDebugView.FoamFilmTarget;
+                case (int)StylizedRiverFoamDebugView.FoamTemporalOccupancy:
+                    return StylizedRiverFoamDebugView.FoamTemporalOccupancy;
+                case (int)StylizedRiverFoamDebugView.FoamTemporalDifference:
+                    return StylizedRiverFoamDebugView.FoamTemporalDifference;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }
@@ -4361,6 +4402,14 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObstacleMinimumDownstreamFactor,
                 MinimumFoamObstacleMinimumDownstreamFactor,
                 MaximumFoamObstacleMinimumDownstreamFactor);
+            foamVisualOccupancyBuildTime = Mathf.Clamp(
+                foamVisualOccupancyBuildTime,
+                MinimumFoamVisualOccupancyBuildTime,
+                MaximumFoamVisualOccupancyBuildTime);
+            foamVisualOccupancyReleaseTime = Mathf.Clamp(
+                foamVisualOccupancyReleaseTime,
+                MinimumFoamVisualOccupancyReleaseTime,
+                MaximumFoamVisualOccupancyReleaseTime);
             foamColour.a = Mathf.Clamp01(foamColour.a);
             foamSpawnDistanceNormalized = Mathf.Clamp01(
                 foamSpawnDistanceNormalized);

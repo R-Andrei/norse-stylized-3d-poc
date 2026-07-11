@@ -4,6 +4,68 @@
 >
 > This handoff is historical for earlier rock/river refactor context. Any river Foam architecture, static-foam, morphing, lateral motion, or rendering responsibility statement in this document is superseded by `Docs/River_Foam_Stage6_Architecture.md` and `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`. Use those documents as the active Foam source of truth.
 
+## Current River Foam continuation — `4.11C.5.16C` source implementation
+
+This section supersedes later historical River Foam movement/history statements wherever they conflict.
+
+`4.11C.5.16A.1`, `4.11C.5.16B`, and `4.11C.5.16B.1` are accepted for progression. The active source now contains `4.11C.5.16C — Advected Layer D Temporal Occupancy`, awaiting Unity import/compile and runtime validation.
+
+Current Layer C movement truth remains:
+
+```text
+canonical local velocity moves the complete packed FoamState;
+shared donor-cell face fluxes provide longitudinal and lateral movement;
+shore, obstacle, invalid, and lateral exterior faces are no-flux;
+endpoint outflow follows physical flow direction;
+CFL substeps target 0.90 with a 64-substep safety ceiling;
+lifecycle aging is distributed across those substeps;
+births are applied after completed transport;
+open-water render smoothing is local residual-time backtracing.
+```
+
+Current Layer D temporal-sheet truth:
+
+```text
+Film Source and Film Support remain half-resolution material-derived helpers;
+two additional half-resolution RHalf textures ping-pong temporal occupancy;
+occupancy uses the same canonical velocity and Layer C substep count;
+occupancy uses closed shore/obstacle/invalid faces and flow-aware endpoint outflow;
+Build Time defaults to 0.20 s and Release Time defaults to 0.80 s;
+_FoamShapeMask combines committed Presence with temporal occupancy;
+new Target, Occupancy, and Difference views expose the field;
+history clears when Layer D diagnostics are re-entered;
+Final Foam remains disconnected and unchanged.
+```
+
+The temporal field is visual-only. It does not create or move durable material, change Remaining Life, alter Material Pattern, feed Layer B/C, or extend source lifetime. Its purpose is to provide the persistent moving visual sheet that `5.16D` can pinch, tear, split, rejoin, and fracture.
+
+Primary `5.16C` files:
+
+```text
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Binding.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+```
+
+The canonical velocity files remain unchanged:
+
+```text
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoamVelocity.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Motion.hlsl
+```
+
+Required next action is Unity validation of `5.16C`. Do not begin `5.16D` damage/fracture or `5.16E` Final Foam integration until temporal occupancy is proven stable, correctly advected, clipped, reversible, and visually useful.
+
+
 ## Purpose
 
 This document is a refactor-grade handoff for the current generated-rock and river files requested from the workspace.

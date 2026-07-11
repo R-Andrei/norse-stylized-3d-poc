@@ -242,8 +242,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private const float PaintedAccentRidgeBoundaryEmbedDepth = 0.002f;
         private const float PaintedAccentRidgeMinimumEndWidthScale = 0.12f;
         private const int PaintedAccentCrestSearchSampleCount = 5;
-        private const int PaintedAccentRibbonVertexCountAcross = 2;
+        private const int PaintedAccentRibbonVertexCountAcross = 3;
         private const int PaintedAccentRibbonMinimumLongitudinalSampleCount = 13;
+        private const float PaintedAccentSingleCrestBlend = 0.35f;
+        private const float PaintedAccentValleyThresholdFraction = 0.08f;
+        private const float PaintedAccentValleyRepairStrength = 0.60f;
+        private const float PaintedAccentShoulderCrownFraction = 0.50f;
+        private const float PaintedAccentLegCrownSupport = 0.45f;
+        private const float PaintedAccentCrownEndRampFraction = 0.12f;
 
         // Position (12) + normal (12) + UV0 (8). The proof mesh has no
         // tangents, vertex colours, collider data, or secondary streams.
@@ -1707,6 +1713,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 feature != null
                     ? feature.PaintedAccentFoldHeight
                     : 0.018f;
+            float crestCrownHeight =
+                feature != null
+                    ? feature.PaintedAccentCrestCrownHeight
+                    : 0.02f;
             float foldIrregularity =
                 feature != null
                     ? feature.PaintedAccentFoldIrregularity
@@ -1728,6 +1738,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             float minimumCrestPeakHeight = float.PositiveInfinity;
             float maximumCrestPeakHeight = 0f;
             double totalCrestPeakHeight = 0d;
+            float minimumCrownPeakHeight = float.PositiveInfinity;
+            float maximumCrownPeakHeight = 0f;
+            double totalCrownPeakHeight = 0d;
+            float minimumCombinedPeakHeight = float.PositiveInfinity;
+            float maximumCombinedPeakHeight = 0f;
+            double totalCombinedPeakHeight = 0d;
             float minimumEffectiveWidth = float.PositiveInfinity;
             float maximumEffectiveWidth = 0f;
             double totalEffectiveWidth = 0d;
@@ -1761,6 +1777,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     foldHeight *
                     Mathf.Lerp(0.82f, 1f, stroke.Strength);
                 float crestPeakHeightForStroke = 0f;
+                float crownPeakHeightForStroke = 0f;
+                float combinedPeakHeightForStroke = 0f;
+                float[] endEnvelopes =
+                    new float[longitudinalSampleCount];
+                float[] normalizedCrestHeights =
+                    new float[longitudinalSampleCount];
 
                 for (int pointIndex = 0;
                      pointIndex < longitudinalSampleCount;
@@ -1776,6 +1798,48 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             t,
                             stroke.Seed,
                             foldEndTaper);
+                    endEnvelopes[pointIndex] = endEnvelope;
+
+                    float normalizedCrestHeight = 0f;
+                    for (int sampleIndex = 0;
+                         sampleIndex < PaintedAccentCrestSearchSampleCount;
+                         sampleIndex++)
+                    {
+                        float sample01 =
+                            sampleIndex /
+                            (float)(PaintedAccentCrestSearchSampleCount - 1);
+                        float u = sample01 * 2f - 1f;
+                        normalizedCrestHeight =
+                            Mathf.Max(
+                                normalizedCrestHeight,
+                                ResolvePaintedAccentFoldProfileHeight(
+                                    t,
+                                    u,
+                                    stroke.Seed,
+                                    profileBases,
+                                    profileNormalization,
+                                    foldIrregularity,
+                                    endEnvelope));
+                    }
+
+                    normalizedCrestHeights[pointIndex] =
+                        normalizedCrestHeight;
+                }
+
+                ShapePaintedAccentValleySuppressedProfile(
+                    normalizedCrestHeights,
+                    endEnvelopes);
+
+                for (int pointIndex = 0;
+                     pointIndex < longitudinalSampleCount;
+                     pointIndex++)
+                {
+                    float t =
+                        longitudinalSampleCount <= 1
+                            ? 0f
+                            : pointIndex /
+                              (float)(longitudinalSampleCount - 1);
+                    float endEnvelope = endEnvelopes[pointIndex];
                     float widthScale =
                         Mathf.Lerp(
                             PaintedAccentRidgeMinimumEndWidthScale,
@@ -1818,32 +1882,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
                     across.Normalize();
 
-                    float normalizedCrestHeight = 0f;
-                    for (int sampleIndex = 0;
-                         sampleIndex < PaintedAccentCrestSearchSampleCount;
-                         sampleIndex++)
-                    {
-                        float sample01 =
-                            sampleIndex /
-                            (float)(PaintedAccentCrestSearchSampleCount - 1);
-                        float u = sample01 * 2f - 1f;
-                        normalizedCrestHeight =
-                            Mathf.Max(
-                                normalizedCrestHeight,
-                                ResolvePaintedAccentFoldProfileHeight(
-                                    t,
-                                    u,
-                                    stroke.Seed,
-                                    profileBases,
-                                    profileNormalization,
-                                    foldIrregularity,
-                                    endEnvelope));
-                    }
-
                     float crestHeight =
-                        strokeHeight * normalizedCrestHeight;
+                        strokeHeight * normalizedCrestHeights[pointIndex];
+                    float crownEndEnvelope =
+                        ResolvePaintedAccentCrownEndEnvelope(
+                            t,
+                            endEnvelope);
+                    float effectiveCrownHeight =
+                        crestCrownHeight * crownEndEnvelope;
                     crestPeakHeightForStroke =
                         Mathf.Max(crestPeakHeightForStroke, crestHeight);
+                    crownPeakHeightForStroke =
+                        Mathf.Max(
+                            crownPeakHeightForStroke,
+                            effectiveCrownHeight);
+                    combinedPeakHeightForStroke =
+                        Mathf.Max(
+                            combinedPeakHeightForStroke,
+                            crestHeight + effectiveCrownHeight);
 
                     for (int sideIndex = 0;
                          sideIndex < PaintedAccentRibbonVertexCountAcross;
@@ -1853,6 +1909,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             sideIndex /
                             (float)(PaintedAccentRibbonVertexCountAcross - 1);
                         float sideSign = side01 * 2f - 1f;
+                        float crownProfile =
+                            Mathf.Lerp(
+                                PaintedAccentShoulderCrownFraction,
+                                1f,
+                                1f - Mathf.Abs(sideSign));
                         Vector3 lateralPosition =
                             centerlinePoint +
                             across * (sideSign * effectiveHalfWidth);
@@ -1883,7 +1944,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                                 : 0f;
                         Vector3 surfacePosition =
                             groundPosition +
-                            liftNormal * (crestHeight - boundaryEmbed);
+                            liftNormal *
+                            (
+                                crestHeight +
+                                effectiveCrownHeight * crownProfile -
+                                boundaryEmbed
+                            );
 
                         vertices.Add(surfacePosition);
                         uvs.Add(new Vector2(t, side01));
@@ -1894,19 +1960,27 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                      pointIndex < longitudinalSampleCount - 1;
                      pointIndex++)
                 {
-                    int a =
-                        baseVertex +
-                        pointIndex * PaintedAccentRibbonVertexCountAcross;
-                    int b = a + 1;
-                    int c = a + PaintedAccentRibbonVertexCountAcross;
-                    int d = c + 1;
+                    for (int crossIndex = 0;
+                         crossIndex <
+                             PaintedAccentRibbonVertexCountAcross - 1;
+                         crossIndex++)
+                    {
+                        int a =
+                            baseVertex +
+                            pointIndex *
+                                PaintedAccentRibbonVertexCountAcross +
+                            crossIndex;
+                        int b = a + 1;
+                        int c = a + PaintedAccentRibbonVertexCountAcross;
+                        int d = c + 1;
 
-                    triangles.Add(a);
-                    triangles.Add(c);
-                    triangles.Add(b);
-                    triangles.Add(b);
-                    triangles.Add(c);
-                    triangles.Add(d);
+                        triangles.Add(a);
+                        triangles.Add(c);
+                        triangles.Add(b);
+                        triangles.Add(b);
+                        triangles.Add(c);
+                        triangles.Add(d);
+                    }
                 }
 
                 minimumLongitudinalSampleCount =
@@ -1923,11 +1997,30 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 maximumCrestPeakHeight =
                     Mathf.Max(maximumCrestPeakHeight, crestPeakHeightForStroke);
                 totalCrestPeakHeight += crestPeakHeightForStroke;
+                minimumCrownPeakHeight =
+                    Mathf.Min(
+                        minimumCrownPeakHeight,
+                        crownPeakHeightForStroke);
+                maximumCrownPeakHeight =
+                    Mathf.Max(
+                        maximumCrownPeakHeight,
+                        crownPeakHeightForStroke);
+                totalCrownPeakHeight += crownPeakHeightForStroke;
+                minimumCombinedPeakHeight =
+                    Mathf.Min(
+                        minimumCombinedPeakHeight,
+                        combinedPeakHeightForStroke);
+                maximumCombinedPeakHeight =
+                    Mathf.Max(
+                        maximumCombinedPeakHeight,
+                        combinedPeakHeightForStroke);
+                totalCombinedPeakHeight += combinedPeakHeightForStroke;
                 builtStrokeCount++;
             }
 
             if (vertices.Count < PaintedAccentRibbonVertexCountAcross * 2 ||
-                triangles.Count < 6)
+                triangles.Count <
+                    (PaintedAccentRibbonVertexCountAcross - 1) * 6)
             {
                 return;
             }
@@ -1989,6 +2082,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 builtStrokeCount > 0
                     ? (float)(totalCrestPeakHeight / builtStrokeCount)
                     : 0f;
+            float meanCrownPeakHeight =
+                builtStrokeCount > 0
+                    ? (float)(totalCrownPeakHeight / builtStrokeCount)
+                    : 0f;
+            float meanCombinedPeakHeight =
+                builtStrokeCount > 0
+                    ? (float)(totalCombinedPeakHeight / builtStrokeCount)
+                    : 0f;
             float meanEffectiveWidth =
                 effectiveWidthSampleCount > 0
                     ? (float)(totalEffectiveWidth / effectiveWidthSampleCount)
@@ -2013,17 +2114,34 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
 
             Debug.Log(
-                $"GeneratedGround Painted Accent open crest ribbon built: " +
+                $"GeneratedGround Painted Accent valley-suppressed crowned ribbon built: " +
                 $"strokes={builtStrokeCount}, " +
                 $"requestedFoldHeight={foldHeight:F4}, " +
+                $"requestedCrownHeight={crestCrownHeight:F4}, " +
                 $"crestSearchSamples={PaintedAccentCrestSearchSampleCount}, " +
                 $"ribbonVerticesAcross={PaintedAccentRibbonVertexCountAcross}, " +
+                $"singleCrestBlend={PaintedAccentSingleCrestBlend:F3}, " +
+                $"valleyThresholdFraction=" +
+                $"{PaintedAccentValleyThresholdFraction:F3}, " +
+                $"valleyRepairStrength=" +
+                $"{PaintedAccentValleyRepairStrength:F3}, " +
+                $"shoulderCrownFraction=" +
+                $"{PaintedAccentShoulderCrownFraction:F3}, " +
+                $"legCrownSupport={PaintedAccentLegCrownSupport:F3}, " +
+                $"crownEndRampFraction=" +
+                $"{PaintedAccentCrownEndRampFraction:F3}, " +
                 $"longitudinalSamplesMin={minimumLongitudinalSampleCount}, " +
                 $"longitudinalSamplesMean={meanLongitudinalSampleCount:F2}, " +
                 $"longitudinalSamplesMax={maximumLongitudinalSampleCount}, " +
                 $"crestPeakHeightMin={minimumCrestPeakHeight:F4}, " +
                 $"crestPeakHeightMean={meanCrestPeakHeight:F4}, " +
                 $"crestPeakHeightMax={maximumCrestPeakHeight:F4}, " +
+                $"crownPeakHeightMin={minimumCrownPeakHeight:F4}, " +
+                $"crownPeakHeightMean={meanCrownPeakHeight:F4}, " +
+                $"crownPeakHeightMax={maximumCrownPeakHeight:F4}, " +
+                $"combinedPeakHeightMin={minimumCombinedPeakHeight:F4}, " +
+                $"combinedPeakHeightMean={meanCombinedPeakHeight:F4}, " +
+                $"combinedPeakHeightMax={maximumCombinedPeakHeight:F4}, " +
                 $"effectiveWidthMin={minimumEffectiveWidth:F4}, " +
                 $"effectiveWidthMean={meanEffectiveWidth:F4}, " +
                 $"effectiveWidthMax={maximumEffectiveWidth:F4}, " +
@@ -2200,6 +2318,113 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
 
             return tangent.normalized;
+        }
+
+        private static void ShapePaintedAccentValleySuppressedProfile(
+            float[] normalizedCrestHeights,
+            float[] endEnvelopes)
+        {
+            if (normalizedCrestHeights == null ||
+                endEnvelopes == null ||
+                normalizedCrestHeights.Length < 3 ||
+                normalizedCrestHeights.Length != endEnvelopes.Length)
+            {
+                return;
+            }
+
+            int lastIndex = normalizedCrestHeights.Length - 1;
+            int peakIndex = 1;
+            float peakHeight =
+                Mathf.Max(0f, normalizedCrestHeights[peakIndex]);
+
+            for (int index = 2; index < lastIndex; index++)
+            {
+                float candidateHeight =
+                    Mathf.Max(0f, normalizedCrestHeights[index]);
+                if (candidateHeight > peakHeight)
+                {
+                    peakHeight = candidateHeight;
+                    peakIndex = index;
+                }
+            }
+
+            float peakEndEnvelope =
+                Mathf.Max(0.001f, endEnvelopes[peakIndex]);
+
+            for (int index = 0; index <= lastIndex; index++)
+            {
+                float hillProgress;
+                if (index <= peakIndex)
+                {
+                    hillProgress =
+                        peakIndex > 0
+                            ? index / (float)peakIndex
+                            : 1f;
+                }
+                else
+                {
+                    int finishSpan = lastIndex - peakIndex;
+                    hillProgress =
+                        finishSpan > 0
+                            ? (lastIndex - index) / (float)finishSpan
+                            : 1f;
+                }
+
+                float smoothHillEnvelope =
+                    Mathf.SmoothStep(
+                        0f,
+                        1f,
+                        Mathf.Clamp01(hillProgress));
+                float relativeEndEnvelope =
+                    Mathf.Clamp01(
+                        Mathf.Max(0f, endEnvelopes[index]) /
+                        peakEndEnvelope);
+                float targetHeight =
+                    peakHeight *
+                    Mathf.Min(
+                        smoothHillEnvelope,
+                        relativeEndEnvelope);
+                float rawHeight =
+                    Mathf.Max(0f, normalizedCrestHeights[index]);
+                normalizedCrestHeights[index] =
+                    Mathf.Lerp(
+                        rawHeight,
+                        targetHeight,
+                        PaintedAccentSingleCrestBlend);
+            }
+
+            normalizedCrestHeights[0] = 0f;
+            normalizedCrestHeights[lastIndex] = 0f;
+
+            // Preserve broad seeded variation. Only substantial one-row valleys
+            // are lifted; unlike C4, no monotonic rise/fall constraint is
+            // imposed, so shelves, asymmetry, and small irregular changes remain.
+            float[] valleySource =
+                (float[])normalizedCrestHeights.Clone();
+            float valleyThreshold =
+                peakHeight * PaintedAccentValleyThresholdFraction;
+
+            for (int index = 1; index < lastIndex; index++)
+            {
+                float currentHeight =
+                    Mathf.Max(0f, valleySource[index]);
+                float lowerNeighbourHeight =
+                    Mathf.Min(
+                        Mathf.Max(0f, valleySource[index - 1]),
+                        Mathf.Max(0f, valleySource[index + 1]));
+                float valleyDepth =
+                    lowerNeighbourHeight - currentHeight;
+                if (valleyDepth <= valleyThreshold)
+                {
+                    continue;
+                }
+
+                normalizedCrestHeights[index] =
+                    Mathf.Lerp(
+                        currentHeight,
+                        lowerNeighbourHeight,
+                        PaintedAccentValleyRepairStrength);
+            }
         }
 
         private static PaintedAccentFoldProfileBasis[]
@@ -2461,6 +2686,33 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 endEnvelope,
                 0f,
                 1.55f);
+        }
+
+        private static float ResolvePaintedAccentCrownEndEnvelope(
+            float t,
+            float foldEndEnvelope)
+        {
+            float shortRampEnvelope =
+                Mathf.SmoothStep(
+                    0f,
+                    1f,
+                    Mathf.Clamp01(
+                        t /
+                        Mathf.Max(
+                            0.001f,
+                            PaintedAccentCrownEndRampFraction))) *
+                Mathf.SmoothStep(
+                    0f,
+                    1f,
+                    Mathf.Clamp01(
+                        (1f - t) /
+                        Mathf.Max(
+                            0.001f,
+                            PaintedAccentCrownEndRampFraction)));
+
+            return Mathf.Max(
+                Mathf.Clamp01(foldEndEnvelope),
+                shortRampEnvelope * PaintedAccentLegCrownSupport);
         }
 
         private static float ResolvePaintedAccentFoldEndEnvelope(

@@ -6,7 +6,7 @@ status: working-log
 scope: proof-of-concept
 authoritative_for: "chronological implementation history; current state only in latest entries and canonical architecture docs"
 related_documents: [PS3D-06, PS3D-07, PS3D-09, PS3D-10]
-last_updated: 2026-07-07
+last_updated: 2026-07-11
 ---
 
 # Proof of Concept Implementation Log
@@ -18,6 +18,148 @@ Record enough implementation detail to resume work without reconstructing decisi
 ## Current-state reading rule
 
 This is a chronological log. Older entries record what was implemented or believed at that time. For active River Foam architecture, use `Docs/River_Foam_Stage6_Architecture.md` first and `Docs/River_Foam_Active_Blockers_and_Next_Patches.md` second. Any older log entry implying active stored-state morphing, active lateral row commit, active field-driven lateral material movement, or final shader macro stretch as intended Foam behavior is superseded.
+
+---
+
+## 2026-07-11 — River Foam `4.11C.5.16C` Advected Layer D Temporal Occupancy
+
+Status: implemented in source; Unity import/compile and runtime validation remain pending.
+
+After `5.16B/B.1` validation reported no remaining visible issue, work advanced from durable material transport to the visual sheet-memory substrate required by macro fracture.
+
+The patch adds two half-resolution `RHalf` ping-pong textures:
+
+```text
+PS3D_RiverFoam_VisualOccupancy_A
+PS3D_RiverFoam_VisualOccupancy_B
+```
+
+While any Layer D shape diagnostic is active, each fixed material tick now:
+
+```text
+builds Film Source from committed Layer C material;
+builds Film Support from that source;
+uses the existing source/support formula as an instantaneous target;
+advects previous visual occupancy through canonical local velocity;
+reuses Layer C's CFL substep count;
+closes shore, obstacle, invalid, and lateral exterior faces;
+permits flow-aware one-way longitudinal endpoint outflow;
+relaxes toward the target with exponential build/release response;
+evaluates _FoamShapeMask from committed Presence plus temporal occupancy.
+```
+
+Default controls are `Visual Occupancy Build Time = 0.20 s` and `Visual Occupancy Release Time = 0.80 s`. The exponential response preserves the same total acquisition/release for any accepted substep count.
+
+Added diagnostics:
+
+```text
+Foam Instantaneous Film Target
+Foam Temporal Occupancy
+Foam Temporal Difference
+```
+
+The difference view renders retained occupancy in green and not-yet-acquired target coverage in magenta. History is cleared when shape diagnostics are re-entered so debug-gated state cannot silently resume from stale data.
+
+Layer C state, lifetime, spawning, canonical velocity semantics, and Final Foam are unchanged. Temporal occupancy is visual-only infrastructure for `5.16D` persistent macro pinching, tearing, split/rejoin behavior, and fracture.
+
+---
+
+## 2026-07-11 — River Foam `4.11C.5.16B.1` Obstacle Residual Stability + Raw Material Diagnostics
+
+Status: accepted for progression after the user reported that the Unity result looked good and approved moving forward; no remaining warning or obstacle snap-back was reported.
+
+The first Unity run of conservative transport produced a D3D11 warning for the longitudinal face-flux helper and revealed violent visual advance/snap-back near an obstacle at maximum slowdown. The conservative solver kept obstacle-exclusion faces closed, but render-only point-velocity extrapolation predicted movement between ticks that the next material tick could not reproduce.
+
+The corrective patch:
+
+```text
+replaced the float4-return longitudinal helper with a void helper;
+initialized resolved flux and boundary outflow to zero before all branches;
+preserved the exact donor-cell numerical result;
+multiplied residual render travel by 1 - smoothstep(0.05, 0.35, obstacle influence);
+kept open-water two-axis residual smoothing;
+sampled committed Material Presence and Remaining Life directly from _FoamCurrent at fieldUV;
+anchored Motion Field ownership overlays and the cell grid to fieldUV;
+used committed Presence as the Layer D Shape Difference reference.
+```
+
+The existing Lane Advection Ratio remains the route-scroll control. It advances a scalar phase using `deltaTime`, so speed is frame-rate independent and does not trigger lane-texture rebuilds. Initial validation should use `0.05`; existing serialized values are not automatically rewritten.
+
+---
+
+## 2026-07-11 — River Foam `4.11C.5.16B` Conservative Unified 2D Material Advection
+
+Status: accepted for progression after the user reported that the combined `5.16B/B.1` Unity result looked good and approved moving forward.
+
+### Accepted prerequisite
+
+`4.11C.5.16A.1` was accepted externally. Obstacle slowdown at strength `1` / minimum downstream factor `0` produced clearly dark or near-black obstacle-facing regions. Direction Change Frequency and Across-River Coherence produced the intended route structure. The canonical velocity files were therefore preserved.
+
+### Replaced transport authority
+
+Removed the obsolete Layer C movement path:
+
+```text
+CPU foamPhaseTransportMetres accumulation;
+whole-column CommitPhaseTransport dispatch;
+sourceX = x - _FoamPhaseCommitCells;
+global _FoamRenderTravelMetres shader offset.
+```
+
+`SimulateFoam` now transports one packed vector with first-order donor-cell finite-volume fluxes:
+
+```text
+R = Presence
+G = Presence × Remaining Life
+B = Presence × Material Pattern
+A = reserved
+```
+
+Internal longitudinal and lateral face velocities are arithmetic means of the two adjacent canonical cell-centre velocities. The physical downstream magnitude is converted to signed storage-grid X velocity through `_FoamFlowDirection`; signed lateral velocity is used directly. Invalid water, banks, and obstacle footprints close a face. Only the physical longitudinal outlet permits one-way outflow, and reverse flow swaps that outlet.
+
+### Scheduling and lifecycle
+
+The accepted `8 / 12 / 16 Hz` material rates remain. A conservative bound computes:
+
+```text
+CFL = dt × (|u|max / minimum longitudinal spacing
+          + |v|max / minimum lateral spacing)
+substeps = ceil(CFL / 0.90)
+```
+
+The hard limit is 64 substeps. A step exceeding it is not dispatched; its accumulator time and queued births remain pending and the Inspector reports the required count.
+
+Each substep uses `materialStepDuration / substeps` for lifecycle aging. Material topology is sampled at the current cell centre with no phase compensation. Automatic source events and queued births are merged into the final ping-pong texture after all substeps, so new material begins moving on the following tick.
+
+### Render residual
+
+The old global metre offset was removed. The unconsumed material accumulator is bound as `_FoamRenderAdvectionSeconds`. The river shader resolves the same canonical local velocity at the visible field coordinate and backtraces both downstream and lateral metres. This extrapolation is presentation-only and adds no full-resolution texture.
+
+### Diagnostics
+
+Added a compact 12-counter raw GPU buffer captured at 4 Hz with asynchronous readback for aggregate per-substep transport accounting:
+
+```text
+Presence before / after;
+life moment before / after;
+pattern moment before / after;
+longitudinal endpoint outflow for all three;
+clamp/saturation loss for all three;
+unaccounted error ratios;
+full-step and per-substep CFL;
+required / used substeps;
+safety-limit state.
+```
+
+Simulation does not wait for readback. Display gates are `0.25%` unaccounted error and `0.10%` Presence clamp loss.
+
+### Scope proof
+
+No source grammar, lifetime-control meaning, Layer D formula, canonical velocity semantic, Ground system, Generated Mass system, scene/prefab default, or full-resolution Foam texture count was intentionally changed. `RiverWaterFoamVelocity.hlsl` and `CS_RiverFoam.Motion.hlsl` remain unchanged.
+
+### Validation gate
+
+The user reported the combined `5.16B/B.1` result looked correct and approved progression to `5.16C`. Detailed diagnostic values were not copied into this log, so any later conservation regression should still be checked against the fixed-height transport metrics.
 
 ---
 

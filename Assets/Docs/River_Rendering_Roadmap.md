@@ -285,24 +285,15 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 
 `4.11C.5.11` tested the first post-baseline Layer D local procedural breakup probe. Validation rejected it as the fine-fragmentation solution: it was active, but the removals were cell/ribbon-shaped because `_FoamShapeMask` is the wrong resolution for atomic detail. `4.11C.5.11B` retires that code and restores the clean pass-through Layer D baseline. Fine breakup now belongs in Layer E shader composition; Layer D should focus on macro sheet/contact/bridge structure.
 
-### Current status after architecture lock
+### Current status after `4.11C.5.16C`
 
-Stage 6 has completed the provisional Layer C spawning prerequisite. Shore, static-object/contact, and free-water lace/cross-lace/fragment source families now create real persistent `FoamState` material. Their visuals remain imperfect, and cross-lace longitudinal blockiness is parked, but spawning is sufficiently varied to resume evolution work.
+Stage 6 has accepted the Layer C movement foundation. `4.11C.5.16A.1` validated the canonical velocity field. `4.11C.5.16B` replaced global phase transport with conservative local 2D packed-state advection, and `4.11C.5.16B.1` removed the D3D11 helper warning, restored committed-state diagnostics, and prevented obstacle-region render prediction from fighting closed transport faces. The user reported that the Unity result looked good and approved progression, so Layer C is parked unless a regression appears.
 
-The active work now proceeds from motion authority toward final rendering. `4.11C.5.16A` established one unified physical Foam velocity contract from separate scrolling lane intent, fixed obstacle routing, base Foam speed, and local obstacle slowdown. Validation confirmed nonnegative downstream speed, signed lateral response, flow reversal, physical lane phase, and no premature material movement. `4.11C.5.16A.1` is the required pre-transport correction: fixed-height Inspector diagnostics, Motion Field brightness controlled only by downstream speed, and independent Direction Change Frequency / Across-River Coherence controls. It adds no velocity texture, material movement, or steady compute dispatch. Conservative unified 2D Layer C material advection follows only after this corrected field is accepted; Layer D phase/history work follows only after real material transport is accepted.
+`4.11C.5.16C — Advected Layer D Temporal Occupancy` is implemented in source and awaits Unity validation. Two half-resolution `RHalf` textures ping-pong a visual-only occupancy sheet. Each fixed material tick rebuilds Film Source and Film Support from committed material, advects prior occupancy through the same canonical velocity and Layer C CFL substeps, then relaxes toward the instantaneous film target with independent build/release times (`0.20 s / 0.80 s` defaults).
 
-Therefore the active direction is no longer “tune coherent deformation harder.” The active direction is the corrected acyclic layer architecture:
+The temporal field is not a smoothing objective. It is the persistent moving canvas required by the next macro feature: pinching, tears, split/rejoin behavior, and fractures that survive more than one stateless shape evaluation. It never writes Layer C, never extends Remaining Life, and is not yet consumed by Final Foam.
 
-```text
-Layer A — River Domain
-Layer B — External Influence Fields
-Layer C — Persistent Foam Material
-Layer D — Visual Foam / Film Evaluation
-Layer E — Shader Composition
-Layer F — Scheduling, Quality, Debug
-```
-
-The important correction is that the old `Stage 1.5` concept is retired. External support/contact/motion fields are `Layer B` and must remain foam-agnostic. Foam-derived film-source/sheet-support fields are `Layer D` internals and must never feed Layer C.
+New diagnostics expose the current target, temporal occupancy, and their difference. Final Foam remains unchanged. The next stage is gated on proof that occupancy transports, builds, releases, clips, reverses, and resets correctly.
 
 ### Stable foundations
 
@@ -312,7 +303,7 @@ Accepted/stable foundations:
 - source-only `Amount` and source-to-persistent merge rules;
 - topology lifespan support and negative aging pressure;
 - lifetime delta-time rebind and support/negative aging response repair;
-- downstream phase transport;
+- conservative local 2D packed-state transport through the canonical velocity;
 - 5.9n persistent morph cleanup in the compute/simulation path;
 - 5.9p lateral commit shredder disable;
 - Motion Field debug corrected to raw stored `Presence`;
@@ -344,7 +335,7 @@ Layer ownership:
 1. `Layer A — River Domain`: river coordinate basis, valid fluid, boundary/shore mapping, material UV contract.
 2. `Layer B — External Influence Fields`: foam-agnostic support/contact/motion/exclusion/wake/pressure fields. May feed Layer C and Layer D. Must not read Layer C or Layer D.
 3. `Layer C — Persistent Foam Material`: durable `FoamState`; only owner of real material birth, death, life, and movement.
-4. `Layer D — Visual Foam / Film Evaluation`: derived broad visible film products such as `_FoamShapeMask`, future film-source/support helpers, optional visual history. May read C; must not write C.
+4. `Layer D — Visual Foam / Film Evaluation`: Film Source, Film Support, advected temporal occupancy, and `_FoamShapeMask`. May read C; must not write C.
 5. `Layer E — Shader Composition`: final color/opacity/edge softness/local breakup/thin streaks/debug pixels. No feedback.
 6. `Layer F — Scheduling, Quality, Debug`: dispatch order, quality tiers, allocation, binding, labels, debug views. No behavior ownership.
 
@@ -358,22 +349,21 @@ Stage 3 / Layer E = shader polish and local detail.
 
 ### Current recovery sequence
 
-The current approved order is:
+The modern execution order is:
 
-1. Documentation lock and acyclic architecture correction — complete in the canonical docs update.
-2. Compliance and debug truth audit — complete in 4.11C.5.10; Foam Shape Difference now compares _FoamShapeMask against raw Persistent Presence, stale movement labels were corrected, and current Layer D dispatch is gated to Layer D debug use while Final Foam remains disconnected.
-3. Failed 5.9z warp retirement — complete in 4.11C.5.10B; EvaluateFoamShape is back to pass-through clipped Persistent Presence so future work starts from a clean Layer D baseline.
-4. Layer E shader-side local detail probe — implemented in `4.11C.5.12` as debug-only `Foam Shader Detail Probe` / `Foam Shader Detail Difference`; validate cheap sub-cell chipping/fray/cuts at rendered-pixel scale without mutating `_FoamShapeMask` or `FoamState`.
-5. Low-res Layer D Film Source / Film Support — implemented through `4.11C.5.13`; `5.13B` fixed domain-space sampling, `5.13C` fixed support-topology contamination, and `5.13D` tunes spread shape.
-6. Layer C automatic source population — `4.11C.5.14A` adds the first conservative shore/contact birth source class as real persistent FoamState material, disabled by default and routed through the existing birth/injection pipeline. `4.11C.5.14B` establishes source-class-specific spawning, and `4.11C.5.14C` removes bloated low-level controls in favor of Coverage, Size, Strength, and Persistence for shore foam.
-7. Validate automatic shore/contact birth with `Material Presence`, `Material Remaining Life`, `Foam Film Source`, `Foam Film Support`, `Foam Evaluated Shape`, `Foam Shape Difference`, and unchanged Final Foam. At density around 0.35, shore birth should produce small sparse strokes/seeds, not river-wide chunks.
-8. Full-res _FoamShapeMask integration — combine persistent material, visual support, valid fluid, and exclusion into macro structure only after source placement plus Layer D shape are visually accepted.
-9. Final Foam consumes _FoamShapeMask — only after Layer D visibly outperforms current final foam.
-10. Thin bright streak layer — shader-side local detail, separate from broad film structure; this may merge with item 4 if the probe is accepted.
-11. Optional visual-only history — only if flicker becomes a real issue.
-12. Performance tiers and chunk scheduling — formalize update rates, resolution tiers, active chunk caps, and profiling counters.
+1. Layer A/B/C ownership and diagnostic correction — complete.
+2. Layer E rendered-pixel detail proof — complete as debug-only `5.12`.
+3. Layer D Film Source / Film Support — complete through `5.13D`.
+4. Layer C source population families — complete provisionally through `5.15B.3.1`.
+5. Canonical velocity diagnostics — accepted in `5.16A.1`.
+6. Conservative local 2D Layer C material transport — accepted through `5.16B.1`.
+7. Advected Layer D temporal occupancy — implemented in `5.16C`, now awaiting validation.
+8. Persistent visual damage and macro fracture — next after `5.16C` acceptance.
+9. Final Foam consumes the accepted Layer D evaluated shape.
+10. Shader-local cracks, edge chips, thin streaks, glints, and lighting polish.
+11. Formal performance tiers, active-chunk scheduling, and profiling gates.
 
-Automatic birth population is now allowed only as Layer C source population: it must create real persistent material through the existing birth path, must remain disabled by default, must use source-class-specific strategies, and must not make generic support/topology render as foam.
+Final Foam remains disconnected until temporal occupancy and macro fracture visibly outperform the legacy player-facing shape path without changing Layer C truth.
 
 ### Public workflow and debug requirements
 
@@ -583,39 +573,30 @@ Added Cross-Lace Connectors to Free Water Foam. This is a horizontal/cross-curre
 
 
 
-## River Foam movement foundation — `4.11C.5.16A` / `5.16A.1`
+## River Foam movement foundation — `4.11C.5.16A` through `5.16B`
 
-`4.11C.5.16A — Unified Foam Velocity Contract` is implemented and validated at the contract level. `4.11C.5.16A.1 — Velocity Diagnostics Stability + Route Frequency` is implemented and awaiting Unity validation.
+`4.11C.5.16A` established the shared physical velocity contract. `4.11C.5.16A.1` stabilized and validated its route-frequency, across-river-coherence, and slowdown diagnostics.
 
-Canonical inputs:
+`4.11C.5.16B` replaces the obsolete global X-column phase commit with conservative local 2D Layer C transport:
 
 ```text
-scrolling lateral lane intent;
-fixed obstacle route direction/influence;
-river Flow Speed × Liquid Factor × Downstream Speed Ratio;
-Maximum Lateral Speed Ratio;
-Obstacle Slowdown Strength;
-Obstacle Minimum Downstream Factor.
+canonical resolved velocity at cell centres;
+arithmetic-mean velocity at shared faces;
+first-order donor-cell packed-state flux;
+closed bank/obstacle/invalid faces;
+flow-direction-aware one-way endpoint outflow;
+CFL target 0.90 and maximum 64 substeps;
+lifecycle aging distributed across substeps;
+births applied after the completed tick;
+local render residual measured in seconds.
 ```
 
-Canonical output:
+No new full-resolution texture is introduced. The canonical velocity include and raw Motion-field compute include remain unchanged. Unity validation of transport is the only active gate.
+
+Immediate order:
 
 ```text
-float2 velocityMetresPerSecond
-  x = nonnegative downstream speed magnitude
-  y = signed lateral speed
-```
-
-The same pure HLSL contract is used by compute-side field resolution and the existing Motion Field debug branch. The lane and obstacle textures remain separate because their coordinate rules differ. The current global phase transport is temporarily retained, so this remains a velocity proof rather than stored-material movement.
-
-`5.16A.1` adds no new motion authority. It stabilizes the existing Inspector geometry, makes debug brightness a direct downstream-speed proof, and splits route shaping into independent downstream sign-change frequency and across-river coherence. The Motion Lane field rebuild signature includes both controls; obstacle routing remains fixed to its own signature.
-
-Next implementation order:
-
-```text
-validate 5.16A.1 field diagnostics and route shape;
-5.16B conservative unified 2D Layer C material advection;
-5.16C Layer D temporal occupancy/phase state using the same velocity;
+validate 5.16C temporal occupancy transport, boundaries, reverse flow, build/release response, and reset behavior;
 5.16D persistent visual damage and macro fracture;
 5.16E Final Foam consumes the accepted evaluated shape;
 5.16F shader-local sub-cell cracking, edge chipping, glints, and lighting polish.

@@ -319,6 +319,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentStrokeAngleJitterDegrees");
             SerializedProperty paintedAccentFoldHeight =
                 feature.FindPropertyRelative("paintedAccentFoldHeight");
+            SerializedProperty paintedAccentCrestCrownHeight =
+                feature.FindPropertyRelative("paintedAccentCrestCrownHeight");
             SerializedProperty paintedAccentFoldIrregularity =
                 feature.FindPropertyRelative("paintedAccentFoldIrregularity");
             SerializedProperty paintedAccentFoldEndTaper =
@@ -379,11 +381,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         EditorStyles.miniBoldLabel);
                     EditorGUILayout.Slider(
                         paintedAccentStrokeWidth,
-                        0.04f,
+                        0.01f,
                         0.35f,
                         new GUIContent(
                             "Stroke Width",
-                            "Visible width in metres for the open crest ribbon. Legacy BodyWidth is not used by the ribbon mesh."));
+                            "Visible shoulder-to-shoulder width in metres for the crowned crest ribbon. Use 0.02 m for the focused shape proof. Legacy BodyWidth is not used by the ribbon mesh."));
                     EditorGUILayout.Slider(
                         paintedAccentStrokeDensity,
                         0f,
@@ -421,15 +423,22 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                             "Maximum signed angle offset in degrees around the perpendicular stroke angle derived from Facing Direction Degrees. Each stroke rolls independently between -value and +value."));
                     EditorGUILayout.Space(4f);
                     EditorGUILayout.LabelField(
-                        "Grounded Open Crest Ribbon",
+                        "Grounded Crowned Crest Ribbon",
                         EditorStyles.miniBoldLabel);
                     EditorGUILayout.Slider(
                         paintedAccentFoldHeight,
                         0f,
-                        0.25f,
+                        0.50f,
                         new GUIContent(
                             "Fold Height",
-                            "Calibration-only maximum open-ribbon height in metres. Validate 0.12, 0.18, and 0.24 from the same gameplay camera; this extended range is not an accepted production default."));
+                            "Maximum longitudinal rise in metres. Use 0.25 m as the focused crowned-ribbon proof baseline; the extended 0.50 m range leaves room above the intended normal value without changing serialized style defaults."));
+                    EditorGUILayout.Slider(
+                        paintedAccentCrestCrownHeight,
+                        0f,
+                        0.05f,
+                        new GUIContent(
+                            "Crest Crown Height",
+                            "Additional centreline height above the two ribbon shoulders. Test 0.01, 0.02, and 0.03 m at Stroke Width 0.02 m and Fold Height 0.25 m."));
                     EditorGUILayout.Slider(
                         paintedAccentFoldIrregularity,
                         0f,
@@ -706,6 +715,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentStrokeAngleJitterDegrees");
             SerializedProperty foldHeight =
                 feature.FindPropertyRelative("paintedAccentFoldHeight");
+            SerializedProperty crestCrownHeight =
+                feature.FindPropertyRelative("paintedAccentCrestCrownHeight");
             SerializedProperty foldIrregularity =
                 feature.FindPropertyRelative("paintedAccentFoldIrregularity");
             SerializedProperty foldEndTaper =
@@ -744,6 +755,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             if (foldHeight != null)
             {
                 foldHeight.floatValue = 0.018f;
+            }
+
+            if (crestCrownHeight != null)
+            {
+                crestCrownHeight.floatValue = 0.02f;
             }
 
             if (foldIrregularity != null)

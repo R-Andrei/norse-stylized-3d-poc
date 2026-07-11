@@ -371,7 +371,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             {
                 ApplyToTargets(
                     "Regenerate Generated Mass",
-                    mass => mass.Regenerate());
+                    mass =>
+                    {
+                        Debug.Log(
+                            "GeneratedMass manual regeneration context. " +
+                            "object=" + mass.name +
+                            ", entityId=" + mass.GetEntityId(),
+                            mass);
+                        mass.Regenerate();
+                    });
             }
 
             if (GUILayout.Button("Reset to Archetype"))

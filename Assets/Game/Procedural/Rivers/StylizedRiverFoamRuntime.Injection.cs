@@ -78,29 +78,58 @@ namespace ProgrammaticStylized3D.Rivers
             materialStepCountSinceSession++;
         }
 
-        private void SimulateFullField(float deltaTime)
+        private void SimulateFullField(
+            float materialStepDuration,
+            int transportSubsteps)
         {
             if (currentState == null || writeState == null ||
-                fieldWidth <= 0 || fieldHeight <= 0)
+                fieldWidth <= 0 || fieldHeight <= 0 ||
+                transportSubsteps <= 0)
             {
-                pendingMaterialBirths.Clear();
                 return;
             }
 
-            // Topology maintenance kernels also use the shared
-            // _FoamDeltaTime scalar and may configure it with 0 when they
-            // rebuild static/debug inputs immediately before this pass.
-            // Rebind the lifecycle parameters here, directly before
-            // SimulateFoam, so material aging uses this step's real delta
-            // and the current authoritative read/write textures.
-            ConfigureSharedComputeParameters(deltaTime);
-
             previousState = currentState;
-            DispatchSimulation(0, fieldWidth);
-            DispatchAutomaticFoamSourceEvents(writeState, deltaTime);
-            DispatchQueuedMaterialBirths(writeState);
-            (currentState, writeState) = (writeState, currentState);
-            RecordMaterialSimulationStep(deltaTime);
+            float transportMetricsInterval = 1f /
+                TransportMetricsUpdateRate;
+            transportMetricsAccumulator += materialStepDuration;
+            bool captureTransportMetrics =
+                transportMetricsAccumulator >= transportMetricsInterval &&
+                BeginTransportMetricCapture();
+            if (captureTransportMetrics)
+            {
+                transportMetricsAccumulator %= transportMetricsInterval;
+            }
+
+            float substepDelta = materialStepDuration /
+                Mathf.Max(1, transportSubsteps);
+
+            for (int substep = 0; substep < transportSubsteps; substep++)
+            {
+                // Topology maintenance kernels also use shared compute
+                // parameters. Rebind every conservative substep immediately
+                // before SimulateFoam so the packed read/write textures and
+                // lifecycle delta are authoritative.
+                ConfigureSharedComputeParameters(substepDelta);
+                ConfigureTransportSubstepDiagnostics(
+                    captureTransportMetrics);
+                DispatchSimulation(0, fieldWidth);
+                (currentState, writeState) = (writeState, currentState);
+            }
+
+            // Births are merged into the completed transported state. They
+            // begin moving on the following fixed material tick and therefore
+            // cannot be written into an obsolete pre-advection texture.
+            DispatchAutomaticFoamSourceEvents(
+                currentState,
+                materialStepDuration);
+            DispatchQueuedMaterialBirths(currentState);
+            RecordMaterialSimulationStep(materialStepDuration);
+
+            if (captureTransportMetrics)
+            {
+                RequestTransportMetricReadback();
+            }
         }
 
         private void DispatchQueuedMaterialBirths(RenderTexture target)
@@ -554,16 +583,9 @@ namespace ProgrammaticStylized3D.Rivers
             DispatchIsolatedLifeProbeToState(writeState, rectA, rectB, rectC);
             previousState = currentState;
             simulationInterpolation = 1f;
-            foamRenderTravelMetres = foamPhaseTransportMetres;
+            foamRenderAdvectionSeconds = 0f;
             lastRenderInterpolationAlpha = simulationInterpolation;
-            lastFoamPhaseTransportMetres = foamPhaseTransportMetres;
-            lastFoamRenderTravelMetres = foamRenderTravelMetres;
-            lastFoamPhaseCellFraction =
-                minimumTransportLongitudinalSpacing > 0.0001f
-                    ? Mathf.Clamp01(
-                        Mathf.Abs(foamPhaseTransportMetres) /
-                        minimumTransportLongitudinalSpacing)
-                    : 0f;
+            lastFoamRenderAdvectionSeconds = 0f;
 
             double now = Time.realtimeSinceStartupAsDouble;
             birthCommandsThisFrame++;
@@ -667,10 +689,12 @@ namespace ProgrammaticStylized3D.Rivers
             Dispatch(writeIsolatedLifeProbeKernel, fieldWidth, fieldHeight);
         }
 
-        private float WorldGlobalDistanceToFoamStorageGlobalDistance(
+        private static float WorldGlobalDistanceToFoamStorageGlobalDistance(
             float globalDistance)
         {
-            return globalDistance - foamPhaseTransportMetres;
+            // Conservative local transport stores material in its actual
+            // current grid cell. No global phase compensation remains.
+            return globalDistance;
         }
 
         private void DispatchInjection(PendingInjection injection, RenderTexture target)
@@ -789,15 +813,8 @@ namespace ProgrammaticStylized3D.Rivers
                 lastInjectionStateSynchronized = true;
                 lastInjectionBoundaryCoverage = SampleInjectionBoundaryCoverage(injection);
                 simulationInterpolation = 1f;
-                foamRenderTravelMetres = foamPhaseTransportMetres;
-                lastFoamPhaseTransportMetres = foamPhaseTransportMetres;
-                lastFoamPhaseCellFraction =
-                    minimumTransportLongitudinalSpacing > 0.0001f
-                        ? Mathf.Clamp01(
-                            Mathf.Abs(foamPhaseTransportMetres) /
-                            minimumTransportLongitudinalSpacing)
-                        : 0f;
-                lastFoamRenderTravelMetres = foamRenderTravelMetres;
+                foamRenderAdvectionSeconds = 0f;
+                lastFoamRenderAdvectionSeconds = 0f;
             }
         }
 

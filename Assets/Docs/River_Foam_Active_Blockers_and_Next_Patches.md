@@ -39,95 +39,75 @@ Layer D may read Layer C, but must never write Layer C.
 Layer E must never feed back into compute/simulation.
 ```
 
-## Active state after `4.11C.5.16A.1 — Velocity Diagnostics Stability + Route Frequency`
+## Active state after `4.11C.5.16C — Advected Layer D Temporal Occupancy`
 
-Source spawning is provisionally sufficient and no longer the active blocker:
+Source spawning remains provisionally sufficient and parked. `4.11C.5.16A.1`, `4.11C.5.16B`, and `4.11C.5.16B.1` are accepted for progression after the user reported that the Unity result looked good and approved moving forward; no remaining velocity, transport-warning, or obstacle-residual problem was reported.
 
-```text
-shore material exists;
-static object/contact material exists;
-free-water lace, cross-lace, and fragment material exists;
-known cross-lace resolution/blockiness is parked;
-Cross-Lace should remain a minority Mixed pattern until a later resolution strategy is justified.
-```
-
-The canonical motion input is now one physical resolved-velocity contract, not an independent new texture and not the old lateral-cells scalar:
+Layer C movement authority is therefore closed unless a concrete regression appears:
 
 ```text
-velocity.x = nonnegative downstream metres/second
-velocity.y = signed lateral metres/second
+canonical cell-centre velocity
+→ arithmetic-mean shared-face velocity
+→ first-order donor-cell packed-state flux
+→ lifecycle aging per CFL substep
+→ births merged after the completed material tick
 ```
 
-Raw lane intent remains a scrolling RHalf field. Raw obstacle routing remains a fixed RGHalf field. The pure resolver marries them with base Foam speed and obstacle slowdown. No new runtime texture or dispatch was added.
-
-The velocity controls now have one responsibility each:
+`4.11C.5.16C` is implemented in source and is the active validation patch. It creates the Layer D sheet-memory substrate required by persistent macro deformation and fracture:
 
 ```text
-Downstream Speed Ratio:
-  base persistent-Foam speed relative to river speed;
-
-Maximum Lateral Speed Ratio:
-  maximum signed lateral speed;
-
-Lane Advection Ratio:
-  physical downstream speed of the route pattern itself;
-
-Direction Change Frequency:
-  how often route intent changes sign downstream;
-
-Across-River Coherence:
-  how broadly neighbouring rows share route intent;
-
-Low Lateral Motion Coverage:
-  fraction compressed toward low lateral magnitude;
-
-Obstacle Slowdown Strength / Obstacle Minimum Downstream Factor:
-  local nonnegative downstream slowdown contract.
+Film Source from committed Layer C material
+→ Film Support from material-derived source
+→ instantaneous visual film target
+→ advected half-resolution temporal occupancy
+→ full-resolution _FoamShapeMask = max(Presence, temporal occupancy)
 ```
 
-`4.11C.5.16A` validation confirmed the shared velocity authority, physical lane advection, lateral sign response, flow reversal, and no premature FoamState movement. It exposed three blockers before material transport: transient Inspector HelpBoxes shifted controls, obstacle yellow could obscure slowdown darkness, and one route scale controlled both downstream and across-river frequency.
-
-`4.11C.5.16A.1` is implemented to correct those blockers:
+Implemented invariants:
 
 ```text
-no runtime-changing diagnostic inserts or removes Inspector rows;
-Motion Field brightness is downstream speed only after all hue composition;
-Direction Change Frequency and Across-River Coherence are independent;
-all main, breaker, cross-cut, and warp frequencies use the split controls;
-the existing two-pass across-width smoothing remains in place;
-Motion Lane signature version 3 includes both route-shape controls;
-Obstacle Routing signature and rebuild authority remain unchanged.
+two half-resolution RHalf ping-pong textures own temporal occupancy;
+Layer D reuses the canonical velocity and Layer C CFL substep count;
+internal face velocity is the arithmetic mean of adjacent cell-centre velocities;
+shore, obstacle, invalid, and lateral exterior faces are closed;
+only the physical downstream endpoint permits one-way outflow;
+reverse flow swaps the longitudinal outlet without flipping lateral intent;
+build/release response is exponential and substep-count independent;
+default Build Time is 0.20 s and Release Time is 0.80 s;
+occupancy never writes Presence, Remaining Life, Material Pattern, Layer B, or Final Foam;
+history is cleared when Layer D diagnostics are re-entered;
+Final Foam remains unchanged and disconnected.
 ```
 
-This patch deliberately does not move stored material laterally or apply local slowdown to FoamState.
+The active diagnostics are:
+
+```text
+Foam Film Source
+Foam Film Support
+Foam Instantaneous Film Target
+Foam Temporal Occupancy
+Foam Temporal Difference
+Foam Evaluated Shape
+Foam Shape Difference
+```
+
+`Foam Temporal Difference` uses green for occupancy retained beyond the current target and magenta for target coverage not yet acquired.
 
 ### Active validation patch
 
 ```text
-4.11C.5.16A.1 — Velocity Diagnostics Stability + Route Frequency
+4.11C.5.16C — Advected Layer D Temporal Occupancy
 ```
 
-Validation must prove fixed Inspector geometry, unambiguous obstacle slowdown darkness, more frequent irregular downstream sign changes at `Direction Change Frequency = 2.0–2.5`, retained broad row grouping at `Across-River Coherence = 1.5–2.0`, no checkerboard/regular stripe result, and no stored-material movement regression.
+Validation must prove that the temporal sheet moves with the same route and reverse-flow direction as Layer C, does not enter banks or obstacle footprints, builds and releases smoothly without pulsing, preserves short-lived sheet continuity, remains distinct from committed Material Presence, clears cleanly when diagnostics are re-entered, and leaves Final Foam unchanged.
 
-### Next major patch after validation
+### Next major patch after explicit acceptance
 
 ```text
-4.11C.5.16B — Conservative Unified 2D Material Advection
+4.11C.5.16D — Persistent Visual Damage + Macro Fracture
 ```
 
-Required outcome:
-
-```text
-replace the global-only final transport authority with local 2D velocity consumption;
-transport packed Presence / Presence×Life / Presence×Pattern conservatively;
-permit coherent left/right routing and obstacle slowdown;
-permit downstream zero but never downstream negative;
-avoid per-cell stochastic row decisions and neighbour-resampling smear;
-retain strict valid-fluid/obstacle flux gates;
-prove mass error and boundary behavior in Material Presence before Layer D evolution.
-```
-
-Do not begin Layer D history, damage, final mask integration, or shader cracking until this transport authority is accepted. Layer D must later consume the same resolved velocity contract rather than inventing a second motion interpretation.
+`5.16D` will use temporal occupancy as the editable moving sheet on which pinches, persistent tears, split/rejoin behavior, and macro fracture can exist. Do not start damage/fracture, Final Foam integration, or shader cracking until `5.16C` passes Unity validation.
 
 ## Active and trusted foundations
 
@@ -136,14 +116,14 @@ Trusted foundations:
 ```text
 Persistent Foam State stores Presence, Remaining Life, and Material Pattern.
 Manual/source birth creates durable material.
-Downstream phase transport moves durable material downstream.
+Conservative local 2D donor-cell transport moves durable material through the canonical velocity field.
 Lifecycle aging and valid-fluid clipping remain Layer C-owned.
 Topology/support/negative aging influences Layer C where implemented.
-Motion Lane and Obstacle Routing remain raw Layer B inputs. Their canonical resolved physical velocity is now implemented and debug-visible, but it does not move FoamState until 5.16B.
-_FoamShapeMask exists as the Layer D product slot.
+Motion Lane and Obstacle Routing remain raw Layer B inputs. Their canonical resolved physical velocity drives Layer C FoamState transport, the bounded render residual, and Layer D temporal occupancy transport.
+_FoamShapeMask now combines committed Presence with the advected Layer D temporal occupancy product in diagnostics.
 Foam Evaluated Shape debug can display _FoamShapeMask.
 Foam Shape Difference debug compares _FoamShapeMask against raw persistent Presence.
-Final Foam still does not consume _FoamShapeMask.
+Final Foam still does not consume _FoamShapeMask or temporal occupancy.
 ```
 
 ## Superseded/rejected work
@@ -162,6 +142,10 @@ naive full-res radius 1/3/5 wide-neighbour classifier as default;
 pocket IDs / connected components / foam entity database;
 shader-side wide-neighbour structural foam search.
 ```
+
+# Superseded implementation and blocker history
+
+The sections below preserve implementation history only. They are not the active queue and must not override the `5.16C` validation gate above.
 
 ## 5.9z validation conclusion
 
@@ -287,7 +271,7 @@ Foam Shape Difference should again be fully black or nearly black until a new La
 
 ---
 
-# Active blockers
+# Superseded blocker history
 
 ## Blocker 1 — Fine breakup belongs in Layer E, not Layer D cells
 
@@ -367,7 +351,7 @@ Either preserve a transition snapshot ShapeMask or bind a clear fallback and doc
 ---
 
 
-# Immediate patch order
+# Superseded patch-order history
 
 This section is the active source of truth for the next foam work. Work items must come from this sequence:
 
@@ -1329,4 +1313,46 @@ no new dispatch;
 no material-state write;
 no spawning change;
 no lifetime-rule change.
+```
+
+
+# `4.11C.5.16B` implementation record
+
+Status: implemented in source; Unity import/compile and visual validation pending.
+
+Changed movement path:
+
+```text
+removed CPU global phase accumulation and integer column commit;
+removed CommitPhaseTransport compute authority;
+SimulateFoam now evaluates shared longitudinal/lateral donor-cell face fluxes;
+packed material moments move together;
+lifecycle samples the current cell directly and ages by substep delta;
+automatic and queued births target the completed transported texture;
+shader residual movement backtraces through canonical local velocity in X and Y.
+```
+
+Numerical and diagnostic path:
+
+```text
+8 / 12 / 16 Hz material cadence retained;
+CFL target 0.90;
+maximum 64 substeps;
+unsafe step is retained and reported, not velocity-clamped;
+compact 12-counter fixed-point GPU metrics buffer;
+asynchronous Presence/life/pattern accounting readback;
+0.25% unaccounted-error gate;
+0.10% Presence clamp-loss gate.
+```
+
+Explicitly unchanged:
+
+```text
+RiverWaterFoamVelocity.hlsl canonical semantics;
+CS_RiverFoam.Motion.hlsl raw field sampling contract;
+source grammars and authored defaults;
+lifetime-control meanings;
+Layer D formulas and ownership;
+Ground and Generated Mass systems;
+full-resolution Foam texture count.
 ```

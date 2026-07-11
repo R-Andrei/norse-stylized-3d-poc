@@ -1,9 +1,178 @@
 # Ground Generation Surface Upgrade Plan
 
 
-### 2026-07-11 — Patch V3J.3C2: Grounded Open Crest Ribbon Proof
+### 2026-07-11 — Patch V3J.3C5: Valley-Suppressed Crowned Ribbon Refinement
 
-V3J.3C2 is implemented as the final unvalidated secondary-geometry proof before returning to projection. The patch changes only the preview representation and its authoring/documentation contract. Descriptor generation, projected/debug rasterization, the style asset, shaders, base ground mesh, base collider, scenes, and unrelated systems remain unchanged.
+C4 validation isolated two implementation-level overcorrections. The strict `0.70` single-crest blend plus monotonic guards removed the unwanted `M` profiles but made most strokes read as sterile `^` shapes. Shoulder contribution increased to `0.35`, yet the crown still used the slow macro end envelope, leaving first/last interior rows with too little cross-sectional body. C5 keeps the accepted crowned-ribbon representation and corrects only those two points.
+
+Implemented code scope:
+
+```text
+Assets/Game/Procedural/Ground/GeneratedGround.cs
+Assets/Docs/Ground_Visual_Design_and_Architecture.md
+Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+```
+
+No recipe, inspector, style asset, descriptor generator, shader, scene, base mesh, collider, River, Generated Mass, or GroundModifier change is part of C5.
+
+Longitudinal shaping contract:
+
+```text
+raw source:
+  unchanged five-position stochastic crest search at every row
+
+broad guide:
+  choose the highest interior row
+  build the existing smooth rise/fall target
+  blend raw -> target at 0.35
+
+variation preservation:
+  remove C4's monotonic rise/fall passes
+  preserve asymmetry, shelves, minor bumps, and local slope changes
+
+valley suppression:
+  inspect the blended profile from an unmodified copy
+  a valley is actionable only when below both neighbours
+  required depth = more than 0.08 of the stroke peak
+  repair = lift 60% toward the lower neighbour
+  one targeted pass; no global flattening
+```
+
+Crown and leg-support contract:
+
+```text
+old cross-section factors: [0.35, 1.00, 0.35]
+new cross-section factors: [0.50, 1.00, 0.50]
+
+macro Fold Height and width:
+  continue to use the original deterministic Fold End Taper envelope
+
+crown-only short envelope:
+  ramp fraction = 0.12 of stroke length at each end
+  leg support multiplier = 0.45
+  effective crown envelope = max(original fold envelope,
+                                 short envelope × 0.45)
+
+terminal guarantee:
+  exact first/final rows remain zero-crown
+  existing 0.002 m terminal embed remains
+```
+
+No side walls, underside, caps, bottom, collider, or base-ground mutation are introduced. Topology remains three vertices across and thirteen rows minimum: 1,404 vertices and 1,728 triangles for 36 strokes, with estimated raw storage of 55,296 bytes.
+
+The log must include:
+
+```text
+singleCrestBlend=0.350
+valleyThresholdFraction=0.080
+valleyRepairStrength=0.600
+shoulderCrownFraction=0.500
+legCrownSupport=0.450
+crownEndRampFraction=0.120
+ribbonVerticesAcross=3
+longitudinalSamplesMin/Mean/Max
+crestPeakHeightMin/Mean/Max
+crownPeakHeightMin/Mean/Max
+combinedPeakHeightMin/Mean/Max
+effectiveWidthMin/Mean/Max
+vertices / triangles / memory / buildMs
+```
+
+Focused validation baseline:
+
+```text
+Stroke Width       = 0.02 m
+Fold Height        = 0.25 m
+Crest Crown Height = 0.02 m
+```
+
+Validation gate:
+
+- confirm compilation and one combined preview child with no collider;
+- confirm topology remains 1,404 vertices and 1,728 triangles for 36 strokes;
+- confirm more longitudinal variation than C4 and fewer simple `^` profiles;
+- confirm pronounced centre valleys remain uncommon without erasing small irregularity;
+- confirm first/last interior leg rows retain more visible body than C4;
+- confirm exact endpoints still meet the ground with no upright wedge;
+- reject rails, bars, roofs, blades, roots, wires, walls, obstacles, or a return to frequent two-hill profiles;
+- continue to defer final shader and distribution work until this shape gate passes.
+
+Descriptor/texture separation remains deferred to V3J.3D.
+
+### 2026-07-11 — Patch V3J.3C4: Single-Crest Crowned Ribbon Validation Result
+
+C4 retained the correct open crowned-ribbon architecture and removed the repeated `M` silhouette, but visual validation rejected its final shaping. The `0.70` guide blend plus hard monotonic rise/fall guards made most strokes look like simple `^` contours and suppressed too much seeded irregularity. The `[0.35, 1.00, 0.35]` crown factors added limited shoulder body, but the crown still followed the long macro Fold End Taper envelope, so the legs remained liable to disappear from side-biased views. C5 replaces only those over-strong/under-supported details.
+
+### 2026-07-11 — Patch V3J.3C3: Grounded Crowned Crest Ribbon Validation Result
+
+V3J.3C3 was validated as the retained representation direction after C2 removed the filled hill but exposed a flat-sheet limitation. Its three-vertex crown produced real cross-sectional body, stronger lighting variation, and much better gameplay readability. The validation did not yet close the shape gate because raw longitudinal variation frequently produced a centre dip between two higher regions, while the zero-crown shoulders allowed the start/finish legs to disappear from side views. C4 first refined those two points without changing the accepted open crowned-ribbon architecture; C5 now corrects C4's over-strong profile shaping and weak terminal support.
+
+Implemented geometry contract:
+
+```text
+longitudinal crest source:
+  unchanged 5-position stochastic profile search
+
+longitudinal resolution:
+  unchanged minimum 13 rows
+
+visible cross-section:
+  3 vertices across
+  left and right shoulders use the generated macro crest height
+  centre uses macro crest height + Crest Crown Height
+  2 sloped faces per row span
+
+ground connection:
+  existing end envelope retained
+  crown height multiplied by the same end envelope
+  only first and final rows embed by 0.002 m
+
+excluded:
+  no side walls
+  no underside
+  no caps
+  no collider
+  no base-ground mutation
+```
+
+New/extended authoring contract:
+
+```text
+Stroke Width range:       0.01–0.35 m
+Fold Height range:        0–0.50 m
+Crest Crown Height range: 0–0.05 m
+Crest Crown initial value: 0.02 m
+```
+
+The Fold Height serialized default remains `0.018 m`. The style asset is not part of the patch. `0.25 m` is the focused Fold Height proof baseline, not an automatic asset migration.
+
+For 36 strokes, expected topology is 1,404 vertices and 1,728 triangles. Estimated raw storage is 55,296 bytes with the existing 32-byte vertex estimate and 16-bit indices. The build log must report `requestedCrownHeight`, `ribbonVerticesAcross=3`, macro crest peak min/mean/max, crown peak min/mean/max, combined peak min/mean/max, effective width, material state, topology, memory, and build time.
+
+Focused validation keeps shape variables isolated:
+
+```text
+Stroke Width = 0.02 m
+Fold Height  = 0.25 m
+
+Test A: Crest Crown Height = 0.01 m
+Test B: Crest Crown Height = 0.02 m
+Test C: Crest Crown Height = 0.03 m
+```
+
+Validation result:
+
+- one combined preview child, visual-only topology, and no base mesh/collider mutation remained intact;
+- the crown faded at the endpoints and materially improved visible form over C2;
+- the geometry direction was retained;
+- multiple strokes showed an unwanted two-hill `M` silhouette;
+- shoulders and legs remained too thin because only the centre received crown offset;
+- distribution and final shader work remain deferred while C5 completes the isolated profile-variety and leg-support corrections.
+
+Descriptor/texture separation remains deferred to V3J.3D.
+
+### 2026-07-11 — Patch V3J.3C2: Grounded Open Crest Ribbon Validation Result
+
+V3J.3C2 was validated as an open-under-crest secondary-geometry proof. The patch changed only the preview representation and its authoring/documentation contract. Descriptor generation, projected/debug rasterization, the style asset, shaders, base ground mesh, base collider, scenes, and unrelated systems remained unchanged.
 
 Implemented geometry contract:
 
@@ -43,16 +212,16 @@ The Fold Height authoring range is temporarily `0–0.25 m`; serialized defaults
 0.24 m
 ```
 
-Validation gate:
+Validation result:
 
-- confirm the same stroke placement, length, facing, signed jitter, and width semantics;
-- confirm each mark starts on the ground, rises through intermediate rows, and returns to the ground;
-- confirm there is no Painted Accent surface filling the area underneath;
-- confirm one child mesh, one renderer, no collider, and no base-ground/collider mutation;
-- accept only if gameplay and low-angle views read as grounded raised accents rather than floating tape, roots, wires, blades, walls, or obstacles;
-- if the representation fails, stop increasing geometry complexity and return to descriptor-driven projection.
+- stroke placement, length, facing, signed jitter, and width semantics remained stable;
+- each mark started on the ground, rose through intermediate rows, and returned to the ground;
+- no Painted Accent surface filled the area underneath;
+- one child mesh, one renderer, no collider, and no base-ground/collider mutation were retained;
+- `0.12 m` and `0.18 m` logs reported 936 vertices, 864 triangles, and mean macro peaks `0.1140 m` and `0.1709 m`;
+- visual tests at `0.12`, `0.18`, and `0.24 m` rejected the final representation because two equal-height vertices across form a flat raised sheet with weak lighting variation and distance visibility.
 
-V3J.3D descriptor/texture separation remains deferred until the representation decision is made.
+V3J.3C3 adds only the missing narrow cross-sectional crown. V3J.3D descriptor/texture separation remains deferred until the representation decision is made.
 
 ### 2026-07-11 — Patch V3J.3C1: Ridge Readability Calibration Result
 

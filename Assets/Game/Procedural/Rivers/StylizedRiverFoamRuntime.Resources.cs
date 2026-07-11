@@ -79,6 +79,12 @@ namespace ProgrammaticStylized3D.Rivers
                 filmSourceTexture.IsCreated() &&
                 filmSupportTexture != null &&
                 filmSupportTexture.IsCreated() &&
+                visualOccupancyA != null &&
+                visualOccupancyA.IsCreated() &&
+                visualOccupancyB != null &&
+                visualOccupancyB.IsCreated() &&
+                currentVisualOccupancy != null &&
+                writeVisualOccupancy != null &&
                 topologyTexture != null &&
                 topologySourcesTexture != null &&
                 topologyGeneratedTexture != null &&
@@ -103,6 +109,7 @@ namespace ProgrammaticStylized3D.Rivers
                 metricBuffer != null &&
                 automaticFoamSourceEventBuffer != null &&
                 topologyMetricsBuffer != null &&
+                transportMetricsBuffer != null &&
                 domainVersion == river.Domain.Version &&
                 allocatedQuality == river.Quality;
         }
@@ -193,6 +200,10 @@ namespace ProgrammaticStylized3D.Rivers
                             "PS3D_RiverFoam_FilmSource");
                         filmSupportTexture = CreateFilmTexture(
                             "PS3D_RiverFoam_FilmSupport");
+                        visualOccupancyA = CreateFilmTexture(
+                            "PS3D_RiverFoam_VisualOccupancy_A");
+                        visualOccupancyB = CreateFilmTexture(
+                            "PS3D_RiverFoam_VisualOccupancy_B");
                     }
 
                     initializationPhase =
@@ -248,6 +259,8 @@ namespace ProgrammaticStylized3D.Rivers
                         previousState = stateA;
                         currentState = stateA;
                         writeState = stateB;
+                        currentVisualOccupancy = visualOccupancyA;
+                        writeVisualOccupancy = visualOccupancyB;
                     }
 
                     initializationPhase = InitializationPhase.ClearTopology;
@@ -278,6 +291,10 @@ namespace ProgrammaticStylized3D.Rivers
                     {
                         topologyMetricsBuffer = new ComputeBuffer(
                             TopologyMetricCount,
+                            sizeof(uint),
+                            ComputeBufferType.Raw);
+                        transportMetricsBuffer = new ComputeBuffer(
+                            TransportMetricCount,
                             sizeof(uint),
                             ComputeBufferType.Raw);
                         automaticFoamSourceEventBuffer = new ComputeBuffer(
@@ -453,6 +470,8 @@ namespace ProgrammaticStylized3D.Rivers
                         ClearRenderTexture(shapeMaskTexture);
                         ClearRenderTexture(filmSourceTexture);
                         ClearRenderTexture(filmSupportTexture);
+                        ClearRenderTexture(visualOccupancyA);
+                        ClearRenderTexture(visualOccupancyB);
                     }
 
                     initializationPhase =
@@ -610,15 +629,14 @@ namespace ProgrammaticStylized3D.Rivers
             resourcesDirty = false;
             ReleaseTopologyTransitionVisibleHold();
             simulationAccumulator = 0f;
-            foamPhaseTransportMetres = 0f;
-            foamRenderTravelMetres = 0f;
-            lastFoamPhaseTransportMetres = 0f;
-            lastFoamPhaseCellFraction = 0f;
-            lastPhaseCommitCellsThisFrame = 0;
-            lastPhaseCommitCellsThisSecond = 0;
-            phaseCommitCellsInCurrentSecond = 0;
-            phaseCommitCounterAccumulator = 0f;
-            lastFoamRenderTravelMetres = 0f;
+            foamRenderAdvectionSeconds = 0f;
+            lastFoamRenderAdvectionSeconds = 0f;
+            lastMaximumTransportCfl = 0f;
+            lastRequiredTransportSubsteps = 1;
+            lastUsedTransportSubsteps = 1;
+            transportSafetyLimitExceeded = false;
+            transportSafetyStatus = "CFL transport ready";
+            transportMetricsAccumulator = 0f;
             topologyMetricsAccumulator = 0f;
             simulationInterpolation = 1f;
             lastRenderInterpolationAlpha = simulationInterpolation;
@@ -962,6 +980,8 @@ namespace ProgrammaticStylized3D.Rivers
             ReleaseTexture(ref shapeMaskTexture);
             ReleaseTexture(ref filmSourceTexture);
             ReleaseTexture(ref filmSupportTexture);
+            ReleaseTexture(ref visualOccupancyA);
+            ReleaseTexture(ref visualOccupancyB);
             ReleaseProgressiveBirthDiagnosticResources();
             ReleaseTexture(ref topologyTexture);
             ReleaseTexture(ref topologySourcesTexture);
@@ -988,6 +1008,9 @@ namespace ProgrammaticStylized3D.Rivers
             previousState = null;
             currentState = null;
             writeState = null;
+            currentVisualOccupancy = null;
+            writeVisualOccupancy = null;
+            shapeProductDebugActiveLastUpdate = false;
 
             ReleaseMajorEvolutionResources();
 
@@ -1068,6 +1091,28 @@ namespace ProgrammaticStylized3D.Rivers
             topologyMetricsReadbackPending = false;
             topologyMetricsAvailable = false;
             topologyMetricsLastCompletedAt = -1.0;
+
+            if (transportMetricsReadbackPending)
+            {
+                transportMetricsBuffer = null;
+            }
+            else
+            {
+                transportMetricsBuffer?.Release();
+                transportMetricsBuffer = null;
+            }
+
+            transportMetricsGeneration++;
+            transportMetricsReadbackPending = false;
+            transportMetricsAvailable = false;
+            transportMetricsReadbackRequestedAt = -1.0;
+            transportMetricsLastCompletedAt = -1.0;
+            transportMetricsAccumulator = 0f;
+            Array.Clear(
+                latestTransportMetrics,
+                0,
+                latestTransportMetrics.Length);
+            ResetTransportMetricValues();
             integratedPresenceArea = 0f;
             visiblePresenceCoreArea = 0f;
             materialLifetimeAuthorityActive = false;
@@ -1105,7 +1150,7 @@ namespace ProgrammaticStylized3D.Rivers
             buildObjectContactFieldKernel = -1;
             resetTopologyMetricsKernel = -1;
             measureTopologyMetricsKernel = -1;
-            phaseCommitKernel = -1;
+            resetTransportMetricsKernel = -1;
             simulateKernel = -1;
             buildFilmSourceKernel = -1;
             buildFilmSupportKernel = -1;
@@ -1123,6 +1168,7 @@ namespace ProgrammaticStylized3D.Rivers
             validFieldLength = 0f;
             simulationFieldLength = 0f;
             minimumTransportLongitudinalSpacing = 0f;
+            minimumTransportLateralSpacing = 0f;
             allocatedGlobalStart = 0f;
             initializationMotionTime = 0f;
             resourcesDirty = true;

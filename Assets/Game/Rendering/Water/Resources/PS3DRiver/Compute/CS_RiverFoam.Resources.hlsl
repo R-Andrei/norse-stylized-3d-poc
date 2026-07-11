@@ -13,6 +13,8 @@ RWTexture2D<float> _FoamFilmSourceWrite;
 Texture2D<float> _FoamFilmSourceRead;
 RWTexture2D<float> _FoamFilmSupportWrite;
 Texture2D<float> _FoamFilmSupportRead;
+RWTexture2D<float> _FoamVisualOccupancyWrite;
+Texture2D<float> _FoamVisualOccupancyRead;
 RWTexture2D<float4> _FoamBirthDebugWrite;
 RWStructuredBuffer<uint> _FoamBirthDebugCounters;
 Texture2D<float4> _FoamBoundary;
@@ -95,6 +97,25 @@ static const uint FoamMetricVisibleLifeMinFixedIndex = 22u;
 static const uint FoamMetricCount = 24u;
 RWByteAddressBuffer _FoamTopologyMetrics;
 
+// Conservative packed-material transport accounting. Every value is an
+// area-weighted fixed-point sum in square-metre material units. Before/after
+// totals are accumulated per substep so lifecycle aging between substeps does
+// not masquerade as transport loss.
+static const uint FoamTransportPresenceBeforeOffset = 0u;
+static const uint FoamTransportLifeBeforeOffset = 4u;
+static const uint FoamTransportPatternBeforeOffset = 8u;
+static const uint FoamTransportPresenceAfterOffset = 12u;
+static const uint FoamTransportLifeAfterOffset = 16u;
+static const uint FoamTransportPatternAfterOffset = 20u;
+static const uint FoamTransportPresenceOutflowOffset = 24u;
+static const uint FoamTransportLifeOutflowOffset = 28u;
+static const uint FoamTransportPatternOutflowOffset = 32u;
+static const uint FoamTransportPresenceClampOffset = 36u;
+static const uint FoamTransportLifeClampOffset = 40u;
+static const uint FoamTransportPatternClampOffset = 44u;
+static const uint FoamTransportMetricCount = 12u;
+RWByteAddressBuffer _FoamTransportMetrics;
+
 int2 _FoamDimensions;
 int2 _FoamFilmDimensions;
 int2 _FoamTopologyDimensions;
@@ -116,11 +137,11 @@ int _FoamHostedNegativeEvolutionCount;
 int _FoamFreeWaterEvolutionCount;
 int _FoamConnectorIdentityCount;
 int _FoamWeakSpanIdentityCount;
-int _FoamPhaseCommitCells;
 int _FoamSourceEventIndex;
+int _FoamTransportMetricsEnabled;
 float _FoamDeltaTime;
 float _FoamDebugAbsoluteLifeProbeActive;
-float _FoamPhaseTransportMetres;
+float _FoamTransportMetricFixedPointScale;
 float _FoamGlobalStart;
 float _FoamFieldLength;
 float _FoamValidLength;
@@ -139,6 +160,8 @@ float _FoamMaximumLateralSpeedRatio;
 float _FoamObstacleSlowdownStrength;
 float _FoamObstacleMinimumDownstreamFactor;
 float _FoamMotionLaneScrollCells;
+float _FoamVisualOccupancyBuildTime;
+float _FoamVisualOccupancyReleaseTime;
 float _FoamMotionFlowSpeed;
 float _FoamMotionWaveHeight;
 float _FoamMotionWaveLength;
