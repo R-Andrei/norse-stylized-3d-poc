@@ -44,18 +44,37 @@ float RiverWaterFoamSharpenCoverage(
     return saturate(hard);
 }
 
-float RiverWaterFoamStablePattern(
+float RiverWaterFoamResolveMeaningfulPresenceFootprint(
+    float presence)
+{
+    // Match the accepted material diagnostic footprint. Lifecycle-Faithful
+    // rendering still requires meaningful material, but it does not require a
+    // dense local concentration before Remaining Life can remain visible.
+    return smoothstep(0.02, 0.16, saturate(presence));
+}
+
+struct RiverWaterFoamPatternFields
+{
+    float combined;
+    float chip;
+    float fray;
+};
+
+RiverWaterFoamPatternFields RiverWaterFoamStablePatternFields(
     float materialPattern,
     float storedGlobalDistance,
-    float lateralMetres)
+    float lateralMetres,
+    float breakupScale)
 {
+    RiverWaterFoamPatternFields fields;
     float seed = materialPattern * 43.731 + 11.17;
     float2 p = float2(storedGlobalDistance, lateralMetres);
 
     // Use several differently-oriented layers so the stored ribbon footprint
     // is not simply displayed as long parallel strokes. These coordinates are
     // storage-space metres, so the breakup rides with the material instead of
-    // swimming in world space.
+    // swimming in screen space. The accepted combined visibility pattern is
+    // preserved exactly; Chip and Fray only expose transient reuse signals.
     float broad = RiverWaterFoamValueNoise(
         p * float2(0.62, 1.75) + seed);
     float diagonal = RiverWaterFoamValueNoise(
@@ -69,12 +88,20 @@ float RiverWaterFoamStablePattern(
     float fine = RiverWaterFoamValueNoise(
         p * float2(5.80, 7.40) + seed * 2.71 + 41.0);
 
-    return saturate(
+    float broadField = saturate(
+        broad * 0.58 +
+        diagonal * 0.42);
+    float scale = saturate(breakupScale);
+
+    fields.combined = saturate(
         materialPattern * 0.32 +
         broad * 0.24 +
         diagonal * 0.22 +
         mid * 0.16 +
         fine * 0.06);
+    fields.chip = lerp(mid, broadField, scale);
+    fields.fray = lerp(fine, mid, scale);
+    return fields;
 }
 
 float RiverWaterFoamPatternedMask(
@@ -84,17 +111,25 @@ float RiverWaterFoamPatternedMask(
     float materialPattern,
     float storedGlobalDistance,
     float lateralMetres,
-    float sharpness)
+    float sharpness,
+    float breakupScale,
+    out float2 breakupField)
 {
     float s = saturate(sharpness);
     float life = saturate(remainingLife);
     float damage = 1.0 - life;
 
     float seed = materialPattern * 43.731 + 11.17;
-    float pattern = RiverWaterFoamStablePattern(
-        materialPattern,
-        storedGlobalDistance,
-        lateralMetres);
+    RiverWaterFoamPatternFields patternFields =
+        RiverWaterFoamStablePatternFields(
+            materialPattern,
+            storedGlobalDistance,
+            lateralMetres,
+            breakupScale);
+    float pattern = patternFields.combined;
+    breakupField = float2(
+        patternFields.chip,
+        patternFields.fray);
 
     float2 p = float2(storedGlobalDistance, lateralMetres);
     float slowA = sin(_Time.y * 0.31 + seed * 0.43 + pattern * 5.1) * 0.5 + 0.5;
@@ -161,97 +196,126 @@ float RiverWaterFoamPatternedMask(
     return saturate(max(hardVisible, fringe));
 }
 
-float RiverWaterFoamEvaluateShaderLocalDetailProbe(
+float RiverWaterFoamApplyEdgeBreakup(
     float baseShape,
-    float presence,
-    float remainingLife,
     float materialPattern,
-    float2 detailUV,
+    float2 breakupField,
     float globalDistance,
     float lateralMetres,
-    float renderAdvectionSeconds,
-    float sharpness,
-    float surfaceEnergy)
+    float chipStrength,
+    float frayStrength,
+    float breakupScale)
 {
-    baseShape = saturate(baseShape);
-    if (baseShape <= 0.0001)
+    float shape = saturate(baseShape);
+    float chip = saturate(chipStrength);
+    float fray = saturate(frayStrength);
+
+    // Chip and Fray are uniform authoring controls. Their shared neutral branch
+    // preserves the accepted 5.17A.1 silhouette exactly and avoids unnecessary
+    // breakup arithmetic in coherent empty or disabled regions.
+    [branch]
+    if (shape <= 0.0001 || max(chip, fray) <= 0.0001)
     {
-        return 0.0;
+        return shape;
     }
 
-    float s = saturate(sharpness);
-    float life = saturate(remainingLife);
-    float damage = 1.0 - life;
-    float seed = materialPattern * 61.37 +
-        RiverWaterFoamHash21(detailUV * float2(193.0, 257.0)) * 19.0 +
-        7.13;
+    float chipField = saturate(breakupField.x);
+    float frayField = saturate(breakupField.y);
+    float scale = saturate(breakupScale);
 
-    // Use stable river metres, not foam-grid cells or residual material UVs.
-    // This keeps the probe at the rendered-pixel/detail layer and prevents
-    // Layer E diagnostics from inheriting material-cell phase snap. Future
-    // final streak/detail motion should use its own smooth shader motion, not
-    // Layer C's residual transport coordinate.
-    float2 p = float2(globalDistance, lateralMetres);
-    float slowTime = _Time.y * 0.055;
-
-    float broad = RiverWaterFoamValueNoise(
-        float2(
-            p.x * 2.20 + p.y * 0.85,
-            p.y * 4.40 - p.x * 0.31) + seed + slowTime);
-    float mid = RiverWaterFoamValueNoise(
-        float2(
-            p.x * 5.90 - p.y * 1.35,
-            p.y * 8.70 + p.x * 0.74) + seed * 1.71 - slowTime * 1.37);
-    float fine = RiverWaterFoamValueNoise(
-        float2(
-            p.x * 13.20 + p.y * 3.10,
-            p.y * 16.60 - p.x * 1.80) + seed * 2.47 + slowTime * 2.10);
-    float grain = RiverWaterFoamValueNoise(
-        float2(
-            p.x * 24.00 - p.y * 5.80,
-            p.y * 28.00 + p.x * 3.60) + seed * 3.63 - slowTime * 2.80);
-
-    float localField = saturate(
-        broad * 0.16 +
-        mid * 0.29 +
-        fine * 0.33 +
-        grain * 0.22);
-
-    // Limit the diagnostic to edges and weak/old fringe material. Broad, high
-    // coverage interiors should remain readable so this probe tests micro detail
-    // instead of macro shape ownership.
-    float edgeBand = smoothstep(0.035, 0.42, baseShape) *
-        (1.0 - smoothstep(0.62, 0.94, baseShape));
-    float weakCoverage = 1.0 - smoothstep(0.52, 0.88, baseShape);
-    float detailInfluence = saturate(
-        edgeBand * (0.88 + surfaceEnergy * 0.22) +
-        weakCoverage * damage * 0.20);
-
-    float threshold = lerp(0.24, 0.38, s) +
-        damage * 0.12 -
-        surfaceEnergy * 0.035;
-    float keep = smoothstep(
-        threshold - 0.12,
-        threshold + 0.18,
-        localField + broad * 0.10);
-
-    // A narrow scratch signal removes tiny local slivers in the debug probe. It
-    // is deliberately bounded by detailInfluence so it cannot become a broad
-    // structural split/merge system.
-    float scratchPhase = frac(
-        p.y * 7.30 +
-        p.x * 0.46 +
-        mid * 1.70 +
-        seed * 0.11);
-    float scratch = 1.0 - smoothstep(0.010, 0.085, abs(scratchPhase - 0.5));
-    float scratchKeep = lerp(
+    // 5.17B.1 deliberately makes the top end an exaggerated stress test.
+    // Scale now changes activation as well as field selection: low values keep
+    // smaller frequent breakup, while high values admit broader, sparser bites.
+    // The survival functions remain monotone in incoming shape and preserve a
+    // fully established core at shape == 1.
+    float chipSignal = smoothstep(
+        lerp(0.40, 0.30, scale),
+        lerp(0.74, 0.62, scale),
+        chipField);
+    float chipDepth = saturate(
+        chip * chipSignal);
+    float chipCut = smoothstep(
+        0.10 + chipDepth * 0.62,
+        0.26 + chipDepth * 0.72,
+        shape);
+    float chipKeep = lerp(
         1.0,
-        0.54 + keep * 0.46,
-        scratch * edgeBand * (0.28 + damage * 0.18));
+        chipCut,
+        smoothstep(0.01, 0.08, chipDepth));
 
-    float detailed = baseShape * lerp(1.0, keep, detailInfluence);
-    detailed *= scratchKeep;
-    return saturate(detailed);
+    // Fray now reaches visibly into the rendered edge instead of editing only
+    // antialiased fringe pixels. It still fades before the fully established
+    // core and cannot independently create an isolated interior hole.
+    float fringeZone =
+        1.0 - smoothstep(
+            lerp(0.40, 0.46, scale),
+            lerp(0.82, 0.86, scale),
+            shape);
+    float fraySignal = smoothstep(
+        lerp(0.26, 0.22, scale),
+        lerp(0.62, 0.52, scale),
+        frayField);
+    float frayAuthority = saturate(
+        fray *
+        fringeZone *
+        fraySignal);
+    float frayCut = smoothstep(
+        0.02 + frayAuthority * 0.26,
+        0.14 + frayAuthority * 0.56,
+        shape);
+    float frayKeep = lerp(
+        1.0,
+        frayCut,
+        smoothstep(0.01, 0.08, frayAuthority));
+
+    // Short cuts remain derived from Chip Strength. The calibration broadens
+    // their line width, lowers the stable anchors, and lets maximum authority
+    // cut through opaque edge coverage while still preserving shape == 1.
+    float crackFrequency = lerp(
+        10.0,
+        3.5,
+        scale);
+    float crackPhase = frac(
+        lateralMetres * crackFrequency +
+        globalDistance * crackFrequency * 0.18 +
+        chipField * 1.70 +
+        materialPattern * 2.31);
+    float crackHalfWidth = lerp(
+        0.045,
+        0.100,
+        scale);
+    float crackLine =
+        1.0 - smoothstep(
+            crackHalfWidth * 0.25,
+            crackHalfWidth,
+            abs(crackPhase - 0.5));
+    float crackAnchor =
+        smoothstep(
+            lerp(0.52, 0.42, scale),
+            lerp(0.76, 0.64, scale),
+            chipField) *
+        smoothstep(
+            lerp(0.28, 0.22, scale),
+            lerp(0.58, 0.48, scale),
+            frayField);
+    float crackAuthority = saturate(
+        chip *
+        crackLine *
+        crackAnchor);
+    float crackCut = smoothstep(
+        0.16 + crackAuthority * 0.56,
+        0.32 + crackAuthority * 0.64,
+        shape);
+    float crackKeep = lerp(
+        1.0,
+        crackCut,
+        crackAuthority);
+
+    float breakupKeep = min(
+        chipKeep,
+        min(frayKeep, crackKeep));
+    return saturate(
+        shape * breakupKeep);
 }
 
 
@@ -412,26 +476,50 @@ float RiverWaterFoamResolveStateMask(
     float storedGlobalDistance,
     float lateralMetres,
     float sharpness,
+    float finalVisibilityMode,
+    float breakupScale,
     out float presence,
     out float remainingLife,
-    out float materialPattern)
+    out float materialPattern,
+    out float2 breakupField)
 {
     RiverWaterFoamDecodeMaterialState(
         state,
         presence,
         remainingLife,
         materialPattern);
-    float baseMask = RiverWaterFoamSharpenCoverage(
-        presence,
-        sharpness);
+    float baseMask;
+    float patternedPresence;
+    [branch]
+    if (finalVisibilityMode > 0.5)
+    {
+        // Presence defines only the meaningful material footprint in this mode.
+        // Once inside that footprint, Remaining Life and the stable material
+        // pattern own deterioration instead of a second high-concentration gate.
+        float lifecycleFootprint =
+            RiverWaterFoamResolveMeaningfulPresenceFootprint(presence);
+        baseMask = lifecycleFootprint;
+        patternedPresence = lifecycleFootprint;
+    }
+    else
+    {
+        // Preserve the accepted legacy result exactly for the default A/B side.
+        baseMask = RiverWaterFoamSharpenCoverage(
+            presence,
+            sharpness);
+        patternedPresence = presence;
+    }
+
     return RiverWaterFoamPatternedMask(
         baseMask,
-        presence,
+        patternedPresence,
         remainingLife,
         materialPattern,
         storedGlobalDistance,
         lateralMetres,
-        sharpness);
+        sharpness,
+        breakupScale,
+        breakupField);
 }
 
 struct RiverWaterFoamResult
@@ -441,6 +529,7 @@ struct RiverWaterFoamResult
     float materialPattern;
     float mask;
     float surfaceEnergy;
+    float2 breakupField;
     float2 fieldUV;
     float2 materialUV;
 };
@@ -455,11 +544,9 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float globalStart,
     float fieldLength,
     float interpolation,
-    float renderAdvectionSeconds,
-    float2 resolvedVelocityMetresPerSecond,
-    float obstacleInfluence,
-    float flowDirection,
     float sharpness,
+    float finalVisibilityMode,
+    float breakupScale,
     float freezeAmount,
     RiverWaterFoamSurfaceInfluence surfaceInfluence)
 {
@@ -469,6 +556,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     result.materialPattern = 0.0;
     result.mask = 0.0;
     result.surfaceEnergy = 0.0;
+    result.breakupField = 0.0;
     result.fieldUV = 0.0;
     result.materialUV = 0.0;
 
@@ -480,26 +568,12 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float2 fieldUV = float2(
         saturate((globalDistance - globalStart) / fieldLength),
         saturate(lateralMetres / max(0.001, surfaceHalfWidth) * 0.5 + 0.5));
-    float flowSign = flowDirection >= 0.0 ? 1.0 : -1.0;
-    // Point-velocity extrapolation cannot reproduce the conservative solver's
-    // closed obstacle faces. Fade it out before obstacle routing becomes strong
-    // so a material tick cannot invalidate a predicted cross-face displacement
-    // and create a repeated advance/snap-back sawtooth.
-    float renderPredictionConfidence = 1.0 - smoothstep(
-        0.05,
-        0.35,
-        saturate(obstacleInfluence));
-    float2 residualTravelMetres = float2(
-        resolvedVelocityMetresPerSecond.x * flowSign,
-        resolvedVelocityMetresPerSecond.y) *
-        max(0.0, renderAdvectionSeconds) *
-        renderPredictionConfidence;
-    float storedGlobalDistance = globalDistance - residualTravelMetres.x;
-    float storedLateralMetres = lateralMetres - residualTravelMetres.y;
-    float2 foamUV = float2(
-        saturate((storedGlobalDistance - globalStart) / fieldLength),
-        saturate(storedLateralMetres /
-            max(0.001, surfaceHalfWidth) * 0.5 + 0.5));
+    // The current committed Layer C state is the production presentation
+    // authority. Point-velocity residual backtracing was retired after Unity
+    // validation proved that it oscillated around conservative closed faces.
+    float storedGlobalDistance = globalDistance;
+    float storedLateralMetres = lateralMetres;
+    float2 foamUV = fieldUV;
 
     float blend = saturate(interpolation);
     float4 storedState = RiverWaterFoamSampleInterpolatedState(
@@ -515,21 +589,25 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float storedPresence;
     float storedRemainingLife;
     float storedMaterialPattern;
+    float2 storedBreakupField;
     float storedMask = RiverWaterFoamResolveStateMask(
         storedState,
         storedGlobalDistance,
         storedLateralMetres,
         sharpness,
+        finalVisibilityMode,
+        breakupScale,
         storedPresence,
         storedRemainingLife,
-        storedMaterialPattern);
+        storedMaterialPattern,
+        storedBreakupField);
 
-    // This is the residual-predicted state used by normal rendering. Raw Layer C
-    // diagnostics sample the committed current texture directly at fieldUV so
-    // presentation extrapolation cannot masquerade as stored material motion.
+    // Normal rendering and raw Layer C diagnostics now share the committed
+    // field coordinate. Surface warp below remains visual-only and bounded.
     result.presence = storedPresence;
     result.remainingLife = storedRemainingLife;
     result.materialPattern = storedMaterialPattern;
+    result.breakupField = storedBreakupField;
     result.fieldUV = fieldUV;
     result.materialUV = foamUV;
 
@@ -562,14 +640,18 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float visualPresence;
     float visualRemainingLife;
     float visualMaterialPattern;
+    float2 visualBreakupField;
     float visualMask = RiverWaterFoamResolveStateMask(
         visualState,
         storedGlobalDistance - warpMetres.x,
         storedLateralMetres - warpMetres.y,
         sharpness,
+        finalVisibilityMode,
+        breakupScale,
         visualPresence,
         visualRemainingLife,
-        visualMaterialPattern);
+        visualMaterialPattern,
+        visualBreakupField);
 
     float coupledMask = lerp(
         storedMask,
@@ -625,25 +707,33 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         float leadPresence;
         float leadLife;
         float leadPattern;
+        float2 leadBreakupField;
         float leadMask = RiverWaterFoamResolveStateMask(
             leadState,
             storedGlobalDistance - warpMetres.x - stretchDirection.x * stretchMetres,
             storedLateralMetres - warpMetres.y - stretchDirection.y * stretchMetres,
             sharpness,
+            finalVisibilityMode,
+            breakupScale,
             leadPresence,
             leadLife,
-            leadPattern);
+            leadPattern,
+            leadBreakupField);
         float trailPresence;
         float trailLife;
         float trailPattern;
+        float2 trailBreakupField;
         float trailMask = RiverWaterFoamResolveStateMask(
             trailState,
             storedGlobalDistance - warpMetres.x + stretchDirection.x * stretchMetres,
             storedLateralMetres - warpMetres.y + stretchDirection.y * stretchMetres,
             sharpness,
+            finalVisibilityMode,
+            breakupScale,
             trailPresence,
             trailLife,
-            trailPattern);
+            trailPattern,
+            trailBreakupField);
 
         float nearMaterial = saturate(max(
             max(storedMask, visualMask),
@@ -688,7 +778,8 @@ float3 RiverWaterResolveFoamInteriorLighting(
     float3 lighting,
     float foamMask,
     float surfaceEnergy,
-    float minimumNightVisibility)
+    float minimumNightVisibility,
+    float edgeContrast)
 {
     float3 safeLighting = max(
         float3(
@@ -707,19 +798,37 @@ float3 RiverWaterResolveFoamInteriorLighting(
         float3(0.2126, 0.7152, 0.0722));
     float3 flatLighting = lerp(
         float3(1.0, 1.0, 1.0),
-        float3(max(minimumNightVisibility, luminance), max(minimumNightVisibility, luminance), max(minimumNightVisibility, luminance)),
+        float3(
+            max(minimumNightVisibility, luminance),
+            max(minimumNightVisibility, luminance),
+            max(minimumNightVisibility, luminance)),
         0.20);
 
     float interior = smoothstep(0.42, 0.82, saturate(foamMask));
-    float strongSurfaceFeature = smoothstep(0.32, 0.78, saturate(surfaceEnergy));
+    float strongSurfaceFeature = smoothstep(
+        0.32,
+        0.78,
+        saturate(surfaceEnergy));
     float detailAllowance = lerp(0.10, 0.34, strongSurfaceFeature);
     float3 filteredInteriorLighting = lerp(
         flatLighting,
         safeLighting,
         detailAllowance);
 
-    return lerp(
+    // Zero preserves the pre-5.17A lighting exactly. Negative Edge Contrast
+    // suppresses the existing bright rim by moving edge lighting toward the
+    // filtered interior response. Positive values visibly intensify it. The
+    // established body remains on the same filtered lighting path.
+    float suppressEdge = saturate(-edgeContrast);
+    float intensifyEdge = saturate(edgeContrast);
+    float3 controlledEdgeLighting = lerp(
         safeLighting,
+        filteredInteriorLighting,
+        suppressEdge);
+    controlledEdgeLighting *= 1.0 + intensifyEdge * 0.50;
+
+    return lerp(
+        controlledEdgeLighting,
         filteredInteriorLighting,
         interior);
 }
@@ -729,7 +838,8 @@ float3 RiverWaterResolveFoamColourFiltered(
     float3 lighting,
     float foamMask,
     float surfaceEnergy,
-    float minimumNightVisibility)
+    float minimumNightVisibility,
+    float edgeContrast)
 {
     return max(
         0.0,
@@ -737,7 +847,47 @@ float3 RiverWaterResolveFoamColourFiltered(
             lighting,
             foamMask,
             surfaceEnergy,
-            minimumNightVisibility));
+            minimumNightVisibility,
+            edgeContrast));
+}
+
+struct RiverWaterFoamComposition
+{
+    float3 colour;
+    float opacity;
+};
+
+RiverWaterFoamComposition RiverWaterResolveFoamComposition(
+    float3 foamBaseTint,
+    float foamBaseOpacity,
+    float foamMask,
+    float interiorOpacityFloor,
+    float edgeContrast,
+    float3 lighting,
+    float surfaceEnergy,
+    float minimumNightVisibility)
+{
+    RiverWaterFoamComposition result;
+
+    // Preserve the accepted pre-5.17A blend exactly at Floor 0 / Contrast 0.
+    // The absolute floor applies only to an established body, so it cannot
+    // create Foam in weak fringe or outside the incoming silhouette.
+    float safeFoamMask = saturate(foamMask);
+    float baseCoverage = smoothstep(0.08, 0.46, safeFoamMask);
+    float establishedBody = smoothstep(0.42, 0.82, safeFoamMask);
+    float baseOpacity = baseCoverage * saturate(foamBaseOpacity);
+    float floorOpacity =
+        establishedBody * saturate(interiorOpacityFloor);
+
+    result.colour = RiverWaterResolveFoamColourFiltered(
+        foamBaseTint,
+        lighting,
+        safeFoamMask,
+        surfaceEnergy,
+        minimumNightVisibility,
+        edgeContrast);
+    result.opacity = saturate(max(baseOpacity, floorOpacity));
+    return result;
 }
 
 #endif

@@ -32,6 +32,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         Critical
     }
 
+
+    [Flags]
+    public enum GroundSurfaceFeatureExclusionFlags
+    {
+        None = 0,
+        PaintedAccentLines = 1 << 0
+    }
+
     [ExecuteAlways]
     [DisallowMultipleComponent]
     public sealed class GroundModifier : MonoBehaviour
@@ -52,6 +60,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private GroundModifierSurfaceEffectMode surfaceEffectMode =
             GroundModifierSurfaceEffectMode.AutoFromHeight;
+
+
+        [Tooltip("Generated surface features blocked inside this modifier shape and its Blend Distance. This can be used with Mode None and Surface Effect Mode None to create a pure placement exclusion zone.")]
+        [SerializeField]
+        private GroundSurfaceFeatureExclusionFlags featureExclusions =
+            GroundSurfaceFeatureExclusionFlags.None;
 
         [Tooltip("Compaction/path mask strength written to UV2.x when Surface Effect Mode is Custom.")]
         [Range(0f, 1f)]
@@ -105,6 +119,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public GroundModifierShape Shape => shape;
         public GroundModifierPriority Priority => priority;
         public GroundModifierSurfaceEffectMode SurfaceEffectMode => surfaceEffectMode;
+        public GroundSurfaceFeatureExclusionFlags FeatureExclusions => featureExclusions;
         public float SurfaceCompactionStrength => surfaceCompactionStrength;
         public float SurfaceDampDepositStrength => surfaceDampDepositStrength;
         public float SurfaceStandingWaterStrength => surfaceStandingWaterStrength;
@@ -212,6 +227,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 shape,
                 PriorityValue,
                 surfaceEffectMode,
+                featureExclusions,
                 surfaceCompactionStrength,
                 surfaceDampDepositStrength,
                 surfaceStandingWaterStrength,
@@ -295,6 +311,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         private Color ResolveGizmoColor()
         {
+            if ((featureExclusions &
+                 GroundSurfaceFeatureExclusionFlags.PaintedAccentLines) != 0)
+            {
+                return new Color(1f, 0.28f, 0.78f, 0.95f);
+            }
+
             if (mode == GroundModifierMode.None)
             {
                 if (surfaceEffectMode == GroundModifierSurfaceEffectMode.Custom)
@@ -367,6 +389,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             GroundModifierShape shape,
             int priority,
             GroundModifierSurfaceEffectMode surfaceEffectMode,
+            GroundSurfaceFeatureExclusionFlags featureExclusions,
             float surfaceCompactionStrength,
             float surfaceDampDepositStrength,
             float surfaceStandingWaterStrength,
@@ -385,6 +408,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shape = shape;
             Priority = priority;
             SurfaceEffectMode = surfaceEffectMode;
+            FeatureExclusions = featureExclusions;
             SurfaceCompactionStrength =
                 Mathf.Clamp01(surfaceCompactionStrength);
             SurfaceDampDepositStrength =
@@ -413,6 +437,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public GroundModifierShape Shape { get; }
         public int Priority { get; }
         public GroundModifierSurfaceEffectMode SurfaceEffectMode { get; }
+        public GroundSurfaceFeatureExclusionFlags FeatureExclusions { get; }
         public float SurfaceCompactionStrength { get; }
         public float SurfaceDampDepositStrength { get; }
         public float SurfaceStandingWaterStrength { get; }
@@ -426,6 +451,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public Vector2 BoxSize { get; }
         public float HeightAmount { get; }
         public float PreserveDetail { get; }
+
+        public bool Excludes(
+            GroundSurfaceFeatureExclusionFlags feature)
+        {
+            return (FeatureExclusions & feature) != 0;
+        }
 
         public float EvaluateWeight(Vector2 point)
         {

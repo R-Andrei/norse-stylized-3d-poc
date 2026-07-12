@@ -113,7 +113,22 @@ static const uint FoamTransportPatternOutflowOffset = 32u;
 static const uint FoamTransportPresenceClampOffset = 36u;
 static const uint FoamTransportLifeClampOffset = 40u;
 static const uint FoamTransportPatternClampOffset = 44u;
-static const uint FoamTransportMetricCount = 12u;
+// Presence attribution losses are area-weighted fixed-point sums. Peaks use
+// the same fixed-point scale without cell-area weighting. Hit metrics are raw
+// cell-substep sample counts and may count one cell more than once when a
+// material tick requires multiple CFL substeps.
+static const uint FoamTransportPresenceUnitCapacityLossOffset = 48u;
+static const uint FoamTransportPresenceBoundaryCapacityLossOffset = 52u;
+static const uint FoamTransportPresenceObstacleCapacityLossOffset = 56u;
+static const uint FoamTransportPresenceStateValidityLossOffset = 60u;
+static const uint FoamTransportPresenceMinimumCutoffLossOffset = 64u;
+static const uint FoamTransportMaximumRawPresenceOffset = 68u;
+static const uint FoamTransportMaximumLocalCapacityExcessOffset = 72u;
+static const uint FoamTransportTotalCapacityHitCountOffset = 76u;
+static const uint FoamTransportUnitCapacityHitCountOffset = 80u;
+static const uint FoamTransportBoundaryCapacityHitCountOffset = 84u;
+static const uint FoamTransportObstacleCapacityHitCountOffset = 88u;
+static const uint FoamTransportMetricCount = 23u;
 RWByteAddressBuffer _FoamTransportMetrics;
 
 int2 _FoamDimensions;
@@ -140,6 +155,7 @@ int _FoamWeakSpanIdentityCount;
 int _FoamSourceEventIndex;
 int _FoamTransportMetricsEnabled;
 float _FoamDeltaTime;
+float _FoamLifecycleDeltaTime;
 float _FoamDebugAbsoluteLifeProbeActive;
 float _FoamTransportMetricFixedPointScale;
 float _FoamGlobalStart;

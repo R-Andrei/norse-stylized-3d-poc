@@ -746,8 +746,6 @@ namespace ProgrammaticStylized3D.Rivers
         public float MaterialStepDuration => lastMaterialStepDuration;
         public int MaterialStepsLastFrame => lastMaterialStepsThisFrame;
         public float RenderInterpolationAlpha => lastRenderInterpolationAlpha;
-        public float RenderAdvectionSeconds =>
-            lastFoamRenderAdvectionSeconds;
         public float EstimatedTransportCellsPerStep =>
             lastEstimatedTransportCellsPerStep;
         public float EstimatedLateralTransportCellsPerStep =>
@@ -803,6 +801,30 @@ namespace ProgrammaticStylized3D.Rivers
         public float TransportPatternClampLoss => transportPatternClampLoss;
         public float TransportPresenceClampLossRatio =>
             transportPresenceClampLossRatio;
+        public float TransportPresenceUnitCapacityLoss =>
+            transportPresenceUnitCapacityLoss;
+        public float TransportPresenceBoundaryCapacityLoss =>
+            transportPresenceBoundaryCapacityLoss;
+        public float TransportPresenceObstacleCapacityLoss =>
+            transportPresenceObstacleCapacityLoss;
+        public float TransportPresenceStateValidityLoss =>
+            transportPresenceStateValidityLoss;
+        public float TransportPresenceMinimumCutoffLoss =>
+            transportPresenceMinimumCutoffLoss;
+        public float TransportPresenceAttributionResidual =>
+            transportPresenceAttributionResidual;
+        public float TransportMaximumRawPresence =>
+            transportMaximumRawPresence;
+        public float TransportMaximumLocalCapacityExcess =>
+            transportMaximumLocalCapacityExcess;
+        public uint TransportTotalCapacityHitCount =>
+            transportTotalCapacityHitCount;
+        public uint TransportUnitCapacityHitCount =>
+            transportUnitCapacityHitCount;
+        public uint TransportBoundaryCapacityHitCount =>
+            transportBoundaryCapacityHitCount;
+        public uint TransportObstacleCapacityHitCount =>
+            transportObstacleCapacityHitCount;
         public bool InitializationComplete =>
             initializationPhase == InitializationPhase.Ready;
         public bool ResourcesAllocated =>
@@ -979,7 +1001,9 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamDebugView ==
                         StylizedRiverFoamDebugView.FoamTemporalOccupancy ||
                     river.FoamDebugView ==
-                        StylizedRiverFoamDebugView.FoamTemporalDifference;
+                        StylizedRiverFoamDebugView.FoamTemporalDifference ||
+                    river.FoamDebugView ==
+                        StylizedRiverFoamDebugView.FoamEvaluatedFinalPreview;
             }
         }
 

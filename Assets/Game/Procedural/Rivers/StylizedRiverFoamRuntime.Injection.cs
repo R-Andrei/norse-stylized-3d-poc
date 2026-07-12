@@ -110,7 +110,13 @@ namespace ProgrammaticStylized3D.Rivers
                 // parameters. Rebind every conservative substep immediately
                 // before SimulateFoam so the packed read/write textures and
                 // lifecycle delta are authoritative.
-                ConfigureSharedComputeParameters(substepDelta);
+                bool finalSubstep = substep == transportSubsteps - 1;
+                float lifecycleDeltaTime = finalSubstep
+                    ? materialStepDuration
+                    : 0f;
+                ConfigureSharedComputeParameters(
+                    substepDelta,
+                    lifecycleDeltaTime);
                 ConfigureTransportSubstepDiagnostics(
                     captureTransportMetrics);
                 DispatchSimulation(0, fieldWidth);
@@ -583,9 +589,7 @@ namespace ProgrammaticStylized3D.Rivers
             DispatchIsolatedLifeProbeToState(writeState, rectA, rectB, rectC);
             previousState = currentState;
             simulationInterpolation = 1f;
-            foamRenderAdvectionSeconds = 0f;
             lastRenderInterpolationAlpha = simulationInterpolation;
-            lastFoamRenderAdvectionSeconds = 0f;
 
             double now = Time.realtimeSinceStartupAsDouble;
             birthCommandsThisFrame++;
@@ -813,8 +817,6 @@ namespace ProgrammaticStylized3D.Rivers
                 lastInjectionStateSynchronized = true;
                 lastInjectionBoundaryCoverage = SampleInjectionBoundaryCoverage(injection);
                 simulationInterpolation = 1f;
-                foamRenderAdvectionSeconds = 0f;
-                lastFoamRenderAdvectionSeconds = 0f;
             }
         }
 

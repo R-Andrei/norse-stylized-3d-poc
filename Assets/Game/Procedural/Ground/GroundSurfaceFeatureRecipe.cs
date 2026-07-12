@@ -41,7 +41,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float maskInfluence = 0.5f;
 
-        [Tooltip("Stable world X/Z direction for directional features. Directional Streaks consume this as their directional bias. Painted Accent 3D strokes use Facing Direction Degrees instead; Pooled Wetness and Trampled Wear may ignore it.")]
+        [Tooltip("Stable world X/Z direction for directional features. Directional Streaks consume this as their directional bias. Painted Accent descriptors use Facing Direction Degrees instead; Pooled Wetness and Trampled Wear may ignore it.")]
         [SerializeField]
         private Vector2 direction = new Vector2(0.82f, 0.36f);
 
@@ -49,27 +49,42 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private int seedOffset;
 
-        [Tooltip("Painted Accent Lines only. Visible shoulder-to-shoulder width in metres for the crowned crest ribbon. The generated ribbon footprint uses this value directly; legacy BodyWidth remains texture/debug support only.")]
+        [Tooltip("Painted Accent Lines only. Visible projected-contour width in metres. The transformed footprint uses this value directly; BodyWidth remains texture/debug support only.")]
         [Range(0.01f, 0.35f)]
         [SerializeField]
         private float paintedAccentStrokeWidth = 0.12f;
 
-        [Tooltip("Painted Accent Lines only. Approximate target number of generated 3D surface strokes per standard 40x40 ground patch before placement rejection.")]
-        [Range(0f, 80f)]
+        [Tooltip("Painted Accent Lines only. Approximate number of weighted stroke proposals per standard 40x40 ground patch before river, modifier, sampling, slope, and grade rejection. Final accepted count may be lower because rejected proposals are not backfilled.")]
+        [Range(0f, 240f)]
         [SerializeField]
         private float paintedAccentStrokeDensity = 34f;
 
-        [Tooltip("Painted Accent Lines only. Minimum generated 3D surface stroke length in metres.")]
+        [Tooltip("Painted Accent Lines only. World-space scale in metres of the continuous deterministic density patches used to prefer some regions and leave others sparse. Larger values create broader patches without hard island boundaries.")]
+        [Range(2f, 24f)]
+        [SerializeField]
+        private float paintedAccentDistributionPatchScale = 9f;
+
+        [Tooltip("Painted Accent Lines only. Strength of continuous weighted patch distribution. Zero approaches broad random coverage; one strongly prefers high-noise regions while retaining a non-zero chance elsewhere.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float paintedAccentDistributionPatchiness = 0.70f;
+
+        [Tooltip("Painted Accent Lines only. Minimum patch-weight floor retained in sparse regions before semantic weighting. Lower values allow colder regions to become much quieter while preserving a non-zero proposal chance instead of creating hard exclusion islands.")]
+        [Range(0.02f, 0.40f)]
+        [SerializeField]
+        private float paintedAccentDistributionSparseFloor = 0.18f;
+
+        [Tooltip("Painted Accent Lines only. Minimum accepted ground-surface descriptor length in metres.")]
         [Range(0.20f, 4.0f)]
         [SerializeField]
         private float paintedAccentStrokeLengthMin = 0.55f;
 
-        [Tooltip("Painted Accent Lines only. Maximum generated 3D surface stroke length in metres.")]
+        [Tooltip("Painted Accent Lines only. Maximum accepted ground-surface descriptor length in metres.")]
         [Range(0.25f, 6.0f)]
         [SerializeField]
         private float paintedAccentStrokeLengthMax = 1.55f;
 
-        [Tooltip("Painted Accent Lines only. Local X/Z player or camera-facing direction in degrees. Generated 3D surface strokes are perpendicular to this direction, then Angle Jitter Degrees rolls around that perpendicular stroke angle.")]
+        [Tooltip("Painted Accent Lines only. Local X/Z player or camera-facing direction in degrees. Accepted ground-surface descriptors are perpendicular to this direction, then Angle Jitter Degrees rolls around that perpendicular stroke angle.")]
         [Range(0f, 360f)]
         [SerializeField]
         [FormerlySerializedAs("paintedAccentStrokeBaseAngleDegrees")]
@@ -80,27 +95,27 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float paintedAccentStrokeAngleJitterDegrees = 18f;
 
-        [Tooltip("Painted Accent Lines only. Maximum longitudinal rise in metres for the crowned crest ribbon. Height is applied along independently sampled ground normals. The ribbon rises from the ground at its start and returns to the ground at its finish; its underside remains empty.")]
+        [Tooltip("Painted Accent Lines only. Primary mesh-free projected contour amplitude in metres, applied toward fixed world +Z, which is permanent gameplay screen-up.")]
         [Range(0f, 0.50f)]
         [SerializeField]
         private float paintedAccentFoldHeight = 0.018f;
 
-        [Tooltip("Painted Accent Lines only. Additional cross-sectional crown height in metres. The centre vertex rises above the two ribbon shoulders, producing real cross-sectional body and a stable silhouette without adding an underside or collider. The crown fades through the same end envelope as Fold Height.")]
+        [Tooltip("Painted Accent Lines only. Additional projected crest/cap amplitude in metres, added to the fixed world +Z contour displacement.")]
         [Range(0f, 0.05f)]
         [SerializeField]
         private float paintedAccentCrestCrownHeight = 0.02f;
 
-        [Tooltip("Painted Accent Lines only. Controls deterministic stochastic variation in the profile search used to derive crest height. Zero approaches one clean profile; one allows several overlapping smooth basis functions and stronger slow height variation along the stroke.")]
+        [Tooltip("Painted Accent Lines only. Controls seeded longitudinal variation in the mesh-free projected contour profile.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float paintedAccentFoldIrregularity = 0.55f;
 
-        [Tooltip("Painted Accent Lines only. Controls how much of each stroke length is used to blend the raised fold back into the ground. Zero keeps only a minimal anti-clipping fade; one uses long soft end tapers.")]
+        [Tooltip("Painted Accent Lines only. Controls the projected contour and visible-width endpoint envelope.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float paintedAccentFoldEndTaper = 0.65f;
 
-        [Tooltip("Painted Accent Lines only. Uniform opaque ink colour used across the entire double-sided 3D stroke. It is intentionally unlit and does not vary with crown position, endpoints, stroke seed, scene lights, shadows, probes, or viewing side.")]
+        [Tooltip("Painted Accent Lines only. Family/variant-authored opaque ink colour reserved for the future projected coverage bake and ground-albedo composition.")]
         [ColorUsage(false, false)]
         [SerializeField]
         private Color paintedAccentInkColor =
@@ -150,7 +165,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         }
 
         public float PaintedAccentStrokeDensity =>
-            Mathf.Clamp(paintedAccentStrokeDensity, 0f, 80f);
+            Mathf.Clamp(paintedAccentStrokeDensity, 0f, 240f);
+
+        public float PaintedAccentDistributionPatchScale =>
+            Mathf.Clamp(paintedAccentDistributionPatchScale, 2f, 24f);
+
+        public float PaintedAccentDistributionPatchiness =>
+            Mathf.Clamp01(paintedAccentDistributionPatchiness);
+
+        public float PaintedAccentDistributionSparseFloor =>
+            Mathf.Clamp(paintedAccentDistributionSparseFloor, 0.02f, 0.40f);
 
         public float PaintedAccentStrokeLengthMin =>
             Mathf.Clamp(paintedAccentStrokeLengthMin, 0.20f, 4.0f);

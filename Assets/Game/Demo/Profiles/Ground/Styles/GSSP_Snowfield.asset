@@ -68,6 +68,9 @@ MonoBehaviour:
       seedOffset: 11
       paintedAccentStrokeWidth: 0.12
       paintedAccentStrokeDensity: 34
+      paintedAccentDistributionPatchScale: 9
+      paintedAccentDistributionPatchiness: 0.7
+      paintedAccentDistributionSparseFloor: 0.18
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90
@@ -87,16 +90,19 @@ MonoBehaviour:
       direction: {x: 0.82, y: 0.36}
       seedOffset: 301
       paintedAccentStrokeWidth: 0.02
-      paintedAccentStrokeDensity: 80
-      paintedAccentStrokeLengthMin: 0.5
-      paintedAccentStrokeLengthMax: 1.4
+      paintedAccentStrokeDensity: 220
+      paintedAccentDistributionPatchScale: 11
+      paintedAccentDistributionPatchiness: 0.92
+      paintedAccentDistributionSparseFloor: 0.05
+      paintedAccentStrokeLengthMin: 0.4
+      paintedAccentStrokeLengthMax: 0.6
       paintedAccentStrokeFacingDirectionDegrees: 90
-      paintedAccentStrokeAngleJitterDegrees: 25
-      paintedAccentFoldHeight: 0.16
+      paintedAccentStrokeAngleJitterDegrees: 15
+      paintedAccentFoldHeight: 0.1
       paintedAccentCrestCrownHeight: 0.02
-      paintedAccentFoldIrregularity: 0.85
+      paintedAccentFoldIrregularity: 0.8
       paintedAccentFoldEndTaper: 0.4
-      paintedAccentInkColor: {r: 0.122641504, g: 0.11606767, b: 0.10817906, a: 1}
+      paintedAccentInkColor: {r: 0.5895336, g: 0.59665364, b: 0.6037736, a: 1}
   - id: snowfield.patchy
     displayName: Patchy
     materialControls:
@@ -150,6 +156,9 @@ MonoBehaviour:
       seedOffset: 23
       paintedAccentStrokeWidth: 0.12
       paintedAccentStrokeDensity: 34
+      paintedAccentDistributionPatchScale: 9
+      paintedAccentDistributionPatchiness: 0.7
+      paintedAccentDistributionSparseFloor: 0.18
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90
@@ -170,6 +179,9 @@ MonoBehaviour:
       seedOffset: 311
       paintedAccentStrokeWidth: 0.12
       paintedAccentStrokeDensity: 34
+      paintedAccentDistributionPatchScale: 9
+      paintedAccentDistributionPatchiness: 0.7
+      paintedAccentDistributionSparseFloor: 0.18
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90
@@ -232,6 +244,9 @@ MonoBehaviour:
       seedOffset: 317
       paintedAccentStrokeWidth: 0.12
       paintedAccentStrokeDensity: 34
+      paintedAccentDistributionPatchScale: 9
+      paintedAccentDistributionPatchiness: 0.7
+      paintedAccentDistributionSparseFloor: 0.18
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90
@@ -294,6 +309,9 @@ MonoBehaviour:
       seedOffset: 41
       paintedAccentStrokeWidth: 0.12
       paintedAccentStrokeDensity: 34
+      paintedAccentDistributionPatchScale: 9
+      paintedAccentDistributionPatchiness: 0.7
+      paintedAccentDistributionSparseFloor: 0.18
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90
@@ -314,6 +332,9 @@ MonoBehaviour:
       seedOffset: 331
       paintedAccentStrokeWidth: 0.12
       paintedAccentStrokeDensity: 34
+      paintedAccentDistributionPatchScale: 9
+      paintedAccentDistributionPatchiness: 0.7
+      paintedAccentDistributionSparseFloor: 0.18
       paintedAccentStrokeLengthMin: 0.55
       paintedAccentStrokeLengthMax: 1.55
       paintedAccentStrokeFacingDirectionDegrees: 90

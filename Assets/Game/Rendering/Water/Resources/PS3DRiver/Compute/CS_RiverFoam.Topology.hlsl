@@ -66,7 +66,7 @@ float FoamResolveLocalAgeRate(FoamMaterialTopologySample materialTopology)
 
     float positiveAgeFactor = lerp(
         1.0,
-        max(0.01, _FoamPositiveAgeMultiplier),
+        max(0.05, _FoamPositiveAgeMultiplier),
         effectiveSupport);
     float negativeAgeFactor = lerp(
         1.0,

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering;
 using UnityEngine.Serialization;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -113,6 +112,15 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         [InspectorName("Ground Painted Accent Final Prototype")]
         GroundPaintedAccentFinalPrototype = 31
+    }
+
+    public enum PaintedAccentPlacementOverlayWeightMode
+    {
+        [InspectorName("Patch Preference")]
+        PatchPreference = 0,
+
+        [InspectorName("Effective Proposal Weight")]
+        EffectiveProposalWeight = 1
     }
 
     public enum GroundSurfaceType
@@ -233,36 +241,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             "snowfield.wind_scoured";
 
         private const int CurrentSurfaceStyleMigrationVersion = 1;
-        private const string PaintedAccentFoldSurfacePreviewName =
-            "__PaintedAccentRidgePreview_Debug";
-        private const string LegacyPaintedAccentFoldSurfacePreviewName =
-            "__PaintedAccentFoldSurfacePreview_Debug";
-        private const string LegacyPaintedAccentFoldLinePreviewName =
-            "__FoldFieldLinePreview_Debug";
-        private const string PaintedAccentRidgePreviewShaderName =
-            "PS3D/Ground Painted Accent Ink";
-        private const float PaintedAccentRidgeBoundaryEmbedDepth = 0.002f;
-        private const float PaintedAccentRidgeMinimumEndWidthScale = 0.12f;
-        private const int PaintedAccentCrestSearchSampleCount = 5;
-        private const int PaintedAccentRibbonVertexCountAcross = 3;
-        private const int PaintedAccentRibbonMinimumLongitudinalSampleCount = 13;
-        private const float PaintedAccentSingleCrestBlend = 0.35f;
-        private const float PaintedAccentValleyThresholdFraction = 0.08f;
-        private const float PaintedAccentValleyRepairStrength = 0.60f;
-        private const float PaintedAccentShoulderCrownFraction = 0.50f;
-        private const float PaintedAccentLegCrownSupport = 0.45f;
-        private const float PaintedAccentCrownEndRampFraction = 0.12f;
-        // Position (12) + normal (12) + UV0 (8). The flat-ink mesh has
-        // no tangents, vertex colours, UV1, collider data, or extra streams.
-        private const int PaintedAccentRidgeVertexStrideBytes = 32;
-
-        private static readonly Color PaintedAccentDefaultInkColor =
-            new Color(0.12f, 0.10f, 0.08f, 1f);
-        private static readonly int PaintedAccentInkColorId =
-            Shader.PropertyToID("_InkColor");
-        private static readonly int PaintedAccentFallbackColorId =
-            Shader.PropertyToID("_Color");
-        private static Material paintedAccentRidgePreviewMaterial;
 
         [SerializeField]
         private GroundRecipe recipe = new GroundRecipe();
@@ -313,6 +291,29 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             GeneratedGroundDebugView.None;
 
         [SerializeField, HideInInspector]
+        private bool showPaintedAccentDistributionOverlay;
+
+        [SerializeField, HideInInspector]
+        private bool showPaintedAccentWeightedProposals;
+
+        [SerializeField, HideInInspector]
+        private bool showPaintedAccentLastAcceptedPositions;
+
+        [SerializeField, HideInInspector]
+        private bool showPaintedAccentProjectedGlyphDebug;
+
+        [SerializeField, HideInInspector]
+        private bool showPaintedAccentContourClusterCandidateDebug;
+
+        [SerializeField, HideInInspector]
+        private bool comparePaintedAccentProjectedGlyphAndClusterCandidate;
+
+        [SerializeField, HideInInspector]
+        private PaintedAccentPlacementOverlayWeightMode
+            paintedAccentPlacementOverlayWeight =
+                PaintedAccentPlacementOverlayWeightMode.PatchPreference;
+
+        [SerializeField, HideInInspector]
         private GroundModifier[] modifiers = Array.Empty<GroundModifier>();
 
         [SerializeField, HideInInspector]
@@ -339,6 +340,22 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private int paintedAccentFoldFieldSignature;
         private GroundPaintedAccentSurfaceStroke[] paintedAccentSurfaceStrokes =
             Array.Empty<GroundPaintedAccentSurfaceStroke>();
+        private int paintedAccentSurfaceStrokeRevision;
+        private GroundPaintedAccentPlacementDiagnostics
+            paintedAccentPlacementDiagnostics =
+                GroundPaintedAccentPlacementDiagnostics.Empty;
+        private GroundModifierSnapshot[] paintedAccentModifierSnapshots =
+            Array.Empty<GroundModifierSnapshot>();
+        private StylizedRiverGroundSnapshot[] paintedAccentRiverSnapshots =
+            Array.Empty<StylizedRiverGroundSnapshot>();
+        private int paintedAccentProjectedGlyphSignature;
+        private GroundPaintedAccentProjectedGlyphDebugSnapshot
+            paintedAccentProjectedGlyphDebugSnapshot =
+                GroundPaintedAccentProjectedGlyphDebugSnapshot.Empty;
+        private int paintedAccentContourClusterCandidateSignature;
+        private GroundPaintedAccentContourClusterDebugSnapshot
+            paintedAccentContourClusterCandidateDebugSnapshot =
+                GroundPaintedAccentContourClusterDebugSnapshot.Empty;
 
         private static readonly int BaseColorId =
             Shader.PropertyToID("_BaseColor");
@@ -456,41 +473,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             GroundPaintedAccentLineFeatureIds =
                 new GroundShaderFeaturePropertyIds("_GroundPaintedAccentLine");
 
-        private readonly struct PaintedAccentFoldProfileBasis
-        {
-            public PaintedAccentFoldProfileBasis(
-                float center,
-                float width,
-                float amplitude,
-                float centerDrift,
-                float widthVariation,
-                float amplitudeVariation,
-                float phase,
-                float frequency)
-            {
-                Center = center;
-                Width = Mathf.Max(0.04f, width);
-                Amplitude =
-                    Mathf.Abs(amplitude) <= 0.001f
-                        ? (amplitude < 0f ? -0.001f : 0.001f)
-                        : amplitude;
-                CenterDrift = centerDrift;
-                WidthVariation = Mathf.Max(0f, widthVariation);
-                AmplitudeVariation = Mathf.Max(0f, amplitudeVariation);
-                Phase = phase;
-                Frequency = Mathf.Max(0.05f, frequency);
-            }
-
-            public float Center { get; }
-            public float Width { get; }
-            public float Amplitude { get; }
-            public float CenterDrift { get; }
-            public float WidthVariation { get; }
-            public float AmplitudeVariation { get; }
-            public float Phase { get; }
-            public float Frequency { get; }
-        }
-
         private struct GroundShaderFeaturePropertyIds
         {
             public readonly int StrengthId;
@@ -605,11 +587,24 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             EnsureGeneratedMesh();
 
-            List<GroundModifierSnapshot> snapshots =
+            List<GroundModifierSnapshot> allModifierSnapshots =
                 BuildModifierSnapshots();
+
+            IReadOnlyList<GroundModifierSnapshot> heightModifierSnapshots =
+                allModifierSnapshots;
+            if (!recipe.UseModifiers)
+            {
+                heightModifierSnapshots =
+                    Array.Empty<GroundModifierSnapshot>();
+            }
 
             List<StylizedRiverGroundSnapshot> riverSnapshots =
                 BuildRiverSnapshots();
+
+            paintedAccentModifierSnapshots =
+                allModifierSnapshots.ToArray();
+            paintedAccentRiverSnapshots =
+                riverSnapshots.ToArray();
 
             GroundSurfaceProfile resolvedSurfaceProfile =
                 ResolveSurfaceProfile();
@@ -617,7 +612,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             MeshData meshData = GroundGenerator.Generate(
                 recipe,
                 resolvedSurfaceProfile,
-                snapshots,
+                heightModifierSnapshots,
                 riverSnapshots,
                 out baseSurface,
                 out lastSurfaceMaskDiagnostics);
@@ -640,6 +635,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 CalculateGenerationSignature();
 
             paintedAccentFoldFieldSignature = 0;
+            ClearPaintedAccentProjectedGlyphDebugCache();
+            ClearPaintedAccentContourClusterCandidateDebugCache();
             EnsurePaintedAccentFoldFieldCurrent();
 
             ApplySurfaceProfileMaterialProperties();
@@ -794,6 +791,298 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             SetDebugView(GeneratedGroundDebugView.None);
         }
 
+        public bool ShowPaintedAccentDistributionOverlay =>
+            showPaintedAccentDistributionOverlay;
+
+        public bool ShowPaintedAccentWeightedProposals =>
+            showPaintedAccentWeightedProposals;
+
+        public bool ShowPaintedAccentLastAcceptedPositions =>
+            showPaintedAccentLastAcceptedPositions;
+
+        public bool ShowPaintedAccentProjectedGlyphDebug =>
+            showPaintedAccentProjectedGlyphDebug;
+
+        public bool ShowPaintedAccentContourClusterCandidateDebug =>
+            showPaintedAccentContourClusterCandidateDebug;
+
+        public bool ComparePaintedAccentProjectedGlyphAndClusterCandidate =>
+            comparePaintedAccentProjectedGlyphAndClusterCandidate;
+
+        public PaintedAccentPlacementOverlayWeightMode
+            PaintedAccentPlacementOverlayWeight =>
+                paintedAccentPlacementOverlayWeight;
+
+        public int CalculatePaintedAccentPlacementDebugSignature()
+        {
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+            return CalculatePaintedAccentFoldFieldSignature(feature);
+        }
+
+        public bool TryBuildPaintedAccentPlacementDebugSnapshot(
+            out GroundPaintedAccentPlacementDebugSnapshot snapshot)
+        {
+            snapshot = GroundPaintedAccentPlacementDebugSnapshot.Empty;
+            CacheComponents();
+
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+
+            if (!CanGeneratePaintedAccentFoldField(feature))
+            {
+                return false;
+            }
+
+            snapshot =
+                GroundPaintedAccentFoldFieldGenerator
+                    .BuildPlacementDebugSnapshot(
+                        generatedMesh.bounds,
+                        baseSurface,
+                        feature,
+                        recipe != null ? recipe.ShapeSeed : 0,
+                        recipe != null
+                            ? recipe.PatchCoordinate
+                            : Vector2Int.zero);
+            return snapshot.IsValid;
+        }
+
+        public Vector3[] GetLastPaintedAccentAcceptedLocalPositions()
+        {
+            if (paintedAccentSurfaceStrokes == null ||
+                paintedAccentSurfaceStrokes.Length == 0)
+            {
+                return Array.Empty<Vector3>();
+            }
+
+            List<Vector3> positions =
+                new List<Vector3>(paintedAccentSurfaceStrokes.Length);
+
+            for (int index = 0;
+                 index < paintedAccentSurfaceStrokes.Length;
+                 index++)
+            {
+                GroundPaintedAccentSurfaceStroke stroke =
+                    paintedAccentSurfaceStrokes[index];
+
+                if (!stroke.IsValid)
+                {
+                    continue;
+                }
+
+                int middleIndex = stroke.LocalPoints.Length / 2;
+                Vector3 position = stroke.LocalPoints[middleIndex];
+                position.y += 0.035f;
+                positions.Add(position);
+            }
+
+            return positions.ToArray();
+        }
+
+        public string GetLastPaintedAccentPlacementStatistics()
+        {
+            if (!paintedAccentFoldFieldEnabled)
+            {
+                return "No Painted Accent placement has been generated yet.";
+            }
+
+            return
+                $"Target proposals: " +
+                $"{paintedAccentPlacementDiagnostics.TargetProposals}\n" +
+                $"Candidate pool: " +
+                $"{paintedAccentPlacementDiagnostics.CandidatePool}\n" +
+                $"Proposed: {paintedAccentPlacementDiagnostics.Proposed}\n" +
+                $"Accepted: {paintedAccentPlacementDiagnostics.Accepted}\n\n" +
+                $"Rejected sampling: " +
+                $"{paintedAccentPlacementDiagnostics.RejectedSampling}\n" +
+                $"Rejected river: " +
+                $"{paintedAccentPlacementDiagnostics.RejectedRiver}\n" +
+                $"Rejected modifier: " +
+                $"{paintedAccentPlacementDiagnostics.RejectedModifierExclusion}\n" +
+                $"Rejected broad slope: " +
+                $"{paintedAccentPlacementDiagnostics.RejectedBroadSlope}\n" +
+                $"Rejected local grade: " +
+                $"{paintedAccentPlacementDiagnostics.RejectedLocalGrade}";
+        }
+
+        public int CalculatePaintedAccentProjectedGlyphDebugSignature()
+        {
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+            return CalculatePaintedAccentProjectedGlyphSignature(feature);
+        }
+
+        public bool TryBuildPaintedAccentProjectedGlyphDebugSnapshot(
+            out GroundPaintedAccentProjectedGlyphDebugSnapshot snapshot)
+        {
+            snapshot = GroundPaintedAccentProjectedGlyphDebugSnapshot.Empty;
+            CacheComponents();
+
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+
+            if (!CanGeneratePaintedAccentFoldField(feature))
+            {
+                return false;
+            }
+
+            EnsurePaintedAccentFoldFieldCurrent();
+            EnsurePaintedAccentProjectedGlyphsCurrent(feature);
+            snapshot = paintedAccentProjectedGlyphDebugSnapshot;
+            return snapshot.IsValid;
+        }
+
+        public string GetLastPaintedAccentProjectedGlyphStatistics()
+        {
+            CacheComponents();
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+
+            if (!CanGeneratePaintedAccentFoldField(feature))
+            {
+                return "No Painted Accent projected glyphs can be generated from the current ground and feature settings.";
+            }
+
+            EnsurePaintedAccentFoldFieldCurrent();
+            EnsurePaintedAccentProjectedGlyphsCurrent(feature);
+
+            GroundPaintedAccentProjectedGlyphDiagnostics diagnostics =
+                paintedAccentProjectedGlyphDebugSnapshot.Diagnostics;
+
+            return
+                $"Base descriptors: {diagnostics.AcceptedBaseDescriptors}\n" +
+                $"Projected accepted: {diagnostics.ProjectedGlyphsAccepted}\n" +
+                $"Projected rejected: {diagnostics.ProjectedGlyphsRejectedTotal}\n\n" +
+                $"Rejected sampling: {diagnostics.ProjectedGlyphsRejectedSampling}\n" +
+                $"Rejected river: {diagnostics.ProjectedGlyphsRejectedRiver}\n" +
+                $"Rejected modifier: {diagnostics.ProjectedGlyphsRejectedModifier}\n" +
+                $"Rejected broad slope: {diagnostics.ProjectedGlyphsRejectedBroadSlope}\n" +
+                $"Rejected local grade: {diagnostics.ProjectedGlyphsRejectedLocalGrade}\n\n" +
+                $"Projection world direction: +Z\n" +
+                $"Projection local X/Z: " +
+                $"({diagnostics.ProjectionLocalDirection.x:F4}, " +
+                $"{diagnostics.ProjectionLocalDirection.y:F4})\n" +
+                $"Point count min/mean/max: " +
+                $"{diagnostics.ProjectedPointCountMin} / " +
+                $"{diagnostics.ProjectedPointCountMean:F1} / " +
+                $"{diagnostics.ProjectedPointCountMax}\n" +
+                $"Crest T min/mean/max: " +
+                $"{diagnostics.ProjectedCrestTMin:F3} / " +
+                $"{diagnostics.ProjectedCrestTMean:F3} / " +
+                $"{diagnostics.ProjectedCrestTMax:F3}\n" +
+                $"Crest peak min/mean/max: " +
+                $"{diagnostics.CrestPeakHeightMin:F4} / " +
+                $"{diagnostics.CrestPeakHeightMean:F4} / " +
+                $"{diagnostics.CrestPeakHeightMax:F4} m\n" +
+                $"Crown peak min/mean/max: " +
+                $"{diagnostics.CrownPeakHeightMin:F4} / " +
+                $"{diagnostics.CrownPeakHeightMean:F4} / " +
+                $"{diagnostics.CrownPeakHeightMax:F4} m\n" +
+                $"Combined peak min/mean/max: " +
+                $"{diagnostics.CombinedPeakHeightMin:F4} / " +
+                $"{diagnostics.CombinedPeakHeightMean:F4} / " +
+                $"{diagnostics.CombinedPeakHeightMax:F4} m\n" +
+                $"Maximum north displacement error: " +
+                $"{diagnostics.MaximumNorthDisplacementError:F7} m\n" +
+                $"Maximum cross-axis drift: " +
+                $"{diagnostics.MaximumCrossAxisDrift:F7} m";
+        }
+
+        public int CalculatePaintedAccentContourClusterCandidateDebugSignature()
+        {
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+            return CalculatePaintedAccentContourClusterCandidateSignature(
+                feature);
+        }
+
+        public bool TryBuildPaintedAccentContourClusterCandidateDebugSnapshot(
+            out GroundPaintedAccentContourClusterDebugSnapshot snapshot)
+        {
+            snapshot = GroundPaintedAccentContourClusterDebugSnapshot.Empty;
+            CacheComponents();
+
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+
+            if (!CanGeneratePaintedAccentFoldField(feature))
+            {
+                return false;
+            }
+
+            EnsurePaintedAccentFoldFieldCurrent();
+            EnsurePaintedAccentContourClusterCandidateCurrent(feature);
+            snapshot = paintedAccentContourClusterCandidateDebugSnapshot;
+            return snapshot.IsValid;
+        }
+
+        public string GetLastPaintedAccentContourClusterCandidateStatistics()
+        {
+            CacheComponents();
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+
+            if (!CanGeneratePaintedAccentFoldField(feature))
+            {
+                return "No Painted Accent contour-cluster candidates can be generated from the current ground and feature settings.";
+            }
+
+            EnsurePaintedAccentFoldFieldCurrent();
+            EnsurePaintedAccentContourClusterCandidateCurrent(feature);
+
+            GroundPaintedAccentContourClusterDiagnostics diagnostics =
+                paintedAccentContourClusterCandidateDebugSnapshot.Diagnostics;
+
+            return
+                $"Base descriptors: {diagnostics.BaseDescriptors}\n" +
+                $"Candidate density selected/skipped: " +
+                $"{diagnostics.DensitySelected} / " +
+                $"{diagnostics.DensitySkipped}\n" +
+                $"Candidates accepted/rejected: " +
+                $"{diagnostics.CandidatesAccepted} / " +
+                $"{diagnostics.RejectedTotal}\n\n" +
+                $"Rejected sampling: {diagnostics.RejectedSampling}\n" +
+                $"Rejected river: {diagnostics.RejectedRiver}\n" +
+                $"Rejected modifier: {diagnostics.RejectedModifier}\n" +
+                $"Rejected broad slope: {diagnostics.RejectedBroadSlope}\n" +
+                $"Rejected local grade: {diagnostics.RejectedLocalGrade}\n" +
+                $"Rejected upward excursion: " +
+                $"{diagnostics.RejectedUpwardExcursion}\n\n" +
+                $"Chains total: {diagnostics.ChainsTotal}\n" +
+                $"Primary arms/branches/echoes: " +
+                $"{diagnostics.PrimaryArmsTotal} / " +
+                $"{diagnostics.BranchesTotal} / " +
+                $"{diagnostics.EchoesTotal}\n" +
+                $"Chains per cluster min/mean/max: " +
+                $"{diagnostics.ChainCountMin} / " +
+                $"{diagnostics.ChainCountMean:F2} / " +
+                $"{diagnostics.ChainCountMax}\n" +
+                $"Points per chain min/mean/max: " +
+                $"{diagnostics.PointCountMin} / " +
+                $"{diagnostics.PointCountMean:F1} / " +
+                $"{diagnostics.PointCountMax}\n" +
+                $"Planar span min/mean/max: " +
+                $"{diagnostics.PlanarSpanMin:F3} / " +
+                $"{diagnostics.PlanarSpanMean:F3} / " +
+                $"{diagnostics.PlanarSpanMax:F3} m\n" +
+                $"Visual drop min/mean/max: " +
+                $"{diagnostics.VisualDropMin:F3} / " +
+                $"{diagnostics.VisualDropMean:F3} / " +
+                $"{diagnostics.VisualDropMax:F3} m\n" +
+                $"Maximum accepted upward excursion: " +
+                $"{diagnostics.MaximumUpwardExcursion:F7} m\n" +
+                $"Accepted upward violations: " +
+                $"{diagnostics.AcceptedUpwardViolationCount}";
+        }
+
         public void RefreshSurfaceMaterialProperties()
         {
             CacheComponents();
@@ -922,8 +1211,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             List<GroundModifierSnapshot> snapshots =
                 new List<GroundModifierSnapshot>();
 
-            if (!recipe.UseModifiers ||
-                modifiers == null)
+            if (modifiers == null)
             {
                 return snapshots;
             }
@@ -1566,22 +1854,43 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 return;
             }
 
-            Texture2D generatedTexture =
-                GroundPaintedAccentFoldFieldGenerator.Generate(
+            GroundPaintedAccentSurfaceStroke[] surfaceStrokes =
+                GroundPaintedAccentFoldFieldGenerator.GenerateSurfaceStrokes(
                     generatedMesh.bounds,
                     baseSurface,
                     feature,
                     recipe != null ? recipe.ShapeSeed : 0,
-                    out Vector4 originSize,
+                    recipe != null
+                        ? recipe.PatchCoordinate
+                        : Vector2Int.zero,
+                    paintedAccentRiverSnapshots,
+                    paintedAccentModifierSnapshots,
+                    out Vector4 descriptorOriginSize,
+                    out GroundPaintedAccentPlacementDiagnostics diagnostics);
+
+            Texture2D generatedTexture =
+                GroundPaintedAccentFoldFieldGenerator.RasterizeSurfaceStrokes(
+                    generatedMesh.bounds,
+                    baseSurface,
+                    feature,
+                    recipe != null ? recipe.ShapeSeed : 0,
+                    surfaceStrokes,
+                    out Vector4 rasterOriginSize,
                     out Vector4 texelSize,
-                    out float[] bodyValues,
-                    out GroundPaintedAccentSurfaceStroke[] surfaceStrokes);
+                    out _);
 
             paintedAccentSurfaceStrokes =
                 surfaceStrokes ?? Array.Empty<GroundPaintedAccentSurfaceStroke>();
+            paintedAccentPlacementDiagnostics = diagnostics;
+            paintedAccentSurfaceStrokeRevision++;
+            ClearPaintedAccentProjectedGlyphDebugCache();
+            ClearPaintedAccentContourClusterCandidateDebugCache();
             ReplacePaintedAccentFoldFieldTexture(generatedTexture);
             paintedAccentFoldFieldEnabled = true;
-            paintedAccentFoldFieldOriginSize = originSize;
+            paintedAccentFoldFieldOriginSize =
+                rasterOriginSize.z > 0f && rasterOriginSize.w > 0f
+                    ? rasterOriginSize
+                    : descriptorOriginSize;
             paintedAccentFoldFieldTexelSize = texelSize;
         }
 
@@ -1600,6 +1909,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         {
             paintedAccentFoldFieldEnabled = false;
             paintedAccentSurfaceStrokes = Array.Empty<GroundPaintedAccentSurfaceStroke>();
+            paintedAccentPlacementDiagnostics =
+                GroundPaintedAccentPlacementDiagnostics.Empty;
+            paintedAccentSurfaceStrokeRevision++;
+            ClearPaintedAccentProjectedGlyphDebugCache();
+            ClearPaintedAccentContourClusterCandidateDebugCache();
             ReplacePaintedAccentFoldFieldTexture(
                 CreateNeutralPaintedAccentFoldFieldTexture());
 
@@ -1638,6 +1952,130 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             paintedAccentFoldFieldTexture = texture;
         }
 
+        private void EnsurePaintedAccentProjectedGlyphsCurrent(
+            GroundSurfaceFeatureRecipe feature)
+        {
+            int signature =
+                CalculatePaintedAccentProjectedGlyphSignature(feature);
+
+            if (paintedAccentProjectedGlyphSignature == signature &&
+                paintedAccentProjectedGlyphDebugSnapshot.IsValid)
+            {
+                return;
+            }
+
+            paintedAccentProjectedGlyphSignature = signature;
+
+            if (!CanGeneratePaintedAccentFoldField(feature) ||
+                paintedAccentSurfaceStrokes == null)
+            {
+                paintedAccentProjectedGlyphDebugSnapshot =
+                    GroundPaintedAccentProjectedGlyphDebugSnapshot.Empty;
+                return;
+            }
+
+            paintedAccentProjectedGlyphDebugSnapshot =
+                GroundPaintedAccentProjectedGlyphGenerator.Build(
+                    paintedAccentSurfaceStrokes,
+                    baseSurface,
+                    feature,
+                    paintedAccentRiverSnapshots,
+                    paintedAccentModifierSnapshots,
+                    ResolvePaintedAccentProjectedNorthLocalXZ());
+        }
+
+        private int CalculatePaintedAccentProjectedGlyphSignature(
+            GroundSurfaceFeatureRecipe feature)
+        {
+            unchecked
+            {
+                int hash = CalculatePaintedAccentFoldFieldSignature(feature);
+                hash = hash * 31 + paintedAccentSurfaceStrokeRevision;
+                hash = hash * 31 + Quantize(
+                    feature != null
+                        ? feature.PaintedAccentCrestCrownHeight
+                        : 0f);
+                Vector2 localNorth = ResolvePaintedAccentProjectedNorthLocalXZ();
+                hash = hash * 31 + Quantize(localNorth.x);
+                hash = hash * 31 + Quantize(localNorth.y);
+                return hash;
+            }
+        }
+
+        private Vector2 ResolvePaintedAccentProjectedNorthLocalXZ()
+        {
+            Vector3 localNorth3 =
+                transform.InverseTransformDirection(Vector3.forward);
+            Vector2 localNorth =
+                new Vector2(localNorth3.x, localNorth3.z);
+            return localNorth.sqrMagnitude > 0.000001f
+                ? localNorth.normalized
+                : Vector2.up;
+        }
+
+        private void ClearPaintedAccentProjectedGlyphDebugCache()
+        {
+            paintedAccentProjectedGlyphSignature = 0;
+            paintedAccentProjectedGlyphDebugSnapshot =
+                GroundPaintedAccentProjectedGlyphDebugSnapshot.Empty;
+        }
+
+        private void EnsurePaintedAccentContourClusterCandidateCurrent(
+            GroundSurfaceFeatureRecipe feature)
+        {
+            int signature =
+                CalculatePaintedAccentContourClusterCandidateSignature(
+                    feature);
+
+            if (paintedAccentContourClusterCandidateSignature == signature &&
+                paintedAccentContourClusterCandidateDebugSnapshot.IsValid)
+            {
+                return;
+            }
+
+            paintedAccentContourClusterCandidateSignature = signature;
+
+            if (!CanGeneratePaintedAccentFoldField(feature) ||
+                paintedAccentSurfaceStrokes == null)
+            {
+                paintedAccentContourClusterCandidateDebugSnapshot =
+                    GroundPaintedAccentContourClusterDebugSnapshot.Empty;
+                return;
+            }
+
+            paintedAccentContourClusterCandidateDebugSnapshot =
+                GroundPaintedAccentContourClusterCandidateGenerator.Build(
+                    paintedAccentSurfaceStrokes,
+                    baseSurface,
+                    feature,
+                    paintedAccentRiverSnapshots,
+                    paintedAccentModifierSnapshots,
+                    ResolvePaintedAccentProjectedNorthLocalXZ());
+        }
+
+        private int CalculatePaintedAccentContourClusterCandidateSignature(
+            GroundSurfaceFeatureRecipe feature)
+        {
+            unchecked
+            {
+                int hash = CalculatePaintedAccentFoldFieldSignature(feature);
+                hash = hash * 31 + paintedAccentSurfaceStrokeRevision;
+                Vector2 localNorth =
+                    ResolvePaintedAccentProjectedNorthLocalXZ();
+                hash = hash * 31 + Quantize(localNorth.x);
+                hash = hash * 31 + Quantize(localNorth.y);
+                hash = hash * 31 + 0x4A9A;
+                return hash;
+            }
+        }
+
+        private void ClearPaintedAccentContourClusterCandidateDebugCache()
+        {
+            paintedAccentContourClusterCandidateSignature = 0;
+            paintedAccentContourClusterCandidateDebugSnapshot =
+                GroundPaintedAccentContourClusterDebugSnapshot.Empty;
+        }
+
         private int CalculatePaintedAccentFoldFieldSignature(
             GroundSurfaceFeatureRecipe feature)
         {
@@ -1659,6 +2097,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                     feature != null ? feature.PaintedAccentStrokeWidth : 0f);
                 hash = hash * 31 + Quantize(
                     feature != null ? feature.PaintedAccentStrokeDensity : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentDistributionPatchScale : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentDistributionPatchiness : 0f);
+                hash = hash * 31 + Quantize(
+                    feature != null ? feature.PaintedAccentDistributionSparseFloor : 0f);
                 hash = hash * 31 + Quantize(
                     feature != null ? feature.PaintedAccentStrokeLengthMin : 0f);
                 hash = hash * 31 + Quantize(
@@ -1687,1253 +2131,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 }
 
                 return hash;
-            }
-        }
-
-        [ContextMenu("Build Painted Accent 3D Ridge Preview")]
-        public void BuildPaintedAccentFoldSurfacePreview()
-        {
-            CacheComponents();
-
-            if (generatedMesh == null ||
-                baseSurface == null ||
-                !baseSurface.IsValid)
-            {
-                Regenerate();
-            }
-
-            paintedAccentFoldFieldSignature = 0;
-            EnsurePaintedAccentFoldFieldCurrent();
-
-            if (!CanBuildPaintedAccentFoldSurfacePreview())
-            {
-                ClearPaintedAccentFoldSurfacePreview();
-                return;
-            }
-
-            System.Diagnostics.Stopwatch buildStopwatch =
-                System.Diagnostics.Stopwatch.StartNew();
-
-            GroundSurfaceFeatureRecipe feature =
-                ResolveShaderFeature(GroundSurfaceFeatureKind.PaintedAccentLines);
-            float foldHeight =
-                feature != null
-                    ? feature.PaintedAccentFoldHeight
-                    : 0.018f;
-            float crestCrownHeight =
-                feature != null
-                    ? feature.PaintedAccentCrestCrownHeight
-                    : 0.02f;
-            float foldIrregularity =
-                feature != null
-                    ? feature.PaintedAccentFoldIrregularity
-                    : 0.55f;
-            float foldEndTaper =
-                feature != null
-                    ? feature.PaintedAccentFoldEndTaper
-                    : 0.65f;
-            Color inkColor =
-                feature != null
-                    ? feature.PaintedAccentInkColor
-                    : PaintedAccentDefaultInkColor;
-
-            ClearPaintedAccentFoldSurfacePreview();
-
-            List<Vector3> vertices = new List<Vector3>();
-            List<Vector2> uvs = new List<Vector2>();
-            List<int> triangles = new List<int>();
-            int builtStrokeCount = 0;
-            int minimumLongitudinalSampleCount = int.MaxValue;
-            int maximumLongitudinalSampleCount = 0;
-            long totalLongitudinalSampleCount = 0;
-            float minimumCrestPeakHeight = float.PositiveInfinity;
-            float maximumCrestPeakHeight = 0f;
-            double totalCrestPeakHeight = 0d;
-            float minimumCrownPeakHeight = float.PositiveInfinity;
-            float maximumCrownPeakHeight = 0f;
-            double totalCrownPeakHeight = 0d;
-            float minimumCombinedPeakHeight = float.PositiveInfinity;
-            float maximumCombinedPeakHeight = 0f;
-            double totalCombinedPeakHeight = 0d;
-            float minimumEffectiveWidth = float.PositiveInfinity;
-            float maximumEffectiveWidth = 0f;
-            double totalEffectiveWidth = 0d;
-            long effectiveWidthSampleCount = 0;
-
-            for (int strokeIndex = 0;
-                 strokeIndex < paintedAccentSurfaceStrokes.Length;
-                 strokeIndex++)
-            {
-                GroundPaintedAccentSurfaceStroke stroke =
-                    paintedAccentSurfaceStrokes[strokeIndex];
-                if (!stroke.IsValid)
-                {
-                    continue;
-                }
-
-                Vector3[] points = stroke.LocalPoints;
-                Vector3[] normals = stroke.LocalNormals;
-                int longitudinalSampleCount =
-                    Mathf.Max(
-                        PaintedAccentRibbonMinimumLongitudinalSampleCount,
-                        points.Length);
-                PaintedAccentFoldProfileBasis[] profileBases =
-                    BuildPaintedAccentFoldProfileBases(
-                        stroke.Seed,
-                        foldIrregularity,
-                        out float profileNormalization);
-                int baseVertex = vertices.Count;
-                float halfWidth = stroke.Width * 0.5f;
-                float strokeHeight =
-                    foldHeight *
-                    Mathf.Lerp(0.82f, 1f, stroke.Strength);
-                float crestPeakHeightForStroke = 0f;
-                float crownPeakHeightForStroke = 0f;
-                float combinedPeakHeightForStroke = 0f;
-                float[] endEnvelopes =
-                    new float[longitudinalSampleCount];
-                float[] normalizedCrestHeights =
-                    new float[longitudinalSampleCount];
-
-                for (int pointIndex = 0;
-                     pointIndex < longitudinalSampleCount;
-                     pointIndex++)
-                {
-                    float t =
-                        longitudinalSampleCount <= 1
-                            ? 0f
-                            : pointIndex /
-                              (float)(longitudinalSampleCount - 1);
-                    float endEnvelope =
-                        ResolvePaintedAccentFoldEndEnvelope(
-                            t,
-                            stroke.Seed,
-                            foldEndTaper);
-                    endEnvelopes[pointIndex] = endEnvelope;
-
-                    float normalizedCrestHeight = 0f;
-                    for (int sampleIndex = 0;
-                         sampleIndex < PaintedAccentCrestSearchSampleCount;
-                         sampleIndex++)
-                    {
-                        float sample01 =
-                            sampleIndex /
-                            (float)(PaintedAccentCrestSearchSampleCount - 1);
-                        float u = sample01 * 2f - 1f;
-                        normalizedCrestHeight =
-                            Mathf.Max(
-                                normalizedCrestHeight,
-                                ResolvePaintedAccentFoldProfileHeight(
-                                    t,
-                                    u,
-                                    stroke.Seed,
-                                    profileBases,
-                                    profileNormalization,
-                                    foldIrregularity,
-                                    endEnvelope));
-                    }
-
-                    normalizedCrestHeights[pointIndex] =
-                        normalizedCrestHeight;
-                }
-
-                ShapePaintedAccentValleySuppressedProfile(
-                    normalizedCrestHeights,
-                    endEnvelopes);
-
-                for (int pointIndex = 0;
-                     pointIndex < longitudinalSampleCount;
-                     pointIndex++)
-                {
-                    float t =
-                        longitudinalSampleCount <= 1
-                            ? 0f
-                            : pointIndex /
-                              (float)(longitudinalSampleCount - 1);
-                    float endEnvelope = endEnvelopes[pointIndex];
-                    float widthScale =
-                        Mathf.Lerp(
-                            PaintedAccentRidgeMinimumEndWidthScale,
-                            1f,
-                            endEnvelope);
-                    float effectiveHalfWidth = halfWidth * widthScale;
-                    float effectiveWidth = effectiveHalfWidth * 2f;
-                    minimumEffectiveWidth =
-                        Mathf.Min(minimumEffectiveWidth, effectiveWidth);
-                    maximumEffectiveWidth =
-                        Mathf.Max(maximumEffectiveWidth, effectiveWidth);
-                    totalEffectiveWidth += effectiveWidth;
-                    effectiveWidthSampleCount++;
-
-                    bool isEndBoundary =
-                        pointIndex == 0 ||
-                        pointIndex == longitudinalSampleCount - 1;
-                    ResolvePaintedAccentRidgeLongitudinalSample(
-                        points,
-                        normals,
-                        t,
-                        out Vector3 centerlinePoint,
-                        out Vector3 normal);
-                    Vector3 tangent =
-                        ResolveStrokePreviewTangent(
-                            points,
-                            t,
-                            normal);
-                    Vector3 across =
-                        Vector3.Cross(normal, tangent);
-                    if (across.sqrMagnitude <= 0.000001f)
-                    {
-                        across = Vector3.Cross(Vector3.up, tangent);
-                    }
-
-                    if (across.sqrMagnitude <= 0.000001f)
-                    {
-                        across = Vector3.right;
-                    }
-
-                    across.Normalize();
-
-                    float crestHeight =
-                        strokeHeight * normalizedCrestHeights[pointIndex];
-                    float crownEndEnvelope =
-                        ResolvePaintedAccentCrownEndEnvelope(
-                            t,
-                            endEnvelope);
-                    float effectiveCrownHeight =
-                        crestCrownHeight * crownEndEnvelope;
-                    crestPeakHeightForStroke =
-                        Mathf.Max(crestPeakHeightForStroke, crestHeight);
-                    crownPeakHeightForStroke =
-                        Mathf.Max(
-                            crownPeakHeightForStroke,
-                            effectiveCrownHeight);
-                    combinedPeakHeightForStroke =
-                        Mathf.Max(
-                            combinedPeakHeightForStroke,
-                            crestHeight + effectiveCrownHeight);
-
-                    for (int sideIndex = 0;
-                         sideIndex < PaintedAccentRibbonVertexCountAcross;
-                         sideIndex++)
-                    {
-                        float side01 =
-                            sideIndex /
-                            (float)(PaintedAccentRibbonVertexCountAcross - 1);
-                        float sideSign = side01 * 2f - 1f;
-                        float crownProfile =
-                            Mathf.Lerp(
-                                PaintedAccentShoulderCrownFraction,
-                                1f,
-                                1f - Mathf.Abs(sideSign));
-                        Vector3 lateralPosition =
-                            centerlinePoint +
-                            across * (sideSign * effectiveHalfWidth);
-                        Vector3 groundPosition = lateralPosition;
-                        Vector3 liftNormal = normal;
-                        Vector2 lateralXZ =
-                            new Vector2(
-                                lateralPosition.x,
-                                lateralPosition.z);
-                        if (baseSurface.TrySample(
-                                lateralXZ,
-                                out GroundSurfaceSample lateralSample))
-                        {
-                            groundPosition =
-                                new Vector3(
-                                    lateralXZ.x,
-                                    lateralSample.Height,
-                                    lateralXZ.y);
-                            if (lateralSample.RenderNormal.sqrMagnitude > 0.000001f)
-                            {
-                                liftNormal = lateralSample.RenderNormal.normalized;
-                            }
-                        }
-
-                        float boundaryEmbed =
-                            isEndBoundary
-                                ? PaintedAccentRidgeBoundaryEmbedDepth
-                                : 0f;
-                        Vector3 surfacePosition =
-                            groundPosition +
-                            liftNormal *
-                            (
-                                crestHeight +
-                                effectiveCrownHeight * crownProfile -
-                                boundaryEmbed
-                            );
-
-                        vertices.Add(surfacePosition);
-                        uvs.Add(new Vector2(t, side01));
-                    }
-                }
-
-                for (int pointIndex = 0;
-                     pointIndex < longitudinalSampleCount - 1;
-                     pointIndex++)
-                {
-                    for (int crossIndex = 0;
-                         crossIndex <
-                             PaintedAccentRibbonVertexCountAcross - 1;
-                         crossIndex++)
-                    {
-                        int a =
-                            baseVertex +
-                            pointIndex *
-                                PaintedAccentRibbonVertexCountAcross +
-                            crossIndex;
-                        int b = a + 1;
-                        int c = a + PaintedAccentRibbonVertexCountAcross;
-                        int d = c + 1;
-
-                        triangles.Add(a);
-                        triangles.Add(c);
-                        triangles.Add(b);
-                        triangles.Add(b);
-                        triangles.Add(c);
-                        triangles.Add(d);
-                    }
-                }
-
-                minimumLongitudinalSampleCount =
-                    Mathf.Min(
-                        minimumLongitudinalSampleCount,
-                        longitudinalSampleCount);
-                maximumLongitudinalSampleCount =
-                    Mathf.Max(
-                        maximumLongitudinalSampleCount,
-                        longitudinalSampleCount);
-                totalLongitudinalSampleCount += longitudinalSampleCount;
-                minimumCrestPeakHeight =
-                    Mathf.Min(minimumCrestPeakHeight, crestPeakHeightForStroke);
-                maximumCrestPeakHeight =
-                    Mathf.Max(maximumCrestPeakHeight, crestPeakHeightForStroke);
-                totalCrestPeakHeight += crestPeakHeightForStroke;
-                minimumCrownPeakHeight =
-                    Mathf.Min(
-                        minimumCrownPeakHeight,
-                        crownPeakHeightForStroke);
-                maximumCrownPeakHeight =
-                    Mathf.Max(
-                        maximumCrownPeakHeight,
-                        crownPeakHeightForStroke);
-                totalCrownPeakHeight += crownPeakHeightForStroke;
-                minimumCombinedPeakHeight =
-                    Mathf.Min(
-                        minimumCombinedPeakHeight,
-                        combinedPeakHeightForStroke);
-                maximumCombinedPeakHeight =
-                    Mathf.Max(
-                        maximumCombinedPeakHeight,
-                        combinedPeakHeightForStroke);
-                totalCombinedPeakHeight += combinedPeakHeightForStroke;
-                builtStrokeCount++;
-            }
-
-            if (vertices.Count < PaintedAccentRibbonVertexCountAcross * 2 ||
-                triangles.Count <
-                    (PaintedAccentRibbonVertexCountAcross - 1) * 6)
-            {
-                return;
-            }
-
-            bool use32BitIndices = vertices.Count > ushort.MaxValue;
-            Mesh previewMesh =
-                new Mesh
-                {
-                    name = "GeneratedGround_PaintedAccentRidgePreview",
-                    hideFlags = HideFlags.DontSave,
-                    indexFormat =
-                        use32BitIndices
-                            ? IndexFormat.UInt32
-                            : IndexFormat.UInt16
-                };
-            previewMesh.SetVertices(vertices);
-            previewMesh.SetUVs(0, uvs);
-            previewMesh.SetTriangles(triangles, 0);
-            previewMesh.RecalculateNormals();
-            previewMesh.RecalculateBounds();
-
-            GameObject previewObject =
-                new GameObject(PaintedAccentFoldSurfacePreviewName)
-                {
-                    hideFlags = HideFlags.DontSave
-                };
-            previewObject.transform.SetParent(transform, false);
-            previewObject.transform.localPosition = Vector3.zero;
-            previewObject.transform.localRotation = Quaternion.identity;
-            previewObject.transform.localScale = Vector3.one;
-
-            MeshFilter previewFilter =
-                previewObject.AddComponent<MeshFilter>();
-            MeshRenderer previewRenderer =
-                previewObject.AddComponent<MeshRenderer>();
-            previewFilter.sharedMesh = previewMesh;
-            previewRenderer.shadowCastingMode = ShadowCastingMode.Off;
-            previewRenderer.receiveShadows = false;
-            previewRenderer.lightProbeUsage = LightProbeUsage.Off;
-            previewRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
-            previewRenderer.motionVectorGenerationMode =
-                MotionVectorGenerationMode.Camera;
-            Material previewMaterial =
-                ResolvePaintedAccentRidgePreviewMaterial();
-            previewRenderer.sharedMaterial = previewMaterial;
-            MaterialPropertyBlock previewProperties =
-                new MaterialPropertyBlock();
-            previewProperties.SetColor(
-                PaintedAccentInkColorId,
-                inkColor);
-            previewProperties.SetColor(
-                BaseColorId,
-                inkColor);
-            previewProperties.SetColor(
-                PaintedAccentFallbackColorId,
-                inkColor);
-            previewRenderer.SetPropertyBlock(previewProperties);
-
-            buildStopwatch.Stop();
-            int triangleCount = triangles.Count / 3;
-            int indexStrideBytes = use32BitIndices ? 4 : 2;
-            long estimatedVertexBufferBytes =
-                (long)vertices.Count * PaintedAccentRidgeVertexStrideBytes;
-            long estimatedIndexBufferBytes =
-                (long)triangles.Count * indexStrideBytes;
-            long estimatedRawMeshBytes =
-                estimatedVertexBufferBytes + estimatedIndexBufferBytes;
-            float meanLongitudinalSampleCount =
-                builtStrokeCount > 0
-                    ? totalLongitudinalSampleCount / (float)builtStrokeCount
-                    : 0f;
-            float meanCrestPeakHeight =
-                builtStrokeCount > 0
-                    ? (float)(totalCrestPeakHeight / builtStrokeCount)
-                    : 0f;
-            float meanCrownPeakHeight =
-                builtStrokeCount > 0
-                    ? (float)(totalCrownPeakHeight / builtStrokeCount)
-                    : 0f;
-            float meanCombinedPeakHeight =
-                builtStrokeCount > 0
-                    ? (float)(totalCombinedPeakHeight / builtStrokeCount)
-                    : 0f;
-            float meanEffectiveWidth =
-                effectiveWidthSampleCount > 0
-                    ? (float)(totalEffectiveWidth / effectiveWidthSampleCount)
-                    : 0f;
-            string materialShaderName =
-                previewMaterial != null && previewMaterial.shader != null
-                    ? previewMaterial.shader.name
-                    : "None";
-            string materialCullMode = "Unavailable";
-            bool materialDoubleSidedGi = false;
-            if (previewMaterial != null)
-            {
-                if (previewMaterial.HasProperty("_Cull"))
-                {
-                    materialCullMode =
-                        ((CullMode)Mathf.RoundToInt(
-                            previewMaterial.GetFloat("_Cull"))).ToString();
-                }
-
-                materialDoubleSidedGi = previewMaterial.doubleSidedGI;
-            }
-
-            Debug.Log(
-                $"GeneratedGround Painted Accent flat-ink crowned ribbon built: " +
-                $"strokes={builtStrokeCount}, " +
-                $"requestedFoldHeight={foldHeight:F4}, " +
-                $"requestedCrownHeight={crestCrownHeight:F4}, " +
-                $"crestSearchSamples={PaintedAccentCrestSearchSampleCount}, " +
-                $"ribbonVerticesAcross={PaintedAccentRibbonVertexCountAcross}, " +
-                $"singleCrestBlend={PaintedAccentSingleCrestBlend:F3}, " +
-                $"valleyThresholdFraction=" +
-                $"{PaintedAccentValleyThresholdFraction:F3}, " +
-                $"valleyRepairStrength=" +
-                $"{PaintedAccentValleyRepairStrength:F3}, " +
-                $"shoulderCrownFraction=" +
-                $"{PaintedAccentShoulderCrownFraction:F3}, " +
-                $"legCrownSupport={PaintedAccentLegCrownSupport:F3}, " +
-                $"crownEndRampFraction=" +
-                $"{PaintedAccentCrownEndRampFraction:F3}, " +
-                $"longitudinalSamplesMin={minimumLongitudinalSampleCount}, " +
-                $"longitudinalSamplesMean={meanLongitudinalSampleCount:F2}, " +
-                $"longitudinalSamplesMax={maximumLongitudinalSampleCount}, " +
-                $"crestPeakHeightMin={minimumCrestPeakHeight:F4}, " +
-                $"crestPeakHeightMean={meanCrestPeakHeight:F4}, " +
-                $"crestPeakHeightMax={maximumCrestPeakHeight:F4}, " +
-                $"crownPeakHeightMin={minimumCrownPeakHeight:F4}, " +
-                $"crownPeakHeightMean={meanCrownPeakHeight:F4}, " +
-                $"crownPeakHeightMax={maximumCrownPeakHeight:F4}, " +
-                $"combinedPeakHeightMin={minimumCombinedPeakHeight:F4}, " +
-                $"combinedPeakHeightMean={meanCombinedPeakHeight:F4}, " +
-                $"combinedPeakHeightMax={maximumCombinedPeakHeight:F4}, " +
-                $"effectiveWidthMin={minimumEffectiveWidth:F4}, " +
-                $"effectiveWidthMean={meanEffectiveWidth:F4}, " +
-                $"effectiveWidthMax={maximumEffectiveWidth:F4}, " +
-                $"materialShader={materialShaderName}, " +
-                $"inkColor=" +
-                $"({inkColor.r:F3}," +
-                $"{inkColor.g:F3}," +
-                $"{inkColor.b:F3}," +
-                $"{inkColor.a:F3}), " +
-                $"surfaceMode=FlatUnlitInk, " +
-                $"materialCull={materialCullMode}, " +
-                $"doubleSidedGI={materialDoubleSidedGi}, " +
-                $"shadowCasting={previewRenderer.shadowCastingMode}, " +
-                $"receiveShadows={previewRenderer.receiveShadows}, " +
-                $"lightProbes={previewRenderer.lightProbeUsage}, " +
-                $"reflectionProbes={previewRenderer.reflectionProbeUsage}, " +
-                $"vertices={vertices.Count}, " +
-                $"triangles={triangleCount}, " +
-                $"estimatedVertexBufferBytes={estimatedVertexBufferBytes}, " +
-                $"estimatedIndexBufferBytes={estimatedIndexBufferBytes}, " +
-                $"estimatedRawMeshBytes={estimatedRawMeshBytes}, " +
-                $"buildMs={buildStopwatch.Elapsed.TotalMilliseconds:F2}.",
-                this);
-
-#if UNITY_EDITOR
-            Undo.RegisterCreatedObjectUndo(
-                previewObject,
-                "Build Painted Accent 3D Ridge Preview");
-#endif
-        }
-
-        [ContextMenu("Clear Painted Accent 3D Ridge Preview")]
-        public void ClearPaintedAccentFoldSurfacePreview()
-        {
-            List<GameObject> previewObjects =
-                new List<GameObject>();
-
-            for (int childIndex = 0; childIndex < transform.childCount; childIndex++)
-            {
-                Transform child =
-                    transform.GetChild(childIndex);
-
-                if (child != null &&
-                    IsPaintedAccentFoldPreviewObjectName(child.name))
-                {
-                    previewObjects.Add(child.gameObject);
-                }
-            }
-
-            for (int index = 0; index < previewObjects.Count; index++)
-            {
-                DestroyPaintedAccentFoldSurfacePreviewObject(
-                    previewObjects[index]);
-            }
-        }
-
-        private bool CanBuildPaintedAccentFoldSurfacePreview()
-        {
-            return paintedAccentFoldFieldEnabled &&
-                   paintedAccentSurfaceStrokes != null &&
-                   paintedAccentSurfaceStrokes.Length > 0 &&
-                   baseSurface != null &&
-                   baseSurface.IsValid;
-        }
-
-        private static bool IsPaintedAccentFoldPreviewObjectName(
-            string objectName)
-        {
-            return !string.IsNullOrEmpty(objectName) &&
-                   (objectName.StartsWith(
-                        PaintedAccentFoldSurfacePreviewName,
-                        StringComparison.Ordinal) ||
-                    objectName.StartsWith(
-                        LegacyPaintedAccentFoldSurfacePreviewName,
-                        StringComparison.Ordinal) ||
-                    objectName.StartsWith(
-                        LegacyPaintedAccentFoldLinePreviewName,
-                        StringComparison.Ordinal));
-        }
-
-        private static void ResolvePaintedAccentRidgeLongitudinalSample(
-            Vector3[] points,
-            Vector3[] normals,
-            float t,
-            out Vector3 point,
-            out Vector3 normal)
-        {
-            t = Mathf.Clamp01(t);
-            float scaledIndex = t * (points.Length - 1);
-            int lowerIndex =
-                Mathf.Clamp(
-                    Mathf.FloorToInt(scaledIndex),
-                    0,
-                    points.Length - 1);
-            int upperIndex =
-                Mathf.Min(points.Length - 1, lowerIndex + 1);
-            float interpolation = scaledIndex - lowerIndex;
-
-            point =
-                Vector3.Lerp(
-                    points[lowerIndex],
-                    points[upperIndex],
-                    interpolation);
-
-            Vector3 lowerNormal =
-                lowerIndex < normals.Length &&
-                normals[lowerIndex].sqrMagnitude > 0.000001f
-                    ? normals[lowerIndex].normalized
-                    : Vector3.up;
-            Vector3 upperNormal =
-                upperIndex < normals.Length &&
-                normals[upperIndex].sqrMagnitude > 0.000001f
-                    ? normals[upperIndex].normalized
-                    : lowerNormal;
-            normal =
-                Vector3.Lerp(
-                    lowerNormal,
-                    upperNormal,
-                    interpolation);
-            if (normal.sqrMagnitude <= 0.000001f)
-            {
-                normal = Vector3.up;
-            }
-            else
-            {
-                normal.Normalize();
-            }
-        }
-
-        private static Vector3 ResolveStrokePreviewTangent(
-            Vector3[] points,
-            float t,
-            Vector3 surfaceNormal)
-        {
-            if (points == null || points.Length < 2)
-            {
-                return ResolvePreviewFallbackTangent(surfaceNormal);
-            }
-
-            int centerIndex =
-                Mathf.Clamp(
-                    Mathf.RoundToInt(Mathf.Clamp01(t) * (points.Length - 1)),
-                    0,
-                    points.Length - 1);
-            Vector3 previous =
-                points[Mathf.Max(0, centerIndex - 1)];
-            Vector3 next =
-                points[Mathf.Min(points.Length - 1, centerIndex + 1)];
-            Vector3 tangent =
-                Vector3.ProjectOnPlane(
-                    next - previous,
-                    surfaceNormal);
-
-            if (tangent.sqrMagnitude <= 0.000001f)
-            {
-                return ResolvePreviewFallbackTangent(surfaceNormal);
-            }
-
-            return tangent.normalized;
-        }
-
-        private static Vector3 ResolvePreviewFallbackTangent(
-            Vector3 surfaceNormal)
-        {
-            Vector3 tangent =
-                Vector3.ProjectOnPlane(
-                    Vector3.forward,
-                    surfaceNormal);
-            if (tangent.sqrMagnitude <= 0.000001f)
-            {
-                tangent =
-                    Vector3.ProjectOnPlane(
-                        Vector3.right,
-                        surfaceNormal);
-            }
-
-            if (tangent.sqrMagnitude <= 0.000001f)
-            {
-                tangent = Vector3.forward;
-            }
-
-            return tangent.normalized;
-        }
-
-        private static void ShapePaintedAccentValleySuppressedProfile(
-            float[] normalizedCrestHeights,
-            float[] endEnvelopes)
-        {
-            if (normalizedCrestHeights == null ||
-                endEnvelopes == null ||
-                normalizedCrestHeights.Length < 3 ||
-                normalizedCrestHeights.Length != endEnvelopes.Length)
-            {
-                return;
-            }
-
-            int lastIndex = normalizedCrestHeights.Length - 1;
-            int peakIndex = 1;
-            float peakHeight =
-                Mathf.Max(0f, normalizedCrestHeights[peakIndex]);
-
-            for (int index = 2; index < lastIndex; index++)
-            {
-                float candidateHeight =
-                    Mathf.Max(0f, normalizedCrestHeights[index]);
-                if (candidateHeight > peakHeight)
-                {
-                    peakHeight = candidateHeight;
-                    peakIndex = index;
-                }
-            }
-
-            float peakEndEnvelope =
-                Mathf.Max(0.001f, endEnvelopes[peakIndex]);
-
-            for (int index = 0; index <= lastIndex; index++)
-            {
-                float hillProgress;
-                if (index <= peakIndex)
-                {
-                    hillProgress =
-                        peakIndex > 0
-                            ? index / (float)peakIndex
-                            : 1f;
-                }
-                else
-                {
-                    int finishSpan = lastIndex - peakIndex;
-                    hillProgress =
-                        finishSpan > 0
-                            ? (lastIndex - index) / (float)finishSpan
-                            : 1f;
-                }
-
-                float smoothHillEnvelope =
-                    Mathf.SmoothStep(
-                        0f,
-                        1f,
-                        Mathf.Clamp01(hillProgress));
-                float relativeEndEnvelope =
-                    Mathf.Clamp01(
-                        Mathf.Max(0f, endEnvelopes[index]) /
-                        peakEndEnvelope);
-                float targetHeight =
-                    peakHeight *
-                    Mathf.Min(
-                        smoothHillEnvelope,
-                        relativeEndEnvelope);
-                float rawHeight =
-                    Mathf.Max(0f, normalizedCrestHeights[index]);
-                normalizedCrestHeights[index] =
-                    Mathf.Lerp(
-                        rawHeight,
-                        targetHeight,
-                        PaintedAccentSingleCrestBlend);
-            }
-
-            normalizedCrestHeights[0] = 0f;
-            normalizedCrestHeights[lastIndex] = 0f;
-
-            // Preserve broad seeded variation. Only substantial one-row valleys
-            // are lifted; unlike C4, no monotonic rise/fall constraint is
-            // imposed, so shelves, asymmetry, and small irregular changes remain.
-            float[] valleySource =
-                (float[])normalizedCrestHeights.Clone();
-            float valleyThreshold =
-                peakHeight * PaintedAccentValleyThresholdFraction;
-
-            for (int index = 1; index < lastIndex; index++)
-            {
-                float currentHeight =
-                    Mathf.Max(0f, valleySource[index]);
-                float lowerNeighbourHeight =
-                    Mathf.Min(
-                        Mathf.Max(0f, valleySource[index - 1]),
-                        Mathf.Max(0f, valleySource[index + 1]));
-                float valleyDepth =
-                    lowerNeighbourHeight - currentHeight;
-                if (valleyDepth <= valleyThreshold)
-                {
-                    continue;
-                }
-
-                normalizedCrestHeights[index] =
-                    Mathf.Lerp(
-                        currentHeight,
-                        lowerNeighbourHeight,
-                        PaintedAccentValleyRepairStrength);
-            }
-        }
-
-        private static PaintedAccentFoldProfileBasis[]
-            BuildPaintedAccentFoldProfileBases(
-                int strokeSeed,
-                float irregularity,
-                out float normalization)
-        {
-            irregularity = Mathf.Clamp01(irregularity);
-            int maximumAdditionalBases =
-                irregularity <= 0.001f
-                    ? 0
-                    : Mathf.Clamp(
-                          Mathf.CeilToInt(irregularity * 3f),
-                          1,
-                          3);
-            int additionalBases = 0;
-            if (maximumAdditionalBases > 0)
-            {
-                additionalBases =
-                    1 +
-                    Mathf.Min(
-                        maximumAdditionalBases - 1,
-                        Mathf.FloorToInt(
-                            ResolvePaintedAccentPreviewHash01(
-                                strokeSeed,
-                                101u) *
-                            maximumAdditionalBases));
-            }
-
-            int basisCount = 1 + additionalBases;
-            PaintedAccentFoldProfileBasis[] bases =
-                new PaintedAccentFoldProfileBasis[basisCount];
-            normalization = 1f;
-            float primaryWidth =
-                Mathf.Lerp(
-                    0.34f,
-                    0.50f,
-                    ResolvePaintedAccentPreviewHash01(
-                        strokeSeed,
-                        109u));
-
-            for (int basisIndex = 0; basisIndex < basisCount; basisIndex++)
-            {
-                uint salt = (uint)(basisIndex * 47 + 137);
-                bool isPrimary = basisIndex == 0;
-                float center =
-                    isPrimary
-                        ? ResolvePaintedAccentPreviewSignedHash(
-                              strokeSeed,
-                              salt + 1u) *
-                          0.20f * irregularity
-                        : ResolvePaintedAccentPreviewSignedHash(
-                              strokeSeed,
-                              salt + 1u) *
-                          Mathf.Lerp(
-                              0.22f,
-                              0.62f,
-                              ResolvePaintedAccentPreviewHash01(
-                                  strokeSeed,
-                                  salt + 3u));
-                float width =
-                    primaryWidth *
-                    (isPrimary
-                        ? Mathf.Lerp(
-                              0.84f,
-                              1.14f,
-                              ResolvePaintedAccentPreviewHash01(
-                                  strokeSeed,
-                                  salt + 5u))
-                        : Mathf.Lerp(
-                              0.38f,
-                              0.82f,
-                              ResolvePaintedAccentPreviewHash01(
-                                  strokeSeed,
-                                  salt + 5u)));
-                float amplitude = 1f;
-                if (!isPrimary)
-                {
-                    float amplitudeMagnitude =
-                        Mathf.Lerp(
-                            0.14f,
-                            0.56f,
-                            ResolvePaintedAccentPreviewHash01(
-                                strokeSeed,
-                                salt + 7u)) *
-                        irregularity;
-                    float amplitudeSign =
-                        ResolvePaintedAccentPreviewHash01(
-                            strokeSeed,
-                            salt + 9u) < 0.33f
-                            ? -1f
-                            : 1f;
-                    amplitude = amplitudeMagnitude * amplitudeSign;
-                }
-                float centerDrift =
-                    ResolvePaintedAccentPreviewSignedHash(
-                        strokeSeed,
-                        salt + 11u) *
-                    0.18f * irregularity;
-                float widthVariation =
-                    Mathf.Lerp(
-                        0.04f,
-                        0.24f,
-                        ResolvePaintedAccentPreviewHash01(
-                            strokeSeed,
-                            salt + 13u)) *
-                    irregularity;
-                float amplitudeVariation =
-                    Mathf.Lerp(
-                        0.07f,
-                        0.32f,
-                        ResolvePaintedAccentPreviewHash01(
-                            strokeSeed,
-                            salt + 17u)) *
-                    irregularity;
-                float phase =
-                    ResolvePaintedAccentPreviewHash01(
-                        strokeSeed,
-                        salt + 19u) *
-                    Mathf.PI * 2f;
-                float frequency =
-                    Mathf.Lerp(
-                        0.55f,
-                        1.35f,
-                        ResolvePaintedAccentPreviewHash01(
-                            strokeSeed,
-                            salt + 23u));
-
-                bases[basisIndex] =
-                    new PaintedAccentFoldProfileBasis(
-                        center,
-                        width,
-                        amplitude,
-                        centerDrift,
-                        widthVariation,
-                        amplitudeVariation,
-                        phase,
-                        frequency);
-                if (!isPrimary && amplitude > 0f)
-                {
-                    normalization += amplitude * 0.35f;
-                }
-            }
-
-            normalization = Mathf.Max(0.001f, normalization);
-            return bases;
-        }
-
-        private static float ResolvePaintedAccentFoldProfileHeight(
-            float t,
-            float u,
-            int strokeSeed,
-            PaintedAccentFoldProfileBasis[] profileBases,
-            float profileNormalization,
-            float irregularity,
-            float endEnvelope)
-        {
-            float edgePower =
-                Mathf.Lerp(
-                    1.15f,
-                    1.65f,
-                    ResolvePaintedAccentPreviewHash01(
-                        strokeSeed,
-                        307u));
-            float edgeEnvelope =
-                Mathf.Pow(
-                    Mathf.Max(0f, 1f - u * u),
-                    edgePower);
-            if (edgeEnvelope <= 0f)
-            {
-                return 0f;
-            }
-
-            float profile = 0f;
-            for (int basisIndex = 0;
-                 basisIndex < profileBases.Length;
-                 basisIndex++)
-            {
-                PaintedAccentFoldProfileBasis basis =
-                    profileBases[basisIndex];
-                float angle =
-                    t * Mathf.PI * 2f * basis.Frequency +
-                    basis.Phase;
-                float center =
-                    basis.Center +
-                    basis.CenterDrift * Mathf.Sin(angle);
-                float width =
-                    basis.Width *
-                    (1f +
-                     basis.WidthVariation *
-                     Mathf.Sin(angle * 0.83f + basis.Phase * 0.47f));
-                width = Mathf.Max(0.04f, width);
-                float amplitude =
-                    basis.Amplitude *
-                    (1f +
-                     basis.AmplitudeVariation *
-                     Mathf.Sin(angle * 1.11f + basis.Phase * 0.71f));
-                float normalizedDistance =
-                    (u - center) /
-                    width;
-                float gaussian =
-                    Mathf.Exp(
-                        -0.5f *
-                        normalizedDistance *
-                        normalizedDistance);
-                profile += amplitude * gaussian;
-            }
-
-            profile /= Mathf.Max(0.001f, profileNormalization);
-
-            float crossPhaseA =
-                ResolvePaintedAccentPreviewHash01(
-                    strokeSeed,
-                    313u) *
-                Mathf.PI * 2f;
-            float crossPhaseB =
-                ResolvePaintedAccentPreviewHash01(
-                    strokeSeed,
-                    317u) *
-                Mathf.PI * 2f;
-            float crossVariation =
-                1f +
-                irregularity *
-                (Mathf.Sin(
-                     u * Mathf.PI * 1.25f +
-                     t * Mathf.PI * 0.55f +
-                     crossPhaseA) * 0.24f +
-                 Mathf.Sin(
-                     u * Mathf.PI * 2.35f -
-                     t * Mathf.PI * 0.70f +
-                     crossPhaseB) * 0.14f);
-            profile =
-                Mathf.Max(
-                    0f,
-                    profile * Mathf.Max(0.40f, crossVariation));
-
-            float phaseA =
-                ResolvePaintedAccentPreviewHash01(
-                    strokeSeed,
-                    271u) *
-                Mathf.PI * 2f;
-            float phaseB =
-                ResolvePaintedAccentPreviewHash01(
-                    strokeSeed,
-                    277u) *
-                Mathf.PI * 2f;
-            float alongVariation =
-                1f +
-                irregularity *
-                (Mathf.Sin(t * Mathf.PI * 1.55f + phaseA) * 0.30f +
-                 Mathf.Sin(t * Mathf.PI * 3.10f + phaseB) * 0.18f);
-            alongVariation = Mathf.Clamp(alongVariation, 0.45f, 1.50f);
-
-            return Mathf.Clamp(
-                profile *
-                edgeEnvelope *
-                alongVariation *
-                endEnvelope,
-                0f,
-                1.55f);
-        }
-
-        private static float ResolvePaintedAccentCrownEndEnvelope(
-            float t,
-            float foldEndEnvelope)
-        {
-            float shortRampEnvelope =
-                Mathf.SmoothStep(
-                    0f,
-                    1f,
-                    Mathf.Clamp01(
-                        t /
-                        Mathf.Max(
-                            0.001f,
-                            PaintedAccentCrownEndRampFraction))) *
-                Mathf.SmoothStep(
-                    0f,
-                    1f,
-                    Mathf.Clamp01(
-                        (1f - t) /
-                        Mathf.Max(
-                            0.001f,
-                            PaintedAccentCrownEndRampFraction)));
-
-            return Mathf.Max(
-                Mathf.Clamp01(foldEndEnvelope),
-                shortRampEnvelope * PaintedAccentLegCrownSupport);
-        }
-
-        private static float ResolvePaintedAccentFoldEndEnvelope(
-            float t,
-            int strokeSeed,
-            float endTaper)
-        {
-            float taperFraction =
-                Mathf.Lerp(0.025f, 0.35f, Mathf.Clamp01(endTaper));
-            float startTaper =
-                taperFraction *
-                Mathf.Lerp(
-                    0.84f,
-                    1.16f,
-                    ResolvePaintedAccentPreviewHash01(
-                        strokeSeed,
-                        283u));
-            float finishTaper =
-                taperFraction *
-                Mathf.Lerp(
-                    0.84f,
-                    1.16f,
-                    ResolvePaintedAccentPreviewHash01(
-                        strokeSeed,
-                        293u));
-
-            return
-                Mathf.SmoothStep(
-                    0f,
-                    1f,
-                    Mathf.Clamp01(t / Mathf.Max(0.001f, startTaper))) *
-                Mathf.SmoothStep(
-                    0f,
-                    1f,
-                    Mathf.Clamp01((1f - t) / Mathf.Max(0.001f, finishTaper)));
-        }
-
-        private static float ResolvePaintedAccentPreviewSignedHash(
-            int seed,
-            uint salt)
-        {
-            return ResolvePaintedAccentPreviewHash01(seed, salt) * 2f - 1f;
-        }
-
-        private static float ResolvePaintedAccentPreviewHash01(
-            int seed,
-            uint salt)
-        {
-            unchecked
-            {
-                uint value = (uint)seed ^ (salt * 0x9E3779B9u);
-                value ^= value >> 16;
-                value *= 0x7FEB352Du;
-                value ^= value >> 15;
-                value *= 0x846CA68Bu;
-                value ^= value >> 16;
-                return (value & 0x00FFFFFFu) / 16777215f;
-            }
-        }
-
-        private static Material ResolvePaintedAccentRidgePreviewMaterial()
-        {
-            Shader dedicatedShader =
-                Shader.Find(PaintedAccentRidgePreviewShaderName);
-
-            if (paintedAccentRidgePreviewMaterial != null)
-            {
-                if (dedicatedShader != null &&
-                    paintedAccentRidgePreviewMaterial.shader != dedicatedShader)
-                {
-                    paintedAccentRidgePreviewMaterial.shader = dedicatedShader;
-                }
-
-                ConfigurePaintedAccentRidgePreviewMaterial(
-                    paintedAccentRidgePreviewMaterial);
-                return paintedAccentRidgePreviewMaterial;
-            }
-
-            Shader shader = dedicatedShader;
-            if (shader == null)
-            {
-                shader = Shader.Find("Universal Render Pipeline/Unlit");
-            }
-
-            if (shader == null)
-            {
-                shader = Shader.Find("Unlit/Color");
-            }
-
-            if (shader == null)
-            {
-                shader = Shader.Find("Sprites/Default");
-            }
-
-            if (shader == null)
-            {
-                return null;
-            }
-
-            paintedAccentRidgePreviewMaterial =
-                new Material(shader)
-                {
-                    name = "GeneratedGround_PaintedAccentRidgePreview_SharedMaterial",
-                    hideFlags = HideFlags.DontSave
-                };
-
-            ConfigurePaintedAccentRidgePreviewMaterial(
-                paintedAccentRidgePreviewMaterial);
-            return paintedAccentRidgePreviewMaterial;
-        }
-
-        private static void ConfigurePaintedAccentRidgePreviewMaterial(
-            Material material)
-        {
-            if (material == null)
-            {
-                return;
-            }
-
-            if (material.HasProperty("_InkColor"))
-            {
-                material.SetColor(
-                    "_InkColor",
-                    PaintedAccentDefaultInkColor);
-            }
-
-            if (material.HasProperty("_BaseColor"))
-            {
-                material.SetColor(
-                    "_BaseColor",
-                    PaintedAccentDefaultInkColor);
-            }
-
-            if (material.HasProperty("_Color"))
-            {
-                material.SetColor(
-                    "_Color",
-                    PaintedAccentDefaultInkColor);
-            }
-
-            if (material.HasProperty("_Cull"))
-            {
-                material.SetFloat(
-                    "_Cull",
-                    (float)CullMode.Off);
-            }
-
-            material.doubleSidedGI = false;
-        }
-
-        private static void DestroyPaintedAccentFoldSurfacePreviewObject(
-            GameObject previewObject)
-        {
-            MeshFilter meshFilter =
-                previewObject.GetComponent<MeshFilter>();
-            MeshRenderer meshRenderer =
-                previewObject.GetComponent<MeshRenderer>();
-
-            if (meshFilter != null &&
-                meshFilter.sharedMesh != null)
-            {
-                DestroyGeneratedObject(meshFilter.sharedMesh);
-            }
-
-            if (meshRenderer != null &&
-                meshRenderer.sharedMaterial != null &&
-                meshRenderer.sharedMaterial != paintedAccentRidgePreviewMaterial)
-            {
-                // Legacy V3J.3B previews owned one material per child. Destroy
-                // those stale materials, but never destroy the shared ridge material.
-                DestroyGeneratedObject(meshRenderer.sharedMaterial);
-            }
-
-            DestroyGeneratedObject(previewObject);
-        }
-
-        private static void DestroyGeneratedObject(
-            UnityEngine.Object generatedObject)
-        {
-            if (generatedObject == null)
-            {
-                return;
-            }
-
-            if (Application.isPlaying)
-            {
-                Destroy(generatedObject);
-            }
-            else
-            {
-                DestroyImmediate(generatedObject);
             }
         }
 
@@ -2997,6 +2194,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             lastSurfaceMaskDiagnostics =
                 "Surface masks have not been generated yet.";
             paintedAccentFoldFieldSignature = 0;
+            paintedAccentModifierSnapshots = Array.Empty<GroundModifierSnapshot>();
+            paintedAccentRiverSnapshots = Array.Empty<StylizedRiverGroundSnapshot>();
             ApplyNeutralPaintedAccentFoldField();
 
             if (meshFilter != null &&
@@ -3014,7 +2213,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         private void OnDestroy()
         {
-            ClearPaintedAccentFoldSurfacePreview();
             ClearGeneratedAssignments();
 
             if (paintedAccentFoldFieldTexture != null)

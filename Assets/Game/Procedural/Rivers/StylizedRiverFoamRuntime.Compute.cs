@@ -48,7 +48,9 @@ namespace ProgrammaticStylized3D.Rivers
             applyBoundaryKernel = computeShader.FindKernel("ApplyBoundary");
         }
 
-        private void ConfigureSharedComputeParameters(float deltaTime)
+        private void ConfigureSharedComputeParameters(
+            float transportDeltaTime,
+            float lifecycleDeltaTime)
         {
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
             computeShader.SetInts(
@@ -63,7 +65,7 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamSimulationLength",
                 simulationFieldLength);
-            lastConfiguredFoamDeltaTime = deltaTime;
+            lastConfiguredFoamDeltaTime = lifecycleDeltaTime;
             lastConfiguredFoamNeutralLifetime = river.FoamNeutralLifetime;
             lastConfiguredFoamPositiveAgeMultiplier =
                 river.FoamSupportedAgingRate;
@@ -72,7 +74,12 @@ namespace ProgrammaticStylized3D.Rivers
             lastConfiguredAbsoluteLifeProbeActive =
                 isolatedLifeProbeAbsoluteAgingActive;
 
-            computeShader.SetFloat("_FoamDeltaTime", deltaTime);
+            computeShader.SetFloat(
+                "_FoamDeltaTime",
+                transportDeltaTime);
+            computeShader.SetFloat(
+                "_FoamLifecycleDeltaTime",
+                lifecycleDeltaTime);
             computeShader.SetFloat(
                 "_FoamDebugAbsoluteLifeProbeActive",
                 isolatedLifeProbeAbsoluteAgingActive ? 1f : 0f);
@@ -598,18 +605,67 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             float inverseScale = 1f / TransportMetricFixedPointScale;
-            transportPresenceBefore = values[0] * inverseScale;
-            transportLifeMomentBefore = values[1] * inverseScale;
-            transportPatternMomentBefore = values[2] * inverseScale;
-            transportPresenceAfter = values[3] * inverseScale;
-            transportLifeMomentAfter = values[4] * inverseScale;
-            transportPatternMomentAfter = values[5] * inverseScale;
-            transportPresenceBoundaryOutflow = values[6] * inverseScale;
-            transportLifeBoundaryOutflow = values[7] * inverseScale;
-            transportPatternBoundaryOutflow = values[8] * inverseScale;
-            transportPresenceClampLoss = values[9] * inverseScale;
-            transportLifeClampLoss = values[10] * inverseScale;
-            transportPatternClampLoss = values[11] * inverseScale;
+            transportPresenceBefore =
+                values[TransportPresenceBeforeMetricIndex] * inverseScale;
+            transportLifeMomentBefore =
+                values[TransportLifeBeforeMetricIndex] * inverseScale;
+            transportPatternMomentBefore =
+                values[TransportPatternBeforeMetricIndex] * inverseScale;
+            transportPresenceAfter =
+                values[TransportPresenceAfterMetricIndex] * inverseScale;
+            transportLifeMomentAfter =
+                values[TransportLifeAfterMetricIndex] * inverseScale;
+            transportPatternMomentAfter =
+                values[TransportPatternAfterMetricIndex] * inverseScale;
+            transportPresenceBoundaryOutflow =
+                values[TransportPresenceOutflowMetricIndex] * inverseScale;
+            transportLifeBoundaryOutflow =
+                values[TransportLifeOutflowMetricIndex] * inverseScale;
+            transportPatternBoundaryOutflow =
+                values[TransportPatternOutflowMetricIndex] * inverseScale;
+            transportPresenceClampLoss =
+                values[TransportPresenceClampMetricIndex] * inverseScale;
+            transportLifeClampLoss =
+                values[TransportLifeClampMetricIndex] * inverseScale;
+            transportPatternClampLoss =
+                values[TransportPatternClampMetricIndex] * inverseScale;
+            transportPresenceUnitCapacityLoss =
+                values[TransportPresenceUnitCapacityLossMetricIndex] *
+                inverseScale;
+            transportPresenceBoundaryCapacityLoss =
+                values[TransportPresenceBoundaryCapacityLossMetricIndex] *
+                inverseScale;
+            transportPresenceObstacleCapacityLoss =
+                values[TransportPresenceObstacleCapacityLossMetricIndex] *
+                inverseScale;
+            transportPresenceStateValidityLoss =
+                values[TransportPresenceStateValidityLossMetricIndex] *
+                inverseScale;
+            transportPresenceMinimumCutoffLoss =
+                values[TransportPresenceMinimumCutoffLossMetricIndex] *
+                inverseScale;
+            transportMaximumRawPresence =
+                values[TransportMaximumRawPresenceMetricIndex] * inverseScale;
+            transportMaximumLocalCapacityExcess =
+                values[TransportMaximumLocalCapacityExcessMetricIndex] *
+                inverseScale;
+            transportTotalCapacityHitCount =
+                values[TransportTotalCapacityHitCountMetricIndex];
+            transportUnitCapacityHitCount =
+                values[TransportUnitCapacityHitCountMetricIndex];
+            transportBoundaryCapacityHitCount =
+                values[TransportBoundaryCapacityHitCountMetricIndex];
+            transportObstacleCapacityHitCount =
+                values[TransportObstacleCapacityHitCountMetricIndex];
+
+            float attributedPresenceLoss =
+                transportPresenceUnitCapacityLoss +
+                transportPresenceBoundaryCapacityLoss +
+                transportPresenceObstacleCapacityLoss +
+                transportPresenceStateValidityLoss +
+                transportPresenceMinimumCutoffLoss;
+            transportPresenceAttributionResidual =
+                transportPresenceClampLoss - attributedPresenceLoss;
 
             transportPresenceUnaccountedError =
                 transportPresenceBefore - transportPresenceAfter -
@@ -660,6 +716,18 @@ namespace ProgrammaticStylized3D.Rivers
             transportPresenceClampLoss = 0f;
             transportLifeClampLoss = 0f;
             transportPatternClampLoss = 0f;
+            transportPresenceUnitCapacityLoss = 0f;
+            transportPresenceBoundaryCapacityLoss = 0f;
+            transportPresenceObstacleCapacityLoss = 0f;
+            transportPresenceStateValidityLoss = 0f;
+            transportPresenceMinimumCutoffLoss = 0f;
+            transportPresenceAttributionResidual = 0f;
+            transportMaximumRawPresence = 0f;
+            transportMaximumLocalCapacityExcess = 0f;
+            transportTotalCapacityHitCount = 0u;
+            transportUnitCapacityHitCount = 0u;
+            transportBoundaryCapacityHitCount = 0u;
+            transportObstacleCapacityHitCount = 0u;
             transportPresenceUnaccountedError = 0f;
             transportLifeUnaccountedError = 0f;
             transportPatternUnaccountedError = 0f;

@@ -4,8 +4,21 @@
 
 - **Active edge-wear architecture:** EW-C — Explicit Single-Segment Chamfer Kernel
 - **Validated implementation baseline:** EW-C2S6R3 — full EW-C2 provisional topology gate passed across all 24 physical masses
-- **Current implementation step:** EW-C3A2 — Global patch-cluster stitching and source-boundary completion census, implemented and awaiting Unity validation
-- **Geometry emission:** provisional build and audit only; final geometry commit remains disabled
+- **Validated EW-C3A baseline:** EW-C3A4 — component ownership and closure classification passed across all 24 physical masses; six closed-source clusters, two single-loop promotions, and one count-preserving multi-cycle ownership swap are validated
+- **Validated EW-C3B1R2 result:** the complete 492-loop/1503-boundary/519-triangle plan was audited; the patch-local area correction produced zero area or winding failures and 17/24 complete topology passes, while eight folded loops rejected every cyclic triangulation of their global ordered boundary
+- **Validated EW-C3B1R3 result:** exactly eight source-local cell complexes were audited and all were infeasible; source-vertex fan/bridge reconstruction is rejected by incidence and T-junction evidence
+- **Validated EW-C3B1R4 result:** eight folded loops were audited; six closed-source clusters failed authoritative directed-boundary coherence, while both coherent local quads rejected both candidates only at existing-surface intersection
+- **Validated EW-C3B1R5 result:** the expected six cluster plans and 41 cluster edges were audited, but eight co-directed two-use provisional edges caused 16 successor failures and decomposed every cluster into open chains; the sliver census also selected four microscopic quads and proved that its cloned audit had not re-entered the real segmentation pipeline
+- **Validated EW-C3B1R5R1 result:** all eight co-directed pairs were classified; orientation parity was rejected by nine contradictions, six required face reversals, and six normal failures, while the independent-sector interpretation produced 108 closed loops for 108 existing plans with zero open chains, successor failures, or internal-direction failures. Exactly two failed slivers were audited, two successful microscopic quads were excluded, and both failed slivers resolved cleanly to triangles after the full cloned segmentation path.
+- **Validated EW-C3B1R5R2 result:** the sector-bearing masses retained 108 authoritative loops for 108 plans, but the first complete-clone proof rejected validated baseline patches, treated sixteen promoted co-directed occurrences as missing ownership, and globally merged one proven sliver closure
+- **Validated EW-C3B1R5R3 result:** the five sector-bearing masses passed the exact `347 legacy-owned + 16 promoted = 363 authoritative` occurrence equation with 108/108 loops, but the exact-key contact classifier rejected 185 of 484 already-successful loops and one reserved sliver still reduced `22 → 21`
+- **Validated EW-C3B1R5R4 result:** authoritative boundary contact recovered 61 baseline loops and raised corrected construction to 360 loops while retaining the exact sector proof and both local sliver triangles; 124 baseline loops still show likely real replacement/bevel overlap, six corrected loops have boundary-occurrence mismatches, and one sliver mass remains `22 → 21`
+- **Validated EW-C3B1R5R5 result:** overlap ownership and containment, boundary-occurrence causes, and remap-aware sliver component lineage produced the stable 24-mass compact baseline used for the MassGenerator refactor.
+- **Validated refactor boundary:** MG-R5 — Production-Candidate and Diagnostic-Harness Separation; all 24 compact audits match MG-R4.
+- **Validated MG-R6A result:** `contained=22/0/22/0/22/0`; all 22 contained patches have deterministic owners, no patch can be deleted safely, and every direct omission fails boundary transfer.
+- **Validated MG-R6B runtime result:** `containedRepartition=22/0/0/0/0/22/0/0`; all 22 candidates build and conserve area, then fail exact boundary incidence.
+- **Current functional step:** MG-R6B.1 — clone-only contained boundary-incidence decomposition and shadow topology/overlap validation; Unity validation pending.
+- **Geometry emission:** replacement faces, bevel strips, and vertex patches are built only in the temporary audit topology; final geometry commit remains disabled
 
 ## Feature goal
 
@@ -13,7 +26,7 @@ Generated masses need a crude physical chamfer on selected exposed convex source
 
 - one bevel strip per selected manifold edge;
 - one new quadrilateral surface, or two triangles, between the two trimmed source faces;
-- crude triangle-fan corner closure;
+- deterministic boundary-only corner triangulation;
 - no rounded profile, sampled ribbon, or arbitrary segment count;
 - no runtime topology work.
 
@@ -413,28 +426,586 @@ patchBoundaryCompletionOwnershipConflicts
 
 `readyForVertexPatchComponents` now accepts exact closed-source clusters but continues to reject unresolved source-fan components until a later approved ownership-transfer patch.
 
-### EW-C3B — Provisional patch emission
+Unity validation across all 24 physical masses produced the exact aggregate:
+
+```text
+patchClosedSourceClusters=6
+patchClosedSourceClusterComponents=16
+patchClosedSourceClusterBoundaryRecords=41
+patchClosedSourceClusterFailures=0
+```
+
+The five formerly blocked closed-source masses passed. Twenty-one of twenty-four physical masses reached `readyForVertexPatchComponents=1`. The remaining three masses contained four source-fan components. Two identical 18-selected masses each formed one connected three-edge completion loop. The 36-selected mass formed two disconnected, individually closed three-edge cycles from one original source-boundary loop. No degree, duplicate-key, use-count, or ownership failure was present.
+
+### EW-C3A3 — Proven boundary promotion and multi-cycle lineage
+
+EW-C3A3 performs one guarded ownership correction and one read-only lineage audit. It still emits no patch face and does not alter the original normalized `ChamferSourceBoundaryRecord.Children`.
+
+For an unresolved source-fan completion, promotion is permitted only when the combined exact graph satisfies all of the following:
+
+```text
+one original source-boundary loop
+one connected component
+one closed cycle
+every graph vertex has degree two
+no duplicate topology keys
+every source and candidate edge has one provisional use
+source edges are source-boundary-owned only
+candidate edges are vertex-boundary-owned only
+every candidate component and edge is consumed exactly once
+```
+
+Passing candidate edges move only in derived ownership sets:
+
+```text
+remainingVertexPatchBoundaryKeys
+→ finalSourceBoundaryKeys
+```
+
+The original source-boundary children and provisional geometry remain unchanged. Passing components receive `OpenChainSourceBoundaryCompletionResolved` and reference an ordered `ChamferFinalSourceBoundaryLoop`. They require no patch geometry.
+
+Required promotion counters are:
+
+```text
+patchBoundaryCompletionTransfers
+patchBoundaryCompletionTransferredComponents
+patchBoundaryCompletionTransferredEdges
+patchBoundaryCompletionTransferFailures
+```
+
+The two validated 18-selected masses are expected to report one transferred component and one transferred edge each, reducing the unresolved physical set from three masses to one.
+
+When one original source-boundary loop resolves into multiple disconnected closed cycles, EW-C3A3 refuses promotion and emits a detailed lineage warning. The audit deterministically orders each derived cycle and reports:
+
+- source-boundary orders and source-edge indices represented by each cycle;
+- candidate source vertices, active run count, and active source edges;
+- every ordered edge position, provisional use count, and current ownership type;
+- cycle winding relative to the ordered original parent boundary;
+- whether the cycles partition consecutive source-record ranges;
+- whether an R1 retrace or R3 terminal-alias removal connects different cycles;
+- every original source-boundary record with raw, post-R1, and post-R3 child counts plus each removal reason.
+
+Required lineage counters are:
+
+```text
+patchBoundaryCompletionMultiCycleLoops
+patchBoundaryCompletionDerivedCycles
+patchBoundaryCompletionCycleLineageFailures
+```
+
+Unity validation confirmed the two physical single-loop promotions, zero transfer failures, and 23/24 component readiness. The remaining 36-selected mass produced two exact three-edge cycles. Cycle 1 contained source orders 2 and 3 plus candidate edge 0 and aligned exactly with the original source-boundary normal (`windingDot=1.000000`). Cycle 0 contained source order 1 plus candidate edges 35 and 43 and was nearly orthogonal (`windingDot=0.019933`). The R3 removed alias connected the two cycles but was already proven internally closed, so it cannot be restored as boundary geometry.
+
+### EW-C3A4 — Multi-cycle boundary/patch ownership resolution
+
+EW-C3A4 applies one narrow, count-preserving derived ownership swap only when the validated two-cycle pattern satisfies every strict guard:
+
+```text
+exactly one original source-boundary loop
+exactly two derived cycles and two candidate components
+consecutive source-record partitions
+removed R1/R3 lineage connects the cycles
+each candidate component belongs to exactly one cycle
+every cycle edge has one provisional use
+all current derived ownership is disjoint and correct
+exactly one cycle aligns >= 0.95 with the original loop normal
+the residual cycle has |alignment| <= 0.25
+alignment separation is >= 0.50
+exactly one candidate edge is promoted
+exactly one source child is demoted
+source, patch, union, and disjointness counts remain invariant
+```
+
+The aligned cycle becomes the derived final source-boundary loop. Its candidate edge moves from `remainingVertexPatchBoundaryEdges` to `finalSourceBoundaryEdges` and its component receives `OpenChainSourceBoundaryMultiCycleResolved`.
+
+The orthogonal cycle becomes a complete residual patch target. Its one surviving source child moves from `finalSourceBoundaryEdges` to `remainingVertexPatchBoundaryEdges`; the full ordered cycle is retained in a `ChamferVertexPatchCluster` through `OrderedCompletionEdges`, and its component receives `OpenChainSourceBoundaryResidualPatchResolved`.
+
+No original expected-ownership set, normalized source child, provisional face, vertex, or topology edge is changed. The validated 36-selected equation remains:
+
+```text
+75 provisional open edges
+= 3 derived final source-boundary edges
++ 72 remaining vertex-patch boundaries
+```
+
+New counters:
+
+```text
+patchBoundaryMultiCycleResolutions
+patchBoundaryMultiCycleSourceCycles
+patchBoundaryMultiCycleResidualPatchCycles
+patchBoundaryMultiCyclePromotedEdges
+patchBoundaryMultiCycleDemotedEdges
+patchBoundaryMultiCycleWindingSelectionFailures
+patchBoundaryMultiCycleOwnershipSwapFailures
+patchBoundaryMultiCycleCountInvariantFailures
+```
+
+Unity validation confirmed the exact A4 result across the physical set:
+
+```text
+24 / 24 readyForVertexPatchComponents=1
+patchBoundaryMultiCycleResolutions=1
+patchBoundaryMultiCycleSourceCycles=1
+patchBoundaryMultiCycleResidualPatchCycles=1
+patchBoundaryMultiCyclePromotedEdges=1
+patchBoundaryMultiCycleDemotedEdges=1
+all A4 failure counters=0
+```
+
+The 36-selected object retained the count-preserving derived contract `75 = 3 final source-boundary edges + 72 remaining patch-boundary edges`.
+
+### EW-C3B1 / EW-C3B1R1 — Provisional patch emission and final topology audit
 
 EW-C3B may begin only after EW-C3A reports zero unresolved and ordering/provenance failures across all 24 masses.
 
-Closed-loop components use a crude centre fan:
+EW-C3B1 materialized the validated ownership result as a `ChamferVertexPatchPlan` and reconstructed the exact expected physical aggregate: 492 patch loops and 1503 derived patch-boundary edges. Unity validation rejected the arithmetic-mean centre fan on 23 masses, so the centre-fan operation is retired without changing ownership architecture.
+
+EW-C3B1R1 preserved the plan and switched to boundary-only deterministic triangulation. Three-edge loops emit directly; larger loops use expected-normal projection and deterministic ear clipping. Unity validation retained the exact aggregate plan and eliminated the old winding failures, but produced:
 
 ```text
-centre = arithmetic mean of the ordered unique boundary positions
-triangle[i] = centre, boundary[i], boundary[i+1]
+ 6 / 24 masses: complete provisional patch topology passed
+13 / 24 masses: a direct or ear-clipped triangle was above TinyFaceAreaEpsilon but below the unrelated replacement/bevel minimumStableFaceArea
+ 5 / 24 masses: the ordered non-planar boundary crossed in the expected-normal projection before ear clipping
 ```
 
-The loop orientation is chosen against the normalized sum of incident source-face normals. Every fan triangle must have finite vertices, stable positive area, and compatible winding. Boundary edges receive their second use from the patch; internal centre spokes must have exactly two patch-triangle uses.
+All 24 retained `readyForVertexPatchComponents=1`, `readyForVertexPatches=1`, and `geometryCommit=disabled`. No EW-C2 or EW-C3A ownership regression occurred.
 
-Open-chain geometry must use the closure class proven by EW-C3A:
+### EW-C3B1R2 — Patch-local area gate and complete feasibility census
 
-- source-boundary-resolved chains may use a source-vertex apex fan only when the two new radial spokes are installed as explicit ordered source-boundary descendants replacing the consumed terminal ownership at that source vertex;
-- closed-source-resolved chains may use only the exact connector topology proven by EW-C3A;
-- unresolved chains emit no geometry and remain hard blockers.
+EW-C3B1R2 preserves the validated plan and the R1 boundary-only emitter. It makes one narrow acceptance correction:
 
-Patch faces carry `PolygonFaceFeature.ConvexEdgeWear`. Initial patch strength is the maximum strength of active selected source edges incident to the owning source vertex. No new artistic variation is added in EW-C3.
+```text
+provisional patch-triangle minimum area = TinyFaceAreaEpsilon
+replacement-face and bevel-strip minimum area = unchanged minimumStableFaceArea
+```
 
-EW-C3B remains provisional. Replacement faces, bevel strips, and vertex patches are audited together and then discarded.
+`TinyFaceAreaEpsilon` is already the final mesh face-retention floor. Using it only for patch triangles removes the false mismatch in which renderable patch triangles were rejected by the larger replacement/bevel stability threshold. Patch-local ordered-loop and triangle normals are computed from their raw Newell/cross-product vectors without inheriting the generic polygon-normal fallback threshold, so the tiny-area gate and normal test use compatible scales.
+
+R2 no longer stops after the first failed loop. Every one of the 492 planned loops is evaluated. A failed loop contributes no provisional faces, increments `patchLoopsFailed`, logs its own evidence, and does not prevent later loops from being tested. The final combined topology audit still runs only when every loop succeeds.
+
+For every loop with four or more boundary positions, R2 also performs a read-only exhaustive cyclic triangulation census. It enumerates all Catalan boundary triangulations and accepts a candidate only when every triangle:
+
+- has three finite, distinct topology vertices;
+- has area greater than `TinyFaceAreaEpsilon`;
+- has a finite normal with positive alignment to `ExpectedNormal`;
+- participates in a cyclic boundary triangulation with `n - 2` triangles and `n - 3` non-crossing combinatorial diagonals.
+
+The census does not emit its selected candidate. It records total candidate and feasible triangulation counts, loops with and without a feasible result, and one deterministic best diagonal set. The best candidate maximizes minimum normalized triangle quality, then minimum normal alignment, then minimum triangle area, with the lexicographically smallest diagonal-index set as the final tie-break.
+
+Expected-normal projection crossing remains a blocker for the active R1 ear clipper, but R2 now reports structured evidence: loop kind, source vertices, ordered 3D positions, expected and ordered normals, alignment, projection extent and epsilon, projected area, maximum out-of-plane distance, normalized non-planarity, first crossing edge pair, crossing type, projected endpoints, and all four orientation values. Crossing types are `Proper`, `EndpointTouch`, or `CollinearOverlap`.
+
+New summary evidence includes:
+
+```text
+patchLoopsFailed
+patchMaximumBoundaryCount
+patchTriangleAreaFailuresTotal
+patchSelfIntersectionLoopsTotal
+patchTriangulationCandidatesTested
+patchFeasibleTriangulations
+patchLoopsWithFeasibleTriangulation
+patchLoopsWithoutFeasibleTriangulation
+```
+
+Open-chain ownership and patch-loop membership remain exactly those proven by EW-C3A. Patch faces remain temporary `ConvexEdgeWear` provisional faces. No vertex is created or moved, and no geometry is committed.
+
+R2 Unity validation completed the physical census:
+
+```text
+492 loops attempted
+484 loops built
+8 loops failed
+519 triangles attempted
+486 triangles built
+482 direct-triangle loops built
+2 ear-clipped loops built
+0 patch-area failures
+0 patch-winding failures
+```
+
+The ten non-triangle loops consisted of four local four-edge loops and six closed-source clusters. Two local loops had two feasible cyclic triangulations each and passed the complete final topology audit. The remaining two local loops and all six clusters had zero feasible cyclic triangulations. All eight blockers were proper expected-normal projection crossings. This proves that the validated outer ownership cycle is not always one geometric polygon; folded source-local provenance must be retained.
+
+### EW-C3B1R3 — Source-local patch cell-complex feasibility census
+
+R3 is read-only and runs only for the eight R2 loops with no feasible cyclic triangulation. It does not alter the successful direct-triangle or ear-clipped paths.
+
+Each original `ChamferVertexPatchComponent` is audited as a local fan cell from its source vertex to every ordered component boundary edge. The fan uses a component-local expected normal derived only from that component's represented source faces. Adjacent open components in a cluster are joined at their shared endpoint. When their source vertices differ, R3 plans an endpoint bridge triangle from the shared endpoint to both source vertices; when the source vertices coincide, the matching endpoint spokes close directly.
+
+After component fans and endpoint bridges are planned, R3 audits the source-to-source graph. Edges whose combined existing and planned use count is two are already closed. One-use edges must form degree-two central loops. Each central loop receives a read-only exhaustive triangulation census on the original source-vertex positions; a feasible central fill contributes one additional use to each central boundary edge and two uses to every internal diagonal.
+
+The complete prospective cell complex must prove:
+
+```text
+each original patch boundary: existing 1 + planned 1 = 2
+each component spoke: combined uses = 2
+each endpoint bridge/source edge: combined uses = 2
+each central diagonal: planned uses = 2
+planned edges overlapping final source-boundary ownership = 0
+prospective T-junctions = 0
+component-local geometry failures = 0
+bridge geometry failures = 0
+central graph/triangulation failures = 0
+```
+
+R3 reports one structured cell-complex census per audited folded loop, including component boundary counts, source vertices, component fan and bridge triangle counts, central graph and fill counts, every planned edge's existing-plus-planned incidence, local geometry minima, prospective T-junction count, and `feasibleCellComplex`. No prospective face is appended to `provisionalFaceRecords` in R3.
+
+New summary evidence includes:
+
+```text
+patchCellComplexesAudited
+patchLocalFoldedCellsAudited
+patchClusterCellComplexesAudited
+patchComponentFanTrianglesPlanned
+patchEndpointBridgeTrianglesPlanned
+patchCentralLoopsFound
+patchCentralTrianglesPlanned
+patchCellComplexesFeasible
+patchCellComplexesInfeasible
+patchCellComponentFailures
+patchCellBridgeFailures
+patchCellCentralGraphFailures
+patchCellIncidenceFailures
+patchCellGeometryFailures
+```
+
+### EW-C3B1R4 — Directed-manifold boundary triangulation census
+
+R3 validation rejected all eight source-vertex cell complexes. The physical aggregate was:
+
+```text
+8 cell complexes audited
+0 feasible
+49 component-fan triangles planned
+16 endpoint bridges planned
+5 central source edges
+0 central loops
+22 component failures
+7 bridge failures
+1 central-graph failure
+29 geometry failures
+46 incidence failures
+20 prospective T-junctions
+```
+
+The decisive evidence was that geometrically valid source-fan cases still produced invalid incidence and T-junctions. The removed original source vertex is not generally part of the trimmed replacement/bevel topology and cannot be reintroduced as a universal patch centre.
+
+R4 instead recovers the unique directed owner of every one-use folded-loop boundary edge from the pre-patch provisional faces. The candidate patch cycle must traverse each edge opposite to the owning face. All cyclic triangulations of the coherent directed boundary are enumerated without expected-normal projection or aggregate-normal rejection.
+
+Each candidate must prove:
+
+```text
+outer boundary use: existing 1 + directed patch 1 = 2
+internal diagonal use: existing 0 + two opposite patch uses = 2
+final source-boundary overlap = 0
+triangle area > TinyFaceAreaEpsilon
+improper candidate-candidate 3D intersections = 0
+improper candidate-existing-face 3D intersections = 0
+combined T-junctions = 0
+combined non-manifold edges = 0
+```
+
+The diagnostic ranks feasible candidates by minimum normalized triangle quality, then lower maximum internal dihedral, lower maximum boundary dihedral, higher minimum area, and lexicographically stable diagonals. It does not emit the selected candidate.
+
+New summary evidence includes:
+
+```text
+patchDirectedLoopsAudited
+patchDirectedBoundaryEdgesChecked
+patchDirectedBoundaryConflicts
+patchDirectedCandidatesTested
+patchDirectedCandidatesPassingIncidence
+patchDirectedCandidatesPassingTriangleIntersection
+patchDirectedCandidatesPassingExistingFaceIntersection
+patchLoopsWithFeasibleDirectedTriangulation
+patchLoopsWithoutFeasibleDirectedTriangulation
+patchDirectedTriangleIntersectionFailures
+patchDirectedExistingFaceIntersectionFailures
+patchDirectedTJunctionFailures
+patchDirectedNonManifoldFailures
+```
+
+R4 validation produced the decisive split:
+
+```text
+8 directed loops audited
+49 boundary edges checked
+6 directed-boundary conflicts
+4 candidates tested across the two coherent local quads
+4 passed incidence
+4 passed candidate-candidate intersection
+0 passed existing-face intersection
+0 feasible directed triangulations
+```
+
+The six conflicts are the six `ClosedSourceCluster` loops with boundary counts `5, 6, 6, 6, 9, 9`. Their undirected positional cycles are not authoritative oriented boundary components. The two local four-edge loops have coherent ownership, but each contains a sub-`PointMergeDistance` edge and both triangulations overlap the existing replacement/bevel surface. Triangle selection is no longer the active blocker.
+
+### EW-C3B1R5 — Validated half-edge and sliver census result
+
+R5 remained diagnostic-only and preserved the complete R4 baseline:
+
+```text
+24 physical masses
+17 readyForChamferPatchTopology=1
+7 readyForChamferPatchTopology=0
+492 patch loops attempted
+484 patch loops built
+8 patch loops failed
+geometryCommit=disabled
+```
+
+It audited exactly the expected cluster population:
+
+```text
+6 ClosedSourceCluster plans
+41 cluster boundary edges
+0 missing authoritative edges
+```
+
+The first face-sector traversal did not recover closed components. Across the five cluster-bearing masses it found:
+
+```text
+8 co-directed two-use provisional edges
+16 successor failures
+16 positional pinch/end vertices
+16 open boundary chains
+0 corrected cluster partitions
+```
+
+Each co-directed pair has the same undirected `TopologyEdgeKey` but both owning faces traverse it in the same direction. Because R5 linked only opposite-direction twins, those eight pairs remained unlinked and necessarily produced the 16 open-chain endpoints. R5 did not yet distinguish whether each pair is a true internal adjacency with an orientation inconsistency or two coincident but independent boundary sectors.
+
+R5 also audited four sub-`PointMergeDistance` local quads rather than the intended two failed loops. Two entries belonged to already-successful R2 quads. All four chose a deterministic sanitation survivor without representative or face failures, but the cloned topology then ran the generic topology audit without first applying the real provisional T-junction segmentation and boundary-descendant normalization. Its reported post-collapse T-junctions therefore were not authoritative.
+
+### EW-C3B1R5R1 — Co-directed classification and targeted sliver re-audit
+
+R5R1 remains read-only. It adds exact evidence for every co-directed two-use pair:
+
+```text
+edge key and high-precision directed uses
+face-record and face-corner identity
+replacement/bevel kind
+source-face and source-edge provenance
+face-local previous/next half-edges
+stored and calculated normals
+source-topology adjacency
+radial face-sector relationship
+```
+
+Two cloned interpretations are tested independently.
+
+**Orientation-parity hypothesis**
+
+- opposite directed two-use edges impose equal face parity;
+- co-directed two-use edges impose opposite face parity;
+- a BFS reports parity contradictions;
+- required faces are virtually reversed;
+- every reversal is checked against the authoritative stored/source-facing normal;
+- twins and boundary components are rebuilt;
+- all six cluster plans must resolve with no successor, assignment, or internal-direction failure.
+
+**Independent-boundary-sector hypothesis**
+
+- the two co-directed uses remain distinct boundary half-edges;
+- traversal preserves exact face-corner sectors;
+- every half-edge must be assigned exactly once;
+- all cluster edges must decompose into complete, exclusive closed components;
+- no ambiguous successor or duplicated component ownership is accepted.
+
+A hypothesis is selected only when exactly one interpretation passes its complete topology gate. If both pass or both fail, the result remains explicitly unresolved.
+
+R5R1 also carries sliver eligibility from the actual live loop path. A local quad is audited only when it has the R4 sliver signature **and** its real R2 emission fails. Already-successful microscopic quads are counted as excluded, not normalized again. Expected physical totals are:
+
+```text
+failed sliver loops audited = 2
+successful sliver-like loops excluded = 2
+```
+
+After a deterministic virtual collapse, cloned replacement/bevel faces now re-enter the same provisional sequence used by the live topology proof:
+
+```text
+SegmentRawChamferTJunctions(...)
+NormalizeChamferProvisionalFaceWalks(...)
+rebuild face/use records
+NormalizeChamferVertexBoundaries(...)
+NormalizeChamferSourceBoundaryLoops(...)
+CollapseChamferSourceBoundaryTerminalTransferAliases(...)
+AuditChamferSourceBoundaryOwnership(...)
+```
+
+Only then is the post-collapse half-edge component recovered and a possible triangle evaluated. R5R1 still mutates no live face, patch plan, source-boundary ownership, or committed geometry.
+
+R5R1 adds these principal counters:
+
+```text
+patchCoDirectedUsePairsAudited
+patchCoDirectedSourceAdjacentPairs
+patchCoDirectedSameSectorPairs
+patchCoDirectedSeparateSectorPairs
+patchCoDirectedAmbiguousSectorPairs
+patchHalfEdgeParityContradictions
+patchHalfEdgeParityFacesReversed
+patchHalfEdgeParityNormalFailures
+patchHalfEdgeParityClustersResolved
+patchHalfEdgeSectorClustersResolved
+patchHalfEdgeParityHypothesisAccepted
+patchHalfEdgeSectorHypothesisAccepted
+patchHalfEdgeHypothesisAmbiguities
+patchSliverSuccessfulLoopsExcluded
+patchSliverPostSegmentationTJunctions
+patchSliverPostSegmentationIncompatibleTJunctions
+```
+
+R5R1 validation established:
+
+```text
+co-directed pairs audited = 8
+source-adjacent pairs = 8
+orientation-parity contradictions = 9
+faces requiring parity reversal = 6
+parity normal failures = 6
+parity clusters resolved = 0
+independent-sector loops = 108
+existing plans on affected masses = 108
+sector open chains = 0
+sector successor failures = 0
+sector internal-direction failures = 0
+failed sliver loops audited = 2
+successful sliver-like loops excluded = 2
+slivers resolved to triangles = 2
+post-segmentation incompatible T-junctions = 0
+```
+
+The legacy `sectorAccepted=0` result was caused only by requiring the authoritative sector loops to remain exact copies of the known-invalid position-key cluster plans. It is not evidence against the sector topology. The authoritative loop count is preserved one-for-one, but some old plan boundaries must be repartitioned globally.
+
+### EW-C3B1R5R2 — Authoritative sector-loop repartition and corrected full-topology census
+
+R5R2 remains clone-only. For every physical mass it builds a corrected pre-patch snapshot. The two validated sliver masses first apply their sanitation-consistent endpoint collapse and rerun the full provisional segmentation and boundary-normalization sequence. All other masses retain the validated pre-patch replacement/bevel snapshot unchanged.
+
+The corrected snapshot is decomposed into face-sector-aware closed boundary loops. On the five cluster-bearing masses, all current plans are compared against all authoritative sector loops rather than only the six legacy cluster objects. Every authoritative face-corner boundary occurrence is checked against the complete legacy plan set and must have exactly one provenance owner. The census also reports plans contributing to multiple sector loops and sector loops combining multiple plans. Exact plan matches are retained for lineage; non-exact plans are mapped deterministically by maximum occurrence and key overlap. The resulting patch geometry is always constructed from the authoritative half-edge component, never from the old cluster label or its lineage assignment.
+
+For each authoritative loop R5R2:
+
+```text
+builds the opposite boundary order from owning face half-edges
+constructs a diagnostic patch loop
+triangulates with the patch-local TinyFaceAreaEpsilon policy
+checks candidate-candidate and candidate-existing-face intersections
+appends triangles only to a cloned topology
+checks source-boundary preservation and unexpected openings
+runs the final generic non-manifold and T-junction audit
+```
+
+R5R2 reports both the occurrence-level sector ownership and the final position-key topology. This distinction is important: two independent face sectors may share an identical geometric edge key. R5R2 must not hide a resulting generic non-manifold count; such a result would prove that the production representation needs sector-distinct vertex identity before commitment.
+
+Principal R5R2 counters include:
+
+```text
+patchSectorMassesAudited
+patchSectorExistingPlanLoops
+patchSectorAuthoritativeLoops
+patchSectorExactPlanMatches
+patchSectorRepartitionedPlanLoops
+patchSectorBoundaryHalfEdgesAssigned
+patchSectorLoopCountInvariantFailures
+patchSectorOwnershipInvariantFailures
+patchSectorProvenanceFailures
+patchSectorPlansAttempted
+patchSectorPlansBuilt
+patchSectorPlansFailed
+patchCorrectedMassesAudited
+patchCorrectedLoopsAttempted
+patchCorrectedLoopsBuilt
+patchCorrectedLoopsFailed
+patchCorrectedTrianglesAttempted
+patchCorrectedTrianglesBuilt
+patchCorrectedSliverCollapses
+patchCorrectedFinalUnexpectedOpenEdges
+patchCorrectedFinalNonManifoldEdges
+patchCorrectedFinalTJunctions
+readyForCorrectedChamferPatchTopology
+```
+
+The live 484 successful patch faces, live plan, and final geometry remain unchanged.
+
+R5R2 Unity validation compiled and ran deterministically but did not satisfy the corrected-topology gate. Across 24 physical masses it attempted 492 authoritative loops, found 491 global components, built 286, and rejected 205. The failures were dominated by 196 candidate intersection reports. The same gate rejected many already-successful baseline triangle patches, so those intersection results are not authoritative without attribution and a baseline control. The five cluster-bearing masses still preserved 108 authoritative loops for 108 plans. Their 363 authoritative occurrences decomposed into 347 legacy-owned occurrences plus exactly sixteen occurrences exposed by the eight co-directed pairs. Those sixteen are promoted sector boundaries, not missing ownership. Both sanitation collapses executed, but one sliver was globally retraced into a malformed seven-edge neighbour rather than preserving the locally proven triangle.
+
+### EW-C3B1R5R3 — Intersection calibration, promoted sectors, and reserved slivers
+
+R5R3 remains clone-only and adds a canonical baseline control. Every live-successful R2 patch loop is passed through the same attributed intersection test before reconstructed sector loops are judged. Candidate hits are classified as internal, accepted-patch, replacement-face, or bevel-strip. Existing faces are tested both with the former vertex-zero fan and with deterministic polygon-aware triangulation. Fan-only hits are evidence about the old diagnostic representation and do not reject a candidate; polygon-aware improper hits remain blockers.
+
+Sector occurrence ownership now recognizes the exact two face-corner uses of every proven co-directed pair as `PromotedCoDirectedSectorBoundary` occurrences. They remain separate face sectors and require no invented legacy patch owner. The expected cluster-bearing aggregate is 347 legacy-owned plus sixteen promoted occurrences, with zero unexplained or multiply owned occurrences.
+
+The two R5R1-proven slivers are reserved before global tracing. Their sanitation-consistent collapse is applied, their exact three authoritative boundary occurrences are recovered, and one occurrence-oriented triangle is appended only to the corrected clone. Those triangle edges become internal before the remaining sector decomposition runs, preventing the validated local closure from being merged into a neighbouring global component.
+
+Three-edge authoritative components no longer derive orientation from an unsanitized aggregate loop normal. Their ordered patch triangle is built directly opposite the three owning boundary half-edges; area and final normal are measured afterward. Larger loops retain deterministic projected ear clipping.
+
+Principal R5R3 counters include:
+
+```text
+patchCorrectedBaselineLoopsAudited
+patchCorrectedBaselineLoopsRejected
+patchCorrectedBaselineIntersectionFailures
+patchCorrectedBaselineCandidateInternalIntersections
+patchCorrectedBaselineAcceptedPatchIntersections
+patchCorrectedBaselineReplacementFaceIntersections
+patchCorrectedBaselineBevelStripIntersections
+patchCorrectedBaselineFanOnlyIntersections
+patchCorrectedBaselinePolygonAwareIntersections
+patchCorrectedCandidateInternalIntersections
+patchCorrectedAcceptedPatchIntersections
+patchCorrectedReplacementFaceIntersections
+patchCorrectedBevelStripIntersections
+patchCorrectedFanOnlyFaceIntersections
+patchCorrectedPolygonAwareFaceIntersections
+patchCorrectedAllowedBoundaryContacts
+patchCorrectedPolygonTriangulationFailures
+patchSectorLegacyOwnedBoundaryHalfEdges
+patchSectorPromotedBoundaryHalfEdges
+patchCorrectedReservedSliverLoops
+patchCorrectedReservedSliverTriangles
+patchCorrectedReservedSliverOccurrenceConflicts
+```
+
+R5R3 validation audited all 484 live-successful loops and rejected 185, almost entirely against replacement faces. This disproved exact triangle-key identity as a sufficient legal-contact classifier. The sector proof itself passed exactly, and both local sliver triangles remained valid.
+
+### EW-C3B1R5R4 — Boundary-aware contact and exact sliver reservation
+
+R5R4 retains the R5R3 ownership model but changes the proof gate. Every patch loop now exposes its true outer boundary segments by cancelling internal triangle diagonals. Every sanitized replacement or bevel face exposes its polygon boundary independently of the triangle representation used for intersection testing. A patch-to-face contact is legal only when every detected contact lies on both authoritative boundary sets. Interior penetration and proper coplanar crossings remain failures.
+
+Existing faces are gated against the sanitized vertex-zero fan used by the current rendered `ConvexEdgeWear` path. Deterministic projected ear clipping runs silently as comparison evidence; failure of that comparison is recorded without changing the render-faithful gate. It does not call the verbose vertex-patch triangulator, so a non-simple diagnostic face no longer emits a full failure dump and stack trace.
+
+Reserved slivers now reuse the validated R5R1 normalization result directly. The exact three post-collapse patch positions are recovered after sanitation and segmentation, their opposite face half-edges are matched by exact direction, and the reserved triangle is appended before global sector traversal. The expected counts are therefore:
+
+```text
+sliver mass A: 20 → 20
+sliver mass B: 22 → 22
+reserved sliver triangles = 2
+reserved occurrence conflicts = 0
+```
+
+Detailed intersection evidence is capped to one representative sample total for baseline mode and one for corrected mode per physical evaluation. Normal validation relies on compact per-mass summaries; full triangle positions require the explicitly enabled temporary verbose diagnostic constant.
+
+R5R4 validation recovered 61 baseline loops but retained 124 rejected baseline loops: 121 against replacement faces and four against bevel strips. The corrected clone built 360 of 491 authoritative loops. The remaining blocking contacts were reproduced by the independent polygon representation in 123 of 125 cases, which means they are not explainable as vertex-zero-fan artifacts alone. The sector proof remained exact at 108/108 loops and 363/363 owned occurrences. Both reserved sliver triangles remained valid, but one sliver mass still reported `22 → 21`.
+
+### EW-C3B1R5R5 — Overlap ownership and component lineage
+
+R5R5 remains diagnostic-only. Each rejected baseline loop is assigned exactly one primary overlap class:
+
+```text
+patch contained by replacement face
+replacement face contained by patch
+partial coplanar overlap
+non-coplanar replacement penetration
+bevel-strip penetration
+unclassified
+```
+
+Coplanar classifications use deterministic projected triangle-set overlap area. The census also distinguishes overlaps with an authoritative patch-boundary owner from overlaps with unrelated faces. This determines whether the likely production correction is patch elimination/ownership transfer or clipping of excess replacement-face area.
+
+Boundary-occurrence failures are no longer reported as one undifferentiated count. R5R5 records missing opposite edges, duplicate opposite edges, same-direction mismatches, and extra patch boundary edges.
+
+The remaining sliver deficit is audited through a pre-collapse/post-collapse component comparison. The census removes the locally reserved sliver component, applies the validated removed-to-representative vertex remap to the remaining pre-collapse components, then reports exact component matches, disappeared components, post-collapse merges, pre-collapse splits, the remaining loop-count deficit, and a compact deterministic component trace.
+
+Default Console output is one compact no-stacktrace emission summary per physical evaluation. Adjacent identical `OnValidate`/`OnEnable` lifecycle duplicates are suppressed without collapsing separate same-origin physical evaluations. Successful readiness and corner details, per-intersection samples, half-edge details, sector details, and sliver geometry dumps remain behind the explicit verbose diagnostic gate.
 
 ### EW-C3 topology gate
 
@@ -451,7 +1022,7 @@ Required conditions:
 remaining expected vertex-boundary edges = 0
 unowned patch edges = 0
 patch boundary edges with use count != 2 = 0
-patch internal spokes with use count != 2 = 0
+patch internal diagonals with use count != 2 = 0
 output non-manifold edges = 0
 output T-junctions = 0
 source-boundary mismatches = 0
@@ -511,6 +1082,46 @@ This coefficient is a proof-stage safety policy, not the final artistic mapping.
 
 EW-B is retired. It independently rebuilt source faces, emitted local bridge faces, then inferred ownership from resulting open-edge coordinates and attempted post-hoc cap closure. That architecture repeatedly produced unexplained boundaries and T-junctions. Its construction code, cap experiments, rail records, and EW-B-only diagnostics have been removed.
 
+## MassGenerator source architecture — MG-R1 through MG-R5
+
+`MassGenerator` is implemented as one static partial class across responsibility-focused files. `MassGenerator.cs` contains only orchestration, shared tolerances, and the public `Generate` entry points. Plane-cut construction, polyhedron operations, radial construction, output, geodesic topology, helpers, core types, and edge-wear stages live in separate files under `Assets/Game/Procedural/Masses/`.
+
+MG-R1 is Unity-validated as behaviour-preserving: all 24 compact R5R5 summaries match the pre-refactor baseline exactly, with no public API, geometry, readiness, or commitment change.
+
+MG-R2 and MG-R2R1 are Unity-validated cleanup waves:
+
+- the canonical code inventory is `Generated_Mass_Edge_Wear_Code_Inventory.md`;
+- historical detailed logging and per-intersection evidence payloads are removed;
+- methods proven unreferenced after diagnostic removal are deleted;
+- normal output remains the compact no-stacktrace summary;
+- the orphaned classification warning was removed without changing any compact value.
+
+MG-R3 removes three rejected proof families after explicit producer/consumer tracing:
+
+- orientation parity and unused co-directed classification;
+- source-vertex cell-complex feasibility;
+- historical directed-manifold feasibility.
+
+The independent-sector decision remains authoritative, and directed ownership/triangulation utilities still required by validated sliver recovery remain present. MG-R3/MG-R3R1 are Unity-validated with unchanged 24-mass compact output and zero warnings. MG-R4 removes write-only counter/result state and newly orphaned diagnostics, reducing the source to 22,480 lines across all `MassGenerator` partials; Unity validation confirms all 24 compact audits remain unchanged. Future recovery work must be added to the responsible partial file, and rejected/superseded methods must be removed through separately validated cleanup waves rather than retained indefinitely.
+
+MG-R3R1 is a compile-only correction: one corrected-topology sliver call still passed the old nullable hypothesis argument. It now passes `false`, exactly matching the former `null` path that selected the unresolved/default half-edge decomposition.
+
+MG-R4 reduces `ChamferEmissionStats` from 286 to 95 fields, `ChamferCornerStats` from 60 to 16, and `ChamferReadinessStats` from 28 to 13. It removes three uncalled summary builders, 19 orphaned methods, and two orphaned types. The compact logger and public edge-wear entry point remain text-identical to MG-R3R1; retrace-normalization calls that mutate face walks remain active.
+
+MG-R5 establishes one explicit builder-to-diagnostics boundary. `MassGenerator.EdgeWear.Orchestration.cs` coordinates the production candidate and clone-only harness. `ChamferBuildArtifacts` carries the already-created plan, provisional snapshots, topology context, normalized boundaries, thresholds, and shared spans to `MassGenerator.EdgeWear.Diagnostics.*.cs`. Production-candidate files contain no references to diagnostic-harness methods or diagnostic-only types. The corrected clone, overlap census, lineage analysis, diagnostic types, and compact logging are isolated in explicit diagnostic partials.
+
+MG-R5 removes no algorithms. The separation adds 155 lines of wrapper/file overhead, producing 22,635 lines across all `MassGenerator` partials: 14,186 production/shared edge-wear lines, 570 orchestration lines, 3,840 diagnostic-harness lines, and a 10-line compatibility shim. Unity validation confirmed the same 24 compact audits. Geometry remains provisional and `geometryCommit=disabled`.
+
+MG-R6A adds production-side contained-candidate identification without production-side mutation. Successful patch loops are classified from render-faithful triangle geometry, authoritative boundary segments, and replacement-face provenance. Only `PatchContainedInReplacement` loops are passed through `ChamferBuildArtifacts`; a deterministic owner requires one containing replacement face with a shared authoritative patch-boundary segment.
+
+The clone-only diagnostic removes one candidate patch at a time and tests whether the owner already provides the complete boundary and manifold topology. The compact field is `contained=candidates/resolved/stillRequired/ownerAmbiguous/boundaryTransferFailures/topologyFailures`. Unity validation produced `contained=22/0/22/0/22/0`: all 22 patches remain topologically required, every owner is deterministic, and direct deletion is rejected by boundary transfer rather than owner ambiguity or general topology.
+
+MG-R6B retains each patch and subtracts its region from the deterministic replacement owner only in a diagnostic clone. Owner and patch boundaries are projected into one stable owner-plane basis, split at endpoint contacts and collinear overlaps, and combined as directed boundaries. Shared owner/patch segments cancel; the remaining directed segments form residual owner cycles, which are triangulated deterministically. Original owner vertices and authoritative patch-boundary endpoints are protected so the transform cannot hide a T-junction by deleting required segmentation.
+
+The individual compact field is `containedRepartition=candidates/resolved/arrangementFailures/triangulationFailures/areaFailures/boundaryFailures/topologyFailures/overlapRemaining`. Every resolved candidate conserves area, gives every retained patch-boundary edge two uses, does not worsen baseline-relative topology, and removes the target replacement overlap. `containedCombined=attempted/applied/ownerConflicts/topologyFailures/remainingOverlaps` then tests all individually resolved candidates together, grouped by original owner. Live replacement faces, bevel strips, patch records, rendered geometry, and commitment remain unchanged.
+
+Unity validation produced `containedRepartition=22/0/0/0/0/22/0/0`: all 22 contained candidates reached the exact boundary-incidence gate, but none reached the original topology or overlap gates. MG-R6B.1 therefore keeps construction unchanged and adds `containedBoundary=`, `containedBoundarySegments=`, and `containedShadow=`. Exact edge use is separated from collinear split-equivalent coverage and from real missing, unsplit, underused, overused, or mixed ownership. Shadow checks independently report whether the overlap was removed and whether T-junction, unexpected-open-edge, source-boundary, or non-manifold counts increased. This evidence is clone-only and cannot promote a candidate.
+
 ## Performance policy
 
 Chamfer topology is generated before gameplay and cached with the generated mass. The first implementation prioritizes deterministic, low-complexity geometry:
@@ -522,8 +1133,9 @@ Chamfer topology is generated before gameplay and cached with the generated mass
 
 ## Next work items
 
-1. Compile EW-C3A2 in Unity.
-2. Regenerate all 24 physical masses and verify the sixteen closed-source arcs become six exact clusters with zero cluster failures.
-3. Inspect every source-boundary completion census and prove whether the four remaining components complete their original boundary loops.
-4. Define a separate ownership-transfer patch only if every combined boundary loop passes degree, connectivity, use-count, duplicate, and ownership checks.
-5. Keep patch-face emission and final geometry commitment disabled.
+1. Validate MG-R6B.1 compilation with zero errors and zero warnings.
+2. Require all pre-MG-R6B.1 compact fields, including `containedRepartition=22/0/0/0/0/22/0/0`, to remain unchanged.
+3. Aggregate `containedBoundary=` and `containedBoundarySegments=` to identify exact-key segmentation versus real ownership failure.
+4. Aggregate `containedShadow=` to determine whether subtraction removed the overlap and which topology invariant changed.
+5. Keep live geometry unchanged and `geometryCommit=disabled`.
+6. Use the MG-R6B.1 evidence to choose between validator correction and adjacent-face repartitioning before beginning MG-R6C.

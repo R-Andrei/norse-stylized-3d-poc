@@ -285,17 +285,13 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 
 `4.11C.5.11` tested the first post-baseline Layer D local procedural breakup probe. Validation rejected it as the fine-fragmentation solution: it was active, but the removals were cell/ribbon-shaped because `_FoamShapeMask` is the wrong resolution for atomic detail. `4.11C.5.11B` retires that code and restores the clean pass-through Layer D baseline. Fine breakup now belongs in Layer E shader composition; Layer D should focus on macro sheet/contact/bridge structure.
 
-### Current status after `4.11C.5.16C.1`
+### Current status after `4.11C.5.16E.2`
 
-Stage 6 has accepted the Layer C movement foundation. `4.11C.5.16A.1` validated the canonical velocity field. `4.11C.5.16B` replaced global phase transport with conservative local 2D packed-state advection, and `4.11C.5.16B.1` removed the D3D11 helper warning, restored committed-state diagnostics, and prevented obstacle-region render prediction from fighting closed transport faces. The user reported that the Unity result looked good and approved progression, so Layer C is parked unless a regression appears.
+The accepted state is restored to `5.16E`: both Final Foam visibility policies remain, support aging may reach `0.05`, and Layer C/Layer D ownership is unchanged.
 
-`4.11C.5.16C — Advected Layer D Temporal Occupancy` is implemented and has provisional Unity runtime evidence; final stationary convergence and acceptance validation remain. Two half-resolution `RHalf` textures ping-pong a visual-only occupancy sheet. Each fixed material tick rebuilds Film Source and Film Support from committed material, advects prior occupancy through the same canonical velocity and Layer C CFL substeps, then relaxes toward the instantaneous film target with independent build/release times (`0.20 s / 0.80 s` defaults).
+`5.16E.1` face-consistent residual gating and released object/shore source formation failed Unity validation. Source disabling did not stop constrained foam stutter, and the released sources produced an unwanted grey-interior/white-fringe result. The failure confirms that conservative redistribution beside blocked faces cannot be reconstructed by a single point-velocity render offset.
 
-The temporal field is not a smoothing objective. It is the persistent moving canvas required by the next macro feature: pinching, tears, split/rejoin behavior, and fractures that survive more than one stateless shape evaluation. It never writes Layer C, never extends Remaining Life, and is not yet consumed by Final Foam.
-
-New diagnostics expose the current target, temporal occupancy, and their difference. Final Foam remains unchanged. The next stage is gated on proof that occupancy transports, builds, releases, clips, reverses, and resets correctly.
-
-`4.11C.5.16C.1 — Debug Footprint Consistency` corrects only comparative diagnostic transfer functions. Motion Field ownership and Remaining Life now share `smoothstep(0.02, 0.16, committed Presence)` so tiny donor-cell tails no longer appear absent in one view and fully occupied in another. Raw Material Presence remains literal amplitude. Evaluated Shape and Temporal Occupancy remain intentionally broader because they include half-resolution Layer D visual coverage. No simulation or Final Foam behavior changes.
+The no-allocation audit proved that residual-predicted Final Foam alone stuttered while both committed and evaluated previews were stable. `5.16E.2` therefore promotes committed Layer C presentation to normal Final Foam and retires render-only residual point-velocity backtracing. Evaluated shape remains diagnostic-only.
 
 ### Stable foundations
 
@@ -304,7 +300,7 @@ Accepted/stable foundations:
 - persistent material state with `Presence`, `Remaining Life`, and `Material Pattern` semantics;
 - source-only `Amount` and source-to-persistent merge rules;
 - topology lifespan support and negative aging pressure;
-- lifetime delta-time rebind and support/negative aging response repair;
+- lifetime delta-time rebind, support/negative aging response repair, and precision-safe once-per-material-tick aging at a `0.05` supported minimum;
 - conservative local 2D packed-state transport through the canonical velocity;
 - 5.9n persistent morph cleanup in the compute/simulation path;
 - 5.9p lateral commit shredder disable;
@@ -328,6 +324,8 @@ Rejected or superseded as active planning direction:
 - 5.11 Layer D local procedural breakup is rejected and retired because it produced visible but cell/ribbon-shaped removals; fine breakup belongs in Layer E shader composition at rendered-pixel scale;
 - naive multi-radius edge classification is rejected as a default: radius 1/3/5 box sampling costs `179` samples per cell, about `2.93M` samples for a 128×128 field evaluation;
 - final shader macro stretch/warp must not be treated as the source of broad Foam structure;
+- 5.16D–5.16D.2 occupancy-native macro breakup is rejected and retired; it produced weak-film suppression rather than coherent tears;
+- a separate persistent damage texture/channel is rejected;
 - pocket IDs, connected components, and foam entity databases remain rejected unless explicitly reopened.
 
 ### Canonical architecture summary
@@ -359,34 +357,160 @@ The modern execution order is:
 4. Layer C source population families — complete provisionally through `5.15B.3.1`.
 5. Canonical velocity diagnostics — accepted in `5.16A.1`.
 6. Conservative local 2D Layer C material transport — accepted through `5.16B.1`.
-7. Advected Layer D temporal occupancy plus debug-footprint consistency — implemented in `5.16C/5.16C.1`, now awaiting final validation.
-8. Persistent visual damage and macro fracture — next after `5.16C` acceptance.
-9. Final Foam consumes the accepted Layer D evaluated shape.
-10. Shader-local cracks, edge chips, thin streaks, glints, and lighting polish.
-11. Formal performance tiers, active-chunk scheduling, and profiling gates.
+7. Advected Layer D temporal occupancy and debug-footprint consistency — accepted through `5.16C.1`.
+8. Occupancy-native macro breakup — rejected and removed through `5.16D.R`.
+9. Final Foam visibility-policy A/B plus low-rate aging precision — implemented in `5.16E`; both visibility policies retained.
+10. Released source formation plus face-consistent residual advection — rejected and removed through `5.16E.1R`.
+11. Zero-memory presentation audit — passed; only residual-predicted Final Foam stuttered.
+12. Committed Final Foam promotion and residual prediction retirement — Unity-validated and accepted in `5.16E.2`.
+13. River Inspector and diagnostics redesign — Unity-validated and accepted through R1–R5; canonicalized and temporary plan retired in R6.
+14. Transport Presence capacity-loss attribution — Unity-validated and accepted in `5.16E.3`.
+15. Capacity audit closure and deferred sub-1% PoC limitation — accepted in `5.16E.3C`; original `0.10%` target retained, temporary review threshold `1.00%`.
+16. Layer E final-rendering contract lock — accepted in documentation-only `5.17P`.
+17. Layer E finishing — `5.17A` failed visual validation; corrected `5.17A.1` is Unity-validated and accepted. Initial `5.17B` breakup was stable but visually underpowered. `5.17B.1` recalibrates Chip, Fray, short-cut, and Scale authority with Unity validation pending, followed by Remaining-Life progression and fine-detail work in `5.17C–D`.
+18. Decide whether `_FoamShapeMask` production integration is still required after Layer E comparison.
+19. Reopen capacity correction only if the review threshold is exceeded or visible loss appears.
+20. Formal performance tiers, active-chunk scheduling, and profiling gates.
 
-Final Foam remains disconnected until temporal occupancy and macro fracture visibly outperform the legacy player-facing shape path without changing Layer C truth.
+Final Foam reads committed packed Layer C material without residual backtracing. The `5.16E` A/B visibility control remains an artistic choice. `_FoamShapeMask` remains diagnostic-only through Foam Evaluated Final Preview.
+
+
+## Approved Layer E finishing contract — `4.11C.5.17P`
+
+The inspiration comparison is refreshed before final rendering work. The production river is not expected to copy the reference one-to-one. Its accepted macro result already contains the required family resemblance: broad predominantly horizontal bands, lateral travel, split/merge behavior, obstacle-driven convergence, and stronger shore accumulation. Slightly fatter ribbons and greater bank accumulation are acceptable consequences of the current field resolution and source grammar. Layer C and the existing motion system remain the macro authority.
+
+The remaining target is local rendered character: foam should read as pale, substantially opaque, chipped, frayed, and energetic while preserving the accepted macro ribbons.
+
+The approved Layer E order is:
+
+```text
+committed Layer C material and selected visibility policy
+  -> local rendered morphology
+  -> interior colour / opacity composition
+  -> post-breakup edge contrast
+  -> final water lighting, fog, and reflection/refraction composition
+```
+
+Layer E reads upstream data and writes screen pixels only. It adds no persistent damage state, transported channel, compute pass, or feedback into Layers C or D.
+
+### `5.17A / 5.17A.1 — Layer E Interior Composition`
+
+`5.17A` failed visual validation. The controls were bound correctly, but `Interior Fill Strength` operated after the visible mask had already been hardened near full coverage, `Interior Opacity Floor` was incorrectly capped by `Foam Colour` alpha, and `Edge Emphasis Strength` added only a weak second whitening treatment instead of controlling the existing rim produced by the edge-versus-interior lighting transition.
+
+`4.11C.5.17A.1 — Interior Composition Authority Correction` replaces that failed control model. Its authoring surface is:
+
+```text
+Foam Colour                 base RGB/tint and base opacity before the interior floor
+Interior Opacity Floor      absolute minimum opacity for established Foam body
+Edge Contrast               signed control over the existing edge-versus-interior lighting contrast
+```
+
+`Interior Fill Strength` is removed. The current visibility path already supplies a hardened established body, so a second fill remap had no useful authority and risked duplicating later morphology. `Interior Opacity Floor` may now exceed `Foam Colour` alpha, but it is gated by `smoothstep(0.42, 0.82, incoming mask)` and therefore cannot create Foam in weak fringe or outside the incoming silhouette. `Edge Contrast` ranges from `-1` to `+1`: negative values suppress the existing bright rim toward filtered interior lighting, zero preserves the accepted pre-5.17A lighting exactly, and positive values intensify the existing edge.
+
+Production Final Foam and Foam Evaluated Final Preview share the corrected composition helper. Neutral values are:
+
+```text
+Interior Opacity Floor = 0
+Edge Contrast           = 0
+```
+
+At neutral values, opacity reduces exactly to `smoothstep(0.08, 0.46, mask) × Foam Colour alpha` and lighting reduces exactly to the pre-5.17A edge/interior transition. The correction adds arithmetic only: no texture sample, branch, loop, neighbourhood stencil, persistent resource, compute dispatch, readback, material-state change, or silhouette expansion.
+
+### `5.17B — Layer E Edge Breakup Proof`
+
+`4.11C.5.17B` promoted the shared Layer E breakup helper successfully, but Unity visual validation found its maximum authority too subtle. `4.11C.5.17B.1 — Breakup Authority Calibration` is implemented with Unity validation pending. It retains the same production path, controls, stable fields, and ownership boundaries while strengthening only the existing threshold calibration.
+
+The public authoring surface is deliberately narrow:
+
+```text
+Chip Strength   0–1; default 0
+Fray Strength   0–1; default 0
+Breakup Scale   0–1; default 0.5
+```
+
+Neutral Chip and Fray values reproduce `5.17A.1` regardless of Breakup Scale. Medium chips, fine weak-fringe fray, and short edge-connected cuts use a monotone edge-threshold model: stronger incoming coverage always survives at least as well as weaker coverage, so a fully established core cannot disappear as an isolated interior hole. The short-cut signal is derived from Chip Strength rather than adding another public control.
+
+The implementation reuses the four stable pattern bands already evaluated by `RiverWaterFoamPatternedMask`. Their accepted combined visibility equation is unchanged. Two transient shader values are exposed locally: Chip selects between the existing mid and broad/diagonal bands; Fray selects between fine and mid bands. No new texture sample, procedural-noise evaluation, persistent field, channel, compute kernel, dispatch, readback, or material-state write is added.
+
+Production Final Foam, Foam Evaluated Final Preview, Foam Shader Detail Probe, and Foam Shader Detail Difference use the same breakup helper. The Probe now shows the production post-breakup committed silhouette. The Difference view is removal-only: black is unchanged and magenta/red is coverage removed by chips, fray, or short cuts; no green addition is expected.
+
+The first proof intentionally reads no Remaining Life, Support, Negative Topology, surface-energy multiplier, or additional `_Time` input. It isolates morphology quality at fixed author-controlled strength. Existing upstream visibility may retain its already accepted lifecycle and surface behavior, but `5.17B` adds no new temporal or location-based breakup rule.
+
+`5.17B.1` makes maximum Chip/Fray deliberately excessive so production tuning can be selected from the interior of the `0–1` range. Medium chips now reach approximately `0.72–0.98` coverage at maximum authority, fray reaches deeper into the visible edge, and short cuts widen/deepen while still preserving `shape == 1`. Scale now changes feature activation and crack width/frequency as well as pattern-band selection. No new texture sample, noise evaluation, resource, compute dispatch, or persistent state is introduced.
+
+### Lifetime and topology rule
+
+Direct Support or Negative Topology breakup multipliers are explicitly excluded from `5.17A` and the first `5.17B` proof. Layer C already converts topology into Remaining Life through the configured aging rates. Supported foam therefore remains visually younger for much longer, neutral foam follows normal lifetime, and negative foam expires rapidly. Current proof tuning is Neutral Lifetime `7.5 s`, Supported Aging Rate `0.08×`, and Negative Aging Rate `7.5×`; these values describe the validation setup and are not silently promoted to new project defaults. The first `5.17B` proof does not read Remaining Life at all; it isolates the fixed morphology vocabulary before temporal progression is introduced. `5.17C` will then use Remaining Life as the initial and sole temporal fragility signal, allowing the existing lifecycle system to prove whether it supplies enough differentiation without hidden additional help.
+
+Do not sample support/negative topology directly for breakup unless later Unity evidence shows that Remaining Life alone is insufficient and the user separately approves that coupling. Layer E must never modify Remaining Life.
+
+### Later polish
+
+`5.17C` is planned Remaining-Life progression for the complete deterioration vocabulary: chips, fray, short cracks, thinning strands, detached flecks, broken streak remnants, and sparse old-foam remnants should advance as Layer C Remaining Life falls. Supported and Negative Topology must initially influence that progression only through their existing Layer C aging rates; direct topology, support, negative-pressure, or river-location breakup multipliers remain deferred unless Remaining Life demonstrably proves insufficient. `5.17D` is planned fine-fragment and final-energy work rather than an optional bucket to omit: tiny detached flecks, small fragments, thin streak remnants, micro-bubbles, and selective bright glints are part of the intended final Foam pass. Their underlying Foam availability and deterioration follow the lifecycle-derived mask; optical glints may additionally respond to lighting.
+
+### Performance contract
+
+```text
+new persistent textures / fields / channels = 0
+new compute kernels / dispatches / readbacks = 0
+cost location = fragment shader only
+wide neighbourhood sampling = rejected by default
+```
+
+Reuse the existing shader-detail probe and available samples where practical. Profile before accepting any broad sampling stencil.
+
 
 ### Public workflow and debug requirements
 
-Primary debug views should include or gain:
+The accepted River Inspector contract is compact and closed by default. Production authoring is grouped by feature; Foam authoring follows Layers A–E. Debug presentation, read-only runtime telemetry, generated status, and mutating actions are separate top-level responsibilities.
 
-- Final Foam;
-- Foam + Aging Topology;
-- Progressive Birth Source;
-- Progressive Birth Transfer;
-- Material Presence;
-- Material Remaining Life;
-- Foam Motion Field;
-- Foam Motion Field + Cell Grid;
-- Foam Evaluated Shape;
-- Foam Shape Difference;
-- Foam Shader Detail Probe;
-- Foam Shader Detail Difference;
-- Foam Film Source;
-- Foam Film Support.
+`Debug Views` is the only authoring surface for Water Body, Surface Motion, Refraction, Disturbance, and Foam debug substitutions. It applies exclusive selections over the existing serialized enum fields, reports legacy conflicts without silently changing them, and follows the shader priority:
 
-Debug views must identify what product they show: raw Persistent Foam State, External Influence Field, Layer D helper, Evaluated Foam Shape, or final rendered result. A debug view must not use final `foam.mask` while claiming to show raw material truth.
+```text
+Foam > Disturbances > Refraction > Surface Motion > Water Body
+```
+
+The hub provides `Normalize to Rendered View` and `Reset All Debug Views`.
+
+Foam views are grouped by architectural ownership:
+
+```text
+Layer A — Topology
+  Foam + Aging Topology
+
+Layer B — Velocity
+  Foam Motion Field
+  Foam Motion Field + Cell Grid
+
+Layer C — Persistent Material
+  Material Presence
+  Material Remaining Life
+  Progressive Birth Source
+
+Layer D — Primary
+  Foam Evaluated Shape
+  Foam Evaluated Final Preview
+
+Layer D — Advanced Internals
+  Foam Film Source
+  Foam Film Support
+  Foam Instantaneous Film Target
+  Foam Temporal Occupancy
+
+Layer D — Comparisons
+  Foam Shape Difference
+  Foam Temporal Difference
+
+Layer E — Rendering
+  Foam Shader Detail Probe
+  Foam Shader Detail Difference
+```
+
+Every view must identify whether it displays persistent material truth, an external influence field, a Layer D helper/product, or final shader output. A raw-material diagnostic must not reuse final `foam.mask`.
+
+`Runtime Diagnostics` contains labelled, selectable, non-editable, stable-height rows. Foam diagnostics are grouped by Layers A–D, with transport accounting under Layer C. Pending asynchronous readback and unavailable runtime states change values, not row count. Constant Inspector repaint is allowed only for a visible live Disturbance or Foam diagnostic leaf in Play Mode with one selected River.
+
+All generation, validation, cache, test-source, lifecycle-probe, clear, and reset operations live under `Actions`. They must not be mixed into production authoring or read-only diagnostics.
 
 ### Performance constraints
 
@@ -588,9 +712,9 @@ first-order donor-cell packed-state flux;
 closed bank/obstacle/invalid faces;
 flow-direction-aware one-way endpoint outflow;
 CFL target 0.90 and maximum 64 substeps;
-lifecycle aging distributed across substeps;
+lifecycle aging applied once on the final CFL substep for the complete material tick;
 births applied after the completed tick;
-local render residual measured in seconds.
+local render residual was initially added in `5.16B` but was later rejected and removed in `5.16E.2`.
 ```
 
 No new full-resolution texture is introduced. The canonical velocity include and raw Motion-field compute include remain unchanged. Unity validation of transport is the only active gate.
@@ -598,8 +722,12 @@ No new full-resolution texture is introduced. The canonical velocity include and
 Immediate order:
 
 ```text
-validate 5.16C/5.16C.1 temporal occupancy transport, boundaries, reverse flow, build/release response, stationary convergence, reset behavior, and diagnostic footprint consistency;
-5.16D persistent visual damage and macro fracture;
-5.16E Final Foam consumes the accepted evaluated shape;
-5.16F shader-local sub-cell cracking, edge chipping, glints, and lighting polish.
+5.16D.R removes the rejected macro-breakup experiment and restores the accepted 5.16C.1 baseline;
+5.16E adds reversible packed-material visibility policies and non-stalling `0.05` support aging without `_FoamShapeMask` production integration;
+5.16E.1 source release and next-face residual gating are rejected and removed;
+5.16E.1R proved residual prediction was the stutter source without another allocation;
+5.16E.2 promotes committed Final Foam and removes residual prediction;
+5.16E.3 attributes capacity loss to unit overflow and fractional shoreline capacity with zero residual;
+5.16E.3C retains the `0.10%` engineering target, temporarily tolerates measured sub-1% PoC loss, and defers expensive transport correction;
+5.17B must prove readable stable chips, fringe fray, and short edge-connected cuts without damaging macro ribbon continuity before Remaining-Life progression proceeds.
 ```

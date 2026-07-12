@@ -10,6 +10,364 @@ implementation_documents:
   - Ground_Generation_Surface_Upgrade_Plan.md
 ---
 
+
+
+### 2026-07-12 — Patch V3J.4A9AR: Regional Network Boundary and Debug Independence
+
+V3J.4A9A is rejected as a successful contour-network architecture. Its downward-only chains are mathematically valid, but the generator creates one complete local construction per accepted descriptor. Branches and echoes therefore decorate isolated symbols rather than connecting the field into shared terrain structure.
+
+Authoritative visual finding:
+
+```text
+more chains inside one descriptor-local result
+is not equivalent to
+one network shared by a local region
+```
+
+The A9A generator remains temporarily available only as rejected comparison evidence. It is not an accepted representation, is not the base for fragmentation, and must not be promoted to coverage rendering.
+
+Scene-view presentation is strictly independent and additive:
+
+```text
+accepted true-position overlay
+rejected A9A true-position overlay
+editor-offset paired comparison copies
+```
+
+Any subset may be enabled. The paired preview does not force either true-position overlay. In paired mode, both copies are offset around the source anchor—accepted to visual left and A9A to visual right—without mutating stored geometry or validation footprints.
+
+The next candidate, V3J.4A10A, must use a regional generation unit:
+
+```text
+nearby directionally compatible descriptor group
+→ one shared high spine/root system
+→ connected downward-only chains spanning the group
+→ optional restrained branches and lower related echoes
+→ one complete unbroken regional network
+```
+
+Descriptors are inputs to grouping and network constraints, not one-to-one visible symbols. A regional candidate may use some descriptors as trunk anchors, some as branch targets, and some only as spacing or validation support.
+
+The downward-only doctrine remains mandatory for every directed path:
+
+```text
+next visual height <= current visual height + numerical tolerance
+```
+
+A10A may not form cups, valleys, upward hooks, or drop-then-rise paths. It must also avoid the opposite A9A failure: a collection of disconnected local mounds with extra tendrils. The complete regional network must be proven before any gap or fragmentation experiment is reconsidered.
+
+A9AR adds no new shape-generation behavior. It establishes the correct architectural boundary and restores trustworthy comparison controls before A10A implementation.
+
+
+### 2026-07-12 — Patch V3J.4A9A: Separate Downward-Only Cluster Candidate
+
+**Historical status:** rejected as a network solution; retained temporarily for visual comparison only.
+
+The sole accepted Painted Accent representation remains the complete mesh-free A6/A7 projected glyph. V3J.4A9A introduced a separate unaccepted native-2D contour-cluster candidate for Scene-view evaluation. The candidate may share placement descriptors and validation infrastructure, but it may not alter the accepted glyph's arrays, cache signature, diagnostics, controls, or debug meaning.
+
+Authoritative representation boundary:
+
+```text
+accepted path
+    GroundPaintedAccentSurfaceStroke
+    → A6 longitudinal profile
+    → fixed world +Z projection
+    → complete accepted projected glyph
+
+experimental A9A path
+    GroundPaintedAccentSurfaceStroke
+    → separate directed 2D control graph
+    → complete downward-only contour cluster
+    → separate candidate snapshot and Scene Handles
+```
+
+The candidate's shape grammar is a directed mound-contour family, not a freeform crack or contour graph. It owns one shared high/root point, two independently shaped outward primary arms, zero to two child branches, and an optional lower echo. Every chain is directed from high/root to free end. In that direction its world-`+Z` visual coordinate may remain level or decrease but may never rise.
+
+Required invariant:
+
+```text
+next visual height <= previous visual height + 0.0005 m
+```
+
+This forbids:
+
+```text
+cups
+valleys
+upward hooks
+free ends curling toward a higher parent
+a chain that drops and later climbs
+an echo that rises back toward its source arm
+```
+
+It permits:
+
+```text
+near-horizontal crest shoulders
+firm downward legs
+long shallow descending runs
+smooth downward forks
+lower parallel echoes that preserve the parent's descent
+```
+
+The interpolation contract is monotone cubic Hermite evaluation of outward distance and accumulated drop, followed by dense sampled auditing. Unconstrained Catmull-Rom and overshooting spline handles are prohibited.
+
+The candidate is complete and unbroken in A9A. No visibility windows, gaps, clipped parent pieces, or fragmentation logic may be applied. A later experiment may remove restrained sections only after the full cluster proves coherent and only while preserving one dominant readable component, every junction, and the downward-only mound interpretation.
+
+Debug and data separation is mandatory:
+
+```text
+accepted toggle: complete red/purple/yellow A6/A7 glyph
+candidate toggle: complete cyan/green/blue A9A cluster
+comparison toggle: editor-offset pair, baseline left and candidate right
+```
+
+The comparison offset exists only in Scene Handles. Stored positions, validation footprints, caches, and future production data remain at their true coordinates.
+
+Candidate chains undergo fresh centreline and full-width sampling, broad-slope, local-grade, river, and modifier validation. The entire cluster is rejected if one chain fails. Partial acceptance would silently change the designed graph and is not allowed in this proof.
+
+A9A remains data-only and editor-only. It creates no secondary geometry, renderer, child object, collider, material, shader pass, texture, or runtime update. The accepted future production destination remains an R8 coverage bake blended into ground albedo, but no candidate advances to that stage until its complete shape language is explicitly accepted.
+
+
+### 2026-07-12 — Patch V3J.4A8R: Baseline Restored; New Candidate Must Be a Downward-Only Cluster
+
+V3J.4A8 is rejected as both a visual premise and an integration strategy. It exposed windows from each small accepted A6 mound and replaced the accepted overlay with those clipped pieces. The result was a field of disconnected random-looking strokes, not a larger implied terrain structure.
+
+V3J.4A8R restores the authoritative A7 representation without fragment metadata or clipping:
+
+```text
+accepted representation: complete A6 projected contour
+accepted debug meaning: full contour, full width boundaries, visible crest marker
+accepted data: complete LocalSurfacePoints and HalfWidths only
+rejected: visibility windows cut inside accepted mound glyphs
+```
+
+The next candidate is not a modified A6 glyph. It is a separate native-2D **downward-only contour cluster** evaluated beside the accepted baseline.
+
+Authoritative candidate visual grammar:
+
+```text
+one coherent high crest or primary spine
+longer native-2D primary contour than the accepted mound glyph
+arms generated outward from their high/root point
+zero to two related branches that inherit the parent tangent
+optional lower parallel echo with related curvature
+complete unbroken cluster during the first proof
+no upward hook, cup, valley, or drop-then-rise sequence
+```
+
+Fixed world `+Z` remains permanent screen-up. Along every directed chain moving away from its high/root point, projected height may remain level or decrease only. The candidate must satisfy:
+
+```text
+nextHeight <= currentHeight + numericalTolerance
+```
+
+A complete mound family may contain left and right arms, but each arm is generated independently from the high region toward a lower free end. Branches attach to an internal parent point and may continue sideways or downward; they may never begin low and curl upward. Parallel echoes must obey the same rule and must not turn upward toward the primary chain.
+
+Interpolation must preserve this order between controls. Monotone cubic Hermite interpolation or height-bounded cubic Bezier handles are acceptable. Unconstrained Catmull-Rom interpolation is not acceptable because it can overshoot into an upward hook even when its controls are ordered correctly. Dense post-sampling must report and reject any upward excursion.
+
+The A9A experiment is intentionally unbroken. It first asks whether a larger connected or strongly related contour family reads as mound-like terrain notation. Only after that complete structure succeeds may A9B consider a very small number of gaps. Any later gap logic must preserve one long dominant component, avoid junctions, and retain the downward-only read.
+
+Architectural separation is mandatory:
+
+```text
+accepted A6/A7 glyph generator, cache, diagnostics, and toggle remain unchanged
+candidate cluster owns separate data, cache, diagnostics, and Scene-view toggle
+candidate generation cannot mutate or replace accepted glyph arrays
+comparison may offset Scene Handles only; stored geometry remains at true positions
+```
+
+The candidate remains mesh-free and data-only. It adds no `Mesh`, `MeshFilter`, `MeshRenderer`, child `GameObject`, collider, material, shader pass, texture, or per-frame camera work during the proof stage. Any displaced candidate chain requires its own full-width ground, river, modifier, slope, and grade validation; it cannot inherit parent validity merely because it shares a seed or origin.
+
+
+### 2026-07-12 — Patch V3J.4A7: Mesh-Free Projected Contours Are the Sole Active Representation
+
+The Painted Accent 3D crowned-ribbon experiment is retired. It proved useful longitudinal shape mathematics, but the secondary geometry representation was less successful than the mesh-free projected contour and is no longer part of the architecture. There is no active Painted Accent child mesh, renderer, material, collider, ground-normal displacement path, comparison action, or dedicated preview shader.
+
+Authoritative representation contract:
+
+```text
+accepted ground-surface descriptor
+→ A6 continuous scalar contour profile
+→ fixed world +Z embedding
+→ tapered visible width
+→ transformed-footprint validation
+→ current Scene-view diagnostics
+→ future R8 coverage bake
+→ future ground-albedo composition
+```
+
+The fixed gameplay camera makes world `+Z` permanent screen-up. Painted Accent profile controls describe this 2D projected contour only. Historical serialized field names are retained for asset compatibility and do not imply an active fold mesh or raised representation.
+
+A7 originally proposed fragmenting the complete A6 contour as the next experiment. V3J.4A8 tested that premise and was rejected: cutting already-isolated mound glyphs produced disconnected scraps and incorrectly replaced the accepted overlay. V3J.4A8R restores the complete A7 contour as the sole active representation. The corrected experimental direction is the separate, unbroken, downward-only native-2D cluster described above. Production remains a projected coverage field blended into final ground albedo after family/variant surface composition.
+
+## Historical architecture record — superseded by V3J.4A7
+
+All sections below this heading are retained as design history. Any older statement that treats the raised ribbon, secondary Painted Accent geometry, comparison shader, or dual raised/projected path as active is superseded by the sole mesh-free projected-contour contract above.
+
+### 2026-07-12 — Patch V3J.4A6: Continuous Profile and Endpoint-Angle Contract
+
+Painted Accent profiles are continuous curves, not corrected polylines. The authoritative shared profile starts from the legacy solved profile knots, retains their seeded character, adds smooth signed detail, constrains the result above a positive mound floor, and evaluates one shape-preserving cubic spline at 65–97 samples. Adjacent spline segments share one tangent at every source knot; lower-leg elbow detection and reconstruction are no longer part of the architecture.
+
+Ground entry is authored in physical profile-space angles. Each endpoint independently requests a continuous angle between `12` and `68 degrees`, converted using actual stroke length and Profile Height. Soft, moderate, and steep entries must all remain materially represented after monotonic derivative limiting. A dense population in which most applied endpoints are nearly parallel to the baseline is not accepted.
+
+Visual variation may be signed, provided the final contour remains above its positive mound floor. This permits a shoulder to rise, release slightly, and rise again without producing the broad inward collapse previously rejected. Positive-only bell stacks are no longer authoritative because they changed fullness more readily than directional rhythm and made distinct parameters look like the same arch.
+
+Population diversity is judged from normalized sampled silhouettes. Nearest-neighbour RMS distance, near-duplicate pair count, and largest near-duplicate cluster are the evidence; internal seed or parameter differences are not sufficient.
+
+The contract remains:
+
+```text
+exact grounded endpoints
++ materially varied endpoint angles
++ C1-continuous legs and crest
++ smooth signed multi-scale character
++ positive mound safety floor
++ one unique dominant crest
++ fixed world +Z projected embedding
+```
+
+Projection, width, descriptor placement, river/modifier exclusion, shaders, and family/variant assets remain representation-independent and unchanged.
+
+### 2026-07-12 — Patch V3J.4A5: Endpoint Diversity and Profile-Population Contract
+
+Painted Accent legs must not all stitch into the ground with the same horizontal tangent. The fixed camera and world-`+Z` projection make endpoint angle a major part of the visible glyph language, so each endpoint-to-crest leg now owns independent continuous takeoff and curvature parameters.
+
+The positive mound foundation uses a monotone cubic-Hermite leg with a seeded endpoint derivative in `0.10–2.80` and a monotonic curvature warp in approximately `-0.45…+0.45`. Every leg still reaches the dominant crest with zero slope, but grounded entries may be soft, moderate, or steep. Steep entries are an intentional part of the family population, not errors to be normalized away. Left and right legs vary independently.
+
+Profile diversity must come from continuous parameter variation rather than a small named archetype set. The former mandatory broad-shoulder-plus-fine-bells recipe is replaced by two to six positive events per sufficiently long leg, continuously varying in amplitude, centre, and width. Endpoint protection and detail release are also independently seeded per leg. Variation remains positive-only and subordinate to the unique dominant crest.
+
+Lower-leg corner suppression is an exceptional safety repair, not a general smoothing stage. It may repair an early height reversal or an isolated turn exceeding both `34°` and the neighbouring median by `1.8× + 7°`. It must preserve the selected endpoint derivative. A correction rate near or above `25%` is evidence that the guard has become a population normalizer and must not be accepted.
+
+Visual acceptance requires all of the following in one dense sample:
+
+- clearly represented soft, moderate, and steep ground entries;
+- no hard elbows on steep entries;
+- independent left/right leg character;
+- no obvious two-or-three-template repetition;
+- positive multi-scale contour variation without inward sag;
+- one rounded dominant crest;
+- exact endpoint grounding and unchanged world-`+Z` projection.
+
+### 2026-07-12 — Patch V3J.4A4: Smooth Grounded Takeoff Contract
+
+The A3 positive mound grammar remains authoritative, but positive variation may not begin with a visible mechanical elbow. Every Painted Accent leg now has a protected grounded takeoff before broader shoulders and small contour events become fully active.
+
+The shared profile uses smooth envelope selection rather than hard `min`/`max` crossover points, suppresses retained raw and seeded detail through the first `20%` of each leg, and releases that detail smoothly by `38%`. Broad shoulders are centred in the upper `42–72%` of a leg; fine positive events begin no lower than `30%`.
+
+A final guarded lower-leg audit measures the first `40%` in normalized endpoint-to-crest coordinates. A turn above `26 degrees` or an early height reversal triggers a local cubic-Hermite takeoff rebuild. The endpoint, upper leg, crest, and all accepted positive detail above the repair anchor remain fixed. The guide and positive residual are rebuilt separately so no correction can violate the A3 positive mound floor.
+
+This is not a general smoothing pass. Accepted legs retain their chaotic positive shoulders and mini-events. The contract is simply:
+
+```text
+grounded endpoint
+→ smooth takeoff
+→ positive irregular contour detail
+→ one dominant rounded crest
+```
+
+Hard lower-leg elbows, negative sags, random projection sides, and long globally smoothed strokes are not accepted. Projection, width, exclusions, shaders, and raised topology are unchanged.
+
+### 2026-07-12 — Patch V3J.4A3: Positive Crest-Smooth Contour Grammar
+
+The accepted V3J.4A1 architecture remains unchanged: one mesh-free scalar profile feeds the fixed-world-`+Z` projected glyph and the legacy raised comparison. V3J.4A3 replaces the rejected A2 signed-articulation experiment with a stricter visual grammar:
+
+```text
+crest-flat asymmetric positive mound
++ retained positive raw detail
++ positive broad shoulders
++ positive fine contour events
+- negative sags
+- cusp-producing power-law joins
+```
+
+The mound foundation uses a smootherstep basis raised by the existing seeded side sharpness. It has zero analytic slope at both the grounded endpoint and dominant crest. Every final sample must remain on or above this foundation. Raw variation contributes only where it rises above the guide, and all newly seeded contour events are additive. No negative detail term exists.
+
+Every leg long enough to support detail receives one broad positive shoulder and one to three finer positive events, scaled by **Profile Irregularity**. Detail fades out near endpoints and inside the protected crest zone, and non-crest samples remain below `0.88 ×` the dominant peak. This keeps one dominant rounded mound while avoiding long sterile ramps.
+
+A2 is historical only. Its signed broad bell and absolute chord-deviation success metric are rejected because they allowed inward sags and counted them as useful variation. The authoritative diagnostics now require zero negative detail samples and zero samples below the positive mound guide. Projection direction, descriptor placement, full-width validation, river/modifier exclusion, width taper, shaders, and raised topology remain unchanged.
+
+### 2026-07-12 — Patch V3J.4A1: One Shared Profile, Two Embeddings
+
+The accepted architectural distinction is between **shape mathematics** and **representation**. The raised crowned-ribbon experiment is rejected as the final material representation, but its longitudinal silhouette mathematics is accepted. V3J.4A failed because it correctly removed the mesh while also discarding that solved profile and inventing a weaker sine-based plan curve.
+
+V3J.4A1 establishes one representation-independent scalar profile:
+
+```text
+accepted placement descriptor
+→ shared longitudinal profile evaluator
+→ H(t): solved crest + crown height
+      ├─ legacy raised comparison: local ground normal × H(t)
+      └─ projected ground glyph:   fixed world +Z × H(t)
+```
+
+The evaluator reproduces the legacy raised calculation without changing arithmetic order: 17–25 descriptor-index samples at the existing `0.09 m` target spacing, five cross-profile crest probes, seeded profile bases, asymmetric single-mound shaping, plateau suppression, valley repair, rounded-crest shaping, peak normalization, end envelopes, and the existing `0.12` endpoint width floor.
+
+The shared physical profile is:
+
+```text
+H(t) =
+  ProfileHeight
+  × lerp(0.94, 1.0, stroke.Strength)
+  × normalizedCrestHeight(t)
+  + CrestCrownHeight
+  × crownEndEnvelope(t)
+```
+
+The gameplay camera is fixed permanently. World `+Z` is the authored screen-up direction and is converted once into the GeneratedGround local X/Z plane. This removes all left/right ambiguity: projected profiles never choose a random bend side and never use the local stroke perpendicular as their height direction. Only visible line width uses a perpendicular to the final projected tangent.
+
+The V3J.4A-only `Projected Profile Spread` control and its independent resampler, crest selector, sine envelope, modulation, random sign, and width taper are removed. The shared family/variant controls are now **Profile Height**, **Crest Crown Height**, **Profile Irregularity**, **End Taper**, and **Stroke Width**. Existing serialized field names for the legacy controls remain intact to avoid style-asset migration.
+
+The projected representation is still pure data:
+
+```text
+Vector3[] local surface points
+float[] half widths
+seed
+crest T
+crest/crown/combined peak heights
+projection-invariant errors
+```
+
+It creates no `Mesh`, `MeshFilter`, `MeshRenderer`, child object, collider, material, shader pass, or per-frame camera work. The raised preview remains an explicit editor comparison and consumes the same profile samples before applying its unchanged crowned cross-section and ground-normal lift.
+
+After `+Z` transfer, centre and tapered left/right footprint samples are revalidated against valid ground sampling, broad slope, transverse/longitudinal grade, river surface/bed/handoff plus safety clearance, and `GroundModifier` Painted Accent exclusion. Any invalid transformed sample rejects the whole glyph. Clipping, spread fitting, relocation, and proposal backfill remain excluded.
+
+The later V3J.4A1a visibility correction supersedes the initial cyan-on-turquoise palette. Scene diagnostics now use a black-outlined red projected centreline, black-outlined dark-purple width boundaries, a black-outlined yellow crest marker, and reason-coloured rejection crosses. Added diagnostics prove that the displacement contains only the shared height in the authored north direction:
+
+```text
+maximumNorthDisplacementError <= 0.00001 m
+maximumCrossAxisDrift         <= 0.00001 m
+```
+
+V3J.4A1 remains a shape-equivalence proof, not production rendering. The old 256 RGBA diagnostic field, final ground shader, and raised comparison shader remain unchanged. V3J.4B may begin only after Unity confirms that the projected cyan curve matches the useful brown upper-silhouette grammar while the legacy raised output remains unchanged.
+
+### 2026-07-11 — Patch V3J.3D5: Environment-Integrated Flat Ink
+
+The active Painted Accent material proof is no longer completely unlit. Unity validation showed that uniform C8 ink remained visibly bright beneath cast shadows and at night, separating the marks from the ground. V3J.3D5 retains the flat graphic colour model but modulates that colour by local environmental illumination and shadow attenuation.
+
+Current material contract:
+
+```text
+shader: PS3D/Ground Painted Accent Ink
+pass: UniversalForward
+culling: Off / double-sided
+normal-based diffuse: none
+specular/metallic/emission/textures: none
+ambient response: 0.75
+main-light response: 0.80
+main/additional shadow response: 0.70
+additional-light response: 0.25
+minimum visibility: 0.14
+maximum exposure: authored Ink Color
+cast shadows: Off
+receive shadows: True
+```
+
+Light colour is converted to luminance before modulation, preserving the family/variant-authored Ink Color hue. The shader uses world position, ambient spherical harmonics, main-light shadow attenuation, and restrained additional-light attenuation, but never mesh normals. Geometry, placement, exclusions, distribution, topology, and authoring controls are unchanged.
+
+The D4 apex-softening result was not materially better in the gameplay camera and remains a separate unresolved geometry-polish question. D5 validation must judge only terrain integration under daylight, cast shadows, night, and local lights.
+
 ### 2026-07-11 — Patch V3J.3C8: Flat Ink Surface Baseline
 
 C7 validation confirmed that the accepted C5 geometry plus C6 double-sided rasterization renders the entire crowned ribbon consistently from all tested viewpoints. Geometry is therefore locked for the current Painted Accent milestone. The C7 lit response was rejected as a final visual direction: normal lighting, crown lift, edge darkening, endpoint softening, per-stroke brightness variation, saturation changes, and shadow reception made the marks read as small physical brown ridges rather than graphic outline strokes.
@@ -2111,3 +2469,444 @@ finalStrokeAngle = Facing Direction Degrees + 90° + random(-Angle Jitter Degree
 ```
 
 This keeps the generator deterministic and keeps angle variation as simple signed jitter, but removes the 90-degree semantic mismatch from the authoring UI.
+
+## Patch V3J.3D — Painted Accent Placement Foundation (Implemented, Awaiting Unity Validation)
+
+The accepted Painted Accent geometry and flat unlit ink surface remain unchanged. V3J.3D changes only where deterministic stroke descriptors may be proposed and accepted.
+
+### Distribution contract
+
+Painted Accent placement now uses a dense stratified candidate pool and continuous weighted two-scale value noise rather than selecting one candidate from a sparse evenly distributed grid.
+
+```text
+Stroke Density
+→ approximate proposal count before hard placement rejection
+
+Distribution Patch Scale
+→ world-space size of broad sparse/dense regions
+
+Distribution Patchiness
+→ strength of weighted preference for high-noise regions
+```
+
+The density field is continuous and retains a non-zero low-density floor. It must be able to produce empty-looking regions, dense regions, isolated marks, and touching or near-touching marks without binary island boundaries. Rejected proposals are not backfilled elsewhere, so rivers and exclusions do not artificially compress the original target density onto the remaining ground. Patch noise and candidate hashes are sampled in patch-coordinate ground space, so neighbouring patches using the same seed and distribution settings do not repeat the same local motif and the broad density field remains continuous across their shared boundary.
+
+`Distribution Patch Scale` and `Distribution Patchiness` are stored per `GroundSurfaceFeatureRecipe`. They are exposed both in the style-profile feature editor and directly in the selected `GeneratedGround` component's Painted Accent controls, so normal variant tuning can remain a one-component workflow.
+
+### Placement-validity contract
+
+Every proposed stroke is validated as a complete curved footprint before it becomes an authoritative descriptor. Validation uses at least thirteen longitudinal samples, never more than 0.25 m apart, and checks the left shoulder, centre, and right shoulder.
+
+A complete stroke is rejected when any required sample:
+
+- cannot sample the base surface;
+- overlaps a river handoff corridor or river-bed concealment region;
+- lies inside a `GroundModifier` Painted Accent exclusion shape or its blend distance;
+- exceeds the proof broad-slope limit;
+- crosses a steep longitudinal or transverse local grade.
+
+The initial proof constants are:
+
+```text
+river safety clearance = 0.15 m
+maximum broad slope = 45 degrees
+maximum local grade = 40 degrees
+```
+
+The existing positive Painted Accent contribution from `ShoreInfluence` is removed. Rivers are now hard exclusions rather than preferred semantic support.
+
+### General feature exclusions
+
+`GroundModifier` now owns a flags-based `Feature Exclusions` contract. The first flag is `Painted Accent Lines`.
+
+A pure exclusion zone is authored as:
+
+```text
+Mode = None
+Surface Effect Mode = None
+Feature Exclusions = Painted Accent Lines
+Shape = Circle or Box
+Blend Distance = desired clearance
+```
+
+This does not change height or surface masks. It provides deterministic explicit clearances for structures, rocks, encounter spaces, roads, future world-assembly outputs, and other authored areas. Arbitrary physics colliders are intentionally not scanned.
+
+Feature-exclusion snapshots remain available to Painted Accent placement even when the parent ground recipe disables ordinary height modifiers. The `Use Modifiers` switch continues to control height/surface generation only.
+
+### Descriptor/texture ownership
+
+Stroke descriptor generation and legacy 256x256 fold-field rasterization are now separate generator entry points. The accepted descriptors are generated, validated, and stored first. The old projected/debug texture is then rasterized from those accepted descriptors when the existing shader/debug contract requests it.
+
+### Diagnostics
+
+The Painted Accent preview build log now includes:
+
+```text
+targetProposals
+candidatePool
+proposed
+accepted
+distributionPatchScale
+distributionPatchiness
+proposalPatchWeightMin/Mean/Max
+rejectedSampling
+rejectedRiver
+rejectedModifierExclusion
+rejectedBroadSlope
+rejectedLocalGrade
+nearestStrokeDistanceMin/Mean/Max
+```
+
+V3J.3D is implemented but not accepted until Unity validation proves soft patch distribution, complete river clearance, explicit exclusion zones, terrain-edge rejection, deterministic regeneration, and unchanged crowned-ribbon/flat-ink visuals.
+
+
+## Patch V3J.3D1 — Painted Accent Distribution Debug and Density Headroom (Implemented, Awaiting Unity Validation)
+
+Unity validation of V3J.3D established that soft patch distribution is a clear visual improvement and that explicit exclusion is functioning. The accepted crowned-ribbon geometry and flat unlit ink remain locked. V3J.3D1 adds authoring visibility and density headroom only; it does not alter patch weighting, proposal selection, exclusion rules, geometry, or rendering.
+
+### Live GeneratedGround placement debug
+
+The selected `GeneratedGround` component now exposes three editor-only Scene view overlays:
+
+- **Show Distribution Overlay** samples the exact production continuous patch-weight function on a 21x21 point grid. Cool/small points represent low placement preference; warm/larger points represent high placement preference.
+- **Show Weighted Proposals** displays the exact deterministic proposal centres selected from the production candidate pool before river, modifier, sampling, broad-slope, and local-grade rejection.
+- **Show Last Accepted Positions** displays accepted descriptor centres from the most recent placement generation.
+
+The live distribution/proposal snapshot is generated directly from `GroundPaintedAccentFoldFieldGenerator` using the same candidate construction, semantic weighting, noise, weighted random priority, shape seed, patch coordinate, and selected variant values as production placement. It does not rebuild the 3D ribbon preview, change the base mesh/collider, allocate runtime objects, or introduce a debug texture.
+
+The GeneratedGround inspector also displays a compact **Last Generated** statistics block containing target proposals, candidate pool, proposed, accepted, and each rejection category. This distinguishes genuinely sparse patch regions from proposals removed by placement validity.
+
+### Density headroom
+
+`Painted Accent Stroke Density` remains the single authoring control for proposal count. Its range is extended from `0–80` to `0–240`, and the generator target cap is extended to 240. Serialized defaults and authored style assets are unchanged. Density continues to mean approximate weighted proposals per standard 40x40 patch before rejection; rejected proposals remain unfilled so exclusions cannot crowd surviving terrain.
+
+At the maximum 240 accepted strokes, the locked geometry would produce approximately 9,360 vertices and 11,520 triangles. This is authoring headroom rather than a recommended default, and candidate evaluation remains regeneration/editor work rather than per-frame simulation.
+
+### Validation gate
+
+V3J.3D1 is accepted only after Unity confirms:
+
+1. Distribution points update live for seed, density, Patch Scale, and Patchiness changes without rebuilding the 3D preview.
+2. Weighted proposal centres match the next generated placement before exclusions.
+3. Last accepted points and inspector rejection totals match the build diagnostic.
+4. Density values above 80 can produce materially higher proposal/accepted counts.
+5. Patch weighting, exclusion behavior, crowned geometry, and flat ink remain visually unchanged.
+
+## Patch V3J.3D1a — Painted Accent Placement Overlay Visibility Correction (Implemented, Awaiting Unity Validation)
+
+Unity validation confirmed that the V3J.3D1 placement controls, proposal counts, density headroom, and rejection statistics were active, but the Scene-view visualization failed its usability requirement. The original debug marks were sub-pixel to only a few pixels at normal Scene-view zoom, low-weight samples were low-alpha against pale ground, and `Handles.zTest = LessEqual` allowed terrain and generated geometry to occlude the diagnostics. The empty debug snapshot also reported itself as valid because it contained non-null empty arrays.
+
+V3J.3D1a changes debug presentation only. Production patch weighting, proposal selection, exclusions, accepted descriptors, geometry, and flat-ink rendering remain unchanged.
+
+### Filled patch heatmap
+
+- The exact production 21x21 distribution sample grid is retained.
+- Samples now preserve their fixed grid index and validity state.
+- Adjacent samples render as 20x20 surface-following translucent cells rather than tiny points.
+- Colour runs from cool blue through cyan to warm red according to the exact production patch weight.
+- Invalid surface cells are omitted rather than corrupting grid indexing.
+
+### Clear proposal and accepted markers
+
+- Weighted proposals render as large screen-stable cyan-to-yellow crosses with dark under-strokes.
+- Last accepted positions render as larger solid green discs with dark outlines.
+- All placement diagnostics use `CompareFunction.Always`, so terrain, rivers, rocks, and ribbon geometry cannot hide them.
+
+### Status and failure reporting
+
+A Scene-view legend explains the active layers and reports valid samples, proposal count, and accepted count. If the live snapshot cannot be built, the legend and GeneratedGround inspector report that failure instead of silently accepting an empty snapshot.
+
+`GroundPaintedAccentPlacementDebugSnapshot.IsValid` now requires a resolution of at least two and exactly `resolution × resolution` distribution samples. `Empty` is therefore correctly invalid.
+
+### Validation gate
+
+V3J.3D1a is accepted only after Unity confirms:
+
+1. The filled blue-to-red distribution field is immediately visible at ordinary Scene-view zoom.
+2. Proposal crosses and accepted discs remain unmistakable over pale ground and through scene geometry.
+3. The legend reports 441 total samples for a complete 21x21 field and counts consistent with the active proposal/accepted sets.
+4. Disabling each toggle removes only its corresponding layer.
+5. Production placement, exclusion counts, generated line topology, and rendering remain unchanged.
+
+## Patch V3J.3D2 — Effective Placement Weight Debug and Sparse-Area Control (Implemented, Awaiting Unity Validation)
+
+V3J.3D1a made the placement field visible and confirmed that warm patch regions are preferred, but Unity validation also showed that small local red/cold comparisons can be misleading. Production proposal selection multiplies the noise-driven patch preference by semantic support and then performs a deterministic weighted random draw. A red patch is therefore not a per-cell quota, accepted markers can differ after river/sampling rejection, and the fixed `0.18` sparse floor limited the strongest possible warm-to-cold contrast.
+
+V3J.3D2 preserves the weighted-random placement architecture and adds the controls and diagnostics needed to tune it directly.
+
+### Family/variant sparse-floor control
+
+Each Painted Accent `GroundSurfaceFeatureRecipe` now owns:
+
+```text
+Distribution Sparse Floor
+range: 0.02–0.40
+default: 0.18
+```
+
+The value is exposed both in `GroundSurfaceStyleProfileEditor` and in the selected `GeneratedGround` component's consolidated Painted Accent controls. It is the minimum noise-driven patch preference before semantic weighting. Lower values allow cold regions to become substantially quieter while retaining a non-zero proposal chance, so the field remains soft rather than becoming a binary exclusion mask.
+
+The patch-weight contract is now:
+
+```text
+patchWeight = lerp(
+    1,
+    lerp(Distribution Sparse Floor, 1, smoothPatchNoise),
+    Distribution Patchiness)
+```
+
+The default `0.18` preserves existing authored behavior. A proof value near `0.05` is intended for stronger patch concentration tests.
+
+### Patch versus effective-weight debug
+
+The `GeneratedGround` placement debug section now includes an `Overlay Weight` mode:
+
+```text
+Patch Preference
+Effective Proposal Weight
+```
+
+`Patch Preference` displays the continuous noise-driven patch weight only. `Effective Proposal Weight` displays the actual pre-lottery selection weight:
+
+```text
+effectiveProposalWeight = patchWeight × lerp(0.45, 1, semanticSupport)
+```
+
+The live debug snapshot stores both values for every distribution sample and proposal. The Scene-view legend reports the selected mode plus minimum, mean, and maximum valid sample weight. This distinguishes weak patch preference from semantic suppression without changing production placement.
+
+Proposal crosses are coloured by effective proposal weight. Last accepted positions are now green rings rather than filled discs, so a proposal cross remains visible inside an accepted marker. A cross without a green ring represents a proposal rejected by sampling, river, modifier, slope, or grade validation.
+
+### Editor API correction
+
+`GeneratedGroundEditor.OnSceneGUI()` now uses the singular `target` property and no longer reads Unity's `targets` array. Unity 6 explicitly forbids `targets` access inside `OnSceneGUI` and `OnPreviewGUI`; the previous implementation produced a warning on every Scene-view repaint.
+
+### Diagnostics and unchanged contracts
+
+The Painted Accent build diagnostic now includes `distributionSparseFloor`. The placement signature includes the new value so live debug and generated descriptors refresh deterministically when it changes.
+
+V3J.3D2 does not alter candidate-pool size, weighted-random priority, no-backfill behavior, river/modifier/slope/grade rejection, accepted crowned-ribbon geometry, flat-ink rendering, base ground mesh, collider, scenes, or style assets.
+
+### Validation gate
+
+1. Confirm the `targets array should not be used inside OnSceneGUI` warning no longer appears.
+2. Confirm `Distribution Sparse Floor` is editable from both the style profile and selected `GeneratedGround` component.
+3. Compare `Patch Preference` and `Effective Proposal Weight`; verify semantic influence can visibly change the effective field.
+4. Enable proposals and accepted positions together; confirm crosses remain visible inside green accepted rings.
+5. Confirm the legend reports correct mode-specific weight min/mean/max values.
+6. Test Patchiness `0.92`, Sparse Floor `0.18`, then Sparse Floor `0.05`; confirm the lower floor produces materially quieter cold areas without hard island boundaries.
+7. Confirm same seed/settings remain deterministic and all placement rejection totals, geometry, and flat-ink visuals remain correct.
+
+## Patch V3J.3D3 — Painted Accent Single-Mound Bias Refinement (Unity-Validated Plateau Fix, Superseded by V3J.3D4 Apex Refinement)
+
+Unity validation of V3J.3D2 established that the patch distribution, sparse-floor control, exclusions, double-sided visibility, and flat-ink rendering are all directionally successful. The remaining individual-line defect is narrower: from the gameplay camera, a significant subset of longer strokes reads as a low, smooth plateau with a long nearly level top rather than as one clear raised mound. High Fold Irregularity does not reliably correct this because most of the existing variation is vertical and is compressed by the elevated camera angle.
+
+V3J.3D3 reopens only the longitudinal crest profile. Placement, exclusions, descriptor centreline paths, width authoring, crown cross-section, flat ink, and family/variant controls remain unchanged.
+
+### Requested-height bias
+
+The generated crest now treats Fold Height as the normal artistic magnitude rather than a loose upper bound:
+
+- per-stroke Fold Height scaling is narrowed from `0.82–1.00` to `0.94–1.00`;
+- every shaped longitudinal profile is normalized toward a deterministic target in the `0.90–1.10` range;
+- longer and wider descriptor strokes receive a stronger target promotion;
+- small seeded variation remains so all strokes do not reach exactly the same height.
+
+The promotion factor uses actual planar stroke length at 65% weight and generated stroke-width position within the existing `0.84–1.18` width variation at 35% weight. This makes the visually riskier long/wide marks more likely to form a decisive crest.
+
+### Plateau-aware single-mound guide
+
+The raw profile is inspected before shaping. Samples at or above 86% of the raw peak define the contiguous high-crest span. Broad high spans increase the guide strength and mound sharpness instead of surviving as long shelves.
+
+The mound guide:
+
+- chooses the dominant crest near the weighted centre of an almost-equal raw high region;
+- uses separate deterministic left/right powers so one side may rise or fall more steeply;
+- blends more strongly only when the raw profile is broad or the stroke span is large;
+- retains more raw variation at high Fold Irregularity;
+- preserves the existing targeted one-row valley repair so the earlier double-hill failure does not return.
+
+No monotonic hard constraint is reintroduced. Minor shelves, asymmetry, and small seeded changes remain valid, but long nearly level high sections should become uncommon.
+
+### Longitudinal resolution
+
+The crowned ribbon now uses:
+
+```text
+minimum longitudinal rows: 17
+maximum longitudinal rows: 25
+target spacing: approximately 0.09 m
+```
+
+At the current `0.50–0.90 m` authoring range, strokes normally use 17 rows. Longer future strokes can increase resolution up to 25 rows without changing descriptor generation.
+
+With three vertices across, a 17-row stroke contributes:
+
+```text
+51 vertices
+64 triangles
+```
+
+At 220 fully accepted strokes this is approximately 11,220 vertices and 14,080 triangles. The preview remains one combined mesh, one material, no collider, no per-stroke objects, and regeneration/editor work only.
+
+### Diagnostics
+
+The build log now adds:
+
+```text
+moundPeakTargetMin/Mean/Max
+moundGuideBlendMin/Mean/Max
+rawPlateauSpanMin/Mean/Max
+plateauSuppressedStrokes
+```
+
+Existing actual crest, crown, combined-height, topology, placement, exclusion, and material diagnostics remain authoritative.
+
+### Validation gate
+
+Use the accepted distribution and rendering baseline, with the current proof settings around:
+
+```text
+Stroke Width = 0.02 m
+Stroke Length = 0.50–0.90 m
+Fold Height = 0.20 m
+Crest Crown Height = 0.02 m
+Fold Irregularity = 0.80
+Fold End Taper = 0.40
+```
+
+V3J.3D3 is accepted only if the gameplay camera shows materially fewer long flat-topped marks, longer/wider strokes commonly develop a clear dominant mound, actual crest peaks remain near the requested Fold Height, high irregularity retains visible asymmetry, and double hills do not return. Distribution, exclusions, river clearance, crown geometry, and flat-ink output must remain unchanged.
+
+
+## Patch V3J.3D4 — Rounded Crest Apex Refinement (Unity-Validated, Apex Softening Not Accepted)
+
+Unity validation of V3J.3D3 confirmed that the long-plateau defect was solved, but the plateau-aware mound guide overcompensated: too many marks now terminate in a narrow, roof-like `^` apex. V3J.3D4 keeps the accepted stronger mound, near-requested peak height, asymmetric shoulders, valley repair, distribution, exclusions, crown cross-section, and flat-ink rendering. It changes only the local longitudinal shape around the dominant crest.
+
+### Local rounded crest cap
+
+After mound shaping and targeted valley repair, the dominant shaped peak is detected again. A short deterministic cap is then built around that peak:
+
+- crest half-span varies between approximately 10% and 16% of the longitudinal sample span;
+- left and right cap radii receive a small deterministic irregularity-driven asymmetry;
+- at least two rows per side are used where the peak location permits it;
+- each side blends from the peak toward its own existing boundary height with `SmoothStep`;
+- low neighbouring samples are lifted strongly toward the rounded cap, while already-high samples are only reduced lightly;
+- the exact peak, cap boundaries, endpoints, end envelopes, and post-shape peak normalization remain intact.
+
+This creates a curved apex with immediate but smooth falloff. It does not clip the crest into a flat table and does not impose a symmetric or monotonic profile.
+
+### Relaxed anti-plateau sharpening
+
+The D3 plateau response remains active but is reduced so it no longer converts most valid mounds into pointed roofs:
+
+```text
+plateau guide contribution: 0.42 -> 0.34
+base mound sharpness:       1.35 -> 1.15
+span sharpness:             0.65 -> 0.50
+plateau sharpness:          0.85 -> 0.50
+rounded crest blend:        0.72
+rounded crest falloff power: 1.65
+```
+
+Requested-height promotion, raw plateau detection, asymmetric left/right shaping, targeted valley repair, 17–25 longitudinal rows, and the accepted three-vertex crown remain unchanged.
+
+### Diagnostics
+
+The build log now also reports:
+
+```text
+roundedCrestSpanMin/Mean/Max
+roundedCrestBlend
+roundedCrestFalloffPower
+apexSoftenedStrokes
+```
+
+The existing mound target, guide blend, raw plateau span, crest height, crown height, topology, placement, exclusion, and material diagnostics remain authoritative.
+
+### Validation gate
+
+Use the same seed and accepted D3/D2 settings. V3J.3D4 passes only if:
+
+1. Long flat plateaus remain materially less common than before D3.
+2. Most marks no longer end in a sharp `^` or roof peak.
+3. Crests read as short curved caps rather than clipped flat shelves.
+4. Left/right shoulder asymmetry and seeded irregularity remain visible.
+5. Double-hill/M profiles do not return.
+6. Requested Fold Height response, placement positions, exclusions, crown cross-section, flat ink, and topology remain unchanged.
+
+The gameplay camera is the primary acceptance view; close profile views are supporting evidence only.
+
+
+## Patch V3J.3D5 — Environment-Integrated Flat Ink (Implemented, Awaiting Unity Validation)
+
+Unity validation after V3J.3D4 exposed a separate material-integration defect. The completely unlit Painted Accent ink retained the same value beneath strong cast shadows and at night, while the surrounding ground responded normally. The marks therefore read as bright tracers floating over the terrain rather than as graphic contours belonging to it.
+
+V3J.3D5 does not reopen geometry, placement, exclusions, distribution, crown construction, or Ink Color authoring. It replaces only the flat-unlit output policy with a restrained environment-integrated flat-ink policy.
+
+### Lighting contract
+
+The Painted Accent shader remains graphic rather than physically shaded:
+
+- no normal-dot-light term;
+- no face-direction shading;
+- no crown/shoulder gradient;
+- no metallic, smoothness, specular, emission, texture, or reflection response;
+- no self-cast shadow pass;
+- double-sided rendering remains enabled.
+
+Every fragment samples environmental illumination at its world position and multiplies the authored Ink Color by one scalar exposure. The scalar uses:
+
+```text
+ambient spherical-harmonic luminance
++ main-light luminance and attenuation
++ main-light shadow attenuation
++ restrained additional-light luminance and attenuation
+```
+
+Lighting colour is reduced to luminance so the authored Ink Color hue remains stable. Illumination may darken the mark or restore it toward the authored value, but exposure is capped at `1.0`; lights cannot make the ink brighter than its authored colour.
+
+Initial proof constants are:
+
+```text
+Ambient Response:       0.75
+Direct Response:        0.80
+Shadow Response:        0.70
+Local Light Response:   0.25
+Minimum Visibility:     0.14
+```
+
+The minimum visibility floor prevents complete disappearance in darkness while remaining low enough to remove the previous bright nighttime-tracer effect.
+
+### Renderer contract
+
+The preview renderer now reports `receiveShadows=True` and the shader explicitly samples URP main-light and additional-light shadow attenuation. Shadow casting remains `Off`; the visual-only ribbon does not add its own miniature cast shadow to the terrain.
+
+Light probes and reflection probes remain disabled. Ambient response uses the scene environment spherical harmonics, including the project's flat ambient colour/intensity changes driven by the time-of-day system.
+
+### Diagnostics
+
+The Painted Accent build log now reports:
+
+```text
+surfaceMode=EnvironmentIntegratedFlatInk
+inkAmbientResponse
+inkDirectResponse
+inkShadowResponse
+inkLocalLightResponse
+inkMinimumVisibility
+receiveShadows=True
+shadowCasting=Off
+```
+
+### Validation gate
+
+V3J.3D5 passes only if:
+
+1. The same stroke is visibly darker inside a cast shadow than in open daylight.
+2. Night no longer produces bright floating outlines over a dark ground.
+3. Main and local lights can restore visibility without exceeding the authored Ink Color.
+4. Opposite faces, crown, and shoulders remain free of normal-based gradients.
+5. The ink hue remains the authored family/variant colour.
+6. The ribbon continues to cast no shadow.
+7. Geometry, placement, exclusions, distribution, topology, and authoring controls remain unchanged.
+
+The unresolved V3J.3D4 apex-shape question remains separate from this material proof and must not be judged as part of the D5 lighting validation.

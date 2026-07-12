@@ -73,6 +73,14 @@ namespace ProgrammaticStylized3D.Rivers
         TornFragments = 2
     }
 
+    public enum StylizedRiverFinalFoamVisibilityMode
+    {
+        [InspectorName("Concentration + Lifetime")]
+        ConcentrationAndLifetime = 0,
+        [InspectorName("Lifecycle-Faithful")]
+        LifecycleFaithful = 1
+    }
+
     public enum StylizedRiverFoamBirthShapeMode
     {
         Ellipse,
@@ -146,7 +154,9 @@ namespace ProgrammaticStylized3D.Rivers
         FoamFilmSupport = 12,
         FoamFilmTarget = 13,
         FoamTemporalOccupancy = 14,
-        FoamTemporalDifference = 15
+        FoamTemporalDifference = 15,
+        // Serialized value 16 is retired and resolves safely to Final.
+        FoamEvaluatedFinalPreview = 17
     }
 
 
@@ -231,7 +241,7 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamNeutralLifetime = 1f;
         private const float MaximumFoamNeutralLifetime = 10f;
         private const float DefaultFoamNeutralLifetime = 4f;
-        private const float MinimumFoamSupportedAgingRate = 0.1f;
+        private const float MinimumFoamSupportedAgingRate = 0.05f;
         private const float MaximumFoamSupportedAgingRate = 1f;
         private const float DefaultFoamSupportedAgingRate = 0.2f;
         private const float MinimumFoamNegativeAgingRate = 1f;
@@ -1319,12 +1329,17 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField]
         private float foamNeutralLifetime = DefaultFoamNeutralLifetime;
 
-        [Tooltip("Aging-rate multiplier at full positive support. Values below one extend Remaining Life. The default 0.20 gives fully supported material five times the neutral lifetime before negative overlap is considered.")]
+        [Tooltip("Aging-rate multiplier at full positive support. Values below one extend Remaining Life. The default 0.20 gives fully supported material five times the neutral lifetime; the minimum 0.05 requests twenty times the neutral lifetime before negative overlap is considered.")]
         [Range(
             MinimumFoamSupportedAgingRate,
             MaximumFoamSupportedAgingRate)]
         [SerializeField]
         private float foamSupportedAgingRate = DefaultFoamSupportedAgingRate;
+
+        [Tooltip("Selects how Final Foam converts living persistent material into visible coverage. Concentration + Lifetime preserves the current dense-core renderer, where local Presence concentration and Remaining Life both discard coverage. Lifecycle-Faithful uses Presence only to define a meaningful material footprint, then lets Remaining Life and the stable material pattern control deterioration. This is a render-only A/B control and does not change stored material or lifecycle.")]
+        [SerializeField]
+        private StylizedRiverFinalFoamVisibilityMode foamFinalVisibilityMode =
+            StylizedRiverFinalFoamVisibilityMode.ConcentrationAndLifetime;
 
         [Tooltip("Aging-rate multiplier at full Negative Aging Pressure. Values above one consume Remaining Life faster. Negative pressure also suppresses positive support preservation before this multiplier is applied, so hostile overlap kills rather than merely weakens support.")]
         [Range(
@@ -1433,9 +1448,29 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField, HideInInspector]
         private int foamVelocityTuningVersion;
 
-        [Tooltip("Lit, non-emissive Foam tint. The alpha channel controls maximum Foam opacity, so no separate opacity control is required.")]
+        [Tooltip("Lit, non-emissive Foam base tint. RGB is resolved before water bleed-through; alpha sets the base Foam opacity before the established-interior floor is applied.")]
         [SerializeField] private Color foamColour =
             new Color(0.94f, 0.97f, 0.94f, 0.72f);
+
+        [Tooltip("Sets an absolute minimum rendered opacity for established Foam interiors. This may exceed Foam Colour alpha, but it does not affect weak fringe or create Foam outside the incoming silhouette. Zero preserves the accepted pre-5.17A composition.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamInteriorOpacityFloor;
+
+        [Tooltip("Controls the existing edge-versus-interior lighting contrast. Negative values suppress the bright rim toward interior lighting, zero preserves the accepted pre-5.17A lighting, and positive values intensify the existing edge. This never expands the Foam silhouette.")]
+        [Range(-1f, 1f)]
+        [SerializeField] private float foamEdgeContrast;
+
+        [Tooltip("Strength of medium shader-local bites and the derived short edge-connected cuts applied after the final Foam visibility mask. Zero preserves the accepted pre-5.17B silhouette. This is render-only and never changes Layer C material or Layer D shape.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamChipStrength;
+
+        [Tooltip("Strength of fine shader-local shredding confined to weak Foam fringe coverage. Zero preserves the accepted pre-5.17B silhouette. This is render-only and does not age or remove stored material.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFrayStrength;
+
+        [Tooltip("Selects the physical size family of the existing stable breakup pattern in river/material space. Zero favours finer, more frequent features; one favours broader, less frequent features. Chip and Fray strengths at zero remain neutral regardless of this value.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamBreakupScale = 0.5f;
 
         [Tooltip("Selects one of the retained Stage 6 diagnostics. Final is the normal rendered result; all obsolete Foam debug modes have been removed.")]
         [SerializeField] private StylizedRiverFoamDebugView foamDebugView =
@@ -2337,6 +2372,11 @@ namespace ProgrammaticStylized3D.Rivers
                 foamSupportedAgingRate,
                 MinimumFoamSupportedAgingRate,
                 MaximumFoamSupportedAgingRate);
+        public StylizedRiverFinalFoamVisibilityMode FoamFinalVisibilityMode =>
+            foamFinalVisibilityMode ==
+                StylizedRiverFinalFoamVisibilityMode.LifecycleFaithful
+                ? StylizedRiverFinalFoamVisibilityMode.LifecycleFaithful
+                : StylizedRiverFinalFoamVisibilityMode.ConcentrationAndLifetime;
         public float FoamNegativeAgingRate =>
             Mathf.Clamp(
                 foamNegativeAgingRate,
@@ -2393,6 +2433,16 @@ namespace ProgrammaticStylized3D.Rivers
                 MinimumFoamVisualOccupancyReleaseTime,
                 MaximumFoamVisualOccupancyReleaseTime);
         public Color FoamColour => foamColour;
+        public float FoamInteriorOpacityFloor =>
+            Mathf.Clamp01(foamInteriorOpacityFloor);
+        public float FoamEdgeContrast =>
+            Mathf.Clamp(foamEdgeContrast, -1f, 1f);
+        public float FoamChipStrength =>
+            Mathf.Clamp01(foamChipStrength);
+        public float FoamFrayStrength =>
+            Mathf.Clamp01(foamFrayStrength);
+        public float FoamBreakupScale =>
+            Mathf.Clamp01(foamBreakupScale);
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
         public float FoamSpawnDistanceNormalized =>
             foamSpawnDistanceNormalized;
@@ -3023,6 +3073,8 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.FoamTemporalOccupancy;
                 case (int)StylizedRiverFoamDebugView.FoamTemporalDifference:
                     return StylizedRiverFoamDebugView.FoamTemporalDifference;
+                case (int)StylizedRiverFoamDebugView.FoamEvaluatedFinalPreview:
+                    return StylizedRiverFoamDebugView.FoamEvaluatedFinalPreview;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }
@@ -4366,6 +4418,7 @@ namespace ProgrammaticStylized3D.Rivers
                 foamSupportedAgingRate,
                 MinimumFoamSupportedAgingRate,
                 MaximumFoamSupportedAgingRate);
+            foamFinalVisibilityMode = FoamFinalVisibilityMode;
             foamNegativeAgingRate = Mathf.Clamp(
                 foamNegativeAgingRate,
                 MinimumFoamNegativeAgingRate,
@@ -4411,6 +4464,15 @@ namespace ProgrammaticStylized3D.Rivers
                 MinimumFoamVisualOccupancyReleaseTime,
                 MaximumFoamVisualOccupancyReleaseTime);
             foamColour.a = Mathf.Clamp01(foamColour.a);
+            foamInteriorOpacityFloor = Mathf.Clamp01(
+                foamInteriorOpacityFloor);
+            foamEdgeContrast = Mathf.Clamp(
+                foamEdgeContrast,
+                -1f,
+                1f);
+            foamChipStrength = Mathf.Clamp01(foamChipStrength);
+            foamFrayStrength = Mathf.Clamp01(foamFrayStrength);
+            foamBreakupScale = Mathf.Clamp01(foamBreakupScale);
             foamSpawnDistanceNormalized = Mathf.Clamp01(
                 foamSpawnDistanceNormalized);
             foamSpawnAcrossNormalized = Mathf.Clamp(

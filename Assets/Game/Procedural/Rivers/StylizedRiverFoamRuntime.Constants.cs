@@ -211,7 +211,30 @@ namespace ProgrammaticStylized3D.Rivers
         private const float AutomaticShoreBirthShapeSeedSalt = 521.909f;
         private const float PresenceMetricThreshold = 0.16432f;
         private const float IntegratedAreaFixedPointScale = 4096f;
-        private const int TransportMetricCount = 12;
+        private const int TransportPresenceBeforeMetricIndex = 0;
+        private const int TransportLifeBeforeMetricIndex = 1;
+        private const int TransportPatternBeforeMetricIndex = 2;
+        private const int TransportPresenceAfterMetricIndex = 3;
+        private const int TransportLifeAfterMetricIndex = 4;
+        private const int TransportPatternAfterMetricIndex = 5;
+        private const int TransportPresenceOutflowMetricIndex = 6;
+        private const int TransportLifeOutflowMetricIndex = 7;
+        private const int TransportPatternOutflowMetricIndex = 8;
+        private const int TransportPresenceClampMetricIndex = 9;
+        private const int TransportLifeClampMetricIndex = 10;
+        private const int TransportPatternClampMetricIndex = 11;
+        private const int TransportPresenceUnitCapacityLossMetricIndex = 12;
+        private const int TransportPresenceBoundaryCapacityLossMetricIndex = 13;
+        private const int TransportPresenceObstacleCapacityLossMetricIndex = 14;
+        private const int TransportPresenceStateValidityLossMetricIndex = 15;
+        private const int TransportPresenceMinimumCutoffLossMetricIndex = 16;
+        private const int TransportMaximumRawPresenceMetricIndex = 17;
+        private const int TransportMaximumLocalCapacityExcessMetricIndex = 18;
+        private const int TransportTotalCapacityHitCountMetricIndex = 19;
+        private const int TransportUnitCapacityHitCountMetricIndex = 20;
+        private const int TransportBoundaryCapacityHitCountMetricIndex = 21;
+        private const int TransportObstacleCapacityHitCountMetricIndex = 22;
+        private const int TransportMetricCount = 23;
         private const float TransportMetricFixedPointScale = 4096f;
         private const float TransportMetricsUpdateRate = 4f;
         private const float TransportTargetCfl = 0.90f;
@@ -485,18 +508,26 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamObstacleMinimumDownstreamFactor");
         private static readonly int FoamInterpolationId =
             Shader.PropertyToID("_FoamInterpolation");
-        private static readonly int FoamRenderAdvectionSecondsId =
-            Shader.PropertyToID("_FoamRenderAdvectionSeconds");
-        private static readonly int FoamFlowDirectionId =
-            Shader.PropertyToID("_FoamFlowDirection");
         private static readonly int FoamGlobalStartId =
             Shader.PropertyToID("_FoamGlobalStart");
         private static readonly int FoamFieldLengthId =
             Shader.PropertyToID("_FoamFieldLength");
         private static readonly int FoamColourId =
             Shader.PropertyToID("_FoamColour");
+        private static readonly int FoamInteriorOpacityFloorId =
+            Shader.PropertyToID("_FoamInteriorOpacityFloor");
+        private static readonly int FoamEdgeContrastId =
+            Shader.PropertyToID("_FoamEdgeContrast");
+        private static readonly int FoamChipStrengthId =
+            Shader.PropertyToID("_FoamChipStrength");
+        private static readonly int FoamFrayStrengthId =
+            Shader.PropertyToID("_FoamFrayStrength");
+        private static readonly int FoamBreakupScaleId =
+            Shader.PropertyToID("_FoamBreakupScale");
         private static readonly int FoamSharpnessId =
             Shader.PropertyToID("_FoamSharpness");
+        private static readonly int FoamFinalVisibilityModeId =
+            Shader.PropertyToID("_FoamFinalVisibilityMode");
         private static readonly int FoamDebugViewId =
             Shader.PropertyToID("_FoamDebugView");
     }

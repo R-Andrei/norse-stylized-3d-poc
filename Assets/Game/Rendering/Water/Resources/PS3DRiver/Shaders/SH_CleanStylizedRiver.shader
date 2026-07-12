@@ -101,12 +101,16 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamObstacleSlowdownStrength("Foam Obstacle Slowdown Strength", Float) = 0.85
         [HideInInspector] _FoamObstacleMinimumDownstreamFactor("Foam Obstacle Minimum Downstream Factor", Float) = 0.12
         [HideInInspector] _FoamInterpolation("Foam Interpolation", Range(0, 1)) = 1
-        [HideInInspector] _FoamRenderAdvectionSeconds("Foam Render Advection Seconds", Float) = 0
-        [HideInInspector] _FoamFlowDirection("Foam Flow Direction", Float) = 1
         [HideInInspector] _FoamGlobalStart("Foam Global Start", Float) = 0
         [HideInInspector] _FoamFieldLength("Foam Field Length", Float) = 1
         [HideInInspector] _FoamColour("Foam Colour", Color) = (0.94, 0.97, 0.94, 1)
+        [HideInInspector] _FoamInteriorOpacityFloor("Foam Interior Opacity Floor", Range(0, 1)) = 0
+        [HideInInspector] _FoamEdgeContrast("Foam Edge Contrast", Range(-1, 1)) = 0
+        [HideInInspector] _FoamChipStrength("Foam Chip Strength", Range(0, 1)) = 0
+        [HideInInspector] _FoamFrayStrength("Foam Fray Strength", Range(0, 1)) = 0
+        [HideInInspector] _FoamBreakupScale("Foam Breakup Scale", Range(0, 1)) = 0.5
         [HideInInspector] _FoamSharpness("Foam Sharpness", Range(0, 1)) = 0.8
+        [HideInInspector] _FoamFinalVisibilityMode("Foam Final Visibility Mode", Float) = 0
         [HideInInspector] _FoamDebugView("Foam Debug View", Float) = 0
 
         [Header(Lighting Response)]
@@ -251,12 +255,16 @@ Shader "PS3D/Stylized River Water"
 
                 float _FoamEnabled;
                 float _FoamInterpolation;
-                float _FoamRenderAdvectionSeconds;
-                float _FoamFlowDirection;
                 float _FoamGlobalStart;
                 float _FoamFieldLength;
                 half4 _FoamColour;
+                float _FoamInteriorOpacityFloor;
+                float _FoamEdgeContrast;
+                float _FoamChipStrength;
+                float _FoamFrayStrength;
+                float _FoamBreakupScale;
                 float _FoamSharpness;
+                float _FoamFinalVisibilityMode;
                 float _FoamDebugView;
                 float _FoamMotionLaneScrollCells;
                 float _FoamBaseDownstreamSpeed;
@@ -329,77 +337,6 @@ Shader "PS3D/Stylized River Water"
                     saturate(committedPresence));
             }
 
-            RiverWaterFoamResolvedVelocity ResolveRenderedFoamVelocity(
-                float2 fieldUV)
-            {
-                int2 laneDimensions = int2(
-                    max(1.0, _FoamMotionLane_TexelSize.z),
-                    max(1.0, _FoamMotionLane_TexelSize.w));
-                int2 routingDimensions = int2(
-                    max(1.0, _FoamObstacleRouting_TexelSize.z),
-                    max(1.0, _FoamObstacleRouting_TexelSize.w));
-                float laneX = fieldUV.x * (float)laneDimensions.x -
-                    _FoamMotionLaneScrollCells;
-                laneX = fmod(laneX, (float)laneDimensions.x);
-                if (laneX < 0.0)
-                {
-                    laneX += (float)laneDimensions.x;
-                }
-
-                int laneX0 = clamp(
-                    (int)floor(laneX),
-                    0,
-                    laneDimensions.x - 1);
-                int laneX1 = laneX0 + 1;
-                if (laneX1 >= laneDimensions.x)
-                {
-                    laneX1 = 0;
-                }
-
-                int laneY = clamp(
-                    (int)floor(fieldUV.y * (float)laneDimensions.y),
-                    0,
-                    laneDimensions.y - 1);
-                float laneBlend = frac(laneX);
-                float laneA = _FoamMotionLane.Load(
-                    int3(laneX0, laneY, 0)).r;
-                float laneB = _FoamMotionLane.Load(
-                    int3(laneX1, laneY, 0)).r;
-                float lane = clamp(
-                    lerp(laneA, laneB, laneBlend),
-                    -1.0,
-                    1.0);
-
-                int2 routingCoordinate = clamp(
-                    (int2)floor(fieldUV * (float2)routingDimensions),
-                    int2(0, 0),
-                    routingDimensions - 1);
-                float2 obstacleRouting = _FoamObstacleRouting.Load(
-                    int3(routingCoordinate, 0)).rg;
-                obstacleRouting.x = clamp(obstacleRouting.x, -1.0, 1.0);
-                obstacleRouting.y = saturate(obstacleRouting.y);
-
-                int2 obstacleDimensions = int2(
-                    max(1.0, _FoamObstacleExclusion_TexelSize.z),
-                    max(1.0, _FoamObstacleExclusion_TexelSize.w));
-                int2 obstacleCoordinate = clamp(
-                    (int2)floor(fieldUV * (float2)obstacleDimensions),
-                    int2(0, 0),
-                    obstacleDimensions - 1);
-                float obstacleFootprint = saturate(
-                    _FoamObstacleExclusion.Load(
-                        int3(obstacleCoordinate, 0)).r);
-
-                return RiverWaterResolveFoamVelocityContract(
-                    lane,
-                    obstacleRouting.x,
-                    obstacleRouting.y,
-                    _FoamBaseDownstreamSpeed,
-                    _FoamMaximumLateralSpeedRatio,
-                    _FoamObstacleSlowdownStrength,
-                    _FoamObstacleMinimumDownstreamFactor,
-                    1.0 - obstacleFootprint);
-            }
 
             struct Attributes
             {
@@ -875,14 +812,11 @@ Shader "PS3D/Stylized River Water"
                 foamSurface.wakeDownstreamGradient = wake.downstreamGradient;
                 foamSurface.wakeLateralGradient = wake.lateralGradient;
 
-                float2 foamVelocityFieldUV = float2(
+                float2 foamFieldUV = float2(
                     saturate((input.domainData.x - _FoamGlobalStart) /
                         max(0.001, _FoamFieldLength)),
                     saturate(input.domainData.y /
                         max(0.001, input.domainData.w) * 0.5 + 0.5));
-                RiverWaterFoamResolvedVelocity renderedFoamVelocity =
-                    ResolveRenderedFoamVelocity(foamVelocityFieldUV);
-
                 RiverWaterFoamResult foam = RiverWaterEvaluateFoam(
                     TEXTURE2D_ARGS(
                         _FoamPrevious,
@@ -897,36 +831,96 @@ Shader "PS3D/Stylized River Water"
                     _FoamGlobalStart,
                     _FoamFieldLength,
                     _FoamInterpolation,
-                    _FoamRenderAdvectionSeconds,
-                    renderedFoamVelocity.velocityMetresPerSecond,
-                    renderedFoamVelocity.obstacleInfluence,
-                    _FoamFlowDirection,
                     _FoamSharpness,
+                    _FoamFinalVisibilityMode,
+                    _FoamBreakupScale,
                     _FreezeAmount,
                     foamSurface);
 
+                float finalFoamMask = RiverWaterFoamApplyEdgeBreakup(
+                    foam.mask,
+                    foam.materialPattern,
+                    foam.breakupField,
+                    input.domainData.x,
+                    input.domainData.y,
+                    _FoamChipStrength,
+                    _FoamFrayStrength,
+                    _FoamBreakupScale);
 
-                float3 finalColour = RiverWaterApplyReservedIntegration(
+                float3 foamBaseColour = RiverWaterApplyReservedIntegration(
                     body.colour,
                     integration);
-                finalColour *= 1.0 + motion.currentAccent * 0.22;
+                foamBaseColour *= 1.0 + motion.currentAccent * 0.22;
+                float3 finalColour = foamBaseColour;
 
-                float3 foamColour = RiverWaterResolveFoamColourFiltered(
-                    _FoamColour.rgb,
-                    lighting.combined,
-                    foam.mask,
-                    foam.surfaceEnergy,
-                    _MinimumNightVisibility);
+                RiverWaterFoamComposition foamComposition =
+                    RiverWaterResolveFoamComposition(
+                        _FoamColour.rgb,
+                        _FoamColour.a,
+                        finalFoamMask,
+                        _FoamInteriorOpacityFloor,
+                        _FoamEdgeContrast,
+                        lighting.combined,
+                        foam.surfaceEnergy,
+                        _MinimumNightVisibility);
                 // Foam lifetime no longer fades the whole patch. RiverWaterEvaluateFoam
                 // returns an erosion-shaped mask: surviving fragments should stay
                 // foam-coloured, with only a narrow fringe blending into water.
-                float foamBlend = saturate(
-                    smoothstep(0.08, 0.46, foam.mask) *
-                    _FoamColour.a);
-                finalColour = lerp(finalColour, foamColour, foamBlend);
+                finalColour = lerp(
+                    finalColour,
+                    foamComposition.colour,
+                    foamComposition.opacity);
                 finalColour = MixFog(finalColour, input.motionData.w);
 
                 int foamDebug = (int)round(_FoamDebugView);
+
+
+                if (foamDebug == 17)
+                {
+                    float2 committedFieldUV = foamFieldUV;
+                    float4 committedState =
+                        SampleCommittedFoamState(committedFieldUV);
+                    float committedPresence;
+                    float committedRemainingLife;
+                    float committedMaterialPattern;
+                    RiverWaterFoamDecodeMaterialState(
+                        committedState,
+                        committedPresence,
+                        committedRemainingLife,
+                        committedMaterialPattern);
+                    float evaluatedShape = saturate(
+                        SAMPLE_TEXTURE2D(
+                            _FoamShapeMask,
+                            sampler_FoamCurrent,
+                            committedFieldUV).r);
+                    float evaluatedPreviewMask =
+                        RiverWaterFoamApplyEdgeBreakup(
+                            evaluatedShape,
+                            committedMaterialPattern,
+                            foam.breakupField,
+                            input.domainData.x,
+                            input.domainData.y,
+                            _FoamChipStrength,
+                            _FoamFrayStrength,
+                            _FoamBreakupScale);
+                    RiverWaterFoamComposition evaluatedPreviewComposition =
+                        RiverWaterResolveFoamComposition(
+                            _FoamColour.rgb,
+                            _FoamColour.a,
+                            evaluatedPreviewMask,
+                            _FoamInteriorOpacityFloor,
+                            _FoamEdgeContrast,
+                            lighting.combined,
+                            foam.surfaceEnergy,
+                            _MinimumNightVisibility);
+                    float3 evaluatedPreviewColour = lerp(
+                        foamBaseColour,
+                        evaluatedPreviewComposition.colour,
+                        evaluatedPreviewComposition.opacity);
+                    return half4(
+                        MixFog(evaluatedPreviewColour, input.motionData.w),
+                        1.0);
+                }
 
                 if (foamDebug == 5 || foamDebug == 6)
                 {
@@ -1182,35 +1176,20 @@ Shader "PS3D/Stylized River Water"
 
                     if (foamDebug == 9 || foamDebug == 10)
                     {
-                        float detailedShape =
-                            RiverWaterFoamEvaluateShaderLocalDetailProbe(
-                                evaluatedShape,
-                                foam.presence,
-                                foam.remainingLife,
-                                foam.materialPattern,
-                                foam.fieldUV,
-                                input.domainData.x,
-                                input.domainData.y,
-                                _FoamRenderAdvectionSeconds,
-                                _FoamSharpness,
-                                foam.surfaceEnergy);
-
                         if (foamDebug == 10)
                         {
-                            float addedByDetail = saturate(
-                                (detailedShape - evaluatedShape) * 5.0);
                             float removedByDetail = saturate(
-                                (evaluatedShape - detailedShape) * 5.0);
+                                (foam.mask - finalFoamMask) * 5.0);
                             float3 detailDifferenceColour = float3(
-                                removedByDetail + addedByDetail * 0.10,
-                                addedByDetail,
+                                removedByDetail,
+                                0.0,
                                 removedByDetail * 0.85);
                             return half4(
                                 saturate(detailDifferenceColour),
                                 1.0);
                         }
 
-                        return half4(detailedShape.xxx, 1.0);
+                        return half4(finalFoamMask.xxx, 1.0);
                     }
 
                     return half4(evaluatedShape.xxx, 1.0);

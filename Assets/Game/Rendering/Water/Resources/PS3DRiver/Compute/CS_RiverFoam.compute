@@ -2960,6 +2960,13 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
         FoamTransportLifeClampOffset,
         FoamTransportPatternClampOffset,
         clampLoss);
+    FoamAccumulateTransportPresenceAttribution(
+        coordinate,
+        rawTransported.x,
+        transportedPacked.x,
+        validFluid,
+        cellArea,
+        clampLoss.x);
 
     // Stored material occupies this exact cell after conservative transport.
     // Topology/lifecycle sampling therefore uses the current cell centre with
@@ -2992,9 +2999,9 @@ void SimulateFoam(uint3 dispatchId : SV_DispatchThreadID)
     }
 
     float localAgeRate = FoamResolveLocalAgeRate(materialTopology);
-    float configuredAgeDelta = _FoamDeltaTime * localAgeRate /
+    float configuredAgeDelta = _FoamLifecycleDeltaTime * localAgeRate /
         max(0.05, _FoamNeutralLifetime);
-    float absoluteProbeAgeDelta = _FoamDeltaTime;
+    float absoluteProbeAgeDelta = _FoamLifecycleDeltaTime;
     float ageDelta = _FoamDebugAbsoluteLifeProbeActive > 0.5
         ? absoluteProbeAgeDelta
         : configuredAgeDelta;

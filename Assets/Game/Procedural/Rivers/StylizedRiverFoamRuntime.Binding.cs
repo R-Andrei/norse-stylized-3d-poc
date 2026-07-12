@@ -64,10 +64,6 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(
                 FoamInterpolationId,
                 snapshot.Interpolation);
-            propertyBlock.SetFloat(FoamRenderAdvectionSecondsId, 0f);
-            propertyBlock.SetFloat(
-                FoamFlowDirectionId,
-                river != null ? river.FlowDirection : 1f);
             propertyBlock.SetFloat(FoamGlobalStartId, snapshot.GlobalStart);
             propertyBlock.SetFloat(
                 FoamFieldLengthId,
@@ -76,8 +72,28 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamColourId,
                 river != null ? river.FoamColour : Color.clear);
             propertyBlock.SetFloat(
+                FoamInteriorOpacityFloorId,
+                river != null ? river.FoamInteriorOpacityFloor : 0f);
+            propertyBlock.SetFloat(
+                FoamEdgeContrastId,
+                river != null ? river.FoamEdgeContrast : 0f);
+            propertyBlock.SetFloat(
+                FoamChipStrengthId,
+                river != null ? river.FoamChipStrength : 0f);
+            propertyBlock.SetFloat(
+                FoamFrayStrengthId,
+                river != null ? river.FoamFrayStrength : 0f);
+            propertyBlock.SetFloat(
+                FoamBreakupScaleId,
+                river != null ? river.FoamBreakupScale : 0.5f);
+            propertyBlock.SetFloat(
                 FoamSharpnessId,
                 MaterialContourSharpness);
+            propertyBlock.SetFloat(
+                FoamFinalVisibilityModeId,
+                river != null
+                    ? (float)river.FoamFinalVisibilityMode
+                    : 0f);
             propertyBlock.SetFloat(
                 FoamDebugViewId,
                 river != null ? (float)river.FoamDebugView : 0f);
@@ -146,16 +162,30 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamObstacleMinimumDownstreamFactorId,
                 river.FoamObstacleMinimumDownstreamFactor);
             propertyBlock.SetFloat(FoamInterpolationId, simulationInterpolation);
-            propertyBlock.SetFloat(
-                FoamRenderAdvectionSecondsId,
-                foamRenderAdvectionSeconds);
-            propertyBlock.SetFloat(FoamFlowDirectionId, river.FlowDirection);
             propertyBlock.SetFloat(FoamGlobalStartId, allocatedGlobalStart);
             propertyBlock.SetFloat(FoamFieldLengthId, Mathf.Max(0.001f, fieldLength));
             propertyBlock.SetColor(FoamColourId, river.FoamColour);
             propertyBlock.SetFloat(
+                FoamInteriorOpacityFloorId,
+                river.FoamInteriorOpacityFloor);
+            propertyBlock.SetFloat(
+                FoamEdgeContrastId,
+                river.FoamEdgeContrast);
+            propertyBlock.SetFloat(
+                FoamChipStrengthId,
+                river.FoamChipStrength);
+            propertyBlock.SetFloat(
+                FoamFrayStrengthId,
+                river.FoamFrayStrength);
+            propertyBlock.SetFloat(
+                FoamBreakupScaleId,
+                river.FoamBreakupScale);
+            propertyBlock.SetFloat(
                 FoamSharpnessId,
                 MaterialContourSharpness);
+            propertyBlock.SetFloat(
+                FoamFinalVisibilityModeId,
+                (float)river.FoamFinalVisibilityMode);
             propertyBlock.SetFloat(FoamDebugViewId, (float)river.FoamDebugView);
             surfaceRenderer.SetPropertyBlock(propertyBlock);
         }
@@ -201,12 +231,16 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamObstacleMinimumDownstreamFactorId,
                 1f);
             propertyBlock.SetFloat(FoamInterpolationId, 1f);
-            propertyBlock.SetFloat(FoamRenderAdvectionSecondsId, 0f);
-            propertyBlock.SetFloat(FoamFlowDirectionId, 1f);
             propertyBlock.SetFloat(FoamGlobalStartId, 0f);
             propertyBlock.SetFloat(FoamFieldLengthId, 1f);
             propertyBlock.SetColor(FoamColourId, Color.clear);
+            propertyBlock.SetFloat(FoamInteriorOpacityFloorId, 0f);
+            propertyBlock.SetFloat(FoamEdgeContrastId, 0f);
+            propertyBlock.SetFloat(FoamChipStrengthId, 0f);
+            propertyBlock.SetFloat(FoamFrayStrengthId, 0f);
+            propertyBlock.SetFloat(FoamBreakupScaleId, 0.5f);
             propertyBlock.SetFloat(FoamSharpnessId, 1f);
+            propertyBlock.SetFloat(FoamFinalVisibilityModeId, 0f);
             propertyBlock.SetFloat(FoamDebugViewId, 0f);
             surfaceRenderer.SetPropertyBlock(propertyBlock);
         }

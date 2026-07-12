@@ -380,19 +380,11 @@ namespace ProgrammaticStylized3D.Rivers
                 MeasureTopologyMetrics(true);
             }
 
-            // Persistent material advances only on fixed material ticks.
-            // The remaining accumulator time is presentation-only and is
-            // backtraced through the same local canonical 2D velocity in the
-            // river shader. It never writes FoamState or Remaining Life.
+            // Production rendering consumes the current committed Layer C
+            // state directly. Point-velocity residual prediction was rejected
+            // because it visibly oscillated beside blocked rock and bank faces.
             simulationInterpolation = 1f;
-            foamRenderAdvectionSeconds = transportSafetyLimitExceeded
-                ? 0f
-                : Mathf.Clamp(
-                    simulationAccumulator,
-                    0f,
-                    stepDuration);
             lastRenderInterpolationAlpha = simulationInterpolation;
-            lastFoamRenderAdvectionSeconds = foamRenderAdvectionSeconds;
 
             if (IsSleeping)
             {
@@ -620,8 +612,6 @@ namespace ProgrammaticStylized3D.Rivers
             lastInjectionBoundaryCoverage = -1f;
             lastInjectionStateSynchronized = false;
             simulationAccumulator = 0f;
-            foamRenderAdvectionSeconds = 0f;
-            lastFoamRenderAdvectionSeconds = 0f;
             lastEstimatedTransportCellsPerStep = 0f;
             lastEstimatedLateralTransportCellsPerStep = 0f;
             lastMaximumTransportCfl = 0f;

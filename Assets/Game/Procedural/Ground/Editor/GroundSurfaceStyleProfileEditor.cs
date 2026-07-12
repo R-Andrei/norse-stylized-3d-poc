@@ -309,6 +309,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentStrokeWidth");
             SerializedProperty paintedAccentStrokeDensity =
                 feature.FindPropertyRelative("paintedAccentStrokeDensity");
+            SerializedProperty paintedAccentDistributionPatchScale =
+                feature.FindPropertyRelative("paintedAccentDistributionPatchScale");
+            SerializedProperty paintedAccentDistributionPatchiness =
+                feature.FindPropertyRelative("paintedAccentDistributionPatchiness");
+            SerializedProperty paintedAccentDistributionSparseFloor =
+                feature.FindPropertyRelative("paintedAccentDistributionSparseFloor");
             SerializedProperty paintedAccentStrokeLengthMin =
                 feature.FindPropertyRelative("paintedAccentStrokeLengthMin");
             SerializedProperty paintedAccentStrokeLengthMax =
@@ -379,7 +385,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 {
                     EditorGUILayout.Space(4f);
                     EditorGUILayout.LabelField(
-                        "Painted Accent 3D Strokes",
+                        "Painted Accent Strokes",
                         EditorStyles.miniBoldLabel);
                     EditorGUILayout.Slider(
                         paintedAccentStrokeWidth,
@@ -387,35 +393,60 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         0.35f,
                         new GUIContent(
                             "Stroke Width",
-                            "Visible shoulder-to-shoulder width in metres for the crowned crest ribbon. Use 0.02 m for the focused shape proof. Legacy BodyWidth is not used by the ribbon mesh."));
+                            "Visible authored projected-contour width in metres. BodyWidth remains texture/debug support only."));
                     EditorGUILayout.Slider(
                         paintedAccentStrokeDensity,
                         0f,
-                        80f,
+                        240f,
                         new GUIContent(
                             "Stroke Density",
-                            "Approximate target number of generated 3D strokes per standard 40x40 ground patch."));
+                            "Approximate number of weighted stroke proposals per standard 40x40 ground patch before river, modifier, sampling, slope, and grade rejection. Final accepted count may be lower because rejected proposals are not backfilled."));
+                    EditorGUILayout.Space(4f);
+                    EditorGUILayout.LabelField(
+                        "Distribution & Placement",
+                        EditorStyles.miniBoldLabel);
+                    EditorGUILayout.Slider(
+                        paintedAccentDistributionPatchScale,
+                        2f,
+                        24f,
+                        new GUIContent(
+                            "Distribution Patch Scale",
+                            "World-space size in metres of soft continuous density patches. Larger values create broader sparse and dense regions without hard island boundaries."));
+                    EditorGUILayout.Slider(
+                        paintedAccentDistributionPatchiness,
+                        0f,
+                        1f,
+                        new GUIContent(
+                            "Distribution Patchiness",
+                            "Strength of weighted patch placement. Zero approaches broad random coverage; one strongly prefers dense noise regions while retaining a non-zero chance elsewhere."));
+                    EditorGUILayout.Slider(
+                        paintedAccentDistributionSparseFloor,
+                        0.02f,
+                        0.40f,
+                        new GUIContent(
+                            "Distribution Sparse Floor",
+                            "Minimum patch preference retained in cold regions before semantic weighting. Lower values create stronger sparse/dense contrast while preserving a non-zero chance outside warm patches."));
                     EditorGUILayout.Slider(
                         paintedAccentStrokeLengthMin,
                         0.20f,
                         4.0f,
                         new GUIContent(
                             "Stroke Length Min",
-                            "Minimum generated 3D stroke length in metres."));
+                            "Minimum accepted ground-surface descriptor length in metres."));
                     EditorGUILayout.Slider(
                         paintedAccentStrokeLengthMax,
                         0.25f,
                         6.0f,
                         new GUIContent(
                             "Stroke Length Max",
-                            "Maximum generated 3D stroke length in metres."));
+                            "Maximum accepted ground-surface descriptor length in metres."));
                     EditorGUILayout.Slider(
                         paintedAccentStrokeFacingDirectionDegrees,
                         0f,
                         360f,
                         new GUIContent(
                             "Facing Direction Degrees",
-                            "Local X/Z player or camera-facing direction. Generated 3D strokes are perpendicular to this direction before signed Angle Jitter is applied."));
+                            "Local X/Z orientation reference. Accepted descriptor strokes are perpendicular to this direction before signed Angle Jitter is applied."));
                     EditorGUILayout.Slider(
                         paintedAccentStrokeAngleJitterDegrees,
                         0f,
@@ -425,45 +456,48 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                             "Maximum signed angle offset in degrees around the perpendicular stroke angle derived from Facing Direction Degrees. Each stroke rolls independently between -value and +value."));
                     EditorGUILayout.Space(4f);
                     EditorGUILayout.LabelField(
-                        "Grounded Crowned Crest Ribbon",
+                        "Projected Contour Profile",
                         EditorStyles.miniBoldLabel);
+                    EditorGUILayout.HelpBox(
+                        "The mesh-free projected contour applies its solved scalar profile toward fixed world +Z, which is permanent gameplay screen-up.",
+                        MessageType.None);
                     EditorGUILayout.Slider(
                         paintedAccentFoldHeight,
                         0f,
                         0.50f,
                         new GUIContent(
-                            "Fold Height",
-                            "Maximum longitudinal rise in metres. Use 0.25 m as the focused crowned-ribbon proof baseline; the extended 0.50 m range leaves room above the intended normal value without changing serialized style defaults."));
+                            "Profile Height",
+                            "Primary projected contour amplitude in metres, applied toward fixed world +Z."));
                     EditorGUILayout.Slider(
                         paintedAccentCrestCrownHeight,
                         0f,
                         0.05f,
                         new GUIContent(
                             "Crest Crown Height",
-                            "Additional centreline height above the two ribbon shoulders. This controls cross-sectional silhouette only; the flat-ink shader does not light or shade the crown differently."));
+                            "Additional projected crest/cap amplitude added directly to fixed world +Z displacement."));
                     EditorGUILayout.Slider(
                         paintedAccentFoldIrregularity,
                         0f,
                         1f,
                         new GUIContent(
-                            "Fold Irregularity",
-                            "Strength of the deterministic profile search that sets crest height along each stroke. This does not add lateral centerline squiggle."));
+                            "Profile Irregularity",
+                            "Seeded longitudinal variation in the projected contour silhouette."));
                     EditorGUILayout.Slider(
                         paintedAccentFoldEndTaper,
                         0f,
                         1f,
                         new GUIContent(
-                            "Fold End Taper",
-                            "How much of the stroke length blends the raised profile back into the ground at each end."));
+                            "End Taper",
+                            "Projected contour and visible-width endpoint envelope."));
                     EditorGUILayout.Space(4f);
                     EditorGUILayout.LabelField(
-                        "Flat Ink Surface",
+                        "Authored Ink",
                         EditorStyles.miniBoldLabel);
                     EditorGUILayout.PropertyField(
                         paintedAccentInkColor,
                         new GUIContent(
                             "Ink Color",
-                            "One opaque unlit colour across the entire double-sided stroke. It does not vary with lights, shadows, crown position, endpoints, stroke seed, or viewing side."));
+                            "Family/variant-authored ink colour reserved for the future projected coverage bake and ground-albedo composition."));
 
                     if (paintedAccentStrokeLengthMax.floatValue <
                         paintedAccentStrokeLengthMin.floatValue + 0.05f)
@@ -716,6 +750,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 feature.FindPropertyRelative("paintedAccentStrokeWidth");
             SerializedProperty strokeDensity =
                 feature.FindPropertyRelative("paintedAccentStrokeDensity");
+            SerializedProperty distributionPatchScale =
+                feature.FindPropertyRelative("paintedAccentDistributionPatchScale");
+            SerializedProperty distributionPatchiness =
+                feature.FindPropertyRelative("paintedAccentDistributionPatchiness");
+            SerializedProperty distributionSparseFloor =
+                feature.FindPropertyRelative("paintedAccentDistributionSparseFloor");
             SerializedProperty strokeLengthMin =
                 feature.FindPropertyRelative("paintedAccentStrokeLengthMin");
             SerializedProperty strokeLengthMax =
@@ -743,6 +783,21 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             if (strokeDensity != null)
             {
                 strokeDensity.floatValue = 34f;
+            }
+
+            if (distributionPatchScale != null)
+            {
+                distributionPatchScale.floatValue = 9f;
+            }
+
+            if (distributionPatchiness != null)
+            {
+                distributionPatchiness.floatValue = 0.70f;
+            }
+
+            if (distributionSparseFloor != null)
+            {
+                distributionSparseFloor.floatValue = 0.18f;
             }
 
             if (strokeLengthMin != null)

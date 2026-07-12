@@ -345,3 +345,200 @@ void FoamAccumulateTransportTriplet(
         FoamTransportFixedPoint(areaWeightedPacked.z),
         originalValue);
 }
+
+void FoamAccumulateTransportPresenceAttribution(
+    int2 coordinate,
+    float rawTransportedPresence,
+    float finalStoredPresence,
+    float validFluid,
+    float cellArea,
+    float totalPresenceLossArea)
+{
+    if (_FoamTransportMetricsEnabled == 0)
+    {
+        return;
+    }
+
+    float positiveRawPresence = max(0.0, rawTransportedPresence);
+    float unitLimitedPresence = saturate(rawTransportedPresence);
+    float boundaryCapacity = LoadBoundaryCoverage(coordinate);
+    float boundaryLimitedPresence = min(
+        unitLimitedPresence,
+        boundaryCapacity);
+    float obstacleLimitedPresence = min(
+        boundaryLimitedPresence,
+        saturate(validFluid));
+
+    float unitCapacityLoss = max(
+        0.0,
+        positiveRawPresence - unitLimitedPresence);
+    float boundaryCapacityLoss = max(
+        0.0,
+        unitLimitedPresence - boundaryLimitedPresence);
+    float obstacleCapacityLoss = max(
+        0.0,
+        boundaryLimitedPresence - obstacleLimitedPresence);
+
+    bool minimumCutoff =
+        obstacleLimitedPresence > 0.0 &&
+        obstacleLimitedPresence <= FoamMaterialStateEpsilon;
+    float minimumCutoffLoss = minimumCutoff
+        ? obstacleLimitedPresence
+        : 0.0;
+    float stateValidityLoss = max(
+        0.0,
+        obstacleLimitedPresence -
+        saturate(finalStoredPresence) -
+        minimumCutoffLoss);
+
+    bool unitCapacityHit = unitCapacityLoss > 0.0;
+    bool boundaryCapacityHit = boundaryCapacityLoss > 0.0;
+    bool obstacleCapacityHit = obstacleCapacityLoss > 0.0;
+    bool anyCapacityHit =
+        unitCapacityHit ||
+        boundaryCapacityHit ||
+        obstacleCapacityHit;
+
+    float maximumLocalCapacityExcess = max(
+        0.0,
+        positiveRawPresence - saturate(validFluid));
+
+    float attributedLoss =
+        unitCapacityLoss +
+        boundaryCapacityLoss +
+        obstacleCapacityLoss +
+        stateValidityLoss +
+        minimumCutoffLoss;
+    float attributedLossArea = attributedLoss * cellArea;
+    float reconciliationTolerance = max(
+        0.0000001,
+        totalPresenceLossArea * 0.00001);
+    bool floatAttributionReconciles =
+        attributedLoss > 0.0 &&
+        abs(attributedLossArea - totalPresenceLossArea) <=
+            reconciliationTolerance;
+
+    uint unitCapacityLossFixed;
+    uint boundaryCapacityLossFixed;
+    uint obstacleCapacityLossFixed;
+    uint stateValidityLossFixed;
+    uint minimumCutoffLossFixed;
+    if (floatAttributionReconciles)
+    {
+        uint totalLossFixed = FoamTransportFixedPoint(
+            totalPresenceLossArea);
+        float inverseAttributedLoss = 1.0 / attributedLoss;
+        uint unitEnd = (uint)min(
+            (float)totalLossFixed,
+            floor(
+                (float)totalLossFixed *
+                unitCapacityLoss *
+                inverseAttributedLoss + 0.5));
+        uint boundaryEnd = max(
+            unitEnd,
+            (uint)min(
+                (float)totalLossFixed,
+                floor(
+                    (float)totalLossFixed *
+                    (unitCapacityLoss + boundaryCapacityLoss) *
+                    inverseAttributedLoss + 0.5)));
+        uint obstacleEnd = max(
+            boundaryEnd,
+            (uint)min(
+                (float)totalLossFixed,
+                floor(
+                    (float)totalLossFixed *
+                    (unitCapacityLoss + boundaryCapacityLoss +
+                     obstacleCapacityLoss) *
+                    inverseAttributedLoss + 0.5)));
+        uint validityEnd = max(
+            obstacleEnd,
+            (uint)min(
+                (float)totalLossFixed,
+                floor(
+                    (float)totalLossFixed *
+                    (unitCapacityLoss + boundaryCapacityLoss +
+                     obstacleCapacityLoss + stateValidityLoss) *
+                    inverseAttributedLoss + 0.5)));
+
+        unitCapacityLossFixed = unitEnd;
+        boundaryCapacityLossFixed = boundaryEnd - unitEnd;
+        obstacleCapacityLossFixed = obstacleEnd - boundaryEnd;
+        stateValidityLossFixed = validityEnd - obstacleEnd;
+        minimumCutoffLossFixed = totalLossFixed - validityEnd;
+    }
+    else
+    {
+        // Keep a genuine unattributed path visible through the CPU residual
+        // instead of forcing an incomplete category set to reconcile.
+        unitCapacityLossFixed = FoamTransportFixedPoint(
+            unitCapacityLoss * cellArea);
+        boundaryCapacityLossFixed = FoamTransportFixedPoint(
+            boundaryCapacityLoss * cellArea);
+        obstacleCapacityLossFixed = FoamTransportFixedPoint(
+            obstacleCapacityLoss * cellArea);
+        stateValidityLossFixed = FoamTransportFixedPoint(
+            stateValidityLoss * cellArea);
+        minimumCutoffLossFixed = FoamTransportFixedPoint(
+            minimumCutoffLoss * cellArea);
+    }
+
+    uint originalValue;
+    _FoamTransportMetrics.InterlockedAdd(
+        FoamTransportPresenceUnitCapacityLossOffset,
+        unitCapacityLossFixed,
+        originalValue);
+    _FoamTransportMetrics.InterlockedAdd(
+        FoamTransportPresenceBoundaryCapacityLossOffset,
+        boundaryCapacityLossFixed,
+        originalValue);
+    _FoamTransportMetrics.InterlockedAdd(
+        FoamTransportPresenceObstacleCapacityLossOffset,
+        obstacleCapacityLossFixed,
+        originalValue);
+    _FoamTransportMetrics.InterlockedAdd(
+        FoamTransportPresenceStateValidityLossOffset,
+        stateValidityLossFixed,
+        originalValue);
+    _FoamTransportMetrics.InterlockedAdd(
+        FoamTransportPresenceMinimumCutoffLossOffset,
+        minimumCutoffLossFixed,
+        originalValue);
+    _FoamTransportMetrics.InterlockedMax(
+        FoamTransportMaximumRawPresenceOffset,
+        FoamTransportFixedPoint(positiveRawPresence),
+        originalValue);
+    _FoamTransportMetrics.InterlockedMax(
+        FoamTransportMaximumLocalCapacityExcessOffset,
+        FoamTransportFixedPoint(maximumLocalCapacityExcess),
+        originalValue);
+
+    if (anyCapacityHit)
+    {
+        _FoamTransportMetrics.InterlockedAdd(
+            FoamTransportTotalCapacityHitCountOffset,
+            1u,
+            originalValue);
+    }
+    if (unitCapacityHit)
+    {
+        _FoamTransportMetrics.InterlockedAdd(
+            FoamTransportUnitCapacityHitCountOffset,
+            1u,
+            originalValue);
+    }
+    if (boundaryCapacityHit)
+    {
+        _FoamTransportMetrics.InterlockedAdd(
+            FoamTransportBoundaryCapacityHitCountOffset,
+            1u,
+            originalValue);
+    }
+    if (obstacleCapacityHit)
+    {
+        _FoamTransportMetrics.InterlockedAdd(
+            FoamTransportObstacleCapacityHitCountOffset,
+            1u,
+            originalValue);
+    }
+}

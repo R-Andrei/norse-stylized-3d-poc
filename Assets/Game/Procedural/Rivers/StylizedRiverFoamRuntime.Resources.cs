@@ -629,8 +629,6 @@ namespace ProgrammaticStylized3D.Rivers
             resourcesDirty = false;
             ReleaseTopologyTransitionVisibleHold();
             simulationAccumulator = 0f;
-            foamRenderAdvectionSeconds = 0f;
-            lastFoamRenderAdvectionSeconds = 0f;
             lastMaximumTransportCfl = 0f;
             lastRequiredTransportSubsteps = 1;
             lastUsedTransportSubsteps = 1;

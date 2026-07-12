@@ -12,6 +12,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty shape;
         private SerializedProperty priority;
         private SerializedProperty surfaceEffectMode;
+        private SerializedProperty featureExclusions;
         private SerializedProperty surfaceCompactionStrength;
         private SerializedProperty surfaceDampDepositStrength;
         private SerializedProperty surfaceStandingWaterStrength;
@@ -29,6 +30,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             shape = serializedObject.FindProperty("shape");
             priority = serializedObject.FindProperty("priority");
             surfaceEffectMode = serializedObject.FindProperty("surfaceEffectMode");
+            featureExclusions = serializedObject.FindProperty("featureExclusions");
             surfaceCompactionStrength = serializedObject.FindProperty("surfaceCompactionStrength");
             surfaceDampDepositStrength = serializedObject.FindProperty("surfaceDampDepositStrength");
             surfaceStandingWaterStrength = serializedObject.FindProperty("surfaceStandingWaterStrength");
@@ -51,6 +53,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             DrawProperty(priority, "Priority");
             DrawProperty(strength, "Height Strength");
             DrawProperty(blendDistance, "Blend Distance");
+
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField("Feature Exclusions", EditorStyles.boldLabel);
+            DrawProperty(featureExclusions, "Excluded Surface Features");
+            EditorGUILayout.HelpBox(
+                "Feature exclusions use the full modifier shape plus Blend Distance. Mode None and Surface Effect Mode None create a pure deterministic placement exclusion zone without changing height or surface masks.",
+                MessageType.None);
 
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField("Authored Surface Masks", EditorStyles.boldLabel);
@@ -144,7 +153,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     break;
                 case 3:
                     EditorGUILayout.HelpBox(
-                        "Mode None does not change terrain height. Use Custom surface masks above to author visual/path/damp/standing-water metadata.",
+                        "Mode None does not change terrain height. Use feature exclusions and/or Custom surface masks above for placement and authored metadata.",
                         MessageType.None);
                     break;
             }
