@@ -19,6 +19,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             OverlapRemaining
         }
 
+        private enum ChamferContainedResidualBuildMode
+        {
+            GuidedBoundary,
+            GenericArrangement
+        }
+
         private sealed class ChamferContainedRepartitionResult
         {
             public readonly ChamferContainedPatchCandidate Candidate;
@@ -241,6 +247,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 float minimumPatchTriangleArea,
                 ref ChamferEmissionStats stats)
         {
+            stats.PatchContainedRepairCandidates++;
             if (!candidate.HasDeterministicOwner ||
                 candidate.OwnerPrePatchRecordIndex < 0 ||
                 candidate.OwnerPrePatchRecordIndex >=
@@ -250,6 +257,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     out List<ChamferProvisionalFaceRecord> patchRecords) ||
                 patchRecords.Count == 0)
             {
+                stats.PatchContainedRepairBuildFailures++;
                 return BuildChamferContainedRepartitionFailure(
                     candidate,
                     ChamferContainedRepartitionFailure.Arrangement);
@@ -271,11 +279,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     minimumPatchTriangleArea,
                     out List<ChamferProvisionalFaceRecord> residualRecords,
                     out ChamferContainedRepartitionFailure buildFailure,
+                    out ChamferContainedResidualBuildMode buildMode,
                     out float ownerArea,
                     out float patchArea,
                     out float residualArea,
                     out float areaError))
             {
+                stats.PatchContainedRepairBuildFailures++;
                 return new ChamferContainedRepartitionResult(
                     candidate,
                     residualRecords,
@@ -284,6 +294,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     patchArea,
                     residualArea,
                     areaError);
+            }
+
+            if (buildMode ==
+                ChamferContainedResidualBuildMode.GuidedBoundary)
+            {
+                stats.PatchContainedRepairGuidedResiduals++;
+            }
+            else
+            {
+                stats.PatchContainedRepairGenericFallbacks++;
             }
 
             Dictionary<int, List<ChamferProvisionalFaceRecord>> replacements =
@@ -296,12 +316,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     prePatchFaceRecords,
                     successfulPatchRecords,
                     replacements);
+            int endpointInsertions =
+                SplitChamferContainedRepartitionEndpoints(
+                    patchRecords,
+                    transformedRecords,
+                    minimumStableEdgeLength);
+            if (endpointInsertions > 0)
+            {
+                stats.PatchContainedRepairEndpointAligned++;
+            }
             ChamferContainedBoundaryAudit boundaryAudit =
                 AuditChamferContainedBoundaryIncidence(
                     candidate,
                     ownerRecord,
                     patchRecords,
                     transformedRecords,
+                    candidate.OwnerPrePatchRecordIndex,
+                    residualRecords.Count,
                     minimumStableEdgeLength);
             RegisterChamferContainedBoundaryAudit(
                 candidate,
@@ -323,6 +354,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             if (!boundaryAudit.ExactTwoUse)
             {
+                stats.PatchContainedRepairBoundaryFailures++;
                 return new ChamferContainedRepartitionResult(
                     candidate,
                     residualRecords,
@@ -335,6 +367,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             if (!shadowAudit.TopologyClean)
             {
+                stats.PatchContainedRepairTopologyFailures++;
                 return new ChamferContainedRepartitionResult(
                     candidate,
                     residualRecords,
@@ -347,6 +380,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             if (!shadowAudit.OverlapRemoved)
             {
+                stats.PatchContainedRepairOverlapRemaining++;
                 return new ChamferContainedRepartitionResult(
                     candidate,
                     residualRecords,
@@ -357,6 +391,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     areaError);
             }
 
+            stats.PatchContainedRepairResolved++;
             return new ChamferContainedRepartitionResult(
                 candidate,
                 residualRecords,
@@ -451,6 +486,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         out _,
                         out _,
                         out _,
+                        out _,
                         out _))
                 {
                     stats.PatchContainedCombinedOwnerConflicts +=
@@ -472,6 +508,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     prePatchFaceRecords,
                     successfulPatchRecords,
                     replacements);
+            List<ChamferBoundarySegment> combinedPatchBoundary =
+                new List<ChamferBoundarySegment>();
+            for (int candidateIndex = 0;
+                 candidateIndex < appliedCandidates.Count;
+                 candidateIndex++)
+            {
+                combinedPatchBoundary.AddRange(
+                    BuildChamferPatchBoundarySegments(
+                        byLoop[
+                            appliedCandidates[candidateIndex].PatchLoopIndex]));
+            }
+            SplitChamferContainedRepartitionEndpoints(
+                BuildChamferBoundaryEndpointList(combinedPatchBoundary),
+                transformedRecords,
+                minimumStableEdgeLength);
             bool boundaryFailure = false;
             for (int candidateIndex = 0;
                  candidateIndex < appliedCandidates.Count;
@@ -526,6 +577,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float minimumPatchTriangleArea,
             out List<ChamferProvisionalFaceRecord> residualRecords,
             out ChamferContainedRepartitionFailure failure,
+            out ChamferContainedResidualBuildMode buildMode,
             out float originalOwnerArea,
             out float patchArea,
             out float residualArea,
@@ -533,6 +585,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             residualRecords = new List<ChamferProvisionalFaceRecord>();
             failure = ChamferContainedRepartitionFailure.Arrangement;
+            buildMode = ChamferContainedResidualBuildMode.GenericArrangement;
             originalOwnerArea = 0f;
             patchArea = 0f;
             residualArea = 0f;
@@ -667,23 +720,39 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Mathf.Max(
                     PointMergeDistance * 2f,
                     minimumStableEdgeLength * 0.001f));
-            if (projectionEpsilon <= 0f ||
-                !TrySplitChamferRepartitionSegments(
-                    sourceSegments,
-                    projectionEpsilon))
+            if (projectionEpsilon <= 0f)
             {
                 return false;
             }
 
-            if (!TryBuildChamferRepartitionBoundaryCycles(
-                    sourceSegments,
+            List<List<Vector3>> residualCycles;
+            if (TryBuildChamferContainedGuidedResidualCycles(
+                    ownerVertices,
+                    patchGroups,
                     projection,
                     projectionEpsilon,
-                    protectedKeys,
-                    preferredPositions,
-                    out List<List<Vector3>> residualCycles))
+                    out residualCycles))
             {
-                return false;
+                buildMode =
+                    ChamferContainedResidualBuildMode.GuidedBoundary;
+            }
+            else
+            {
+                if (!TrySplitChamferRepartitionSegments(
+                        sourceSegments,
+                        projectionEpsilon) ||
+                    !TryBuildChamferRepartitionBoundaryCycles(
+                        sourceSegments,
+                        projection,
+                        projectionEpsilon,
+                        protectedKeys,
+                        preferredPositions,
+                        out residualCycles))
+                {
+                    return false;
+                }
+                buildMode =
+                    ChamferContainedResidualBuildMode.GenericArrangement;
             }
 
             float expectedResidualArea = originalOwnerArea - patchArea;

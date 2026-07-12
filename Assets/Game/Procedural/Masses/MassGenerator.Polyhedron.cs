@@ -65,7 +65,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<PolygonFace> faces,
             CutPlane plane,
             PolygonFaceFeature capFeature = PolygonFaceFeature.Base,
-            float capFeatureStrength = 0f)
+            float capFeatureStrength = 0f,
+            bool clampIntersectionsToSegment = false)
         {
             List<PolygonFace> clippedFaces = new List<PolygonFace>();
             List<Vector3> capPoints = new List<Vector3>();
@@ -75,7 +76,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 List<Vector3> clipped = ClipPolygon(
                     faces[i].Vertices,
                     plane,
-                    capPoints);
+                    capPoints,
+                    clampIntersectionsToSegment);
 
                 clipped = SanitizePolygon(
                     clipped,
@@ -130,116 +132,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
-        private static bool TryClipPolyhedron(
-            List<PolygonFace> faces,
-            CutPlane plane,
-            PolygonFaceFeature capFeature,
-            float capFeatureStrength,
-            float minimumStableFaceArea,
-            float minimumStableEdgeLength)
-        {
-            if (faces.Count < 4)
-            {
-                return false;
-            }
-
-            List<PolygonFace> snapshot = ClonePolygonFaces(faces);
-            int previousFeatureFaceCount = CountFeatureFaces(faces, capFeature);
-
-            ClipPolyhedron(
-                faces,
-                plane,
-                capFeature,
-                capFeatureStrength);
-
-            bool accepted =
-                CountFeatureFaces(faces, capFeature) > previousFeatureFaceCount &&
-                ValidatePolyhedronFaces(
-                    faces,
-                    minimumStableFaceArea,
-                    minimumStableEdgeLength);
-
-            if (accepted)
-            {
-                return true;
-            }
-
-            faces.Clear();
-            faces.AddRange(snapshot);
-            return false;
-        }
-
-        private static List<PolygonFace> ClonePolygonFaces(
-            List<PolygonFace> faces)
-        {
-            List<PolygonFace> clone = new List<PolygonFace>(faces.Count);
-            for (int i = 0; i < faces.Count; i++)
-            {
-                clone.Add(
-                    new PolygonFace(
-                        new List<Vector3>(faces[i].Vertices),
-                        faces[i].Normal,
-                        faces[i].Feature,
-                        faces[i].FeatureStrength));
-            }
-
-            return clone;
-        }
-
-        private static int CountFeatureFaces(
-            List<PolygonFace> faces,
-            PolygonFaceFeature feature)
-        {
-            int count = 0;
-            for (int i = 0; i < faces.Count; i++)
-            {
-                if (faces[i].Feature == feature)
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
-
-private static bool ValidatePolyhedronFaces(
-            List<PolygonFace> faces,
-            float minimumStableFaceArea,
-            float minimumStableEdgeLength)
-        {
-            if (faces.Count < 4)
-            {
-                return false;
-            }
-
-            float minimumEdgeLengthSqr = minimumStableEdgeLength * minimumStableEdgeLength;
-            for (int faceIndex = 0; faceIndex < faces.Count; faceIndex++)
-            {
-                List<Vector3> vertices = faces[faceIndex].Vertices;
-                if (vertices.Count < 3 ||
-                    CalculatePolygonArea(vertices) <= minimumStableFaceArea)
-                {
-                    return false;
-                }
-
-                for (int vertexIndex = 0; vertexIndex < vertices.Count; vertexIndex++)
-                {
-                    Vector3 start = vertices[vertexIndex];
-                    Vector3 end = vertices[(vertexIndex + 1) % vertices.Count];
-                    if ((end - start).sqrMagnitude <= minimumEdgeLengthSqr)
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            return true;
-        }
-
         private static List<Vector3> ClipPolygon(
             List<Vector3> vertices,
             CutPlane plane,
-            List<Vector3> capPoints)
+            List<Vector3> capPoints,
+            bool clampIntersectionsToSegment)
         {
             List<Vector3> result = new List<Vector3>();
 
@@ -263,7 +160,8 @@ private static bool ValidatePolyhedronFaces(
                         previous,
                         current,
                         previousDistance,
-                        currentDistance);
+                        currentDistance,
+                        clampIntersectionsToSegment);
 
                     AddPointIfDifferent(result, intersection);
                     capPoints.Add(intersection);
@@ -274,7 +172,8 @@ private static bool ValidatePolyhedronFaces(
                         previous,
                         current,
                         previousDistance,
-                        currentDistance);
+                        currentDistance,
+                        clampIntersectionsToSegment);
 
                     AddPointIfDifferent(result, intersection);
                     AddPointIfDifferent(result, current);
@@ -294,7 +193,8 @@ private static bool ValidatePolyhedronFaces(
             Vector3 start,
             Vector3 end,
             float startDistance,
-            float endDistance)
+            float endDistance,
+            bool clampToSegment)
         {
             float denominator = startDistance - endDistance;
 
@@ -304,6 +204,10 @@ private static bool ValidatePolyhedronFaces(
             }
 
             float t = startDistance / denominator;
+            if (clampToSegment)
+            {
+                t = Mathf.Clamp01(t);
+            }
             return Vector3.LerpUnclamped(start, end, t);
         }
 

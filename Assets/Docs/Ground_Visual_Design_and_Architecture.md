@@ -12,7 +12,46 @@ implementation_documents:
 
 
 
+### 2026-07-12 — Patch V3J.4A10R: Accepted Projected Glyphs Become the Sole Shape Architecture
+
+**Status:** Regional-network architecture rejected and removed.
+
+Unity evidence closed the regional-network investigation.
+
+A10A failed structurally at population scale: its compatibility graph and rooted-tree extraction represented only 11 of 169 considered descriptors and produced three tiny Y-like candidates. A10B corrected the population problem, but its deliberate connected terrace grammar generated a repeated table/π-symbol family. That output was coherent as a graph and wrong as terrain contour language.
+
+The failure is artistic grammar, not sampling, river exclusion, slope validation, connectivity, or rendering. Fragmentation and additional procedural branches are not valid rescue strategies.
+
+The active Painted Accent shape architecture is again singular:
+
+```text
+accepted descriptor
+→ A6 continuous spline profile
+→ fixed world +Z native-2D projection
+→ complete A6/A7 projected glyph
+→ future coverage/albedo integration
+```
+
+The following candidate architecture is absent from production and editor code:
+
+```text
+descriptor-local clusters
+regional compatibility graphs
+rooted trees
+macro-regional terrace networks
+candidate caches and diagnostics
+candidate Scene overlays
+accepted-versus-candidate paired previews
+```
+
+`GroundPaintedAccentProjectedGlyphGenerator.cs` and `GroundPaintedAccentLongitudinalProfileGenerator.cs` remain authoritative for shape generation. The accepted result remains data-only and mesh-free. Scene Handles remain an editor proof tool, not the final renderer.
+
+A9A, A10A, and A10B remain documented only as rejected-method history so future work does not repeat them. A materially different future representation requires a new explicit design discussion and approval; the existing network family must not be silently revived.
+
+
 ### 2026-07-12 — Patch V3J.4A9AR: Regional Network Boundary and Debug Independence
+
+**Historical status:** superseded; all candidate controls were removed by V3J.4A10R.
 
 V3J.4A9A is rejected as a successful contour-network architecture. Its downward-only chains are mathematically valid, but the generator creates one complete local construction per accepted descriptor. Branches and echoes therefore decorate isolated symbols rather than connecting the field into shared terrain structure.
 
@@ -24,9 +63,9 @@ is not equivalent to
 one network shared by a local region
 ```
 
-The A9A generator remains temporarily available only as rejected comparison evidence. It is not an accepted representation, is not the base for fragmentation, and must not be promoted to coverage rendering.
+The A9A generator was temporarily retained as rejected comparison evidence by A9AR, but A10A removes that provisional code path. A9A remains only as historical evidence and must not be restored as a production or comparison representation.
 
-Scene-view presentation is strictly independent and additive:
+At that historical stage, Scene-view presentation was independent and additive:
 
 ```text
 accepted true-position overlay
@@ -34,9 +73,9 @@ rejected A9A true-position overlay
 editor-offset paired comparison copies
 ```
 
-Any subset may be enabled. The paired preview does not force either true-position overlay. In paired mode, both copies are offset around the source anchor—accepted to visual left and A9A to visual right—without mutating stored geometry or validation footprints.
+Any subset could be enabled. The paired preview did not force either true-position overlay. In paired mode, both copies are offset around the source anchor—accepted to visual left and A9A to visual right—without mutating stored geometry or validation footprints.
 
-The next candidate, V3J.4A10A, must use a regional generation unit:
+The then-proposed candidate, V3J.4A10A, was intended to use a regional generation unit:
 
 ```text
 nearby directionally compatible descriptor group
@@ -54,14 +93,14 @@ The downward-only doctrine remains mandatory for every directed path:
 next visual height <= current visual height + numerical tolerance
 ```
 
-A10A may not form cups, valleys, upward hooks, or drop-then-rise paths. It must also avoid the opposite A9A failure: a collection of disconnected local mounds with extra tendrils. The complete regional network must be proven before any gap or fragmentation experiment is reconsidered.
+This historical design gate was not met. A10A produced only sparse Y-like survivors, and A10B produced repeated table/π-symbol formations. A10R subsequently removed the network implementation.
 
-A9AR adds no new shape-generation behavior. It establishes the correct architectural boundary and restores trustworthy comparison controls before A10A implementation.
+A9AR added no new shape-generation behavior. It historically established independent comparison controls before the later A10A/A10B experiments; those candidate controls were removed by A10R.
 
 
 ### 2026-07-12 — Patch V3J.4A9A: Separate Downward-Only Cluster Candidate
 
-**Historical status:** rejected as a network solution; retained temporarily for visual comparison only.
+**Historical status:** rejected as a network solution; implementation removed by V3J.4A10A.
 
 The sole accepted Painted Accent representation remains the complete mesh-free A6/A7 projected glyph. V3J.4A9A introduced a separate unaccepted native-2D contour-cluster candidate for Scene-view evaluation. The candidate may share placement descriptors and validation infrastructure, but it may not alter the accepted glyph's arrays, cache signature, diagnostics, controls, or debug meaning.
 

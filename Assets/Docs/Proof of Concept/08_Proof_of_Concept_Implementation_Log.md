@@ -1,3 +1,17 @@
+## 2026-07-12 — River Foam `4.11C.5.17B.2B` Edge-Band Regional Fragmentation
+
+Implemented the separate Layer E **Edge Fragmentation** group with Fragmentation Strength, Fragment Size, and Fragment Reach. Strength defaults to `0`; Size and Reach default to `0.5`. Chip, Fray, Breakup Scale, and optional Strands remain unchanged and are provisionally accepted for current authoring.
+
+The production and evaluated-preview removal helper now receives existing Material Presence in addition to pre-hardening soft visibility. Fragmentation selects meaningful partial-presence material inside a cuttable visual edge band, then applies stable broad regional removal. Size perturbs the same broad foundation with existing lower-scale detail instead of crossfading seeds; Reach expands eligibility and cut depth while exact saturated cores remain protected. The result remains removal-only and introduces no texture sample, procedural-noise/hash call, persistent field, compute work, topology lookup, Remaining-Life multiplier, Layer C mutation, or Layer D mutation. Unity visual validation and profiling remain pending before `5.17C`.
+
+## 2026-07-12 — River Foam `4.11C.5.17B.2A` Foam Strand Extraction and Stability Controls
+
+Unity validation accepted `5.17B.2` Chip and Fray authority: both now produce the intended visible bites and serration. Follow-up inspection found that the visually useful pulled-strip effect was actually the chip-owned periodic short-cut path. Its `frac(...)` phase could expose many adjacent parallel lanes, especially at the old fine frequency, producing comb-like subpixel shimmer and artificial intersecting groups. The effect is retained but separated rather than discarded.
+
+Layer E Inspector authoring is now grouped by ownership: General Composition, Edge Breakup — Chips & Fray, and Foam Strands. New Strand Strength, Spacing, Width, and Curvature controls are independent of Chip/Fray; Strength defaults to zero. Breakup Scale remains Chip/Fray-only.
+
+The shader replaces the old chip-owned crack comb with an independent removal-only strand path against pre-hardening soft visibility. It reuses existing broad/diagonal/mid fields for stable curvature and grouping, caps authored frequency at `6.0–2.2`, suppresses adjacent candidate lanes, rejects some lanes deterministically, gates broad groups and deep core reach, and uses `fwidth` to widen or fade unresolved projected stripes. No compute, texture, sample, persistent state, Layer C, Layer D, topology, or lifecycle change is introduced. Four scalar properties/bindings, two transient stable fields, fragment arithmetic, derivatives, and one hash evaluation are added. Unity validation and profiling remain pending; Breakup Scale coherence is still separate work before `5.17C`.
+
 ---
 document_id: PS3D-08
 title: "Proof of Concept Implementation Log"
@@ -9,15 +23,29 @@ related_documents: [PS3D-06, PS3D-07, PS3D-09, PS3D-10]
 last_updated: 2026-07-12
 ---
 
+## 2026-07-12 — River Foam `4.11C.5.17B.2` Pre-Hardening Binary Edge Cuts
+
+Status: implemented; mandatory blind Unity visual validation and profiling pending.
+
+The blind `5.17B.1` comparison failed: with Breakup Scale `0`, the Chip/Fray `0` and `1` images were so similar that they were identified backwards. The failure is now attributed to applying erosion after `smoothstep` hardening, where most visible body pixels were already near `1.0`; stronger thresholds changed mainly the antialiased fringe, and the accepted opacity floor concealed partial erosion. Broad Scale also compressed the pattern distribution and reduced threshold crossings. `5.17B` and `5.17B.1` are therefore both visually rejected.
+
+`5.17B.2` preserves the continuous pre-hardening visibility scalar in `RiverWaterFoamPatternedMask`, carries it transiently through the existing render-side surface coupling beside the unchanged hardened mask, and evaluates medium chips, shallow fray, and stable flow-biased short cuts as antialiased binary survival tests against that soft signal. The final mask is `hardenedMask × breakupKeep`, so it is removal-only, may reach true zero coverage, preserves exact saturated cores, and cannot be restored by Interior Opacity Floor. Neutral Chip/Fray returns the exact accepted hardened mask.
+
+The existing broad, diagonal, mid, and fine noise evaluations are unchanged. Chip/Fray pattern outputs are contrast-normalized before Scale interpolation so broader features do not lose mean selection authority. Production Final Foam and Foam Evaluated Final Preview call the same helper; Shader Detail Probe shows the production result and Difference remains removal-only.
+
+Static checks confirm no added noise call, texture sample, shader property, C# binding, persistent resource, compute file, kernel, dispatch, or readback. The only state addition is one transient fragment scalar; expected risk is register pressure. `5.17C` remains blocked until the blind neutral-versus-maximum A/B passes. A failure must escalate to the minimal two-sample `5.17B.3` lateral stencil rather than another threshold recalibration.
+
 ## 2026-07-12 — River Foam `4.11C.5.17B.1` Breakup Authority Calibration
 
-Status: implemented; Unity visual and performance validation pending.
+Status: visually rejected and superseded by `5.17B.2`.
 
 Unity comparison of `5.17B` with Chip/Fray at `0` and `1` showed that the production helper was stable but visually underpowered. Full-river silhouettes were nearly unchanged, and close-range differences were mostly limited to a few feathered tips. The opaque interior composition also concealed partial edge weakening that did not drive selected pixels close enough to zero.
 
 `5.17B.1` keeps the existing Chip Strength, Fray Strength, and Breakup Scale controls and changes only shader arithmetic. Maximum medium-chip thresholds now reach approximately `0.72–0.98`, fray reaches farther into visible edge coverage, short cuts are wider and deeper, and Scale additionally changes activation, crack frequency, and crack width. The top of the range is intentionally an exaggerated stress-test ceiling; useful production values are expected below it.
 
 The monotone safety and cost contracts are unchanged: neutral values reproduce `5.17A.1`, output never exceeds incoming coverage, fully established core coverage survives, and no new texture sample, noise call, persistent resource, compute work, readback, lifecycle rule, topology lookup, or time input is added.
+
+Unity blind A/B later proved this recalibration still ineffective: maximum breakup remained difficult to distinguish from neutral, and Breakup Scale `0` exposed more visible change than broader settings. The hardened-mask strategy is retired.
 
 ## 2026-07-12 — River Foam `4.11C.5.17B` Layer E Edge Breakup Proof
 

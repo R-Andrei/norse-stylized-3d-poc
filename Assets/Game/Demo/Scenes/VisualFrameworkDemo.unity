@@ -2048,7 +2048,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.407275, y: -0.000000013609313, z: 0.0000000060688703, w: 0.9133056}
-  m_LocalPosition: {x: -7.04, y: 22.275, z: -34.72}
+  m_LocalPosition: {x: 3.97, y: 22.275, z: -33.33}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2845,8 +2845,8 @@ MonoBehaviour:
   showPaintedAccentWeightedProposals: 1
   showPaintedAccentLastAcceptedPositions: 1
   showPaintedAccentProjectedGlyphDebug: 0
-  showPaintedAccentContourClusterCandidateDebug: 0
-  comparePaintedAccentProjectedGlyphAndClusterCandidate: 0
+  showPaintedAccentRegionalNetworkCandidateDebug: 0
+  comparePaintedAccentProjectedGlyphAndRegionalNetwork: 0
   paintedAccentPlacementOverlayWeight: 0
   modifiers:
   - {fileID: 1356653796}
@@ -7920,7 +7920,7 @@ Transform:
   m_GameObject: {fileID: 1533091818}
   serializedVersion: 2
   m_LocalRotation: {x: 0.407275, y: -0.000000013609314, z: 0.0000000060688703, w: 0.9133056}
-  m_LocalPosition: {x: -7.04, y: 22.275, z: -34.72}
+  m_LocalPosition: {x: 3.97, y: 22.275, z: -33.33}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -8537,7 +8537,7 @@ Transform:
   m_GameObject: {fileID: 1611485499}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -7.04, y: 1.025, z: -14.72}
+  m_LocalPosition: {x: 3.97, y: 1.025, z: -13.33}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -9238,9 +9238,9 @@ MonoBehaviour:
   shoreWaveProfileVariation: 0.016
   motionDebugView: 0
   refractionPreset: 4
-  liquidRefractionStrength: 0.0096
-  refractionDepthInfluence: 0.532
-  refractionNormalInfluence: 0.85
+  liquidRefractionStrength: 0.01517
+  refractionDepthInfluence: 0.715
+  refractionNormalInfluence: 0.509
   shoreRefraction: 0.588
   depthEdgeProtection: 0.665
   preserveObjectSilhouettes: 1
@@ -9442,7 +9442,7 @@ MonoBehaviour:
   foamEdgeContrast: 0
   foamChipStrength: 0
   foamFrayStrength: 0
-  foamBreakupScale: 0.5
+  foamBreakupScale: 0
   foamDebugView: 0
   foamSpawnDistanceNormalized: 0.634
   foamSpawnAcrossNormalized: -0.27

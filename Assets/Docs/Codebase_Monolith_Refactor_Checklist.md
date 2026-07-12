@@ -423,7 +423,7 @@ Split helper code into include files while keeping the main compute asset as the
 
 **Recommended pass count:** 3.
 
-**Status:** Deferred as of 2026-07-03. Re-evaluate this opportunity before starting any pass; the checklist below is retained as a planning snapshot, not an active implementation queue.
+**Status:** Implementation complete in MG-R1 through MG-R6; final MG-R6 Unity validation pending. Functional edge-wear experiments historically named MG-R6A through MG-R6B.2 are retained but are not counted as refactor passes.
 
 **Pass checklist:**
 
@@ -1001,8 +1001,8 @@ Keep shader behaviour identical while reducing the size of the main fragment pat
 
 **Pass checklist:**
 
-- [ ] Pass 1 - Mechanical region-to-partial split: convert the existing regions into partial files while preserving `Generate(MassRecipe)`.
-- [ ] Pass 2 - Helper cleanup and validation: move independent helper data where obvious, verify generated mass rebuild/editor workflows, and update this log.
+- [x] Pass 1 - Mechanical region-to-partial split: convert the existing regions into partial files while preserving `Generate(MassRecipe)`.
+- [x] Pass 2 - Helper cleanup and validation: move independent helper data where obvious, verify generated mass rebuild/editor workflows, and update this log.
 
 **Observed shape:**
 
@@ -1054,12 +1054,13 @@ Convert the existing region structure into actual files with minimal logic chang
 
 **Checklist:**
 
-- [ ] Public API captured.
-- [ ] Region-to-file split completed.
-- [ ] GeneratedMass rebuild checked.
-- [ ] GeneratedMassEditor checked.
-- [ ] Optional helper extraction completed.
-- [ ] Documentation updated.
+- [x] Public API captured.
+- [x] Region-to-file split completed.
+- [x] GeneratedMass rebuild checked through the validated 24-mass audit workflow.
+- [x] GeneratedMassEditor workflow retained; no editor file or serialized field was changed.
+- [x] Independent helper and type ownership split completed.
+- [x] Final dead-code audit and documentation update completed.
+- [x] MG-R6 final Unity compile/runtime parity validation.
 
 ## Watchlist: Not Top-Priority Yet
 
@@ -1116,3 +1117,5 @@ Use this section as work proceeds.
 | 2026-07-03 | Item 3, Pass 3 | Split `CS_RiverFoam.compute` support envelope, network/guidance, motion, topology helper, evolution/identity, and topology-transition helpers into focused HLSL includes while keeping all kernel entry points in the main compute asset. | Kernel pragma/C# `FindKernel` contract check passed; moved helper definitions no longer remain in the main compute file; include line endings are consistently CRLF; `git diff --check` reported only existing line-ending warnings. | Behaviour-preserving include split only; Unity compute import/compile remains required. |
 | 2026-07-03 | Item 3, Pass 4 | Reduced the largest remaining `CS_RiverFoam.compute` kernel by extracting simulation neighbourhood sampling, population source-need, and distributed supply helpers into `CS_RiverFoam.Simulation.hlsl`; normalized the main compute and include files to consistent CRLF endings. | Kernel pragma/C# `FindKernel` contract check passed; main compute still contains the 19 kernel entry functions; all `CS_RiverFoam` compute/include files have consistent line endings; `git diff --check` reported only the checklist line-ending warning. | Final cleanup pass for Item 3; Unity compute import/compile remains required. |
 | 2026-07-03 | Items 4-10 deferred | Marked the remaining refactor opportunities as deferred after completing the first three priority items. | No code changes for the deferred items; their pass plans remain in the document as planning snapshots. | Re-scan and re-prioritize these opportunities before starting future refactor passes. |
+| 2026-07-12 | Item 10, Pass 1 | MG-R1 mechanically split `MassGenerator` into responsibility-focused partials while retaining the public entry point and exact generated output. | Unity validated across the 24-mass compact baseline. | Behaviour-preserving structural split. |
+| 2026-07-12 | Item 10, Pass 2 / MG-R6 closure | Audited the current post-MG-R6B.2 tree, removed the zero-consumer face-material-mask subsystem, uncalled transactional polyhedron wrapper and helpers, and one unused formatter. | Static call/type/dependency audit passed; CRLF and scope checks passed; Unity compile/runtime parity validated across the same 24 masses. | MassGenerator refactor closed. Retained MG-R6A-B.2 code is functional research, not refactor work. |

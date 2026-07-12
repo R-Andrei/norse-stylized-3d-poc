@@ -58,6 +58,8 @@ struct RiverWaterFoamPatternFields
     float combined;
     float chip;
     float fray;
+    float strandWarp;
+    float strandGroup;
 };
 
 RiverWaterFoamPatternFields RiverWaterFoamStablePatternFields(
@@ -99,8 +101,37 @@ RiverWaterFoamPatternFields RiverWaterFoamStablePatternFields(
         diagonal * 0.22 +
         mid * 0.16 +
         fine * 0.06);
-    fields.chip = lerp(mid, broadField, scale);
-    fields.fray = lerp(fine, mid, scale);
+    // Scale selects feature size, not effective breakup authority. The broad
+    // composite has a compressed centre-weighted distribution, so normalize
+    // each source band before interpolation. This keeps Scale 1 broader and
+    // sparser without making it silently weaker than Scale 0.
+    float mediumChipPattern = saturate(
+        (mid - 0.5) * 1.35 + 0.5);
+    float broadChipPattern = saturate(
+        (broadField - 0.5) * 2.0 + 0.5);
+    float fineFrayPattern = saturate(
+        (fine - 0.5) * 1.20 + 0.5);
+    float mediumFrayPattern = mediumChipPattern;
+
+    fields.chip = lerp(
+        mediumChipPattern,
+        broadChipPattern,
+        scale);
+    fields.fray = lerp(
+        fineFrayPattern,
+        mediumFrayPattern,
+        scale);
+
+    // Strands are a separate authoring feature. Keep their stable broad warp
+    // and grouping sources independent from Chip/Fray Scale so changing edge
+    // breakup granularity cannot reseed or reorient strand families.
+    fields.strandWarp = saturate(
+        broad * 0.70 +
+        diagonal * 0.30);
+    fields.strandGroup = saturate(
+        broad * 0.28 +
+        diagonal * 0.52 +
+        mid * 0.20);
     return fields;
 }
 
@@ -113,7 +144,8 @@ float RiverWaterFoamPatternedMask(
     float lateralMetres,
     float sharpness,
     float breakupScale,
-    out float2 breakupField)
+    out float softVisibility,
+    out float4 breakupField)
 {
     float s = saturate(sharpness);
     float life = saturate(remainingLife);
@@ -127,9 +159,11 @@ float RiverWaterFoamPatternedMask(
             lateralMetres,
             breakupScale);
     float pattern = patternFields.combined;
-    breakupField = float2(
+    breakupField = float4(
         patternFields.chip,
-        patternFields.fray);
+        patternFields.fray,
+        patternFields.strandWarp,
+        patternFields.strandGroup);
 
     float2 p = float2(storedGlobalDistance, lateralMetres);
     float slowA = sin(_Time.y * 0.31 + seed * 0.43 + pattern * 5.1) * 0.5 + 0.5;
@@ -191,129 +225,266 @@ float RiverWaterFoamPatternedMask(
     // Make the surviving body much less blurry. Keep a very narrow soft edge,
     // but drive most surviving fragments toward solid coverage so water colour
     // does not leak through as a false teal aging signal.
-    float hardVisible = smoothstep(0.22, 0.58, visible);
-    float fringe = smoothstep(0.06, 0.34, visible) * 0.34;
+    softVisibility = saturate(visible);
+    float hardVisible = smoothstep(0.22, 0.58, softVisibility);
+    float fringe = smoothstep(0.06, 0.34, softVisibility) * 0.34;
     return saturate(max(hardVisible, fringe));
 }
 
 float RiverWaterFoamApplyEdgeBreakup(
-    float baseShape,
+    float hardenedShape,
+    float softVisibility,
+    float materialPresence,
     float materialPattern,
-    float2 breakupField,
+    float4 breakupField,
     float globalDistance,
     float lateralMetres,
     float chipStrength,
     float frayStrength,
-    float breakupScale)
+    float strandStrength,
+    float strandSpacing,
+    float strandWidth,
+    float strandCurvature,
+    float fragmentationStrength,
+    float fragmentSize,
+    float fragmentReach)
 {
-    float shape = saturate(baseShape);
+    float shape = saturate(hardenedShape);
+    float softShape = saturate(softVisibility);
+    float presence = saturate(materialPresence);
     float chip = saturate(chipStrength);
     float fray = saturate(frayStrength);
+    float strand = saturate(strandStrength);
+    float fragmentation = saturate(fragmentationStrength);
 
-    // Chip and Fray are uniform authoring controls. Their shared neutral branch
-    // preserves the accepted 5.17A.1 silhouette exactly and avoids unnecessary
-    // breakup arithmetic in coherent empty or disabled regions.
+    // Neutral authoring values must reproduce the accepted 5.17A.1 hardened
+    // silhouette exactly. Scale, spacing, width, curvature, size, and reach
+    // have no visual authority while their owning feature strengths are zero.
     [branch]
-    if (shape <= 0.0001 || max(chip, fray) <= 0.0001)
+    if (shape <= 0.0001 ||
+        max(max(max(chip, fray), strand), fragmentation) <= 0.0001)
     {
         return shape;
     }
 
-    float chipField = saturate(breakupField.x);
-    float frayField = saturate(breakupField.y);
-    float scale = saturate(breakupScale);
+    if (softShape <= 0.0001)
+    {
+        return 0.0;
+    }
 
-    // 5.17B.1 deliberately makes the top end an exaggerated stress test.
-    // Scale now changes activation as well as field selection: low values keep
-    // smaller frequent breakup, while high values admit broader, sparser bites.
-    // The survival functions remain monotone in incoming shape and preserve a
-    // fully established core at shape == 1.
-    float chipSignal = smoothstep(
-        lerp(0.40, 0.30, scale),
-        lerp(0.74, 0.62, scale),
-        chipField);
-    float chipDepth = saturate(
-        chip * chipSignal);
+    float chipPattern = saturate(breakupField.x);
+    float frayPattern = saturate(breakupField.y);
+    float visibilityAA = max(
+        fwidth(softShape),
+        0.001);
+    float exactCore = step(0.999, softShape);
+
+    // Medium coherent chip regions now cut against the pre-hardening signal.
+    // A selected bite can therefore reach true zero coverage instead of only
+    // weakening the antialiased rim of an already-binary mask.
+    float chipSelection = smoothstep(
+        0.50,
+        0.76,
+        chipPattern);
+    float chipAuthority = saturate(
+        chip *
+        chipSelection);
+    float chipThreshold = lerp(
+        0.16,
+        0.98,
+        chipAuthority);
     float chipCut = smoothstep(
-        0.10 + chipDepth * 0.62,
-        0.26 + chipDepth * 0.72,
-        shape);
+        chipThreshold - visibilityAA,
+        chipThreshold + visibilityAA,
+        softShape);
     float chipKeep = lerp(
         1.0,
         chipCut,
-        smoothstep(0.01, 0.08, chipDepth));
+        smoothstep(0.001, 0.08, chipAuthority));
+    chipKeep = max(chipKeep, exactCore);
 
-    // Fray now reaches visibly into the rendered edge instead of editing only
-    // antialiased fringe pixels. It still fades before the fully established
-    // core and cannot independently create an isolated interior hole.
-    float fringeZone =
-        1.0 - smoothstep(
-            lerp(0.40, 0.46, scale),
-            lerp(0.82, 0.86, scale),
-            shape);
-    float fraySignal = smoothstep(
-        lerp(0.26, 0.22, scale),
-        lerp(0.62, 0.52, scale),
-        frayField);
+    // Fray uses the same binary survival model but a shallower maximum depth,
+    // producing serrated weak edges without competing with the principal chip
+    // path for the established body.
+    float fraySelection = smoothstep(
+        0.42,
+        0.70,
+        frayPattern);
     float frayAuthority = saturate(
         fray *
-        fringeZone *
-        fraySignal);
+        fraySelection);
+    float frayThreshold = lerp(
+        0.04,
+        0.72,
+        frayAuthority);
     float frayCut = smoothstep(
-        0.02 + frayAuthority * 0.26,
-        0.14 + frayAuthority * 0.56,
-        shape);
+        frayThreshold - visibilityAA,
+        frayThreshold + visibilityAA,
+        softShape);
     float frayKeep = lerp(
         1.0,
         frayCut,
-        smoothstep(0.01, 0.08, frayAuthority));
+        smoothstep(0.001, 0.08, frayAuthority));
+    frayKeep = max(frayKeep, exactCore);
 
-    // Short cuts remain derived from Chip Strength. The calibration broadens
-    // their line width, lowers the stable anchors, and lets maximum authority
-    // cut through opaque edge coverage while still preserving shape == 1.
-    float crackFrequency = lerp(
-        10.0,
-        3.5,
-        scale);
-    float crackPhase = frac(
-        lateralMetres * crackFrequency +
-        globalDistance * crackFrequency * 0.18 +
-        chipField * 1.70 +
-        materialPattern * 2.31);
-    float crackHalfWidth = lerp(
-        0.045,
-        0.100,
-        scale);
-    float crackLine =
-        1.0 - smoothstep(
-            crackHalfWidth * 0.25,
-            crackHalfWidth,
-            abs(crackPhase - 0.5));
-    float crackAnchor =
-        smoothstep(
-            lerp(0.52, 0.42, scale),
-            lerp(0.76, 0.64, scale),
-            chipField) *
-        smoothstep(
-            lerp(0.28, 0.22, scale),
-            lerp(0.58, 0.48, scale),
-            frayField);
-    float crackAuthority = saturate(
-        chip *
-        crackLine *
-        crackAnchor);
-    float crackCut = smoothstep(
-        0.16 + crackAuthority * 0.56,
-        0.32 + crackAuthority * 0.64,
-        shape);
-    float crackKeep = lerp(
+    // Foam Strands are independent from Chip/Fray. The old chip-owned periodic
+    // crack comb was removed because it could expose many adjacent subpixel
+    // lanes. This version keeps the useful pulled-strip look while enforcing
+    // stable grouping, non-adjacent candidate lanes, broad coherent curvature,
+    // and screen-space density protection.
+    float spacing = saturate(strandSpacing);
+    float width = saturate(strandWidth);
+    float curvature = saturate(strandCurvature);
+    float strandWarp = saturate(breakupField.z);
+    float strandGroup = saturate(breakupField.w);
+
+    float strandFrequency = lerp(
+        6.0,
+        2.2,
+        spacing);
+    float rawStrandPhase =
+        lateralMetres * strandFrequency +
+        globalDistance * strandFrequency * 0.16 +
+        (strandWarp - 0.5) * lerp(0.0, 1.40, curvature) +
+        materialPattern * 2.31;
+    float strandPhase = frac(rawStrandPhase);
+    float laneIndex = floor(rawStrandPhase);
+    float laneParity = 1.0 - step(
+        0.5,
+        frac(laneIndex * 0.5));
+    float laneSelectionNoise = RiverWaterFoamHash21(
+        float2(laneIndex, 17.0));
+    float laneSelection = laneParity * smoothstep(
+        0.30,
+        0.64,
+        laneSelectionNoise);
+
+    float phaseFootprint = max(
+        fwidth(rawStrandPhase),
+        0.001);
+    float densityKeep = 1.0 - smoothstep(
+        0.22,
+        0.40,
+        phaseFootprint);
+    float authoredHalfWidth = lerp(
+        0.040,
+        0.125,
+        width);
+    float resolvedHalfWidth = max(
+        authoredHalfWidth,
+        phaseFootprint * 0.45);
+    float strandLine = 1.0 - smoothstep(
+        resolvedHalfWidth,
+        resolvedHalfWidth + phaseFootprint,
+        abs(strandPhase - 0.5));
+    float groupEnvelope = smoothstep(
+        0.38,
+        0.64,
+        strandGroup);
+    float edgeReach = 1.0 - smoothstep(
+        0.90,
+        0.995,
+        softShape);
+    float strandAuthority = saturate(
+        strand *
+        strandLine *
+        laneSelection *
+        groupEnvelope *
+        densityKeep *
+        edgeReach);
+    float strandThreshold = lerp(
+        0.08,
+        0.96,
+        strandAuthority);
+    float strandCut = smoothstep(
+        strandThreshold - visibilityAA,
+        strandThreshold + visibilityAA,
+        softShape);
+    float strandKeep = lerp(
         1.0,
-        crackCut,
-        crackAuthority);
+        strandCut,
+        smoothstep(0.001, 0.08, strandAuthority));
+    strandKeep = max(strandKeep, exactCore);
+
+    // Regional fragmentation owns a different size band from Chip, Fray, and
+    // Strands. It uses the existing stable broad/diagonal/mid signals to cut
+    // coherent portions of weak and partial-presence edge material. Fragment
+    // Size progressively removes subdivision detail from the same broad zones
+    // instead of crossfading to an unrelated pattern identity.
+    float size = saturate(fragmentSize);
+    float reach = saturate(fragmentReach);
+    float fragmentFoundation = saturate(
+        (breakupField.z * 0.62 + breakupField.w * 0.38 - 0.5) * 1.55 +
+        0.5);
+    float fragmentSubdivision = saturate(
+        ((breakupField.w - breakupField.z) * 1.80) + 0.5);
+    float fragmentSignal = saturate(
+        fragmentFoundation +
+        (fragmentSubdivision - 0.5) * 0.18 * (1.0 - size));
+    float regionalSelection = smoothstep(
+        0.46,
+        0.68,
+        fragmentSignal);
+
+    // Material Presence identifies the weak/transitional population observed
+    // by the Material Presence diagnostic. Soft visibility supplies the actual
+    // cuttable rendered edge band. Reach broadens both gates inward, but the
+    // exact saturated core remains protected below.
+    float meaningfulPresence = smoothstep(
+        0.02,
+        0.16,
+        presence);
+    float presenceCoreStart = lerp(
+        0.56,
+        0.72,
+        reach);
+    float presenceCoreEnd = lerp(
+        0.80,
+        0.96,
+        reach);
+    float partialPresenceBand = meaningfulPresence *
+        (1.0 - smoothstep(
+            presenceCoreStart,
+            presenceCoreEnd,
+            presence));
+    float softBandEnd = lerp(
+        0.80,
+        0.995,
+        reach);
+    float visualEdgeBand = smoothstep(
+        0.04,
+        0.18,
+        softShape) *
+        (1.0 - smoothstep(
+            softBandEnd - 0.12,
+            softBandEnd,
+            softShape));
+    float fragmentAuthority = saturate(
+        fragmentation *
+        regionalSelection *
+        partialPresenceBand *
+        visualEdgeBand);
+    float fragmentMaximumThreshold = lerp(
+        0.72,
+        0.985,
+        reach);
+    float fragmentThreshold = lerp(
+        0.08,
+        fragmentMaximumThreshold,
+        fragmentAuthority);
+    float fragmentCut = smoothstep(
+        fragmentThreshold - visibilityAA,
+        fragmentThreshold + visibilityAA,
+        softShape);
+    float fragmentKeep = lerp(
+        1.0,
+        fragmentCut,
+        smoothstep(0.001, 0.10, fragmentAuthority));
+    fragmentKeep = max(fragmentKeep, exactCore);
 
     float breakupKeep = min(
-        chipKeep,
-        min(frayKeep, crackKeep));
+        min(chipKeep, frayKeep),
+        min(strandKeep, fragmentKeep));
     return saturate(
         shape * breakupKeep);
 }
@@ -478,10 +649,11 @@ float RiverWaterFoamResolveStateMask(
     float sharpness,
     float finalVisibilityMode,
     float breakupScale,
+    out float softVisibility,
     out float presence,
     out float remainingLife,
     out float materialPattern,
-    out float2 breakupField)
+    out float4 breakupField)
 {
     RiverWaterFoamDecodeMaterialState(
         state,
@@ -519,6 +691,7 @@ float RiverWaterFoamResolveStateMask(
         lateralMetres,
         sharpness,
         breakupScale,
+        softVisibility,
         breakupField);
 }
 
@@ -528,8 +701,9 @@ struct RiverWaterFoamResult
     float remainingLife;
     float materialPattern;
     float mask;
+    float softVisibility;
     float surfaceEnergy;
-    float2 breakupField;
+    float4 breakupField;
     float2 fieldUV;
     float2 materialUV;
 };
@@ -555,6 +729,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     result.remainingLife = 0.0;
     result.materialPattern = 0.0;
     result.mask = 0.0;
+    result.softVisibility = 0.0;
     result.surfaceEnergy = 0.0;
     result.breakupField = 0.0;
     result.fieldUV = 0.0;
@@ -586,10 +761,11 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         foamUV,
         blend);
 
+    float storedSoftVisibility;
     float storedPresence;
     float storedRemainingLife;
     float storedMaterialPattern;
-    float2 storedBreakupField;
+    float4 storedBreakupField;
     float storedMask = RiverWaterFoamResolveStateMask(
         storedState,
         storedGlobalDistance,
@@ -597,6 +773,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         sharpness,
         finalVisibilityMode,
         breakupScale,
+        storedSoftVisibility,
         storedPresence,
         storedRemainingLife,
         storedMaterialPattern,
@@ -637,10 +814,11 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         visualFoamUV,
         blend);
 
+    float visualSoftVisibility;
     float visualPresence;
     float visualRemainingLife;
     float visualMaterialPattern;
-    float2 visualBreakupField;
+    float4 visualBreakupField;
     float visualMask = RiverWaterFoamResolveStateMask(
         visualState,
         storedGlobalDistance - warpMetres.x,
@@ -648,15 +826,21 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         sharpness,
         finalVisibilityMode,
         breakupScale,
+        visualSoftVisibility,
         visualPresence,
         visualRemainingLife,
         visualMaterialPattern,
         visualBreakupField);
 
+    float surfaceCoupling = saturate(surfaceEnergy * 0.72);
     float coupledMask = lerp(
         storedMask,
         visualMask,
-        saturate(surfaceEnergy * 0.72));
+        surfaceCoupling);
+    float coupledSoftVisibility = lerp(
+        storedSoftVisibility,
+        visualSoftVisibility,
+        surfaceCoupling);
 
     // Wake and lee regions should not spawn Foam, but they may visually stretch
     // or compress already-nearby material. This extra pair of render samples is
@@ -704,10 +888,11 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             saturate(visualFoamUV + stretchUV),
             blend);
 
+        float leadSoftVisibility;
         float leadPresence;
         float leadLife;
         float leadPattern;
-        float2 leadBreakupField;
+        float4 leadBreakupField;
         float leadMask = RiverWaterFoamResolveStateMask(
             leadState,
             storedGlobalDistance - warpMetres.x - stretchDirection.x * stretchMetres,
@@ -715,14 +900,16 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             sharpness,
             finalVisibilityMode,
             breakupScale,
+            leadSoftVisibility,
             leadPresence,
             leadLife,
             leadPattern,
             leadBreakupField);
+        float trailSoftVisibility;
         float trailPresence;
         float trailLife;
         float trailPattern;
-        float2 trailBreakupField;
+        float4 trailBreakupField;
         float trailMask = RiverWaterFoamResolveStateMask(
             trailState,
             storedGlobalDistance - warpMetres.x + stretchDirection.x * stretchMetres,
@@ -730,6 +917,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             sharpness,
             finalVisibilityMode,
             breakupScale,
+            trailSoftVisibility,
             trailPresence,
             trailLife,
             trailPattern,
@@ -738,13 +926,23 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         float nearMaterial = saturate(max(
             max(storedMask, visualMask),
             max(leadMask, trailMask)));
+        float stretchWeight = saturate(
+            nearMaterial * surfaceEnergy);
+        float stretchScale = 0.42 + surfaceEnergy * 0.30;
         float stretchedMask = max(
             coupledMask,
-            max(leadMask, trailMask) * (0.42 + surfaceEnergy * 0.30));
+            max(leadMask, trailMask) * stretchScale);
+        float stretchedSoftVisibility = max(
+            coupledSoftVisibility,
+            max(leadSoftVisibility, trailSoftVisibility) * stretchScale);
         coupledMask = lerp(
             coupledMask,
             stretchedMask,
-            saturate(nearMaterial * surfaceEnergy));
+            stretchWeight);
+        coupledSoftVisibility = lerp(
+            coupledSoftVisibility,
+            stretchedSoftVisibility,
+            stretchWeight);
     }
 
     float edgeExposure = 1.0 - smoothstep(0.36, 0.82, max(storedPresence, visualPresence));
@@ -757,19 +955,32 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         0.92,
         1.10,
         contactWave);
-    coupledMask *= lerp(
+    float surfaceBreakWeight = saturate(
+        edgeExposure * surfaceEnergy * 0.85);
+    float surfaceBreakMultiplier = lerp(
         1.0,
         surfaceBreak,
-        saturate(edgeExposure * surfaceEnergy * 0.85));
+        surfaceBreakWeight);
+    coupledMask *= surfaceBreakMultiplier;
+    coupledSoftVisibility *= surfaceBreakMultiplier;
 
     // Do not allow render coupling to erase coherent stored material. It may
     // visually bend/thin edges, but lifecycle remains in the material field.
+    float storedRetention = lerp(
+        0.72,
+        0.58,
+        saturate(surfaceEnergy));
     coupledMask = max(
         coupledMask,
-        storedMask * lerp(0.72, 0.58, saturate(surfaceEnergy)));
+        storedMask * storedRetention);
+    coupledSoftVisibility = max(
+        coupledSoftVisibility,
+        storedSoftVisibility * storedRetention);
     coupledMask *= liquidFactor;
+    coupledSoftVisibility *= liquidFactor;
 
     result.mask = saturate(coupledMask);
+    result.softVisibility = saturate(coupledSoftVisibility);
     result.surfaceEnergy = surfaceEnergy;
     return result;
 }

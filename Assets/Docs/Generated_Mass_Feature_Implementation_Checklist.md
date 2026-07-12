@@ -1060,13 +1060,112 @@ Validated R5R2 result: the 108-plan / 108-sector count remained stable, but the 
 ### MG-R6B.1 Unity exit criteria
 
 - [ ] Unity compiles with zero errors and zero warnings.
-- [ ] All 24 physical masses regenerate with one compact audit each.
-- [ ] All pre-MG-R6B.1 fields remain unchanged, including `containedRepartition=22/0/0/0/0/22/0/0`.
-- [ ] Aggregate `containedBoundary=` candidate count is 22 and reconciles into one terminal category per candidate.
-- [ ] Aggregate `containedBoundarySegments=` reconciles into one terminal category per authoritative segment.
-- [ ] Aggregate `containedShadow=` reports all 22 candidates as tested.
+- [x] All 24 physical masses regenerate with one compact audit each.
+- [x] All pre-MG-R6B.1 fields remain unchanged, including `containedRepartition=22/0/0/0/0/22/0/0`.
+- [x] Aggregate `containedBoundary=` is `22/0/0/0/0/0/0/22`.
+- [x] Aggregate `containedBoundarySegments=` is `66/0/0/0/0/44/22/0`.
+- [x] Aggregate `containedShadow=` is `22/22/0/14/22/0/22`.
 - [ ] Rendered mesh appearance remains unchanged.
-- [ ] `geometryCommit=disabled` remains present for every mass.
+- [x] `geometryCommit=disabled` remains present for every mass.
+
+MG-R6B.1 evidence proves that all 22 target overlaps are removed, but all 22 transformed clones gain unexpected open and non-manifold edges; 14 also gain T-junctions. Each retained patch has the same three-edge signature: two underused segments and one overused segment.
+
+## MG-R6B.2 — Bundled contained-boundary repair
+
+- [x] Add a deterministic boundary-guided owner-notch construction for the proven contained cases.
+- [x] Order each retained patch boundary and identify one contiguous run shared with the owner boundary.
+- [x] Replace the shared owner run with the reversed complementary patch path.
+- [x] Retain the generic directed-segment arrangement as a deterministic fallback.
+- [x] Subdivide every transformed cloned face at authoritative patch endpoints lying in an edge interior.
+- [x] Preserve positions, winding, area, feature data, and replacement provenance.
+- [x] Classify residual-owner edge occurrences from the exact transformed record range rather than broad source-face identity.
+- [x] Apply the same endpoint alignment to the combined per-mass clone.
+- [x] Add `containedRepair=` construction and terminal evidence.
+- [x] Keep live geometry unchanged and retain `geometryCommit=disabled`.
+
+### MG-R6B.2 Unity exit criteria
+
+- [x] Unity compiles sufficiently to execute the audit with no reported compile failure.
+- [x] The final MG-R6B.2 run contains 24 physical-mass compact audits.
+- [x] All live and pre-contained compact fields remain unchanged.
+- [x] Aggregate `containedRepair=` candidate count is 22.
+- [x] `guidedResiduals + genericFallbacks + buildFailures = candidates`.
+- [x] `resolved + buildFailures + boundaryFailures + topologyFailures + overlapRemaining = candidates`.
+- [x] Aggregate result is `containedRepair=22/22/0/0/0/0/22/0/0`.
+- [x] `containedRepartition=`, `containedBoundary=`, `containedBoundarySegments=`, and `containedShadow=` remain unchanged from MG-R6B.1.
+- [x] `containedCombined=0/0/0/0/0` correctly remains inactive because no individual candidate resolves.
+- [ ] Rendered mesh appearance remains unchanged.
+- [x] `geometryCommit=disabled` remains present for every mass.
+
+## MG-R6 — Final MassGenerator refactor closure
+
+- [x] Audit the current post-MG-R6B.2 source rather than rolling back useful functional work.
+- [x] Remove the uncalled private `FaceMaterialMaskLookup` subsystem and its five support types.
+- [x] Remove the uncalled `TryClipPolyhedron` transaction wrapper and its three private helpers while preserving active direct clipping.
+- [x] Remove the unused `VertexKey.ToDiagnosticString` formatter.
+- [x] Reduce all `MassGenerator` partials from 26,395 to 25,537 lines.
+- [x] Reduce method declarations from 553 to 523 and private nested type declarations from 114 to 108.
+- [x] Verify every remaining method has a surviving caller or method-group reference.
+- [x] Verify every remaining private nested type has a surviving reference.
+- [x] Verify production/shared edge-wear files contain zero diagnostic-only dependencies.
+- [x] Preserve all MG-R6A through MG-R6B.2 clone-only work and compact fields.
+- [x] Preserve CRLF and avoid `.meta`, editor, serialized asset, shader, material, scene, or prefab changes.
+
+### MG-R6 Unity exit criteria
+
+- [x] Unity compiles with zero errors and zero warnings.
+- [x] Exactly 24 compact audits are emitted for the same physical masses.
+- [x] Every compact field remains identical to the final MG-R6B.2 baseline.
+- [x] Aggregate `containedRepair=` remains `22/22/0/0/0/0/22/0/0`.
+- [x] Rendered mesh appearance remains unchanged.
+- [x] `geometryCommit=disabled` remains present for every mass.
+- [x] Close the `MG-R` workstream and continue functional topology work under `EW-*`.
+
+## EW-K1 — Convex plane-cut bevel kernel
+
+- [x] Resume after validated candidate selection and explicit corner/width solving.
+- [x] Keep the existing replacement-face, strip, patch, and contained-repair chain unchanged as comparison evidence.
+- [x] Build one deterministic bevel cut plane per active selected edge from the solved four-point rail and requested bevel normal.
+- [x] Reject non-finite, non-coplanar, boundary, or non-removing planes before clipping.
+- [x] Apply all accepted planes only to a deep-cloned source polyhedron through the existing `ClipPolyhedron` kernel.
+- [x] Preserve `ConvexEdgeWear` feature strength on each generated cap.
+- [x] Audit one surviving cap per active selected edge.
+- [x] Audit closed topology, zero non-manifold edges, zero T-junctions, valid faces, retained volume, and contained bounds.
+- [x] Add compact `planeBevel=selected/active/planesBuilt/planesRejected/capsBuilt/capsMissing/open/nonManifold/tJunction/invalid/valid` evidence.
+- [x] Keep rendered geometry and `geometryCommit=disabled` unchanged.
+
+### EW-K1 Unity result
+
+- [x] Unity compiles with zero errors and zero warnings.
+- [x] Exactly 24 compact audits are emitted with all pre-EW-K1 fields unchanged.
+- [x] All 498 active edges report accepted planes and emitted caps; `planesRejected=0`.
+- [x] Seventeen of 24 clones report `valid=1` immediately.
+- [x] Four failures are isolated to non-conformal shared-edge segmentation: 15 open edges total and two T-junctions, with zero non-manifold or invalid faces.
+- [x] Two failures are topology-clean bounds-only numerical rejections.
+- [x] One topology-clean clone has one cap consumed by later cuts.
+- [x] Rendered geometry remains unchanged and `geometryCommit=disabled` remains present.
+
+## EW-K1.1 — Conformal plane-cut completion
+
+- [x] Preserve every final collinear polyhedron vertex where it subdivides another face edge.
+- [x] Weld again after conformity insertion and do not run a later collinear-removal pass.
+- [x] Add an opt-in segment-clamp parameter to the shared clipper; keep all legacy callers on the previous default behavior.
+- [x] Enable segment clamping only for the clone-only EW-K path.
+- [x] Align bounds validation tolerance with `PlaneEpsilon`.
+- [x] Distinguish a verified redundant plane from an unexplained missing cap.
+- [x] Require the final polyhedron to satisfy a redundant plane and require the original sharp source edge not to survive.
+- [x] Expand compact evidence to `planeBevel=selected/active/planesBuilt/planesRejected/capsBuilt/capsMissing/capsRedundant/conformalSplits/open/nonManifold/tJunction/invalid/valid`.
+- [x] Keep rendered geometry and `geometryCommit=disabled` unchanged.
+
+### EW-K1.1 Unity exit criteria
+
+- [ ] Unity compiles with zero errors and zero warnings.
+- [ ] Exactly 24 compact audits are emitted with every pre-EW-K1.1 field unchanged.
+- [ ] Every clone reports `planesBuilt=active`, `planesRejected=0`, and `capsBuilt=active`.
+- [ ] Every accepted plane has one surviving cap or is counted as verified redundant; `capsMissing=0`.
+- [ ] Every clone reports zero open edges, non-manifold edges, T-junctions, and invalid faces.
+- [ ] Every clone reports `valid=1`.
+- [ ] Rendered geometry remains unchanged and `geometryCommit=disabled` remains present.
 
 ## EW-C4 — Commit and visual proof
 

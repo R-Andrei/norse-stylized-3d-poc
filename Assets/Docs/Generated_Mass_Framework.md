@@ -17,8 +17,11 @@
 - **Validated refactor boundary:** MG-R5 — Production-Candidate and Diagnostic-Harness Separation; all 24 compact audits match MG-R4.
 - **Validated MG-R6A result:** `contained=22/0/22/0/22/0`; all 22 contained patches have deterministic owners, no patch can be deleted safely, and every direct omission fails boundary transfer.
 - **Validated MG-R6B runtime result:** `containedRepartition=22/0/0/0/0/22/0/0`; all 22 candidates build and conserve area, then fail exact boundary incidence.
-- **Current functional step:** MG-R6B.1 — clone-only contained boundary-incidence decomposition and shadow topology/overlap validation; Unity validation pending.
-- **Geometry emission:** replacement faces, bevel strips, and vertex patches are built only in the temporary audit topology; final geometry commit remains disabled
+- **Validated MG-R6B.1 result:** `containedBoundary=22/0/0/0/0/0/0/22`, `containedBoundarySegments=66/0/0/0/0/44/22/0`, and `containedShadow=22/22/0/14/22/0/22`; all target overlaps are removed, but every candidate creates open and non-manifold edges and 14 create T-junctions.
+- **Validated MG-R6B.2 result:** `containedRepair=22/22/0/0/0/0/22/0/0`; all 22 guided residuals still fail boundary incidence.
+- **Validated refactor closure:** MG-R6 compiled and preserved the exact 24-mass MG-R6B.2 baseline; the `MG-R` workstream is closed.
+- **Active functional step:** EW-K1.1 — Conformal Plane-Cut Completion.
+- **Geometry emission:** the legacy replacement/strip/patch chain and the new plane-cut kernel both operate only on temporary clones; final geometry commit remains disabled
 
 ## Feature goal
 
@@ -1082,7 +1085,7 @@ This coefficient is a proof-stage safety policy, not the final artistic mapping.
 
 EW-B is retired. It independently rebuilt source faces, emitted local bridge faces, then inferred ownership from resulting open-edge coordinates and attempted post-hoc cap closure. That architecture repeatedly produced unexplained boundaries and T-junctions. Its construction code, cap experiments, rail records, and EW-B-only diagnostics have been removed.
 
-## MassGenerator source architecture — MG-R1 through MG-R5
+## MassGenerator source architecture — MG-R1 through MG-R6
 
 `MassGenerator` is implemented as one static partial class across responsibility-focused files. `MassGenerator.cs` contains only orchestration, shared tolerances, and the public `Generate` entry points. Plane-cut construction, polyhedron operations, radial construction, output, geodesic topology, helpers, core types, and edge-wear stages live in separate files under `Assets/Game/Procedural/Masses/`.
 
@@ -1122,6 +1125,14 @@ The individual compact field is `containedRepartition=candidates/resolved/arrang
 
 Unity validation produced `containedRepartition=22/0/0/0/0/22/0/0`: all 22 contained candidates reached the exact boundary-incidence gate, but none reached the original topology or overlap gates. MG-R6B.1 therefore keeps construction unchanged and adds `containedBoundary=`, `containedBoundarySegments=`, and `containedShadow=`. Exact edge use is separated from collinear split-equivalent coverage and from real missing, unsplit, underused, overused, or mixed ownership. Shadow checks independently report whether the overlap was removed and whether T-junction, unexpected-open-edge, source-boundary, or non-manifold counts increased. This evidence is clone-only and cannot promote a candidate.
 
+Unity validation of MG-R6B.1 produced `containedBoundary=22/0/0/0/0/0/0/22`, `containedBoundarySegments=66/0/0/0/0/44/22/0`, and `containedShadow=22/22/0/14/22/0/22`. Every candidate has the same three-edge signature: two underused authoritative patch-boundary segments and one overused segment. The target overlap is removed in all 22 cases, but none is topology-clean; every candidate adds unexpected open and non-manifold edges, and 14 add T-junctions. This rejects a validator-only correction and proves that the transformed face complex needs explicit boundary repair.
+
+MG-R6B.2 bundles the two topology corrections supported by that evidence. First, it reconstructs the owning replacement face as an explicit boundary notch: the contiguous patch-boundary run shared with the owner is removed from the owner walk and replaced by the reversed complementary patch path. The existing generic arrangement remains a deterministic fallback. Second, after owner replacement, every affected cloned face is subdivided wherever an authoritative retained-patch endpoint lies in the interior of one of its edges. This aligns the owner, neighboring replacement faces, bevel strips, and other patch records to the same endpoint segmentation without moving vertices or changing area. The compact field is `containedRepair=candidates/guidedResiduals/genericFallbacks/endpointAligned/resolved/buildFailures/boundaryFailures/topologyFailures/overlapRemaining`. Its terminal result reconciles as `candidates = resolved + buildFailures + boundaryFailures + topologyFailures + overlapRemaining`; guided/fallback and endpoint-aligned counts are construction observations. The exact two-use, baseline-relative topology, and overlap-removal gates remain authoritative, and live geometry commitment remains disabled.
+
+Runtime validation produced `containedRepair=22/22/0/0/0/0/22/0/0`. Every candidate uses the guided residual path, no adjacent endpoint insertion is detected, and all 22 still fail exact boundary incidence. The functional experiment is retained unchanged for future topology work.
+
+MG-R6 is the final source-refactor closure. It removes the uncalled private face-material-mask subsystem, its five support types, the uncalled transactional polyhedron-clipping wrapper and three helpers, and one unused vertex-key formatter. The closure removes 858 lines, 30 methods, and six private types without touching edge-wear logic. Before EW-K1, all `MassGenerator` partials total 25,537 lines and edge-wear totals 22,366 lines. EW-K1 adds one focused clone-only kernel partial without reopening the refactor. Static call and type audits find no remaining unreferenced method or private nested type, and production/shared edge-wear code has no diagnostic-only dependency. The historically named MG-R6A through MG-R6B.2 patches remain in the tree as useful functional research, but future topology changes use an `EW-*` prefix.
+
 ## Performance policy
 
 Chamfer topology is generated before gameplay and cached with the generated mass. The first implementation prioritizes deterministic, low-complexity geometry:
@@ -1133,9 +1144,15 @@ Chamfer topology is generated before gameplay and cached with the generated mass
 
 ## Next work items
 
-1. Validate MG-R6B.1 compilation with zero errors and zero warnings.
-2. Require all pre-MG-R6B.1 compact fields, including `containedRepartition=22/0/0/0/0/22/0/0`, to remain unchanged.
-3. Aggregate `containedBoundary=` and `containedBoundarySegments=` to identify exact-key segmentation versus real ownership failure.
-4. Aggregate `containedShadow=` to determine whether subtraction removed the overlap and which topology invariant changed.
-5. Keep live geometry unchanged and `geometryCommit=disabled`.
-6. Use the MG-R6B.1 evidence to choose between validator correction and adjacent-face repartitioning before beginning MG-R6C.
+1. Validate EW-K1.1 compilation with zero errors and zero warnings.
+2. Require exactly 24 compact audits with all pre-EW-K1.1 fields unchanged.
+3. Require every plane to be accounted for by a surviving cap or verified redundancy.
+4. Require zero open edges, non-manifold edges, T-junctions, and invalid faces, with `planeBevel ... /valid=1`.
+5. Keep rendered geometry unchanged and `geometryCommit=disabled` until visual validation of the plane-cut clone.
+
+
+## EW-K1 convex plane-cut resumption
+
+The fastest resumption point is after the validated selected-edge width and corner solve, before independent replacement faces, strips, and corner patches are emitted. EW-K1 uses the existing `ClipPolyhedron` convex half-space operation to cut each selected bevel directly from a deep-cloned source polyhedron. Later cuts trim earlier caps automatically, so corner closure is inherited from the closed convex polyhedron rather than reconstructed through patch ownership.
+
+The existing topology-recovery path is retained unchanged for evidence, but it is no longer the preferred production candidate. EW-K1 proved the architecture with 498 accepted planes and emitted caps; 17 of 24 masses were immediately valid. EW-K1.1 repairs only final edge conformity, clip-tolerance bounds handling, and later-consumed cap accounting. It reports `planeBevel=selected/active/planesBuilt/planesRejected/capsBuilt/capsMissing/capsRedundant/conformalSplits/open/nonManifold/tJunction/invalid/valid`. Promotion is forbidden until every plane is accounted for by a surviving cap or verified redundancy and every clone is closed, manifold, T-junction-free, finite, volume-valid, and contained within source bounds.

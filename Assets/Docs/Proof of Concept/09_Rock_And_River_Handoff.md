@@ -73,13 +73,16 @@ The current continuation contract is now locked by:
 4.11C.5.17P — Layer E Final Rendering Plan Lock
 4.11C.5.17A — original Interior Composition Proof (visually rejected)
 4.11C.5.17A.1 — Interior Composition Authority Correction (Unity-validated and accepted)
-4.11C.5.17B — Layer E Edge Breakup Proof (stable but visually underpowered)
-4.11C.5.17B.1 — Breakup Authority Calibration (implemented; Unity validation pending)
+4.11C.5.17B — Layer E Edge Breakup Proof (visually rejected)
+4.11C.5.17B.1 — Breakup Authority Calibration (visually rejected)
+4.11C.5.17B.2 — Pre-Hardening Binary Edge Cuts (Unity-validated for Chip/Fray)
+4.11C.5.17B.2A — Foam Strand Extraction and Stability Controls (provisionally retained)
+4.11C.5.17B.2B — Edge-Band Regional Fragmentation (implemented; Unity validation pending)
 ```
 
 The original `5.17A` controls were bound correctly but lacked visual authority: fill operated after established coverage was already hardened, the floor was capped by Foam Colour alpha, and edge emphasis did not control the existing bright rim. `5.17A.1` removes Interior Fill, makes Interior Opacity Floor absolute for established Foam, and replaces Edge Emphasis with signed Edge Contrast that directly suppresses or intensifies the current edge-versus-interior lighting transition. Normal Final Foam and Foam Evaluated Final Preview still share one arithmetic-only helper. Floor `0` and Contrast `0` preserve the previous render. The patch adds no texture sample, persistent resource, compute work, morphology, lifecycle rule, or topology lookup.
 
-`5.17B` added production medium chips, fine weak-fringe fray, and short edge-connected cuts in stable river/material coordinates, but Unity comparison showed that even maximum Chip/Fray changed the silhouette only slightly. `5.17B.1` retains the same controls, stable pattern reuse, shared production/debug helper, and zero-resource contract while recalibrating maximum authority: medium chips reach approximately `0.72–0.98` coverage, fray reaches farther into the visible edge, and short cuts become wider/deeper. Maximum `1.0` is intentionally excessive so a production result can be selected from the middle of the range. The fixed proof still reads no Remaining Life, topology, surface-energy multiplier, or new time input. `5.17C` should next drive the full deterioration vocabulary—chips, fray, cracks, strands, flecks, and streak remnants—from Layer C Remaining Life. Supported and Negative Topology initially influence it only through existing aging rates. `5.17D` fine fragments, micro-bubbles, streak remnants, and selective glints are intended final-detail work, not optional work to omit. No persistent state, compute work, broad macro gaps, isolated interior holes, or screen-space crawling noise is allowed.
+`5.17B` and `5.17B.1` are rejected. `5.17B.2` fixes breakup authority; Chip, Fray, and Breakup Scale are provisionally accepted. `5.17B.2A` retains optional independent Foam Strands with Strength, Spacing, Width, and Curvature; future refinement or removal remains possible. `5.17B.2B` adds separate Edge Fragmentation controls: Strength, Fragment Size, and Fragment Reach. It intersects existing partial Material Presence with pre-hardening soft visibility and a stable broad regional field, producing removal-only medium-to-large edge losses while protecting saturated cores. Size perturbs the same broad foundation rather than exchanging seeds. Production, evaluated preview, Probe, and Difference share one helper. No new texture/sample/noise/hash, persistent/compute, topology, lifecycle, Layer C, or Layer D work is introduced. Unity fragmentation validation and profiling are the gate before `5.17C` Remaining-Life orchestration.
 
 Do not reintroduce duplicate selectors, editable diagnostic controls, dynamic-height warning boxes, or ordinary-authoring repaint conditions while validating those metrics.
 

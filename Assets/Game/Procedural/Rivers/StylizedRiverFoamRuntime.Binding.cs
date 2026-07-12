@@ -87,6 +87,27 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamBreakupScaleId,
                 river != null ? river.FoamBreakupScale : 0.5f);
             propertyBlock.SetFloat(
+                FoamStrandStrengthId,
+                river != null ? river.FoamStrandStrength : 0f);
+            propertyBlock.SetFloat(
+                FoamStrandSpacingId,
+                river != null ? river.FoamStrandSpacing : 0.55f);
+            propertyBlock.SetFloat(
+                FoamStrandWidthId,
+                river != null ? river.FoamStrandWidth : 0.5f);
+            propertyBlock.SetFloat(
+                FoamStrandCurvatureId,
+                river != null ? river.FoamStrandCurvature : 0.55f);
+            propertyBlock.SetFloat(
+                FoamFragmentationStrengthId,
+                river != null ? river.FoamFragmentationStrength : 0f);
+            propertyBlock.SetFloat(
+                FoamFragmentSizeId,
+                river != null ? river.FoamFragmentSize : 0.5f);
+            propertyBlock.SetFloat(
+                FoamFragmentReachId,
+                river != null ? river.FoamFragmentReach : 0.5f);
+            propertyBlock.SetFloat(
                 FoamSharpnessId,
                 MaterialContourSharpness);
             propertyBlock.SetFloat(
@@ -181,6 +202,27 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamBreakupScaleId,
                 river.FoamBreakupScale);
             propertyBlock.SetFloat(
+                FoamStrandStrengthId,
+                river.FoamStrandStrength);
+            propertyBlock.SetFloat(
+                FoamStrandSpacingId,
+                river.FoamStrandSpacing);
+            propertyBlock.SetFloat(
+                FoamStrandWidthId,
+                river.FoamStrandWidth);
+            propertyBlock.SetFloat(
+                FoamStrandCurvatureId,
+                river.FoamStrandCurvature);
+            propertyBlock.SetFloat(
+                FoamFragmentationStrengthId,
+                river.FoamFragmentationStrength);
+            propertyBlock.SetFloat(
+                FoamFragmentSizeId,
+                river.FoamFragmentSize);
+            propertyBlock.SetFloat(
+                FoamFragmentReachId,
+                river.FoamFragmentReach);
+            propertyBlock.SetFloat(
                 FoamSharpnessId,
                 MaterialContourSharpness);
             propertyBlock.SetFloat(
@@ -239,6 +281,13 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(FoamChipStrengthId, 0f);
             propertyBlock.SetFloat(FoamFrayStrengthId, 0f);
             propertyBlock.SetFloat(FoamBreakupScaleId, 0.5f);
+            propertyBlock.SetFloat(FoamStrandStrengthId, 0f);
+            propertyBlock.SetFloat(FoamStrandSpacingId, 0.55f);
+            propertyBlock.SetFloat(FoamStrandWidthId, 0.5f);
+            propertyBlock.SetFloat(FoamStrandCurvatureId, 0.55f);
+            propertyBlock.SetFloat(FoamFragmentationStrengthId, 0f);
+            propertyBlock.SetFloat(FoamFragmentSizeId, 0.5f);
+            propertyBlock.SetFloat(FoamFragmentReachId, 0.5f);
             propertyBlock.SetFloat(FoamSharpnessId, 1f);
             propertyBlock.SetFloat(FoamFinalVisibilityModeId, 0f);
             propertyBlock.SetFloat(FoamDebugViewId, 0f);

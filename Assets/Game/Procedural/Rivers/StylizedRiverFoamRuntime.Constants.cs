@@ -524,6 +524,20 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamFrayStrength");
         private static readonly int FoamBreakupScaleId =
             Shader.PropertyToID("_FoamBreakupScale");
+        private static readonly int FoamStrandStrengthId =
+            Shader.PropertyToID("_FoamStrandStrength");
+        private static readonly int FoamStrandSpacingId =
+            Shader.PropertyToID("_FoamStrandSpacing");
+        private static readonly int FoamStrandWidthId =
+            Shader.PropertyToID("_FoamStrandWidth");
+        private static readonly int FoamStrandCurvatureId =
+            Shader.PropertyToID("_FoamStrandCurvature");
+        private static readonly int FoamFragmentationStrengthId =
+            Shader.PropertyToID("_FoamFragmentationStrength");
+        private static readonly int FoamFragmentSizeId =
+            Shader.PropertyToID("_FoamFragmentSize");
+        private static readonly int FoamFragmentReachId =
+            Shader.PropertyToID("_FoamFragmentReach");
         private static readonly int FoamSharpnessId =
             Shader.PropertyToID("_FoamSharpness");
         private static readonly int FoamFinalVisibilityModeId =

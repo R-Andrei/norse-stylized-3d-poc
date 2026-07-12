@@ -303,12 +303,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private bool showPaintedAccentProjectedGlyphDebug;
 
         [SerializeField, HideInInspector]
-        private bool showPaintedAccentContourClusterCandidateDebug;
-
-        [SerializeField, HideInInspector]
-        private bool comparePaintedAccentProjectedGlyphAndClusterCandidate;
-
-        [SerializeField, HideInInspector]
         private PaintedAccentPlacementOverlayWeightMode
             paintedAccentPlacementOverlayWeight =
                 PaintedAccentPlacementOverlayWeightMode.PatchPreference;
@@ -352,10 +346,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private GroundPaintedAccentProjectedGlyphDebugSnapshot
             paintedAccentProjectedGlyphDebugSnapshot =
                 GroundPaintedAccentProjectedGlyphDebugSnapshot.Empty;
-        private int paintedAccentContourClusterCandidateSignature;
-        private GroundPaintedAccentContourClusterDebugSnapshot
-            paintedAccentContourClusterCandidateDebugSnapshot =
-                GroundPaintedAccentContourClusterDebugSnapshot.Empty;
 
         private static readonly int BaseColorId =
             Shader.PropertyToID("_BaseColor");
@@ -636,7 +626,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             paintedAccentFoldFieldSignature = 0;
             ClearPaintedAccentProjectedGlyphDebugCache();
-            ClearPaintedAccentContourClusterCandidateDebugCache();
             EnsurePaintedAccentFoldFieldCurrent();
 
             ApplySurfaceProfileMaterialProperties();
@@ -802,12 +791,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
         public bool ShowPaintedAccentProjectedGlyphDebug =>
             showPaintedAccentProjectedGlyphDebug;
-
-        public bool ShowPaintedAccentContourClusterCandidateDebug =>
-            showPaintedAccentContourClusterCandidateDebug;
-
-        public bool ComparePaintedAccentProjectedGlyphAndClusterCandidate =>
-            comparePaintedAccentProjectedGlyphAndClusterCandidate;
 
         public PaintedAccentPlacementOverlayWeightMode
             PaintedAccentPlacementOverlayWeight =>
@@ -991,96 +974,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 $"{diagnostics.MaximumNorthDisplacementError:F7} m\n" +
                 $"Maximum cross-axis drift: " +
                 $"{diagnostics.MaximumCrossAxisDrift:F7} m";
-        }
-
-        public int CalculatePaintedAccentContourClusterCandidateDebugSignature()
-        {
-            GroundSurfaceFeatureRecipe feature =
-                ResolveShaderFeature(
-                    GroundSurfaceFeatureKind.PaintedAccentLines);
-            return CalculatePaintedAccentContourClusterCandidateSignature(
-                feature);
-        }
-
-        public bool TryBuildPaintedAccentContourClusterCandidateDebugSnapshot(
-            out GroundPaintedAccentContourClusterDebugSnapshot snapshot)
-        {
-            snapshot = GroundPaintedAccentContourClusterDebugSnapshot.Empty;
-            CacheComponents();
-
-            GroundSurfaceFeatureRecipe feature =
-                ResolveShaderFeature(
-                    GroundSurfaceFeatureKind.PaintedAccentLines);
-
-            if (!CanGeneratePaintedAccentFoldField(feature))
-            {
-                return false;
-            }
-
-            EnsurePaintedAccentFoldFieldCurrent();
-            EnsurePaintedAccentContourClusterCandidateCurrent(feature);
-            snapshot = paintedAccentContourClusterCandidateDebugSnapshot;
-            return snapshot.IsValid;
-        }
-
-        public string GetLastPaintedAccentContourClusterCandidateStatistics()
-        {
-            CacheComponents();
-            GroundSurfaceFeatureRecipe feature =
-                ResolveShaderFeature(
-                    GroundSurfaceFeatureKind.PaintedAccentLines);
-
-            if (!CanGeneratePaintedAccentFoldField(feature))
-            {
-                return "No Painted Accent contour-cluster candidates can be generated from the current ground and feature settings.";
-            }
-
-            EnsurePaintedAccentFoldFieldCurrent();
-            EnsurePaintedAccentContourClusterCandidateCurrent(feature);
-
-            GroundPaintedAccentContourClusterDiagnostics diagnostics =
-                paintedAccentContourClusterCandidateDebugSnapshot.Diagnostics;
-
-            return
-                $"Base descriptors: {diagnostics.BaseDescriptors}\n" +
-                $"Candidate density selected/skipped: " +
-                $"{diagnostics.DensitySelected} / " +
-                $"{diagnostics.DensitySkipped}\n" +
-                $"Candidates accepted/rejected: " +
-                $"{diagnostics.CandidatesAccepted} / " +
-                $"{diagnostics.RejectedTotal}\n\n" +
-                $"Rejected sampling: {diagnostics.RejectedSampling}\n" +
-                $"Rejected river: {diagnostics.RejectedRiver}\n" +
-                $"Rejected modifier: {diagnostics.RejectedModifier}\n" +
-                $"Rejected broad slope: {diagnostics.RejectedBroadSlope}\n" +
-                $"Rejected local grade: {diagnostics.RejectedLocalGrade}\n" +
-                $"Rejected upward excursion: " +
-                $"{diagnostics.RejectedUpwardExcursion}\n\n" +
-                $"Chains total: {diagnostics.ChainsTotal}\n" +
-                $"Primary arms/branches/echoes: " +
-                $"{diagnostics.PrimaryArmsTotal} / " +
-                $"{diagnostics.BranchesTotal} / " +
-                $"{diagnostics.EchoesTotal}\n" +
-                $"Chains per cluster min/mean/max: " +
-                $"{diagnostics.ChainCountMin} / " +
-                $"{diagnostics.ChainCountMean:F2} / " +
-                $"{diagnostics.ChainCountMax}\n" +
-                $"Points per chain min/mean/max: " +
-                $"{diagnostics.PointCountMin} / " +
-                $"{diagnostics.PointCountMean:F1} / " +
-                $"{diagnostics.PointCountMax}\n" +
-                $"Planar span min/mean/max: " +
-                $"{diagnostics.PlanarSpanMin:F3} / " +
-                $"{diagnostics.PlanarSpanMean:F3} / " +
-                $"{diagnostics.PlanarSpanMax:F3} m\n" +
-                $"Visual drop min/mean/max: " +
-                $"{diagnostics.VisualDropMin:F3} / " +
-                $"{diagnostics.VisualDropMean:F3} / " +
-                $"{diagnostics.VisualDropMax:F3} m\n" +
-                $"Maximum accepted upward excursion: " +
-                $"{diagnostics.MaximumUpwardExcursion:F7} m\n" +
-                $"Accepted upward violations: " +
-                $"{diagnostics.AcceptedUpwardViolationCount}";
         }
 
         public void RefreshSurfaceMaterialProperties()
@@ -1884,7 +1777,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             paintedAccentPlacementDiagnostics = diagnostics;
             paintedAccentSurfaceStrokeRevision++;
             ClearPaintedAccentProjectedGlyphDebugCache();
-            ClearPaintedAccentContourClusterCandidateDebugCache();
             ReplacePaintedAccentFoldFieldTexture(generatedTexture);
             paintedAccentFoldFieldEnabled = true;
             paintedAccentFoldFieldOriginSize =
@@ -1913,7 +1805,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 GroundPaintedAccentPlacementDiagnostics.Empty;
             paintedAccentSurfaceStrokeRevision++;
             ClearPaintedAccentProjectedGlyphDebugCache();
-            ClearPaintedAccentContourClusterCandidateDebugCache();
             ReplacePaintedAccentFoldFieldTexture(
                 CreateNeutralPaintedAccentFoldFieldTexture());
 
@@ -2018,62 +1909,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             paintedAccentProjectedGlyphSignature = 0;
             paintedAccentProjectedGlyphDebugSnapshot =
                 GroundPaintedAccentProjectedGlyphDebugSnapshot.Empty;
-        }
-
-        private void EnsurePaintedAccentContourClusterCandidateCurrent(
-            GroundSurfaceFeatureRecipe feature)
-        {
-            int signature =
-                CalculatePaintedAccentContourClusterCandidateSignature(
-                    feature);
-
-            if (paintedAccentContourClusterCandidateSignature == signature &&
-                paintedAccentContourClusterCandidateDebugSnapshot.IsValid)
-            {
-                return;
-            }
-
-            paintedAccentContourClusterCandidateSignature = signature;
-
-            if (!CanGeneratePaintedAccentFoldField(feature) ||
-                paintedAccentSurfaceStrokes == null)
-            {
-                paintedAccentContourClusterCandidateDebugSnapshot =
-                    GroundPaintedAccentContourClusterDebugSnapshot.Empty;
-                return;
-            }
-
-            paintedAccentContourClusterCandidateDebugSnapshot =
-                GroundPaintedAccentContourClusterCandidateGenerator.Build(
-                    paintedAccentSurfaceStrokes,
-                    baseSurface,
-                    feature,
-                    paintedAccentRiverSnapshots,
-                    paintedAccentModifierSnapshots,
-                    ResolvePaintedAccentProjectedNorthLocalXZ());
-        }
-
-        private int CalculatePaintedAccentContourClusterCandidateSignature(
-            GroundSurfaceFeatureRecipe feature)
-        {
-            unchecked
-            {
-                int hash = CalculatePaintedAccentFoldFieldSignature(feature);
-                hash = hash * 31 + paintedAccentSurfaceStrokeRevision;
-                Vector2 localNorth =
-                    ResolvePaintedAccentProjectedNorthLocalXZ();
-                hash = hash * 31 + Quantize(localNorth.x);
-                hash = hash * 31 + Quantize(localNorth.y);
-                hash = hash * 31 + 0x4A9A;
-                return hash;
-            }
-        }
-
-        private void ClearPaintedAccentContourClusterCandidateDebugCache()
-        {
-            paintedAccentContourClusterCandidateSignature = 0;
-            paintedAccentContourClusterCandidateDebugSnapshot =
-                GroundPaintedAccentContourClusterDebugSnapshot.Empty;
         }
 
         private int CalculatePaintedAccentFoldFieldSignature(

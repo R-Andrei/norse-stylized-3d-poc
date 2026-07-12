@@ -109,6 +109,13 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamChipStrength("Foam Chip Strength", Range(0, 1)) = 0
         [HideInInspector] _FoamFrayStrength("Foam Fray Strength", Range(0, 1)) = 0
         [HideInInspector] _FoamBreakupScale("Foam Breakup Scale", Range(0, 1)) = 0.5
+        [HideInInspector] _FoamStrandStrength("Foam Strand Strength", Range(0, 1)) = 0
+        [HideInInspector] _FoamStrandSpacing("Foam Strand Spacing", Range(0, 1)) = 0.55
+        [HideInInspector] _FoamStrandWidth("Foam Strand Width", Range(0, 1)) = 0.5
+        [HideInInspector] _FoamStrandCurvature("Foam Strand Curvature", Range(0, 1)) = 0.55
+        [HideInInspector] _FoamFragmentationStrength("Foam Fragmentation Strength", Range(0, 1)) = 0
+        [HideInInspector] _FoamFragmentSize("Foam Fragment Size", Range(0, 1)) = 0.5
+        [HideInInspector] _FoamFragmentReach("Foam Fragment Reach", Range(0, 1)) = 0.5
         [HideInInspector] _FoamSharpness("Foam Sharpness", Range(0, 1)) = 0.8
         [HideInInspector] _FoamFinalVisibilityMode("Foam Final Visibility Mode", Float) = 0
         [HideInInspector] _FoamDebugView("Foam Debug View", Float) = 0
@@ -263,6 +270,13 @@ Shader "PS3D/Stylized River Water"
                 float _FoamChipStrength;
                 float _FoamFrayStrength;
                 float _FoamBreakupScale;
+                float _FoamStrandStrength;
+                float _FoamStrandSpacing;
+                float _FoamStrandWidth;
+                float _FoamStrandCurvature;
+                float _FoamFragmentationStrength;
+                float _FoamFragmentSize;
+                float _FoamFragmentReach;
                 float _FoamSharpness;
                 float _FoamFinalVisibilityMode;
                 float _FoamDebugView;
@@ -839,13 +853,21 @@ Shader "PS3D/Stylized River Water"
 
                 float finalFoamMask = RiverWaterFoamApplyEdgeBreakup(
                     foam.mask,
+                    foam.softVisibility,
+                    foam.presence,
                     foam.materialPattern,
                     foam.breakupField,
                     input.domainData.x,
                     input.domainData.y,
                     _FoamChipStrength,
                     _FoamFrayStrength,
-                    _FoamBreakupScale);
+                    _FoamStrandStrength,
+                    _FoamStrandSpacing,
+                    _FoamStrandWidth,
+                    _FoamStrandCurvature,
+                    _FoamFragmentationStrength,
+                    _FoamFragmentSize,
+                    _FoamFragmentReach);
 
                 float3 foamBaseColour = RiverWaterApplyReservedIntegration(
                     body.colour,
@@ -896,13 +918,21 @@ Shader "PS3D/Stylized River Water"
                     float evaluatedPreviewMask =
                         RiverWaterFoamApplyEdgeBreakup(
                             evaluatedShape,
+                            evaluatedShape,
+                            committedPresence,
                             committedMaterialPattern,
                             foam.breakupField,
                             input.domainData.x,
                             input.domainData.y,
                             _FoamChipStrength,
                             _FoamFrayStrength,
-                            _FoamBreakupScale);
+                            _FoamStrandStrength,
+                            _FoamStrandSpacing,
+                            _FoamStrandWidth,
+                            _FoamStrandCurvature,
+                            _FoamFragmentationStrength,
+                            _FoamFragmentSize,
+                            _FoamFragmentReach);
                     RiverWaterFoamComposition evaluatedPreviewComposition =
                         RiverWaterResolveFoamComposition(
                             _FoamColour.rgb,

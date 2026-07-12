@@ -1,8 +1,66 @@
 # Ground Generation Surface Upgrade Plan
 
+### 2026-07-12 — Patch V3J.4A10R: Retire Rejected Regional-Network Experiments
+
+**Status:** Implemented cleanup; awaiting Unity compilation confirmation.
+
+Unity validation rejected both regional-network proofs.
+
+A10A produced only three tiny one-trunk/one-branch survivors. Its diagnostics showed that restrictive descriptor grouping and generic rooted-tree extraction discarded almost the entire descriptor population before physical validation.
+
+A10B successfully formed larger connected regions, but its explicit upper-run-plus-two-descending-terraces grammar produced a repeated table/π-symbol family rather than terrain-integrated contour marks. The result was structurally connected and deterministic, but artistically wrong. More branches, randomization, or fragmentation would only decorate the rejected grammar.
+
+The complete A9A/A10A/A10B candidate line is therefore retired. Cleanup removes:
+
+```text
+GroundPaintedAccentRegionalNetworkCandidateGenerator.cs and .meta
+regional-network cache, signatures, snapshots, and diagnostics
+regional-network Scene overlay and rejection markers
+accepted-versus-network paired comparison
+regional-network Inspector controls and statistics
+```
+
+The accepted A6/A7 projected glyph path is unchanged and is now the sole Painted Accent shape implementation and Scene-view shape overlay.
+
+Current shape architecture:
+
+```text
+GroundPaintedAccentSurfaceStroke
+→ A6 continuous longitudinal profile
+→ fixed world +Z projection
+→ complete mesh-free A6/A7 projected glyph
+```
+
+No network, tendril, terrace, echo, or fragmentation candidate remains in code. No scene, prefab, style asset, recipe, shader, material, layer, or tag is changed by the cleanup.
+
+Future work must not restart the rejected graph/network progression without a materially different artistic premise. The next useful investigation should begin from the accepted A6/A7 glyphs and concern placement composition, coverage baking, ink integration, or another explicitly approved representation—not additional procedural branches or network fragmentation.
+
+#### Rejected-method ledger
+
+```text
+A9A descriptor-local cluster:
+    rejected — ornate islands/tendrils, not a network
+
+A10A small regional rooted tree:
+    rejected — only three tiny surviving Y-like structures
+
+A10B macro-regional contour terrace:
+    rejected — repeated table/π-symbol grammar
+```
+
+#### Unity cleanup validation
+
+1. Unity compiles without references to regional-network types.
+2. The Painted Accent Inspector exposes only the accepted projected shape overlay.
+3. No A9A/A10A/A10B network toggle, paired comparison, statistics panel, or Scene legend remains.
+4. **Show Accepted Projected Debug** still displays the unchanged A6/A7 baseline.
+5. Placement distribution, proposal, and accepted-position overlays remain available.
+6. No regional-network generator file remains under `Assets/Game/Procedural/Ground/`.
+
+
 ### 2026-07-12 — Patch V3J.4A9AR: A9A Rejection and Independent Overlay Controls
 
-**Status:** Implemented; awaiting Unity editor validation.
+**Historical status:** superseded; candidate controls and implementation removed by V3J.4A10R.
 
 Unity validation rejected V3J.4A9A as a network solution. Its individual chains obey the downward-only rule, but its generation unit remains one accepted descriptor at a time:
 
@@ -14,13 +72,13 @@ accepted descriptor
 → one isolated decorated island
 ```
 
-Adding arms, tendrils, and echoes inside each descriptor-local result did not create regional connectivity. The field still reads as separate symbols distributed across the ground. A9A is therefore retained temporarily as rejected comparison evidence only; it is not the foundation for the next candidate and must not advance to fragmentation or production coverage.
+Adding arms, tendrils, and echoes inside each descriptor-local result did not create regional connectivity. The field still reads as separate symbols distributed across the ground. A9A was therefore retained temporarily as rejected comparison evidence by A9AR. V3J.4A10A removes that provisional implementation and replaces its candidate slot with the regional network; A9A must not be restored or advanced to fragmentation or production coverage.
 
-A9AR changes no generated points, validation, caches, or candidate mathematics. It corrects only the Scene-view comparison workflow and records the next architecture.
+A9AR changed no generated points, validation, caches, or candidate mathematics. It corrected only the then-current Scene-view comparison workflow and recorded the next architecture.
 
 #### Independent and additive overlay contract
 
-The three shape controls now have independent meanings:
+At that historical point, the three shape controls had independent meanings:
 
 ```text
 Show Accepted Projected Debug
@@ -35,7 +93,7 @@ Show Paired Comparison Preview
     rejected A9A copy on visual right
 ```
 
-Valid combinations are:
+Historical valid combinations were:
 
 ```text
 all off                    → no shape overlay
@@ -47,9 +105,9 @@ any true-position toggles
 + paired                   → requested true-position fields plus pairs
 ```
 
-The paired preview no longer substitutes for the true-position toggles. Both comparison copies are moved away from the real anchor in Scene Handles, so enabling a true-position result together with the paired preview does not draw a duplicate directly on top of it. Serialized field names are retained for compatibility; only their editor meaning and draw composition change.
+The paired preview no longer substitutes for the true-position toggles. Both comparison copies are moved away from the real anchor in Scene Handles, so enabling a true-position result together with the paired preview does not draw a duplicate directly on top of it. Serialized field names were retained for compatibility at that stage; A10R later removed the candidate fields and controls completely.
 
-#### V3J.4A10A next candidate — regional downward-only network
+#### Historical V3J.4A10A proposal — regional downward-only network (rejected and removed)
 
 The next experiment must change the unit of generation:
 
@@ -57,11 +115,11 @@ The next experiment must change the unit of generation:
 rejected A9A:
     one descriptor → one decorated island
 
-planned A10A:
+then-planned A10A:
     nearby compatible descriptor group → one shared regional network
 ```
 
-A10A is not implemented by A9AR. Its approved design target is:
+A10A was not implemented by A9AR. Its then-approved design target was:
 
 ```text
 3–7 nearby accepted descriptors grouped by distance and broad direction
@@ -77,12 +135,12 @@ Descriptors become regional anchors and constraints rather than each demanding t
 
 Every directed chain must still remain level or descend away from its high/root point. Cups, valleys, upward hooks, and drop-then-rise chains remain forbidden. The first A10A proof is complete and unbroken; fragmentation remains forbidden until a regional network itself reads coherently.
 
-A10A passes only if the field reads as a small number of shared local terrain systems rather than many enhanced islands.
+This historical acceptance gate was not met. A10A and its A10B replacement were later rejected and removed by A10R.
 
 
 ### 2026-07-12 — Patch V3J.4A9A: Separate Downward-Only Contour-Cluster Candidate
 
-**Status:** Rejected as a network solution by Unity visual validation; retained temporarily for comparison evidence.
+**Status:** Rejected as a network solution by Unity visual validation; implementation removed by V3J.4A10A.
 
 V3J.4A9A adds a new Scene-view-only native-2D candidate beside the accepted A6/A7 projected glyph. It does not modify `GroundPaintedAccentProjectedGlyph`, its generator, its cache, its diagnostics, or the meaning of **Show Projected Glyph Debug**.
 

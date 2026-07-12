@@ -282,6 +282,11 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamVisualOccupancyReleaseTime = 0.05f;
         private const float MaximumFoamVisualOccupancyReleaseTime = 4f;
         private const float DefaultFoamVisualOccupancyReleaseTime = 0.80f;
+        private const float DefaultFoamStrandSpacing = 0.55f;
+        private const float DefaultFoamStrandWidth = 0.50f;
+        private const float DefaultFoamStrandCurvature = 0.55f;
+        private const float DefaultFoamFragmentSize = 0.50f;
+        private const float DefaultFoamFragmentReach = 0.50f;
         private const float MinimumFoamProgressiveRibbonDuration = 0.5f;
         private const float MaximumFoamProgressiveRibbonDuration = 5f;
         private const float DefaultFoamProgressiveRibbonDuration = 2.4f;
@@ -1460,7 +1465,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(-1f, 1f)]
         [SerializeField] private float foamEdgeContrast;
 
-        [Tooltip("Strength of medium shader-local bites and the derived short edge-connected cuts applied after the final Foam visibility mask. Zero preserves the accepted pre-5.17B silhouette. This is render-only and never changes Layer C material or Layer D shape.")]
+        [Tooltip("Strength of medium shader-local bites applied after the final Foam visibility mask. Zero preserves the accepted pre-5.17B silhouette. This is render-only and never changes Layer C material or Layer D shape.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamChipStrength;
 
@@ -1468,9 +1473,42 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFrayStrength;
 
-        [Tooltip("Selects the physical size family of the existing stable breakup pattern in river/material space. Zero favours finer, more frequent features; one favours broader, less frequent features. Chip and Fray strengths at zero remain neutral regardless of this value.")]
+        [Tooltip("Selects the physical size family used by Chip and Fray in river/material space. Zero favours finer, more frequent features; one favours broader, less frequent features. It does not affect Foam Strands.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamBreakupScale = 0.5f;
+
+        [Tooltip("Strength of the independent render-only Foam Strand system. Zero disables all strand channels without changing Chip, Fray, Layer C material, or Layer D shape.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamStrandStrength;
+
+        [Tooltip("Controls strand separation. Zero allows closer strand groups; one produces broader spacing. A screen-space density safeguard suppresses unresolved comb patterns automatically.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamStrandSpacing =
+            DefaultFoamStrandSpacing;
+
+        [Tooltip("Controls visible strand channel width inside a safe antialiased range. Zero is finer; one is broader. Unresolvable subpixel widths are widened or suppressed rather than allowed to shimmer.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamStrandWidth =
+            DefaultFoamStrandWidth;
+
+        [Tooltip("Controls stable broad bending of Foam Strands. Zero is mostly flow-aligned; one produces stronger coherent curvature without time scrolling or screen-space movement.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamStrandCurvature =
+            DefaultFoamStrandCurvature;
+
+        [Tooltip("Strength of medium-to-large render-only regional losses inside weak and transitional Foam edge bands. Zero disables fragmentation exactly and never changes stored material or Layer D shape.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFragmentationStrength;
+
+        [Tooltip("Controls regional fragment size. Zero subdivides the same broad fragmentation zones into smaller coherent sections; one preserves broader connected missing regions without reseeding their large-scale placement.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFragmentSize =
+            DefaultFoamFragmentSize;
+
+        [Tooltip("Controls how deeply selected fragmentation regions may cut inward from weak and partial-presence Foam. Zero stays shallow; one reaches substantially farther while protecting the fully established core.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float foamFragmentReach =
+            DefaultFoamFragmentReach;
 
         [Tooltip("Selects one of the retained Stage 6 diagnostics. Final is the normal rendered result; all obsolete Foam debug modes have been removed.")]
         [SerializeField] private StylizedRiverFoamDebugView foamDebugView =
@@ -2443,6 +2481,20 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamFrayStrength);
         public float FoamBreakupScale =>
             Mathf.Clamp01(foamBreakupScale);
+        public float FoamStrandStrength =>
+            Mathf.Clamp01(foamStrandStrength);
+        public float FoamStrandSpacing =>
+            Mathf.Clamp01(foamStrandSpacing);
+        public float FoamStrandWidth =>
+            Mathf.Clamp01(foamStrandWidth);
+        public float FoamStrandCurvature =>
+            Mathf.Clamp01(foamStrandCurvature);
+        public float FoamFragmentationStrength =>
+            Mathf.Clamp01(foamFragmentationStrength);
+        public float FoamFragmentSize =>
+            Mathf.Clamp01(foamFragmentSize);
+        public float FoamFragmentReach =>
+            Mathf.Clamp01(foamFragmentReach);
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
         public float FoamSpawnDistanceNormalized =>
             foamSpawnDistanceNormalized;
@@ -4473,6 +4525,14 @@ namespace ProgrammaticStylized3D.Rivers
             foamChipStrength = Mathf.Clamp01(foamChipStrength);
             foamFrayStrength = Mathf.Clamp01(foamFrayStrength);
             foamBreakupScale = Mathf.Clamp01(foamBreakupScale);
+            foamStrandStrength = Mathf.Clamp01(foamStrandStrength);
+            foamStrandSpacing = Mathf.Clamp01(foamStrandSpacing);
+            foamStrandWidth = Mathf.Clamp01(foamStrandWidth);
+            foamStrandCurvature = Mathf.Clamp01(foamStrandCurvature);
+            foamFragmentationStrength = Mathf.Clamp01(
+                foamFragmentationStrength);
+            foamFragmentSize = Mathf.Clamp01(foamFragmentSize);
+            foamFragmentReach = Mathf.Clamp01(foamFragmentReach);
             foamSpawnDistanceNormalized = Mathf.Clamp01(
                 foamSpawnDistanceNormalized);
             foamSpawnAcrossNormalized = Mathf.Clamp(

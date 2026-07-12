@@ -154,7 +154,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private static void LogChamferEmissionAudit(
             ChamferEmissionStats stats,
             bool ready,
-            string blocker)
+            string blocker,
+            PlaneCutBevelAuditResult planeCutAudit)
         {
 #if UNITY_EDITOR
             string message =
@@ -200,6 +201,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     "/" + stats.PatchContainedRepartitionBoundaryFailures +
                     "/" + stats.PatchContainedRepartitionTopologyFailures +
                     "/" + stats.PatchContainedRepartitionOverlapRemaining +
+                ", containedRepair=" +
+                    stats.PatchContainedRepairCandidates + "/" +
+                    stats.PatchContainedRepairGuidedResiduals + "/" +
+                    stats.PatchContainedRepairGenericFallbacks + "/" +
+                    stats.PatchContainedRepairEndpointAligned + "/" +
+                    stats.PatchContainedRepairResolved + "/" +
+                    stats.PatchContainedRepairBuildFailures + "/" +
+                    stats.PatchContainedRepairBoundaryFailures + "/" +
+                    stats.PatchContainedRepairTopologyFailures + "/" +
+                    stats.PatchContainedRepairOverlapRemaining +
                 ", containedBoundary=" +
                     stats.PatchContainedBoundaryCandidates + "/" +
                     stats.PatchContainedBoundaryExactValid + "/" +
@@ -232,6 +243,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     stats.PatchContainedCombinedOwnerConflicts + "/" +
                     stats.PatchContainedCombinedTopologyFailures + "/" +
                     stats.PatchContainedCombinedRemainingOverlaps +
+                ", planeBevel=" +
+                    planeCutAudit.SelectedEdgeCount + "/" +
+                    planeCutAudit.ActiveEdgeCount + "/" +
+                    planeCutAudit.PlanesBuilt + "/" +
+                    planeCutAudit.PlanesRejected + "/" +
+                    planeCutAudit.CapsBuilt + "/" +
+                    planeCutAudit.CapsMissing + "/" +
+                    planeCutAudit.CapsRedundant + "/" +
+                    planeCutAudit.ConformalSplitCount + "/" +
+                    planeCutAudit.OpenEdgeCount + "/" +
+                    planeCutAudit.NonManifoldEdgeCount + "/" +
+                    planeCutAudit.TJunctionCount + "/" +
+                    planeCutAudit.InvalidFaceCount + "/" +
+                    planeCutAudit.GeometryValid +
+                (string.IsNullOrEmpty(planeCutAudit.Diagnostic)
+                    ? string.Empty
+                    : ", planeTrace=" + planeCutAudit.Diagnostic) +
                 ", sector=" + stats.PatchSectorAuthoritativeLoops +
                     "/" + stats.PatchSectorExistingPlanLoops +
                 ", sectorOwned=" +

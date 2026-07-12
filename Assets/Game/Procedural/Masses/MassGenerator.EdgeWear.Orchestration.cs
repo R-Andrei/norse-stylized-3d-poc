@@ -100,19 +100,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     cornerBlocker);
                 if (cornersReady)
                 {
+                    float minimumStableFaceArea =
+                        maximumDimension * maximumDimension * 0.000001f;
+                    PlaneCutBevelAuditResult planeCutAudit =
+                        AuditPlaneCutBevelKernel(
+                            faces,
+                            context,
+                            cornerSolution,
+                            minimumStableEdgeLength,
+                            minimumStableFaceArea);
                     ChamferEmissionStats emissionStats = new ChamferEmissionStats();
                     bool emissionReady = AuditProvisionalChamferEmission(
                         faces,
                         context,
                         cornerSolution,
                         minimumStableEdgeLength,
-                        maximumDimension * maximumDimension * 0.000001f,
+                        minimumStableFaceArea,
                         ref emissionStats,
                         out string emissionBlocker);
                     LogChamferEmissionAudit(
                         emissionStats,
                         emissionReady,
-                        emissionBlocker);
+                        emissionBlocker,
+                        planeCutAudit);
                 }
             }
 

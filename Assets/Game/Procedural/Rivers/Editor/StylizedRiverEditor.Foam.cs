@@ -264,6 +264,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
         private void DrawFoamLayerE()
         {
+            EditorGUILayout.LabelField(
+                "General Composition",
+                EditorStyles.miniBoldLabel);
             EditorGUILayout.PropertyField(
                 Find("foamFinalVisibilityMode"),
                 new GUIContent(
@@ -284,11 +287,16 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent(
                     "Edge Contrast",
                     "Controls the existing edge-versus-interior lighting contrast. Negative values suppress the bright rim, zero preserves the accepted pre-5.17A lighting, and positive values intensify the edge without expanding the silhouette."));
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Edge Breakup — Chips & Fray",
+                EditorStyles.miniBoldLabel);
             EditorGUILayout.PropertyField(
                 Find("foamChipStrength"),
                 new GUIContent(
                     "Chip Strength",
-                    "Strength of medium render-only edge bites and derived short cuts. Zero preserves the accepted pre-5.17B silhouette; this never changes stored Foam material or Layer D shape."));
+                    "Strength of medium render-only edge bites. Zero preserves the accepted pre-5.17B silhouette; this never changes stored Foam material or Layer D shape."));
             EditorGUILayout.PropertyField(
                 Find("foamFrayStrength"),
                 new GUIContent(
@@ -298,7 +306,52 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("foamBreakupScale"),
                 new GUIContent(
                     "Breakup Scale",
-                    "Chooses between finer, more frequent and broader, less frequent stable breakup features in river/material space. It has no visible effect while Chip and Fray Strength are both zero."));
+                    "Chooses between finer, more frequent and broader, less frequent Chip/Fray features in river/material space. It does not affect Foam Strands and has no authority while Chip and Fray Strength are both zero."));
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Foam Strands",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                Find("foamStrandStrength"),
+                new GUIContent(
+                    "Strand Strength",
+                    "Independent render-only strength for edge-connected strand channels. Zero disables the feature without changing Chip, Fray, stored material, or Layer D shape."));
+            EditorGUILayout.PropertyField(
+                Find("foamStrandSpacing"),
+                new GUIContent(
+                    "Strand Spacing",
+                    "Zero permits closer strand groups; one produces broader separation. Unresolved dense combs are suppressed automatically in screen space."));
+            EditorGUILayout.PropertyField(
+                Find("foamStrandWidth"),
+                new GUIContent(
+                    "Strand Width",
+                    "Controls antialiased channel width inside a safe range. Unresolvable subpixel widths are widened or suppressed rather than allowed to shimmer."));
+            EditorGUILayout.PropertyField(
+                Find("foamStrandCurvature"),
+                new GUIContent(
+                    "Strand Curvature",
+                    "Zero is mostly flow-aligned; one adds stronger stable broad bends. The curvature is anchored in river/material space and does not time-scroll."));
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Edge Fragmentation",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.PropertyField(
+                Find("foamFragmentationStrength"),
+                new GUIContent(
+                    "Fragmentation Strength",
+                    "Strength of medium-to-large render-only losses inside weak and transitional Foam edge bands. Zero is exactly neutral and never changes stored material or Layer D shape."));
+            EditorGUILayout.PropertyField(
+                Find("foamFragmentSize"),
+                new GUIContent(
+                    "Fragment Size",
+                    "Zero subdivides the same broad fragmentation zones into smaller coherent sections; one preserves broader connected missing regions without reseeding their large-scale placement."));
+            EditorGUILayout.PropertyField(
+                Find("foamFragmentReach"),
+                new GUIContent(
+                    "Fragment Reach",
+                    "Controls how deeply selected regions may cut inward from partial-presence Foam. Zero stays shallow; one reaches substantially farther while protecting the fully established core."));
         }
 
         private void DrawNormalizedPatternWeight(

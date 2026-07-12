@@ -21,8 +21,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private SerializedProperty showPaintedAccentWeightedProposals;
         private SerializedProperty showPaintedAccentLastAcceptedPositions;
         private SerializedProperty showPaintedAccentProjectedGlyphDebug;
-        private SerializedProperty showPaintedAccentContourClusterCandidateDebug;
-        private SerializedProperty comparePaintedAccentProjectedGlyphAndClusterCandidate;
         private SerializedProperty paintedAccentPlacementOverlayWeight;
 
         private int paintedAccentPlacementDebugSignature = int.MinValue;
@@ -35,13 +33,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private GroundPaintedAccentProjectedGlyphDebugSnapshot
             paintedAccentProjectedGlyphDebugSnapshot =
                 GroundPaintedAccentProjectedGlyphDebugSnapshot.Empty;
-        private int paintedAccentContourClusterCandidateDebugSignature =
-            int.MinValue;
-        private bool
-            paintedAccentContourClusterCandidateDebugSnapshotBuildFailed;
-        private GroundPaintedAccentContourClusterDebugSnapshot
-            paintedAccentContourClusterCandidateDebugSnapshot =
-                GroundPaintedAccentContourClusterDebugSnapshot.Empty;
 
         private SerializedProperty shapeSeed;
         private SerializedProperty patchSize;
@@ -146,14 +137,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             showPaintedAccentProjectedGlyphDebug =
                 serializedObject.FindProperty(
                     "showPaintedAccentProjectedGlyphDebug");
-
-            showPaintedAccentContourClusterCandidateDebug =
-                serializedObject.FindProperty(
-                    "showPaintedAccentContourClusterCandidateDebug");
-
-            comparePaintedAccentProjectedGlyphAndClusterCandidate =
-                serializedObject.FindProperty(
-                    "comparePaintedAccentProjectedGlyphAndClusterCandidate");
 
             paintedAccentPlacementOverlayWeight =
                 serializedObject.FindProperty(
@@ -856,26 +839,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     "Displays accepted stroke centres from the most recent placement generation."));
             EditorGUILayout.Space(5f);
             EditorGUILayout.LabelField(
-                "Painted Accent Shape Overlays",
+                "Painted Accent Shape Overlay",
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.HelpBox(
-                "These three Scene-view overlays are independent and additive. Disable all three for no shape overlay, enable either true-position result by itself, enable both true-position results together, or add the paired offset comparison separately.",
+                "Displays the accepted complete A6/A7 projected glyphs. The rejected A9A, A10A, and A10B candidate systems have been retired.",
                 MessageType.None);
             EditorGUILayout.PropertyField(
                 showPaintedAccentProjectedGlyphDebug,
                 new GUIContent(
                     "Show Accepted Projected Debug",
-                    "Displays only the accepted complete A6/A7 projected glyphs at their true positions. This toggle never enables the rejected A9A candidate."));
-            EditorGUILayout.PropertyField(
-                showPaintedAccentContourClusterCandidateDebug,
-                new GUIContent(
-                    "Show Rejected A9A Candidate Debug",
-                    "Displays only the rejected per-descriptor A9A candidate at its true positions. It is retained temporarily for evidence and comparison while A10A is designed; cyan, green, and blue curves are primary arms, branches, and echoes."));
-            EditorGUILayout.PropertyField(
-                comparePaintedAccentProjectedGlyphAndClusterCandidate,
-                new GUIContent(
-                    "Show Paired Comparison Preview",
-                    "Adds editor-offset comparison copies: the accepted glyph is placed to the visual left and the matching rejected A9A candidate to the visual right. This toggle does not force either true-position overlay on."));
+                    "Displays the accepted complete A6/A7 projected glyphs at their true positions."));
 
             if (EditorGUI.EndChangeCheck())
             {
@@ -884,10 +857,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 paintedAccentPlacementDebugSnapshotBuildFailed = false;
                 paintedAccentProjectedGlyphDebugSignature = int.MinValue;
                 paintedAccentProjectedGlyphDebugSnapshotBuildFailed = false;
-                paintedAccentContourClusterCandidateDebugSignature =
-                    int.MinValue;
-                paintedAccentContourClusterCandidateDebugSnapshotBuildFailed =
-                    false;
                 SceneView.RepaintAll();
             }
 
@@ -900,21 +869,11 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     MessageType.Warning);
             }
 
-            if ((showPaintedAccentProjectedGlyphDebug.boolValue ||
-                 comparePaintedAccentProjectedGlyphAndClusterCandidate.boolValue) &&
+            if (showPaintedAccentProjectedGlyphDebug.boolValue &&
                 paintedAccentProjectedGlyphDebugSnapshotBuildFailed)
             {
                 EditorGUILayout.HelpBox(
                     "The projected glyph snapshot could not be built. Confirm that Painted Accent Lines are enabled and that the ground has valid generated descriptors, then regenerate the ground.",
-                    MessageType.Warning);
-            }
-
-            if ((showPaintedAccentContourClusterCandidateDebug.boolValue ||
-                 comparePaintedAccentProjectedGlyphAndClusterCandidate.boolValue) &&
-                paintedAccentContourClusterCandidateDebugSnapshotBuildFailed)
-            {
-                EditorGUILayout.HelpBox(
-                    "The contour-cluster candidate snapshot could not be built. Confirm that Painted Accent Lines are enabled and that the ground has valid generated descriptors, then regenerate the ground.",
                     MessageType.Warning);
             }
 
@@ -932,8 +891,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 ground.GetLastPaintedAccentPlacementStatistics(),
                 MessageType.None);
 
-            if (showPaintedAccentProjectedGlyphDebug.boolValue ||
-                comparePaintedAccentProjectedGlyphAndClusterCandidate.boolValue)
+            if (showPaintedAccentProjectedGlyphDebug.boolValue)
             {
                 EditorGUILayout.Space(3f);
                 EditorGUILayout.LabelField(
@@ -941,18 +899,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     EditorStyles.miniBoldLabel);
                 EditorGUILayout.HelpBox(
                     ground.GetLastPaintedAccentProjectedGlyphStatistics(),
-                    MessageType.None);
-            }
-
-            if (showPaintedAccentContourClusterCandidateDebug.boolValue ||
-                comparePaintedAccentProjectedGlyphAndClusterCandidate.boolValue)
-            {
-                EditorGUILayout.Space(3f);
-                EditorGUILayout.LabelField(
-                    "A9A Downward-Only Cluster Candidate",
-                    EditorStyles.miniBoldLabel);
-                EditorGUILayout.HelpBox(
-                    ground.GetLastPaintedAccentContourClusterCandidateStatistics(),
                     MessageType.None);
             }
         }
@@ -1602,22 +1548,13 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 ground.ShowPaintedAccentLastAcceptedPositions;
             bool showProjectedGlyphs =
                 ground.ShowPaintedAccentProjectedGlyphDebug;
-            bool showClusterCandidates =
-                ground.ShowPaintedAccentContourClusterCandidateDebug;
-            bool compareProjectedAndCandidate =
-                ground.ComparePaintedAccentProjectedGlyphAndClusterCandidate;
-            bool needsProjectedSnapshot =
-                showProjectedGlyphs || compareProjectedAndCandidate;
-            bool needsCandidateSnapshot =
-                showClusterCandidates || compareProjectedAndCandidate;
             PaintedAccentPlacementOverlayWeightMode overlayWeightMode =
                 ground.PaintedAccentPlacementOverlayWeight;
 
             if (!showDistribution &&
                 !showProposals &&
                 !showAccepted &&
-                !needsProjectedSnapshot &&
-                !needsCandidateSnapshot)
+                !showProjectedGlyphs)
             {
                 return;
             }
@@ -1645,7 +1582,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 }
             }
 
-            if (needsProjectedSnapshot)
+            if (showProjectedGlyphs)
             {
                 int projectedSignature =
                     ground.CalculatePaintedAccentProjectedGlyphDebugSignature();
@@ -1665,33 +1602,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     {
                         paintedAccentProjectedGlyphDebugSnapshot =
                             GroundPaintedAccentProjectedGlyphDebugSnapshot.Empty;
-                    }
-
-                    Repaint();
-                }
-            }
-
-            if (needsCandidateSnapshot)
-            {
-                int candidateSignature =
-                    ground.CalculatePaintedAccentContourClusterCandidateDebugSignature();
-
-                if (candidateSignature !=
-                        paintedAccentContourClusterCandidateDebugSignature ||
-                    paintedAccentContourClusterCandidateDebugSnapshotBuildFailed)
-                {
-                    paintedAccentContourClusterCandidateDebugSignature =
-                        candidateSignature;
-                    bool built =
-                        ground.TryBuildPaintedAccentContourClusterCandidateDebugSnapshot(
-                            out paintedAccentContourClusterCandidateDebugSnapshot);
-                    paintedAccentContourClusterCandidateDebugSnapshotBuildFailed =
-                        !built;
-
-                    if (!built)
-                    {
-                        paintedAccentContourClusterCandidateDebugSnapshot =
-                            GroundPaintedAccentContourClusterDebugSnapshot.Empty;
                     }
 
                     Repaint();
@@ -1736,23 +1646,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     paintedAccentProjectedGlyphDebugSnapshot);
             }
 
-            if (showClusterCandidates)
-            {
-                DrawPaintedAccentContourClusterCandidateOverlay(
-                    ground,
-                    paintedAccentContourClusterCandidateDebugSnapshot,
-                    Vector3.zero,
-                    drawRejections: true);
-            }
-
-            if (compareProjectedAndCandidate)
-            {
-                DrawPaintedAccentProjectedGlyphAndClusterCandidateComparison(
-                    ground,
-                    paintedAccentProjectedGlyphDebugSnapshot,
-                    paintedAccentContourClusterCandidateDebugSnapshot);
-            }
-
             Handles.color = previousColor;
             Handles.zTest = previousZTest;
 
@@ -1761,16 +1654,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 showProposals,
                 showAccepted,
                 showProjectedGlyphs,
-                showClusterCandidates,
-                compareProjectedAndCandidate,
                 overlayWeightMode,
                 paintedAccentPlacementDebugSnapshot,
                 acceptedLocalPositions,
                 paintedAccentPlacementDebugSnapshotBuildFailed,
                 paintedAccentProjectedGlyphDebugSnapshotBuildFailed,
-                paintedAccentContourClusterCandidateDebugSnapshotBuildFailed,
-                paintedAccentProjectedGlyphDebugSnapshot,
-                paintedAccentContourClusterCandidateDebugSnapshot);
+                paintedAccentProjectedGlyphDebugSnapshot);
         }
 
         private static void DrawPaintedAccentDistributionOverlay(
@@ -2062,465 +1951,6 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             }
         }
 
-        private static void DrawPaintedAccentContourClusterCandidateOverlay(
-            GeneratedGround ground,
-            GroundPaintedAccentContourClusterDebugSnapshot snapshot,
-            Vector3 localOffset,
-            bool drawRejections)
-        {
-            if (!snapshot.IsValid)
-            {
-                return;
-            }
-
-            Transform groundTransform = ground.transform;
-            GroundPaintedAccentContourClusterCandidate[] candidates =
-                snapshot.Candidates;
-            for (int candidateIndex = 0;
-                 candidates != null && candidateIndex < candidates.Length;
-                 candidateIndex++)
-            {
-                GroundPaintedAccentContourClusterCandidate candidate =
-                    candidates[candidateIndex];
-                if (!candidate.IsValid)
-                {
-                    continue;
-                }
-
-                DrawPaintedAccentContourClusterCandidate(
-                    groundTransform,
-                    candidate,
-                    localOffset);
-            }
-
-            if (!drawRejections)
-            {
-                return;
-            }
-
-            GroundPaintedAccentContourClusterRejectionDebugPoint[] rejections =
-                snapshot.Rejections;
-            for (int rejectionIndex = 0;
-                 rejections != null && rejectionIndex < rejections.Length;
-                 rejectionIndex++)
-            {
-                GroundPaintedAccentContourClusterRejectionDebugPoint rejection =
-                    rejections[rejectionIndex];
-                Vector3 localPosition = rejection.LocalPosition + localOffset;
-                Vector3 worldPosition =
-                    groundTransform.TransformPoint(localPosition);
-                float size =
-                    HandleUtility.GetHandleSize(worldPosition) * 0.070f;
-                Vector3 right = groundTransform.right * size;
-                Vector3 forward = groundTransform.forward * size;
-
-                Handles.color = new Color(0f, 0f, 0f, 0.92f);
-                Handles.DrawAAPolyLine(
-                    5f,
-                    worldPosition - right - forward,
-                    worldPosition + right + forward);
-                Handles.DrawAAPolyLine(
-                    5f,
-                    worldPosition - right + forward,
-                    worldPosition + right - forward);
-                Handles.color =
-                    ResolvePaintedAccentContourClusterRejectionColor(
-                        rejection.Reason);
-                Handles.DrawAAPolyLine(
-                    2.5f,
-                    worldPosition - right - forward,
-                    worldPosition + right + forward);
-                Handles.DrawAAPolyLine(
-                    2.5f,
-                    worldPosition - right + forward,
-                    worldPosition + right - forward);
-            }
-        }
-
-        private static void DrawPaintedAccentContourClusterCandidate(
-            Transform groundTransform,
-            GroundPaintedAccentContourClusterCandidate candidate,
-            Vector3 localOffset)
-        {
-            GroundPaintedAccentContourClusterChain[] chains = candidate.Chains;
-            for (int chainIndex = 0;
-                 chains != null && chainIndex < chains.Length;
-                 chainIndex++)
-            {
-                GroundPaintedAccentContourClusterChain chain =
-                    chains[chainIndex];
-                if (!chain.IsValid)
-                {
-                    continue;
-                }
-
-                Vector3[] localPoints = chain.LocalSurfacePoints;
-                float[] halfWidths = chain.HalfWidths;
-                Vector3[] centerWorld = new Vector3[localPoints.Length];
-                Vector3[] leftWorld = new Vector3[localPoints.Length];
-                Vector3[] rightWorld = new Vector3[localPoints.Length];
-
-                for (int pointIndex = 0;
-                     pointIndex < localPoints.Length;
-                     pointIndex++)
-                {
-                    Vector3 localPoint = localPoints[pointIndex] + localOffset;
-                    localPoint.y += 0.045f;
-                    Vector2 tangent =
-                        ResolvePaintedAccentProjectedGlyphTangent(
-                            localPoints,
-                            pointIndex);
-                    Vector2 side = new Vector2(-tangent.y, tangent.x);
-                    float halfWidth = Mathf.Max(0f, halfWidths[pointIndex]);
-                    Vector3 leftLocal =
-                        localPoint +
-                        new Vector3(side.x, 0f, side.y) * halfWidth;
-                    Vector3 rightLocal =
-                        localPoint -
-                        new Vector3(side.x, 0f, side.y) * halfWidth;
-                    centerWorld[pointIndex] =
-                        groundTransform.TransformPoint(localPoint);
-                    leftWorld[pointIndex] =
-                        groundTransform.TransformPoint(leftLocal);
-                    rightWorld[pointIndex] =
-                        groundTransform.TransformPoint(rightLocal);
-                }
-
-                Handles.color = new Color(0f, 0f, 0f, 0.98f);
-                Handles.DrawAAPolyLine(6.5f, centerWorld);
-                Handles.color =
-                    ResolvePaintedAccentContourClusterChainColor(chain.Role);
-                Handles.DrawAAPolyLine(3.5f, centerWorld);
-
-                Handles.color = new Color(0f, 0f, 0f, 0.88f);
-                Handles.DrawAAPolyLine(3.25f, leftWorld);
-                Handles.DrawAAPolyLine(3.25f, rightWorld);
-                Handles.color = new Color(0.10f, 0.32f, 0.92f, 0.98f);
-                Handles.DrawAAPolyLine(1.55f, leftWorld);
-                Handles.DrawAAPolyLine(1.55f, rightWorld);
-
-                if (chain.Role ==
-                    GroundPaintedAccentContourClusterChainRole.Branch)
-                {
-                    Vector3 junctionWorld = centerWorld[0];
-                    float radius =
-                        HandleUtility.GetHandleSize(junctionWorld) * 0.026f;
-                    Handles.color = new Color(0f, 0f, 0f, 0.95f);
-                    Handles.DrawWireDisc(
-                        junctionWorld,
-                        groundTransform.up,
-                        radius * 1.55f);
-                    Handles.color = new Color(1f, 1f, 1f, 0.98f);
-                    Handles.DrawWireDisc(
-                        junctionWorld,
-                        groundTransform.up,
-                        radius);
-                }
-            }
-
-            Vector3 highLocal = candidate.HighPointLocalPosition + localOffset;
-            highLocal.y += 0.045f;
-            Vector3 highWorld = groundTransform.TransformPoint(highLocal);
-            float highRadius =
-                HandleUtility.GetHandleSize(highWorld) * 0.052f;
-            Handles.color = new Color(0f, 0f, 0f, 0.98f);
-            Handles.DrawWireDisc(
-                highWorld,
-                groundTransform.up,
-                highRadius * 1.45f);
-            Handles.color = new Color(1f, 0.48f, 0.04f, 1f);
-            Handles.DrawWireDisc(
-                highWorld,
-                groundTransform.up,
-                highRadius);
-        }
-
-        private static void
-            DrawPaintedAccentProjectedGlyphAndClusterCandidateComparison(
-                GeneratedGround ground,
-                GroundPaintedAccentProjectedGlyphDebugSnapshot projectedSnapshot,
-                GroundPaintedAccentContourClusterDebugSnapshot candidateSnapshot)
-        {
-            if (!projectedSnapshot.IsValid || !candidateSnapshot.IsValid)
-            {
-                return;
-            }
-
-            System.Collections.Generic.Dictionary<int,
-                GroundPaintedAccentProjectedGlyph> projectedBySeed =
-                    new System.Collections.Generic.Dictionary<int,
-                        GroundPaintedAccentProjectedGlyph>();
-            GroundPaintedAccentProjectedGlyph[] projectedGlyphs =
-                projectedSnapshot.Glyphs;
-            for (int glyphIndex = 0;
-                 projectedGlyphs != null && glyphIndex < projectedGlyphs.Length;
-                 glyphIndex++)
-            {
-                GroundPaintedAccentProjectedGlyph glyph =
-                    projectedGlyphs[glyphIndex];
-                if (glyph.IsValid && !projectedBySeed.ContainsKey(glyph.Seed))
-                {
-                    projectedBySeed.Add(glyph.Seed, glyph);
-                }
-            }
-
-            Transform groundTransform = ground.transform;
-            Vector3 localNorth3 =
-                groundTransform.InverseTransformDirection(Vector3.forward);
-            Vector2 localNorth =
-                new Vector2(localNorth3.x, localNorth3.z);
-            localNorth =
-                localNorth.sqrMagnitude > 0.000001f
-                    ? localNorth.normalized
-                    : Vector2.up;
-            Vector2 localEast = new Vector2(localNorth.y, -localNorth.x);
-
-            GroundPaintedAccentContourClusterCandidate[] candidates =
-                candidateSnapshot.Candidates;
-            for (int candidateIndex = 0;
-                 candidates != null && candidateIndex < candidates.Length;
-                 candidateIndex++)
-            {
-                GroundPaintedAccentContourClusterCandidate candidate =
-                    candidates[candidateIndex];
-                if (!candidate.IsValid ||
-                    !projectedBySeed.TryGetValue(
-                        candidate.Seed,
-                        out GroundPaintedAccentProjectedGlyph projectedGlyph))
-                {
-                    continue;
-                }
-
-                ResolvePaintedAccentProjectedGlyphEastRange(
-                    projectedGlyph,
-                    localEast,
-                    out _,
-                    out float projectedMaximum);
-                ResolvePaintedAccentContourClusterEastRange(
-                    candidate,
-                    localEast,
-                    out float candidateMinimum,
-                    out _);
-                float comparisonGap =
-                    Mathf.Max(0.22f, projectedGlyph.CombinedPeakHeight * 0.70f);
-                float anchorEast =
-                    Vector2.Dot(
-                        new Vector2(
-                            candidate.SourceAnchorLocalPosition.x,
-                            candidate.SourceAnchorLocalPosition.z),
-                        localEast);
-                float baselineEastShift =
-                    anchorEast - comparisonGap * 0.5f - projectedMaximum;
-                float candidateEastShift =
-                    anchorEast + comparisonGap * 0.5f - candidateMinimum;
-                Vector3 baselineOffset =
-                    new Vector3(
-                        localEast.x * baselineEastShift,
-                        0f,
-                        localEast.y * baselineEastShift);
-                Vector3 candidateOffset =
-                    new Vector3(
-                        localEast.x * candidateEastShift,
-                        0f,
-                        localEast.y * candidateEastShift);
-
-                DrawPaintedAccentProjectedGlyphAtOffset(
-                    groundTransform,
-                    projectedGlyph,
-                    baselineOffset);
-                DrawPaintedAccentContourClusterCandidate(
-                    groundTransform,
-                    candidate,
-                    candidateOffset);
-
-                Vector3 baselineAnchor =
-                    candidate.SourceAnchorLocalPosition + baselineOffset;
-                baselineAnchor.y += 0.055f;
-                Vector3 candidateAnchor =
-                    candidate.SourceAnchorLocalPosition + candidateOffset;
-                candidateAnchor.y += 0.055f;
-                Handles.color = new Color(1f, 1f, 1f, 0.38f);
-                Handles.DrawDottedLine(
-                    groundTransform.TransformPoint(baselineAnchor),
-                    groundTransform.TransformPoint(candidateAnchor),
-                    4f);
-            }
-        }
-
-        private static void DrawPaintedAccentProjectedGlyphAtOffset(
-            Transform groundTransform,
-            GroundPaintedAccentProjectedGlyph glyph,
-            Vector3 localOffset)
-        {
-            if (!glyph.IsValid)
-            {
-                return;
-            }
-
-            Vector3[] localPoints = glyph.LocalSurfacePoints;
-            float[] halfWidths = glyph.HalfWidths;
-            Vector3[] centerWorld = new Vector3[localPoints.Length];
-            Vector3[] leftWorld = new Vector3[localPoints.Length];
-            Vector3[] rightWorld = new Vector3[localPoints.Length];
-            for (int pointIndex = 0;
-                 pointIndex < localPoints.Length;
-                 pointIndex++)
-            {
-                Vector3 localPoint = localPoints[pointIndex] + localOffset;
-                localPoint.y += 0.035f;
-                Vector2 tangent =
-                    ResolvePaintedAccentProjectedGlyphTangent(
-                        localPoints,
-                        pointIndex);
-                Vector2 side = new Vector2(-tangent.y, tangent.x);
-                float halfWidth = Mathf.Max(0f, halfWidths[pointIndex]);
-                Vector3 leftLocal =
-                    localPoint +
-                    new Vector3(side.x, 0f, side.y) * halfWidth;
-                Vector3 rightLocal =
-                    localPoint -
-                    new Vector3(side.x, 0f, side.y) * halfWidth;
-                centerWorld[pointIndex] =
-                    groundTransform.TransformPoint(localPoint);
-                leftWorld[pointIndex] =
-                    groundTransform.TransformPoint(leftLocal);
-                rightWorld[pointIndex] =
-                    groundTransform.TransformPoint(rightLocal);
-            }
-
-            Handles.color = new Color(0f, 0f, 0f, 0.98f);
-            Handles.DrawAAPolyLine(6.5f, centerWorld);
-            Handles.color = new Color(1.00f, 0.05f, 0.04f, 1.00f);
-            Handles.DrawAAPolyLine(3.5f, centerWorld);
-            Handles.color = new Color(0f, 0f, 0f, 0.88f);
-            Handles.DrawAAPolyLine(3.25f, leftWorld);
-            Handles.DrawAAPolyLine(3.25f, rightWorld);
-            Handles.color = new Color(0.48f, 0.08f, 0.72f, 0.98f);
-            Handles.DrawAAPolyLine(1.55f, leftWorld);
-            Handles.DrawAAPolyLine(1.55f, rightWorld);
-
-            int crestIndex = Mathf.Clamp(
-                Mathf.RoundToInt(glyph.CrestT * (centerWorld.Length - 1)),
-                0,
-                centerWorld.Length - 1);
-            Vector3 crestWorld = centerWorld[crestIndex];
-            float crestRadius =
-                HandleUtility.GetHandleSize(crestWorld) * 0.050f;
-            Handles.color = new Color(0f, 0f, 0f, 0.98f);
-            Handles.DrawWireDisc(
-                crestWorld,
-                groundTransform.up,
-                crestRadius * 1.45f);
-            Handles.color = new Color(1.00f, 0.92f, 0.05f, 1.00f);
-            Handles.DrawWireDisc(
-                crestWorld,
-                groundTransform.up,
-                crestRadius);
-        }
-
-        private static void ResolvePaintedAccentProjectedGlyphEastRange(
-            GroundPaintedAccentProjectedGlyph glyph,
-            Vector2 localEast,
-            out float minimum,
-            out float maximum)
-        {
-            minimum = float.PositiveInfinity;
-            maximum = float.NegativeInfinity;
-            Vector3[] points = glyph.LocalSurfacePoints;
-            for (int pointIndex = 0;
-                 points != null && pointIndex < points.Length;
-                 pointIndex++)
-            {
-                float coordinate =
-                    Vector2.Dot(
-                        new Vector2(points[pointIndex].x, points[pointIndex].z),
-                        localEast);
-                minimum = Mathf.Min(minimum, coordinate);
-                maximum = Mathf.Max(maximum, coordinate);
-            }
-
-            if (float.IsPositiveInfinity(minimum) ||
-                float.IsNegativeInfinity(maximum))
-            {
-                minimum = 0f;
-                maximum = 0f;
-            }
-        }
-
-        private static void ResolvePaintedAccentContourClusterEastRange(
-            GroundPaintedAccentContourClusterCandidate candidate,
-            Vector2 localEast,
-            out float minimum,
-            out float maximum)
-        {
-            minimum = float.PositiveInfinity;
-            maximum = float.NegativeInfinity;
-            GroundPaintedAccentContourClusterChain[] chains = candidate.Chains;
-            for (int chainIndex = 0;
-                 chains != null && chainIndex < chains.Length;
-                 chainIndex++)
-            {
-                Vector3[] points = chains[chainIndex].LocalSurfacePoints;
-                for (int pointIndex = 0;
-                     points != null && pointIndex < points.Length;
-                     pointIndex++)
-                {
-                    float coordinate =
-                        Vector2.Dot(
-                            new Vector2(
-                                points[pointIndex].x,
-                                points[pointIndex].z),
-                            localEast);
-                    minimum = Mathf.Min(minimum, coordinate);
-                    maximum = Mathf.Max(maximum, coordinate);
-                }
-            }
-
-            if (float.IsPositiveInfinity(minimum) ||
-                float.IsNegativeInfinity(maximum))
-            {
-                minimum = 0f;
-                maximum = 0f;
-            }
-        }
-
-        private static Color ResolvePaintedAccentContourClusterChainColor(
-            GroundPaintedAccentContourClusterChainRole role)
-        {
-            switch (role)
-            {
-                case GroundPaintedAccentContourClusterChainRole.Branch:
-                    return new Color(0.10f, 1.00f, 0.42f, 1.00f);
-                case GroundPaintedAccentContourClusterChainRole.Echo:
-                    return new Color(0.28f, 0.64f, 1.00f, 1.00f);
-                case GroundPaintedAccentContourClusterChainRole.PrimaryLeftArm:
-                case GroundPaintedAccentContourClusterChainRole.PrimaryRightArm:
-                default:
-                    return new Color(0.00f, 0.94f, 0.94f, 1.00f);
-            }
-        }
-
-        private static Color ResolvePaintedAccentContourClusterRejectionColor(
-            GroundPaintedAccentContourClusterRejectionReason reason)
-        {
-            switch (reason)
-            {
-                case GroundPaintedAccentContourClusterRejectionReason.River:
-                    return new Color(0.10f, 0.45f, 1.00f, 1.00f);
-                case GroundPaintedAccentContourClusterRejectionReason.ModifierExclusion:
-                    return new Color(1.00f, 0.90f, 0.08f, 1.00f);
-                case GroundPaintedAccentContourClusterRejectionReason.BroadSlope:
-                    return new Color(1.00f, 0.10f, 0.08f, 1.00f);
-                case GroundPaintedAccentContourClusterRejectionReason.LocalGrade:
-                    return new Color(0.75f, 0.18f, 1.00f, 1.00f);
-                case GroundPaintedAccentContourClusterRejectionReason.UpwardExcursion:
-                    return new Color(1.00f, 0.05f, 0.72f, 1.00f);
-                case GroundPaintedAccentContourClusterRejectionReason.Sampling:
-                default:
-                    return new Color(1.00f, 0.45f, 0.05f, 1.00f);
-            }
-        }
-
         private static Vector2 ResolvePaintedAccentProjectedGlyphTangent(
             Vector3[] points,
             int pointIndex)
@@ -2645,16 +2075,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             bool showProposals,
             bool showAccepted,
             bool showProjectedGlyphs,
-            bool showClusterCandidates,
-            bool compareProjectedAndCandidate,
             PaintedAccentPlacementOverlayWeightMode overlayWeightMode,
             GroundPaintedAccentPlacementDebugSnapshot snapshot,
             Vector3[] acceptedPositions,
             bool snapshotBuildFailed,
             bool projectedSnapshotBuildFailed,
-            bool candidateSnapshotBuildFailed,
-            GroundPaintedAccentProjectedGlyphDebugSnapshot projectedSnapshot,
-            GroundPaintedAccentContourClusterDebugSnapshot candidateSnapshot)
+            GroundPaintedAccentProjectedGlyphDebugSnapshot projectedSnapshot)
         {
             int validSampleCount = 0;
             GroundPaintedAccentDistributionDebugSample[] samples =
@@ -2688,7 +2114,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     : 0;
 
             System.Text.StringBuilder text =
-                new System.Text.StringBuilder(384);
+                new System.Text.StringBuilder(320);
             text.AppendLine("Painted Accent Placement");
 
             if (showDistribution)
@@ -2717,7 +2143,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 text.AppendLine("Green ring: accepted base stroke");
             }
 
-            if (showProjectedGlyphs || compareProjectedAndCandidate)
+            if (showProjectedGlyphs)
             {
                 text.AppendLine("Red/purple: accepted projected baseline");
                 text.AppendLine("Yellow ring: accepted projected crest");
@@ -2730,42 +2156,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     diagnostics.ProjectedGlyphsRejectedTotal.ToString());
             }
 
-            if (showClusterCandidates || compareProjectedAndCandidate)
-            {
-                text.AppendLine("Cyan/green/blue: cluster primary/branch/echo");
-                text.AppendLine("Orange root; white junction; candidate X: rejection");
-                GroundPaintedAccentContourClusterDiagnostics diagnostics =
-                    candidateSnapshot.Diagnostics;
-                text.Append("Cluster accepted/rejected: ");
-                text.Append(diagnostics.CandidatesAccepted);
-                text.Append(" / ");
-                text.AppendLine(diagnostics.RejectedTotal.ToString());
-                text.Append("Accepted upward violations: ");
-                text.AppendLine(
-                    diagnostics.AcceptedUpwardViolationCount.ToString());
-            }
-
-            if (compareProjectedAndCandidate)
-            {
-                text.AppendLine("Paired preview copies: accepted left, A9A right");
-                text.AppendLine("True-position overlays remain independently controlled");
-            }
-
             if (snapshotBuildFailed && (showDistribution || showProposals))
             {
                 text.AppendLine("PLACEMENT SNAPSHOT UNAVAILABLE");
             }
 
-            if (projectedSnapshotBuildFailed &&
-                (showProjectedGlyphs || compareProjectedAndCandidate))
+            if (projectedSnapshotBuildFailed && showProjectedGlyphs)
             {
                 text.AppendLine("PROJECTED GLYPH SNAPSHOT UNAVAILABLE");
-            }
-
-            if (candidateSnapshotBuildFailed &&
-                (showClusterCandidates || compareProjectedAndCandidate))
-            {
-                text.AppendLine("CLUSTER CANDIDATE SNAPSHOT UNAVAILABLE");
             }
 
             text.Append("Samples: ");
@@ -2778,16 +2176,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             text.Append(acceptedCount);
 
             Handles.BeginGUI();
-            bool showAnyShape =
-                showProjectedGlyphs ||
-                showClusterCandidates ||
-                compareProjectedAndCandidate;
-            float boxHeight =
-                compareProjectedAndCandidate
-                    ? 292f
-                    : showAnyShape
-                        ? 232f
-                        : 124f;
+            float boxHeight = showProjectedGlyphs ? 210f : 124f;
             Rect boxRect = new Rect(12f, 12f, 430f, boxHeight);
             GUI.Box(boxRect, GUIContent.none, EditorStyles.helpBox);
             GUI.Label(

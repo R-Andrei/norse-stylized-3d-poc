@@ -1696,6 +1696,15 @@ private readonly struct EdgeWearTopologyStats
             public int PatchContainedRepartitionBoundaryFailures;
             public int PatchContainedRepartitionTopologyFailures;
             public int PatchContainedRepartitionOverlapRemaining;
+            public int PatchContainedRepairCandidates;
+            public int PatchContainedRepairGuidedResiduals;
+            public int PatchContainedRepairGenericFallbacks;
+            public int PatchContainedRepairEndpointAligned;
+            public int PatchContainedRepairResolved;
+            public int PatchContainedRepairBuildFailures;
+            public int PatchContainedRepairBoundaryFailures;
+            public int PatchContainedRepairTopologyFailures;
+            public int PatchContainedRepairOverlapRemaining;
             public int PatchContainedBoundaryCandidates;
             public int PatchContainedBoundaryExactValid;
             public int PatchContainedBoundarySplitEquivalent;

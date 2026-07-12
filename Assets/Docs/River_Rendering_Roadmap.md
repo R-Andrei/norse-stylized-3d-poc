@@ -367,7 +367,7 @@ The modern execution order is:
 14. Transport Presence capacity-loss attribution — Unity-validated and accepted in `5.16E.3`.
 15. Capacity audit closure and deferred sub-1% PoC limitation — accepted in `5.16E.3C`; original `0.10%` target retained, temporary review threshold `1.00%`.
 16. Layer E final-rendering contract lock — accepted in documentation-only `5.17P`.
-17. Layer E finishing — `5.17A` failed visual validation; corrected `5.17A.1` is Unity-validated and accepted. Initial `5.17B` breakup was stable but visually underpowered. `5.17B.1` recalibrates Chip, Fray, short-cut, and Scale authority with Unity validation pending, followed by Remaining-Life progression and fine-detail work in `5.17C–D`.
+17. Layer E finishing — `5.17A` failed visual validation; corrected `5.17A.1` is accepted. `5.17B` and `5.17B.1` are rejected. `5.17B.2` Chip/Fray and Breakup Scale are provisionally accepted, `5.17B.2A` retains optional independent Foam Strands, and `5.17B.2B` implements medium-to-large edge-band regional fragmentation. Unity validation of fragmentation precedes `5.17C–D` Remaining-Life orchestration and fine polish.
 18. Decide whether `_FoamShapeMask` production integration is still required after Layer E comparison.
 19. Reopen capacity correction only if the review threshold is exceeded or visible loss appears.
 20. Formal performance tiers, active-chunk scheduling, and profiling gates.
@@ -416,11 +416,25 @@ Edge Contrast           = 0
 
 At neutral values, opacity reduces exactly to `smoothstep(0.08, 0.46, mask) × Foam Colour alpha` and lighting reduces exactly to the pre-5.17A edge/interior transition. The correction adds arithmetic only: no texture sample, branch, loop, neighbourhood stencil, persistent resource, compute dispatch, readback, material-state change, or silhouette expansion.
 
-### `5.17B — Layer E Edge Breakup Proof`
+### `5.17B / 5.17B.1 — Rejected Hardened-Mask Breakup`
 
-`4.11C.5.17B` promoted the shared Layer E breakup helper successfully, but Unity visual validation found its maximum authority too subtle. `4.11C.5.17B.1 — Breakup Authority Calibration` is implemented with Unity validation pending. It retains the same production path, controls, stable fields, and ownership boundaries while strengthening only the existing threshold calibration.
+`4.11C.5.17B` and `4.11C.5.17B.1` are both visually rejected. The decisive blind comparison used Breakup Scale `0` with Chip/Fray `0` versus `1`; the difference was weak enough that the images were identified backwards. Stronger threshold constants did not solve the ownership error.
 
-The public authoring surface is deliberately narrow:
+Both patches applied breakup after the visibility signal had already been hardened:
+
+```hlsl
+float hardVisible = smoothstep(0.22, 0.58, softVisibility);
+float fringe = smoothstep(0.06, 0.34, softVisibility) * 0.34;
+float hardenedMask = saturate(max(hardVisible, fringe));
+```
+
+Most visible body pixels therefore entered the breakup helper near `1.0`. The old equations altered mainly the narrow antialiased transition, while `5.17A.1` Interior Opacity Floor concealed partial erosion that did not reach zero. Breakup Scale also weakened the result at broader settings because the broad/diagonal composite had a compressed centre-weighted distribution. No further hardened-mask threshold recalibration is allowed.
+
+### `5.17B.2 — Pre-Hardening Binary Edge Cuts`
+
+Status: Unity-validated for Chip and Fray. Chip, Fray, and Breakup Scale are provisionally accepted as useful fixed-strength authoring controls; no separate Scale correction blocks current work.
+
+The public authoring surface is unchanged:
 
 ```text
 Chip Strength   0–1; default 0
@@ -428,15 +442,76 @@ Fray Strength   0–1; default 0
 Breakup Scale   0–1; default 0.5
 ```
 
-Neutral Chip and Fray values reproduce `5.17A.1` regardless of Breakup Scale. Medium chips, fine weak-fringe fray, and short edge-connected cuts use a monotone edge-threshold model: stronger incoming coverage always survives at least as well as weaker coverage, so a fully established core cannot disappear as an isolated interior hole. The short-cut signal is derived from Chip Strength rather than adding another public control.
+`RiverWaterFoamPatternedMask` now preserves its continuous pre-hardening `softVisibility` transiently while leaving the accepted hardening equation numerically unchanged. `RiverWaterFoamResult` carries that scalar through the existing visual warp, stretch, surface-break, stored-retention, and freeze coupling beside the existing hardened mask. Layer E then performs antialiased binary survival tests against `softVisibility` and multiplies the result into the hardened mask. Selected chips and short cuts may therefore reach true zero coverage; fray uses a shallower threshold. Exact saturated soft cores remain protected. The post-breakup result is removal-only and always satisfies `postBreakupMask <= hardenedMask`, so Interior Opacity Floor cannot refill a removed pixel.
 
-The implementation reuses the four stable pattern bands already evaluated by `RiverWaterFoamPatternedMask`. Their accepted combined visibility equation is unchanged. Two transient shader values are exposed locally: Chip selects between the existing mid and broad/diagonal bands; Fray selects between fine and mid bands. No new texture sample, procedural-noise evaluation, persistent field, channel, compute kernel, dispatch, readback, or material-state write is added.
+The stable pattern path still evaluates exactly the same broad, diagonal, mid, and fine noise calls. Only the transient Chip/Fray outputs are normalized before Scale interpolation: mid and broad chip fields receive separate contrast normalization, as do fine and mid fray fields. Static distribution analysis shows the selected-field means remain effectively matched across Scale endpoints, so Scale changes feature size/frequency without silently collapsing authority. The accepted combined visibility pattern is unchanged.
 
-Production Final Foam, Foam Evaluated Final Preview, Foam Shader Detail Probe, and Foam Shader Detail Difference use the same breakup helper. The Probe now shows the production post-breakup committed silhouette. The Difference view is removal-only: black is unchanged and magenta/red is coverage removed by chips, fray, or short cuts; no green addition is expected.
+Production Final Foam, Foam Evaluated Final Preview, Foam Shader Detail Probe, and Foam Shader Detail Difference continue to use the same breakup helper. The Probe shows the exact production post-breakup silhouette. Difference remains removal-only: black is unchanged and magenta/red is removed coverage; green remains zero. The evaluated preview supplies its evaluated shape to the same binary helper without promoting Layer D to production.
 
-The first proof intentionally reads no Remaining Life, Support, Negative Topology, surface-energy multiplier, or additional `_Time` input. It isolates morphology quality at fixed author-controlled strength. Existing upstream visibility may retain its already accepted lifecycle and surface behavior, but `5.17B` adds no new temporal or location-based breakup rule.
+Neutral Chip and Fray values return the exact accepted hardened mask, and Breakup Scale alone does nothing. The fixed proof still reads no Remaining Life, Support, Negative Topology, surface-energy multiplier, river-location multiplier, or additional time input. It adds no texture sample, procedural-noise call, texture, buffer, persistent field, compute kernel, dispatch, readback, shader property, or C# binding. Incremental cost is fragment arithmetic plus one transient scalar and possible register pressure.
 
-`5.17B.1` makes maximum Chip/Fray deliberately excessive so production tuning can be selected from the interior of the `0–1` range. Medium chips now reach approximately `0.72–0.98` coverage at maximum authority, fray reaches deeper into the visible edge, and short cuts widen/deepen while still preserving `shape == 1`. Scale now changes feature activation and crack width/frequency as well as pattern-band selection. No new texture sample, noise evaluation, resource, compute dispatch, or persistent state is introduced.
+Unity validation passed the authority requirement: Chip and Fray are clearly visible at maximum strength and behave as described. The original short-cut contribution is separated into optional `5.17B.2A` Foam Strands. Breakup Scale visibly modifies the accepted Chip/Fray result and is provisionally accepted; no separate coherence patch is active.
+
+
+### `5.17B.2A — Foam Strand Extraction and Stability Controls`
+
+Status: Unity-observed and provisionally retained as an optional independently disableable feature. Further refinement is deferred until regional fragmentation is evaluated.
+
+The former short-cut path is not discarded, but it is no longer owned by Chip Strength. The old equation generated a periodic stripe family with `frac(...)`; at close spacing and small projected width it exposed many adjacent, nearly parallel subpixel lanes, creating comb-like or jittering artifacts and artificial intersections between differently clipped groups. `5.17B.2A` extracts that useful pulled-strip vocabulary into an independent **Foam Strands** feature:
+
+```text
+General Composition
+  Final Foam Visibility Mode
+  Foam Colour
+  Interior Opacity Floor
+  Edge Contrast
+
+Edge Breakup — Chips & Fray
+  Chip Strength
+  Fray Strength
+  Breakup Scale
+
+Foam Strands
+  Strand Strength
+  Strand Spacing
+  Strand Width
+  Strand Curvature
+```
+
+All strand controls are normalized `0–1`. Strand Strength defaults to `0`, so existing authoring can disable the feature completely. Spacing defaults to `0.55`, Width to `0.50`, and Curvature to `0.55`. Breakup Scale remains inside the Chip/Fray group and has no strand authority.
+
+The strand path remains removal-only and evaluates against the same pre-hardening soft visibility used by accepted Chip/Fray. It reuses the already-computed broad, diagonal, and mid stable fields: broad/diagonal supply coherent curvature and broad grouping, independent of Breakup Scale. The old `10.0–3.5` uninterrupted periodic comb is replaced by a safer `6.0–2.2` authored frequency range, non-adjacent candidate-lane selection, deterministic lane suppression, broad group envelopes, edge-reach gating, derivative-based antialiasing, a projected-width floor, and a density fade when the stripe period becomes too small to resolve. The rule is to show fewer stable strands rather than many unstable subpixel strands.
+
+Production Final Foam, Foam Evaluated Final Preview, Foam Shader Detail Probe, and Foam Shader Detail Difference still share one final-removal helper. No Layer C state, Remaining Life, Layer D occupancy, topology, compute kernel, dispatch, readback, texture, or texture sample is added. Runtime additions are four scalar shader properties/bindings, two transient stable strand fields carried with the existing breakup fields, fragment arithmetic, derivatives, and one deterministic hash evaluation. The include is used only by `SH_CleanStylizedRiver.shader`; Ground, Generated Mass, and other shaders are unaffected.
+
+Unity acceptance requires independent validation with Chip and Fray at zero: Strength `0` must be exactly neutral; increasing Strength must reveal curved grouped channels; Spacing must alter separation; Width must alter stable channel thickness; Curvature must bend the same strand family without crawling. Dense settings and distant views must fade or simplify instead of producing a shimmering comb. Chip/Fray output must remain free of the old derived stripe path when Strand Strength is zero.
+
+### `5.17B.2B — Edge-Band Regional Fragmentation`
+
+Status: implemented; Unity visual validation pending. Chip, Fray, and Breakup Scale are provisionally accepted as useful fixed-strength authoring controls. Foam Strands are retained provisionally as an independently disableable feature. No further correction to those controls blocks this patch.
+
+The missing visual scale is coherent medium-to-large regional loss. `5.17B.2B` adds a separate **Edge Fragmentation** group:
+
+```text
+Edge Fragmentation
+  Fragmentation Strength   0–1; default 0
+  Fragment Size            0–1; default 0.5
+  Fragment Reach           0–1; default 0.5
+```
+
+Fragmentation Strength is exact-neutral at zero and controls overall removal authority. Fragment Size does not crossfade between unrelated seeds: the stable broad foundation remains fixed, while an existing lower-scale stable signal perturbs and subdivides that same foundation progressively toward Size `0`. Fragment Reach expands eligibility and maximum cut depth inward, while exact saturated cores remain protected.
+
+The eligibility domain intentionally intersects two existing transient signals:
+
+```text
+meaningful but partial Material Presence
+  × cuttable pre-hardening soft visibility edge band
+  × stable broad regional selection
+```
+
+Empty water is excluded, fully established core material is suppressed, and the result is removal-only. The patch passes committed Material Presence into the existing shared final-removal helper; production Final Foam and Foam Evaluated Final Preview use the same arithmetic, and Shader Detail Probe/Difference continue to report the production silhouette and removal-only delta. No additional texture sample, procedural-noise evaluation, hash evaluation, texture, buffer, persistent channel, compute kernel, dispatch, readback, Layer C mutation, Layer D mutation, Support lookup, Negative Topology lookup, or Remaining-Life multiplier is added.
+
+Unity acceptance requires Chip, Fray, and Strand Strength at zero. Fragmentation Strength `0` must reproduce the current result exactly. Strength `1` must remove coherent medium or broad portions of weak edge bands rather than isolated pixels or repeated lanes. Fragment Size must alter subdivision while preserving recognizable broad placement. Fragment Reach must clearly alter inward depth without opening isolated holes in firm cores. The result must remain stationary and Difference must show regional magenta removal rather than only one-pixel outlines.
 
 ### Lifetime and topology rule
 
@@ -446,7 +521,7 @@ Do not sample support/negative topology directly for breakup unless later Unity 
 
 ### Later polish
 
-`5.17C` is planned Remaining-Life progression for the complete deterioration vocabulary: chips, fray, short cracks, thinning strands, detached flecks, broken streak remnants, and sparse old-foam remnants should advance as Layer C Remaining Life falls. Supported and Negative Topology must initially influence that progression only through their existing Layer C aging rates; direct topology, support, negative-pressure, or river-location breakup multipliers remain deferred unless Remaining Life demonstrably proves insufficient. `5.17D` is planned fine-fragment and final-energy work rather than an optional bucket to omit: tiny detached flecks, small fragments, thin streak remnants, micro-bubbles, and selective bright glints are part of the intended final Foam pass. Their underlying Foam availability and deterioration follow the lifecycle-derived mask; optical glints may additionally respond to lighting.
+`5.17C` is planned Remaining-Life progression for the accepted deterioration vocabulary: chips, fray, regional fragmentation, optional strands, detached flecks, broken streak remnants, and sparse old-foam remnants should advance as Layer C Remaining Life falls. Supported and Negative Topology must initially influence that progression only through their existing Layer C aging rates; direct topology, support, negative-pressure, or river-location breakup multipliers remain deferred unless Remaining Life demonstrably proves insufficient. `5.17D` is planned fine-fragment and final-energy work rather than an optional bucket to omit: tiny detached flecks, small fragments, thin streak remnants, micro-bubbles, and selective bright glints are part of the intended final Foam pass. Their underlying Foam availability and deterioration follow the lifecycle-derived mask; optical glints may additionally respond to lighting.
 
 ### Performance contract
 

@@ -92,6 +92,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             public readonly Vector3 Start;
             public readonly Vector3 End;
+            public readonly int RecordIndex;
             public readonly ChamferProvisionalFaceKind Kind;
             public readonly int SourceFaceIndex;
             public readonly int PatchLoopIndex;
@@ -99,12 +100,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public ChamferContainedBoundaryEdgeRecord(
                 Vector3 start,
                 Vector3 end,
+                int recordIndex,
                 ChamferProvisionalFaceKind kind,
                 int sourceFaceIndex,
                 int patchLoopIndex)
             {
                 Start = start;
                 End = end;
+                RecordIndex = recordIndex;
                 Kind = kind;
                 SourceFaceIndex = sourceFaceIndex;
                 PatchLoopIndex = patchLoopIndex;
@@ -177,6 +180,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ChamferProvisionalFaceRecord ownerRecord,
                 List<ChamferProvisionalFaceRecord> patchRecords,
                 List<ChamferProvisionalFaceRecord> transformedRecords,
+                int residualRecordStart,
+                int residualRecordCount,
                 float minimumStableEdgeLength)
         {
             List<ChamferBoundarySegment> patchBoundary =
@@ -208,10 +213,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ChamferContainedBoundarySegmentAudit segmentAudit =
                     AuditChamferContainedBoundarySegment(
                         candidate,
-                        ownerRecord,
                         patchBoundary[segmentIndex],
                         ownerBoundary,
                         edgeRecords,
+                        residualRecordStart,
+                        residualRecordCount,
                         tolerance);
                 exactTwoUse &= segmentAudit.ExactTwoUse;
                 switch (segmentAudit.Classification)
@@ -274,10 +280,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private static ChamferContainedBoundarySegmentAudit
             AuditChamferContainedBoundarySegment(
                 ChamferContainedPatchCandidate candidate,
-                ChamferProvisionalFaceRecord ownerRecord,
                 ChamferBoundarySegment boundary,
                 List<ChamferBoundarySegment> ownerBoundary,
                 List<ChamferContainedBoundaryEdgeRecord> edgeRecords,
+                int residualRecordStart,
+                int residualRecordCount,
                 float tolerance)
         {
             TopologyEdgeKey boundaryKey = new TopologyEdgeKey(
@@ -311,8 +318,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ChamferContainedBoundaryEdgeOwner edgeOwner =
                     ClassifyChamferContainedBoundaryEdgeOwner(
                         candidate,
-                        ownerRecord,
-                        edge);
+                        edge,
+                        residualRecordStart,
+                        residualRecordCount);
                 TopologyEdgeKey edgeKey = new TopologyEdgeKey(
                     new VertexKey(edge.Start),
                     new VertexKey(edge.End));
@@ -774,6 +782,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     result.Add(new ChamferContainedBoundaryEdgeRecord(
                         start,
                         end,
+                        recordIndex,
                         record.Kind,
                         record.SourceFaceIndex,
                         record.PatchLoopIndex));
@@ -785,8 +794,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private static ChamferContainedBoundaryEdgeOwner
             ClassifyChamferContainedBoundaryEdgeOwner(
                 ChamferContainedPatchCandidate candidate,
-                ChamferProvisionalFaceRecord ownerRecord,
-                ChamferContainedBoundaryEdgeRecord edge)
+                ChamferContainedBoundaryEdgeRecord edge,
+                int residualRecordStart,
+                int residualRecordCount)
         {
             if (edge.Kind == ChamferProvisionalFaceKind.VertexPatch)
             {
@@ -798,7 +808,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 return ChamferContainedBoundaryEdgeOwner.Bevel;
             }
-            return edge.SourceFaceIndex == ownerRecord.SourceFaceIndex
+            return edge.RecordIndex >= residualRecordStart &&
+                edge.RecordIndex < residualRecordStart + residualRecordCount
                 ? ChamferContainedBoundaryEdgeOwner.ResidualOwner
                 : ChamferContainedBoundaryEdgeOwner.OtherReplacement;
         }
@@ -871,6 +882,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     new ChamferContainedBoundaryEdgeRecord(
                         sourceSegments[i].Start,
                         sourceSegments[i].End,
+                        -1,
                         ChamferProvisionalFaceKind.ReplacementBase,
                         -1,
                         -1);

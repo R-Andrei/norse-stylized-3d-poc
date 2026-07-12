@@ -1,19 +1,19 @@
 # Generated Mass Edge-Wear Code Inventory
 
-This is the canonical code-level companion to `Generated_Mass_Edge_Wear_Recovery_Architecture.md`. MG-R6B.1 preserves the MG-R5 builder-to-diagnostics boundary while decomposing the clone-only contained-owner boundary failure exposed by MG-R6B.
+This is the canonical code-level companion to `Generated_Mass_Edge_Wear_Recovery_Architecture.md`. MG-R6 is the final MassGenerator refactor-closure pass. The historically named MG-R6A through MG-R6B.2 work is retained because it produced useful clone-only edge-wear evidence, but those patches are functional edge-wear research rather than refactor work.
 
 ## Current architecture summary
 
-- All `MassGenerator*.cs`: **25,725 lines**.
-- Edge-wear partials: **21,696 lines**.
-- Production-candidate/shared edge-wear files: **15,558 lines**.
+- All `MassGenerator*.cs`: **25,537 lines**.
+- Edge-wear partials: **22,366 lines**.
+- Production-candidate/shared edge-wear files: **15,567 lines**.
 - Orchestration boundary: **570 lines**.
-- Diagnostic harness: **5,558 lines**.
+- Diagnostic harness: **6,219 lines**.
 - Compatibility shim: **10 lines**.
-- Direct top-level edge-wear methods: **302**.
-- Direct nested edge-wear types: **89**.
+- Direct top-level edge-wear methods: **316**.
+- Direct nested edge-wear types: **90**.
 
-MG-R5 is Unity-validated: all 24 compact audits match MG-R4 with zero errors and zero warnings. MG-R6A is Unity-validated: the 22 production candidates exactly match the 22 patch-contained overlaps, all owners are deterministic, and every direct omission fails boundary transfer. MG-R6B runtime evidence preserves all prior fields and produces `containedRepartition=22/0/0/0/0/22/0/0`. MG-R6B.1 is implemented as the clone-only boundary-incidence and shadow-validation decomposition.
+MG-R5 is Unity-validated: all 24 compact audits match MG-R4 with zero errors and zero warnings. The retained functional work is also runtime-grounded: MG-R6A produced `contained=22/0/22/0/22/0`; MG-R6B produced `containedRepartition=22/0/0/0/0/22/0/0`; MG-R6B.1 proved all 22 overlaps are removed but every transformed candidate introduces open and non-manifold edges, while 14 also introduce T-junctions; MG-R6B.2 produced `containedRepair=22/22/0/0/0/0/22/0/0`, so every guided residual still fails exact boundary incidence. MG-R6 removes only independently proven dead non-edge-wear code and leaves every retained topology experiment untouched.
 
 ## Dependency rule
 
@@ -38,7 +38,9 @@ production candidate -X-> diagnostic-only methods/types
 | MG-R5 | 22,635 | 18,606 | Unity-validated production/diagnostic separation |
 | MG-R6A | 23,104 | 19,075 | Unity-validated contained-patch transfer feasibility; `contained=22/0/22/0/22/0` aggregate |
 | MG-R6B | 24,676 | 20,647 | Runtime census `containedRepartition=22/0/0/0/0/22/0/0`; all 22 stop at exact boundary incidence |
-| MG-R6B.1 | 25,725 | 21,696 | Implemented clone-only boundary-incidence decomposition and shadow topology/overlap checks; Unity validation pending |
+| MG-R6B.1 | 25,725 | 21,696 | Unity-validated: `containedBoundary=22/0/0/0/0/0/0/22`, `containedBoundarySegments=66/0/0/0/0/44/22/0`, `containedShadow=22/22/0/14/22/0/22` |
+| MG-R6B.2 | 26,395 | 22,366 | Runtime result `containedRepair=22/22/0/0/0/0/22/0/0`; guided reconstruction executes but all 22 still fail boundary incidence |
+| MG-R6 | 25,537 | 22,366 | Final refactor closure: 858 dead non-edge-wear lines, 30 methods, and 6 private types removed; Unity validation pending |
 
 ## MG-R6A retained boundary
 
@@ -70,6 +72,32 @@ production candidate -X-> diagnostic-only methods/types
 - Shadow overlap and topology checks now run after residual construction even when exact boundary incidence fails. They independently report overlap removal, clean topology, T-junction increase, unexpected-open-edge increase, source-boundary increase, and non-manifold increase.
 - Normal output adds `containedBoundary=`, `containedBoundarySegments=`, and `containedShadow=`. Detailed representative incidence traces remain behind `EnableVerboseChamferDiagnostics` and are capped to one case per classification.
 - The patch remains clone-only and does not change combined-candidate eligibility, rendered geometry, readiness, or `geometryCommit=disabled`.
+- Unity validation produced `containedBoundary=22/0/0/0/0/0/0/22`, `containedBoundarySegments=66/0/0/0/0/44/22/0`, and `containedShadow=22/22/0/14/22/0/22`. Every target overlap was removed, but all 22 candidates gained unexpected open and non-manifold edges; 14 also gained T-junctions. The failure is therefore real topology, not an exact-key-only validator mismatch.
+
+## MG-R6B.2 bundled repair boundary
+
+- `MassGenerator.EdgeWear.Diagnostics.ContainedRepair.cs` adds a constrained owner-boundary notch builder for the proven three-segment contained-patch cases.
+- The retained patch boundary is ordered deterministically, projected in the owner basis, and divided into one shared owner-boundary run plus its complementary interior run. The shared run is removed from the owner cycle and replaced by the reversed complementary patch path.
+- The existing generic directed-segment arrangement remains as a deterministic fallback if the guided boundary case cannot be established.
+- After owner replacement, every transformed clone face is subdivided at authoritative retained-patch endpoints that lie in an edge interior. This aligns adjacent faces without moving points, changing area, or touching live records.
+- Boundary provenance now identifies residual-owner records by their exact transformed-record range rather than treating every replacement record with the same `SourceFaceIndex` as the owner.
+- Normal output adds `containedRepair=candidates/guidedResiduals/genericFallbacks/endpointAligned/resolved/buildFailures/boundaryFailures/topologyFailures/overlapRemaining`. The terminal reconciliation is `candidates = resolved + buildFailures + boundaryFailures + topologyFailures + overlapRemaining`; guided/fallback and endpoint-aligned values are independent construction observations.
+- The patch remains clone-only. Production candidates, live replacement faces, bevel strips, patch records, readiness, rendering, and `geometryCommit=disabled` are unchanged.
+- Runtime validation produced `containedRepair=22/22/0/0/0/0/22/0/0`. All 22 candidates use the guided path, none require endpoint insertion, and all 22 still fail the exact boundary gate. Existing `containedBoundary=`, `containedBoundarySegments=`, and `containedShadow=` evidence remains unchanged.
+
+## MG-R6 final refactor closure
+
+MG-R6 closes the MassGenerator refactor against the current post-MG-R6B.2 tree without removing any useful edge-wear research. It removes only code with a complete zero-consumer proof:
+
+- the private `FaceMaterialMaskLookup` subsystem, its five support records, and all 25 methods inside it;
+- the uncalled transactional `TryClipPolyhedron` wrapper and its three private helpers;
+- the unused `VertexKey.ToDiagnosticString` formatter.
+
+The removed material-mask subsystem had no construction, rendering, editor, logging, readiness, or diagnostic caller anywhere under `Assets`. `TryClipPolyhedron` likewise had no caller; the active direct `ClipPolyhedron` path remains unchanged. The closure reduces `MassGenerator.Types.cs` from 1,058 to 306 lines and `MassGenerator.Polyhedron.cs` from 493 to 387 lines.
+
+The validated post-cleanup audit finds 523 method declarations across all pre-EW-K1 `MassGenerator` partials. Every method has a surviving call or reference; the only declaration not followed by a normal call expression is `CompareChamferContainedPatchCandidates`, which is consumed twice as a `List<T>.Sort` method group. All private nested types have surviving references. Production/shared edge-wear files contain zero references to diagnostic-only methods or types; only the orchestration boundary invokes the diagnostic harness and logger.
+
+Naming is now strict: `MG-R` denotes MassGenerator refactor work and closes with MG-R6. The retained MG-R6A through MG-R6B.2 labels are historical only. Future topology work continues under an `EW-*` functional series.
 
 ## File inventory
 
@@ -82,60 +110,73 @@ production candidate -X-> diagnostic-only methods/types
 | `MassGenerator.EdgeWear.ContainedOwnership.cs` | 1,241 | 24 | 0 | Production candidate / shared utility |
 | `MassGenerator.EdgeWear.CorrectedTopology.cs` | 10 | 0 | 0 | Compatibility shim |
 | `MassGenerator.EdgeWear.Diagnostics.ContainedOwnership.cs` | 245 | 3 | 0 | Diagnostic harness |
-| `MassGenerator.EdgeWear.Diagnostics.ContainedBoundary.cs` | 985 | 14 | 7 | Diagnostic harness |
-| `MassGenerator.EdgeWear.Diagnostics.ContainedRepartition.cs` | 1,548 | 23 | 5 | Diagnostic harness |
+| `MassGenerator.EdgeWear.Diagnostics.ContainedBoundary.cs` | 997 | 14 | 7 | Diagnostic harness |
+| `MassGenerator.EdgeWear.Diagnostics.ContainedRepartition.cs` | 1,617 | 23 | 6 | Diagnostic harness |
+| `MassGenerator.EdgeWear.Diagnostics.ContainedRepair.cs` | 570 | 14 | 0 | Diagnostic harness |
 | `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs` | 2,050 | 21 | 0 | Diagnostic harness |
-| `MassGenerator.EdgeWear.Diagnostics.Logging.cs` | 345 | 8 | 0 | Diagnostic harness |
+| `MassGenerator.EdgeWear.Diagnostics.Logging.cs` | 371 | 8 | 0 | Diagnostic harness |
 | `MassGenerator.EdgeWear.Diagnostics.Overlap.cs` | 314 | 5 | 0 | Diagnostic harness |
 | `MassGenerator.EdgeWear.Diagnostics.Types.cs` | 71 | 0 | 3 | Diagnostic harness |
 | `MassGenerator.EdgeWear.Graph.cs` | 400 | 12 | 0 | Production candidate / shared utility |
 | `MassGenerator.EdgeWear.HalfEdgeDiagnostics.cs` | 562 | 10 | 0 | Production candidate / shared utility |
-| `MassGenerator.EdgeWear.Orchestration.cs` | 570 | 2 | 0 | Orchestration boundary |
+| `MassGenerator.EdgeWear.Orchestration.cs` | 580 | 2 | 0 | Orchestration boundary |
+| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | 491 | 8 | 2 | Clone-only functional candidate |
 | `MassGenerator.EdgeWear.PatchConstruction.cs` | 1,916 | 26 | 0 | Production candidate / shared utility |
 | `MassGenerator.EdgeWear.SelectionAndCorners.cs` | 2,061 | 37 | 0 | Production candidate / shared utility |
 | `MassGenerator.EdgeWear.SliverAndTriangulation.cs` | 1,786 | 37 | 0 | Production candidate / shared utility |
-| `MassGenerator.EdgeWear.Types.cs` | 1,971 | 0 | 69 | Production candidate / shared utility |
+| `MassGenerator.EdgeWear.Types.cs` | 1,980 | 0 | 69 | Production candidate / shared utility |
 
 ## MG-R6B diagnostic method inventory
 
 | File:line | Method | Responsibility |
 |---|---|---|
-| `MassGenerator.EdgeWear.Diagnostics.ContainedRepartition.cs:122` | `AuditChamferContainedOwnerRepartition` | Runs the 22-candidate terminal census and then the combined per-mass pass. |
-| `...ContainedRepartition.cs:228` | `EvaluateChamferContainedOwnerRepartition` | Builds and validates one transformed clone. |
-| `...ContainedRepartition.cs:355` | `AuditChamferContainedOwnerCombinedRepartition` | Groups individually resolved candidates by owner and tests coexistence. |
-| `...ContainedRepartition.cs:506` | `TryBuildChamferContainedOwnerResidual` | Builds owner-minus-retained-patch residual replacement triangles. |
-| `...ContainedRepartition.cs:779` | `TryBuildChamferRepartitionProjection` | Creates the deterministic owner-plane basis. |
-| `...ContainedRepartition.cs:830` | `CalculateChamferRepartitionSignedArea` | Measures projected cycle orientation. |
-| `...ContainedRepartition.cs:842` | `CalculateChamferRepartitionProjectionEpsilon` | Derives the scale-relative arrangement tolerance. |
-| `...ContainedRepartition.cs:880` | `TrySplitChamferRepartitionSegments` | Splits endpoint contacts and collinear overlaps; rejects proper interior crossings. |
-| `...ContainedRepartition.cs:986` | `AddChamferRepartitionEndpointParameters` | Inserts a projected endpoint into a collinear source segment. |
-| `...ContainedRepartition.cs:1019` | `AddChamferRepartitionParameter` | Deduplicates deterministic split parameters. |
-| `...ContainedRepartition.cs:1034` | `TryBuildChamferRepartitionBoundaryCycles` | Cancels shared directed atoms and traces simple residual cycles. |
-| `...ContainedRepartition.cs:1226` | `SimplifyChamferRepartitionCycle` | Removes only unprotected collinear arrangement vertices. |
-| `...ContainedRepartition.cs:1266` | `IsChamferRepartitionPointOnSegment` | Tests removable collinearity in the owner plane. |
-| `...ContainedRepartition.cs:1289` | `CrossChamferRepartition2D` | Shared 2D cross product. |
-| `...ContainedRepartition.cs:1296` | `BuildChamferPatchRecordLookup` | Groups successful retained patch triangles by loop. |
-| `...ContainedRepartition.cs:1319` | `BuildChamferContainedRepartitionRecordSet` | Builds a deep-cloned full record set with selected owner replacements. |
-| `...ContainedRepartition.cs:1359` | `DoesChamferContainedPatchBoundaryHaveTwoUses` | Enforces exact retained-patch boundary incidence. |
-| `...ContainedRepartition.cs:1390` | `DoesChamferContainedRepartitionWorsenTopology` | Applies baseline-relative open/source-boundary/non-manifold/T-junction gates. |
-| `...ContainedRepartition.cs:1424` | `DoesChamferContainedPatchStillOverlapReplacement` | Reclassifies the target patch against transformed non-patch geometry. |
-| `...ContainedRepartition.cs:1464` | `BuildChamferContainedRepartitionFailure` | Creates a deterministic early terminal result. |
-| `...ContainedRepartition.cs:1479` | `RegisterChamferRepartitionProtectedPosition` | Preserves exact patch and owner boundary vertices. |
-| `...ContainedRepartition.cs:1493` | `SortChamferBoundarySegments` | Removes dictionary-order dependence from arrangement input. |
-| `...ContainedRepartition.cs:1535` | `CompareChamferContainedPatchCandidates` | Orders candidates by owner and loop provenance. |
+| `MassGenerator.EdgeWear.Diagnostics.ContainedRepartition.cs:128` | `AuditChamferContainedOwnerRepartition` | Runs the 22-candidate terminal census and then the combined per-mass pass. |
+| `...ContainedRepartition.cs:235` | `EvaluateChamferContainedOwnerRepartition` | Builds and validates one transformed clone. |
+| `...ContainedRepartition.cs:405` | `AuditChamferContainedOwnerCombinedRepartition` | Groups individually resolved candidates by owner and tests coexistence. |
+| `...ContainedRepartition.cs:572` | `TryBuildChamferContainedOwnerResidual` | Builds owner-minus-retained-patch residual replacement triangles. |
+| `...ContainedRepartition.cs:863` | `TryBuildChamferRepartitionProjection` | Creates the deterministic owner-plane basis. |
+| `...ContainedRepartition.cs:914` | `CalculateChamferRepartitionSignedArea` | Measures projected cycle orientation. |
+| `...ContainedRepartition.cs:926` | `CalculateChamferRepartitionProjectionEpsilon` | Derives the scale-relative arrangement tolerance. |
+| `...ContainedRepartition.cs:964` | `TrySplitChamferRepartitionSegments` | Splits endpoint contacts and collinear overlaps; rejects proper interior crossings. |
+| `...ContainedRepartition.cs:1070` | `AddChamferRepartitionEndpointParameters` | Inserts a projected endpoint into a collinear source segment. |
+| `...ContainedRepartition.cs:1103` | `AddChamferRepartitionParameter` | Deduplicates deterministic split parameters. |
+| `...ContainedRepartition.cs:1118` | `TryBuildChamferRepartitionBoundaryCycles` | Cancels shared directed atoms and traces simple residual cycles. |
+| `...ContainedRepartition.cs:1310` | `SimplifyChamferRepartitionCycle` | Removes only unprotected collinear arrangement vertices. |
+| `...ContainedRepartition.cs:1350` | `IsChamferRepartitionPointOnSegment` | Tests removable collinearity in the owner plane. |
+| `...ContainedRepartition.cs:1373` | `CrossChamferRepartition2D` | Shared 2D cross product. |
+| `...ContainedRepartition.cs:1380` | `BuildChamferPatchRecordLookup` | Groups successful retained patch triangles by loop. |
+| `...ContainedRepartition.cs:1403` | `BuildChamferContainedRepartitionRecordSet` | Builds a deep-cloned full record set with selected owner replacements. |
+| `...ContainedRepartition.cs:1443` | `DoesChamferContainedPatchBoundaryHaveTwoUses` | Enforces exact retained-patch boundary incidence. |
+| `...ContainedRepartition.cs:1474` | `DoesChamferContainedRepartitionWorsenTopology` | Applies baseline-relative open/source-boundary/non-manifold/T-junction gates. |
+| `...ContainedRepartition.cs:1508` | `DoesChamferContainedPatchStillOverlapReplacement` | Reclassifies the target patch against transformed non-patch geometry. |
+| `...ContainedRepartition.cs:1548` | `BuildChamferContainedRepartitionFailure` | Creates a deterministic early terminal result. |
+| `...ContainedRepartition.cs:1563` | `RegisterChamferRepartitionProtectedPosition` | Preserves exact patch and owner boundary vertices. |
+| `...ContainedRepartition.cs:1577` | `SortChamferBoundarySegments` | Removes dictionary-order dependence from arrangement input. |
+| `...ContainedRepartition.cs:1604` | `CompareChamferContainedPatchCandidates` | Orders candidates by owner and loop provenance. |
 
 ## MG-R6B.1 diagnostic method inventory
 
 | File:line | Method | Responsibility |
 |---|---|---|
-| `MassGenerator.EdgeWear.Diagnostics.ContainedBoundary.cs:174` | `AuditChamferContainedBoundaryIncidence` | Aggregates exact and collinear subsegment incidence for one retained patch boundary. |
-| `...ContainedBoundary.cs:274` | `AuditChamferContainedBoundarySegment` | Decomposes one authoritative segment by patch, residual-owner, replacement, bevel, and other-patch use. |
-| `...ContainedBoundary.cs:522` | `ClassifyChamferContainedBoundaryCandidate` | Assigns one deterministic candidate terminal category. |
-| `...ContainedBoundary.cs:589` | `RegisterChamferContainedBoundaryAudit` | Writes compact candidate/segment evidence and caps verbose traces. |
-| `...ContainedBoundary.cs:658` | `AuditChamferContainedRepartitionShadow` | Runs overlap and baseline-relative topology checks past the exact-incidence gate. |
-| `...ContainedBoundary.cs:746` | `BuildChamferContainedBoundaryEdgeRecords` | Preserves face-kind and provenance for transformed edge occurrences. |
-| `...ContainedBoundary.cs:806` | `TryBuildChamferContainedBoundaryInterval` | Projects collinear transformed edges onto an authoritative patch segment. |
-| `...ContainedBoundary.cs:861` | `IsChamferContainedBoundarySegmentCovered` | Distinguishes owner-boundary segments from owner-interior segments. |
+| `MassGenerator.EdgeWear.Diagnostics.ContainedBoundary.cs:177` | `AuditChamferContainedBoundaryIncidence` | Aggregates exact and collinear subsegment incidence for one retained patch boundary. |
+| `...ContainedBoundary.cs:280` | `AuditChamferContainedBoundarySegment` | Decomposes one authoritative segment by patch, residual-owner, replacement, bevel, and other-patch use. |
+| `...ContainedBoundary.cs:530` | `ClassifyChamferContainedBoundaryCandidate` | Assigns one deterministic candidate terminal category. |
+| `...ContainedBoundary.cs:597` | `RegisterChamferContainedBoundaryAudit` | Writes compact candidate/segment evidence and caps verbose traces. |
+| `...ContainedBoundary.cs:666` | `AuditChamferContainedRepartitionShadow` | Runs overlap and baseline-relative topology checks past the exact-incidence gate. |
+| `...ContainedBoundary.cs:754` | `BuildChamferContainedBoundaryEdgeRecords` | Preserves face-kind and provenance for transformed edge occurrences. |
+| `...ContainedBoundary.cs:817` | `TryBuildChamferContainedBoundaryInterval` | Projects collinear transformed edges onto an authoritative patch segment. |
+| `...ContainedBoundary.cs:872` | `IsChamferContainedBoundarySegmentCovered` | Distinguishes owner-boundary segments from owner-interior segments. |
+
+## MG-R6B.2 repair method inventory
+
+| File | Method | Responsibility |
+|---|---|---|
+| `MassGenerator.EdgeWear.Diagnostics.ContainedRepair.cs` | `TryBuildChamferContainedGuidedResidualCycles` | Applies deterministic boundary-guided cutouts sequentially for all patches sharing an owner. |
+| `...ContainedRepair.cs` | `TryBuildChamferContainedOrderedPatchLoop` | Reconstructs one coherent oriented retained-patch boundary from successful patch triangles. |
+| `...ContainedRepair.cs` | `TryApplyChamferContainedBoundaryNotch` | Replaces the shared owner-boundary run with the reversed complementary patch path. |
+| `...ContainedRepair.cs` | `SplitChamferContainedRepartitionEndpoints` | Inserts authoritative patch endpoints into every affected cloned face edge without moving geometry. |
+| `...ContainedRepair.cs` | `SplitChamferCycleAtPositions` | Performs deterministic collinear endpoint insertion for owner cycles and cloned face walks. |
+| `...ContainedBoundary.cs` | `ClassifyChamferContainedBoundaryEdgeOwner` | Uses exact residual transformed-record provenance instead of broad `SourceFaceIndex` equivalence. |
 
 ## Current method inventory
 
@@ -417,8 +458,38 @@ production candidate -X-> diagnostic-only methods/types
 6. `stillRequired = ownerAmbiguous + boundaryTransferFailures + topologyFailures`.
 7. Rendered geometry remains unchanged and `geometryCommit=disabled`.
 
-## Next inventory gates
+## EW-K1 and EW-K1.1 focused inventory
 
-1. Record the validated contained-candidate population and direct-transfer result.
-2. If direct transfer fails for all or most candidates, retain the proof and move to explicit owner-face repartitioning rather than patch deletion.
-3. Keep diagnostics observational; do not allow diagnostic classifications to control production geometry.
+EW-K1 validated the direct convex-cut architecture across all 24 masses. All 498 active selected edges built accepted planes and emitted caps. Seventeen masses were immediately valid. The seven remaining failures were narrow completion cases: four non-conformal shared-boundary results, two bounds-only numerical false negatives, and one final cap consumed by later cuts.
+
+| File | Method | Responsibility |
+|---|---|---|
+| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `AuditPlaneCutBevelKernel` | Builds all accepted bevel planes on a deep clone, conforms final shared boundaries, classifies surviving or redundant caps, and performs topology, face, volume, and bounds validation. |
+| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `TryBuildPlaneCutBevelCandidate` | Converts one active selected edge and its four solved rail points into a stable inward half-space cut while retaining source-edge provenance. |
+| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `ConformPlaneCutFaceBoundaries` | Reinserts final polyhedron vertices into every collinear face edge that spans them so adjacent polygons use identical edge segmentation. |
+| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `IsPlaneCutCandidateRedundant` | Accepts a consumed final cap only when the final polyhedron still satisfies the plane and no segment of the original sharp source edge survives. |
+| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `DoPlaneCutSegmentsOverlap` | Supplies the source-edge survival test used by redundant-plane classification. |
+| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `ClonePolygonFacesForPlaneCutAudit` | Deep-clones source polygon records so the experiment cannot modify rendered faces. |
+| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `CountMatchingPlaneCutCaps` | Counts surviving `ConvexEdgeWear` caps on each accepted plane. |
+| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `CountInvalidPlaneCutFaces` | Rejects non-finite, degenerate, or oppositely wound clone faces. |
+| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `CalculatePlaneCutPolyhedronVolume` | Supplies the conservative retained-volume gate. |
+| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `ArePlaneCutBoundsContained` | Verifies half-space clipping did not expand outside source bounds using clip-consistent tolerance. |
+| `MassGenerator.Polyhedron.cs` | `ClipPolyhedron(..., clampIntersectionsToSegment)` | Preserves all legacy callers by default while allowing the clone-only EW-K path to clamp numerical edge intersections to their source segments. |
+
+Post-EW-K1.1 source totals are 26,364 lines across all `MassGenerator` partials and 23,183 edge-wear lines. The validated MG-R6 refactor baseline remains closed; EW-K1.1 changes only the clone-only functional kernel and an opt-in clipper parameter whose default preserves existing live behavior.
+
+## EW-K1.1 inventory gates
+
+1. Compile with zero errors and zero warnings.
+2. Require the same 24 compact audits with every pre-EW-K1.1 field unchanged.
+3. Require `planesBuilt=active`, `planesRejected=0`, and `capsBuilt=active` for every clone.
+4. Require every accepted plane to be accounted for by one surviving cap or verified redundancy, with `capsMissing=0`.
+5. Require zero open edges, non-manifold edges, T-junctions, and invalid faces, with `valid=1`.
+6. Confirm rendered geometry remains unchanged and `geometryCommit=disabled`.
+
+## Next work items
+
+1. Validate EW-K1.1 compilation with zero errors and zero warnings.
+2. Regenerate the same 24 physical masses and aggregate the expanded `planeBevel=` field.
+3. Require zero unexplained missing caps and zero topology failures across all clones.
+4. If all clones report `valid=1`, expose the plane-cut clone for visual validation before live promotion.
