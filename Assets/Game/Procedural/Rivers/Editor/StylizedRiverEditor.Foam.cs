@@ -48,6 +48,62 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent(
                     "Foam Enabled",
                     "Master switch for persistent foam. Disabled foam allocates no simulation textures and contributes nothing to the water shader."));
+
+            bool hasRiver = false;
+            bool allFoamEnabled = true;
+            bool held = false;
+            bool mixed = false;
+            foreach (Object selectedTarget in targets)
+            {
+                if (selectedTarget is not StylizedRiver river)
+                {
+                    continue;
+                }
+
+                allFoamEnabled &= river.FoamEnabled;
+                if (!hasRiver)
+                {
+                    held = river.FoamStateHeld;
+                    hasRiver = true;
+                }
+                else if (river.FoamStateHeld != held)
+                {
+                    mixed = true;
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(
+                       !Application.isPlaying || !hasRiver ||
+                       !allFoamEnabled))
+            {
+                EditorGUI.showMixedValue = mixed;
+                EditorGUI.BeginChangeCheck();
+                bool nextHeld = EditorGUILayout.Toggle(
+                    new GUIContent(
+                        "Hold Foam State",
+                        "Play Mode diagnostic. Preserves the current Layer C material and Layer D products while continuing to rebind Layer E rendering controls for exact same-state visual comparisons. Pending births and simulation time resume without catch-up when released."),
+                    held);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    foreach (Object selectedTarget in targets)
+                    {
+                        if (selectedTarget is StylizedRiver river)
+                        {
+                            river.SetFoamStateHeld(nextHeld);
+                        }
+                    }
+
+                    RepaintScene();
+                }
+                EditorGUI.showMixedValue = false;
+            }
+
+            if (!Application.isPlaying)
+            {
+                EditorGUILayout.HelpBox(
+                    "Hold Foam State is available in Play Mode and is not saved as authoring data.",
+                    MessageType.None);
+            }
         }
 
         private void DrawFoamLayerA()

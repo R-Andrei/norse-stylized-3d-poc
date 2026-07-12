@@ -12,6 +12,32 @@ implementation_documents:
 
 
 
+### 2026-07-12 — Patch V3J.4B: Accepted Projected Coverage and Ground-Albedo Ink Proof
+
+**Status:** Implemented; awaiting Unity visual validation.
+
+V3J.4B preserves the accepted A6/A7 projected glyph geometry and changes only its production representation. Accepted glyph polylines and tapered half-widths are rasterized at generation/dirty time into a `GeneratedGround`-owned single-channel `R8` coverage texture. The texture is sampled in fixed GeneratedGround-local XZ space by means of a per-renderer world-to-ground matrix, so the same property block remains valid for the ground mesh and dependent river-corridor renderers.
+
+Active representation:
+
+```text
+accepted placement descriptor
+→ A6 continuous spline profile
+→ fixed world +Z native-2D projection
+→ complete A6/A7 projected glyph
+→ bounded segment rasterization
+→ generated R8 coverage
+→ family/variant Ink Color blended into ground albedo
+→ ordinary ground lighting
+```
+
+The proof introduces no mesh, child object, collider, separate renderer, normal displacement, relief response, emission, or special lighting pass. Coverage uses bilinear filtering, fixed soft-edge feathering, tapered authored widths, and a very short endpoint opacity envelope. The shader composes the opaque authored Ink Color at the end of ground-albedo construction and then continues through the existing URP lighting path.
+
+The existing `Ground Painted Accent Lines` mask debug mode now displays the production projected coverage when available. Older fold-body and signed-relief diagnostics remain available as historical/debug infrastructure and do not drive the V3J.4B final render.
+
+This patch is a representation proof, not a shape or placement redesign. The accepted projected points, placement descriptors, river/modifier exclusions, and A6/A7 profile generator remain unchanged. Unity validation must decide whether production-style ink materially reduces the apparent island/symbol problem before regional composition or glyph-family expansion is attempted.
+
+
 ### 2026-07-12 — Patch V3J.4A10R: Accepted Projected Glyphs Become the Sole Shape Architecture
 
 **Status:** Regional-network architecture rejected and removed.
@@ -29,7 +55,8 @@ accepted descriptor
 → A6 continuous spline profile
 → fixed world +Z native-2D projection
 → complete A6/A7 projected glyph
-→ future coverage/albedo integration
+→ generated R8 projected coverage
+→ ground-albedo Ink Color integration
 ```
 
 The following candidate architecture is absent from production and editor code:

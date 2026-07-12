@@ -671,7 +671,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 "Painted Accent Strokes",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Edits accepted placement descriptors, the mesh-free projected contour profile, and authored ink colour. Projected Glyph Debug applies the profile toward fixed world +Z using Scene handles only; it creates no mesh, renderer, child object, or runtime representation.",
+                "Edits accepted placement descriptors, the mesh-free projected contour profile, and authored ink colour. The accepted profile is baked into a generated R8 coverage texture and blended into the normal ground albedo; Scene handles remain an independent geometry diagnostic.",
                 MessageType.None);
 
             EditorGUI.BeginChangeCheck();
@@ -785,7 +785,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 inkColor,
                 new GUIContent(
                     "Ink Color",
-                    "Family/variant-authored ink colour reserved for the future projected coverage bake and ground-albedo composition."));
+                    "Family/variant-authored opaque ink colour blended through the generated projected coverage texture into ground albedo."));
 
             if (strokeLengthMax.floatValue < strokeLengthMin.floatValue + 0.05f)
             {
@@ -889,6 +889,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.HelpBox(
                 ground.GetLastPaintedAccentPlacementStatistics(),
+                MessageType.None);
+
+            EditorGUILayout.Space(3f);
+            EditorGUILayout.LabelField(
+                "Projected Coverage Bake",
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox(
+                ground.GetLastPaintedAccentCoverageStatistics(),
                 MessageType.None);
 
             if (showPaintedAccentProjectedGlyphDebug.boolValue)

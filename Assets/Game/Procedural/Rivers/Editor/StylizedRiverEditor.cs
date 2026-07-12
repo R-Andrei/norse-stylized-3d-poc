@@ -99,6 +99,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
         private readonly HashSet<InspectorSection> openInspectorSections =
             new HashSet<InspectorSection>();
+        private bool structuralAuthoringChanged;
         private StylizedRiverFoamMajorCandidate majorCandidatePreview;
         private Texture2D majorCandidatePreviewTexture;
         private Color32[] majorCandidatePreviewPixels;
@@ -192,31 +193,38 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
+            structuralAuthoringChanged = false;
 
             DrawTopLevelSection(
                 InspectorSection.Setup,
                 "Setup",
-                DrawSetup);
+                DrawSetup,
+                true);
             DrawTopLevelSection(
                 InspectorSection.RiverDomain,
                 "River Domain",
-                DrawRiverDomain);
+                DrawRiverDomain,
+                true);
             DrawTopLevelSection(
                 InspectorSection.ChannelShape,
                 "Channel Shape",
-                DrawChannel);
+                DrawChannel,
+                true);
             DrawTopLevelSection(
                 InspectorSection.ShorelineSafety,
                 "Shoreline Safety",
-                DrawAdvancedShoreline);
+                DrawAdvancedShoreline,
+                true);
             DrawTopLevelSection(
                 InspectorSection.NaturalVariation,
                 "Natural Variation",
-                DrawNaturalVariation);
+                DrawNaturalVariation,
+                true);
             DrawTopLevelSection(
                 InspectorSection.SurfaceMesh,
                 "Surface Mesh",
-                DrawSurfaceMesh);
+                DrawSurfaceMesh,
+                true);
             DrawTopLevelSection(
                 InspectorSection.WaterBodyAndLighting,
                 "Water Body & Lighting",
@@ -256,7 +264,18 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             bool riverChanged = serializedObject.ApplyModifiedProperties();
 
-            if (riverChanged)
+            if (structuralAuthoringChanged)
+            {
+                foreach (Object selectedTarget in targets)
+                {
+                    if (selectedTarget is StylizedRiver river)
+                    {
+                        river.RequestStructuralRegenerationFromInspector();
+                    }
+                }
+            }
+
+            if (riverChanged || structuralAuthoringChanged)
             {
                 RepaintScene();
             }

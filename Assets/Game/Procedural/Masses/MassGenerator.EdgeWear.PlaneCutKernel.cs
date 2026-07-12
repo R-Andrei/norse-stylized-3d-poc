@@ -14,6 +14,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public readonly CutPlane Plane;
             public readonly float Strength;
             public readonly float PlaneTolerance;
+            public readonly float ClipEpsilon;
             public readonly Vector3 SourceStart;
             public readonly Vector3 SourceEnd;
 
@@ -21,12 +22,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 CutPlane plane,
                 float strength,
                 float planeTolerance,
+                float clipEpsilon,
                 Vector3 sourceStart,
                 Vector3 sourceEnd)
             {
                 Plane = plane;
                 Strength = strength;
                 PlaneTolerance = planeTolerance;
+                ClipEpsilon = clipEpsilon;
                 SourceStart = sourceStart;
                 SourceEnd = sourceEnd;
             }
@@ -44,6 +47,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
         }
 
+        private readonly struct PlaneCutOpenEdgeRecord
+        {
+            public readonly int FaceIndex;
+            public readonly Vector3 Start;
+            public readonly Vector3 End;
+            public readonly VertexKey StartKey;
+            public readonly VertexKey EndKey;
+            public readonly EdgeKey EdgeKey;
+
+            public PlaneCutOpenEdgeRecord(
+                int faceIndex,
+                Vector3 start,
+                Vector3 end)
+            {
+                FaceIndex = faceIndex;
+                Start = start;
+                End = end;
+                StartKey = new VertexKey(start);
+                EndKey = new VertexKey(end);
+                EdgeKey = new EdgeKey(start, end);
+            }
+        }
+
         private struct PlaneCutBevelAuditResult
         {
             public int SelectedEdgeCount;
@@ -54,6 +80,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int CapsMissing;
             public int CapsRedundant;
             public int ConformalSplitCount;
+            public int SeamPairCount;
             public int OpenEdgeCount;
             public int NonManifoldEdgeCount;
             public int TJunctionCount;
@@ -146,11 +173,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 int before = CountMatchingPlaneCutCaps(
                     clonedFaces,
                     candidate);
+                if (before == 0 &&
+                    IsPlaneCutCandidateAlreadySatisfied(
+                        clonedFaces,
+                        candidate))
+                {
+                    continue;
+                }
+
                 ClipPolyhedron(
                     clonedFaces,
                     candidate.Plane,
                     PolygonFaceFeature.ConvexEdgeWear,
                     candidate.Strength,
+                    true,
+                    candidate.ClipEpsilon,
                     true);
                 int after = CountMatchingPlaneCutCaps(
                     clonedFaces,
@@ -159,13 +196,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 {
                     result.CapsBuilt++;
                 }
-                else if (after != 1)
+                else if (after > 1)
                 {
                     SetPlaneCutBevelDiagnostic(
                         ref result.Diagnostic,
-                        after == 0
-                            ? "a bevel plane emitted no cap"
-                            : "a bevel plane emitted duplicate caps");
+                        "a bevel plane emitted duplicate caps");
                 }
             }
 
@@ -173,6 +208,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ConformPlaneCutFaceBoundaries(
                     clonedFaces,
                     minimumStableEdgeLength);
+            result.SeamPairCount = RepairPlaneCutNumericalSeams(
+                clonedFaces,
+                minimumStableEdgeLength);
 
             for (int candidateIndex = 0;
                  candidateIndex < planeCandidates.Count;
@@ -191,8 +229,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 if (capCount == 0 &&
                     IsPlaneCutCandidateRedundant(
                         clonedFaces,
-                        candidate,
-                        minimumStableEdgeLength))
+                        candidate))
                 {
                     result.CapsRedundant++;
                     continue;
@@ -270,7 +307,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             bool geometryValid =
                 result.PlanesRejected == 0 &&
                 result.PlanesBuilt == result.ActiveEdgeCount &&
-                result.CapsBuilt == result.ActiveEdgeCount &&
                 result.CapsMissing == 0 &&
                 result.OpenEdgeCount == 0 &&
                 result.NonManifoldEdgeCount == 0 &&
@@ -368,17 +404,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float minimumRemoval = Mathf.Max(
                 PointMergeDistance * 2f,
                 minimumStableEdgeLength * 0.02f);
-            if (plane.SignedDistance(sourceA) <= minimumRemoval ||
-                plane.SignedDistance(sourceB) <= minimumRemoval)
+            float sourceRemovalA = plane.SignedDistance(sourceA);
+            float sourceRemovalB = plane.SignedDistance(sourceB);
+            if (sourceRemovalA <= minimumRemoval ||
+                sourceRemovalB <= minimumRemoval)
             {
                 blocker = "the solved bevel plane does not remove its source edge";
                 return false;
             }
 
+            float minimumSourceRemoval = Mathf.Min(
+                sourceRemovalA,
+                sourceRemovalB);
+            float clipEpsilon = Mathf.Min(
+                PlaneEpsilon,
+                Mathf.Max(
+                    PointMergeDistance * 0.25f,
+                    minimumSourceRemoval * 0.25f));
+
             candidate = new PlaneCutBevelCandidate(
                 plane,
                 selected.Candidate.Strength,
                 planeTolerance,
+                clipEpsilon,
                 sourceA,
                 sourceB);
             return true;
@@ -534,14 +582,296 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return inserted;
         }
 
-        private static bool IsPlaneCutCandidateRedundant(
+        private static int RepairPlaneCutNumericalSeams(
             List<PolygonFace> faces,
-            PlaneCutBevelCandidate candidate,
             float minimumStableEdgeLength)
         {
+            EdgeWearTopologyStats before = AuditEdgeWearTopology(
+                faces,
+                minimumStableEdgeLength);
+            if (before.OpenEdgeCount == 0)
+            {
+                return 0;
+            }
+
+            List<PlaneCutOpenEdgeRecord> openEdges =
+                CollectPlaneCutOpenEdges(faces);
+            if (openEdges.Count != before.OpenEdgeCount)
+            {
+                return 0;
+            }
+
+            float tolerance = Mathf.Clamp(
+                minimumStableEdgeLength * 0.0001f,
+                PointMergeDistance * 4f,
+                PlaneEpsilon * 0.5f);
+            float toleranceSqr = tolerance * tolerance;
+            List<int>[] counterparts =
+                new List<int>[openEdges.Count];
+            for (int edgeIndex = 0;
+                 edgeIndex < openEdges.Count;
+                 edgeIndex++)
+            {
+                counterparts[edgeIndex] = new List<int>();
+            }
+
+            for (int leftIndex = 0;
+                 leftIndex < openEdges.Count;
+                 leftIndex++)
+            {
+                for (int rightIndex = leftIndex + 1;
+                     rightIndex < openEdges.Count;
+                     rightIndex++)
+                {
+                    if (!ArePlaneCutOpenEdgesCounterparts(
+                            openEdges[leftIndex],
+                            openEdges[rightIndex],
+                            toleranceSqr))
+                    {
+                        continue;
+                    }
+
+                    counterparts[leftIndex].Add(rightIndex);
+                    counterparts[rightIndex].Add(leftIndex);
+                }
+            }
+
+            List<(int Left, int Right)> pairs =
+                new List<(int Left, int Right)>();
+            for (int edgeIndex = 0;
+                 edgeIndex < openEdges.Count;
+                 edgeIndex++)
+            {
+                if (counterparts[edgeIndex].Count != 1)
+                {
+                    continue;
+                }
+
+                int counterpartIndex = counterparts[edgeIndex][0];
+                if (counterpartIndex <= edgeIndex ||
+                    counterparts[counterpartIndex].Count != 1 ||
+                    counterparts[counterpartIndex][0] != edgeIndex)
+                {
+                    continue;
+                }
+
+                pairs.Add((edgeIndex, counterpartIndex));
+            }
+
+            if (pairs.Count == 0)
+            {
+                return 0;
+            }
+
+            Dictionary<VertexKey, Vector3> snapTargets =
+                new Dictionary<VertexKey, Vector3>();
+            for (int pairIndex = 0; pairIndex < pairs.Count; pairIndex++)
+            {
+                PlaneCutOpenEdgeRecord left =
+                    openEdges[pairs[pairIndex].Left];
+                PlaneCutOpenEdgeRecord right =
+                    openEdges[pairs[pairIndex].Right];
+                Vector3 canonicalStart =
+                    (left.Start + right.End) * 0.5f;
+                Vector3 canonicalEnd =
+                    (left.End + right.Start) * 0.5f;
+                if ((canonicalEnd - canonicalStart).sqrMagnitude <=
+                    MinimumEdgeLengthSqr ||
+                    !TryAddPlaneCutSnapTarget(
+                        snapTargets,
+                        left.StartKey,
+                        canonicalStart,
+                        toleranceSqr) ||
+                    !TryAddPlaneCutSnapTarget(
+                        snapTargets,
+                        right.EndKey,
+                        canonicalStart,
+                        toleranceSqr) ||
+                    !TryAddPlaneCutSnapTarget(
+                        snapTargets,
+                        left.EndKey,
+                        canonicalEnd,
+                        toleranceSqr) ||
+                    !TryAddPlaneCutSnapTarget(
+                        snapTargets,
+                        right.StartKey,
+                        canonicalEnd,
+                        toleranceSqr))
+                {
+                    return 0;
+                }
+            }
+
+            List<PolygonFace> backup =
+                ClonePolygonFacesForPlaneCutAudit(faces);
+            for (int faceIndex = 0;
+                 faceIndex < faces.Count;
+                 faceIndex++)
+            {
+                List<Vector3> vertices = faces[faceIndex].Vertices;
+                for (int vertexIndex = 0;
+                     vertexIndex < vertices.Count;
+                     vertexIndex++)
+                {
+                    VertexKey key = new VertexKey(vertices[vertexIndex]);
+                    if (snapTargets.TryGetValue(key, out Vector3 target))
+                    {
+                        vertices[vertexIndex] = target;
+                    }
+                }
+            }
+
+            WeldSharedVertices(faces);
+            EdgeWearTopologyStats after = AuditEdgeWearTopology(
+                faces,
+                minimumStableEdgeLength);
+            int expectedOpenEdges =
+                before.OpenEdgeCount - pairs.Count * 2;
+            if (after.OpenEdgeCount != expectedOpenEdges ||
+                after.NonManifoldEdgeCount >
+                    before.NonManifoldEdgeCount ||
+                after.TJunctionCount > before.TJunctionCount)
+            {
+                faces.Clear();
+                faces.AddRange(backup);
+                return 0;
+            }
+
+            return pairs.Count;
+        }
+
+        private static List<PlaneCutOpenEdgeRecord>
+            CollectPlaneCutOpenEdges(List<PolygonFace> faces)
+        {
+            Dictionary<EdgeKey, int> uses =
+                new Dictionary<EdgeKey, int>();
+            List<PlaneCutOpenEdgeRecord> records =
+                new List<PlaneCutOpenEdgeRecord>();
+            for (int faceIndex = 0;
+                 faceIndex < faces.Count;
+                 faceIndex++)
+            {
+                List<Vector3> vertices = faces[faceIndex].Vertices;
+                for (int startIndex = 0;
+                     startIndex < vertices.Count;
+                     startIndex++)
+                {
+                    int endIndex = (startIndex + 1) % vertices.Count;
+                    Vector3 start = vertices[startIndex];
+                    Vector3 end = vertices[endIndex];
+                    if (AreSamePoint(start, end))
+                    {
+                        continue;
+                    }
+
+                    PlaneCutOpenEdgeRecord record =
+                        new PlaneCutOpenEdgeRecord(
+                            faceIndex,
+                            start,
+                            end);
+                    uses.TryGetValue(record.EdgeKey, out int useCount);
+                    uses[record.EdgeKey] = useCount + 1;
+                    records.Add(record);
+                }
+            }
+
+            List<PlaneCutOpenEdgeRecord> openEdges =
+                new List<PlaneCutOpenEdgeRecord>();
+            for (int recordIndex = 0;
+                 recordIndex < records.Count;
+                 recordIndex++)
+            {
+                PlaneCutOpenEdgeRecord record = records[recordIndex];
+                if (uses[record.EdgeKey] == 1)
+                {
+                    openEdges.Add(record);
+                }
+            }
+
+            return openEdges;
+        }
+
+        private static bool ArePlaneCutOpenEdgesCounterparts(
+            PlaneCutOpenEdgeRecord left,
+            PlaneCutOpenEdgeRecord right,
+            float toleranceSqr)
+        {
+            if (left.FaceIndex == right.FaceIndex ||
+                (left.Start - right.End).sqrMagnitude > toleranceSqr ||
+                (left.End - right.Start).sqrMagnitude > toleranceSqr)
+            {
+                return false;
+            }
+
+            Vector3 leftDirection = left.End - left.Start;
+            Vector3 rightDirection = right.End - right.Start;
+            float leftLength = leftDirection.magnitude;
+            float rightLength = rightDirection.magnitude;
+            if (leftLength <= PointMergeDistance ||
+                rightLength <= PointMergeDistance ||
+                Mathf.Abs(leftLength - rightLength) >
+                    Mathf.Sqrt(toleranceSqr) * 2f)
+            {
+                return false;
+            }
+
+            return Vector3.Dot(
+                    leftDirection / leftLength,
+                    rightDirection / rightLength) <= -0.999f;
+        }
+
+        private static bool TryAddPlaneCutSnapTarget(
+            Dictionary<VertexKey, Vector3> snapTargets,
+            VertexKey key,
+            Vector3 target,
+            float toleranceSqr)
+        {
+            if (snapTargets.TryGetValue(key, out Vector3 existing))
+            {
+                return (existing - target).sqrMagnitude <= toleranceSqr;
+            }
+
+            snapTargets.Add(key, target);
+            return true;
+        }
+
+        private static bool IsPlaneCutCandidateAlreadySatisfied(
+            List<PolygonFace> faces,
+            PlaneCutBevelCandidate candidate)
+        {
             float planeTolerance = Mathf.Max(
-                candidate.PlaneTolerance,
-                PlaneEpsilon * 1.25f);
+                candidate.ClipEpsilon * 1.25f,
+                PointMergeDistance * 0.5f);
+            for (int faceIndex = 0;
+                 faceIndex < faces.Count;
+                 faceIndex++)
+            {
+                List<Vector3> vertices = faces[faceIndex].Vertices;
+                for (int vertexIndex = 0;
+                     vertexIndex < vertices.Count;
+                     vertexIndex++)
+                {
+                    if (candidate.Plane.SignedDistance(
+                            vertices[vertexIndex]) > planeTolerance)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return !DoesPlaneCutSourceEdgeSurvive(
+                faces,
+                candidate,
+                PointMergeDistance * 2f);
+        }
+
+        private static bool IsPlaneCutCandidateRedundant(
+            List<PolygonFace> faces,
+            PlaneCutBevelCandidate candidate)
+        {
+            float planeTolerance = Mathf.Max(
+                candidate.ClipEpsilon * 1.25f,
+                PointMergeDistance);
             List<Vector3> contactPoints = new List<Vector3>();
             for (int faceIndex = 0;
                  faceIndex < faces.Count;
@@ -579,9 +909,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
             }
 
-            float sourceTolerance = Mathf.Max(
-                PointMergeDistance * 8f,
-                minimumStableEdgeLength * 0.02f);
+            return !DoesPlaneCutSourceEdgeSurvive(
+                faces,
+                candidate,
+                PointMergeDistance * 2f);
+        }
+
+        private static bool DoesPlaneCutSourceEdgeSurvive(
+            List<PolygonFace> faces,
+            PlaneCutBevelCandidate candidate,
+            float sourceTolerance)
+        {
             float sourceToleranceSqr =
                 sourceTolerance * sourceTolerance;
             for (int faceIndex = 0;
@@ -603,12 +941,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             end,
                             sourceToleranceSqr))
                     {
-                        return false;
+                        return true;
                     }
                 }
             }
 
-            return true;
+            return false;
         }
 
         private static bool DoPlaneCutSegmentsOverlap(

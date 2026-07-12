@@ -367,7 +367,7 @@ The modern execution order is:
 14. Transport Presence capacity-loss attribution — Unity-validated and accepted in `5.16E.3`.
 15. Capacity audit closure and deferred sub-1% PoC limitation — accepted in `5.16E.3C`; original `0.10%` target retained, temporary review threshold `1.00%`.
 16. Layer E final-rendering contract lock — accepted in documentation-only `5.17P`.
-17. Layer E finishing — `5.17A` failed visual validation; corrected `5.17A.1` is accepted. `5.17B` and `5.17B.1` are rejected. `5.17B.2` Chip/Fray and Breakup Scale are provisionally accepted, `5.17B.2A` retains optional independent Foam Strands, and `5.17B.2B` implements medium-to-large edge-band regional fragmentation. Unity validation of fragmentation precedes `5.17C–D` Remaining-Life orchestration and fine polish.
+17. Layer E finishing — `5.17A` failed visual validation; corrected `5.17A.1` is accepted. `5.17B` and `5.17B.1` are rejected. `5.17B.2` Chip/Fray and Breakup Scale are provisionally accepted, and `5.17B.2A` retains optional independent Foam Strands. `5.17B.2B` edge-band fragmentation is visually rejected. `5.17B.2C` now removes non-structural rebuilds and adds exact-state Foam holding before a different regional-splitting design is attempted.
 18. Decide whether `_FoamShapeMask` production integration is still required after Layer E comparison.
 19. Reopen capacity correction only if the review threshold is exceeded or visible loss appears.
 20. Formal performance tiers, active-chunk scheduling, and profiling gates.
@@ -488,7 +488,7 @@ Unity acceptance requires independent validation with Chip and Fray at zero: Str
 
 ### `5.17B.2B — Edge-Band Regional Fragmentation`
 
-Status: implemented; Unity visual validation pending. Chip, Fray, and Breakup Scale are provisionally accepted as useful fixed-strength authoring controls. Foam Strands are retained provisionally as an independently disableable feature. No further correction to those controls blocks this patch.
+Status: visually rejected. The partial-presence/soft-edge selector worked, but it yielded edge shaving rather than serious medium regional fragmentation. Keep Fragmentation Strength at `0`; no further threshold tuning is active. A future replacement must use regional cuts/splits that can cross part of weak-to-medium Foam while still excluding empty water and firm-core random holes.
 
 The missing visual scale is coherent medium-to-large regional loss. `5.17B.2B` adds a separate **Edge Fragmentation** group:
 
@@ -511,7 +511,28 @@ meaningful but partial Material Presence
 
 Empty water is excluded, fully established core material is suppressed, and the result is removal-only. The patch passes committed Material Presence into the existing shared final-removal helper; production Final Foam and Foam Evaluated Final Preview use the same arithmetic, and Shader Detail Probe/Difference continue to report the production silhouette and removal-only delta. No additional texture sample, procedural-noise evaluation, hash evaluation, texture, buffer, persistent channel, compute kernel, dispatch, readback, Layer C mutation, Layer D mutation, Support lookup, Negative Topology lookup, or Remaining-Life multiplier is added.
 
-Unity acceptance requires Chip, Fray, and Strand Strength at zero. Fragmentation Strength `0` must reproduce the current result exactly. Strength `1` must remove coherent medium or broad portions of weak edge bands rather than isolated pixels or repeated lanes. Fragment Size must alter subdivision while preserving recognizable broad placement. Fragment Reach must clearly alter inward depth without opening isolated holes in firm cores. The result must remain stationary and Difference must show regional magenta removal rather than only one-pixel outlines.
+Unity evidence rejected the feature because it remained concentrated in partial-presence perimeter bands and did not split medium regions. Keep the feature neutral and do not spend another patch recalibrating its thresholds.
+
+### `5.17B.2C — State-Preserving Foam Authoring`
+
+Status: implemented; Unity validation pending.
+
+The River Inspector no longer treats every serialized edit as a structural river change. `OnValidate()` still clamps settings, keeps required outputs/runtimes present, and applies live material values, but it no longer queues `RegenerateAll()`. The custom Inspector now requests the existing debounced full rebuild only when one of the structural authoring sections changes:
+
+```text
+Setup
+River Domain
+Channel Shape
+Shoreline Safety
+Natural Variation
+Surface Mesh
+```
+
+Spline edits remain structural through the existing spline-change callback. Water rendering, surface motion, refraction, runtime-disturbance tuning, Foam Layers A–E, debug selection, and diagnostics no longer rebuild the River domain merely because a value changed. Layer E rendering values continue through the existing per-frame property binding, so they preserve the active Layer C textures.
+
+`Runtime & Quality` also exposes the non-persistent Play Mode diagnostic **Hold Foam State**. While held, the runtime preserves the allocated Layer C material and existing Layer D products, skips topology evolution, births, aging, transport, and Layer D temporal advancement, discards elapsed wall time, and continues binding the current textures plus live Layer E properties. Pending manual/automatic work remains queued and resumes without catch-up when the hold is released. The toggle is not serialized authoring data and resets when the component is enabled or disabled.
+
+This patch adds no texture, buffer, shader property, compute kernel, dispatch, readback, or persistent simulation field. Structural or resource-allocation changes may still legitimately rebuild and clear state; Hold Foam State is for same-domain rendering comparisons, not for preserving material across incompatible domain changes.
 
 ### Lifetime and topology rule
 
@@ -804,5 +825,5 @@ Immediate order:
 5.16E.2 promotes committed Final Foam and removes residual prediction;
 5.16E.3 attributes capacity loss to unit overflow and fractional shoreline capacity with zero residual;
 5.16E.3C retains the `0.10%` engineering target, temporarily tolerates measured sub-1% PoC loss, and defers expensive transport correction;
-5.17B must prove readable stable chips, fringe fray, and short edge-connected cuts without damaging macro ribbon continuity before Remaining-Life progression proceeds.
+5.17B.2C must first prove state-preserving Inspector tuning and exact same-state A/B comparison. The rejected edge-band fragmentation then requires a different regional-splitting model before Remaining-Life progression proceeds.
 ```

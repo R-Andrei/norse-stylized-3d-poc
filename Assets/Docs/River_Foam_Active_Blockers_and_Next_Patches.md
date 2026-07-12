@@ -39,7 +39,7 @@ Layer D may read Layer C, but must never write Layer C.
 Layer E must never feed back into compute/simulation.
 ```
 
-## Active state through `4.11C.5.17B.2B — Edge-Band Regional Fragmentation`
+## Active state through `4.11C.5.17B.2C — State-Preserving Foam Authoring`
 
 The zero-memory presentation audit passed decisively:
 
@@ -270,7 +270,7 @@ Unity acceptance requires independent validation with Chip and Fray at zero: Str
 
 ### `5.17B.2B — Edge-Band Regional Fragmentation`
 
-Status: implemented; Unity visual validation pending. Chip, Fray, and Breakup Scale are provisionally accepted as useful fixed-strength authoring controls. Foam Strands are retained provisionally as an independently disableable feature. No further correction to those controls blocks this patch.
+Status: visually rejected. The partial-presence/soft-edge selector worked, but it yielded edge shaving rather than serious medium regional fragmentation. Keep Fragmentation Strength at `0`; no further threshold tuning is active. A future replacement must use regional cuts/splits that can cross part of weak-to-medium Foam while still excluding empty water and firm-core random holes.
 
 The missing visual scale is coherent medium-to-large regional loss. `5.17B.2B` adds a separate **Edge Fragmentation** group:
 
@@ -293,7 +293,28 @@ meaningful but partial Material Presence
 
 Empty water is excluded, fully established core material is suppressed, and the result is removal-only. The patch passes committed Material Presence into the existing shared final-removal helper; production Final Foam and Foam Evaluated Final Preview use the same arithmetic, and Shader Detail Probe/Difference continue to report the production silhouette and removal-only delta. No additional texture sample, procedural-noise evaluation, hash evaluation, texture, buffer, persistent channel, compute kernel, dispatch, readback, Layer C mutation, Layer D mutation, Support lookup, Negative Topology lookup, or Remaining-Life multiplier is added.
 
-Unity acceptance requires Chip, Fray, and Strand Strength at zero. Fragmentation Strength `0` must reproduce the current result exactly. Strength `1` must remove coherent medium or broad portions of weak edge bands rather than isolated pixels or repeated lanes. Fragment Size must alter subdivision while preserving recognizable broad placement. Fragment Reach must clearly alter inward depth without opening isolated holes in firm cores. The result must remain stationary and Difference must show regional magenta removal rather than only one-pixel outlines.
+Unity evidence rejected the feature: Difference remained concentrated around the partial-presence perimeter shown by Evaluated Shape and Material Presence, so the output did not achieve the requested medium-zone split. Treat this as a model failure, not a constant-tuning task.
+
+### `5.17B.2C — State-Preserving Foam Authoring`
+
+Status: implemented; Unity validation pending.
+
+The River Inspector no longer treats every serialized edit as a structural river change. `OnValidate()` still clamps settings, keeps required outputs/runtimes present, and applies live material values, but it no longer queues `RegenerateAll()`. The custom Inspector now requests the existing debounced full rebuild only when one of the structural authoring sections changes:
+
+```text
+Setup
+River Domain
+Channel Shape
+Shoreline Safety
+Natural Variation
+Surface Mesh
+```
+
+Spline edits remain structural through the existing spline-change callback. Water rendering, surface motion, refraction, runtime-disturbance tuning, Foam Layers A–E, debug selection, and diagnostics no longer rebuild the River domain merely because a value changed. Layer E rendering values continue through the existing per-frame property binding, so they preserve the active Layer C textures.
+
+`Runtime & Quality` also exposes the non-persistent Play Mode diagnostic **Hold Foam State**. While held, the runtime preserves the allocated Layer C material and existing Layer D products, skips topology evolution, births, aging, transport, and Layer D temporal advancement, discards elapsed wall time, and continues binding the current textures plus live Layer E properties. Pending manual/automatic work remains queued and resumes without catch-up when the hold is released. The toggle is not serialized authoring data and resets when the component is enabled or disabled.
+
+This patch adds no texture, buffer, shader property, compute kernel, dispatch, readback, or persistent simulation field. Structural or resource-allocation changes may still legitimately rebuild and clear state; Hold Foam State is for same-domain rendering comparisons, not for preserving material across incompatible domain changes.
 
 ### Lifetime and topology rule
 
@@ -318,11 +339,11 @@ Reuse the existing shader-detail probe and available samples where practical. Pr
 
 ### Immediate next steps
 
-1. Validate `5.17B.2B` with Chip, Fray, and Strand Strength at `0`; Fragmentation Strength `0` must be exactly neutral.
-2. Confirm Strength `1` creates coherent medium-to-large regional edge losses rather than isolated pixels or repeated lanes.
-3. Verify Fragment Size changes subdivision while preserving broad placement, and Fragment Reach changes inward depth without firm-core holes.
-4. Inspect production Final Foam, Evaluated Final Preview, Shader Detail Probe, and removal-only Difference for agreement and stability.
-5. Profile the River fragment shader, accept or tune only evidenced fragmentation thresholds, then proceed to `5.17C — Remaining-Life Progression`.
+1. Validate that Layer E and other non-structural Inspector edits no longer queue a River rebuild, clear Layer C state, or stall between small adjustments.
+2. Populate Foam, enable **Hold Foam State**, and confirm Chip/Fray/Breakup Scale/Strand/Fragmentation rendering controls update against the exact same material state while transport, aging, births, and Layer D temporal evolution remain frozen.
+3. Release the hold and confirm simulation resumes without catch-up or a material reset; verify queued manual work remains pending until release.
+4. Leave Fragmentation Strength at `0` and redesign fragmentation later as medium regional splitting rather than edge-band erosion.
+5. Proceed to Remaining-Life orchestration only after the replacement fragmentation vocabulary is visually accepted.
 6. Retain the deferred transport-capacity policy and reopen it only under the already recorded review conditions.
 
 ## Active and trusted foundations

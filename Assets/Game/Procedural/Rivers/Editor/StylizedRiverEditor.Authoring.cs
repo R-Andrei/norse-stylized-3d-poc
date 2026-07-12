@@ -15,7 +15,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private void DrawSetup()
         {
             EditorGUILayout.PropertyField(Find("splineContainer"));
-            EditorGUILayout.PropertyField(Find("liveRegeneration"));
+            EditorGUILayout.PropertyField(
+                Find("liveRegeneration"),
+                new GUIContent(
+                    "Live Regeneration",
+                    "Automatically rebuilds structural river authoring and spline changes. Rendering, runtime tuning, diagnostics, and Foam Layer E controls update without rebuilding the river or clearing live Foam state."));
         }
 
         private void DrawRiverDomain()

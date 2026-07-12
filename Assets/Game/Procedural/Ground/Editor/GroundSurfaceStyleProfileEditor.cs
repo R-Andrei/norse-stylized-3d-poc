@@ -497,7 +497,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                         paintedAccentInkColor,
                         new GUIContent(
                             "Ink Color",
-                            "Family/variant-authored ink colour reserved for the future projected coverage bake and ground-albedo composition."));
+                            "Family/variant-authored opaque ink colour blended through the generated projected coverage texture into ground albedo."));
 
                     if (paintedAccentStrokeLengthMax.floatValue <
                         paintedAccentStrokeLengthMin.floatValue + 0.05f)

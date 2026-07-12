@@ -1846,6 +1846,7 @@ namespace ProgrammaticStylized3D.Rivers
         private bool subscribedToSplineChanges;
         private StylizedRiverDisturbanceRuntime disturbanceRuntime;
         private StylizedRiverFoamRuntime foamRuntime;
+        [NonSerialized] private bool foamStateHeld;
 
         public event Action<RiverDomainSnapshot> DomainChanged;
 
@@ -1980,6 +1981,8 @@ namespace ProgrammaticStylized3D.Rivers
             ResolveInteractionMinimumWavelength();
 
         public bool FoamEnabled => foamEnabled;
+        public bool FoamStateHeld =>
+            Application.isPlaying && foamEnabled && foamStateHeld;
         public StylizedRiverFoamTopologyCacheAsset FoamTopologyCacheAsset =>
             foamTopologyCacheAsset;
         public float FoamMajorSupportAmount =>
@@ -3017,6 +3020,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void OnEnable()
         {
+            foamStateHeld = false;
             MigrateFoamMaterialLifecycleTuningIfRequired();
             MigrateFoamVelocityTuningIfRequired();
             foamDebugView = ResolveFoamDebugView(foamDebugView);
@@ -3038,6 +3042,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void OnDisable()
         {
+            foamStateHeld = false;
             UnsubscribeFromSplineChanges();
 
             disturbanceRuntime ??=
@@ -3200,20 +3205,27 @@ namespace ProgrammaticStylized3D.Rivers
             disturbanceDebugView =
                 ResolveDisturbanceDebugView(disturbanceDebugView);
             ValidateSettings();
+            if (!foamEnabled)
+            {
+                foamStateHeld = false;
+            }
             CacheComponents();
             ResolveSplineContainer();
             AssignWaterLayer();
-            RemoveLegacyGeneratedObjects();
-            EnsureSurfaceOutput();
-            EnsureCorridorOutput();
+            if (!Application.isPlaying)
+            {
+                RemoveLegacyGeneratedObjects();
+                EnsureSurfaceOutput();
+                EnsureCorridorOutput();
+            }
             EnsureDisturbanceRuntime();
             EnsureFoamRuntime();
             ApplyVisualSettings();
 
-            if (liveRegeneration)
-            {
-                RequestRegeneration();
-            }
+            // OnValidate is shared by structural, simulation, rendering, and
+            // diagnostic controls. Full regeneration is therefore routed only
+            // by the custom Inspector's structural sections and spline-change
+            // callback. Render and runtime tuning must preserve live Foam state.
         }
 
         private void Update()
@@ -3402,7 +3414,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             ValidateSettings();
-            RegenerateAll();
+            RequestRegeneration();
         }
 
         public void MarkChannelCharacterCustom()
@@ -5383,6 +5395,23 @@ namespace ProgrammaticStylized3D.Rivers
             EnsureFoamRuntime();
             foamRuntime?.NotifyRiverChanged();
         }
+
+        public void SetFoamStateHeld(bool held)
+        {
+            foamStateHeld = Application.isPlaying && foamEnabled && held;
+        }
+
+#if UNITY_EDITOR
+        public void RequestStructuralRegenerationFromInspector()
+        {
+            if (!liveRegeneration)
+            {
+                return;
+            }
+
+            RequestRegeneration();
+        }
+#endif
 
         private void RequestRegeneration()
         {

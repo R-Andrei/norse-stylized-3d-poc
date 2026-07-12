@@ -1,495 +1,125 @@
 # Generated Mass Edge-Wear Code Inventory
 
-This is the canonical code-level companion to `Generated_Mass_Edge_Wear_Recovery_Architecture.md`. MG-R6 is the final MassGenerator refactor-closure pass. The historically named MG-R6A through MG-R6B.2 work is retained because it produced useful clone-only edge-wear evidence, but those patches are functional edge-wear research rather than refactor work.
+This document describes the current code layout and dependency boundaries only. It is not a progress log.
 
-## Current architecture summary
-
-- All `MassGenerator*.cs`: **25,537 lines**.
-- Edge-wear partials: **22,366 lines**.
-- Production-candidate/shared edge-wear files: **15,567 lines**.
-- Orchestration boundary: **570 lines**.
-- Diagnostic harness: **6,219 lines**.
-- Compatibility shim: **10 lines**.
-- Direct top-level edge-wear methods: **316**.
-- Direct nested edge-wear types: **90**.
-
-MG-R5 is Unity-validated: all 24 compact audits match MG-R4 with zero errors and zero warnings. The retained functional work is also runtime-grounded: MG-R6A produced `contained=22/0/22/0/22/0`; MG-R6B produced `containedRepartition=22/0/0/0/0/22/0/0`; MG-R6B.1 proved all 22 overlaps are removed but every transformed candidate introduces open and non-manifold edges, while 14 also introduce T-junctions; MG-R6B.2 produced `containedRepair=22/22/0/0/0/0/22/0/0`, so every guided residual still fails exact boundary incidence. MG-R6 removes only independently proven dead non-edge-wear code and leaves every retained topology experiment untouched.
-
-## Dependency rule
+The sole canonical patch history, methods-tried ledger, validation record, current blocker, and next-step list is:
 
 ```text
-orchestration -> production candidate
-orchestration -> diagnostic harness
-diagnostic harness -> builder result + production/shared utilities
-production candidate -X-> diagnostic-only methods/types
+Docs/Generated_Mass_Feature_Implementation_Checklist.md
 ```
 
-`ChamferBuildArtifacts` remains the one builder-result boundary. `ContainedPatchCandidates` are still derived from production geometry and provenance. MG-R6B consumes those candidates only inside the diagnostic harness; no repartition result controls production construction or live geometry.
+## Dependency boundary
 
-## Refactor and functional history
+```text
+MassGenerator orchestration
+    -> production/shared construction
+    -> diagnostic harness
 
-| Step | All MassGenerator lines | Edge-wear lines | Status |
-|---|---:|---:|---|
-| MG-R1 | 28,982 | 24,953 | Unity-validated behavior-preserving partial extraction |
-| MG-R2 | 26,546 | 22,517 | Unity-validated first diagnostic deletion wave |
-| MG-R2R1 | 26,510 | 22,481 | Unity-validated warning cleanup |
-| MG-R3/R1 | 24,911 | 20,882 | Unity-validated rejected feasibility removal |
-| MG-R4 | 22,480 | 18,451 | Unity-validated counter/result reduction |
-| MG-R5 | 22,635 | 18,606 | Unity-validated production/diagnostic separation |
-| MG-R6A | 23,104 | 19,075 | Unity-validated contained-patch transfer feasibility; `contained=22/0/22/0/22/0` aggregate |
-| MG-R6B | 24,676 | 20,647 | Runtime census `containedRepartition=22/0/0/0/0/22/0/0`; all 22 stop at exact boundary incidence |
-| MG-R6B.1 | 25,725 | 21,696 | Unity-validated: `containedBoundary=22/0/0/0/0/0/0/22`, `containedBoundarySegments=66/0/0/0/0/44/22/0`, `containedShadow=22/22/0/14/22/0/22` |
-| MG-R6B.2 | 26,395 | 22,366 | Runtime result `containedRepair=22/22/0/0/0/0/22/0/0`; guided reconstruction executes but all 22 still fail boundary incidence |
-| MG-R6 | 25,537 | 22,366 | Final refactor closure: 858 dead non-edge-wear lines, 30 methods, and 6 private types removed; Unity validation pending |
+Diagnostic harness
+    -> immutable builder artifacts
+    -> production/shared utilities
 
-## MG-R6A retained boundary
+Production/shared construction
+    -X-> diagnostic-only results
+```
 
-- Production/shared code groups successful patch triangles by `PatchLoopIndex` and runs the same render-faithful overlap predicates used by the baseline census.
-- Only loops classified as `PatchContainedInReplacement` become production candidates.
-- A deterministic owner requires exactly one containing replacement face that also shares an authoritative patch-boundary segment.
-- The builder stores loop and owner provenance only; it does not remove a patch or alter any face.
-- The diagnostic clone tests direct omission. A candidate resolves only if the owner already supplies every boundary segment, all patch-boundary edges remain two-use, no new source-boundary or unexpected-open-edge failure appears, and non-manifold/T-junction counts do not increase over that mass’s existing clone baseline.
-- Normal output adds `contained=candidates/resolved/stillRequired/ownerAmbiguous/boundaryTransferFailures/topologyFailures`.
-- Existing `overlap=`, corrected topology, sector, sliver, blocker, and live geometry calculations are otherwise unchanged.
+`ChamferBuildArtifacts` remains the builder-result boundary. Diagnostic experiments may read its geometry and provenance, but their results must not control live construction unless a later production-promotion patch explicitly replaces the live path.
 
-## MG-R6B diagnostic boundary
+## Core MassGenerator files
 
-- `MassGenerator.EdgeWear.Diagnostics.ContainedRepartition.cs` is diagnostic-only and receives the already-proven `ChamferContainedPatchCandidate` provenance.
-- The retained patch is never deleted. The diagnostic clone removes only its deterministic replacement owner and inserts residual replacement triangles.
-- Residual construction projects the owner and patch boundaries into one stable owner-plane basis, splits collinear overlaps and endpoint contacts, cancels shared directed segments, traces simple residual cycles, and triangulates those cycles deterministically.
-- Owner vertices and authoritative patch-boundary endpoints remain protected during collinear simplification so neighbouring-face and patch incidence are not silently replaced by T-junctions.
-- Every individual candidate is checked for area conservation, exact two-use patch boundaries, baseline-relative open/source-boundary/non-manifold/T-junction deltas, and remaining replacement overlap.
-- Individually resolved candidates are also rebuilt together per mass and per owner so same-owner interactions cannot be hidden by one-at-a-time success.
-- Normal output adds `containedRepartition=candidates/resolved/arrangementFailures/triangulationFailures/areaFailures/boundaryFailures/topologyFailures/overlapRemaining` and `containedCombined=attempted/applied/ownerConflicts/topologyFailures/remainingOverlaps`.
-- Existing `contained=`, overlap, sector, sliver, readiness, blocker, rendered geometry, and `geometryCommit=disabled` paths remain intact.
+| File | Responsibility |
+|---|---|
+| `MassGenerator.cs` | Shared constants and top-level generation entry points. |
+| `MassGenerator.Types.cs` | Core polygon, edge, vertex-key, and mesh-output support records. |
+| `MassGenerator.Helpers.cs` | Shared polygon sanitization, welding, geometry predicates, and utility methods. |
+| `MassGenerator.Polyhedron.cs` | Convex half-space clipping, cap construction, and polygon-face maintenance. |
+| `MassGenerator.MeshOutput.cs` | Final triangulation and feature-data emission. |
 
-## MG-R6B.1 diagnostic boundary
+## Edge-wear orchestration and selection
 
-- Unity evidence from MG-R6B is `containedRepartition=22/0/0/0/0/22/0/0`: every contained candidate built, triangulated, and conserved area, but all 22 stopped at the exact boundary-incidence gate.
-- `MassGenerator.EdgeWear.Diagnostics.ContainedBoundary.cs` decomposes each retained patch-boundary segment by exact use, collinear subsegment coverage, source kind, and owner provenance.
-- Candidate and segment terminal classifications are `exactValid`, `splitEquivalent`, `residualMissing`, `externalUnsplit`, `underused`, `overused`, or `ambiguous`.
-- The original `containedRepartition=` terminal result is preserved. Split-equivalent coverage is diagnostic evidence only and does not promote a candidate.
-- Shadow overlap and topology checks now run after residual construction even when exact boundary incidence fails. They independently report overlap removal, clean topology, T-junction increase, unexpected-open-edge increase, source-boundary increase, and non-manifold increase.
-- Normal output adds `containedBoundary=`, `containedBoundarySegments=`, and `containedShadow=`. Detailed representative incidence traces remain behind `EnableVerboseChamferDiagnostics` and are capped to one case per classification.
-- The patch remains clone-only and does not change combined-candidate eligibility, rendered geometry, readiness, or `geometryCommit=disabled`.
-- Unity validation produced `containedBoundary=22/0/0/0/0/0/0/22`, `containedBoundarySegments=66/0/0/0/0/44/22/0`, and `containedShadow=22/22/0/14/22/0/22`. Every target overlap was removed, but all 22 candidates gained unexpected open and non-manifold edges; 14 also gained T-junctions. The failure is therefore real topology, not an exact-key-only validator mismatch.
+| File | Responsibility |
+|---|---|
+| `MassGenerator.EdgeWear.Orchestration.cs` | Coordinates selection, corner solving, legacy construction, clone diagnostics, and compact logging. |
+| `MassGenerator.EdgeWear.Graph.cs` | Source topology graph and generic topology audits. |
+| `MassGenerator.EdgeWear.SelectionAndCorners.cs` | Deterministic edge selection, width feasibility, corner positions, and rail solving. |
+| `MassGenerator.EdgeWear.Types.cs` | Edge-wear graph, provenance, diagnostic, and builder result records. |
 
-## MG-R6B.2 bundled repair boundary
+## Retained legacy construction path
 
-- `MassGenerator.EdgeWear.Diagnostics.ContainedRepair.cs` adds a constrained owner-boundary notch builder for the proven three-segment contained-patch cases.
-- The retained patch boundary is ordered deterministically, projected in the owner basis, and divided into one shared owner-boundary run plus its complementary interior run. The shared run is removed from the owner cycle and replaced by the reversed complementary patch path.
-- The existing generic directed-segment arrangement remains as a deterministic fallback if the guided boundary case cannot be established.
-- After owner replacement, every transformed clone face is subdivided at authoritative retained-patch endpoints that lie in an edge interior. This aligns adjacent faces without moving points, changing area, or touching live records.
-- Boundary provenance now identifies residual-owner records by their exact transformed-record range rather than treating every replacement record with the same `SourceFaceIndex` as the owner.
-- Normal output adds `containedRepair=candidates/guidedResiduals/genericFallbacks/endpointAligned/resolved/buildFailures/boundaryFailures/topologyFailures/overlapRemaining`. The terminal reconciliation is `candidates = resolved + buildFailures + boundaryFailures + topologyFailures + overlapRemaining`; guided/fallback and endpoint-aligned values are independent construction observations.
-- The patch remains clone-only. Production candidates, live replacement faces, bevel strips, patch records, readiness, rendering, and `geometryCommit=disabled` are unchanged.
-- Runtime validation produced `containedRepair=22/22/0/0/0/0/22/0/0`. All 22 candidates use the guided path, none require endpoint insertion, and all 22 still fail the exact boundary gate. Existing `containedBoundary=`, `containedBoundarySegments=`, and `containedShadow=` evidence remains unchanged.
+The following files retain the previous replacement-face, strip, patch, boundary-repair, and overlap-investigation implementation. They remain available as comparison evidence while the plane-cut clone is validated, but their diagnostic outputs do not modify rendered geometry.
 
-## MG-R6 final refactor closure
+| File group | Responsibility |
+|---|---|
+| `MassGenerator.EdgeWear.BoundaryPlanning.cs` | Source-boundary planning and ownership preparation. |
+| `MassGenerator.EdgeWear.BoundaryNormalization.cs` | Boundary normalization and segmentation utilities. |
+| `MassGenerator.EdgeWear.BoundaryCompletion.cs` | Boundary completion and closure candidates. |
+| `MassGenerator.EdgeWear.PatchConstruction.cs` | Replacement, bevel-strip, and vertex-patch construction. |
+| `MassGenerator.EdgeWear.SliverAndTriangulation.cs` | Patch triangulation, sliver analysis, and geometry predicates. |
+| `MassGenerator.EdgeWear.ContainedOwnership.cs` | Contained-patch owner provenance. |
+| `MassGenerator.EdgeWear.Diagnostics.Contained*.cs` | Clone-only contained-owner experiments and topology evidence. |
+| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs` | Clone-only corrected-topology evaluation. |
+| `MassGenerator.EdgeWear.Diagnostics.Overlap.cs` | Render-faithful overlap classification. |
 
-MG-R6 closes the MassGenerator refactor against the current post-MG-R6B.2 tree without removing any useful edge-wear research. It removes only code with a complete zero-consumer proof:
+## Plane-cut kernel
 
-- the private `FaceMaterialMaskLookup` subsystem, its five support records, and all 25 methods inside it;
-- the uncalled transactional `TryClipPolyhedron` wrapper and its three private helpers;
-- the unused `VertexKey.ToDiagnosticString` formatter.
+### `MassGenerator.EdgeWear.PlaneCutKernel.cs`
 
-The removed material-mask subsystem had no construction, rendering, editor, logging, readiness, or diagnostic caller anywhere under `Assets`. `TryClipPolyhedron` likewise had no caller; the active direct `ClipPolyhedron` path remains unchanged. The closure reduces `MassGenerator.Types.cs` from 1,058 to 306 lines and `MassGenerator.Polyhedron.cs` from 493 to 387 lines.
+| Method | Responsibility |
+|---|---|
+| `AuditPlaneCutBevelKernel` | Builds all accepted cuts on a deep clone and runs final cap, topology, face, volume, and bounds gates. |
+| `TryBuildPlaneCutBevelCandidate` | Converts one active selected edge and its solved rail into an inward half-space cut with source-edge provenance. |
+| `ClonePolygonFacesForPlaneCutAudit` | Deep-clones source polygon records so diagnostics cannot mutate rendered geometry. |
+| `ConformPlaneCutFaceBoundaries` | Preserves shared collinear segmentation where a final vertex lies inside another face edge. |
+| `RepairPlaneCutNumericalSeams` | Snaps only mutually unique, opposite, near-identical open-edge pairs; rolls back unless the exact expected open-edge reduction occurs without new topology damage. |
+| `CollectPlaneCutOpenEdges` | Extracts exact one-use clone edges for conservative seam pairing. |
+| `IsPlaneCutCandidateAlreadySatisfied` | Detects a cut made redundant by earlier cuts before invoking the clipper. |
+| `IsPlaneCutCandidateRedundant` | Accepts a missing final cap only when the final polyhedron satisfies the plane, contact is lower-dimensional, and the original sharp source edge is absent. |
+| `DoesPlaneCutSourceEdgeSurvive` | Applies strict topology-scale source-edge survival testing. |
+| `CountMatchingPlaneCutCaps` | Counts surviving `ConvexEdgeWear` faces on one candidate plane. |
+| `CountInvalidPlaneCutFaces` | Rejects non-finite, degenerate, or oppositely wound faces. |
+| `CalculatePlaneCutPolyhedronVolume` | Supplies retained-volume validation. |
+| `ArePlaneCutBoundsContained` | Ensures diagnostic clipping does not expand source bounds beyond clip-consistent tolerance. |
 
-The validated post-cleanup audit finds 523 method declarations across all pre-EW-K1 `MassGenerator` partials. Every method has a surviving call or reference; the only declaration not followed by a normal call expression is `CompareChamferContainedPatchCandidates`, which is consumed twice as a `List<T>.Sort` method group. All private nested types have surviving references. Production/shared edge-wear files contain zero references to diagnostic-only methods or types; only the orchestration boundary invokes the diagnostic harness and logger.
+### `MassGenerator.Polyhedron.cs`
 
-Naming is now strict: `MG-R` denotes MassGenerator refactor work and closes with MG-R6. The retained MG-R6A through MG-R6B.2 labels are historical only. Future topology work continues under an `EW-*` functional series.
+| Method | Responsibility |
+|---|---|
+| `ClipPolyhedron` | Clips every face against one half-space and builds the corresponding cap. Optional parameters remain disabled for legacy callers. |
+| `ClipPolygon` | Clips one polygon while collecting cap intersections. |
+| `ResolveClipIntersection` | Reuses one canonical intersection for both faces sharing an undirected edge when explicitly enabled. |
+| `IntersectEdge` | Computes the segment-plane intersection with optional segment clamping. |
+| `CreateOrientedFace` | Orders cap vertices and enforces outward winding. |
 
-## File inventory
+## Compact diagnostic ownership
 
-| File | Lines | Methods | Types | Classification |
-|---|---:|---:|---:|---|
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs` | 1,272 | 20 | 0 | Production candidate / shared utility |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs` | 2,215 | 34 | 0 | Production candidate / shared utility |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs` | 1,997 | 26 | 0 | Production candidate / shared utility |
-| `MassGenerator.EdgeWear.Builder.Types.cs` | 137 | 0 | 5 | Production candidate / shared utility |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs` | 1,241 | 24 | 0 | Production candidate / shared utility |
-| `MassGenerator.EdgeWear.CorrectedTopology.cs` | 10 | 0 | 0 | Compatibility shim |
-| `MassGenerator.EdgeWear.Diagnostics.ContainedOwnership.cs` | 245 | 3 | 0 | Diagnostic harness |
-| `MassGenerator.EdgeWear.Diagnostics.ContainedBoundary.cs` | 997 | 14 | 7 | Diagnostic harness |
-| `MassGenerator.EdgeWear.Diagnostics.ContainedRepartition.cs` | 1,617 | 23 | 6 | Diagnostic harness |
-| `MassGenerator.EdgeWear.Diagnostics.ContainedRepair.cs` | 570 | 14 | 0 | Diagnostic harness |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs` | 2,050 | 21 | 0 | Diagnostic harness |
-| `MassGenerator.EdgeWear.Diagnostics.Logging.cs` | 371 | 8 | 0 | Diagnostic harness |
-| `MassGenerator.EdgeWear.Diagnostics.Overlap.cs` | 314 | 5 | 0 | Diagnostic harness |
-| `MassGenerator.EdgeWear.Diagnostics.Types.cs` | 71 | 0 | 3 | Diagnostic harness |
-| `MassGenerator.EdgeWear.Graph.cs` | 400 | 12 | 0 | Production candidate / shared utility |
-| `MassGenerator.EdgeWear.HalfEdgeDiagnostics.cs` | 562 | 10 | 0 | Production candidate / shared utility |
-| `MassGenerator.EdgeWear.Orchestration.cs` | 580 | 2 | 0 | Orchestration boundary |
-| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | 491 | 8 | 2 | Clone-only functional candidate |
-| `MassGenerator.EdgeWear.PatchConstruction.cs` | 1,916 | 26 | 0 | Production candidate / shared utility |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs` | 2,061 | 37 | 0 | Production candidate / shared utility |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs` | 1,786 | 37 | 0 | Production candidate / shared utility |
-| `MassGenerator.EdgeWear.Types.cs` | 1,980 | 0 | 69 | Production candidate / shared utility |
+`MassGenerator.EdgeWear.Diagnostics.Logging.cs` owns the single compact physical-mass audit. The plane-cut field is:
 
-## MG-R6B diagnostic method inventory
+```text
+planeBevel=
+selected/
+active/
+planesBuilt/
+planesRejected/
+capsBuilt/
+capsMissing/
+capsRedundant/
+conformalSplits/
+seamPairs/
+open/
+nonManifold/
+tJunction/
+invalid/
+valid
+```
 
-| File:line | Method | Responsibility |
-|---|---|---|
-| `MassGenerator.EdgeWear.Diagnostics.ContainedRepartition.cs:128` | `AuditChamferContainedOwnerRepartition` | Runs the 22-candidate terminal census and then the combined per-mass pass. |
-| `...ContainedRepartition.cs:235` | `EvaluateChamferContainedOwnerRepartition` | Builds and validates one transformed clone. |
-| `...ContainedRepartition.cs:405` | `AuditChamferContainedOwnerCombinedRepartition` | Groups individually resolved candidates by owner and tests coexistence. |
-| `...ContainedRepartition.cs:572` | `TryBuildChamferContainedOwnerResidual` | Builds owner-minus-retained-patch residual replacement triangles. |
-| `...ContainedRepartition.cs:863` | `TryBuildChamferRepartitionProjection` | Creates the deterministic owner-plane basis. |
-| `...ContainedRepartition.cs:914` | `CalculateChamferRepartitionSignedArea` | Measures projected cycle orientation. |
-| `...ContainedRepartition.cs:926` | `CalculateChamferRepartitionProjectionEpsilon` | Derives the scale-relative arrangement tolerance. |
-| `...ContainedRepartition.cs:964` | `TrySplitChamferRepartitionSegments` | Splits endpoint contacts and collinear overlaps; rejects proper interior crossings. |
-| `...ContainedRepartition.cs:1070` | `AddChamferRepartitionEndpointParameters` | Inserts a projected endpoint into a collinear source segment. |
-| `...ContainedRepartition.cs:1103` | `AddChamferRepartitionParameter` | Deduplicates deterministic split parameters. |
-| `...ContainedRepartition.cs:1118` | `TryBuildChamferRepartitionBoundaryCycles` | Cancels shared directed atoms and traces simple residual cycles. |
-| `...ContainedRepartition.cs:1310` | `SimplifyChamferRepartitionCycle` | Removes only unprotected collinear arrangement vertices. |
-| `...ContainedRepartition.cs:1350` | `IsChamferRepartitionPointOnSegment` | Tests removable collinearity in the owner plane. |
-| `...ContainedRepartition.cs:1373` | `CrossChamferRepartition2D` | Shared 2D cross product. |
-| `...ContainedRepartition.cs:1380` | `BuildChamferPatchRecordLookup` | Groups successful retained patch triangles by loop. |
-| `...ContainedRepartition.cs:1403` | `BuildChamferContainedRepartitionRecordSet` | Builds a deep-cloned full record set with selected owner replacements. |
-| `...ContainedRepartition.cs:1443` | `DoesChamferContainedPatchBoundaryHaveTwoUses` | Enforces exact retained-patch boundary incidence. |
-| `...ContainedRepartition.cs:1474` | `DoesChamferContainedRepartitionWorsenTopology` | Applies baseline-relative open/source-boundary/non-manifold/T-junction gates. |
-| `...ContainedRepartition.cs:1508` | `DoesChamferContainedPatchStillOverlapReplacement` | Reclassifies the target patch against transformed non-patch geometry. |
-| `...ContainedRepartition.cs:1548` | `BuildChamferContainedRepartitionFailure` | Creates a deterministic early terminal result. |
-| `...ContainedRepartition.cs:1563` | `RegisterChamferRepartitionProtectedPosition` | Preserves exact patch and owner boundary vertices. |
-| `...ContainedRepartition.cs:1577` | `SortChamferBoundarySegments` | Removes dictionary-order dependence from arrangement input. |
-| `...ContainedRepartition.cs:1604` | `CompareChamferContainedPatchCandidates` | Orders candidates by owner and loop provenance. |
+Representative failure text remains in `planeTrace=` and must stay concise.
 
-## MG-R6B.1 diagnostic method inventory
+## Live-geometry boundary
 
-| File:line | Method | Responsibility |
-|---|---|---|
-| `MassGenerator.EdgeWear.Diagnostics.ContainedBoundary.cs:177` | `AuditChamferContainedBoundaryIncidence` | Aggregates exact and collinear subsegment incidence for one retained patch boundary. |
-| `...ContainedBoundary.cs:280` | `AuditChamferContainedBoundarySegment` | Decomposes one authoritative segment by patch, residual-owner, replacement, bevel, and other-patch use. |
-| `...ContainedBoundary.cs:530` | `ClassifyChamferContainedBoundaryCandidate` | Assigns one deterministic candidate terminal category. |
-| `...ContainedBoundary.cs:597` | `RegisterChamferContainedBoundaryAudit` | Writes compact candidate/segment evidence and caps verbose traces. |
-| `...ContainedBoundary.cs:666` | `AuditChamferContainedRepartitionShadow` | Runs overlap and baseline-relative topology checks past the exact-incidence gate. |
-| `...ContainedBoundary.cs:754` | `BuildChamferContainedBoundaryEdgeRecords` | Preserves face-kind and provenance for transformed edge occurrences. |
-| `...ContainedBoundary.cs:817` | `TryBuildChamferContainedBoundaryInterval` | Projects collinear transformed edges onto an authoritative patch segment. |
-| `...ContainedBoundary.cs:872` | `IsChamferContainedBoundarySegmentCovered` | Distinguishes owner-boundary segments from owner-interior segments. |
+The plane-cut kernel currently operates on a deep clone. Rendered geometry remains on the existing path and every physical audit must continue to report:
 
-## MG-R6B.2 repair method inventory
+```text
+geometryCommit=disabled
+```
 
-| File | Method | Responsibility |
-|---|---|---|
-| `MassGenerator.EdgeWear.Diagnostics.ContainedRepair.cs` | `TryBuildChamferContainedGuidedResidualCycles` | Applies deterministic boundary-guided cutouts sequentially for all patches sharing an owner. |
-| `...ContainedRepair.cs` | `TryBuildChamferContainedOrderedPatchLoop` | Reconstructs one coherent oriented retained-patch boundary from successful patch triangles. |
-| `...ContainedRepair.cs` | `TryApplyChamferContainedBoundaryNotch` | Replaces the shared owner-boundary run with the reversed complementary patch path. |
-| `...ContainedRepair.cs` | `SplitChamferContainedRepartitionEndpoints` | Inserts authoritative patch endpoints into every affected cloned face edge without moving geometry. |
-| `...ContainedRepair.cs` | `SplitChamferCycleAtPositions` | Performs deterministic collinear endpoint insertion for owner cycles and cloned face walks. |
-| `...ContainedBoundary.cs` | `ClassifyChamferContainedBoundaryEdgeOwner` | Uses exact residual transformed-record provenance instead of broad `SourceFaceIndex` equivalence. |
-
-## Current method inventory
-
-| File:line | Method | Lines | Classification | Direct callers | Direct callees | Retention |
-|---|---|---:|---|---|---|---|
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:12` | `ResolveAndAuditChamferSourceBoundaryCompletions` | 314 | Production candidate / shared utility | `AuditChamferVertexPatchComponents` | `AddChamferBoundaryCompletionAdjacency`, `CountChamferBoundaryCompletionComponents`, `TryBuildChamferBoundaryCompletionCycles`, `TryPromoteChamferSourceBoundaryCompletion`, `TryResolveChamferSourceBoundaryMultiCycleOwnership` | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:327` | `TryBuildChamferBoundaryCompletionCycles` | 54 | Production candidate / shared utility | `ResolveAndAuditChamferSourceBoundaryCompletions` | `CompareChamferBoundaryCompletionEdges`, `EnqueueChamferBoundaryCompletionEdges`, `TryOrderChamferBoundaryCompletionCycle` | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:382` | `TryOrderChamferBoundaryCompletionCycle` | 169 | Production candidate / shared utility | `TryBuildChamferBoundaryCompletionCycles` | `CompareChamferBoundaryCompletionEdges`, `GetMinimumChamferVertexKey` | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:552` | `CompareChamferBoundaryCompletionEdges` | 26 | Production candidate / shared utility | `TryBuildChamferBoundaryCompletionCycles`, `TryOrderChamferBoundaryCompletionCycle` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:579` | `TryPromoteChamferSourceBoundaryCompletion` | 68 | Production candidate / shared utility | `ResolveAndAuditChamferSourceBoundaryCompletions` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:648` | `TryResolveChamferSourceBoundaryMultiCycleOwnership` | 276 | Production candidate / shared utility | `ResolveAndAuditChamferSourceBoundaryCompletions` | `AuditChamferMultiCycleOwnershipBeforeSwap`, `CalculateChamferBoundaryCompletionCycleNormal`, `CalculateChamferSourceBoundaryParentLoopNormal`, `DoChamferBoundaryCyclesPartitionConsecutiveRanges`, `DoesChamferRemovedBoundaryChildConnectCycles`, `IsFinite` | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:925` | `AuditChamferMultiCycleOwnershipBeforeSwap` | 60 | Production candidate / shared utility | `TryResolveChamferSourceBoundaryMultiCycleOwnership` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:986` | `DoChamferBoundaryCyclesPartitionConsecutiveRanges` | 25 | Production candidate / shared utility | `TryResolveChamferSourceBoundaryMultiCycleOwnership` | `AreChamferBoundaryOrdersCyclicallyConsecutive` | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:1012` | `AreChamferBoundaryOrdersCyclicallyConsecutive` | 26 | Production candidate / shared utility | `DoChamferBoundaryCyclesPartitionConsecutiveRanges` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:1039` | `DoesChamferRemovedBoundaryChildConnectCycles` | 31 | Production candidate / shared utility | `TryResolveChamferSourceBoundaryMultiCycleOwnership` | `FindChamferBoundaryCycleContainingVertex` | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:1071` | `FindChamferBoundaryCycleContainingVertex` | 19 | Production candidate / shared utility | `DoesChamferRemovedBoundaryChildConnectCycles` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:1091` | `CalculateChamferSourceBoundaryParentLoopNormal` | 12 | Production candidate / shared utility | `TryResolveChamferSourceBoundaryMultiCycleOwnership` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:1104` | `CalculateChamferBoundaryCompletionCycleNormal` | 12 | Production candidate / shared utility | `TryResolveChamferSourceBoundaryMultiCycleOwnership` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:1119` | `AddChamferBoundaryCompletionAdjacency` | 12 | Production candidate / shared utility | `ResolveAndAuditChamferSourceBoundaryCompletions` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:1132` | `CountChamferBoundaryCompletionComponents` | 33 | Production candidate / shared utility | `ResolveAndAuditChamferSourceBoundaryCompletions` | `EnqueueChamferBoundaryCompletionEdges` | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:1166` | `EnqueueChamferBoundaryCompletionEdges` | 18 | Production candidate / shared utility | `CountChamferBoundaryCompletionComponents`, `TryBuildChamferBoundaryCompletionCycles` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:1192` | `IncrementChamferTopologyKeyCount` | 7 | Production candidate / shared utility | `AuditChamferVertexPatchComponents`, `TryBuildChamferVertexPatchPlan` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:1200` | `CompareChamferExpectedVertexBoundaryProvenance` | 27 | Production candidate / shared utility | `BuildOrderedChamferVertexPatchComponents`, `CompareChamferVertexPatchComponents`, `TryOrderChamferVertexPatchComponent` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:1228` | `BuildChamferVertexPatchComponentDiagnostic` | 31 | Production candidate / shared utility | `AuditChamferVertexPatchComponents` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryCompletion.cs:1260` | `AddChamferVertexPatchFailure` | 9 | Production candidate / shared utility | `AuditChamferVertexPatchComponents`, `BuildChamferVertexPatchSourceContexts`, `BuildOrderedChamferVertexPatchComponents`, `ResolveChamferClosedSourcePatchClusters` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:12` | `NormalizeChamferProvisionalFaceWalks` | 61 | Production candidate / shared utility | `AuditProvisionalChamferEmission`, `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone` | `IsFinite`, `ReduceChamferFaceRetraces`, `TryFindDuplicateChamferFaceEdge` | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:74` | `RemoveRetraceDeletedChamferBoundaries` | 19 | Production candidate / shared utility | `AuditProvisionalChamferEmission`, `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:94` | `NormalizeChamferVertexBoundaries` | 106 | Production candidate / shared utility | `AuditProvisionalChamferEmission`, `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:201` | `ExtractChamferProvisionalFaces` | 10 | Production candidate / shared utility | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `AuditChamferContainedPatchOwnershipTransfer`, `AuditProvisionalChamferEmission`, `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone`, `TryEmitAndAuditChamferVertexPatches` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:212` | `CloneChamferProvisionalFaceRecord` | 17 | Production candidate / shared utility | `AuditChamferContainedPatchOwnershipTransfer`, `TryEmitAndAuditChamferVertexPatches` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:230` | `CloneChamferProvisionalFaceRecords` | 24 | Production candidate / shared utility | `AuditChamferContainedPatchOwnershipTransfer`, `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone`, `TryEmitAndAuditChamferVertexPatches` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:255` | `TryBuildChamferSourceBoundaryRecords` | 102 | Production candidate / shared utility | `AuditProvisionalChamferEmission` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:358` | `BuildChamferSourceBoundarySegmentKeys` | 17 | Production candidate / shared utility | `AuditProvisionalChamferEmission`, `EvaluateChamferVirtualSliverNormalization`, `SegmentRawChamferTJunctions`, `TryBuildChamferCorrectedPrePatchClone` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:376` | `ApplyChamferSourceBoundarySplitPlans` | 90 | Production candidate / shared utility | `ApplyChamferSplitPlans` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:468` | `NormalizeChamferSourceBoundaryLoops` | 172 | Production candidate / shared utility | `AuditProvisionalChamferEmission`, `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone` | `CountDistinctChamferFaceRecords`, `RecordChamferSourceBoundaryChildRemoval` | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:641` | `RecordChamferSourceBoundaryChildRemoval` | 14 | Production candidate / shared utility | `CollapseChamferSourceBoundaryTerminalTransferAliases`, `NormalizeChamferSourceBoundaryLoops` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:659` | `CollapseChamferSourceBoundaryTerminalTransferAliases` | 220 | Production candidate / shared utility | `AuditProvisionalChamferEmission`, `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone` | `AreChamferSourceBoundaryOccurrencesExactInverse`, `AreChamferSourceBoundaryOccurrencesNonAdjacent`, `BuildChamferSourceBoundaryChildOccurrences`, `CountDistinctChamferFaceRecords`, `RecordChamferSourceBoundaryChildRemoval`, `TryResolveConsecutiveChamferSourceBoundaryRecords` | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:880` | `AreChamferSourceBoundaryOccurrencesExactInverse` | 12 | Production candidate / shared utility | `CollapseChamferSourceBoundaryTerminalTransferAliases` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:893` | `AreChamferSourceBoundaryOccurrencesNonAdjacent` | 24 | Production candidate / shared utility | `CollapseChamferSourceBoundaryTerminalTransferAliases` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:918` | `TryResolveConsecutiveChamferSourceBoundaryRecords` | 65 | Production candidate / shared utility | `CollapseChamferSourceBoundaryTerminalTransferAliases` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:984` | `AuditChamferSourceBoundaryOwnership` | 149 | Production candidate / shared utility | `AuditProvisionalChamferEmission`, `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone` | `AddChamferSourceBoundaryDuplicateGroupDiagnostic`, `AddChamferSourceBoundaryFailure`, `BuildChamferSourceBoundaryChildOccurrences`, `CountDistinctChamferFaceRecords` | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1134` | `BuildChamferSourceBoundaryChildOccurrences` | 90 | Production candidate / shared utility | `AuditChamferSourceBoundaryOwnership`, `AuditProvisionalChamferEmission`, `CollapseChamferSourceBoundaryTerminalTransferAliases`, `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1225` | `AddChamferSourceBoundaryDuplicateGroupDiagnostic` | 84 | Production candidate / shared utility | `AuditChamferSourceBoundaryOwnership` | `BuildChamferSourceBoundaryOccurrenceDiagnostic`, `BuildChamferSourceBoundaryPairDiagnostic`, `CountDistinctChamferFaceRecords` | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1310` | `BuildChamferSourceBoundaryPairDiagnostic` | 59 | Production candidate / shared utility | `AddChamferSourceBoundaryDuplicateGroupDiagnostic` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1370` | `BuildChamferSourceBoundaryOccurrenceDiagnostic` | 35 | Production candidate / shared utility | `AddChamferSourceBoundaryDuplicateGroupDiagnostic` | `ResolveChamferSourceBoundaryOccurrenceDisposition` | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1406` | `ResolveChamferSourceBoundaryOccurrenceDisposition` | 26 | Production candidate / shared utility | `BuildChamferSourceBoundaryOccurrenceDiagnostic` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1433` | `CountDistinctChamferFaceRecords` | 14 | Production candidate / shared utility | `AddChamferSourceBoundaryDuplicateGroupDiagnostic`, `AuditChamferSourceBoundaryOwnership`, `CollapseChamferSourceBoundaryTerminalTransferAliases`, `NormalizeChamferSourceBoundaryLoops`, `TryResolveChamferClosedSourcePatchClosure` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1448` | `AddChamferSourceBoundaryFailure` | 30 | Production candidate / shared utility | `AuditChamferSourceBoundaryOwnership` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1479` | `BuildChamferProvisionalSegmentRecords` | 100 | Production candidate / shared utility | `AuditProvisionalChamferEmission`, `CollectUnresolvedRawChamferTJunctionRecords`, `EvaluateChamferVirtualSliverNormalization`, `SegmentRawChamferTJunctions`, `TryBuildChamferCorrectedPrePatchClone`, `TryEmitAndAuditChamferVertexPatches` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1580` | `BuildChamferBoundaryPointRecords` | 22 | Production candidate / shared utility | `CollectUnresolvedRawChamferTJunctionRecords`, `SegmentRawChamferTJunctions` | `AddChamferBoundaryPointRecord` | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1603` | `AddChamferBoundaryPointRecord` | 13 | Production candidate / shared utility | `BuildChamferBoundaryPointRecords` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1617` | `IsChamferSplitCompatible` | 56 | Production candidate / shared utility | `SegmentRawChamferTJunctions` | `HasValidRawChamferPointProvenance` | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1674` | `HasValidRawChamferPointProvenance` | 21 | Production candidate / shared utility | `IsChamferSplitCompatible` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1696` | `BuildChamferProvisionalVertexKeys` | 11 | Production candidate / shared utility | `CollectUnresolvedRawChamferTJunctionRecords`, `SegmentRawChamferTJunctions` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1708` | `SegmentRawChamferTJunctions` | 208 | Production candidate / shared utility | `AuditProvisionalChamferEmission`, `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone` | `ApplyChamferSplitPlans`, `BuildChamferBoundaryPointRecords`, `BuildChamferProvisionalSegmentRecords`, `BuildChamferProvisionalVertexKeys`, `BuildChamferSourceBoundarySegmentKeys`, `CalculateTopologyTJunctionTolerance`, `CollectUnresolvedRawChamferTJunctionRecords`, `IsChamferSplitCompatible`, `IsPointOnSegmentInterior` | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1917` | `CollectUnresolvedRawChamferTJunctionRecords` | 78 | Production candidate / shared utility | `SegmentRawChamferTJunctions` | `BuildChamferBoundaryPointRecords`, `BuildChamferProvisionalSegmentRecords`, `BuildChamferProvisionalVertexKeys`, `IsPointOnSegmentInterior` | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:1996` | `ApplyChamferSplitPlans` | 115 | Production candidate / shared utility | `SegmentRawChamferTJunctions` | `AppendSplitChamferBoundary`, `ApplyChamferSourceBoundarySplitPlans`, `CountChamferSegmentSplit` | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:2112` | `CountChamferSegmentSplit` | 43 | Production candidate / shared utility | `ApplyChamferSplitPlans` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryNormalization.cs:2156` | `AppendSplitChamferBoundary` | 56 | Production candidate / shared utility | `ApplyChamferSplitPlans` | `AddExpectedVertexBoundary` | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:12` | `AuditChamferVertexPatchComponents` | 265 | Production candidate / shared utility | `AuditProvisionalChamferEmission` | `AddChamferVertexPatchFailure`, `BuildChamferVertexPatchComponentDiagnostic`, `BuildChamferVertexPatchSourceContexts`, `BuildOrderedChamferVertexPatchComponents`, `IncrementChamferTopologyKeyCount`, `ResolveAndAuditChamferSourceBoundaryCompletions`, `ResolveChamferClosedSourcePatchClusters`, `ResolveChamferSourceBoundaryPatchClosure`, `TryBuildChamferVertexPatchPlan`, `TryResolveChamferClosedSourcePatchClosure` | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:278` | `TryBuildChamferVertexPatchPlan` | 198 | Production candidate / shared utility | `AuditChamferVertexPatchComponents` | `BuildChamferClusterBoundaryKeyList`, `BuildChamferComponentBoundaryKeyList`, `IncrementChamferTopologyKeyCount`, `TryCreateChamferVertexPatchLoop` | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:477` | `BuildChamferComponentBoundaryKeyList` | 13 | Production candidate / shared utility | `TryBuildChamferVertexPatchPlan` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:491` | `BuildChamferClusterBoundaryKeyList` | 28 | Production candidate / shared utility | `TryBuildChamferVertexPatchPlan` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:520` | `TryCreateChamferVertexPatchLoop` | 132 | Production candidate / shared utility | `TryBuildChamferVertexPatchPlan` | `BuildChamferSelectedStrengthBySourceEdge`, `IsFinite`, `TryCalculateChamferPatchComponentExpectedNormal` | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:653` | `TryCalculateChamferPatchComponentExpectedNormal` | 52 | Production candidate / shared utility | `TryCreateChamferVertexPatchLoop` | `IsFinite`, `TryCalculateChamferPatchOrderedNormal` | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:706` | `BuildChamferSelectedStrengthBySourceEdge` | 14 | Production candidate / shared utility | `TryCreateChamferVertexPatchLoop` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:721` | `BuildChamferVertexPatchSourceContexts` | 116 | Production candidate / shared utility | `AuditChamferVertexPatchComponents` | `AddChamferSourceBoundaryRecordAtVertex`, `AddChamferVertexPatchFailure`, `IsChamferSourceEdgeActive`, `TryCountActiveChamferRunsAtVertex` | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:838` | `AddChamferSourceBoundaryRecordAtVertex` | 14 | Production candidate / shared utility | `BuildChamferVertexPatchSourceContexts` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:853` | `TryCountActiveChamferRunsAtVertex` | 96 | Production candidate / shared utility | `BuildChamferVertexPatchSourceContexts` | `IsChamferSourceEdgeActive` | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:950` | `IsChamferSourceEdgeActive` | 7 | Production candidate / shared utility | `BuildChamferVertexPatchSourceContexts`, `TryCountActiveChamferRunsAtVertex`, `ValidateChamferVertexPatchComponentProvenance` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:958` | `BuildOrderedChamferVertexPatchComponents` | 132 | Production candidate / shared utility | `AuditChamferVertexPatchComponents` | `AddBoundaryAdjacency`, `AddChamferVertexPatchFailure`, `CompareChamferExpectedVertexBoundaryProvenance`, `EnqueueAdjacentBoundaryEdges`, `TryOrderChamferVertexPatchComponent`, `ValidateChamferVertexPatchComponentProvenance` | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:1091` | `TryOrderChamferVertexPatchComponent` | 168 | Production candidate / shared utility | `BuildOrderedChamferVertexPatchComponents` | `CompareChamferExpectedVertexBoundaryProvenance`, `CountChamferComponentAdjacency`, `GetMinimumChamferVertexKey`, `TryOrientChamferVertexBoundary` | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:1260` | `CountChamferComponentAdjacency` | 16 | Production candidate / shared utility | `TryOrderChamferVertexPatchComponent` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:1277` | `GetMinimumChamferVertexKey` | 15 | Production candidate / shared utility | `TryBuildChamferClosedSourcePatchCluster`, `TryOrderChamferBoundaryCompletionCycle`, `TryOrderChamferVertexPatchComponent` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:1293` | `TryOrientChamferVertexBoundary` | 30 | Production candidate / shared utility | `TryOrderChamferVertexPatchComponent` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:1324` | `ValidateChamferVertexPatchComponentProvenance` | 80 | Production candidate / shared utility | `BuildOrderedChamferVertexPatchComponents` | `IsChamferSourceEdgeActive` | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:1405` | `ResolveChamferSourceBoundaryPatchClosure` | 36 | Production candidate / shared utility | `AuditChamferVertexPatchComponents` | `CountChamferSourceBoundaryEndpointOwners` | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:1442` | `CountChamferSourceBoundaryEndpointOwners` | 47 | Production candidate / shared utility | `ResolveChamferSourceBoundaryPatchClosure` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:1490` | `TryResolveChamferClosedSourcePatchClosure` | 73 | Production candidate / shared utility | `AuditChamferVertexPatchComponents` | `CountDistinctChamferFaceRecords` | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:1564` | `ResolveChamferClosedSourcePatchClusters` | 94 | Production candidate / shared utility | `AuditChamferVertexPatchComponents` | `AddChamferPatchComponentAtEndpoint`, `AddChamferVertexPatchFailure`, `CompareChamferVertexPatchComponents`, `EnqueueChamferPatchClusterNeighbors`, `TryBuildChamferClosedSourcePatchCluster` | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:1659` | `AddChamferPatchComponentAtEndpoint` | 14 | Production candidate / shared utility | `ResolveChamferClosedSourcePatchClusters` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:1674` | `EnqueueChamferPatchClusterNeighbors` | 18 | Production candidate / shared utility | `ResolveChamferClosedSourcePatchClusters` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:1693` | `TryBuildChamferClosedSourcePatchCluster` | 213 | Production candidate / shared utility | `ResolveChamferClosedSourcePatchClusters` | `AppendChamferVertexPatchComponentArc`, `CompareChamferVertexPatchComponents`, `GetMinimumChamferVertexKey` | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:1907` | `AppendChamferVertexPatchComponentArc` | 52 | Production candidate / shared utility | `TryBuildChamferClosedSourcePatchCluster` | — | Retain |
-| `MassGenerator.EdgeWear.BoundaryPlanning.cs:1960` | `CompareChamferVertexPatchComponents` | 34 | Production candidate / shared utility | `ResolveChamferClosedSourcePatchClusters`, `TryBuildChamferClosedSourcePatchCluster` | `CompareChamferExpectedVertexBoundaryProvenance` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:12` | `BuildChamferFaceIntersectionCache` | 45 | Production candidate / shared utility | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `AuditChamferSuccessfulPatchIntersectionBaseline`, `BuildChamferContainedPatchCandidates` | `BuildChamferDirectedFaceTriangles`, `BuildChamferFaceBoundarySegments`, `BuildChamferPolygonAwareFaceTriangles`, `BuildChamferRenderFaithfulFace` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:58` | `AreChamferTrianglesCoplanar` | 15 | Production candidate / shared utility | `ClassifyChamferPatchOverlap` | — | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:74` | `AreChamferTriangleSetsContained` | 41 | Production candidate / shared utility | `ClassifyChamferPatchOverlap` | `IsChamferPointInsideTriangleSet` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:116` | `IsChamferPointInsideTriangleSet` | 17 | Production candidate / shared utility | `AreChamferTriangleSetsContained` | `IsChamferPointInsideOrOnTriangle` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:134` | `IsChamferPointInsideOrOnTriangle` | 40 | Production candidate / shared utility | `IsChamferPointInsideTriangleSet` | `ChamferPatchCross2D`, `GetChamferDirectedProjectionDropAxis`, `ProjectChamferDirectedPoint` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:175` | `CalculateChamferCoplanarTriangleOverlapArea` | 49 | Production candidate / shared utility | `ClassifyChamferPatchOverlap` | `ChamferPatchCross2D`, `ClipChamferPolygonAgainstEdge`, `GetChamferDirectedProjectionDropAxis`, `ProjectChamferDirectedPoint` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:225` | `ClipChamferPolygonAgainstEdge` | 44 | Production candidate / shared utility | `CalculateChamferCoplanarTriangleOverlapArea` | `IsChamferPointInsideClipEdge`, `TryGetChamferLineIntersection2D` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:270` | `IsChamferPointInsideClipEdge` | 12 | Production candidate / shared utility | `ClipChamferPolygonAgainstEdge` | `ChamferPatchCross2D` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:283` | `TryGetChamferLineIntersection2D` | 25 | Production candidate / shared utility | `ClipChamferPolygonAgainstEdge` | — | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:309` | `DoChamferBoundarySetsShareSegment` | 33 | Production candidate / shared utility | `ClassifyChamferPatchOverlap` | `IsChamferSegmentOnAnyBoundarySegment` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:343` | `IsChamferTriangleIntersectionConfinedToBoundary` | 82 | Production candidate / shared utility | `ClassifyChamferPatchOverlap`, `TryFindChamferImproperTriangleListIntersection` | `IsChamferCoplanarIntersectionConfinedToBoundary`, `IsChamferPointOnAnyBoundarySegment`, `TryChamferDirectedSegmentTriangleIntersection` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:426` | `IsChamferCoplanarIntersectionConfinedToBoundary` | 128 | Production candidate / shared utility | `IsChamferTriangleIntersectionConfinedToBoundary` | `ChamferDirectedPointStrictlyInsideTriangle2D`, `GetChamferDirectedProjectionDropAxis`, `IsChamferPointOnBothBoundarySets`, `IsChamferSegmentOnAnyBoundarySegment`, `ProjectChamferDirectedPoint`, `TryGetChamferPatchSegmentIntersectionEvidence` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:555` | `IsChamferPointOnBothBoundarySets` | 15 | Production candidate / shared utility | `IsChamferCoplanarIntersectionConfinedToBoundary` | `IsChamferPointOnAnyBoundarySegment` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:571` | `IsChamferPointOnAnyBoundarySegment` | 18 | Production candidate / shared utility | `IsChamferPointOnBothBoundarySets`, `IsChamferTriangleIntersectionConfinedToBoundary` | `DistanceChamferDirectedPointToSegmentSquared` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:590` | `IsChamferSegmentOnAnyBoundarySegment` | 29 | Production candidate / shared utility | `AuditChamferContainedPatchOwnershipTransfer`, `DoChamferBoundarySetsShareSegment`, `IsChamferCoplanarIntersectionConfinedToBoundary` | `DistanceChamferDirectedPointToSegmentSquared` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:620` | `TryFindChamferIntersectingTriangle` | 21 | Production candidate / shared utility | `AuditChamferCorrectedPatchIntersections` | `ChamferDirectedTrianglesIntersectImproperly` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:642` | `BuildChamferPolygonAwareFaceTriangles` | 106 | Production candidate / shared utility | `BuildChamferFaceIntersectionCache` | `ChamferPatchPolygonSelfIntersects`, `IsFinite`, `TryCreateChamferDirectedTriangleGeometry`, `TryEarClipChamferPolygonSilently`, `TryProjectChamferPatchLoop` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:749` | `TryEarClipChamferPolygonSilently` | 123 | Production candidate / shared utility | `BuildChamferPolygonAwareFaceTriangles` | `ChamferPatchCross2D`, `ChamferPatchDiagonalIntersectsRemainingBoundary`, `ChamferPatchPointInOrOnTriangle`, `TryCalculateChamferPatchTriangleNormal` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:873` | `BuildChamferPatchBoundarySegments` | 49 | Production candidate / shared utility | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `AuditChamferContainedPatchOwnershipTransfer`, `AuditChamferSuccessfulPatchIntersectionBaseline`, `BuildChamferContainedPatchCandidates`, `TryAppendChamferReservedSliverPatches` | — | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:923` | `BuildChamferFaceBoundarySegments` | 20 | Production candidate / shared utility | `AuditChamferContainedPatchOwnershipTransfer`, `BuildChamferFaceIntersectionCache` | — | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:944` | `BuildChamferRenderFaithfulFace` | 20 | Production candidate / shared utility | `AuditChamferContainedPatchOwnershipTransfer`, `BuildChamferFaceIntersectionCache` | — | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:965` | `TryBuildChamferCorrectedPatchTriangleGeometry` | 29 | Production candidate / shared utility | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `AuditChamferSuccessfulPatchIntersectionBaseline`, `BuildChamferContainedPatchCandidates` | `TryCreateChamferDirectedTriangleGeometry` | Retain |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:996` | `ClassifyChamferPatchOverlap` | 175 | Production candidate / shared utility | `AuditChamferPatchReplacementOverlapOwnership`, `BuildChamferContainedPatchCandidates` | `AreChamferTriangleSetsContained`, `AreChamferTrianglesCoplanar`, `CalculateChamferCoplanarTriangleOverlapArea`, `ChamferDirectedTrianglesIntersectImproperly`, `DoChamferBoundarySetsShareSegment`, `IsChamferTriangleIntersectionConfinedToBoundary` | Retain — MG-R6A |
-| `MassGenerator.EdgeWear.ContainedOwnership.cs:1172` | `BuildChamferContainedPatchCandidates` | 66 | Production candidate / shared utility | `TryEmitAndAuditChamferVertexPatches` | `BuildChamferFaceIntersectionCache`, `BuildChamferPatchBoundarySegments`, `ClassifyChamferPatchOverlap`, `TryBuildChamferCorrectedPatchTriangleGeometry` | Retain — MG-R6A |
-| `MassGenerator.EdgeWear.Diagnostics.ContainedOwnership.cs:11` | `AuditChamferContainedPatchOwnershipTransfer` | 189 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology` | `BuildChamferFaceBoundarySegments`, `BuildChamferPatchBoundarySegments`, `BuildChamferRenderFaithfulFace`, `BuildChamferSourceBoundaryFailureSet`, `BuildChamferUnexpectedOpenEdgeSet`, `BuildTopologyEdgeUseCounts`, `CloneChamferProvisionalFaceRecord`, `CloneChamferProvisionalFaceRecords`, `ExtractChamferProvisionalFaces`, `IsChamferSegmentOnAnyBoundarySegment` | Retain — MG-R6A |
-| `MassGenerator.EdgeWear.Diagnostics.ContainedOwnership.cs:202` | `BuildChamferUnexpectedOpenEdgeSet` | 18 | Diagnostic harness | `AuditChamferContainedPatchOwnershipTransfer` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.ContainedOwnership.cs:221` | `BuildChamferSourceBoundaryFailureSet` | 21 | Diagnostic harness | `AuditChamferContainedPatchOwnershipTransfer` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:12` | `RunChamferDiagnosticHarness` | 19 | Diagnostic harness | `AuditProvisionalChamferEmission` | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:32` | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology` | 517 | Diagnostic harness | `RunChamferDiagnosticHarness` | `AppendChamferCompactDiagnostic`, `AuditChamferContainedPatchOwnershipTransfer`, `AuditChamferCorrectedPatchIntersections`, `AuditChamferReservedSliverComponentDelta`, `AuditChamferSectorOccurrenceOwnership`, `AuditChamferSuccessfulPatchIntersectionBaseline`, `BuildChamferAuthoritativeHalfEdgeDecomposition`, `BuildChamferFaceIntersectionCache`, `BuildChamferHalfEdgeComponentKeySet`, `BuildChamferNonPatchFaceRecordSnapshot`, `BuildChamferOppositeBoundaryPositions`, `BuildChamferOrderedBoundaryKeys`, `BuildChamferPatchBoundarySegments`, `BuildChamferPromotedSectorHalfEdgeIndices`, `BuildChamferSectorPlanAssignments`, `BuildTopologyEdgeUseCounts`, `CalculateChamferSectorFeatureStrength`, `CountChamferCorrectedPatchBoundaryOccurrenceFailures`, `ExtractChamferProvisionalFaces`, `IsFinite`, `TryAppendChamferReservedSliverPatches`, `TryBuildChamferCorrectedPatchTriangleGeometry`, `TryBuildChamferCorrectedPrePatchClone`, `TryBuildChamferDirectPatchFromBoundaryComponent`, `TryTriangulateChamferVertexPatchLoop` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:550` | `AuditChamferReservedSliverComponentDelta` | 211 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology` | `BuildChamferAuthoritativeHalfEdgeDecomposition`, `BuildChamferHalfEdgeComponentKeySet`, `BuildChamferRemappedHalfEdgeComponentKeySet`, `CountChamferTopologyKeyOverlap` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:762` | `BuildChamferRemappedHalfEdgeComponentKeySet` | 31 | Diagnostic harness | `AuditChamferReservedSliverComponentDelta` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:794` | `CountChamferTopologyKeyOverlap` | 22 | Diagnostic harness | `AuditChamferReservedSliverComponentDelta` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:817` | `BuildChamferPromotedSectorHalfEdgeIndices` | 16 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:834` | `BuildChamferNonPatchFaceRecordSnapshot` | 16 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:851` | `TryAppendChamferReservedSliverPatches` | 190 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology` | `BuildChamferAuthoritativeHalfEdgeDecomposition`, `BuildChamferPatchBoundarySegments`, `BuildChamferSliverEdgeCandidates`, `CountChamferCorrectedPatchBoundaryOccurrenceFailures`, `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferDirectPatchFromBoundaryComponent`, `TryOrderChamferBoundaryHalfEdgesByEndpoints` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:1042` | `TryOrderChamferBoundaryHalfEdgesByEndpoints` | 54 | Diagnostic harness | `TryAppendChamferReservedSliverPatches` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:1097` | `TryBuildChamferDirectPatchFromBoundaryComponent` | 23 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `TryAppendChamferReservedSliverPatches` | `CalculateChamferSectorFeatureStrength` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:1121` | `TryBuildChamferDirectPatchFromBoundaryComponent` | 47 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `TryAppendChamferReservedSliverPatches` | `BuildChamferOppositeBoundaryPositions`, `TryCreateChamferDirectedTriangleGeometry` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:1169` | `TryBuildChamferCorrectedPrePatchClone` | 191 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology` | `AuditChamferSourceBoundaryOwnership`, `BuildChamferExpectedBoundaryKeySet`, `BuildChamferProvisionalSegmentRecords`, `BuildChamferSliverEdgeCandidates`, `BuildChamferSourceBoundaryChildOccurrences`, `BuildChamferSourceBoundarySegmentKeys`, `BuildTopologyEdgeUseCounts`, `CloneAndRemapChamferExpectedVertexBoundaries`, `CloneAndRemapChamferSharedEdgeSpans`, `CloneAndRemapChamferSourceBoundaryRecords`, `CloneChamferProvisionalFaceRecords`, `CloneChamferSourceBoundaryRecords`, `CollapseChamferSourceBoundaryTerminalTransferAliases`, `ExtractChamferProvisionalFaces`, `NormalizeChamferProvisionalFaceWalks`, `NormalizeChamferSourceBoundaryLoops`, `NormalizeChamferVertexBoundaries`, `RemoveRetraceDeletedChamferBoundaries`, `SegmentRawChamferTJunctions`, `TryDetermineChamferSliverRepresentative`, `TryRemapAndSanitizeChamferDiagnosticFaces` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:1361` | `TryDetermineChamferSliverRepresentative` | 79 | Diagnostic harness | `TryBuildChamferCorrectedPrePatchClone` | `ChamferFaceContainsVertexKey`, `ChamferTrackedPolygonContainsOriginalKey`, `SanitizeChamferTrackedPolygon` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:1441` | `TryRemapAndSanitizeChamferDiagnosticFaces` | 54 | Diagnostic harness | `TryBuildChamferCorrectedPrePatchClone` | `IsFinite`, `TryFindDuplicateChamferFaceEdge` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:1496` | `BuildChamferSectorPlanAssignments` | 151 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology` | `CountChamferPlanSectorKeyOverlap`, `CountChamferPlanSectorOccurrenceOverlap`, `DoesChamferHalfEdgeComponentMatchPatchOrder` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:1648` | `AuditChamferSectorOccurrenceOwnership` | 134 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology` | `CountChamferPlanHalfEdgeOccurrenceMatches` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:1783` | `CountChamferPlanHalfEdgeOccurrenceMatches` | 42 | Diagnostic harness | `AuditChamferSectorOccurrenceOwnership`, `CountChamferPlanSectorOccurrenceOverlap` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:1826` | `CountChamferPlanSectorOccurrenceOverlap` | 21 | Diagnostic harness | `BuildChamferSectorPlanAssignments` | `CountChamferPlanHalfEdgeOccurrenceMatches` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:1848` | `CountChamferPlanSectorKeyOverlap` | 21 | Diagnostic harness | `BuildChamferSectorPlanAssignments` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:1870` | `CalculateChamferSectorFeatureStrength` | 24 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `TryBuildChamferDirectPatchFromBoundaryComponent` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.CorrectedClone.cs:1894` | `CountChamferCorrectedPatchBoundaryOccurrenceFailures` | 144 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `TryAppendChamferReservedSliverPatches` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.Logging.cs:12` | `BuildChamferDiagnosticGeometrySignature` | 35 | Diagnostic harness | `AuditProvisionalChamferEmission` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.Logging.cs:48` | `AppendChamferCompactDiagnostic` | 20 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.Logging.cs:69` | `LogChamferNoStackTrace` | 13 | Diagnostic harness | `LogChamferCornerAudit`, `LogChamferEmissionAudit`, `LogChamferReadiness` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.Logging.cs:83` | `GetChamferGenerationCaller` | 28 | Diagnostic harness | `ShouldSuppressChamferCompactSummary` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.Logging.cs:112` | `ShouldSuppressChamferCompactSummary` | 41 | Diagnostic harness | `LogChamferEmissionAudit` | `GetChamferGenerationCaller` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.Logging.cs:154` | `LogChamferEmissionAudit` | 92 | Diagnostic harness | `ApplyGeneratedEdgeWearBevels` | `LogChamferNoStackTrace`, `ShouldSuppressChamferCompactSummary` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.Logging.cs:247` | `LogChamferCornerAudit` | 28 | Diagnostic harness | `ApplyGeneratedEdgeWearBevels` | `LogChamferNoStackTrace` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.Logging.cs:276` | `LogChamferReadiness` | 25 | Diagnostic harness | `ApplyGeneratedEdgeWearBevels` | `LogChamferNoStackTrace` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.Overlap.cs:11` | `AuditChamferSuccessfulPatchIntersectionBaseline` | 82 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology` | `AuditChamferCorrectedPatchIntersections`, `AuditChamferPatchReplacementOverlapOwnership`, `BuildChamferFaceIntersectionCache`, `BuildChamferPatchBoundarySegments`, `TryBuildChamferCorrectedPatchTriangleGeometry` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.Overlap.cs:94` | `AuditChamferPatchReplacementOverlapOwnership` | 55 | Diagnostic harness | `AuditChamferSuccessfulPatchIntersectionBaseline` | `ClassifyChamferPatchOverlap` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.Overlap.cs:150` | `AuditChamferCorrectedPatchIntersections` | 113 | Diagnostic harness | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `AuditChamferSuccessfulPatchIntersectionBaseline` | `AddChamferAllowedBoundaryContactCount`, `ChamferDirectedTrianglesIntersectImproperly`, `TryFindChamferImproperTriangleListIntersection`, `TryFindChamferIntersectingTriangle` | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.Overlap.cs:264` | `AddChamferAllowedBoundaryContactCount` | 10 | Diagnostic harness | `AuditChamferCorrectedPatchIntersections` | — | Retain |
-| `MassGenerator.EdgeWear.Diagnostics.Overlap.cs:275` | `TryFindChamferImproperTriangleListIntersection` | 36 | Diagnostic harness | `AuditChamferCorrectedPatchIntersections` | `ChamferDirectedTrianglesIntersectImproperly`, `IsChamferTriangleIntersectionConfinedToBoundary` | Retain |
-| `MassGenerator.EdgeWear.Graph.cs:12` | `TryBuildEdgeWearTopologyGraph` | 87 | Production candidate / shared utility | `TryBuildChamferTopologyContext` | `CountGraphNonManifoldEdges`, `GetOrAddEdgeWearGraphEdge`, `GetOrAddEdgeWearGraphVertex`, `GetUniqueGraphVertexCount` | Retain |
-| `MassGenerator.EdgeWear.Graph.cs:100` | `TryMapSelectedCandidatesToGraph` | 47 | Production candidate / shared utility | `TryBuildChamferTopologyContext` | `GraphEdgeMatchesCandidateFaces` | Retain |
-| `MassGenerator.EdgeWear.Graph.cs:147` | `GetOrAddEdgeWearGraphVertex` | 15 | Production candidate / shared utility | `TryBuildEdgeWearTopologyGraph` | — | Retain |
-| `MassGenerator.EdgeWear.Graph.cs:163` | `GetOrAddEdgeWearGraphEdge` | 20 | Production candidate / shared utility | `TryBuildEdgeWearTopologyGraph` | — | Retain |
-| `MassGenerator.EdgeWear.Graph.cs:184` | `GetUniqueGraphVertexCount` | 10 | Production candidate / shared utility | `TryBuildEdgeWearTopologyGraph` | — | Retain |
-| `MassGenerator.EdgeWear.Graph.cs:195` | `GraphEdgeMatchesCandidateFaces` | 8 | Production candidate / shared utility | `TryMapSelectedCandidatesToGraph` | — | Retain |
-| `MassGenerator.EdgeWear.Graph.cs:204` | `CountGraphNonManifoldEdges` | 13 | Production candidate / shared utility | `TryBuildEdgeWearTopologyGraph` | — | Retain |
-| `MassGenerator.EdgeWear.Graph.cs:217` | `IsFinite` | 9 | Production candidate / shared utility | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `AuditChamferReplacementFaces`, `AuditExplicitChamferCornerSolution`, `AuditProvisionalChamferEmission`, `BuildChamferPolygonAwareFaceTriangles`, `EvaluateChamferVirtualSliverNormalization`, `NormalizeChamferProvisionalFaceWalks`, `TryBuildChamferCornerTable`, `TryBuildChamferFaceLine`, `TryCalculateChamferPatchComponentExpectedNormal`, `TryCalculateChamferPatchOrderedNormal`, `TryCalculateChamferPatchTriangleNormal`, `TryChamferDirectedSegmentTriangleIntersection`, `TryCreateChamferDirectedTriangleGeometry`, `TryCreateChamferVertexPatchLoop`, `TryCreateChamferVertexPatchTriangle`, `TryEmitAndAuditChamferVertexPatches`, `TryMeasureChamferPatchTriangle`, `TryProjectChamferPatchLoop`, `TryRemapAndSanitizeChamferDiagnosticFaces`, `TryResolveChamferSourceBoundaryMultiCycleOwnership`, `TrySolveChamferFaceCorner` | — | Retain |
-| `MassGenerator.EdgeWear.Graph.cs:313` | `CountTopologyTJunctions` | 42 | Production candidate / shared utility | — | `CalculateTopologyTJunctionTolerance`, `IsPointOnSegmentInterior` | Retain |
-| `MassGenerator.EdgeWear.Graph.cs:356` | `IsPointOnSegmentInterior` | 28 | Production candidate / shared utility | `CollectUnresolvedRawChamferTJunctionRecords`, `CountTopologyTJunctions`, `SegmentRawChamferTJunctions` | — | Retain |
-| `MassGenerator.EdgeWear.Graph.cs:385` | `CalculateTopologyTJunctionTolerance` | 7 | Production candidate / shared utility | `CountTopologyTJunctions`, `IsChamferBoundaryHalfEdgeDescendantOfSegment`, `SegmentRawChamferTJunctions` | — | Retain |
-| `MassGenerator.EdgeWear.Graph.cs:393` | `AreSamePoint` | 4 | Production candidate / shared utility | — | — | Retain |
-| `MassGenerator.EdgeWear.HalfEdgeDiagnostics.cs:16` | `BuildChamferAuthoritativeHalfEdgeDecomposition` | 323 | Production candidate / shared utility | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `AuditChamferReservedSliverComponentDelta`, `BuildChamferSliverHalfEdgeDecomposition`, `TryAppendChamferReservedSliverPatches` | `AddChamferIntegerAdjacency`, `GetMinimumChamferInteger`, `IncrementChamferVertexKeyCount`, `OrderChamferBoundaryComponent`, `RegisterChamferBoundaryHalfEdge`, `TryFindChamferBoundarySuccessor` | Retain |
-| `MassGenerator.EdgeWear.HalfEdgeDiagnostics.cs:340` | `RegisterChamferBoundaryHalfEdge` | 20 | Production candidate / shared utility | `BuildChamferAuthoritativeHalfEdgeDecomposition` | — | Retain |
-| `MassGenerator.EdgeWear.HalfEdgeDiagnostics.cs:361` | `TryFindChamferBoundarySuccessor` | 39 | Production candidate / shared utility | `BuildChamferAuthoritativeHalfEdgeDecomposition` | — | Retain |
-| `MassGenerator.EdgeWear.HalfEdgeDiagnostics.cs:401` | `OrderChamferBoundaryComponent` | 44 | Production candidate / shared utility | `BuildChamferAuthoritativeHalfEdgeDecomposition` | — | Retain |
-| `MassGenerator.EdgeWear.HalfEdgeDiagnostics.cs:446` | `AddChamferIntegerAdjacency` | 24 | Production candidate / shared utility | `BuildChamferAuthoritativeHalfEdgeDecomposition` | — | Retain |
-| `MassGenerator.EdgeWear.HalfEdgeDiagnostics.cs:471` | `IncrementChamferVertexKeyCount` | 7 | Production candidate / shared utility | `BuildChamferAuthoritativeHalfEdgeDecomposition` | — | Retain |
-| `MassGenerator.EdgeWear.HalfEdgeDiagnostics.cs:479` | `GetMinimumChamferInteger` | 9 | Production candidate / shared utility | `BuildChamferAuthoritativeHalfEdgeDecomposition` | — | Retain |
-| `MassGenerator.EdgeWear.HalfEdgeDiagnostics.cs:489` | `GetOnlyChamferInteger` | 8 | Production candidate / shared utility | `EvaluateChamferVirtualSliverNormalization` | — | Retain |
-| `MassGenerator.EdgeWear.HalfEdgeDiagnostics.cs:498` | `BuildChamferHalfEdgeComponentKeySet` | 16 | Production candidate / shared utility | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `AuditChamferReservedSliverComponentDelta` | — | Retain |
-| `MassGenerator.EdgeWear.HalfEdgeDiagnostics.cs:515` | `DoesChamferHalfEdgeComponentMatchPatchOrder` | 41 | Production candidate / shared utility | `BuildChamferSectorPlanAssignments` | — | Retain |
-| `MassGenerator.EdgeWear.Orchestration.cs:12` | `ApplyGeneratedEdgeWearBevels` | 114 | Orchestration boundary | — | `AuditExplicitChamferCornerSolution`, `AuditProvisionalChamferEmission`, `BuildEdgeWearBevelCandidates`, `LogChamferCornerAudit`, `LogChamferEmissionAudit`, `LogChamferReadiness`, `TryBuildChamferTopologyContext` | Retain |
-| `MassGenerator.EdgeWear.Orchestration.cs:127` | `AuditProvisionalChamferEmission` | 440 | Orchestration boundary | `ApplyGeneratedEdgeWearBevels` | `AddExpectedVertexBoundary`, `AppendChamferReplacementEdgeChain`, `AuditChamferSourceBoundaryOwnership`, `AuditChamferVertexPatchComponents`, `AuditExpectedVertexBoundaryComponents`, `BuildChamferDiagnosticGeometrySignature`, `BuildChamferFaceEdgeKeySet`, `BuildChamferProvisionalSegmentRecords`, `BuildChamferSourceBoundaryChildOccurrences`, `BuildChamferSourceBoundarySegmentKeys`, `BuildTopologyEdgeUseCounts`, `CollapseChamferSourceBoundaryTerminalTransferAliases`, `ExtractChamferProvisionalFaces`, `IsFinite`, `NormalizeChamferProvisionalFaceWalks`, `NormalizeChamferSourceBoundaryLoops`, `NormalizeChamferVertexBoundaries`, `ReduceChamferFaceRetraces`, `RemoveRetraceDeletedChamferBoundaries`, `RunChamferDiagnosticHarness`, `SegmentRawChamferTJunctions`, `TryBuildChamferSourceBoundaryRecords`, `TryEmitAndAuditChamferVertexPatches`, `TryFindDuplicateChamferFaceEdge` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:13` | `TryEmitAndAuditChamferVertexPatches` | 332 | Production candidate / shared utility | `AuditProvisionalChamferEmission` | `AuditChamferPatchTriangulationFeasibility`, `BuildChamferContainedPatchCandidates`, `BuildChamferProvisionalSegmentRecords`, `BuildTopologyEdgeUseCounts`, `CloneChamferProvisionalFaceRecord`, `CloneChamferProvisionalFaceRecords`, `ExtractChamferProvisionalFaces`, `IsChamferSliverDiagnosticCandidate`, `IsFinite`, `TryCalculateChamferPatchOrderedNormal`, `TryTriangulateChamferVertexPatchLoop` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:346` | `TryTriangulateChamferVertexPatchLoop` | 159 | Production candidate / shared utility | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `TryEmitAndAuditChamferVertexPatches` | `BuildChamferFaceEdgeKeySet`, `ChamferPatchPolygonSelfIntersects`, `TryCreateChamferVertexPatchTriangle`, `TryEarClipChamferPatchLoop`, `TryProjectChamferPatchLoop` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:506` | `TryCreateChamferVertexPatchTriangle` | 86 | Production candidate / shared utility | `TryTriangulateChamferVertexPatchLoop` | `BuildChamferFaceEdgeKeySet`, `IsFinite`, `TryCalculateChamferPatchTriangleNormal` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:593` | `TryProjectChamferPatchLoop` | 85 | Production candidate / shared utility | `BuildChamferPolygonAwareFaceTriangles`, `TryTriangulateChamferVertexPatchLoop` | `CalculateChamferPatchSignedArea`, `IsFinite`, `IsFiniteFloat` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:679` | `TryEarClipChamferPatchLoop` | 178 | Production candidate / shared utility | `TryTriangulateChamferVertexPatchLoop` | `ChamferPatchCross2D`, `ChamferPatchDiagonalIntersectsRemainingBoundary`, `ChamferPatchPointInOrOnTriangle`, `CompareTopologyEdgeKeys`, `TryCalculateChamferPatchTriangleNormal` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:858` | `TryCalculateChamferPatchOrderedNormal` | 36 | Production candidate / shared utility | `AuditChamferPatchTriangulationFeasibility`, `TryCalculateChamferPatchComponentExpectedNormal`, `TryEmitAndAuditChamferVertexPatches` | `IsFinite`, `IsFiniteFloat` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:895` | `TryCalculateChamferPatchTriangleNormal` | 23 | Production candidate / shared utility | `TryCreateChamferVertexPatchTriangle`, `TryEarClipChamferPatchLoop`, `TryEarClipChamferPolygonSilently`, `TryMeasureChamferPatchTriangle` | `IsFinite`, `IsFiniteFloat` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:919` | `TryBuildChamferDirectedBoundaryOwnership` | 109 | Production candidate / shared utility | `EvaluateChamferVirtualSliverNormalization`, `IsChamferSliverDiagnosticCandidate` | `DoesChamferDirectedBoundaryCycleMatch` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1029` | `DoesChamferDirectedBoundaryCycleMatch` | 28 | Production candidate / shared utility | `TryBuildChamferDirectedBoundaryOwnership` | — | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1058` | `EnumerateChamferDirectedTriangulations` | 66 | Production candidate / shared utility | `IsChamferSliverDiagnosticCandidate` | — | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1125` | `EvaluateChamferDirectedTriangulation` | 265 | Production candidate / shared utility | `EvaluateChamferVirtualSliverNormalization`, `IsChamferSliverDiagnosticCandidate` | `AddChamferDirectedEdgeUse`, `BuildChamferDirectedDiagonalCodes`, `BuildChamferDirectedFaceTriangles`, `CalculateChamferDirectedMaximumBoundaryDihedral`, `CalculateChamferDirectedMaximumInternalDihedral`, `ChamferDirectedTrianglesIntersectImproperly`, `TryCreateChamferDirectedTriangleGeometry` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1391` | `TryCreateChamferDirectedTriangleGeometry` | 64 | Production candidate / shared utility | `BuildChamferDirectedFaceTriangles`, `BuildChamferPolygonAwareFaceTriangles`, `EvaluateChamferDirectedTriangulation`, `TryBuildChamferCorrectedPatchTriangleGeometry`, `TryBuildChamferDirectPatchFromBoundaryComponent` | `IsFinite`, `IsFiniteFloat` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1456` | `AddChamferDirectedEdgeUse` | 22 | Production candidate / shared utility | `EvaluateChamferDirectedTriangulation` | — | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1479` | `BuildChamferDirectedDiagonalCodes` | 24 | Production candidate / shared utility | `EvaluateChamferDirectedTriangulation` | — | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1504` | `CalculateChamferDirectedMaximumInternalDihedral` | 22 | Production candidate / shared utility | `EvaluateChamferDirectedTriangulation` | — | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1527` | `CalculateChamferDirectedMaximumBoundaryDihedral` | 26 | Production candidate / shared utility | `EvaluateChamferDirectedTriangulation` | — | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1554` | `BuildChamferDirectedFaceTriangles` | 29 | Production candidate / shared utility | `BuildChamferFaceIntersectionCache`, `EvaluateChamferDirectedTriangulation` | `TryCreateChamferDirectedTriangleGeometry` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1584` | `ChamferDirectedTrianglesIntersectImproperly` | 77 | Production candidate / shared utility | `AuditChamferCorrectedPatchIntersections`, `ClassifyChamferPatchOverlap`, `EvaluateChamferDirectedTriangulation`, `TryFindChamferImproperTriangleListIntersection`, `TryFindChamferIntersectingTriangle` | `ChamferDirectedCoplanarTrianglesOverlapImproperly`, `IsChamferDirectedAllowedSharedContact`, `TryChamferDirectedSegmentTriangleIntersection` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1662` | `ChamferDirectedCoplanarTrianglesOverlapImproperly` | 82 | Production candidate / shared utility | `ChamferDirectedTrianglesIntersectImproperly` | `ChamferDirectedEdgesShareEndpoint`, `ChamferDirectedPointStrictlyInsideTriangle2D`, `GetChamferDirectedProjectionDropAxis`, `ProjectChamferDirectedPoint`, `TryGetChamferPatchSegmentIntersectionEvidence` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1745` | `ChamferDirectedEdgesShareEndpoint` | 15 | Production candidate / shared utility | `ChamferDirectedCoplanarTrianglesOverlapImproperly` | — | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1761` | `ChamferDirectedPointStrictlyInsideTriangle2D` | 28 | Production candidate / shared utility | `ChamferDirectedCoplanarTrianglesOverlapImproperly`, `IsChamferCoplanarIntersectionConfinedToBoundary` | `ChamferPatchCross2D` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1790` | `TryChamferDirectedSegmentTriangleIntersection` | 45 | Production candidate / shared utility | `ChamferDirectedTrianglesIntersectImproperly`, `IsChamferTriangleIntersectionConfinedToBoundary` | `IsFinite` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1836` | `IsChamferDirectedAllowedSharedContact` | 31 | Production candidate / shared utility | `ChamferDirectedTrianglesIntersectImproperly` | `DistanceChamferDirectedPointToSegmentSquared` | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1868` | `DistanceChamferDirectedPointToSegmentSquared` | 17 | Production candidate / shared utility | `IsChamferDirectedAllowedSharedContact`, `IsChamferPointOnAnyBoundarySegment`, `IsChamferSegmentOnAnyBoundarySegment` | — | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1886` | `GetChamferDirectedProjectionDropAxis` | 12 | Production candidate / shared utility | `CalculateChamferCoplanarTriangleOverlapArea`, `ChamferDirectedCoplanarTrianglesOverlapImproperly`, `IsChamferCoplanarIntersectionConfinedToBoundary`, `IsChamferPointInsideOrOnTriangle` | — | Retain |
-| `MassGenerator.EdgeWear.PatchConstruction.cs:1899` | `ProjectChamferDirectedPoint` | 14 | Production candidate / shared utility | `CalculateChamferCoplanarTriangleOverlapArea`, `ChamferDirectedCoplanarTrianglesOverlapImproperly`, `IsChamferCoplanarIntersectionConfinedToBoundary`, `IsChamferPointInsideOrOnTriangle` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:13` | `BuildEdgeWearBevelCandidates` | 146 | Production candidate / shared utility | `ApplyGeneratedEdgeWearBevels` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:160` | `TryBuildChamferTopologyContext` | 96 | Production candidate / shared utility | `ApplyGeneratedEdgeWearBevels` | `AuditChamferVertexFans`, `BuildChamferHalfEdges`, `TraceChamferBoundaryLoops`, `TryBuildEdgeWearTopologyGraph`, `TryMapSelectedCandidatesToGraph` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:257` | `BuildChamferHalfEdges` | 47 | Production candidate / shared utility | `TryBuildChamferTopologyContext` | `PackDirectedVertexPair` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:305` | `PackDirectedVertexPair` | 4 | Production candidate / shared utility | `BuildChamferHalfEdges` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:310` | `TraceChamferBoundaryLoops` | 69 | Production candidate / shared utility | `TryBuildChamferTopologyContext` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:380` | `AuditChamferVertexFans` | 88 | Production candidate / shared utility | `TryBuildChamferTopologyContext` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:471` | `AuditExplicitChamferCornerSolution` | 247 | Production candidate / shared utility | `ApplyGeneratedEdgeWearBevels` | `AuditChamferReplacementFaces`, `AuditChamferSelectedRails`, `AuditChamferSolvedBoundary`, `CalculateChamferCornerDisplacementLimit`, `CalculateChamferEdgeWidth`, `GetGraphEdgeLength`, `IsFinite`, `TryBuildChamferFaceLine`, `TryBuildChamferSharedEdgeSpans`, `TrySolveChamferFaceCorner`, `TrySolveCornerAwareChamferWidths`, `UpdateChamferFinalWorstCorner` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:719` | `TrySolveCornerAwareChamferWidths` | 209 | Production candidate / shared utility | `AuditExplicitChamferCornerSolution` | `CalculateChamferCornerDisplacementLimit`, `CollectChamferSharedEdgeParticipatingSelectedEdges`, `GetGraphEdgeLength`, `HasStableChamferSharedInterval`, `TryBuildChamferCornerTable`, `TryClampChamferEdgeWidth`, `TryFindChamferSharedEdgeWidthScale`, `UpdateChamferInitialWorstCorner` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:929` | `TryBuildChamferCornerTable` | 93 | Production candidate / shared utility | `TryFindChamferSharedEdgeWidthScale`, `TrySolveCornerAwareChamferWidths` | `IsFinite`, `TryBuildChamferFaceLine`, `TrySolveChamferFaceCorner` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1023` | `HasStableChamferSharedInterval` | 43 | Production candidate / shared utility | `TryFindChamferSharedEdgeWidthScale`, `TrySolveCornerAwareChamferWidths` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1067` | `CollectChamferSharedEdgeParticipatingSelectedEdges` | 27 | Production candidate / shared utility | `TrySolveCornerAwareChamferWidths` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1095` | `TryFindChamferSharedEdgeWidthScale` | 78 | Production candidate / shared utility | `TrySolveCornerAwareChamferWidths` | `HasStableChamferSharedInterval`, `TryBuildChamferCornerTable` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1174` | `UpdateChamferInitialWorstCorner` | 16 | Production candidate / shared utility | `TrySolveCornerAwareChamferWidths` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1191` | `TryClampChamferEdgeWidth` | 28 | Production candidate / shared utility | `TrySolveCornerAwareChamferWidths` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1220` | `CalculateChamferCornerDisplacementLimit` | 12 | Production candidate / shared utility | `AuditExplicitChamferCornerSolution`, `TrySolveCornerAwareChamferWidths` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1233` | `UpdateChamferFinalWorstCorner` | 16 | Production candidate / shared utility | `AuditExplicitChamferCornerSolution` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1250` | `CalculateChamferEdgeWidth` | 37 | Production candidate / shared utility | `AuditExplicitChamferCornerSolution` | `AccumulateChamferEndpointWidthLimit` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1288` | `AccumulateChamferEndpointWidthLimit` | 29 | Production candidate / shared utility | `CalculateChamferEdgeWidth` | `GetGraphEdgeLength` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1318` | `GetGraphEdgeLength` | 9 | Production candidate / shared utility | `AccumulateChamferEndpointWidthLimit`, `AuditChamferSolvedBoundary`, `AuditExplicitChamferCornerSolution`, `TrySolveCornerAwareChamferWidths` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1328` | `TryBuildChamferFaceLine` | 34 | Production candidate / shared utility | `AuditExplicitChamferCornerSolution`, `TryBuildChamferCornerTable` | `IsFinite` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1363` | `TrySolveChamferFaceCorner` | 31 | Production candidate / shared utility | `AuditExplicitChamferCornerSolution`, `TryBuildChamferCornerTable` | `IsFinite` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1395` | `TryBuildChamferSharedEdgeSpans` | 73 | Production candidate / shared utility | `AuditExplicitChamferCornerSolution` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1469` | `AuditChamferReplacementFaces` | 80 | Production candidate / shared utility | `AuditExplicitChamferCornerSolution` | `AppendChamferReplacementEdgeChain`, `IsFinite`, `ReduceChamferFaceRetraces`, `TryFindDuplicateChamferFaceEdge` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1550` | `AuditChamferSelectedRails` | 42 | Production candidate / shared utility | `AuditExplicitChamferCornerSolution` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1593` | `AuditChamferSolvedBoundary` | 34 | Production candidate / shared utility | `AuditExplicitChamferCornerSolution` | `GetGraphEdgeLength` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1628` | `AppendChamferReplacementEdgeChain` | 72 | Production candidate / shared utility | `AuditChamferReplacementFaces`, `AuditProvisionalChamferEmission` | `AddExpectedVertexBoundary`, `AppendUniquePoint` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1701` | `AppendUniquePoint` | 11 | Production candidate / shared utility | `AppendChamferReplacementEdgeChain` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1713` | `ReduceChamferFaceRetraces` | 76 | Production candidate / shared utility | `AuditChamferReplacementFaces`, `AuditProvisionalChamferEmission`, `NormalizeChamferProvisionalFaceWalks` | `BuildChamferFaceEdgeUseCounts`, `RemoveChamferFaceVertexPair` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1790` | `RemoveChamferFaceVertexPair` | 10 | Production candidate / shared utility | `ReduceChamferFaceRetraces` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1801` | `BuildChamferFaceEdgeUseCounts` | 24 | Production candidate / shared utility | `BuildChamferFaceEdgeKeySet`, `ReduceChamferFaceRetraces` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1826` | `TryFindDuplicateChamferFaceEdge` | 40 | Production candidate / shared utility | `AuditChamferReplacementFaces`, `AuditProvisionalChamferEmission`, `EvaluateChamferVirtualSliverNormalization`, `NormalizeChamferProvisionalFaceWalks`, `TryRemapAndSanitizeChamferDiagnosticFaces` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1867` | `BuildChamferFaceEdgeKeySet` | 6 | Production candidate / shared utility | `AuditProvisionalChamferEmission`, `TryCreateChamferVertexPatchTriangle`, `TryTriangulateChamferVertexPatchLoop` | `BuildChamferFaceEdgeUseCounts` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1874` | `AddExpectedVertexBoundary` | 24 | Production candidate / shared utility | `AppendChamferReplacementEdgeChain`, `AppendSplitChamferBoundary`, `AuditProvisionalChamferEmission` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1899` | `BuildTopologyEdgeUseCounts` | 27 | Production candidate / shared utility | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `AuditChamferContainedPatchOwnershipTransfer`, `AuditProvisionalChamferEmission`, `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone`, `TryEmitAndAuditChamferVertexPatches` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:1927` | `AuditExpectedVertexBoundaryComponents` | 102 | Production candidate / shared utility | `AuditProvisionalChamferEmission` | `AddBoundaryAdjacency`, `EnqueueAdjacentBoundaryEdges` | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:2030` | `AddBoundaryAdjacency` | 12 | Production candidate / shared utility | `AuditExpectedVertexBoundaryComponents`, `BuildOrderedChamferVertexPatchComponents` | — | Retain |
-| `MassGenerator.EdgeWear.SelectionAndCorners.cs:2043` | `EnqueueAdjacentBoundaryEdges` | 15 | Production candidate / shared utility | `AuditExpectedVertexBoundaryComponents`, `BuildOrderedChamferVertexPatchComponents` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:12` | `IsChamferSliverDiagnosticCandidate` | 73 | Production candidate / shared utility | `TryEmitAndAuditChamferVertexPatches` | `BuildChamferSliverEdgeCandidates`, `EnumerateChamferDirectedTriangulations`, `EvaluateChamferDirectedTriangulation`, `TryBuildChamferDirectedBoundaryOwnership` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:87` | `BuildChamferSliverEdgeCandidates` | 41 | Production candidate / shared utility | `IsChamferSliverDiagnosticCandidate`, `TryAppendChamferReservedSliverPatches`, `TryBuildChamferCorrectedPrePatchClone` | `CompareTopologyEdgeKeys`, `FindChamferSliverEdgeOwners` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:129` | `FindChamferSliverEdgeOwners` | 36 | Production candidate / shared utility | `BuildChamferSliverEdgeCandidates` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:166` | `EvaluateChamferVirtualSliverNormalization` | 482 | Production candidate / shared utility | `TryAppendChamferReservedSliverPatches` | `AuditChamferSourceBoundaryOwnership`, `BuildChamferExpectedBoundaryKeySet`, `BuildChamferOppositeBoundaryPositions`, `BuildChamferOrderedBoundaryKeys`, `BuildChamferProvisionalSegmentRecords`, `BuildChamferSliverHalfEdgeDecomposition`, `BuildChamferSourceBoundaryChildOccurrences`, `BuildChamferSourceBoundarySegmentKeys`, `BuildTopologyEdgeUseCounts`, `ChamferFaceContainsVertexKey`, `ChamferTrackedPolygonContainsOriginalKey`, `CloneAndRemapChamferExpectedVertexBoundaries`, `CloneAndRemapChamferSharedEdgeSpans`, `CloneAndRemapChamferSourceBoundaryRecords`, `CloneChamferProvisionalFaceRecords`, `CollapseChamferSourceBoundaryTerminalTransferAliases`, `EvaluateChamferDirectedTriangulation`, `ExtractChamferProvisionalFaces`, `GetOnlyChamferInteger`, `IsChamferBoundaryComponentContainedBySegments`, `IsChamferBoundaryHalfEdgeDescendantOfSegment`, `IsFinite`, `NormalizeChamferProvisionalFaceWalks`, `NormalizeChamferSourceBoundaryLoops`, `NormalizeChamferVertexBoundaries`, `RemoveRetraceDeletedChamferBoundaries`, `SanitizeChamferTrackedPolygon`, `SegmentRawChamferTJunctions`, `TryBuildChamferDirectedBoundaryOwnership`, `TryFindDuplicateChamferFaceEdge` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:649` | `IsChamferBoundaryHalfEdgeDescendantOfSegment` | 19 | Production candidate / shared utility | `EvaluateChamferVirtualSliverNormalization`, `IsChamferBoundaryComponentContainedBySegments` | `CalculateTopologyTJunctionTolerance`, `IsChamferPointOnClosedSegment` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:669` | `IsChamferPointOnClosedSegment` | 25 | Production candidate / shared utility | `IsChamferBoundaryHalfEdgeDescendantOfSegment` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:695` | `IsChamferBoundaryComponentContainedBySegments` | 35 | Production candidate / shared utility | `EvaluateChamferVirtualSliverNormalization` | `IsChamferBoundaryHalfEdgeDescendantOfSegment` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:731` | `BuildChamferExpectedBoundaryKeySet` | 12 | Production candidate / shared utility | `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:744` | `CloneAndRemapChamferExpectedVertexBoundaries` | 36 | Production candidate / shared utility | `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone` | `RemapChamferDiagnosticPosition` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:781` | `CloneChamferSourceBoundaryRecords` | 32 | Production candidate / shared utility | `TryBuildChamferCorrectedPrePatchClone` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:814` | `CloneAndRemapChamferSourceBoundaryRecords` | 83 | Production candidate / shared utility | `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone` | `RemapChamferDiagnosticPosition` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:898` | `CloneAndRemapChamferSharedEdgeSpans` | 31 | Production candidate / shared utility | `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferCorrectedPrePatchClone` | `RemapChamferDiagnosticPosition` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:930` | `RemapChamferDiagnosticPosition` | 9 | Production candidate / shared utility | `CloneAndRemapChamferExpectedVertexBoundaries`, `CloneAndRemapChamferSharedEdgeSpans`, `CloneAndRemapChamferSourceBoundaryRecords` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:940` | `BuildChamferSliverHalfEdgeDecomposition` | 9 | Production candidate / shared utility | `EvaluateChamferVirtualSliverNormalization` | `BuildChamferAuthoritativeHalfEdgeDecomposition` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:950` | `ChamferFaceContainsVertexKey` | 13 | Production candidate / shared utility | `EvaluateChamferVirtualSliverNormalization`, `TryDetermineChamferSliverRepresentative` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:964` | `SanitizeChamferTrackedPolygon` | 78 | Production candidate / shared utility | `EvaluateChamferVirtualSliverNormalization`, `TryDetermineChamferSliverRepresentative` | `RemoveClosingChamferTrackedDuplicate` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1043` | `RemoveClosingChamferTrackedDuplicate` | 14 | Production candidate / shared utility | `SanitizeChamferTrackedPolygon` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1058` | `ChamferTrackedPolygonContainsOriginalKey` | 13 | Production candidate / shared utility | `EvaluateChamferVirtualSliverNormalization`, `TryDetermineChamferSliverRepresentative` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1072` | `BuildChamferOppositeBoundaryPositions` | 16 | Production candidate / shared utility | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `EvaluateChamferVirtualSliverNormalization`, `TryBuildChamferDirectPatchFromBoundaryComponent` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1089` | `BuildChamferOrderedBoundaryKeys` | 21 | Production candidate / shared utility | `AuditChamferAuthoritativeSectorRepartitionAndCorrectedTopology`, `EvaluateChamferVirtualSliverNormalization` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1112` | `AuditChamferPatchTriangulationFeasibility` | 71 | Production candidate / shared utility | `TryEmitAndAuditChamferVertexPatches` | `CompareChamferPatchTriangulationCandidates`, `CountChamferPatchTriangulations`, `EnumerateChamferPatchTriangulations`, `SaturatingAddLong`, `TryCalculateChamferPatchOrderedNormal` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1184` | `EnumerateChamferPatchTriangulations` | 117 | Production candidate / shared utility | `AuditChamferPatchTriangulationFeasibility` | `AddChamferPatchDiagonalCode`, `TryMeasureChamferPatchTriangle` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1302` | `TryMeasureChamferPatchTriangle` | 69 | Production candidate / shared utility | `EnumerateChamferPatchTriangulations` | `IsFinite`, `IsFiniteFloat`, `TryCalculateChamferPatchTriangleNormal` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1372` | `AddChamferPatchDiagonalCode` | 15 | Production candidate / shared utility | `EnumerateChamferPatchTriangulations` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1388` | `CompareChamferPatchTriangulationCandidates` | 37 | Production candidate / shared utility | `AuditChamferPatchTriangulationFeasibility` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1426` | `CountChamferPatchTriangulations` | 21 | Production candidate / shared utility | `AuditChamferPatchTriangulationFeasibility` | `SaturatingAddLong`, `SaturatingMultiplyLong` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1448` | `SaturatingAddLong` | 8 | Production candidate / shared utility | `AuditChamferPatchTriangulationFeasibility`, `CountChamferPatchTriangulations` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1457` | `SaturatingMultiplyLong` | 12 | Production candidate / shared utility | `CountChamferPatchTriangulations` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1474` | `CompareTopologyEdgeKeys` | 9 | Production candidate / shared utility | `BuildChamferSliverEdgeCandidates`, `TryEarClipChamferPatchLoop` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1484` | `IsFiniteFloat` | 4 | Production candidate / shared utility | `TryCalculateChamferPatchOrderedNormal`, `TryCalculateChamferPatchTriangleNormal`, `TryCreateChamferDirectedTriangleGeometry`, `TryMeasureChamferPatchTriangle`, `TryProjectChamferPatchLoop` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1489` | `CalculateChamferPatchSignedArea` | 12 | Production candidate / shared utility | `TryProjectChamferPatchLoop` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1502` | `ChamferPatchCross2D` | 10 | Production candidate / shared utility | `CalculateChamferCoplanarTriangleOverlapArea`, `ChamferDirectedPointStrictlyInsideTriangle2D`, `ChamferPatchPointInOrOnTriangle`, `IsChamferPointInsideClipEdge`, `IsChamferPointInsideOrOnTriangle`, `TryEarClipChamferPatchLoop`, `TryEarClipChamferPolygonSilently`, `TryGetChamferPatchSegmentIntersectionEvidence` | — | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1513` | `ChamferPatchPointInOrOnTriangle` | 24 | Production candidate / shared utility | `TryEarClipChamferPatchLoop`, `TryEarClipChamferPolygonSilently` | `ChamferPatchCross2D` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1538` | `ChamferPatchPolygonSelfIntersects` | 38 | Production candidate / shared utility | `BuildChamferPolygonAwareFaceTriangles`, `TryTriangulateChamferVertexPatchLoop` | `TryGetChamferPatchSegmentIntersectionEvidence` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1577` | `ChamferPatchDiagonalIntersectsRemainingBoundary` | 38 | Production candidate / shared utility | `TryEarClipChamferPatchLoop`, `TryEarClipChamferPolygonSilently` | `TryGetChamferPatchSegmentIntersectionEvidence` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1616` | `TryGetChamferPatchSegmentIntersectionEvidence` | 143 | Production candidate / shared utility | `ChamferDirectedCoplanarTrianglesOverlapImproperly`, `ChamferPatchDiagonalIntersectsRemainingBoundary`, `ChamferPatchPolygonSelfIntersects`, `IsChamferCoplanarIntersectionConfinedToBoundary` | `ChamferPatchCross2D`, `ChamferPatchPointOnSegment2D` | Retain |
-| `MassGenerator.EdgeWear.SliverAndTriangulation.cs:1760` | `ChamferPatchPointOnSegment2D` | 11 | Production candidate / shared utility | `TryGetChamferPatchSegmentIntersectionEvidence` | — | Retain |
-
-## MG-R6A validated census
-
-1. Unity compiles with zero errors and zero warnings.
-2. All 24 physical masses regenerate.
-3. Existing compact fields match MG-R5; only the new `contained=` field is added.
-4. Physical aggregate candidate count matches the existing patch-contained overlap population.
-5. `candidates = resolved + stillRequired`.
-6. `stillRequired = ownerAmbiguous + boundaryTransferFailures + topologyFailures`.
-7. Rendered geometry remains unchanged and `geometryCommit=disabled`.
-
-## EW-K1 and EW-K1.1 focused inventory
-
-EW-K1 validated the direct convex-cut architecture across all 24 masses. All 498 active selected edges built accepted planes and emitted caps. Seventeen masses were immediately valid. The seven remaining failures were narrow completion cases: four non-conformal shared-boundary results, two bounds-only numerical false negatives, and one final cap consumed by later cuts.
-
-| File | Method | Responsibility |
-|---|---|---|
-| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `AuditPlaneCutBevelKernel` | Builds all accepted bevel planes on a deep clone, conforms final shared boundaries, classifies surviving or redundant caps, and performs topology, face, volume, and bounds validation. |
-| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `TryBuildPlaneCutBevelCandidate` | Converts one active selected edge and its four solved rail points into a stable inward half-space cut while retaining source-edge provenance. |
-| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `ConformPlaneCutFaceBoundaries` | Reinserts final polyhedron vertices into every collinear face edge that spans them so adjacent polygons use identical edge segmentation. |
-| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `IsPlaneCutCandidateRedundant` | Accepts a consumed final cap only when the final polyhedron still satisfies the plane and no segment of the original sharp source edge survives. |
-| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `DoPlaneCutSegmentsOverlap` | Supplies the source-edge survival test used by redundant-plane classification. |
-| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `ClonePolygonFacesForPlaneCutAudit` | Deep-clones source polygon records so the experiment cannot modify rendered faces. |
-| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `CountMatchingPlaneCutCaps` | Counts surviving `ConvexEdgeWear` caps on each accepted plane. |
-| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `CountInvalidPlaneCutFaces` | Rejects non-finite, degenerate, or oppositely wound clone faces. |
-| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `CalculatePlaneCutPolyhedronVolume` | Supplies the conservative retained-volume gate. |
-| `MassGenerator.EdgeWear.PlaneCutKernel.cs` | `ArePlaneCutBoundsContained` | Verifies half-space clipping did not expand outside source bounds using clip-consistent tolerance. |
-| `MassGenerator.Polyhedron.cs` | `ClipPolyhedron(..., clampIntersectionsToSegment)` | Preserves all legacy callers by default while allowing the clone-only EW-K path to clamp numerical edge intersections to their source segments. |
-
-Post-EW-K1.1 source totals are 26,364 lines across all `MassGenerator` partials and 23,183 edge-wear lines. The validated MG-R6 refactor baseline remains closed; EW-K1.1 changes only the clone-only functional kernel and an opt-in clipper parameter whose default preserves existing live behavior.
-
-## EW-K1.1 inventory gates
-
-1. Compile with zero errors and zero warnings.
-2. Require the same 24 compact audits with every pre-EW-K1.1 field unchanged.
-3. Require `planesBuilt=active`, `planesRejected=0`, and `capsBuilt=active` for every clone.
-4. Require every accepted plane to be accounted for by one surviving cap or verified redundancy, with `capsMissing=0`.
-5. Require zero open edges, non-manifold edges, T-junctions, and invalid faces, with `valid=1`.
-6. Confirm rendered geometry remains unchanged and `geometryCommit=disabled`.
-
-## Next work items
-
-1. Validate EW-K1.1 compilation with zero errors and zero warnings.
-2. Regenerate the same 24 physical masses and aggregate the expanded `planeBevel=` field.
-3. Require zero unexplained missing caps and zero topology failures across all clones.
-4. If all clones report `valid=1`, expose the plane-cut clone for visual validation before live promotion.
+No diagnostic result may mutate live polygon faces, serialized assets, materials, shaders, scenes, prefabs, tags, layers, or components.

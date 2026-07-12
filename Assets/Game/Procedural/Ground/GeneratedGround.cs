@@ -346,6 +346,16 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         private GroundPaintedAccentProjectedGlyphDebugSnapshot
             paintedAccentProjectedGlyphDebugSnapshot =
                 GroundPaintedAccentProjectedGlyphDebugSnapshot.Empty;
+        private Texture2D paintedAccentCoverageTexture;
+        private bool paintedAccentCoverageEnabled;
+        private Vector4 paintedAccentCoverageOriginSize =
+            new Vector4(0f, 0f, 1f, 1f);
+        private Vector4 paintedAccentCoverageTexelSize =
+            new Vector4(1f, 1f, 1f, 1f);
+        private int paintedAccentCoverageSignature;
+        private GroundPaintedAccentCoverageDiagnostics
+            paintedAccentCoverageDiagnostics =
+                GroundPaintedAccentCoverageDiagnostics.Empty;
 
         private static readonly int BaseColorId =
             Shader.PropertyToID("_BaseColor");
@@ -435,6 +445,18 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundPaintedAccentFoldFieldOriginSize");
         private static readonly int GroundPaintedAccentFoldFieldTexelSizeId =
             Shader.PropertyToID("_GroundPaintedAccentFoldFieldTexelSize");
+        private static readonly int GroundPaintedAccentCoverageId =
+            Shader.PropertyToID("_GroundPaintedAccentCoverage");
+        private static readonly int GroundPaintedAccentCoverageEnabledId =
+            Shader.PropertyToID("_GroundPaintedAccentCoverageEnabled");
+        private static readonly int GroundPaintedAccentCoverageOriginSizeId =
+            Shader.PropertyToID("_GroundPaintedAccentCoverageOriginSize");
+        private static readonly int GroundPaintedAccentCoverageTexelSizeId =
+            Shader.PropertyToID("_GroundPaintedAccentCoverageTexelSize");
+        private static readonly int GroundPaintedAccentCoverageWorldToLocalId =
+            Shader.PropertyToID("_GroundPaintedAccentCoverageWorldToLocal");
+        private static readonly int GroundPaintedAccentInkColorId =
+            Shader.PropertyToID("_GroundPaintedAccentInkColor");
         private static readonly int GroundFeatureModeId =
             Shader.PropertyToID("_GroundFeatureMode");
         private static readonly int GroundFeatureStrengthId =
@@ -627,6 +649,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             paintedAccentFoldFieldSignature = 0;
             ClearPaintedAccentProjectedGlyphDebugCache();
             EnsurePaintedAccentFoldFieldCurrent();
+            EnsurePaintedAccentCoverageCurrent();
 
             ApplySurfaceProfileMaterialProperties();
             NotifyRiverCorridorsChanged();
@@ -976,10 +999,36 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 $"{diagnostics.MaximumCrossAxisDrift:F7} m";
         }
 
+        public string GetLastPaintedAccentCoverageStatistics()
+        {
+            GroundPaintedAccentCoverageDiagnostics diagnostics =
+                paintedAccentCoverageDiagnostics;
+
+            if (!diagnostics.IsValid)
+            {
+                return "Projected coverage has not been generated yet.";
+            }
+
+            return
+                $"Texture: {diagnostics.TextureWidth} x " +
+                $"{diagnostics.TextureHeight} R8\n" +
+                $"Projected glyphs baked: {diagnostics.GlyphCount}\n" +
+                $"Polyline segments baked: {diagnostics.SegmentCount}\n" +
+                $"Covered texels: {diagnostics.CoveredTexelCount} " +
+                $"({diagnostics.CoveredTexelFraction * 100f:F3}%)\n" +
+                $"World texel X/Z: " +
+                $"{diagnostics.TexelWorldSizeX:F5} / " +
+                $"{diagnostics.TexelWorldSizeZ:F5} m\n" +
+                $"Minimum authored/effective half-width: " +
+                $"{diagnostics.MinimumAuthoredHalfWidth:F5} / " +
+                $"{diagnostics.MinimumEffectiveHalfWidth:F5} m";
+        }
+
         public void RefreshSurfaceMaterialProperties()
         {
             CacheComponents();
             EnsurePaintedAccentFoldFieldCurrent();
+            EnsurePaintedAccentCoverageCurrent();
             ApplySurfaceProfileMaterialProperties();
             RefreshRiverCorridorMaterialProperties();
         }
@@ -1636,6 +1685,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
 
             ApplyResolvedFeatureMaterialProperties(materialProperties);
             ApplyPaintedAccentFoldFieldProperties(materialProperties);
+            ApplyPaintedAccentCoverageProperties(materialProperties);
 
             targetRenderer.SetPropertyBlock(materialProperties);
         }
@@ -1703,6 +1753,48 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
 
             return paintedAccentFoldFieldTexture;
+        }
+
+        private void ApplyPaintedAccentCoverageProperties(
+            MaterialPropertyBlock properties)
+        {
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+            Color inkColor =
+                feature != null
+                    ? feature.PaintedAccentInkColor
+                    : new Color(0.12f, 0.10f, 0.08f, 1f);
+
+            properties.SetTexture(
+                GroundPaintedAccentCoverageId,
+                ResolvePaintedAccentCoverageTexture());
+            properties.SetFloat(
+                GroundPaintedAccentCoverageEnabledId,
+                paintedAccentCoverageEnabled ? 1f : 0f);
+            properties.SetVector(
+                GroundPaintedAccentCoverageOriginSizeId,
+                paintedAccentCoverageOriginSize);
+            properties.SetVector(
+                GroundPaintedAccentCoverageTexelSizeId,
+                paintedAccentCoverageTexelSize);
+            properties.SetMatrix(
+                GroundPaintedAccentCoverageWorldToLocalId,
+                transform.worldToLocalMatrix);
+            properties.SetColor(
+                GroundPaintedAccentInkColorId,
+                inkColor);
+        }
+
+        private Texture2D ResolvePaintedAccentCoverageTexture()
+        {
+            if (paintedAccentCoverageTexture == null)
+            {
+                paintedAccentCoverageTexture =
+                    GroundPaintedAccentCoverageBaker.CreateNeutralTexture();
+            }
+
+            return paintedAccentCoverageTexture;
         }
 
         private static Texture2D CreateNeutralPaintedAccentFoldFieldTexture()
@@ -1843,6 +1935,102 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             paintedAccentFoldFieldTexture = texture;
         }
 
+        private void EnsurePaintedAccentCoverageCurrent()
+        {
+            GroundSurfaceFeatureRecipe feature =
+                ResolveShaderFeature(
+                    GroundSurfaceFeatureKind.PaintedAccentLines);
+            int signature =
+                CalculatePaintedAccentCoverageSignature(feature);
+
+            if (paintedAccentCoverageSignature == signature &&
+                paintedAccentCoverageTexture != null)
+            {
+                return;
+            }
+
+            paintedAccentCoverageSignature = signature;
+            EnsurePaintedAccentProjectedGlyphsCurrent(feature);
+
+            if (!CanGeneratePaintedAccentFoldField(feature) ||
+                !paintedAccentProjectedGlyphDebugSnapshot.IsValid ||
+                paintedAccentProjectedGlyphDebugSnapshot.Glyphs == null ||
+                paintedAccentProjectedGlyphDebugSnapshot.Glyphs.Length == 0)
+            {
+                ApplyNeutralPaintedAccentCoverage();
+                paintedAccentCoverageSignature = signature;
+                return;
+            }
+
+            Texture2D generatedTexture =
+                GroundPaintedAccentCoverageBaker.Bake(
+                    generatedMesh.bounds,
+                    paintedAccentProjectedGlyphDebugSnapshot.Glyphs,
+                    out Vector4 originSize,
+                    out Vector4 texelSize,
+                    out GroundPaintedAccentCoverageDiagnostics diagnostics);
+
+            ReplacePaintedAccentCoverageTexture(generatedTexture);
+            paintedAccentCoverageEnabled = diagnostics.IsValid;
+            paintedAccentCoverageOriginSize = originSize;
+            paintedAccentCoverageTexelSize = texelSize;
+            paintedAccentCoverageDiagnostics = diagnostics;
+        }
+
+        private int CalculatePaintedAccentCoverageSignature(
+            GroundSurfaceFeatureRecipe feature)
+        {
+            unchecked
+            {
+                int hash =
+                    CalculatePaintedAccentProjectedGlyphSignature(feature);
+                hash = hash * 31 +
+                    GroundPaintedAccentCoverageBaker.Revision;
+                return hash;
+            }
+        }
+
+        private void ApplyNeutralPaintedAccentCoverage()
+        {
+            paintedAccentCoverageEnabled = false;
+            paintedAccentCoverageDiagnostics =
+                GroundPaintedAccentCoverageDiagnostics.Empty;
+            ReplacePaintedAccentCoverageTexture(
+                GroundPaintedAccentCoverageBaker.CreateNeutralTexture());
+
+            Bounds localBounds =
+                generatedMesh != null
+                    ? generatedMesh.bounds
+                    : new Bounds(Vector3.zero, Vector3.one);
+            paintedAccentCoverageOriginSize =
+                new Vector4(
+                    localBounds.min.x,
+                    localBounds.min.z,
+                    Mathf.Max(0.0001f, localBounds.size.x),
+                    Mathf.Max(0.0001f, localBounds.size.z));
+            paintedAccentCoverageTexelSize =
+                new Vector4(1f, 1f, 1f, 1f);
+        }
+
+        private void ReplacePaintedAccentCoverageTexture(
+            Texture2D texture)
+        {
+            if (paintedAccentCoverageTexture != null &&
+                paintedAccentCoverageTexture != texture)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(paintedAccentCoverageTexture);
+                }
+                else
+                {
+                    DestroyImmediate(paintedAccentCoverageTexture);
+                }
+            }
+
+            paintedAccentCoverageTexture = texture;
+        }
+
         private void EnsurePaintedAccentProjectedGlyphsCurrent(
             GroundSurfaceFeatureRecipe feature)
         {
@@ -1909,6 +2097,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             paintedAccentProjectedGlyphSignature = 0;
             paintedAccentProjectedGlyphDebugSnapshot =
                 GroundPaintedAccentProjectedGlyphDebugSnapshot.Empty;
+            paintedAccentCoverageSignature = 0;
         }
 
         private int CalculatePaintedAccentFoldFieldSignature(
@@ -2032,6 +2221,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             paintedAccentModifierSnapshots = Array.Empty<GroundModifierSnapshot>();
             paintedAccentRiverSnapshots = Array.Empty<StylizedRiverGroundSnapshot>();
             ApplyNeutralPaintedAccentFoldField();
+            ApplyNeutralPaintedAccentCoverage();
 
             if (meshFilter != null &&
                 meshFilter.sharedMesh == generatedMesh)
@@ -2062,6 +2252,20 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 }
 
                 paintedAccentFoldFieldTexture = null;
+            }
+
+            if (paintedAccentCoverageTexture != null)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(paintedAccentCoverageTexture);
+                }
+                else
+                {
+                    DestroyImmediate(paintedAccentCoverageTexture);
+                }
+
+                paintedAccentCoverageTexture = null;
             }
 
             if (generatedMesh == null)

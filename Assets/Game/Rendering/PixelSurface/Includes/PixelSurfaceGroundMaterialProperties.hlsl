@@ -66,6 +66,11 @@
                 float _GroundPaintedAccentFoldFieldEnabled;
                 float4 _GroundPaintedAccentFoldFieldOriginSize;
                 float4 _GroundPaintedAccentFoldFieldTexelSize;
+                float _GroundPaintedAccentCoverageEnabled;
+                float4 _GroundPaintedAccentCoverageOriginSize;
+                float4 _GroundPaintedAccentCoverageTexelSize;
+                float4x4 _GroundPaintedAccentCoverageWorldToLocal;
+                half4 _GroundPaintedAccentInkColor;
                 float _HighlightCompressStrength;
                 float _HighlightCompressStart;
                 float _BottomDarkenStrength;

@@ -115,7 +115,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         [SerializeField]
         private float paintedAccentFoldEndTaper = 0.65f;
 
-        [Tooltip("Painted Accent Lines only. Family/variant-authored opaque ink colour reserved for the future projected coverage bake and ground-albedo composition.")]
+        [Tooltip("Painted Accent Lines only. Family/variant-authored opaque ink colour blended through the generated projected coverage field into ground albedo.")]
         [ColorUsage(false, false)]
         [SerializeField]
         private Color paintedAccentInkColor =

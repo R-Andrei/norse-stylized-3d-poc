@@ -30,9 +30,9 @@ namespace ProgrammaticStylized3D.Rendering
         // those serialized debug values remain stable.
         GroundStandingWaterPotential = 27,
 
-        // Raw shader-only painted accent line mask. Kept after the ground
-        // standing-water value and outside the existing 15-26 generated-mass
-        // diagnostic range.
+        // Generated accepted projected-glyph coverage. When V3J.4B coverage
+        // is unavailable, the shader falls back to the historical line field.
+        // The value remains stable for serialized debug selections.
         GroundPaintedAccentLines = 28,
 
         // Painted accent visual-relief channels. These expose the wider soft

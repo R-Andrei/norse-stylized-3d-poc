@@ -66,8 +66,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             CutPlane plane,
             PolygonFaceFeature capFeature = PolygonFaceFeature.Base,
             float capFeatureStrength = 0f,
-            bool clampIntersectionsToSegment = false)
+            bool clampIntersectionsToSegment = false,
+            float insideEpsilon = PlaneEpsilon,
+            bool canonicalizeSharedIntersections = false)
         {
+            float effectiveInsideEpsilon = Mathf.Clamp(
+                insideEpsilon,
+                PointMergeDistance * 0.01f,
+                PlaneEpsilon);
+            Dictionary<EdgeKey, Vector3> intersectionCache =
+                canonicalizeSharedIntersections
+                    ? new Dictionary<EdgeKey, Vector3>()
+                    : null;
             List<PolygonFace> clippedFaces = new List<PolygonFace>();
             List<Vector3> capPoints = new List<Vector3>();
 
@@ -77,7 +87,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     faces[i].Vertices,
                     plane,
                     capPoints,
-                    clampIntersectionsToSegment);
+                    clampIntersectionsToSegment,
+                    effectiveInsideEpsilon,
+                    intersectionCache);
 
                 clipped = SanitizePolygon(
                     clipped,
@@ -136,19 +148,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<Vector3> vertices,
             CutPlane plane,
             List<Vector3> capPoints,
-            bool clampIntersectionsToSegment)
+            bool clampIntersectionsToSegment,
+            float insideEpsilon,
+            Dictionary<EdgeKey, Vector3> intersectionCache)
         {
             List<Vector3> result = new List<Vector3>();
 
             Vector3 previous = vertices[vertices.Count - 1];
             float previousDistance = plane.SignedDistance(previous);
-            bool previousInside = previousDistance <= PlaneEpsilon;
+            bool previousInside = previousDistance <= insideEpsilon;
 
             for (int i = 0; i < vertices.Count; i++)
             {
                 Vector3 current = vertices[i];
                 float currentDistance = plane.SignedDistance(current);
-                bool currentInside = currentDistance <= PlaneEpsilon;
+                bool currentInside = currentDistance <= insideEpsilon;
 
                 if (previousInside && currentInside)
                 {
@@ -156,24 +170,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
                 else if (previousInside && !currentInside)
                 {
-                    Vector3 intersection = IntersectEdge(
+                    Vector3 intersection = ResolveClipIntersection(
                         previous,
                         current,
                         previousDistance,
                         currentDistance,
-                        clampIntersectionsToSegment);
+                        clampIntersectionsToSegment,
+                        insideEpsilon,
+                        intersectionCache);
 
                     AddPointIfDifferent(result, intersection);
                     capPoints.Add(intersection);
                 }
                 else if (!previousInside && currentInside)
                 {
-                    Vector3 intersection = IntersectEdge(
+                    Vector3 intersection = ResolveClipIntersection(
                         previous,
                         current,
                         previousDistance,
                         currentDistance,
-                        clampIntersectionsToSegment);
+                        clampIntersectionsToSegment,
+                        insideEpsilon,
+                        intersectionCache);
 
                     AddPointIfDifferent(result, intersection);
                     AddPointIfDifferent(result, current);
@@ -189,16 +207,56 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return result;
         }
 
+        private static Vector3 ResolveClipIntersection(
+            Vector3 start,
+            Vector3 end,
+            float startDistance,
+            float endDistance,
+            bool clampToSegment,
+            float denominatorEpsilon,
+            Dictionary<EdgeKey, Vector3> intersectionCache)
+        {
+            if (intersectionCache == null)
+            {
+                return IntersectEdge(
+                    start,
+                    end,
+                    startDistance,
+                    endDistance,
+                    clampToSegment,
+                    denominatorEpsilon);
+            }
+
+            EdgeKey edgeKey = new EdgeKey(start, end);
+            if (intersectionCache.TryGetValue(
+                    edgeKey,
+                    out Vector3 cached))
+            {
+                return cached;
+            }
+
+            Vector3 intersection = IntersectEdge(
+                start,
+                end,
+                startDistance,
+                endDistance,
+                clampToSegment,
+                denominatorEpsilon);
+            intersectionCache.Add(edgeKey, intersection);
+            return intersection;
+        }
+
         private static Vector3 IntersectEdge(
             Vector3 start,
             Vector3 end,
             float startDistance,
             float endDistance,
-            bool clampToSegment)
+            bool clampToSegment,
+            float denominatorEpsilon)
         {
             float denominator = startDistance - endDistance;
 
-            if (Mathf.Abs(denominator) <= PlaneEpsilon)
+            if (Mathf.Abs(denominator) <= denominatorEpsilon)
             {
                 return start;
             }

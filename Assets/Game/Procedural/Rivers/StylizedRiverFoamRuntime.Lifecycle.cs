@@ -164,7 +164,8 @@ namespace ProgrammaticStylized3D.Rivers
             bool shapeProductDebugEnteredThisUpdate =
                 shapeProductDebugActive &&
                 !shapeProductDebugActiveLastUpdate;
-            if (shapeProductDebugEnteredThisUpdate)
+            if (shapeProductDebugEnteredThisUpdate &&
+                !river.FoamStateHeld)
             {
                 ClearRenderTexture(shapeMaskTexture);
                 ClearRenderTexture(filmSourceTexture);
@@ -208,6 +209,22 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     BindDisabled();
                 }
+                return;
+            }
+
+            if (river.FoamStateHeld)
+            {
+                // Exact-state rendering comparison: keep every allocated Foam
+                // product untouched, discard elapsed wall time, and continue
+                // binding the current textures plus live Layer E properties.
+                // Queued injections and births remain pending until release.
+                lastRuntimeTime = Time.realtimeSinceStartup;
+                simulationAccumulator = 0f;
+                simulationInterpolation = 1f;
+                lastRenderInterpolationAlpha = simulationInterpolation;
+                idleSince = 0.0;
+                BindField();
+                UpdateRecentPeaks();
                 return;
             }
 

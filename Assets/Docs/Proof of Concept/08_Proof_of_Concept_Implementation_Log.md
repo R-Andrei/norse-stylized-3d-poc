@@ -1,3 +1,11 @@
+## 2026-07-12 — River Foam `4.11C.5.17B.2C` State-Preserving Foam Authoring
+
+Removed the blanket `OnValidate() -> RequestRegeneration() -> RegenerateAll()` path. The custom River Inspector now marks only Setup, River Domain, Channel Shape, Shoreline Safety, Natural Variation, and Surface Mesh as structural rebuild owners; spline edits retain their existing debounced rebuild callback. Rendering, runtime tuning, Foam, and debug changes preserve the active domain and Foam resources.
+
+Added the non-serialized Play Mode **Hold Foam State** diagnostic under `Foam -> Runtime & Quality`. While held, Layer C state and existing Layer D products remain untouched, simulation/birth/topology evolution is skipped, elapsed time is discarded, and current textures plus live Layer E properties continue to bind. Pending work resumes without catch-up after release. No shader, compute, texture, buffer, dispatch, readback, or persistent-state resource was added.
+
+Unity evidence also rejects `5.17B.2B` as the requested fragmentation solution: its partial-presence/soft-edge domain produced perimeter erosion rather than medium regional splitting. The controls remain default-neutral for comparison, but no further threshold calibration is active.
+
 ## 2026-07-12 — River Foam `4.11C.5.17B.2B` Edge-Band Regional Fragmentation
 
 Implemented the separate Layer E **Edge Fragmentation** group with Fragmentation Strength, Fragment Size, and Fragment Reach. Strength defaults to `0`; Size and Reach default to `0.5`. Chip, Fray, Breakup Scale, and optional Strands remain unchanged and are provisionally accepted for current authoring.

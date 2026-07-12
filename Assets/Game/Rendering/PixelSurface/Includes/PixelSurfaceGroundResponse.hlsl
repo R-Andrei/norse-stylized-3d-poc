@@ -47,6 +47,39 @@
             }
 
 #if defined(PS3D_PIXELSURFACEGROUND_MATERIAL_PROPERTIES)
+            float ResolveGroundPaintedAccentCoverage(
+                Varyings input)
+            {
+                if (_GroundPaintedAccentCoverageEnabled <= 0.5)
+                {
+                    return 0.0;
+                }
+
+                float3 groundLocalPosition =
+                    mul(
+                        _GroundPaintedAccentCoverageWorldToLocal,
+                        float4(input.positionWS, 1.0)).xyz;
+                float2 fieldSize =
+                    max(
+                        _GroundPaintedAccentCoverageOriginSize.zw,
+                        float2(0.0001, 0.0001));
+                float2 uv =
+                    (groundLocalPosition.xz -
+                     _GroundPaintedAccentCoverageOriginSize.xy) /
+                    fieldSize;
+
+                if (any(uv < 0.0) || any(uv > 1.0))
+                {
+                    return 0.0;
+                }
+
+                return saturate(
+                    SAMPLE_TEXTURE2D(
+                        _GroundPaintedAccentCoverage,
+                        sampler_GroundPaintedAccentCoverage,
+                        uv).r);
+            }
+
             float3 ResolveGroundPaintedAccentFoldFieldFeature(
                 Varyings input)
             {

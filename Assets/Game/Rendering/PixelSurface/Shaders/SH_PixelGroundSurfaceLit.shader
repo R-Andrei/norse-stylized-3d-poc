@@ -73,6 +73,11 @@ Shader "PS3D/Pixel Ground Surface Lit"
         [HideInInspector] _GroundPaintedAccentFoldFieldEnabled("Ground Painted Accent Fold Field Enabled", Float) = 0
         [HideInInspector] _GroundPaintedAccentFoldFieldOriginSize("Ground Painted Accent Fold Field Origin Size", Vector) = (0, 0, 1, 1)
         [HideInInspector] _GroundPaintedAccentFoldFieldTexelSize("Ground Painted Accent Fold Field Texel Size", Vector) = (1, 1, 1, 1)
+        [HideInInspector] _GroundPaintedAccentCoverage("Ground Painted Accent Coverage", 2D) = "black" {}
+        [HideInInspector] _GroundPaintedAccentCoverageEnabled("Ground Painted Accent Coverage Enabled", Float) = 0
+        [HideInInspector] _GroundPaintedAccentCoverageOriginSize("Ground Painted Accent Coverage Origin Size", Vector) = (0, 0, 1, 1)
+        [HideInInspector] _GroundPaintedAccentCoverageTexelSize("Ground Painted Accent Coverage Texel Size", Vector) = (1, 1, 1, 1)
+        [HideInInspector] _GroundPaintedAccentInkColor("Ground Painted Accent Ink Color", Color) = (0.12, 0.10, 0.08, 1)
 
         [Header(Stylized Value Shaping)]
         _HighlightCompressStrength("Highlight Compress Strength", Range(0, 0.5)) = 0.08
@@ -152,6 +157,8 @@ Shader "PS3D/Pixel Ground Surface Lit"
             SAMPLER(sampler_BaseMap);
             TEXTURE2D(_GroundPaintedAccentFoldField);
             SAMPLER(sampler_GroundPaintedAccentFoldField);
+            TEXTURE2D(_GroundPaintedAccentCoverage);
+            SAMPLER(sampler_GroundPaintedAccentCoverage);
 
             #include "../Includes/PixelSurfaceGroundForwardTypes.hlsl"
             #include "../Includes/PixelSurfaceGroundResponse.hlsl"

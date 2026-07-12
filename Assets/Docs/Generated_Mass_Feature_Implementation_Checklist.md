@@ -1,9 +1,15 @@
-# Generated Mass Feature Implementation Checklist
+# Generated Mass Edge-Wear Progress Log and Implementation Checklist
+
+## Canonical log policy
+
+This is the sole canonical Generated Mass edge-wear progress ledger. It owns patch history, methods tried, validation results, the current blocker, and the active next step.
+
+The code inventory, recovery architecture, and framework documents contain only their own current stable facts. They may reference this file but must not maintain competing or complementary progress histories.
 
 ## Active feature
 
 ```text
-EW-C — Explicit Single-Segment Chamfer Kernel
+EW-K — Convex Plane-Cut Bevel Kernel
 ```
 
 ## EW-C0 — Reconciliation and topology readiness
@@ -1157,15 +1163,67 @@ MG-R6B.1 evidence proves that all 22 target overlaps are removed, but all 22 tra
 - [x] Expand compact evidence to `planeBevel=selected/active/planesBuilt/planesRejected/capsBuilt/capsMissing/capsRedundant/conformalSplits/open/nonManifold/tJunction/invalid/valid`.
 - [x] Keep rendered geometry and `geometryCommit=disabled` unchanged.
 
-### EW-K1.1 Unity exit criteria
+### EW-K1.1 Unity result
+
+- [x] Unity compiles with zero errors and zero warnings.
+- [x] Exactly 24 compact audits are emitted with every pre-EW-K1.1 field unchanged.
+- [x] All 498 active planes build with zero rejection.
+- [x] Bounds failures reduce to zero.
+- [x] T-junctions reduce to zero.
+- [x] One later-consumed cap is classified as redundant.
+- [x] Eighteen of 24 masses report `valid=1`.
+- [x] Three masses retain four open edges each.
+- [x] Three masses retain one unexplained missing cap each.
+- [x] Rendered geometry remains unchanged and `geometryCommit=disabled` remains present.
+
+## EW-K1.2 — Canonical intersection and cut-tolerance completion
+
+- [x] Add a per-cut cache keyed by the undirected current polyhedron edge.
+- [x] Reuse the exact cached intersection for both incident faces and cap construction.
+- [x] Preserve the shared clipper's legacy behavior unless canonicalization is explicitly enabled.
+- [x] Record a candidate-specific clip epsilon below the measured source-edge removal.
+- [x] Use the candidate epsilon only in the clone-only EW-K path.
+- [x] Keep segment clamping, bounds validation, redundancy classification, and all topology gates active.
+- [x] Keep rendered geometry and `geometryCommit=disabled` unchanged.
+
+### EW-K1.2 Unity result
+
+- [x] Unity compiles and emits the expected 24 physical-mass audits.
+- [x] Every pre-EW-K1.2 compact field remains unchanged.
+- [x] All 498 active planes build with zero rejection.
+- [x] Canonical per-cut intersections reduce open-edge failures from three masses to one mass.
+- [x] Open edges reduce from 12 to 4.
+- [x] Non-manifold edges, T-junctions, invalid faces, and bounds failures remain zero.
+- [x] Valid clones increase from 18/24 to 20/24.
+- [ ] One mass still contains two mutually corresponding numerical seams, reported as four open edge records.
+- [ ] Three cuts still emit no cap because earlier cuts appear to have already satisfied their planes while broad source-edge survival tolerance misclassifies nearby bevel boundaries as the original edge.
+- [x] Rendered geometry remains unchanged and `geometryCommit=disabled` remains present.
+
+## EW-K1.3 — Final seam and redundant-cut resolution
+
+- [x] Preserve the EW-K clone-only boundary and all legacy live behavior.
+- [x] Collect exact one-use open-edge records after all plane cuts.
+- [x] Pair only mutually unique edges from different faces with opposite orientation and near-identical endpoints under a narrow topology-scale tolerance.
+- [x] Snap verified pair endpoints to shared midpoint targets across every occurrence of the involved vertex keys.
+- [x] Roll back the entire seam repair unless it produces exactly two fewer open records per pair without increasing non-manifold edges or T-junctions.
+- [x] Detect a plane already satisfied by earlier cuts before invoking the clipper.
+- [x] Require strict `PointMergeDistance`-scale proof that the original source edge no longer survives.
+- [x] Tighten final redundant-plane source-edge survival to the same strict topology scale.
+- [x] Allow final validity to depend on complete final cap/redundancy accounting rather than requiring every active plane to have emitted a new cap at its own step.
+- [x] Expand `planeBevel=` with `seamPairs` after `conformalSplits`.
+- [x] Consolidate all progress history into this file and remove duplicate timelines, result censuses, and next-step lists from the inventory, architecture, and framework documents.
+
+### EW-K1.3 Unity exit criteria
 
 - [ ] Unity compiles with zero errors and zero warnings.
-- [ ] Exactly 24 compact audits are emitted with every pre-EW-K1.1 field unchanged.
-- [ ] Every clone reports `planesBuilt=active`, `planesRejected=0`, and `capsBuilt=active`.
-- [ ] Every accepted plane has one surviving cap or is counted as verified redundant; `capsMissing=0`.
+- [ ] Exactly 24 compact audits are emitted with every unrelated field unchanged.
+- [ ] Every clone reports `planesBuilt=active` and `planesRejected=0`.
+- [ ] The exceptional seam mass reports `seamPairs=2` and `open=0`, or remains rejected without arbitrary repair if the pairs are not mutually unique.
+- [ ] The three no-cap cuts are classified as verified redundant only when their original source edges are absent; `capsMissing=0`.
 - [ ] Every clone reports zero open edges, non-manifold edges, T-junctions, and invalid faces.
 - [ ] Every clone reports `valid=1`.
 - [ ] Rendered geometry remains unchanged and `geometryCommit=disabled` remains present.
+- [ ] On success, stop clone-topology development and expose an editor-only plane-cut visual preview.
 
 ## EW-C4 — Commit and visual proof
 

@@ -1,8 +1,64 @@
 # Ground Generation Surface Upgrade Plan
 
+### 2026-07-12 — Patch V3J.4B: Accepted Projected Coverage Proof
+
+**Status:** Implemented; awaiting Unity compilation and visual confirmation.
+
+V3J.4B keeps the accepted A6/A7 projected glyph data unchanged and supplies its first production-style renderer. `GroundPaintedAccentCoverageBaker` rasterizes accepted projected polylines and their per-sample half-widths into a generated linear `R8` texture at generation/dirty time. Rasterization is segment-bounded rather than a full texture-by-segment scan. Resolution targets approximately `0.0125 m` per texel, aligns dimensions to eight texels, and caps each axis at `2048`. A sub-texel minimum raster half-width and bilinear filtering prevent accepted thin lines from disappearing at the proof resolution.
+
+Implemented files:
+
+```text
+add:
+  Assets/Game/Procedural/Ground/GroundPaintedAccentCoverageBaker.cs
+  Assets/Game/Procedural/Ground/GroundPaintedAccentCoverageBaker.cs.meta
+
+modify:
+  Assets/Game/Procedural/Ground/GeneratedGround.cs
+  Assets/Game/Procedural/Ground/GroundSurfaceFeatureRecipe.cs
+  Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs
+  Assets/Game/Procedural/Ground/Editor/GroundSurfaceStyleProfileEditor.cs
+  Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelGroundSurfaceLit.shader
+  Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaterialProperties.hlsl
+  Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundResponse.hlsl
+  Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundForwardPass.hlsl
+  Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGroundMaskDebug.hlsl
+  Assets/Game/Rendering/PixelSurface/PixelSurfaceMaskDebugMode.cs
+  Assets/Docs/Ground_Visual_Design_and_Architecture.md
+  Assets/Docs/Ground_Generation_Surface_Upgrade_Plan.md
+```
+
+Runtime/dirty-time contract:
+
+```text
+accepted projected glyph snapshot
+→ R8 coverage texture owned by GeneratedGround
+→ MaterialPropertyBlock texture/origin/size/world-to-ground matrix/Ink Color
+→ coverage sampled in GeneratedGround-local XZ
+→ lerp existing ground albedo toward opaque authored Ink Color
+→ existing URP ground lighting
+```
+
+No scene, prefab, style asset, recipe value, material asset, layer, tag, river code, or accepted glyph point is changed. Dependent river corridor renderers receive the same ground-owned texture and world-to-ground matrix through the existing `ApplySurfaceProfileMaterialProperties(Renderer)` path. Glyph footprints already reject visible river, hidden bed/handoff, modifier, slope, grade, and invalid-surface regions before the coverage bake.
+
+The proof deliberately does not add authoring controls for feather, opacity, resolution, breakup, or texture quality. `Strength` remains the existing layer blend scalar and `Ink Color` is the existing family/variant-authored opaque colour. `Ground Painted Accent Lines` debug mode displays the production coverage mask when it is enabled. The Inspector reports resolution, glyph/segment counts, coverage fraction, world texel size, and authored/effective minimum half-width.
+
+Validation gate:
+
+1. Unity compiles with no shader or C# errors.
+2. The normal ground render shows dark accepted A6/A7 marks without Scene Handles.
+3. **Ground Painted Accent Lines** shows the same silhouettes as a monochrome coverage mask.
+4. **Show Accepted Projected Debug** aligns with the rendered ink centreline and width boundaries.
+5. Changing only Ink Color updates the rendered ink without changing coverage.
+6. Changing profile controls regenerates coverage and preserves A6/A7 geometry semantics.
+7. Marks remain absent from river/handoff and Painted Accent modifier exclusions.
+8. No child object, mesh, separate renderer, or material instance is created.
+9. The user judges the production result before any placement-composition or glyph-family patch is approved.
+
+
 ### 2026-07-12 — Patch V3J.4A10R: Retire Rejected Regional-Network Experiments
 
-**Status:** Implemented cleanup; awaiting Unity compilation confirmation.
+**Status:** Confirmed in Unity; cleanup accepted.
 
 Unity validation rejected both regional-network proofs.
 
@@ -789,7 +845,7 @@ Acceptance gate:
 - Complete transformed-footprint validation remains correct.
 - No production texture bake, shader composition, pooling, or quality-tier work is included.
 
-Next step after acceptance: V3J.4B consumes the accepted projected polylines in a mesh-free procedural GPU segment bake, stores single-channel coverage, and blends family/variant Ink Color into final ground albedo before ordinary lighting.
+Implemented by V3J.4B: accepted projected polylines are rasterized into single-channel coverage and the family/variant Ink Color is blended into final ground albedo before ordinary lighting. The proof uses bounded CPU segment rasterization at dirty time; a GPU bake is not required unless later profiling justifies it.
 
 ### 2026-07-11 — Patch V3J.3D5: Environment-Integrated Flat Ink
 

@@ -266,6 +266,10 @@
                 float paintedAccentLinesFeature = paintedAccentLineRelief.x;
                 float paintedAccentReliefFeature = paintedAccentLineRelief.y;
                 float paintedAccentSignedRelief = paintedAccentLineRelief.z;
+                float paintedAccentCoverage =
+                    ResolveGroundPaintedAccentCoverage(input) *
+                    contractMask *
+                    saturate(_GroundPaintedAccentLineStrength);
 
 #if defined(PS3D_PIXELSURFACEGROUND_MATERIAL_PROPERTIES)
                 // Patch V3I.3A:
@@ -446,6 +450,19 @@
                     albedo,
                     monolithicTarget,
                     (half)saturate(_MonolithicFlatten));
+
+                // V3J.4B: accepted projected glyph coverage is a flat albedo
+                // layer. It introduces no normal displacement, relief, emission,
+                // smoothness, or extra renderer. Ordinary ground lighting is
+                // applied after this composition by the existing URP path.
+                half inkBlend =
+                    (half)saturate(
+                        paintedAccentCoverage *
+                        _GroundPaintedAccentInkColor.a);
+                albedo = lerp(
+                    albedo,
+                    (half3)_GroundPaintedAccentInkColor.rgb,
+                    inkBlend);
 
                 return albedo;
             }

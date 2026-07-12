@@ -10,7 +10,7 @@ The goal is to reproduce the broad behavior of the visual inspiration river: sty
 
 The target is not a physically exact fluid solver and not a foam entity database. The target is a fixed-grid mathematical field system with strict ownership boundaries and no circular dependencies.
 
-## Current implementation status — `4.11C.5.17B.2B`
+## Current implementation status — `4.11C.5.17B.2C`
 
 Unity presentation audit is conclusive: normal Final Foam stuttered beside rocks and banks, while both `Foam Committed Final Preview` and `Foam Evaluated Final Preview` remained stable on the same material population. The committed simulation therefore was not oscillating. The rejected point-velocity residual predictor was the presentation fault.
 
@@ -39,7 +39,7 @@ Status: `5.16E.2` is Unity-validated and accepted. Normal Final Foam matches the
 
 The River Inspector and diagnostics redesign R1–R5 is also Unity-validated and accepted. It changes only Editor organization and presentation: all sections are collapsed by default, authoring follows feature ownership and Foam Layers A–E, one exclusive debug hub controls the existing serialized debug fields, runtime telemetry is read-only and stable-height, mutating tools live under Actions, and constant repaint is limited to visible live diagnostic leaves.
 
-`4.11C.5.17A` failed visual validation despite correct binding. `4.11C.5.17A.1 — Interior Composition Authority Correction` is Unity-validated and accepted: Interior Opacity Floor has real established-body authority and signed Edge Contrast controls the existing rim. `4.11C.5.17B` and `5.17B.1` are both visually rejected. `4.11C.5.17B.2 — Pre-Hardening Binary Edge Cuts` is Unity-validated for Chip and Fray; Chip, Fray, and Breakup Scale are now provisionally accepted. `4.11C.5.17B.2A — Foam Strand Extraction and Stability Controls` is retained provisionally as an independently disableable authoring feature. `4.11C.5.17B.2B — Edge-Band Regional Fragmentation` is implemented with Unity validation pending and adds the missing medium-to-large regional-loss scale before Remaining-Life orchestration.
+`4.11C.5.17A` failed visual validation despite correct binding. `4.11C.5.17A.1 — Interior Composition Authority Correction` is Unity-validated and accepted: Interior Opacity Floor has real established-body authority and signed Edge Contrast controls the existing rim. `4.11C.5.17B` and `5.17B.1` are both visually rejected. `4.11C.5.17B.2 — Pre-Hardening Binary Edge Cuts` is Unity-validated for Chip and Fray; Chip, Fray, and Breakup Scale are provisionally accepted. `4.11C.5.17B.2A — Foam Strand Extraction and Stability Controls` is retained provisionally as an independently disableable authoring feature. `4.11C.5.17B.2B — Edge-Band Regional Fragmentation` is visually rejected because it remained edge erosion rather than the requested medium regional splitting. `4.11C.5.17B.2C — State-Preserving Foam Authoring` is the active validation patch: it prevents non-structural Inspector edits from rebuilding the River and adds exact-state Foam holding for Layer E comparison.
 
 
 ## Approved Layer E finishing contract — `4.11C.5.17P`
@@ -155,7 +155,7 @@ Unity acceptance requires independent validation with Chip and Fray at zero: Str
 
 ### `5.17B.2B — Edge-Band Regional Fragmentation`
 
-Status: implemented; Unity visual validation pending. Chip, Fray, and Breakup Scale are provisionally accepted as useful fixed-strength authoring controls. Foam Strands are retained provisionally as an independently disableable feature. No further correction to those controls blocks this patch.
+Status: visually rejected. The implementation did target weak/partial-presence edge bands as designed, but Unity evidence showed that this produced another perimeter-erosion treatment rather than substantial medium regional splitting. The controls remain default-neutral and may stay available temporarily for comparison, but Fragmentation Strength should remain `0` during current authoring. Do not tune this model into `5.17C`; any replacement must use a different regional split/cut model that can begin at a weak edge and traverse part of a weak-to-medium body without scattering firm-core holes.
 
 The missing visual scale is coherent medium-to-large regional loss. `5.17B.2B` adds a separate **Edge Fragmentation** group:
 
@@ -178,7 +178,28 @@ meaningful but partial Material Presence
 
 Empty water is excluded, fully established core material is suppressed, and the result is removal-only. The patch passes committed Material Presence into the existing shared final-removal helper; production Final Foam and Foam Evaluated Final Preview use the same arithmetic, and Shader Detail Probe/Difference continue to report the production silhouette and removal-only delta. No additional texture sample, procedural-noise evaluation, hash evaluation, texture, buffer, persistent channel, compute kernel, dispatch, readback, Layer C mutation, Layer D mutation, Support lookup, Negative Topology lookup, or Remaining-Life multiplier is added.
 
-Unity acceptance requires Chip, Fray, and Strand Strength at zero. Fragmentation Strength `0` must reproduce the current result exactly. Strength `1` must remove coherent medium or broad portions of weak edge bands rather than isolated pixels or repeated lanes. Fragment Size must alter subdivision while preserving recognizable broad placement. Fragment Reach must clearly alter inward depth without opening isolated holes in firm cores. The result must remain stationary and Difference must show regional magenta removal rather than only one-pixel outlines.
+Unity validation rejected the result: Shader Detail Difference remained concentrated on the same partial-presence perimeter band seen in Evaluated Shape and Material Presence, and the feature did not create the requested medium-scale separation of larger zones. This is a model failure, not a request for another threshold calibration.
+
+### `5.17B.2C — State-Preserving Foam Authoring`
+
+Status: implemented; Unity validation pending.
+
+The River Inspector no longer treats every serialized edit as a structural river change. `OnValidate()` still clamps settings, keeps required outputs/runtimes present, and applies live material values, but it no longer queues `RegenerateAll()`. The custom Inspector now requests the existing debounced full rebuild only when one of the structural authoring sections changes:
+
+```text
+Setup
+River Domain
+Channel Shape
+Shoreline Safety
+Natural Variation
+Surface Mesh
+```
+
+Spline edits remain structural through the existing spline-change callback. Water rendering, surface motion, refraction, runtime-disturbance tuning, Foam Layers A–E, debug selection, and diagnostics no longer rebuild the River domain merely because a value changed. Layer E rendering values continue through the existing per-frame property binding, so they preserve the active Layer C textures.
+
+`Runtime & Quality` also exposes the non-persistent Play Mode diagnostic **Hold Foam State**. While held, the runtime preserves the allocated Layer C material and existing Layer D products, skips topology evolution, births, aging, transport, and Layer D temporal advancement, discards elapsed wall time, and continues binding the current textures plus live Layer E properties. Pending manual/automatic work remains queued and resumes without catch-up when the hold is released. The toggle is not serialized authoring data and resets when the component is enabled or disabled.
+
+This patch adds no texture, buffer, shader property, compute kernel, dispatch, readback, or persistent simulation field. Structural or resource-allocation changes may still legitimately rebuild and clear state; Hold Foam State is for same-domain rendering comparisons, not for preserving material across incompatible domain changes.
 
 ### Lifetime and topology rule
 

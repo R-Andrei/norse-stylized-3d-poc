@@ -252,6 +252,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     planeCutAudit.CapsMissing + "/" +
                     planeCutAudit.CapsRedundant + "/" +
                     planeCutAudit.ConformalSplitCount + "/" +
+                    planeCutAudit.SeamPairCount + "/" +
                     planeCutAudit.OpenEdgeCount + "/" +
                     planeCutAudit.NonManifoldEdgeCount + "/" +
                     planeCutAudit.TJunctionCount + "/" +

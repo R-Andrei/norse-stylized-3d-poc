@@ -15,7 +15,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private void DrawTopLevelSection(
             InspectorSection section,
             string label,
-            InspectorSectionDrawer drawer)
+            InspectorSectionDrawer drawer,
+            bool tracksStructuralAuthoring = false)
         {
             EditorGUILayout.Space(4f);
 
@@ -44,7 +45,18 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             using (new EditorGUI.IndentLevelScope())
             {
+                if (tracksStructuralAuthoring)
+                {
+                    EditorGUI.BeginChangeCheck();
+                }
+
                 drawer();
+
+                if (tracksStructuralAuthoring &&
+                    EditorGUI.EndChangeCheck())
+                {
+                    structuralAuthoringChanged = true;
+                }
             }
         }
 
